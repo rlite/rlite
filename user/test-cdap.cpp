@@ -10,6 +10,7 @@
 #include <arpa/inet.h>  /* IP address conversion stuff */
 
 #include "cdap.hpp"
+#include "rinalite/rinalite-utils.h"
 
 using namespace std;
 
@@ -84,9 +85,28 @@ test_cdap_server(int port)
 }
 
 static int
+client_connect(int sfd)
+{
+    struct AuthValue av;
+    struct rina_name local_appl;
+    struct rina_name remote_appl;
+
+    av.name = "George";
+    av.password = "Washington";
+
+    rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
+    rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
+
+    if (cdap_m_connect_send(sfd, gpb::AUTH_NONE, &av, &local_appl,
+                            &remote_appl)) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+}
+
+static int
 test_cdap_client(int port)
 {
-    struct CDAPMessage m(gpb::M_CONNECT);
     struct sockaddr_in server;
     int buf_len;
     int sk;
@@ -106,12 +126,7 @@ test_cdap_client(int port)
         return -1;
     }
 
-    if (cdap_msg_send(&m, sk)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
-    }
-
-    PD("CDAP message sent\n");
-    m.print();
+    client_connect(sk);
 
     close(sk);
 

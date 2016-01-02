@@ -20,6 +20,12 @@ CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
     memset(&dst_appl, 0, sizeof(dst_appl));
 }
 
+CDAPMessage::~CDAPMessage()
+{
+    rina_name_free(&src_appl);
+    rina_name_free(&dst_appl);
+}
+
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 {
     const char *apn, *api, *aen, *aei;
@@ -308,3 +314,24 @@ cdap_msg_recv(int fd)
     return m;
 }
 
+int
+cdap_m_connect_send(int fd, gpb::authTypes_t auth_mech,
+                    const struct AuthValue *auth_value,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl)
+{
+    struct CDAPMessage m(gpb::M_CONNECT);
+    int ret;
+
+    m.auth_mech = auth_mech;
+    m.auth_value = *auth_value;
+    ret = rina_name_copy(&m.src_appl, local_appl);
+    ret |= rina_name_copy(&m.dst_appl, remote_appl);
+
+    if (ret) {
+        PE("%s: Out of memory\n", __func__);
+        return ret;
+    }
+
+    return cdap_msg_send(&m, fd);
+}

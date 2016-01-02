@@ -6,15 +6,17 @@
 #include "rinalite/rinalite-common.h"
 #include "CDAP.pb.h"
 
+struct AuthValue {
+    std::string name;
+    std::string password;
+    std::string other;
+};
+
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
     int                 abs_syntax;
     gpb::authTypes_t    auth_mech;
-    struct {
-        std::string name;
-        std::string password;
-        std::string other;
-    }                   auth_value;
+    struct AuthValue    auth_value;
     struct rina_name    src_appl;
     struct rina_name    dst_appl;
     std::string              filter;
@@ -45,6 +47,7 @@ struct CDAPMessage {
     void print() const;
 
     CDAPMessage(gpb::opCode_t);
+    ~CDAPMessage();
 
     CDAPMessage(const gpb::CDAPMessage& gm);
     operator gpb::CDAPMessage() const;
@@ -68,5 +71,10 @@ private:
 
 int cdap_msg_send(const struct CDAPMessage *m, int fd);
 struct CDAPMessage * cdap_msg_recv(int fd);
+
+int cdap_m_connect_send(int fd, gpb::authTypes_t auth_mech,
+                    const struct AuthValue *auth_value,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl);
 
 #endif /* __RINALITE_CDAP_H__ */
