@@ -337,3 +337,59 @@ outs =  '#!/bin/bash\n'                                             \
 fout.write(outs)
 fout.close()
 subprocess.call(['chmod', '+x', 'program.sh'])
+
+
+################### GENERATE TEST SCRIPT #####################
+
+fout = open('test.sh', 'w')
+
+outs =  '#!/bin/bash\n'                                             \
+        '\n'                                                        \
+        'set -x\n'
+
+# Run rinaperf in server mode on the pivot machine, at all layers
+outs += ''\
+        'DONE=255\n'\
+        'while [ $DONE != "0" ]; do\n'\
+        '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': pvm['ssh']}
+
+for level in range(1, args.levels + 1):
+    outs += 'rinaperf -l -d n.%(level)s.DIF &> /dev/null &\n' % {'level' : level}
+
+outs += 'sleep 1\n'\
+        'true\n'\
+        'ENDSSH\n'\
+        '   DONE=$?\n'\
+        '   if [ $DONE != "0" ]; then\n'\
+        '       sleep 1\n'\
+        '   fi\n'\
+        'done\n\n'
+
+# Run rinaperf in client mode on all but the pivot machine, at all layers,
+# towards the server running on the pivot machine
+for vm_name in vms:
+    if vm_name == pvm['name']:
+        continue
+
+    vm = vms[vm_name]
+
+    outs += ''\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+
+    for level in range(1, args.levels + 1):
+        outs += 'rinaperf -c 10 -d n.%(level)s.DIF\n' % {'level': level}
+
+    outs += 'sleep 0.2\n'\
+            'true\n'\
+            'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n'
+
+fout.write(outs)
+fout.close()
+subprocess.call(['chmod', '+x', 'test.sh'])
