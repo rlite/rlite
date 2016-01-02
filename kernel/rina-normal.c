@@ -489,11 +489,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     }
 
     if (pci->dst_addr != ipcp->addr) {
-        /* Forward the PDU. */
-        /* TODO */
-        PD("%s: PDU forwarding not supported\n", __func__);
-        rina_buf_free(rb);
-        return 0;
+        /* The PDU is not for this IPCP, forward it. */
+        return rmt_tx(ipcp, pci->dst_addr, rb);
     }
 
     if (pci->pdu_type != PDU_TYPE_DT) {
