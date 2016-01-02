@@ -34,6 +34,7 @@
 #include <linux/workqueue.h>
 #include <linux/hashtable.h>
 #include <linux/ktime.h>
+#include <linux/spinlock.h>
 
 
 #define PDUFT_HASHTABLE_BITS    3
@@ -43,6 +44,8 @@ struct rina_normal {
 
     /* Implementation of the PDU Forwarding Table (PDUFT). */
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
+
+    spinlock_t pduft_lock;
 };
 
 static void *
@@ -57,6 +60,7 @@ rina_normal_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
+    spin_lock_init(&priv->pduft_lock);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -152,7 +156,11 @@ pduft_lookup_internal(struct rina_normal *priv, uint64_t dest_addr)
 static struct flow_entry *
 pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 {
-    struct pduft_entry *entry = pduft_lookup_internal(priv, dest_addr);
+    struct pduft_entry *entry;
+
+    spin_lock(&priv->pduft_lock);
+    entry = pduft_lookup_internal(priv, dest_addr);
+    spin_unlock(&priv->pduft_lock);
 
     return entry ? entry->flow : NULL;
 }
@@ -408,10 +416,12 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
+    spin_lock(&priv->pduft_lock);
+
     entry = pduft_lookup_internal(priv, dest_addr);
 
     if (!entry) {
-        entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+        entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
         if (!entry) {
             return -ENOMEM;
         }
@@ -427,6 +437,8 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     entry->flow = flow;
     entry->address = dest_addr;
 
+    spin_unlock(&priv->pduft_lock);
+
     return 0;
 }
 
@@ -435,9 +447,11 @@ rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
 
-    (void)priv;
+    spin_lock(&priv->pduft_lock);
     list_del(&entry->fnode);
     hash_del(&entry->node);
+    spin_unlock(&priv->pduft_lock);
+
     kfree(entry);
 
     return 0;

@@ -546,7 +546,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->state = FLOW_STATE_NULL;
         entry->upper = upper;
         entry->event_id = event_id;
-        entry->refcnt = 1;
+        entry->refcnt = 1;  /* Cogito, ergo sum. */
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
@@ -649,6 +649,9 @@ flow_put(struct flow_entry *entry)
         uint64_t dest_addr = pfte->address;
 
         BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
+        /* Here we are sure that 'entry->upper.ipcp' will not be destroyed
+         * before 'entry' is destroyed, and so we can operate outside
+         * the global lock. */
         ret = entry->upper.ipcp->ops.pduft_del(entry->upper.ipcp, pfte);
         if (ret == 0) {
             PD("%s: Removed IPC process %u PDUFT entry: %llu --> %u\n",
@@ -969,10 +972,16 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
-    if (ipcp && flow && ipcp->ops.pduft_set) {
+    mutex_unlock(&rina_dm.lock);
+
+    if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set) {
+        /* We allow this operation only if the requesting IPCP (req->ipcp_id)
+         * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
+         * In this situation we are sure that 'ipcp' will not be deleted before
+         * 'flow' is deleted, so it we can work outside the global lock and
+         * rely on the internal pduft lock. */
         ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
     }
-    mutex_unlock(&rina_dm.lock);
 
     flow_put(flow);
 
