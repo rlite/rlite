@@ -350,18 +350,14 @@ evloop_function(void *arg)
             /* Stop the event loop. */
             break;
         } else {
-            int fdcb_done = 0;
-
             /* First look for fdcb events. */
             list_for_each_entry(fdcb, &loop->fdcbs, node) {
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
-                    fdcb_done = 1;
                     fdcb->cb(loop, fdcb->fd);
                 }
             }
 
             if (!FD_ISSET(loop->rfd, &rdfs)) {
-                assert(fdcb_done);
                 /* We did some fdcb processing, but no events are
                  * available on the rina control device. */
                 continue;
