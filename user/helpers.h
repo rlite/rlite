@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "rlite/utils.h"
 #include "rlite/conf-msg.h"
@@ -33,6 +34,20 @@ rina_msg_write_fd(int sfd, struct rina_msg_base *msg)
     free(serbuf);
 
     return (n == serlen) ? 0 : -1;
+}
+
+static inline int
+type_has_uipcp(const char *dif_type)
+{
+    if (strcmp(dif_type, "normal") == 0) {
+        return 1;
+    }
+
+    if (strcmp(dif_type, "shim-inet4") == 0) {
+        return 1;
+    }
+
+    return 0;
 }
 
 

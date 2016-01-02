@@ -411,7 +411,7 @@ uipcps_update(struct uipcps *uipcps)
 
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(rlite_ipcp, &loop.ipcps, node) {
-        if (strcmp(rlite_ipcp->dif_type, "normal") == 0) {
+        if (type_has_uipcp(rlite_ipcp->dif_type)) {
             ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id);
             if (ret) {
                 return ret;

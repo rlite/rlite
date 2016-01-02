@@ -174,20 +174,6 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
     return request_response((struct rina_msg_base *)&req, 0, NULL);
 }
 
-static int
-type_has_uipcp(const char *dif_type)
-{
-    if (strcmp(dif_type, "normal") == 0) {
-        return 1;
-    }
-
-    if (strcmp(dif_type, "shim-inet4") == 0) {
-        return 1;
-    }
-
-    return 0;
-}
-
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
 rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
