@@ -126,23 +126,16 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
 {
     struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
-    struct ipcp *ipcp;
     struct uipcp *uipcp;
     int ret;
 
     resp.result = 1; /* Report failure by default. */
 
-    ipcp = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
-    if (!ipcp) {
-        PE("%s: Could not find enrolling IPC process\n", __func__);
-        goto out;
-    }
-
     /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_lookup(ipcm, ipcp->ipcp_id);
+    uipcp = uipcp_lookup(ipcm, req->ipcp_id);
     if (!uipcp) {
         PE("%s: Could not find userspace IPC process %u\n",
-            __func__, ipcp->ipcp_id);
+            __func__, req->ipcp_id);
         goto out;
     }
 

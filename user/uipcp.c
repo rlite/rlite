@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <rina/rina-utils.h>
+#include <rina/rina-conf-msg.h>
 #include "ipcm.h"
 
 

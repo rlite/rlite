@@ -494,6 +494,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     const char *neigh_ipcp_api;
     const char *dif_name;
     const char *supp_dif_name;
+    struct ipcp *ipcp;
 
     assert(argc >= 6);
     dif_name = argv[0];
@@ -503,10 +504,17 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     neigh_ipcp_api = argv[4];
     supp_dif_name = argv[5];
 
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    if (!ipcp) {
+        PE("%s: Could not find enrolling IPC process\n", __func__);
+        return -1;
+    }
+
     req.msg_type = RINA_CONF_IPCP_ENROLL;
     req.event_id = 0;
+    req.ipcp_id = ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
 

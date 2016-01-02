@@ -44,6 +44,7 @@ struct rina_cmsg_ipcp_enroll {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    uint16_t ipcp_id;
     struct rina_name dif_name;
     struct rina_name ipcp_name;
     struct rina_name neigh_ipcp_name;

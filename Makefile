@@ -16,7 +16,7 @@ user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-n
 
 user/ipcm.o:  $(HEADERS) user/pending_queue.h user/helpers.h user/evloop.h user/application.h user/ipcm.h
 
-user/uipcp.o: user/ipcm.h
+user/uipcp.o: $(HEADERS) user/ipcm.h
 
 user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
