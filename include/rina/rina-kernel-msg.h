@@ -35,6 +35,7 @@ enum {
     RINA_KERN_IPCP_DFT_SET, /* 14 */
     RINA_KERN_IPCP_UIPCP_SET, /* 15 */
     RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
+    RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED, /* 17 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -200,6 +201,18 @@ struct rina_kmsg_uipcp_flow_allocate_req_arrived {
     struct rina_name local_application;
     /* Requesting application. */
     struct rina_name remote_application;
+} __attribute__((packed));
+
+/* uipcp (application) --> kernel to tell the kernel that a flow
+ * allocation response has arrived. */
+struct rina_kmsg_uipcp_flow_allocate_resp_arrived {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+    uint32_t local_port;
+    uint32_t remote_port;
+    uint8_t response;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

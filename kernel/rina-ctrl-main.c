@@ -927,6 +927,28 @@ rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
     return ret;
 }
 
+static int
+rina_uipcp_flow_allocate_resp_arrived(struct rina_ctrl *rc,
+                                      struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_uipcp_flow_allocate_resp_arrived *req =
+                    (struct rina_kmsg_uipcp_flow_allocate_resp_arrived *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    ipcp = ipcp_table_find(req->ipcp_id);
+    mutex_unlock(&rina_dm.lock);
+
+    if (ipcp) {
+        ret = rina_flow_allocate_resp_arrived(ipcp, req->local_port,
+                                              req->remote_port,
+                                              req->response);
+    }
+
+    return ret;
+}
+
 /* To be called under global lock. */
 static int
 rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
@@ -1334,6 +1356,7 @@ static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,
     [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
     [RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED] = rina_uipcp_flow_allocate_req_arrived,
+    [RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED] = rina_uipcp_flow_allocate_resp_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
