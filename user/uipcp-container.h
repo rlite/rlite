@@ -73,7 +73,7 @@ int rib_neighbor_flow(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       int neigh_fd, unsigned int neigh_port_id);
 
-int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req);
+int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req);
 
 int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                   char *serbuf, int serlen);

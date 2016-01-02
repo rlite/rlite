@@ -547,6 +547,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 {
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START */
+    struct rinalite_ipcp *ipcp;
     EnrollmentInfo enr_info;
     CDAPMessage m;
     int ret;
@@ -556,6 +557,9 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
     m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
               0, 0, string());
 
+    ipcp = rib->ipcp_info();
+
+    enr_info.address = ipcp->ipcp_addr;
     enr_info.lower_difs = rib->lower_difs;
 
     ret = send_to_port_id(&m, 0, &enr_info);
@@ -603,7 +607,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     has_address = (enr_info.address != 0);
 
-    if (has_address) {
+    if (!has_address) {
         /* Assign an address to the initiator. */
         enr_info.address = address = rib->address_allocate();
     }
@@ -952,7 +956,7 @@ uipcp_rib::remote_sync(bool create, const string& obj_class,
 }
 
 extern "C"
-int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
+int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
 {
     struct uipcp *uipcp = rib->uipcp;
     unsigned int port_id;
