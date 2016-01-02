@@ -100,7 +100,7 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
     struct hlist_head *head;
 
     head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
-    hlist_for_each_entry(entry, head, node) {
+    hlist_for_each_entry(entry, head, ftnode) {
         if (entry->pduft_dest_addr == dest_addr) {
             return entry;
         }

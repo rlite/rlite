@@ -403,7 +403,7 @@ uipcp_fa_req(struct rina_evloop *loop,
     serialize_rina_name(&cur, &req->remote_application);
 
     mgmt_write_to_dst_addr(uipcp, dft_entry->remote_addr,
-                           mgmtsdu, sizeof(mgmtsdu));
+                           mgmtsdu, len);
 
     free(mgmtsdu);
 
@@ -449,7 +449,7 @@ uipcp_fa_resp(struct rina_evloop *loop,
     cur += sizeof(resp->response);
 
     mgmt_write_to_dst_addr(uipcp, resp->remote_addr,
-                           mgmtsdu, sizeof(mgmtsdu));
+                           mgmtsdu, len);
     free(mgmtsdu);
 
     return 0;

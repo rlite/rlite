@@ -14,5 +14,6 @@ $RINACONF ipcp-config n.IPCP 2 address 22
 $RINACONF ipcp-register d.DIF n.IPCP 1
 $RINACONF ipcp-register d.DIF n.IPCP 2
 $RINACONF ipcp-enroll n.DIF n.IPCP 1 n.IPCP 2 d.DIF
+$RINACONF ipcp-dft-set n.IPCP 2 rinaperf-data server 21
 
 source tests/epilogue.sh
