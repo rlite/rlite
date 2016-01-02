@@ -172,7 +172,7 @@ uipcp_rib::load_qos_cubes(const char *filename)
     string line;
 
     if (fin.fail()) {
-        PE("Failed to find qoscubes file %s\n", filename);
+        UPE(uipcp, "Failed to find qoscubes file %s\n", filename);
         return -1;
     }
 
@@ -188,7 +188,7 @@ uipcp_rib::load_qos_cubes(const char *filename)
         pos = line.find('=');
         if (pos == string::npos || pos < 1 || line.rfind('=') != pos
                 || pos + 1 >= line.size()) {
-            PE("Invalid specification at line %u\n", cnt);
+            UPE(uipcp, "Invalid specification at line %u\n", cnt);
             continue;
         }
 
@@ -199,7 +199,7 @@ uipcp_rib::load_qos_cubes(const char *filename)
 
         pos = param.find('.');
         if (pos == string::npos || pos < 1 || pos + 1 >= param.size()) {
-            PE("Invalid specification at line %u\n", cnt);
+            UPE(uipcp, "Invalid specification at line %u\n", cnt);
             continue;
         }
         cubename = param.substr(0, pos);

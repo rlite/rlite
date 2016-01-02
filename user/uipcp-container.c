@@ -34,12 +34,12 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
     resp->response = response;
     rina_name_copy(&resp->appl_name, &req->appl_name);
 
-    PD("Issuing application register response ...\n");
+    UPD(uipcp, "Issuing application register response ...\n");
 
     fkresp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(resp),
                                sizeof(*resp), 0, 0, &result);
     assert(!fkresp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -55,7 +55,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return ENOMEM;
     }
 
@@ -65,12 +65,12 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     req->dest_addr = dest_addr;
     req->local_port = local_port;
 
-    PD("Requesting IPCP pdu forwarding table set...\n");
+    UPD(uipcp, "Requesting IPCP pdu forwarding table set...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -85,7 +85,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return ENOMEM;
     }
 
@@ -93,12 +93,12 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
     req->msg_type = RINA_KERN_IPCP_PDUFT_FLUSH;
     req->ipcp_id = ipcp_id;
 
-    PD("Requesting IPCP pdu forwarding table flush...\n");
+    UPD(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req),
                                   sizeof(*req), 0, 0, &result);
     assert(!resp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -118,7 +118,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return ENOMEM;
     }
 
@@ -137,13 +137,12 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     rina_name_copy(&req->local_appl, local_appl);
     rina_name_copy(&req->remote_appl, remote_appl);
 
-    PD("[uipcp %u] Issuing UIPCP_FA_REQ_ARRIVED message...\n",
-        uipcp->ipcp_id);
+    UPD(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -161,7 +160,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return ENOMEM;
     }
 
@@ -179,13 +178,12 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
         rlite_flow_cfg_default(&req->flowcfg);
     }
 
-    PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
-        uipcp->ipcp_id);
+    UPD(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -200,7 +198,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return ENOMEM;
     }
 
@@ -208,12 +206,12 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     req->msg_type = RINA_KERN_IPCP_UIPCP_SET;
     req->ipcp_id = ipcp_id;
 
-    PD("Requesting IPCP uipcp set...\n");
+    UPD(uipcp, "Requesting IPCP uipcp set...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp);
-    PD("result: %d\n", result);
+    UPD(uipcp, "result: %d\n", result);
 
     return result;
 }

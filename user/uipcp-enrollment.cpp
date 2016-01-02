@@ -45,10 +45,10 @@ Neighbor::~Neighbor()
         int ret = close(flow_fd);
 
         if (ret) {
-            PE("Error deallocating N-1 flow fd %d\n",
+            UPE(rib->uipcp, "Error deallocating N-1 flow fd %d\n",
                flow_fd);
         } else {
-            PD("N-1 flow deallocated [fd=%d]\n", flow_fd);
+            UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n", flow_fd);
         }
     }
 }
@@ -101,7 +101,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
     if (obj) {
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
-            PE("serialization failed\n");
+            UPE(rib->uipcp, "serialization failed\n");
             return objlen;
         }
 
@@ -115,7 +115,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
     }
 
     if (ret) {
-        PE("message serialization failed\n");
+        UPE(rib->uipcp, "message serialization failed\n");
         if (serbuf) {
             delete [] serbuf;
         }
@@ -137,7 +137,7 @@ Neighbor::abort()
     CDAPMessage m;
     int ret;
 
-    PE("Aborting enrollment\n");
+    UPE(rib->uipcp, "Aborting enrollment\n");
 
     if (enrollment_state == NONE) {
         return;
@@ -149,7 +149,7 @@ Neighbor::abort()
 
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
 
     if (conn) {
@@ -164,8 +164,8 @@ enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
     ScopeLock(neigh->rib->lock);
 
     (void)loop;
-    PI("Enrollment timeout with neighbor '%s'\n",
-       static_cast<string>(neigh->ipcp_name).c_str());
+    UPI(neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
+        static_cast<string>(neigh->ipcp_name).c_str());
     neigh->abort();
 }
 
@@ -212,7 +212,7 @@ Neighbor::none(const CDAPMessage *rm)
         rina_name_free(&dst_name);
 
         if (ret) {
-            PE("M_CONNECT creation failed\n");
+            UPE(rib->uipcp, "M_CONNECT creation failed\n");
             abort();
             return -1;
         }
@@ -228,7 +228,7 @@ Neighbor::none(const CDAPMessage *rm)
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
         ret = m.m_connect_r(rm, 0, string());
         if (ret) {
-            PE("M_CONNECT_R creation failed\n");
+            UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
             abort();
             return -1;
         }
@@ -240,7 +240,7 @@ Neighbor::none(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, invoke_id, NULL);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -264,7 +264,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
     assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
 
     if (rm->result) {
-        PE("Neighbor returned negative response [%d], '%s'\n",
+        UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
         abort();
         return 0;
@@ -280,7 +280,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -306,14 +306,14 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     int ret;
 
     if (rm->op_code != gpb::M_START) {
-        PE("M_START expected\n");
+        UPE(rib->uipcp, "M_START expected\n");
         abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START does not contain a nested message\n");
+        UPE(rib->uipcp, "M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -341,7 +341,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -376,7 +376,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -396,13 +396,13 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
     size_t objlen;
 
     if (rm->op_code != gpb::M_START_R) {
-        PE("M_START_R expected\n");
+        UPE(rib->uipcp, "M_START_R expected\n");
         abort();
         return 0;
     }
 
     if (rm->result) {
-        PE("Neighbor returned negative response [%d], '%s'\n",
+        UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
         abort();
         return 0;
@@ -410,7 +410,7 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START_R does not contain a nested message\n");
+        UPE(rib->uipcp, "M_START_R does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -446,14 +446,14 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     }
 
     if (rm->op_code != gpb::M_STOP) {
-        PE("M_STOP expected\n");
+        UPE(rib->uipcp, "M_STOP expected\n");
         abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_STOP does not contain a nested message\n");
+        UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -475,13 +475,13 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
         abort();
         return 0;
     }
 
     if (enr_info.start_early) {
-        PI("Initiator is allowed to start early\n");
+        UPI(rib->uipcp, "Initiator is allowed to start early\n");
         enroll_tmr_stop();
         enrollment_state = ENROLLED;
 
@@ -492,7 +492,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
         remote_sync_rib();
 
     } else {
-        PI("Initiator is not allowed to start early\n");
+        UPI(rib->uipcp, "Initiator is not allowed to start early\n");
         enroll_tmr_stop();
         enroll_tmr_start();
         enrollment_state = I_WAIT_START;
@@ -511,13 +511,13 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     int ret;
 
     if (rm->op_code != gpb::M_STOP_R) {
-        PE("M_START_R expected\n");
+        UPE(rib->uipcp, "M_START_R expected\n");
         abort();
         return 0;
     }
 
     if (rm->result) {
-        PE("Neighbor returned negative response [%d], '%s'\n",
+        UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
         abort();
         return 0;
@@ -530,7 +530,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
-        PE("send_to_port_id failed\n");
+        UPE(rib->uipcp, "send_to_port_id failed\n");
         abort();
         return ret;
     }
@@ -563,7 +563,7 @@ Neighbor::enrolled(const CDAPMessage *rm)
                 && rm->obj_name == obj_name::status) {
         /* This is OK, but we didn't need it, as
          * we started early. */
-        PI("Ignoring M_START(status)\n");
+        UPI(rib->uipcp, "Ignoring M_START(status)\n");
         return 0;
     }
 
@@ -583,7 +583,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     assert(enroll_fsm_handlers[enrollment_state]);
 
     if (!rm && enrollment_state != NONE) {
-        PI("Enrollment already in progress, current state "
+        UPI(rib->uipcp, "Enrollment already in progress, current state "
             "is %s\n", enrollment_state_repr(enrollment_state));
         return 0;
     }
@@ -591,17 +591,17 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     ret = (this->*(enroll_fsm_handlers[enrollment_state]))(rm);
 
     if (old_state != enrollment_state) {
-        PI("switching state %s --> %s\n",
-             enrollment_state_repr(old_state),
-             enrollment_state_repr(enrollment_state));
+        UPI(rib->uipcp, "switching state %s --> %s\n",
+            enrollment_state_repr(old_state),
+            enrollment_state_repr(enrollment_state));
     }
 
     return ret;
 }
 
 int Neighbor::remote_sync_obj(bool create, const string& obj_class,
-                          const string& obj_name,
-                          const UipcpObject *obj_value) const
+                              const string& obj_name,
+                              const UipcpObject *obj_value) const
 {
     CDAPMessage m;
     int ret;
@@ -617,7 +617,7 @@ int Neighbor::remote_sync_obj(bool create, const string& obj_class,
 
     ret = send_to_port_id(&m, 0, obj_value);
     if (ret) {
-        PE("send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
 
     return ret;
@@ -627,8 +627,8 @@ int Neighbor::remote_sync_rib() const
 {
     int ret = 0;
 
-    PD("Starting RIB sync with neighbor '%s'\n",
-       static_cast<string>(ipcp_name).c_str());
+    UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
+        static_cast<string>(ipcp_name).c_str());
 
     {
         LowerFlowList lfl;
@@ -680,8 +680,8 @@ int Neighbor::remote_sync_rib() const
                                &ncl);
     }
 
-    PD("Finished RIB sync with neighbor '%s'\n",
-       static_cast<string>(ipcp_name).c_str());
+    UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
+        static_cast<string>(ipcp_name).c_str());
 
     return ret;
 }
@@ -766,7 +766,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
     bool add = true;
 
     if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        PE("M_CREATE or M_DELETE expected\n");
+        UPE(uipcp, "M_CREATE or M_DELETE expected\n");
         return 0;
     }
 
@@ -776,7 +776,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START does not contain a nested message\n");
+        UPE(uipcp, "M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -801,21 +801,21 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
         if (add) {
             string common_dif = common_lower_dif(neigh->lower_difs, lower_difs);
             if (common_dif == string()) {
-                PD("Neighbor %s discarded because there are no lower DIFs in "
+                UPD(uipcp, "Neighbor %s discarded because there are no lower DIFs in "
                         "common with us\n", key.c_str());
                 continue;
             }
 
             cand_neighbors[key] = *neigh;
-            PD("Candidate neighbor %s %s remotely\n", key.c_str(),
+            UPD(uipcp, "Candidate neighbor %s %s remotely\n", key.c_str(),
                     (mit != cand_neighbors.end() ? "updated" : "added"));
 
         } else {
             if (mit == cand_neighbors.end()) {
-                PI("Candidate neighbor does not exist\n");
+                UPI(uipcp, "Candidate neighbor does not exist\n");
             } else {
                 cand_neighbors.erase(mit);
-                PD("Candidate neighbor %s removed remotely\n", key.c_str());
+                UPD(uipcp, "Candidate neighbor %s removed remotely\n", key.c_str());
             }
 
         }
@@ -853,7 +853,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     int ret;
 
     if (has_mgmt_flow()) {
-        PI("Management flow already allocated\n");
+        UPI(rib->uipcp, "Management flow already allocated\n");
         return 0;
     }
 
@@ -866,22 +866,21 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
                          &port_id_, 2000, info->ipcp_id);
     rina_name_free(&neigh_name);
     if (ret) {
-        PE("Failed to allocate a flow towards neighbor\n");
+        UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
         return -1;
     }
 
     flow_fd_ = rlite_open_appl_port(port_id_);
     if (flow_fd_ < 0) {
-        PE("Failed to access the flow towards the neighbor\n");
+        UPE(rib->uipcp, "Failed to access the flow towards the neighbor\n");
         return -1;
     }
 
     port_id = port_id_;
     flow_fd = flow_fd_;
 
-    PD("N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
-       port_id);
-
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
+        port_id);
 
     return 0;
 }
@@ -895,7 +894,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 
     neigh = rib->get_neighbor(&req->neigh_ipcp_name);
     if (!neigh) {
-        PE("Failed to add neighbor\n");
+        UPE(uipcp, "Failed to add neighbor\n");
         return -1;
     }
 
@@ -920,7 +919,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
     Neighbor *neigh = rib->get_neighbor(neigh_name);
 
     if (!neigh) {
-        PE("Failed to get neighbor\n");
+        UPE(rib->uipcp, "Failed to get neighbor\n");
         return -1;
     }
 
@@ -937,13 +936,13 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
     Neighbor *neigh = rib->get_neighbor(neigh_name);
 
     if (!neigh) {
-        PE("Failed to get neighbor\n");
+        UPE(rib->uipcp, "Failed to get neighbor\n");
     }
 
     neigh->flow_fd = neigh_fd;
 
-    PD("N-1 flow allocated [fd=%d, port_id=%u]\n", neigh->flow_fd,
-       neigh->port_id);
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", neigh->flow_fd,
+        neigh->port_id);
 
     return 0;
 }

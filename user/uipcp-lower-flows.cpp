@@ -13,7 +13,7 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
     int ret;
 
     if (remote_addr == 0) {
-        PE("Cannot find address for neighbor %s\n",
+        UPE(uipcp, "Cannot find address for neighbor %s\n",
             static_cast<string>(neigh.ipcp_name).c_str());
         return -1;
     }
@@ -59,7 +59,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
     bool add = true;
 
     if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        PE("M_CREATE or M_DELETE expected\n");
+        UPE(uipcp, "M_CREATE or M_DELETE expected\n");
         return 0;
     }
 
@@ -69,7 +69,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START does not contain a nested message\n");
+        UPE(uipcp, "M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -92,17 +92,17 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
                 modified = true;
                 prop_lfl.flows.push_back(*f);
             }
-            PD("Lower flow %s added remotely\n", key.c_str());
+            UPD(uipcp, "Lower flow %s added remotely\n", key.c_str());
 
         } else {
             if (mit == lfdb.end()) {
-                PI("Lower flow %s does not exist\n", key.c_str());
+                UPI(uipcp, "Lower flow %s does not exist\n", key.c_str());
 
             } else {
                 lfdb.erase(mit);
                 modified = true;
                 prop_lfl.flows.push_back(*f);
-                PD("Lower flow %s removed remotely\n", key.c_str());
+                UPD(uipcp, "Lower flow %s removed remotely\n", key.c_str());
             }
 
         }
@@ -251,7 +251,7 @@ uipcp_rib::pduft_sync()
         neigh_name = static_cast<string>(
                                 lookup_neighbor_by_address(r->second));
         if (neigh_name == string()) {
-            PE("Could not find neighbor with address %lu\n",
+            UPE(uipcp, "Could not find neighbor with address %lu\n",
                     (long unsigned)r->second);
             continue;
         }
@@ -259,7 +259,7 @@ uipcp_rib::pduft_sync()
         neigh = neighbors.find(neigh_name);
 
         if (neigh == neighbors.end()) {
-            PE("Could not find neighbor with name %s\n",
+            UPE(uipcp, "Could not find neighbor with name %s\n",
                     neigh_name.c_str());
             continue;
         }
@@ -274,10 +274,10 @@ uipcp_rib::pduft_sync()
             int ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,
                                       port_id);
             if (ret) {
-                PE("Failed to insert %lu --> %u PDUFT entry\n",
+                UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry\n",
                     (long unsigned)r->first, port_id);
             } else {
-                PD("Add PDUFT entry %lu --> %u\n",
+                UPD(uipcp, "Add PDUFT entry %lu --> %u\n",
                     (long unsigned)r->first, port_id);
             }
     }

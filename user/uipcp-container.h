@@ -107,6 +107,14 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                           uint64_t remote_addr, uint8_t response,
                           const struct rina_flow_config *flowcfg);
 
+#define UPRINT(_u, LEV, FMT, ...)    \
+    DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->ipcp_id, __func__, ##__VA_ARGS__)
+
+#define UPD(_u, FMT, ...)   UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
+#define UPI(_u, FMT, ...)   UPRINT(_u, "INF", FMT, ##__VA_ARGS__)
+#define UPE(_u, FMT, ...)   UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
+
+
 #ifdef __cplusplus
 }
 #endif

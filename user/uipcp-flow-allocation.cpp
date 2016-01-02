@@ -27,13 +27,13 @@ uipcp_rib::flow_deallocated(struct rina_kmsg_flow_deallocated *req)
     }
 
     if (f == flow_reqs.end()) {
-        PE("Spurious flow allocation response, no object with name %s\n",
+        UPE(uipcp, "Spurious flow allocation response, no object with name %s\n",
             obj_name.str().c_str());
         return -1;
     }
 
     flow_reqs.erase(f);
-    PD("Removed flow request %s\n", obj_name.str().c_str());
+    UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
 
     return 0;
 }
@@ -129,7 +129,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 
     if (!remote_addr) {
         /* Return a negative flow allocation response immediately. */
-        PI("No DFT matching entry for destination %s\n",
+        UPI(uipcp, "No DFT matching entry for destination %s\n",
                 static_cast<string>(dest_appl).c_str());
 
         return uipcp_issue_fa_resp_arrived(uipcp, req->local_port,
@@ -161,12 +161,12 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     cubename = string(req->flowspec.cubename);
     qcmi = qos_cubes.find(cubename);
     if (qcmi == qos_cubes.end()) {
-        PI("Cannot find QoSCube '%s': Using default flow configuration\n",
+        UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
            cubename.c_str());
         rlite_flow_cfg_default(&flowcfg);
     } else {
         flowcfg = qcmi->second;
-        PI("QoSCube '%s' selected\n", qcmi->first.c_str());
+        UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());
     }
 
     flowcfg2policies(&flowcfg, freq.qos, freq.policies);
@@ -202,7 +202,7 @@ uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
 
     f = flow_reqs_tmp.find(resp->kevent_id);
     if (f == flow_reqs_tmp.end()) {
-        PE("Spurious flow allocation response, no request for kevent_id %u\n",
+        UPE(uipcp, "Spurious flow allocation response, no request for kevent_id %u\n",
            resp->kevent_id);
         return -1;
     }
@@ -242,7 +242,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_CREATE does not contain a nested message\n");
+        UPE(uipcp, "M_CREATE does not contain a nested message\n");
         return 0;
     }
 
@@ -257,7 +257,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
          * reject the request. */
         CDAPMessage m;
 
-        PI("Cannot find DFT entry for %s\n",
+        UPI(uipcp, "Cannot find DFT entry for %s\n",
            static_cast<string>(freq.dst_app).c_str());
 
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
@@ -271,7 +271,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
          * to forward the request. TODO */
         CDAPMessage m;
 
-        PE("Flow request forwarding not supported\n");
+        UPE(uipcp, "Flow request forwarding not supported\n");
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Flow request forwarding not supported");
 
@@ -281,7 +281,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     if (freq.connections.size() < 1) {
         CDAPMessage m;
 
-        PE("No connections specified on this flow\n");
+        UPE(uipcp, "No connections specified on this flow\n");
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
@@ -319,7 +319,7 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_CREATE_R does not contain a nested message\n");
+        UPE(uipcp, "M_CREATE_R does not contain a nested message\n");
         return 0;
     }
 
@@ -327,7 +327,7 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
     map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
 
     if (f == flow_reqs.end()) {
-        PE("M_CREATE_R for '%s' does not match any pending request\n",
+        UPE(uipcp, "M_CREATE_R for '%s' does not match any pending request\n",
                 rm->obj_name.c_str());
         return 0;
     }
@@ -356,12 +356,12 @@ uipcp_rib::flows_handler(const CDAPMessage *rm, Neighbor *neigh)
 
         case gpb::M_DELETE:
         case gpb::M_DELETE_R:
-            PE("NOT SUPPORTED YET");
+            UPE(uipcp, "NOT SUPPORTED YET");
             assert(0);
             break;
 
         default:
-            PE("M_CREATE, M_CREATE_R, M_DELETE or M_DELETE_R expected\n");
+            UPE(uipcp, "M_CREATE, M_CREATE_R, M_DELETE or M_DELETE_R expected\n");
             break;
     }
 

@@ -53,13 +53,13 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
     int ret = 0;
 
     if (buflen > MGMTBUF_SIZE_MAX) {
-        PE("Dropping oversized mgmt message %d/%d\n",
+        UPE(uipcp, "Dropping oversized mgmt message %d/%d\n",
             (int)buflen, MGMTBUF_SIZE_MAX);
     }
 
     mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
     if (!mgmtbuf) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return -1;
     }
 
@@ -69,10 +69,10 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
 
     n = write(rib->mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
-        PE("write(): %d\n", n);
+        UPE(uipcp, "write(): %d\n", n);
         ret = n;
     } else if (n != (int)buflen) {
-        PE("partial write %d/%d\n", n, (int)buflen);
+        UPE(uipcp, "partial write %d/%d\n", n, (int)buflen);
         ret = -1;
     }
 
@@ -127,7 +127,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 
             m->get_obj_value(objbuf, objlen);
             if (!objbuf) {
-                PE("CDAP message does not contain a nested message\n");
+                UPE(rib->uipcp, "CDAP message does not contain a nested message\n");
 
                 delete m;
                 return 0;
@@ -136,7 +136,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
             AData adata(objbuf, objlen);
 
             if (!adata.cdap) {
-                PE("A_DATA does not contain an encapsulated CDAP message\n");
+                UPE(rib->uipcp, "A_DATA does not contain an encapsulated CDAP message\n");
 
                 delete m;
                 return 0;
@@ -168,7 +168,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
         /* Lookup neighbor by port id. */
         neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
         if (neigh == rib->neighbors.end()) {
-            PE("Received message from unknown port id %d\n",
+            UPE(rib->uipcp, "Received message from unknown port id %d\n",
                     mhdr->local_port);
             return -1;
         }
@@ -180,7 +180,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
         /* Deserialize the received CDAP message. */
         m = neigh->second.conn->msg_deser(serbuf, serlen);
         if (!m) {
-            PE("msg_deser() failed\n");
+            UPE(rib->uipcp, "msg_deser() failed\n");
             return -1;
         }
 
@@ -188,7 +188,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
         ret = neigh->second.enroll_fsm_run(m);
 
     } catch (std::bad_alloc) {
-        PE("Out of memory\n");
+        UPE(rib->uipcp, "Out of memory\n");
     }
 
     delete m;
@@ -212,11 +212,11 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
      * a management SDU. */
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
-        PE("Error: read() failed [%d]\n", n);
+        UPE(uipcp, "Error: read() failed [%d]\n", n);
         return;
 
     } else if (n < (int)sizeof(*mhdr)) {
-        PE("Error: read() does not contain mgmt header, %d<%d\n",
+        UPE(uipcp, "Error: read() does not contain mgmt header, %d<%d\n",
                 n, (int)sizeof(*mhdr));
         return;
     }
@@ -430,7 +430,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
     if (reg) {
         if (lit != lower_difs.end()) {
-            PE("DIF %s already registered\n", lower_dif.c_str());
+            UPE(uipcp, "DIF %s already registered\n", lower_dif.c_str());
             return -1;
         }
 
@@ -438,7 +438,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
     } else {
         if (lit == lower_difs.end()) {
-            PE("DIF %s not registered\n", lower_dif.c_str());
+            UPE(uipcp, "DIF %s not registered\n", lower_dif.c_str());
             return -1;
         }
         lower_difs.erase(lit);
@@ -466,7 +466,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
 
     objlen = obj.serialize(objbuf, sizeof(objbuf));
     if (objlen < 0) {
-        PE("serialization failed\n");
+        UPE(uipcp, "serialization failed\n");
         return -1;
     }
 
@@ -484,7 +484,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
     aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
     if (aobjlen < 0) {
         invoke_id_mgr.put_invoke_id(m.invoke_id);
-        PE("serialization failed\n");
+        UPE(uipcp, "serialization failed\n");
         return -1;
     }
 
@@ -497,7 +497,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
     }
 
     if (ret) {
-        PE("message serialization failed\n");
+        UPE(uipcp, "message serialization failed\n");
         invoke_id_mgr.put_invoke_id(m.invoke_id);
         delete serbuf;
         return -1;
@@ -519,14 +519,14 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
 
         if (pos != string::npos) {
             container_obj_name = rm->obj_name.substr(0, pos);
-            PD("Falling back to container object '%s'\n",
-               container_obj_name.c_str());
+            UPD(uipcp, "Falling back to container object '%s'\n",
+                container_obj_name.c_str());
             hi = handlers.find(container_obj_name);
         }
     }
 
     if (hi == handlers.end()) {
-        PE("Unable to manage CDAP message\n");
+        UPE(uipcp, "Unable to manage CDAP message\n");
         rm->print();
         return -1;
     }
@@ -600,7 +600,7 @@ normal_fa_req(struct rlite_evloop *loop,
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
@@ -626,7 +626,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
 
     assert(b_req == NULL);
 
-    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+    UPD(uipcp, "flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
             req->ipcp_id, req->port_id);
 
     /* First of all we update the neighbors in the RIB. This
@@ -637,7 +637,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
     ret = rib_neigh_set_port_id(rib, &req->remote_appl,
                                 req->port_id);
     if (ret) {
-        PE("rib_neigh_set_port_id() failed\n");
+        UPE(uipcp, "rib_neigh_set_port_id() failed\n");
         result = 1;
     }
 
@@ -645,7 +645,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
                                    uipcp->ipcp_id, req->port_id, result);
 
     if (ret || result) {
-        PE("rlite_flow_allocate_resp() failed\n");
+        UPE(uipcp, "rlite_flow_allocate_resp() failed\n");
         goto err;
     }
 
@@ -679,7 +679,7 @@ normal_fa_resp(struct rlite_evloop *loop,
                 (struct rina_kmsg_fa_resp *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
@@ -713,10 +713,10 @@ normal_init(struct uipcp *uipcp)
         uipcp->priv = new uipcp_rib(uipcp);
 
     } catch (std::bad_alloc) {
-        PE("Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
         return -1;
     } catch (std::exception) {
-        PE("RIB initialization failed\n");
+        UPE(uipcp, "RIB initialization failed\n");
         return -1;
     }
 
@@ -753,7 +753,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
     }
 
     if (!rina_name_valid(lower_dif)) {
-        PE("lower_dif name is not valid\n");
+        UPE(uipcp, "lower_dif name is not valid\n");
         return -1;
     }
 

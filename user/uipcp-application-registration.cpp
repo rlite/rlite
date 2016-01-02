@@ -10,7 +10,7 @@ static uint64_t time64()
     struct timespec tv;
 
     if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
-        PE("clock_gettime() failed\n");
+        perror("clock_gettime() failed");
         tv.tv_sec = 0;
         tv.tv_nsec = 0;
     }
@@ -43,7 +43,7 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 
     dft[key] = entry;
 
-    PD("[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->ipcp_id,
+    UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->ipcp_id,
        key.c_str(), (long long unsigned)entry.address);
 
     return 0;
@@ -75,7 +75,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
 
     if (req->reg) {
         if (mit != dft.end()) {
-            PE("Application %s already registered on uipcp with address "
+            UPE(uipcp, "Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", name_str.c_str(),
                     (long long unsigned)mit->second.address,
                     (long long unsigned)local_addr);
@@ -88,7 +88,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
 
     } else {
         if (mit == dft.end()) {
-            PE("Application %s was not registered here\n",
+            UPE(uipcp, "Application %s was not registered here\n",
                 name_str.c_str());
             return 0;
         }
@@ -100,7 +100,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
 
     dft_slice.entries.push_back(dft_entry);
 
-    PD("Application %s %sregistered %s uipcp %d\n",
+    UPD(uipcp, "Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->ipcp_id);
 
@@ -123,7 +123,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
     bool add = true;
 
     if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        PE("M_CREATE or M_DELETE expected\n");
+        UPE(uipcp, "M_CREATE or M_DELETE expected\n");
         return 0;
     }
 
@@ -133,7 +133,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START does not contain a nested message\n");
+        UPE(uipcp, "M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -150,17 +150,17 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
             if (mit == dft.end() || e->timestamp > mit->second.timestamp) {
                 dft[key] = *e;
                 prop_dft.entries.push_back(*e);
-                PD("DFT entry %s %s remotely\n", key.c_str(),
+                UPD(uipcp, "DFT entry %s %s remotely\n", key.c_str(),
                         (mit != dft.end() ? "updated" : "added"));
             }
 
         } else {
             if (mit == dft.end()) {
-                PI("DFT entry does not exist\n");
+                UPI(uipcp, "DFT entry does not exist\n");
             } else {
                 dft.erase(mit);
                 prop_dft.entries.push_back(*e);
-                PD("DFT entry %s removed remotely\n", key.c_str());
+                UPD(uipcp, "DFT entry %s removed remotely\n", key.c_str());
             }
 
         }
