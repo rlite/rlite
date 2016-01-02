@@ -20,7 +20,7 @@ options=()
 install="rlite.install"
 source=("rlite.install" "rlite.conf" "rlite.service")
 noextract=()
-md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "76e6df2e7a96156829f702a42f000f42" "ecaab3e792c1c36048a069334337b380")
+md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "f42f582e7be0c99ed67a3cbe9e56c3ba" "ecaab3e792c1c36048a069334337b380")
 
 _gitroot="$PWD/.."
 _gitname="rina"
@@ -36,12 +36,6 @@ build() {
         git clone "$_gitroot" "$_gitname"
         cd "$srcdir/$_gitname"
         # We expect to be already on branch master
-        git clone "$_gitroot/kernel/vmpi" "kernel/vmpi"
-        # We want to be on the 3.18 branch
-        cd kernel/vmpi
-        git checkout 3.18
-        cd ..
-        cd ..
     fi
     msg "GIT checkout done or server timeout"
 
@@ -64,7 +58,6 @@ package() {
     # Install the rina kernel modules into the VERSION/extra directory
     mkdir -p "$pkgdir/usr/lib/modules/${KVER1}/extra"
     cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
-    #cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
 
     # Install the userspace programs and libraries
     mkdir -p "$pkgdir/usr/bin"
