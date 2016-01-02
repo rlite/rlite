@@ -211,6 +211,16 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
 extern struct uipcp_ops normal_ops;
 
+static const struct uipcp_ops *
+select_uipcp_ops(const char *dif_type)
+{
+    if (strcmp(dif_type, "normal") == 0) {
+        return &normal_ops;
+    }
+
+    return NULL;
+}
+
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 {
@@ -228,8 +238,15 @@ uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 int
 uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 {
+    const char *dif_type = "normal";
+    const struct uipcp_ops *ops = select_uipcp_ops(dif_type);
     struct uipcp *uipcp;
-    int ret = ENOMEM;
+    int ret = -1;
+
+    if (!ops) {
+        PE("Could not find uIPCP ops for DIF type %s\n", dif_type);
+        return -1;
+    }
 
     uipcp = malloc(sizeof(*uipcp));
     if (!uipcp) {
@@ -240,7 +257,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
-    uipcp->ops = normal_ops;
+    uipcp->ops = *ops;
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
