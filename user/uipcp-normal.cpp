@@ -806,8 +806,8 @@ struct uipcp_ops normal_ops = {
     .rib_show = normal_ipcp_rib_show,
     .appl_register = normal_appl_register,
     .fa_req = normal_fa_req,
-    .fa_req_arrived = normal_fa_req_arrived,
     .fa_resp = normal_fa_resp,
+    .neigh_fa_req_arrived = normal_fa_req_arrived,
     .flow_deallocated = normal_flow_deallocated,
 };
 

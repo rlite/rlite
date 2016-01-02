@@ -36,9 +36,9 @@ struct uipcp_ops {
     int (*fini)(struct uipcp *);
 
     int (*register_to_lower)(struct uipcp *uipcp, int reg,
-                         const struct rina_name *dif_name,
-                         unsigned int ipcp_id,
-                         const struct rina_name *ipcp_name);
+                             const struct rina_name *dif_name,
+                             unsigned int ipcp_id,
+                             const struct rina_name *ipcp_name);
 
     int (*enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
 
@@ -54,13 +54,13 @@ struct uipcp_ops {
                   const struct rina_msg_base_resp *b_resp,
                   const struct rina_msg_base *b_req);
 
-    int (*fa_req_arrived)(struct rlite_evloop *loop,
-                          const struct rina_msg_base_resp *b_resp,
-                          const struct rina_msg_base *b_req);
-
     int (*fa_resp)(struct rlite_evloop *loop,
                    const struct rina_msg_base_resp *b_resp,
                    const struct rina_msg_base *b_req);
+
+    int (*neigh_fa_req_arrived)(struct rlite_evloop *loop,
+                                const struct rina_msg_base_resp *b_resp,
+                                const struct rina_msg_base *b_req);
 
     int (*flow_deallocated)(struct rlite_evloop *loop,
                             const struct rina_msg_base_resp *b_resp,

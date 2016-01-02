@@ -423,26 +423,6 @@ err1:
 }
 
 static int
-shim_inet4_fa_req_arrived(struct rlite_evloop *loop,
-                      const struct rina_msg_base_resp *b_resp,
-                      const struct rina_msg_base *b_req)
-{
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
-    struct rina_kmsg_fa_req_arrived *req =
-                    (struct rina_kmsg_fa_req_arrived *)b_resp;
-    assert(b_req == NULL);
-
-    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-            req->ipcp_id, req->port_id);
-
-    (void)uipcp;
-
-    return 0;
-}
-
-static int
 shim_inet4_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
@@ -532,7 +512,6 @@ struct uipcp_ops shim_inet4_ops = {
     .fini = shim_inet4_fini,
     .appl_register = shim_inet4_appl_register,
     .fa_req = shim_inet4_fa_req,
-    .fa_req_arrived = shim_inet4_fa_req_arrived,
     .fa_resp = shim_inet4_fa_resp,
     .flow_deallocated = shim_inet4_flow_deallocated,
 };
