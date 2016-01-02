@@ -341,6 +341,9 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
 
     if (parse_flowcfg_int(arg, &field_int, "max_sdu_gap") == 0) {
         flowcfg->max_sdu_gap = field_int;
+        if (flowcfg->max_sdu_gap >= 0) {
+            flowcfg->dtcp_present = 1;
+        }
         return 0;
     }
 
@@ -348,48 +351,66 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
         return 0;
 
     if (parse_flowcfg_bool(arg, &flowcfg->dtcp.flow_control,
-                                            "dtcp.flow_control") == 0)
+                                            "dtcp.flow_control") == 0) {
+        flowcfg->dtcp_present = 1;
         return 0;
+    }
 
     if (parse_flowcfg_bool(arg, &flowcfg->dtcp.rtx_control,
-                                            "dtcp.rtx_control") == 0)
+                                            "dtcp.rtx_control") == 0) {
+        flowcfg->dtcp_present = 1;
         return 0;
+    }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.sending_rate") == 0) {
         flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.flow_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.r.sending_rate = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.time_period") == 0) {
         flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.flow_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.r.time_period = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.max_cwq_len") == 0) {
         flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.flow_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.w.max_cwq_len = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.initial_credit") == 0) {
         flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.flow_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.w.initial_credit = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.max_time_to_retry") == 0) {
+        flowcfg->dtcp.rtx_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.rtx.max_time_to_retry = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.data_rxms_max") == 0) {
+        flowcfg->dtcp.rtx_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.rtx.data_rxms_max = field_int;
         return 0;
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.initial_rtx_max") == 0) {
+        flowcfg->dtcp.rtx_control = 1;
+        flowcfg->dtcp_present = 1;
         flowcfg->dtcp.rtx.initial_rtx_max = field_int;
         return 0;
     }
