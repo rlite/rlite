@@ -31,3 +31,5 @@
 
 - shim-eth: implementare la funzionalità di unpadding per estrarre rina_name
   serializzati dai messaggi ARP.
+
+- proteggere l'accesso al flusso (fase di allocazione) con uno spinlock

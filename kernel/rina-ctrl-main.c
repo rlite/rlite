@@ -630,7 +630,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
-        entry->state = FLOW_STATE_NULL;
+        entry->state = FLOW_STATE_PENDING;
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
@@ -1249,7 +1249,6 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     if (ret) {
         goto out;
     }
-    flow_entry->state = FLOW_STATE_PENDING;
 
     if (ipcp_entry->ops.flow_allocate_req) {
         /* This IPCP handles the flow allocation in kernel-space. This is
@@ -1470,7 +1469,6 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_addr = remote_addr;
-    flow_entry->state = FLOW_STATE_PENDING;
 
     PI("%s: Flow allocation request arrived to IPC process %u, "
         "port-id %u\n", __func__, ipcp->id, flow_entry->local_port);
