@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source tests/prologue.sh
 source tests/env.sh
 
 if [ -z "$1" ]; then
@@ -8,3 +9,5 @@ if [ -z "$1" ]; then
 fi
 
 $RINACONF ipcp-destroy ${1}.IPCP 1
+
+source tests/epilogue.sh
