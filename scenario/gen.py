@@ -69,6 +69,7 @@ for l in links:
 
     vms[vm]['ports'].append({'tap': tap, 'br': b, 'idx': idx})
 
+
 vmid = 1
 
 for i in vms:
@@ -76,8 +77,10 @@ for i in vms:
 
     vm['id'] = vmid
 
-    fwdp = 2222 - 1 + vmid
-    mp = 150 + vmid
+    fwdp = 2222 + vmid
+    mac = '00:0a:0a:0a:%02x:%02x' % (vmid, 99)
+
+    vm['ssh'] = fwdp
 
     outs += ''                                                  \
             'qemu-system-x86_64 "/home/vmaffione/git/vm/arch.qcow2" '   \
@@ -85,25 +88,45 @@ for i in vms:
             '--enable-kvm '                                             \
             '-smp 2 '                                                   \
             '-m 512M '                                                  \
-            '-device e1000,mac=00:0a:0a:0a:0a:%(mp)s,netdev=mgmt '      \
+            '-device e1000,mac=%(mac)s,netdev=mgmt '                    \
             '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
             '-vga std '                                                 \
             '-pidfile rina-%(id)s.pid '                                 \
-            '-display none ' % {'fwdp': fwdp, 'mp': ('%02x' % mp),
-                                'id': vmid}
+            '-display none ' % {'fwdp': fwdp, 'id': vmid, 'mac': mac}
 
     for port in vm['ports']:
         tap = port['tap']
-        idx = '%02x' % port['idx']
+        mac = '00:0a:0a:0a:%02x:%02x' % (vmid, port['idx'])
+        port['mac'] = mac
 
         outs += ''                                                      \
-        '-device virtio-net-pci,mac=00:0a:0a:0a:%(vmid)s:%(idx)s,netdev=data '\
+        '-device virtio-net-pci,mac=%(mac)s,netdev=data '               \
         '-netdev tap,ifname=%(tap)s,id=data,script=no,downscript=no '   \
-            % {'idx': idx, 'tap': tap, 'vmid': '%02x' % vmid}
+            % {'mac': mac, 'tap': tap}
 
     outs += '&\n\n'
 
     vmid += 1
+
+for i in vms:
+    vm = vms[i]
+
+    outs += 'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'sudo hostname %(name)s\n'\
+                % {'name': vm['name'], 'ssh': vm['ssh']}
+
+    for port in vm['ports']:
+        outs += 'PORT=$(mac2ifname %(mac)s)\n'\
+                'sudo ip link set $PORT up\n' % {'mac': port['mac']}
+
+    outs += 'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n'
 
 fout.write(outs)
 
@@ -112,6 +135,7 @@ fout.close()
 subprocess.call(['chmod', '+x', 'up.sh'])
 
 print(vms)
+
 
 ################### GENERATE DOWN SCRIPT #####################
 
