@@ -3,8 +3,8 @@
 
 #include "rlite/conf-msg.h"
 #include "rlite/kernel-msg.h"
-#include "rlite-list.h"
-#include "rlite-appl.h"
+#include "rlite/list.h"
+#include "rlite/appl.h"
 
 #ifdef __cplusplus
 extern "C" {

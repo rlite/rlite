@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/timer.h>
-#include <rlite/utils.h>
+#include "rlite/utils.h"
 #include "rlite-kernel.h"
 
 

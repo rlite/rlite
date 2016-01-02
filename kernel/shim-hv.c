@@ -20,7 +20,7 @@
 
 #include <linux/types.h>
 #include <linux/string.h>
-#include <rlite/utils.h>
+#include "rlite/utils.h"
 #include <vmpi-provider.h>
 #include "rlite-kernel.h"
 #include "shim-hv-msg.h"

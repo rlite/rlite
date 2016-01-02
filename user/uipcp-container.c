@@ -8,7 +8,7 @@
 #include "rlite/conf-msg.h"
 
 #include "uipcp-container.h"
-#include "rlite-conf.h"
+#include "rlite/conf.h"
 
 
 int

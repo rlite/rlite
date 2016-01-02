@@ -16,10 +16,10 @@
 #include "rlite/conf-msg.h"
 #include "rlite/utils.h"
 
-#include "rlite-list.h"
+#include "rlite/list.h"
 #include "helpers.h"
-#include "rlite-evloop.h"
-#include "rlite-appl.h"
+#include "rlite/evloop.h"
+#include "rlite/appl.h"
 #include "uipcp-container.h"
 
 

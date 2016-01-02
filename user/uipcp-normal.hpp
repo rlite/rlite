@@ -9,8 +9,8 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/conf-msg.h"
-#include "rlite-appl.h"
-#include "rlite-conf.h"
+#include "rlite/appl.h"
+#include "rlite/conf.h"
 
 #include "uipcp-codecs.hpp"
 #include "uipcp-container.h"

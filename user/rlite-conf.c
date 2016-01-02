@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "rlite-conf.h"
+#include "rlite/conf.h"
 
 
 int

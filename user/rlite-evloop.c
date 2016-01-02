@@ -18,7 +18,7 @@
 #include "rlite/utils.h"
 
 #include "pending_queue.h"
-#include "rlite-evloop.h"
+#include "rlite/evloop.h"
 
 
 struct rlite_tmr_event {

@@ -19,8 +19,8 @@
  */
 
 #include <linux/types.h>
-#include <rlite/kernel-msg.h>
-#include <rlite/utils.h>
+#include "rlite/kernel-msg.h"
+#include "rlite/utils.h"
 #include "rlite-kernel.h"
 #include "rlite-bufs.h"
 

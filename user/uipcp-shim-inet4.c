@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "rlite-list.h"
+#include "rlite/list.h"
 #include "uipcp-container.h"
 
 

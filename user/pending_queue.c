@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "rlite/common.h"
 #include "pending_queue.h"
-#include "rlite-list.h"
+#include "rlite/list.h"
 
 
 struct pending_entry *

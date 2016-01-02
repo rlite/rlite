@@ -1,7 +1,7 @@
 #ifndef __RINALITE_CONF_H__
 #define __RINALITE_CONF_H__
 
-#include "rlite-evloop.h"
+#include "evloop.h"
 
 
 #ifdef __cplusplus
@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 int rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
-                         const char *param_name, const char *param_value);
+                      const char *param_name, const char *param_value);
 
 #ifdef __cplusplus
 }

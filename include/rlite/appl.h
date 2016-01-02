@@ -1,10 +1,10 @@
 #ifndef __RINALITE_APPL_H__
 #define __RINALITE_APPL_H__
 
-#include <rlite/common.h>
+#include "rlite/common.h"
 #include <stdint.h>
-#include "rlite-list.h"
-#include "rlite-evloop.h"
+#include "list.h"
+#include "evloop.h"
 
 
 #ifdef __cplusplus

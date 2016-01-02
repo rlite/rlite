@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include <rlite/common.h>
-#include <rlite/utils.h>
+#include "rlite/common.h"
+#include "rlite/utils.h"
 
 
 /* Message types. They **must** be listed alternating requests with
