@@ -484,7 +484,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->state = FLOW_STATE_NULL;
         entry->upper = upper;
         entry->event_id = event_id;
-        mutex_init(&entry->lock);
         entry->refcnt = 0;
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);

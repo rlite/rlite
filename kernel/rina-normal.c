@@ -78,6 +78,7 @@ snd_inact_tmr_cb(struct hrtimer *timer)
 {
     struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
 
+    spin_lock(&dtp->lock);
     PD("%s\n", __func__);
     dtp->set_drf = true;
 
@@ -93,6 +94,7 @@ snd_inact_tmr_cb(struct hrtimer *timer)
     /* Send transfer PDU with zero length. */
 
     /* Notify user flow that there has been no activity for a while */
+    spin_unlock(&dtp->lock);
 
     return HRTIMER_NORESTART;
 }
@@ -186,6 +188,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     int ret;
 
+    spin_lock(&dtp->lock);
+
     /* Stop the sender inactivity timer if it was activated or the callback
      * running , but without waiting for the callback to finish.
      * These needs probably to be done only whent DTCP is present. */
@@ -216,9 +220,13 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 /* POL: FlowControlOverrun */
 
                 /* TODO Set blocking write (backpressure) ? */
+
+                spin_unlock(&dtp->lock);
+
                 PD("%s: Dropping overrun PDU [%lu]", __func__,
                         (long unsigned)pci->seqnum);
                 rina_buf_free(rb);
+
 
                 return 0;
             }
@@ -234,11 +242,13 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->last_seq_num_sent = pci->seqnum;
     }
 
-    ret = rmt_tx(ipcp, flow, rb);
-
     /* 3 * (MPL + R + A) */
     hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
                   HRTIMER_MODE_REL);
+
+    spin_unlock(&dtp->lock);
+
+    ret = rmt_tx(ipcp, flow, rb);
 
     return ret;
 }
@@ -365,11 +375,12 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return rb;
 }
 
-static void
+static struct rina_buf *
 sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                  uint64_t seqnum)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
+    struct rina_buf *crb = NULL;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
@@ -382,15 +393,12 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
             /* POL: ReceivingFlowControl */
             if (cfg->fc.fc_type == RINA_FC_T_WIN) {
                 /* Send a flow control only control PDU. */
-                struct rina_buf *rb;
-
-                rb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_FC, 0);
-                if (rb) {
-                    rmt_tx(ipcp, flow, rb);
-                }
+                crb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_FC, 0);
             }
         }
     }
+
+    return crb;
 }
 
 /* Takes the ownership of the rb. */
@@ -438,6 +446,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     struct rina_pci *pci = RINA_BUF_PCI(rb);
     struct flow_entry *flow = flow_lookup(pci->conn_id.dst_cep);
     struct dtp *dtp;
+    struct rina_buf *crb = NULL;
     int ret = 0;
 
     if (!flow) {
@@ -455,7 +464,13 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     dtp = &flow->dtp;
 
+    spin_lock(&dtp->lock);
+
     hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
+
+    /* 2 * (MPL + R + A) */
+    hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
+            HRTIMER_MODE_REL);
 
     rina_buf_pci_pop(rb);
 
@@ -467,11 +482,13 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         dtp->rcv_lwe = pci->seqnum + 1;
         dtp->max_seq_num_rcvd = pci->seqnum;
 
-        sdu_rx_sv_update(ipcp, flow, pci->seqnum);
+        crb = sdu_rx_sv_update(ipcp, flow, pci->seqnum);
+
+        spin_unlock(&dtp->lock);
 
         ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
 
-        goto out;
+        goto snd_crb;
     }
 
     if (unlikely(pci->seqnum < dtp->rcv_lwe)) {
@@ -484,12 +501,16 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         if (flow->cfg.dtcp.flow_control &&
                 dtp->rcv_lwe >= dtp->last_snd_data_ack) {
             /* Send ACK flow control PDU */
-            rb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_ACK_AND_FC,
-                    dtp->rcv_lwe);
-            if (rb && rmt_tx(ipcp, flow, rb) == 0) {
+            crb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_ACK_AND_FC,
+                                 dtp->rcv_lwe);
+            if (crb) {
                 dtp->last_snd_data_ack = dtp->rcv_lwe;
             }
         }
+
+        spin_unlock(&dtp->lock);
+
+        goto snd_crb;
 
     } else {
         bool drop;
@@ -545,27 +566,41 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
 
         if (deliver) {
+            /* Update rcv_lwe only if this PDU is going to be
+             * delivered. */
             dtp->rcv_lwe = seqnum + 1;
         }
 
-        sdu_rx_sv_update(ipcp, flow, seqnum);
+        crb = sdu_rx_sv_update(ipcp, flow, seqnum);
 
         if (deliver) {
+
+            spin_unlock(&dtp->lock);
+
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-        } else if (drop) {
+
+            goto snd_crb;
+        }
+
+        if (drop) {
+            PD("%s: dropping PDU [%lu] to meet QoS requirements\n",
+                    __func__, (long unsigned)seqnum);
             rina_buf_free(rb);
+
         } else {
             /* What is not dropped nor delivered goes in the
              * sequencing queue.
              */
             seqq_push(dtp, rb);
         }
+
+        spin_unlock(&dtp->lock);
     }
 
-out:
-    /* 2 * (MPL + R + A) */
-    hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
-            HRTIMER_MODE_REL);
+snd_crb:
+    if (crb) {
+        rmt_tx(ipcp, flow, crb);
+    }
 
     return ret;
 }

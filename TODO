@@ -34,3 +34,5 @@
 
 - rivedere se è la struct upper_ref è ancora necessaria, o se può essere rimossa
 
+- spostare la callback flow_init() nella funzione add_flow(), per evitare possibili
+  corse critiche

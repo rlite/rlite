@@ -94,6 +94,7 @@ struct upper_ref {
 };
 
 struct dtp {
+    spinlock_t lock;
     bool set_drf;
     uint64_t snd_lwe;
     uint64_t snd_rwe;
@@ -127,7 +128,6 @@ struct flow_entry {
     struct dtp          dtp;
     struct rina_flow_config cfg;
 
-    struct mutex        lock; /* Unused */
     unsigned int        refcnt;
     struct hlist_node   node;
     struct hlist_node   ftnode;

@@ -27,6 +27,7 @@
 void
 dtp_init(struct dtp *dtp)
 {
+    spin_lock_init(&dtp->lock);
     hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     INIT_LIST_HEAD(&dtp->cwq);
@@ -40,6 +41,7 @@ dtp_fini(struct dtp *dtp)
 {
     struct rina_buf *rb, *next;
 
+    spin_lock(&dtp->lock);
     hrtimer_cancel(&dtp->snd_inact_tmr);
     hrtimer_cancel(&dtp->rcv_inact_tmr);
 
@@ -53,6 +55,7 @@ dtp_fini(struct dtp *dtp)
         list_del(&rb->node);
         rina_buf_free(rb);
     }
+    spin_unlock(&dtp->lock);
 }
 EXPORT_SYMBOL(dtp_fini);
 
