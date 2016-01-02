@@ -103,6 +103,16 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         return -EBUSY;
     }
 
+    /* Check if IPCP ops are ok. */
+    if (!factory->ops.destroy ||
+        !factory->ops.assign_to_dif ||
+        !factory->ops.application_register ||
+        !factory->ops.application_unregister ||
+        !factory->ops.flow_allocate_req ||
+        !factory->ops.sdu_write) {
+        return -EINVAL;
+    }
+
     /* Build a copy and insert it into the IPC process factories
      * list. */
     f = kmalloc(sizeof(*f), GFP_KERNEL);
