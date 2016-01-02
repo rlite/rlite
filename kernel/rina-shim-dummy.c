@@ -34,9 +34,48 @@
 #include <linux/workqueue.h>
 
 
+struct rx_entry {
+    struct rina_buf *rb;
+    unsigned int remote_port;
+};
+
+#define RX_POW      8
+#define RX_ENTRIES  (1 << RX_POW)
+
 struct rina_shim_dummy {
     struct ipcp_entry *ipcp;
+    bool queued;
+    struct rx_entry rxr[RX_ENTRIES];
+    unsigned int rdh;
+    unsigned int rdt;
+    spinlock_t lock;
+    struct work_struct rcv;
 };
+
+static void
+rcv_work(struct work_struct *w)
+{
+    struct rina_shim_dummy *priv =
+            container_of(w, struct rina_shim_dummy, rcv);
+
+    for (;;) {
+        struct rina_buf *rb = NULL;
+        unsigned int remote_port;
+
+        spin_lock(&priv->lock);
+        if (priv->rdh != priv->rdt) {
+            rb = priv->rxr[priv->rdh].rb;
+            remote_port = priv->rxr[priv->rdh].remote_port;
+            priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
+        }
+        spin_unlock(&priv->lock);
+
+        if (!rb) {
+            break;
+        }
+        rina_sdu_rx(priv->ipcp, rb, remote_port);
+    }
+}
 
 static void *
 rina_shim_dummy_create(struct ipcp_entry *ipcp)
@@ -49,6 +88,10 @@ rina_shim_dummy_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
+    priv->queued = 0;
+    INIT_WORK(&priv->rcv, rcv_work);
+    spin_lock_init(&priv->lock);
+    priv->rdt = priv->rdh = 0;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -59,6 +102,11 @@ static void
 rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
 {
     struct rina_shim_dummy *priv = ipcp->priv;
+
+    while (priv->rdh != priv->rdt) {
+        rina_buf_free(priv->rxr[priv->rdh].rb);
+        priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
+    }
 
     kfree(priv);
 
@@ -166,7 +214,28 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
                           struct flow_entry *flow,
                           struct rina_buf *rb)
 {
-    rina_sdu_rx(ipcp, rb, flow->remote_port);
+    struct rina_shim_dummy *priv = ipcp->priv;
+
+    if (priv->queued) {
+        unsigned int next;
+
+        spin_lock(&priv->lock);
+        next = (priv->rdt + 1) & (RX_ENTRIES -1);
+        if (unlikely(next == priv->rdh)) {
+            /* PD("%s: Dropping PDU because internal queue is full\n",
+                __func__); */
+            rina_buf_free(rb);
+        } else {
+            priv->rxr[priv->rdt].rb = rb;
+            priv->rxr[priv->rdt].remote_port = flow->remote_port;
+            priv->rdt = next;
+        }
+        spin_unlock(&priv->lock);
+
+        schedule_work(&priv->rcv);
+    } else {
+        rina_sdu_rx(ipcp, rb, flow->remote_port);
+    }
 
     return 0;
 }
