@@ -246,8 +246,8 @@ struct ConnId : public UipcpObject {
 struct FlowRequest : public UipcpObject {
     RinaName src_app;
     RinaName dst_app;
-    uint64_t src_port;
-    uint64_t dst_port;
+    rl_port_t src_port;
+    rl_port_t dst_port;
     rl_addr_t src_addr;
     rl_addr_t dst_addr;
     std::list<ConnId> connections;
