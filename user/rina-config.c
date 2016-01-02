@@ -184,6 +184,29 @@ static int assign_to_dif(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int ipcp_config(int argc, char **argv)
+{
+    struct rina_amsg_ipcp_config req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    const char *param_name;
+    const char *param_value;
+
+    assert(argc >= 4);
+    ipcp_apn = argv[0];
+    ipcp_api = argv[1];
+    param_name = argv[2];
+    param_value = argv[3];
+
+    req.msg_type = RINA_APPL_IPCP_CONFIG;
+    req.event_id = 0;
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    req.name = strdup(param_name);
+    req.value = strdup(param_value);
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -209,6 +232,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME IPCP_APN IPCP_API",
         .num_args = 3,
         .func = assign_to_dif,
+    },
+    {
+        .name = "ipcp-config",
+        .usage = "IPCP_APN IPCP_API PARAM_NAME PARAM_VALUE",
+        .num_args = 4,
+        .func = ipcp_config,
     },
 };
 

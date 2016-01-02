@@ -41,6 +41,8 @@
             _p += sizeof(_t);           \
         } while (0)
 
+typedef char *string_t;
+
 /* Size of a serialized string, not including the storage for the size
  * field itself. */
 static unsigned int
@@ -143,11 +145,17 @@ rina_msg_serlen(struct rina_msg_layout *numtables,
 {
     unsigned int ret = numtables[msg->msg_type].copylen;
     struct rina_name *name;
+    string_t *str;
     int i;
 
     name = (struct rina_name *)(((void *)msg) + ret);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         ret += rina_name_serlen(name);
+    }
+
+    str = (string_t *)name;
+    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+        ret += sizeof(uint8_t) + string_prlen(*str);
     }
 
     return ret;
@@ -163,15 +171,23 @@ serialize_rina_msg(struct rina_msg_layout *numtables,
     unsigned int serlen;
     unsigned int copylen;
     struct rina_name *name;
+    string_t *str;
     int i;
 
     copylen = numtables[msg->msg_type].copylen;
     memcpy(serbuf, msg, copylen);
-    name = (struct rina_name *)(((void *)msg) + copylen);
+
     serptr = serbuf + copylen;
+    name = (struct rina_name *)(((void *)msg) + copylen);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         serialize_rina_name(&serptr, name);
     }
+
+    str = (string_t *)(name);
+    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+        serialize_string(&serptr, *str);
+    }
+
     serlen = serptr - serbuf;
 
     return serlen;
@@ -186,6 +202,7 @@ deserialize_rina_msg(struct rina_msg_layout *numtables,
 {
     struct rina_msg_base *bmsg = (struct rina_msg_base *)serbuf;
     struct rina_name *name;
+    string_t *str;
     unsigned int copylen;
     const void *desptr;
     int ret;
@@ -193,16 +210,24 @@ deserialize_rina_msg(struct rina_msg_layout *numtables,
 
     copylen = numtables[bmsg->msg_type].copylen;
     memcpy(msgbuf, serbuf, copylen);
+
     desptr = serbuf + copylen;
     name = (struct rina_name *)(msgbuf + copylen);
-    //COMMON_PRINT(">>>> %u %u %p\n", serbuf_len, copylen, desptr);
     for (i = 0; i < numtables[bmsg->msg_type].names; i++, name++) {
         ret = deserialize_rina_name(&desptr, name);
         if (ret) {
             return ret;
         }
-        //COMMON_PRINT("   desptr %p\n", desptr);
     }
+
+    str = (string_t *)name;
+    for (i = 0; i < numtables[bmsg->msg_type].strings; i++, str++) {
+        ret = deserialize_string(&desptr, str);
+        if (ret) {
+            return ret;
+        }
+    }
+
     if ((desptr - serbuf) != serbuf_len) {
         return -1;
     }

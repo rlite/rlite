@@ -32,6 +32,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 14 */
     RINA_KERN_FLOW_ALLOCATE_RESP, /* 15 */
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
+    RINA_KERN_IPCP_CONFIG, /* 17 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -134,6 +135,16 @@ struct rina_kmsg_flow_allocate_resp {
     uint16_t ipcp_id;
     uint8_t response;
     uint32_t port_id;
+} __attribute__((packed));
+
+/* IPCM --> kernel to configure and IPC process. */
+struct rina_kmsg_ipcp_config {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+    char *name;
+    char *value;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

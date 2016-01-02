@@ -17,7 +17,8 @@ enum {
     RINA_APPL_IPCP_DESTROY_RESP,  /* 4 */
     RINA_APPL_ASSIGN_TO_DIF,      /* 5 */
     RINA_APPL_ASSIGN_TO_DIF_RESP, /* 6 */
-    RINA_APPL_BASE_RESP,          /* 7 */
+    RINA_APPL_IPCP_CONFIG,        /* 7 */
+    RINA_APPL_BASE_RESP,          /* 8 */
 
     RINA_APPL_MSG_MAX,
 };
@@ -51,6 +52,16 @@ struct rina_amsg_assign_to_dif {
 
     struct rina_name application_name;
     struct rina_name dif_name;
+} __attribute__((packed));
+
+/* Application --> IPCM message to configure an IPC process */
+struct rina_amsg_ipcp_config {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    struct rina_name ipcp_name;
+    char *name;
+    char *value;
 } __attribute__((packed));
 
 #endif  /* __RINA_APPLICATION_MSG_H__ */

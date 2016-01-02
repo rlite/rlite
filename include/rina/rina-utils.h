@@ -16,6 +16,7 @@
 struct rina_msg_layout {
     unsigned int copylen;
     unsigned int names;
+    unsigned int strings;
 };
 
 unsigned rina_name_serlen(const struct rina_name *name);

@@ -196,6 +196,14 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
     return rb->size;
 }
 
+static int
+rina_shim_dummy_config(struct ipcp_entry *ipcp,
+                       const char *param_name,
+                       const char *param_value)
+{
+    return -1;
+}
+
 static int __init
 rina_shim_dummy_init(void)
 {
@@ -213,6 +221,7 @@ rina_shim_dummy_init(void)
     factory.ops.flow_allocate_req = rina_shim_dummy_flow_allocate_req;
     factory.ops.flow_allocate_resp = rina_shim_dummy_flow_allocate_resp;
     factory.ops.sdu_write = rina_shim_dummy_sdu_write;
+    factory.ops.config = rina_shim_dummy_config;
 
     ret = rina_ipcp_factory_register(&factory);
 

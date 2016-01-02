@@ -131,7 +131,8 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         !factory->ops.application_unregister ||
         !factory->ops.flow_allocate_req ||
         !factory->ops.flow_allocate_resp ||
-        !factory->ops.sdu_write) {
+        !factory->ops.sdu_write ||
+        !factory->ops.config) {
         return -EINVAL;
     }
 
@@ -543,6 +544,31 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
     if (name_s) {
         kfree(name_s);
+    }
+
+    return ret;
+}
+
+static int
+rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_config *req =
+                    (struct rina_kmsg_ipcp_config *)bmsg;
+    struct ipcp_entry *entry;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    /* Find the IPC process entry corresponding to req->ipcp_id and
+     * fill the DIF name field. */
+    entry = ipcp_table_find(req->ipcp_id);
+    if (entry) {
+        ret = entry->ops.config(entry, req->name, req->value);
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    if (ret == 0) {
+        printk("%s: Configured IPC process %u: %s <= %s\n", __func__,
+                req->ipcp_id, req->name, req->value);
     }
 
     return ret;
@@ -1067,8 +1093,7 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
-    [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
-    [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
+    [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 

@@ -154,6 +154,37 @@ assign_to_dif(struct ipcm *ipcm,
 }
 
 static int
+ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
+            char *param_name, char *param_value)
+{
+    struct rina_kmsg_ipcp_config *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        printf("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_CONFIG;
+    req->ipcp_id = ipcp_id;
+    req->name = param_name;
+    req->value = param_value;
+
+    printf("Requesting IPCP config...\n");
+
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    printf("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -289,6 +320,28 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
+static int
+rina_appl_ipcp_config(struct ipcm *ipcm, int sfd,
+                      const struct rina_msg_base *b_req)
+{
+    unsigned int ipcp_id;
+    struct rina_amsg_ipcp_config *req = (struct rina_amsg_ipcp_config *)b_req;
+    struct rina_msg_base_resp resp;
+
+    resp.result = 1;  /* Report failure by default. */
+
+    /* The request specifies an IPCP: lookup that. */
+    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    if (ipcp_id == ~0U) {
+        printf("%s: Could not find a suitable IPC process\n", __func__);
+    } else {
+        /* Forward the request to the kernel. */
+        resp.result = ipcp_config(ipcm, ipcp_id, req->name, req->value);
+    }
+
+    return rina_appl_response(sfd, RMB(req), &resp);
+}
+
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -297,6 +350,7 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_IPCP_CREATE] = rina_appl_ipcp_create,
     [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
     [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
+    [RINA_APPL_IPCP_CONFIG] = rina_appl_ipcp_config,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 

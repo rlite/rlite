@@ -8,10 +8,6 @@ struct rina_msg_layout rina_application_numtables[] = {
                    sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_APPL_IPCP_CREATE_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
     [RINA_APPL_IPCP_DESTROY] = {
         .copylen = sizeof(struct rina_amsg_ipcp_destroy) -
                    sizeof(struct rina_name),
@@ -19,7 +15,14 @@ struct rina_msg_layout rina_application_numtables[] = {
     },
     [RINA_APPL_ASSIGN_TO_DIF] = {
         .copylen = sizeof(struct rina_amsg_assign_to_dif) -
-                   2*sizeof(struct rina_name),
+                   2 * sizeof(struct rina_name),
         .names = 2,
+    },
+    [RINA_APPL_IPCP_CONFIG] = {
+        .copylen = sizeof(struct rina_amsg_ipcp_config) -
+                   1 * sizeof(struct rina_name) -
+                   2 * sizeof(char *),
+        .names = 1,
+        .strings = 2,
     },
 };
