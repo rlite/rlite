@@ -8,6 +8,7 @@
 #include <linux/hrtimer.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/timer.h>
 
 #include "rina-bufs.h"
 
@@ -120,7 +121,7 @@ struct dtp {
     struct delayed_work remove;
     struct list_head seqq;
     struct list_head rtxq;
-    struct hrtimer rtx_tmr;
+    struct timer_list rtx_tmr;
 };
 
 struct flow_entry {

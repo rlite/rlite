@@ -110,34 +110,18 @@ rcv_inact_tmr_cb(struct hrtimer *timer)
     return HRTIMER_NORESTART;
 }
 
-static void
-timer_update(struct hrtimer *timer, unsigned long exp_jiffies)
-{
-    unsigned long msecs = jiffies_to_msecs(exp_jiffies);
-    long unsigned secs;
-
-    secs = msecs / 1000;
-    msecs -= secs * 1000;
-
-    hrtimer_start(timer, ktime_set(secs, msecs * 1000 * 1000),
-                  HRTIMER_MODE_ABS);
-    PD("%s: Forward rtx timer to %lu\n", __func__,
-            secs * 1000 + msecs);
-}
-
 #define RTX_MSECS   1000
 
 static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
                   struct rina_buf *rb, bool maysleep);
 
-enum hrtimer_restart
-rtx_tmr_cb(struct hrtimer *timer)
+void
+rtx_tmr_cb(long unsigned arg)
 {
-    struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
-    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
+    struct flow_entry *flow = (struct flow_entry *)arg;
+    struct dtp *dtp = &flow->dtp;
     struct rina_buf *rb, *tmp, *crb;
     struct list_head rrbq;
-    enum hrtimer_restart ret = HRTIMER_NORESTART;
 
     PD("%s\n", __func__);
 
@@ -160,8 +144,9 @@ rtx_tmr_cb(struct hrtimer *timer)
             }
 
         } else {
-            timer_update(timer, rb->rtx_jiffies);
-            ret = HRTIMER_RESTART;
+            PD("%s: Forward rtx timer by %u\n", __func__,
+                    jiffies_to_msecs(rb->rtx_jiffies - jiffies));
+            mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
             break;
         }
     }
@@ -175,8 +160,6 @@ rtx_tmr_cb(struct hrtimer *timer)
                 (long unsigned)pci->seqnum);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
-
-    return ret;
 }
 
 static int
@@ -197,6 +180,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
     dtp->rtx_tmr.function = rtx_tmr_cb;
+    dtp->rtx_tmr.data = (unsigned long)flow;
 
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -387,9 +371,10 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             /* Add to the rtx queue and start the rtx timer if not already
              * started. */
             list_add_tail(&crb->node, &dtp->rtxq);
-            if (!hrtimer_active(&dtp->rtx_tmr)) {
-                hrtimer_start(&dtp->rtx_tmr, ktime_set(0, RTX_MSECS *1000*1000),
-                              HRTIMER_MODE_REL);
+            if (!timer_pending(&dtp->rtx_tmr)) {
+                PD("%s: Forward rtx timer by %u\n", __func__,
+                        jiffies_to_msecs(crb->rtx_jiffies - jiffies));
+                mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
             }
             PD("%s: cloning [%lu] into rtxq\n", __func__,
                     (long unsigned)RINA_BUF_PCI(crb)->seqnum);
@@ -751,10 +736,17 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         /* The rtxq is sorted by seqnum, so we can safely
                          * stop here. Let's update the rtx timer
                          * expiration time. */
-                        timer_update(&dtp->rtx_tmr, cur->rtx_jiffies);
+                        PD("%s: Forward rtx timer by %u\n", __func__,
+                                jiffies_to_msecs(cur->rtx_jiffies - jiffies));
+                        mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
                         break;
                     }
                 }
+
+                if (list_empty(&dtp->rtxq)) {
+                    del_timer(&dtp->rtx_tmr);
+                }
+
                 break;
 
             case PDU_T_NACK:
