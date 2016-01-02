@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <sys/eventfd.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -646,6 +647,13 @@ int main()
 {
     const char *confname = "/etc/rlite/rina-gw.conf";
     int ret;
+
+    errno = 0;
+    signal(SIGPIPE, SIG_IGN);
+    if (errno) {
+        perror("signal()");
+        return -1;
+    }
 
     ret = parse_conf(confname);
     if (ret) {
