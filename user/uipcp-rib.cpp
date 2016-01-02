@@ -1755,6 +1755,8 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
             rib->cdap_dispatch(adata.cdap);
 
             delete m;
+
+            return 0;
         }
 
         /* This is not an A-DATA message, so we try to match it

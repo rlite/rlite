@@ -1029,6 +1029,8 @@ AData::AData(const char *buf, unsigned int size)
 {
     gpb::a_data_t gm;
 
+    gm.ParseFromArray(buf, size);
+
     src_addr = gm.sourceaddress();
     dst_addr = gm.destaddress();
     cdap = msg_deser_stateless(gm.cdapmessage().data(),
