@@ -50,6 +50,13 @@ list_pop_front(struct list_head *list)
     return ret;
 }
 
+static inline void
+list_del(struct list_head *elem)
+{
+    elem->prev->succ = elem->succ;
+    elem->succ->prev = elem->prev;
+}
+
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 #define container_of(ptr, type, member) ({                      \

@@ -31,8 +31,9 @@ int application_register(struct application *application,
 
 int flow_allocate(struct application *application,
                   struct rina_name *dif_name,
-                  struct rina_name *local_application,
-                  struct rina_name *remote_application,
+                  int dif_fallback,
+                  const struct rina_name *local_application,
+                  const struct rina_name *remote_application,
                   unsigned int *port_id, unsigned int wait_ms);
 
 struct pending_flow_req *flow_request_wait(struct application *application);

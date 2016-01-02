@@ -138,8 +138,8 @@ application_register_req(struct application *application,
 static struct rina_kmsg_flow_allocate_resp_arrived *
 flow_allocate_req(struct application *application,
                   unsigned int wait_for_completion,
-                  uint16_t ipcp_id, struct rina_name *local_application,
-                  struct rina_name *remote_application, int *result)
+                  uint16_t ipcp_id, const struct rina_name *local_application,
+                  const struct rina_name *remote_application, int *result)
 {
     struct rina_kmsg_flow_allocate_req *req;
 
@@ -215,15 +215,17 @@ application_register(struct application *application, int reg,
 int
 flow_allocate(struct application *application,
               struct rina_name *dif_name,
-              struct rina_name *local_application,
-              struct rina_name *remote_application,
+              int dif_fallback,
+              const struct rina_name *local_application,
+              const struct rina_name *remote_application,
               unsigned int *port_id, unsigned int wait_ms)
 {
     unsigned int ipcp_id;
     struct rina_kmsg_flow_allocate_resp_arrived *kresp;
     int result;
 
-    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
+    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name,
+                                 dif_fallback);
 
     if (ipcp_id == ~0U) {
         PE("%s: No suitable IPCP found\n", __func__);

@@ -18,7 +18,15 @@
 #include "list.h"
 #include "helpers.h"
 #include "evloop.h"
+#include "application.h"
 
+
+struct uipcp {
+    struct application appl;
+    unsigned int ipcp_id;
+
+    struct list_head node;
+};
 
 /* IPC Manager data model. */
 struct ipcm {
@@ -27,6 +35,8 @@ struct ipcm {
     /* Unix domain socket file descriptor used to accept request from
      * applications. */
     int lfd;
+
+    struct list_head uipcps;
 };
 
 static int
@@ -73,6 +83,93 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
+static struct uipcp *
+uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id)
+{
+    struct uipcp *cur;
+
+    list_for_each_entry(cur, &ipcm->uipcps, node) {
+        if (cur->ipcp_id == ipcp_id) {
+            return cur;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
+{
+    struct uipcp *uipcp;
+    int ret;
+
+    uipcp = malloc(sizeof(*uipcp));
+    if (!uipcp) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+    memset(uipcp, 0, sizeof(*uipcp));
+
+    uipcp->ipcp_id = ipcp_id;
+
+    list_add_tail(&uipcp->node, &ipcm->uipcps);
+
+    ret = rina_application_init(&uipcp->appl);
+    if (ret) {
+        list_del(&uipcp->node);
+        return ret;
+    }
+
+    PD("userspace IPCP %u created\n", ipcp_id);
+
+    return 0;
+}
+
+static int
+uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
+{
+    struct uipcp *uipcp;
+    int ret;
+
+    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    if (!uipcp) {
+        /* The specified IPCP is a Shim IPCP. */
+        return 0;
+    }
+
+    evloop_stop(&uipcp->appl.loop);
+
+    ret = rina_application_fini(&uipcp->appl);
+
+    list_del(&uipcp->node);
+
+    free(uipcp);
+
+    if (ret == 0) {
+        PD("userspace IPCP %u destroyed\n", ipcp_id);
+    }
+
+    return ret;
+}
+
+static int
+uipcps_update(struct ipcm *ipcm)
+{
+    struct ipcp *ipcp;
+    int ret = 0;
+
+    list_for_each_entry(ipcp, &ipcm->loop.ipcps, node) {
+        if (ipcp->dif_type == DIF_TYPE_NORMAL) {
+            ret = uipcp_add(ipcm, ipcp->ipcp_id);
+            if (ret) {
+                return ret;
+            }
+        }
+    }
+
+    return 0;
+}
+
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
 ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
@@ -101,6 +198,10 @@ ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
                          sizeof(*msg), 1, wait_for_completion, result);
 
     ipcps_fetch(&ipcm->loop);
+
+    if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
+        *result = uipcp_add(ipcm, resp->ipcp_id);
+    }
 
     return resp;
 }
@@ -132,6 +233,10 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
+
+    if (result == 0) {
+        result = uipcp_del(ipcm, ipcp_id);
+    }
 
     return result;
 }
@@ -230,6 +335,9 @@ ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
     return result;
 }
 
+/* XXX This code is going to be reused for allocation
+ * of IPCP2IPCP transport flows.
+
 struct rina_msg_base_resp *
 ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
             const struct rina_name *neigh_ipcp_name,
@@ -239,7 +347,6 @@ ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
     struct rina_msg_base_resp *resp;
     int result;
 
-    /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
         PE("%s: Out of memory\n", __func__);
@@ -260,6 +367,7 @@ ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
 
     return resp;
 }
+*/
 
 static int
 test(struct ipcm *ipcm)
@@ -451,10 +559,13 @@ static int
 rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
-    unsigned int ipcp_id, supp_ipcp_id;
+    unsigned int ipcp_id;
     struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
-    struct rina_msg_base_resp *kresp;
+    struct uipcp *uipcp;
+    unsigned int port_id;
+    int fd;
+    int ret;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -464,18 +575,28 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    supp_ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->supp_dif_name, 0);
-    if (supp_ipcp_id == ~0U) {
-        PE("%s: Could not find a supporting IPC process\n", __func__);
+    /* Find the userspace part of the enrolling IPCP. */
+    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    if (!uipcp) {
+        PE("%s: Could not find userspace IPC process %u\n", __func__, ipcp_id);
         goto out;
     }
-    /* Forward the request to the kernel. */
-    kresp = ipcp_enroll(ipcm, ipcp_id, &req->neigh_ipcp_name,
-                              supp_ipcp_id);
-    if (kresp) {
-        resp.result = kresp->result;
-        rina_msg_free(rina_kernel_numtables, RMB(kresp));
+
+    /* Allocate a flow. */
+    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
+                         &req->ipcp_name, &req->neigh_ipcp_name,
+                         &port_id, 2000);
+    if (ret) {
+        goto out;
     }
+
+    fd = open_port(port_id);
+
+    /* Do enrollment here. */
+
+    /* Deallocate the flow. */
+    close(fd);
+
 out:
     return rina_conf_response(sfd, RMB(req), &resp);
 }
@@ -617,6 +738,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    list_init(&ipcm.uipcps);
+
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
     sa.sa_handler = sigint_handler;
@@ -652,10 +775,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Run the script thread. */
     ipcps_fetch(&ipcm.loop);
+    ret = uipcps_update(&ipcm);
+    if (ret) {
+        PE("Failed to load userspace ipcps\n");
+    }
 
     if (enable_testing) {
+        /* Run the hardwired test script. */
         test(&ipcm);
     }
 
