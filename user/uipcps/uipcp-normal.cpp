@@ -98,7 +98,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
 }
 
 int
-mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
+mgmt_write_to_dst_addr(struct uipcp *uipcp, rl_addr_t dst_addr,
                        void *buf, size_t buflen)
 {
     struct rlite_mgmt_hdr mhdr;
@@ -424,7 +424,7 @@ uipcp_rib::dump() const
 }
 
 int
-uipcp_rib::set_address(uint64_t address)
+uipcp_rib::set_address(rl_addr_t address)
 {
     stringstream addr_ss;
 
@@ -465,7 +465,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
+uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                             const UipcpObject *obj)
 {
     struct rl_ipcp *ipcp;
@@ -567,7 +567,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
     return (this->*(hi->second))(rm, nf);
 }
 
-uint64_t
+rl_addr_t
 uipcp_rib::address_allocate() const
 {
     return 0; // TODO

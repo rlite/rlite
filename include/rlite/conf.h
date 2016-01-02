@@ -14,8 +14,8 @@ struct rlite_flow {
     unsigned int ipcp_id;
     unsigned int local_port;
     unsigned int remote_port;
-    uint64_t local_addr;
-    uint64_t remote_addr;
+    rl_addr_t local_addr;
+    rl_addr_t remote_addr;
 
     struct list_head node;
 };

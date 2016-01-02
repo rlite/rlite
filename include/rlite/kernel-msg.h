@@ -95,8 +95,8 @@ struct rl_kmsg_flow_fetch_resp {
     uint16_t ipcp_id;
     uint32_t local_port;
     uint32_t remote_port;
-    uint64_t local_addr;
-    uint64_t remote_addr;
+    rl_addr_t local_addr;
+    rl_addr_t remote_addr;
 } __attribute__((packed));
 
 #define RLITE_UPDATE_ADD    0x01
@@ -110,7 +110,7 @@ struct rl_kmsg_ipcp_update {
 
     uint8_t update_type;
     uint16_t ipcp_id;
-    uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
+    rl_addr_t ipcp_addr;
     uint16_t  depth;
     struct rina_name ipcp_name;
     char *dif_name;
@@ -210,7 +210,7 @@ struct rl_kmsg_ipcp_pduft_set {
     /* The IPCP whose PDUFT is to be modified. */
     uint16_t ipcp_id;
     /* The address of a remote IPCP. */
-    uint64_t dest_addr;
+    rl_addr_t dst_addr;
     /* The local port through which the remote IPCP
      * can be reached. */
     uint16_t local_port;
@@ -240,7 +240,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     uint16_t ipcp_id;
     uint32_t remote_port;
     uint32_t remote_cep;
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
     struct rlite_flow_config flowcfg;
     /* Requested application. */
     struct rina_name local_appl;
@@ -258,7 +258,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     uint32_t local_port;
     uint32_t remote_port;
     uint32_t remote_cep;
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
     uint8_t response;
     struct rlite_flow_config flowcfg;
 } __attribute__((packed));
@@ -272,7 +272,7 @@ struct rl_kmsg_flow_deallocated {
     uint16_t ipcp_id;
     uint32_t local_port_id;
     uint32_t remote_port_id;
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
 } __attribute__((packed));
 
 /* uipcp (application) --> kernel message to ask

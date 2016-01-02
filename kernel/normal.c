@@ -170,7 +170,7 @@ rcv_inact_tmr_cb(long unsigned arg)
     spin_unlock_bh(&dtp->lock);
 }
 
-static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
+static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
                   struct rlite_buf *rb, bool maysleep);
 
 void
@@ -320,14 +320,14 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static struct pduft_entry *
-pduft_lookup_internal(struct rlite_normal *priv, uint64_t dest_addr)
+pduft_lookup_internal(struct rlite_normal *priv, rl_addr_t dst_addr)
 {
     struct pduft_entry *entry;
     struct hlist_head *head;
 
-    head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
+    head = &priv->pdu_ft[hash_min(dst_addr, HASH_BITS(priv->pdu_ft))];
     hlist_for_each_entry(entry, head, node) {
-        if (entry->address == dest_addr) {
+        if (entry->address == dst_addr) {
             return entry;
         }
     }
@@ -336,12 +336,12 @@ pduft_lookup_internal(struct rlite_normal *priv, uint64_t dest_addr)
 }
 
 static struct flow_entry *
-pduft_lookup(struct rlite_normal *priv, uint64_t dest_addr)
+pduft_lookup(struct rlite_normal *priv, rl_addr_t dst_addr)
 {
     struct pduft_entry *entry;
 
     spin_lock_bh(&priv->pduft_lock);
-    entry = pduft_lookup_internal(priv, dest_addr);
+    entry = pduft_lookup_internal(priv, dst_addr);
     spin_unlock_bh(&priv->pduft_lock);
 
     return entry ? entry->flow : NULL;
@@ -350,7 +350,7 @@ pduft_lookup(struct rlite_normal *priv, uint64_t dest_addr)
 #define RMTQ_MAX_LEN    64
 
 static int
-rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
+rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rlite_buf *rb,
        bool maysleep)
 {
     DECLARE_WAITQUEUE(wait, current);
@@ -569,7 +569,7 @@ rlite_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
 {
     struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     struct rina_pci *pci;
-    uint64_t dst_addr = 0; /* Not valid. */
+    rl_addr_t dst_addr = 0; /* Not valid. */
 
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
         *lower_flow = pduft_lookup(priv, mhdr->remote_addr);
@@ -630,11 +630,12 @@ rlite_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     int ret = -EINVAL;
 
     if (strcmp(param_name, "address") == 0) {
-        uint64_t address;
+        rl_addr_t address;
 
         ret = kstrtou64(param_value, 10, &address);
         if (ret == 0) {
-            PI("IPCP %u address set to %llu\n", ipcp->id, address);
+            PI("IPCP %u address set to %lu\n", ipcp->id,
+               (long unsigned)address);
             ipcp->addr = address;
         }
     }
@@ -645,7 +646,7 @@ rlite_normal_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
-rlite_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
+rlite_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
                       struct flow_entry *flow)
 {
     struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
@@ -653,7 +654,7 @@ rlite_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
 
     spin_lock_bh(&priv->pduft_lock);
 
-    entry = pduft_lookup_internal(priv, dest_addr);
+    entry = pduft_lookup_internal(priv, dst_addr);
 
     if (!entry) {
         entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
@@ -661,7 +662,7 @@ rlite_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
             return -ENOMEM;
         }
 
-        hash_add(priv->pdu_ft, &entry->node, dest_addr);
+        hash_add(priv->pdu_ft, &entry->node, dst_addr);
         list_add_tail(&entry->fnode, &flow->pduft_entries);
     } else {
         /* Move from the old list to the new one. */
@@ -670,7 +671,7 @@ rlite_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     }
 
     entry->flow = flow;
-    entry->address = dest_addr;
+    entry->address = dst_addr;
 
     spin_unlock_bh(&priv->pduft_lock);
 

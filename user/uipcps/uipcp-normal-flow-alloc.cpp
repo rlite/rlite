@@ -84,7 +84,7 @@ int
 uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_appl);
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
     CDAPMessage *m;
     FlowRequest freq;
     ConnId conn_id;
@@ -218,7 +218,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
     FlowRequest freq(objbuf, objlen);
     struct rina_name local_appl, remote_appl;
     struct rlite_flow_config flowcfg;
-    uint64_t dft_next_hop;
+    rl_addr_t dft_next_hop;
     int ret;
 
     ret = dft_lookup(freq.dst_app, dft_next_hop);
@@ -324,7 +324,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     map<string, FlowRequest>::iterator f;
     stringstream obj_name;
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
     CDAPMessage *m;
 
     /* Lookup the corresponding FlowRequest, and figure out whether we

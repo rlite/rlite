@@ -47,7 +47,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
 
 int
 uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
-                uint64_t dest_addr, uint32_t local_port)
+                rl_addr_t dst_addr, uint32_t local_port)
 {
     struct rl_kmsg_ipcp_pduft_set *req;
     struct rlite_msg_base *resp;
@@ -64,7 +64,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     req->msg_type = RLITE_KER_IPCP_PDUFT_SET;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
-    req->dest_addr = dest_addr;
+    req->dst_addr = dst_addr;
     req->local_port = local_port;
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table set...\n");
@@ -109,7 +109,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            uint32_t remote_port, uint32_t remote_cep,
-                           uint64_t remote_addr,
+                           rl_addr_t remote_addr,
                            const struct rina_name *local_appl,
                            const struct rina_name *remote_appl,
                            const struct rlite_flow_config *flowcfg)
@@ -154,7 +154,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                             uint32_t remote_port, uint32_t remote_cep,
-                            uint64_t remote_addr,
+                            rl_addr_t remote_addr,
                             uint8_t response, const struct rlite_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req;

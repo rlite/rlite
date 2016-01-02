@@ -15,6 +15,4 @@
 - CDAP: support a simple retransmission mechanism, in case the CDAP
   connection is not supported by a reliable flow
 
-- addr size not consistent (PCI/all the stack)
-
 - support RIB M_READ (and M_WRITE)

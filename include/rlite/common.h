@@ -32,6 +32,7 @@ struct rina_name {
     char *aei;
 } __attribute__((packed));
 
+typedef uint64_t rl_addr_t;
 typedef uint16_t rlite_msg_t;
 
 #define RLITE_SUCC  0
@@ -88,7 +89,7 @@ struct rlite_ioctl_info {
 struct rlite_mgmt_hdr {
     uint8_t type;
     uint32_t local_port;
-    uint64_t remote_addr;
+    rl_addr_t remote_addr;
 } __attribute__((packed));
 
 

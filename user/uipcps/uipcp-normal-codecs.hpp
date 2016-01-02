@@ -15,7 +15,7 @@ struct UipcpObject {
 };
 
 struct EnrollmentInfo : public UipcpObject {
-    uint64_t address;
+    rl_addr_t address;
     std::list< std::string > lower_difs;
     bool start_early;
 
@@ -44,7 +44,7 @@ struct RinaName {
 
 struct DFTEntry : public UipcpObject {
     RinaName appl_name;
-    uint64_t address;
+    rl_addr_t address;
     uint64_t timestamp;
     /* Not externally visible (not serialized), true
      * if this entry refers to an application registered
@@ -67,7 +67,7 @@ struct DFTSlice : public UipcpObject {
 struct NeighborCandidate : public UipcpObject {
     std::string apn;
     std::string api;
-    uint64_t address;
+    rl_addr_t address;
     std::list<std::string> lower_difs;
 
     NeighborCandidate() { }
@@ -84,8 +84,8 @@ struct NeighborCandidateList : public UipcpObject {
 };
 
 struct LowerFlow : public UipcpObject {
-    uint64_t local_addr;
-    uint64_t remote_addr;
+    rl_addr_t local_addr;
+    rl_addr_t remote_addr;
     unsigned int cost;
     unsigned int seqnum;
     bool state;
@@ -248,8 +248,8 @@ struct FlowRequest : public UipcpObject {
     RinaName dst_app;
     uint64_t src_port;
     uint64_t dst_port;
-    uint64_t src_addr;
-    uint64_t dst_addr;
+    rl_addr_t src_addr;
+    rl_addr_t dst_addr;
     std::list<ConnId> connections;
     uint32_t cur_conn_idx;
     uint32_t state;
@@ -272,8 +272,8 @@ struct FlowRequest : public UipcpObject {
 };
 
 struct AData : public UipcpObject {
-    uint64_t src_addr;
-    uint64_t dst_addr;
+    rl_addr_t src_addr;
+    rl_addr_t dst_addr;
     CDAPMessage *cdap;
 
     AData() : cdap(NULL) { }

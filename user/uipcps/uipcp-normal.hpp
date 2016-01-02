@@ -149,17 +149,17 @@ struct Neighbor {
 class SPEngine {
 public:
     SPEngine() {};
-    int run(uint64_t, const std::map<std::string, LowerFlow >& db);
+    int run(rl_addr_t, const std::map<std::string, LowerFlow >& db);
 
     /* The routing table computed by run(). */
-    std::map<uint64_t, uint64_t> next_hops;
+    std::map<rl_addr_t, rl_addr_t> next_hops;
 
 private:
     struct Edge {
-        uint64_t to;
+        rl_addr_t to;
         unsigned int cost;
 
-        Edge(uint64_t to_, unsigned int cost_) :
+        Edge(rl_addr_t to_, unsigned int cost_) :
                             to(to_), cost(cost_) { }
     };
 
@@ -168,8 +168,8 @@ private:
         bool visited;
     };
 
-    std::map<uint64_t, std::list<Edge> > graph;
-    std::map<uint64_t, Info> info;
+    std::map<rl_addr_t, std::list<Edge> > graph;
+    std::map<rl_addr_t, Info> info;
 };
 
 class ScopeLock {
@@ -232,25 +232,25 @@ struct uipcp_rib {
     struct rl_ipcp *ipcp_info() const;
     char *dump() const;
 
-    int set_address(uint64_t address);
+    int set_address(rl_addr_t address);
     Neighbor *get_neighbor(const struct rina_name *neigh_name, bool initiator);
     int del_neighbor(const RinaName& neigh_name);
-    int dft_lookup(const RinaName& appl_name, uint64_t& dstaddr) const;
-    int dft_set(const RinaName& appl_name, uint64_t remote_addr);
+    int dft_lookup(const RinaName& appl_name, rl_addr_t& dstaddr) const;
+    int dft_set(const RinaName& appl_name, rl_addr_t remote_addr);
     int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rl_kmsg_appl_register *req);
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
-    uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
-    RinaName lookup_neighbor_by_address(uint64_t address);
+    rl_addr_t lookup_neighbor_address(const RinaName& neigh_name) const;
+    RinaName lookup_neighbor_by_address(rl_addr_t address);
     int lookup_neigh_flow_by_port_id(unsigned int port_id,
                                      NeighFlow **nfp);
-    int commit_lower_flow(uint64_t local_addr, const Neighbor& neigh);
+    int commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
-    uint64_t address_allocate() const;
+    rl_addr_t address_allocate() const;
 
-    int send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
+    int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);
 
     /* Synchronize neighbors. */

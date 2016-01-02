@@ -943,7 +943,7 @@ flow_put(struct flow_entry *entry)
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
         int ret;
-        uint64_t dest_addr = pfte->address;
+        rl_addr_t dst_addr = pfte->address;
 
         BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
         /* Here we are sure that 'entry->upper.ipcp' will not be destroyed
@@ -952,7 +952,7 @@ flow_put(struct flow_entry *entry)
         if (ret == 0) {
             PD("Removed IPC process %u PDUFT entry: %llu --> %u\n",
                     entry->upper.ipcp->id,
-                    (unsigned long long)dest_addr, entry->local_port);
+                    (unsigned long long)dst_addr, entry->local_port);
         }
     }
 
@@ -1486,7 +1486,7 @@ rlite_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
          * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
          * In this situation we are sure that 'ipcp' will not be deleted before
          * 'flow' is deleted, so we can rely on the internal pduft lock. */
-        ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
+        ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
         mutex_unlock(&ipcp->lock);
     }
 
@@ -1495,7 +1495,7 @@ rlite_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     if (ret == 0) {
         PD("Set IPC process %u PDUFT entry: %llu --> %u\n",
-                req->ipcp_id, (unsigned long long)req->dest_addr,
+                req->ipcp_id, (unsigned long long)req->dst_addr,
                 req->local_port);
     }
 
@@ -2027,7 +2027,7 @@ out:
 int
 rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                     uint32_t remote_port, uint32_t remote_cep,
-                    uint64_t remote_addr,
+                    rl_addr_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
                     const struct rlite_flow_config *flowcfg)
@@ -2092,7 +2092,7 @@ rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
                      uint32_t remote_cep,
-                     uint64_t remote_addr,
+                     rl_addr_t remote_addr,
                      uint8_t response,
                      struct rlite_flow_config *flowcfg)
 {
@@ -2170,7 +2170,7 @@ int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             /* Management PDU for this IPC process. Post it to the userspace
              * IPCP. */
             struct rlite_mgmt_hdr *mhdr;
-            uint64_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
+            rl_addr_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
 
             if (!flow->upper.ipcp->mgmt_txrx) {
                 PE("Missing mgmt_txrx\n");

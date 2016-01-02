@@ -917,7 +917,7 @@ uipcp_rib::del_neighbor(const RinaName& neigh_name)
     return 0;
 }
 
-uint64_t
+rl_addr_t
 uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
 {
     map< string, NeighborCandidate >::const_iterator
@@ -931,7 +931,7 @@ uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
 }
 
 RinaName
-uipcp_rib::lookup_neighbor_by_address(uint64_t address)
+uipcp_rib::lookup_neighbor_by_address(rl_addr_t address)
 {
     map<string, NeighborCandidate>::iterator nit;
 

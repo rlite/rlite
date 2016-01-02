@@ -78,7 +78,7 @@ EXPORT_SYMBOL_GPL(rlite_buf_free);
 void
 rina_pci_dump(struct rina_pci *pci)
 {
-    PD("PCI: dst=%lu,src=%lu,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
+    PD("PCI: dst=%lx,src=%lx,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
         "seq=%lu\n", (long unsigned)pci->dst_addr,
         (long unsigned)pci->src_addr, pci->conn_id.qos_id,
         pci->conn_id.dst_cep, pci->conn_id.src_cep,

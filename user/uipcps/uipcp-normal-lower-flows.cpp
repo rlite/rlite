@@ -6,10 +6,10 @@ using namespace std;
 
 
 int
-uipcp_rib::commit_lower_flow(uint64_t local_addr, const Neighbor& neigh)
+uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
 {
     LowerFlow lf;
-    uint64_t remote_addr = lookup_neighbor_address(neigh.ipcp_name);
+    rl_addr_t remote_addr = lookup_neighbor_address(neigh.ipcp_name);
     int ret;
 
     if (remote_addr == 0) {
@@ -113,7 +113,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 int
-SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
+SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
 {
     /* Clean up state left from the previous run. */
     next_hops.clear();
@@ -141,19 +141,19 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 
 #if 1
     PD_S("Graph [%lu]:\n", db.size());
-    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
+    for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         PD_S("%lu: {", (long unsigned)g->first);
         for (list<Edge>::iterator l = g->second.begin();
                                     l != g->second.end(); l++) {
-            PD_S("(%lu, %u), ", l->to, l->cost);
+            PD_S("(%lu, %u), ", (long unsigned)l->to, l->cost);
         }
         PD_S("}\n");
     }
 #endif
 
     /* Initialize the per-node info map. */
-    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
+    for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         struct Info inf;
 
@@ -165,11 +165,11 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     info[local_addr].dist = 0;
 
     for (;;) {
-        uint64_t min = UINT_MAX;
+        rl_addr_t min = UINT_MAX;
         unsigned int min_dist = UINT_MAX;
 
         /* Select the closest node from the ones in the frontier. */
-        for (map<uint64_t, Info>::iterator i = info.begin();
+        for (map<rl_addr_t, Info>::iterator i = info.begin();
                                         i != info.end(); i++) {
             if (!i->second.visited && i->second.dist < min_dist) {
                 min = i->first;
@@ -203,7 +203,7 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     }
 
     PD_S("Dijkstra result:\n");
-    for (map<uint64_t, Info>::iterator i = info.begin();
+    for (map<rl_addr_t, Info>::iterator i = info.begin();
                                     i != info.end(); i++) {
         PD_S("    Address: %lu, Dist: %u, Visited %u\n",
                 (long unsigned)i->first, i->second.dist,
@@ -211,7 +211,7 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     }
 
     PD_S("Routing table:\n");
-    for (map<uint64_t, uint64_t>::iterator h = next_hops.begin();
+    for (map<rl_addr_t, rl_addr_t>::iterator h = next_hops.begin();
                                         h != next_hops.end(); h++) {
         PD_S("    Address: %lu, Next hop: %lu\n",
              (long unsigned)h->first, (long unsigned)h->second);
@@ -223,14 +223,14 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 int
 uipcp_rib::pduft_sync()
 {
-    map<uint64_t, unsigned int> next_hop_to_port_id;
+    map<rl_addr_t, unsigned int> next_hop_to_port_id;
 
     /* Flush previous entries. */
     uipcp_pduft_flush(uipcp, uipcp->ipcp_id);
 
     /* Precompute the port-ids corresponding to all the possible
      * next-hops. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
+    for (map<rl_addr_t, rl_addr_t>::iterator r = spe.next_hops.begin();
                                         r !=  spe.next_hops.end(); r++) {
         map<string, Neighbor*>::iterator neigh;
         string neigh_name;
@@ -261,7 +261,7 @@ uipcp_rib::pduft_sync()
     }
 
     /* Generate PDUFT entries. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
+    for (map<rl_addr_t, rl_addr_t>::iterator r = spe.next_hops.begin();
                                         r !=  spe.next_hops.end(); r++) {
             unsigned int port_id = next_hop_to_port_id[r->second];
             int ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,

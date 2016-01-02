@@ -19,7 +19,7 @@ struct rl_ipcp {
     /* IPCP attributes. */
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
-    uint64_t ipcp_addr;
+    rl_addr_t ipcp_addr;
     unsigned int depth;
     char *dif_type;
     char *dif_name;
@@ -62,7 +62,7 @@ rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
 
 int
 rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
-                             uint64_t *addr);
+                               rl_addr_t *addr);
 
 struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);

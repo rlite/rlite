@@ -20,7 +20,7 @@ static uint64_t time64()
 
 int
 uipcp_rib::dft_lookup(const RinaName& appl_name,
-                      uint64_t& dstaddr) const
+                      rl_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
          = dft.find(static_cast<string>(appl_name));
@@ -35,7 +35,7 @@ uipcp_rib::dft_lookup(const RinaName& appl_name,
 }
 
 int
-uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
+uipcp_rib::dft_set(const RinaName& appl_name, rl_addr_t remote_addr)
 {
     string key = static_cast<string>(appl_name);
     DFTEntry entry;
@@ -57,7 +57,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 {
     RinaName appl_name(&req->appl_name);
     map< string, DFTEntry >::iterator mit;
-    uint64_t local_addr;
+    rl_addr_t local_addr;
     string name_str;
     int ret;
     bool create = true;
