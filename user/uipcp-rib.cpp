@@ -341,17 +341,6 @@ rib_create(struct uipcp *uipcp)
 extern "C" void
 rib_destroy(struct uipcp_rib *rib)
 {
-    int ret;
-
-    for (map<string, Neighbor>::iterator neigh = rib->neighbors.begin();
-                        neigh != rib->neighbors.end(); neigh++) {
-        ret = close(neigh->second.flow_fd);
-        if (ret) {
-            PE("Error deallocating N-1 flow fd %d\n",
-               neigh->second.flow_fd);
-        }
-    }
-
     delete rib;
 }
 

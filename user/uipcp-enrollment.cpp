@@ -41,6 +41,16 @@ Neighbor::~Neighbor()
     if (conn) {
         delete conn;
     }
+    if (flow_fd != -1) {
+        int ret = close(flow_fd);
+
+        if (ret) {
+            PE("Error deallocating N-1 flow fd %d\n",
+               flow_fd);
+        } else {
+            PD("N-1 flow deallocated [fd=%d]\n", flow_fd);
+        }
+    }
 }
 
 const char *
