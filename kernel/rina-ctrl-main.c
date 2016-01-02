@@ -717,6 +717,16 @@ flow_rc_unbind(struct rina_ctrl *rc)
     }
 }
 
+static void
+flow_orphan(struct flow_entry *flow)
+{
+    if (flow) {
+        FLOCK();
+        flow->refcnt--;
+        FUNLOCK();
+    }
+}
+
 static int
 ipcp_del_entry(struct ipcp_entry *entry, int locked)
 {
@@ -1272,11 +1282,11 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     mutex_unlock(&rina_dm.lock);
 
     flow_entry = flow_put(flow_entry, 1);
-    if (flow_entry) {
-        FLOCK();
-        flow_entry->refcnt--;
-        FUNLOCK();
-    }
+    /* Here reference counter is (likely) 1. Reset it to 0, so that
+     * proper flow destruction happens in rina_io_release(). If we
+     * didn't do it, the flow would live forever with its refcount
+     * set to 1. */
+    flow_orphan(flow_entry);
 
     return ret;
 }
@@ -1386,11 +1396,8 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
 
 out:
     flow_entry = flow_put(flow_entry, 0);
-    if (flow_entry) {
-        FLOCK();
-        flow_entry->refcnt--;
-        FUNLOCK();
-    }
+    /* Same operation as above. */
+    flow_orphan(flow_entry);
 
     if (locked) {
         mutex_unlock(&rina_dm.lock);
