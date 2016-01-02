@@ -460,10 +460,15 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
 }
 
 static int
-sdu_rx_ctrl(struct flow_entry *flow, struct rina_buf *rb)
+sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
+            struct rina_buf *rb)
 {
     struct rina_pci_ctrl *pcic = RINA_BUF_PCI_CTRL(rb);
     struct dtp *dtp = &flow->dtp;
+    struct list_head qrbs;
+    struct rina_buf *qrb;
+
+    INIT_LIST_HEAD(&qrbs);
 
     spin_lock(&dtp->lock);
 
@@ -486,6 +491,39 @@ sdu_rx_ctrl(struct flow_entry *flow, struct rina_buf *rb)
 
     switch (pcic->base.pdu_type) {
         case PDU_TYPE_FC:
+            {
+                struct rina_buf *tmp;
+
+                if (unlikely(pcic->new_rwe < dtp->snd_rwe)) {
+                    /* This should not happen, the other end is
+                     * broken. */
+                    PD("%s: Broken peer, new_rwe would go backward [%lu] "
+                        "--> [%lu]\n", __func__, (long unsigned)dtp->snd_rwe,
+                            (long unsigned)pcic->new_rwe);
+                    break;
+                }
+
+                PD("%s: snd_rwe [%lu] --> [%lu]\n", __func__,
+                        (long unsigned)dtp->snd_rwe,
+                        (long unsigned)pcic->new_rwe);
+
+                /* Update snd_rwe. */
+                dtp->snd_rwe = pcic->new_rwe;
+
+                /* The update may have unblocked PDU in the cwq,
+                 * let's pop them out. */
+                list_for_each_entry_safe(qrb, tmp, &dtp->cwq, node) {
+                    if (dtp->snd_lwe >= dtp->snd_rwe) {
+                        break;
+                    }
+                    list_del(&qrb->node);
+                    dtp->cwq_len--;
+                    list_add_tail(&qrb->node, &qrbs);
+                    dtp->last_seq_num_sent = dtp->snd_lwe++;
+                }
+                break;
+            }
+
         case PDU_TYPE_ACK_AND_FC:
         case PDU_TYPE_CC:
         case PDU_TYPE_ACK:
@@ -504,6 +542,15 @@ out:
     spin_unlock(&dtp->lock);
 
     rina_buf_free(rb);
+
+    /* Send PDUs popped out from cwq, if any. */
+    list_for_each_entry(qrb, &qrbs, node) {
+        struct rina_pci *pci = RINA_BUF_PCI(qrb);
+
+        PD("%s: sending [%lu] from cwq\n", __func__,
+                (long unsigned)pci->seqnum);
+        rmt_tx(ipcp, pci->seqnum, qrb);
+    }
 
     return 0;
 }
@@ -535,7 +582,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     if (pci->pdu_type != PDU_TYPE_DT) {
         /* This is a control PDU. */
-        return sdu_rx_ctrl(flow, rb);
+        return sdu_rx_ctrl(ipcp, flow, rb);
     }
 
     /* This is data transfer PDU. */
