@@ -292,7 +292,7 @@ perf_client(struct rinaperf *rp)
 
 static void
 rate_print(unsigned long long *limit, struct timespec *ts,
-           unsigned int bytes)
+           unsigned long long bytes)
 {
         struct timespec now;
         unsigned long long elapsed_ns;
@@ -362,7 +362,7 @@ perf_server(struct rinaperf *rp)
 
         if (rate_cnt == rate_cnt_limit) {
             rate_print(&rate_cnt_limit, &rate_ts,
-                    rate_bytes);
+                       rate_bytes);
             rate_cnt = 0;
             rate_bytes = 0;
         }
