@@ -84,6 +84,7 @@ struct ipcp_entry {
     bool                use_cep_ids;
     struct ipcp_ops     ops;
     void                *priv;
+    uint8_t             depth;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
     struct rina_ctrl    *uipcp;

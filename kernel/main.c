@@ -429,6 +429,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->uipcp = NULL;
         entry->mgmt_txrx = NULL;
         entry->refcnt = 1;
+        entry->depth = RLITE_DEFAULT_LAYERS;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
         mutex_init(&entry->lock);
@@ -1339,9 +1340,19 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     entry = ipcp_get(req->ipcp_id);
 
     if (entry) {
-        mutex_lock(&entry->lock);
-        ret = entry->ops.config(entry, req->name, req->value);
-        mutex_unlock(&entry->lock);
+        if (strcmp(req->name, "depth") == 0) {
+            uint8_t depth;
+
+            ret = kstrtou8(req->value, 10, &depth);
+            if (ret) {
+                entry->depth = depth;
+            }
+
+        } else {
+            mutex_lock(&entry->lock);
+            ret = entry->ops.config(entry, req->name, req->value);
+            mutex_unlock(&entry->lock);
+        }
     }
 
     ipcp_put(entry);
@@ -2310,7 +2321,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         ulen -= sizeof(mhdr);
     }
 
-    rb = rlite_buf_alloc(ulen, RLITE_MAX_LAYERS, GFP_KERNEL);
+    rb = rlite_buf_alloc(ulen, RLITE_DEFAULT_LAYERS, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }

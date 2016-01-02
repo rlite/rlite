@@ -141,7 +141,7 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
         return;
     }
 
-    rb = rlite_buf_alloc(len, RLITE_MAX_LAYERS, GFP_ATOMIC);
+    rb = rlite_buf_alloc(len, RLITE_DEFAULT_LAYERS, GFP_ATOMIC);
     if (!rb) {
         printk("Out of memory\n");
         return;
