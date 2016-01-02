@@ -14,8 +14,8 @@
 struct rinaperf {
     struct application application;
 
-    struct rina_name this_application;
-    struct rina_name remote_application;
+    struct rina_name client_appl_name;
+    struct rina_name server_appl_name;
     struct rina_name dif_name;
     unsigned int ctrl_port_id;
 };
@@ -35,8 +35,8 @@ echo_client(struct rinaperf *rp)
         size = sizeof(buf);
     }
 
-    ret = flow_allocate(&rp->application, &rp->dif_name, &rp->this_application,
-                        &rp->remote_application, &data_port_id);
+    ret = flow_allocate(&rp->application, &rp->dif_name, &rp->client_appl_name,
+                        &rp->server_appl_name, &data_port_id);
     if (ret) {
         return ret;
     }
@@ -156,6 +156,7 @@ main(int argc, char **argv)
     const char *type = "echo";
     const char *dif_name = "d.DIF";
     perf_function_t perf_function = NULL;
+    struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
     int ret;
     int opt;
@@ -208,19 +209,25 @@ main(int argc, char **argv)
 
     /* Rinaperf-specific initialization. */
     rina_name_fill(&rp.dif_name, dif_name, "", "", "");
-    if (listen) {
-        rina_name_fill(&rp.this_application, "server", "1", NULL, NULL);
-        rina_name_fill(&rp.remote_application, "client", "1", NULL, NULL);
+    rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", "", "");
+    rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", "", "");
+    rina_name_fill(&rp.client_appl_name, "rinaperf-data", "client", NULL, NULL);
+    rina_name_fill(&rp.server_appl_name, "rinaperf-data", "server", NULL, NULL);
 
-        /* In listen mode also register the application. */
+    if (listen) {
+        /* Server-side initializations. */
+
+        /* In listen mode also register the application names. */
         ret = application_register(&rp.application, 1, &rp.dif_name,
-                                   &rp.this_application);
+                                   &server_ctrl_name);
         if (ret) {
             return ret;
         }
-    } else {
-        rina_name_fill(&rp.this_application, "client", "1", NULL, NULL);
-        rina_name_fill(&rp.remote_application, "server", "1", NULL, NULL);
+        ret = application_register(&rp.application, 1, &rp.dif_name,
+                                   &rp.server_appl_name);
+        if (ret) {
+            return ret;
+        }
     }
 
     /* Run the perf function. */
