@@ -7,6 +7,13 @@ no_cmake() {
 }
 
 
+# Check if kernel headers are there for out-of-tree build
+if [ ! -d /lib/modules/`uname -r`/build ]; then
+    echo "Cannot find '/lib/modules/$(uname -r)/build' directory"
+    echo "Make sure headers for the running kernel are installed"
+    exit 1
+fi
+
 # Make sure CMake is installed
 which cmake || no_cmake
 
