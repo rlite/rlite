@@ -1,5 +1,5 @@
 /*
- * Definition of configuration control messages.
+ * Definition of uipcps control messages.
  *
  * Copyright (C) 2014-2015 Vincenzo Maffione <v.maffione@gmail.com>
  *
@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __RLITE_CFG_MSG_H__
-#define __RLITE_CFG_MSG_H__
+#ifndef __RLITE_U_MSG_H__
+#define __RLITE_U_MSG_H__
 
 #include <stdint.h>
 
@@ -30,19 +30,19 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RLITE_CFG_IPCP_REGISTER = 1,  /* 1 */
-    RLITE_CFG_IPCP_ENROLL,        /* 2 */
-    RLITE_CFG_IPCP_DFT_SET,       /* 3 */
-    RLITE_CFG_BASE_RESP,          /* 4 */
-    RLITE_CFG_IPCP_RIB_SHOW_REQ,  /* 5 */
-    RLITE_CFG_IPCP_RIB_SHOW_RESP, /* 6 */
+    RLITE_U_IPCP_REGISTER = 1,  /* 1 */
+    RLITE_U_IPCP_ENROLL,        /* 2 */
+    RLITE_U_IPCP_DFT_SET,       /* 3 */
+    RLITE_U_BASE_RESP,          /* 4 */
+    RLITE_U_IPCP_RIB_SHOW_REQ,  /* 5 */
+    RLITE_U_IPCP_RIB_SHOW_RESP, /* 6 */
 
-    RLITE_CFG_MSG_MAX,
+    RLITE_U_MSG_MAX,
 };
 
 /* Numtables for rlite-ctl <==> uipcp-server messages exchange. */
 
-extern struct rlite_msg_layout rlite_conf_numtables[RLITE_CFG_MSG_MAX + 1];
+extern struct rlite_msg_layout rlite_uipcps_numtables[RLITE_U_MSG_MAX + 1];
 
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
@@ -97,4 +97,4 @@ struct rl_cmsg_ipcp_rib_show_resp {
     char *dump;
 } __attribute__((packed));
 
-#endif  /* __RLITE_CFG_MSG_H__ */
+#endif  /* __RLITE_U_MSG_H__ */

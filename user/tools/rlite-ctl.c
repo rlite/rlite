@@ -34,7 +34,7 @@
 
 #include "../helpers.h"
 #include "rlite/list.h"
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 #include "rlite/rlite.h"
 #include "rlite/conf.h"
 
@@ -90,7 +90,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+    ret = deserialize_rlite_msg(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
                                serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("error while deserializing response [%d]\n",
@@ -264,7 +264,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
         return -1;
     }
 
-    req.msg_type = RLITE_CFG_IPCP_REGISTER;
+    req.msg_type = RLITE_U_IPCP_REGISTER;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
     req.reg = reg;
@@ -311,7 +311,7 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
         return -1;
     }
 
-    req.msg_type = RLITE_CFG_IPCP_ENROLL;
+    req.msg_type = RLITE_U_IPCP_ENROLL;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
     rina_name_fill(&req.neigh_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
@@ -350,7 +350,7 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
         return -1;
     }
 
-    req.msg_type = RLITE_CFG_IPCP_DFT_SET;
+    req.msg_type = RLITE_U_IPCP_DFT_SET;
     req.event_id = 0;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
@@ -411,7 +411,7 @@ ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
         return -1;
     }
 
-    req.msg_type = RLITE_CFG_IPCP_RIB_SHOW_REQ;
+    req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
     req.event_id = 0;
 
     return request_response(RLITE_MB(&req),

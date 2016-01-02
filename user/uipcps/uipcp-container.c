@@ -25,7 +25,7 @@
 #include <string.h>
 
 #include "rlite/utils.h"
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 
 #include "uipcp-container.h"
 #include "rlite/evloop.h"

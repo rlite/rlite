@@ -28,7 +28,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 #include "rlite/evloop.h"
 #include "rlite/cdap.hpp"
 

@@ -23,7 +23,7 @@
 
 #include <pthread.h>
 
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 #include "rlite/kernel-msg.h"
 #include "rlite/list.h"
 #include "rlite/evloop.h"

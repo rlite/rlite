@@ -37,7 +37,7 @@
 #include <pthread.h>
 
 #include "rlite/kernel-msg.h"
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
 #include "rlite/list.h"
 #include "rlite/evloop.h"
@@ -67,10 +67,10 @@ struct registered_ipcp {
 static struct uipcps guipcps;
 
 static int
-rlite_conf_response(int sfd, struct rlite_msg_base *req,
+rlite_u_response(int sfd, struct rlite_msg_base *req,
                    struct rlite_msg_base_resp *resp)
 {
-    resp->msg_type = RLITE_CFG_BASE_RESP;
+    resp->msg_type = RLITE_U_BASE_RESP;
     resp->event_id = req->event_id;
 
     return rlite_msg_write_fd(sfd, RLITE_MB(resp));
@@ -158,7 +158,7 @@ ipcp_register(struct uipcps *uipcps,
 }
 
 static int
-rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
+rlite_u_ipcp_register(struct uipcps *uipcps, int sfd,
                         const struct rlite_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
@@ -166,7 +166,7 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
 
     resp.result = ipcp_register(uipcps, req);
 
-    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
+    return rlite_u_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -187,7 +187,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
 }
 
 static int
-rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
+rlite_u_ipcp_enroll(struct uipcps *uipcps, int sfd,
                        const struct rlite_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
@@ -195,11 +195,11 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
 
     resp.result = ipcp_enroll(uipcps, req);
 
-    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
+    return rlite_u_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
-rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
+rlite_u_ipcp_dft_set(struct uipcps *uipcps, int sfd,
                        const struct rlite_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_dft_set *req = (struct rl_cmsg_ipcp_dft_set *)b_req;
@@ -220,11 +220,11 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     uipcp_put(uipcps, uipcp->id);
 
 out:
-    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
+    return rlite_u_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
-rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
+rlite_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                         const struct rlite_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_rib_show_req *req =
@@ -251,7 +251,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     uipcp_put(uipcps, uipcp->id);
 
 out:
-    resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
+    resp.msg_type = RLITE_U_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
     ret = rlite_msg_write_fd(sfd, RLITE_MB(&resp));
@@ -268,11 +268,11 @@ typedef int (*rlite_req_handler_t)(struct uipcps *uipcps, int sfd,
 
 /* The table containing all application request handlers. */
 static rlite_req_handler_t rlite_config_handlers[] = {
-    [RLITE_CFG_IPCP_REGISTER] = rlite_conf_ipcp_register,
-    [RLITE_CFG_IPCP_ENROLL] = rlite_conf_ipcp_enroll,
-    [RLITE_CFG_IPCP_DFT_SET] = rlite_conf_ipcp_dft_set,
-    [RLITE_CFG_IPCP_RIB_SHOW_REQ] = rlite_conf_ipcp_rib_show,
-    [RLITE_CFG_MSG_MAX] = NULL,
+    [RLITE_U_IPCP_REGISTER] = rlite_u_ipcp_register,
+    [RLITE_U_IPCP_ENROLL] = rlite_u_ipcp_enroll,
+    [RLITE_U_IPCP_DFT_SET] = rlite_u_ipcp_dft_set,
+    [RLITE_U_IPCP_RIB_SHOW_REQ] = rlite_u_ipcp_rib_show,
+    [RLITE_U_MSG_MAX] = NULL,
 };
 
 struct worker_info {
@@ -299,7 +299,7 @@ worker_fn(void *opaque)
     }
 
     /* Deserialize into a formatted message. */
-    ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+    ret = deserialize_rlite_msg(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
             serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("deserialization error [%d]\n", ret);
@@ -312,7 +312,7 @@ worker_fn(void *opaque)
 
         PE("Invalid message received [type=%d]\n",
                 req->msg_type);
-        resp.msg_type = RLITE_CFG_BASE_RESP;
+        resp.msg_type = RLITE_U_BASE_RESP;
         resp.event_id = req->event_id;
         resp.result = RLITE_ERR;
         rlite_msg_write_fd(wi->cfd, RLITE_MB(&resp));
@@ -325,7 +325,7 @@ worker_fn(void *opaque)
         }
     }
 
-    rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX, req);
+    rlite_msg_free(rlite_uipcps_numtables, RLITE_U_MSG_MAX, req);
 
     /* Close the connection. */
     close(wi->cfd);
@@ -462,7 +462,7 @@ process_persistence_file(struct uipcps *uipcps)
             msg.dif_name = strdup(s1);
             if (ret || !msg.dif_name) {
                 PE("Out of memory\n");
-                rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+                rlite_msg_free(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
                                RLITE_MB(&msg));
                 continue;
             }
@@ -470,7 +470,7 @@ process_persistence_file(struct uipcps *uipcps)
             ret = ipcp_register(uipcps, &msg);
             PI("Automatic re-registration for %s --> %s\n",
                     s2, (ret == RLITE_SUCC) ? "DONE" : "FAILED");
-            rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+            rlite_msg_free(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
                            RLITE_MB(&msg));
 
         } else if (strncmp(s0, "ENR", 3) == 0) {
@@ -489,7 +489,7 @@ process_persistence_file(struct uipcps *uipcps)
             msg.supp_dif_name = strdup(s4);
             if (ret || !msg.dif_name || !msg.supp_dif_name) {
                 PE("Out of memory\n");
-                rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+                rlite_msg_free(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
                                RLITE_MB(&msg));
                 continue;
             }
@@ -497,7 +497,7 @@ process_persistence_file(struct uipcps *uipcps)
             ret = ipcp_enroll(uipcps, &msg);
             PI("Automatic re-enrollment for %s in DIF %s --> %s\n", s2, s1,
                (ret == RLITE_SUCC) ? "DONE" : "FAILED");
-            rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+            rlite_msg_free(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
                            RLITE_MB(&msg));
         }
     }

@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include "rlite/kernel-msg.h"
-#include "rlite/conf-msg.h"
+#include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
 
 #include "list.h"
