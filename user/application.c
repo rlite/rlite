@@ -77,6 +77,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     }
     pfr->ipcp_id = req->ipcp_id;
     pfr->port_id = req->port_id;
+    rina_name_copy(&pfr->remote_appl, &req->remote_appl);
 
     pthread_mutex_lock(&application->lock);
     list_add_tail(&pfr->node, &application->pending_flow_reqs);
@@ -352,7 +353,7 @@ flow_request_wait_open(struct application *application)
     result = flow_allocate_resp(application, pfr->ipcp_id,
             pfr->port_id, 0);
     port_id = pfr->port_id;
-    free(pfr);
+    pfr_free(pfr);
 
     if (result) {
         return -1;

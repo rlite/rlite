@@ -518,20 +518,22 @@ uipcp_server(void *arg)
 
         result = flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
                                     pfr->port_id, 0);
-        free(pfr);
 
         if (result) {
+            pfr_free(pfr);
             free(neigh);
             continue;
         }
 
         neigh->flow_fd = open_port_ipcp(port_id, uipcp->ipcp_id);
         if (neigh->flow_fd < 0) {
+            pfr_free(pfr);
             free(neigh);
             continue;
         }
-        rina_name_fill(&neigh->ipcp_name, "Unknown", NULL, NULL, NULL);
+        rina_name_copy(&neigh->ipcp_name, &pfr->remote_appl);
         list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
+        pfr_free(pfr);
 
         /* XXX This usleep() is a temporary hack to make sure that the
          * flow allocation response has the time to be processed by the neighbor,

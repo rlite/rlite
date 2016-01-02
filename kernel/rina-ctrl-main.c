@@ -1214,12 +1214,14 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     req.event_id = 0;
     req.ipcp_id = ipcp->id;
     req.port_id = flow_entry->local_port;
+    rina_name_copy(&req.remote_appl, remote_application);
 
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);
     if (ret) {
         flow_del_entry(flow_entry, 0);
     }
+    rina_name_free(&req.remote_appl);
 out:
     if (locked) {
         mutex_unlock(&rina_dm.lock);

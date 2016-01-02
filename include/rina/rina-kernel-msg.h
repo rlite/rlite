@@ -127,6 +127,7 @@ struct rina_kmsg_fa_req_arrived {
 
     uint32_t port_id;
     uint16_t ipcp_id;
+    struct rina_name remote_appl;
 } __attribute__((packed));
 
 /* application --> kernel to respond to an incoming flow request. */

@@ -10,9 +10,17 @@
 struct pending_flow_req {
     uint16_t ipcp_id;
     uint32_t port_id;
+    struct rina_name remote_appl;
 
     struct list_head node;
 };
+
+static inline void
+pfr_free(struct pending_flow_req *pfr)
+{
+    rina_name_free(&pfr->remote_appl);
+    free(pfr);
+}
 
 /* Application data model. */
 struct application {
