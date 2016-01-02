@@ -71,6 +71,7 @@ struct rina_cmsg_uipcp_update {
     uint32_t event_id;
 
     uint16_t ipcp_id;
+    char *dif_type;
 } __attribute__((packed));
 
 #define rina_cmsg_ipcp_rib_show_req rina_cmsg_uipcp_update

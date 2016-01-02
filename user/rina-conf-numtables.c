@@ -19,13 +19,19 @@ struct rina_msg_layout rina_conf_numtables[] = {
         .names = 1,
     },
     [RINA_CONF_UIPCP_CREATE] = {
-        .copylen = sizeof(struct rina_cmsg_uipcp_update),
+        .copylen = sizeof(struct rina_cmsg_uipcp_update) -
+                   1 * sizeof(char *),
+        .strings = 1,
     },
     [RINA_CONF_UIPCP_DESTROY] = {
-        .copylen = sizeof(struct rina_cmsg_uipcp_update),
+        .copylen = sizeof(struct rina_cmsg_uipcp_update) -
+                   1 * sizeof(char *),
+        .strings = 1,
     },
     [RINA_CONF_UIPCP_UPDATE] = {
-        .copylen = sizeof(struct rina_cmsg_uipcp_update),
+        .copylen = sizeof(struct rina_cmsg_uipcp_update) -
+                   1 * sizeof(char *),
+        .strings = 1,
     },
     [RINA_CONF_BASE_RESP] = {
         .copylen = sizeof(struct rina_msg_base_resp),

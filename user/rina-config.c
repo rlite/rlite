@@ -153,15 +153,39 @@ request_response(struct rina_msg_base *req, int verbose,
 }
 
 static int
-uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id)
+uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
+             const char *dif_type)
 {
     struct rina_cmsg_uipcp_update req;
 
     req.msg_type = update_type;
     req.event_id = 0;
     req.ipcp_id = ipcp_id;
+    if (dif_type) {
+        req.dif_type = strdup(dif_type);
+        if (!req.dif_type) {
+            PE("Out of memory\n");
+            return -1;
+        }
+    } else {
+        req.dif_type = NULL;
+    }
 
     return request_response((struct rina_msg_base *)&req, 0, NULL);
+}
+
+static int
+type_has_uipcp(const char *dif_type)
+{
+    if (strcmp(dif_type, "normal") == 0) {
+        return 1;
+    }
+
+    if (strcmp(dif_type, "shim-inet4") == 0) {
+        return 1;
+    }
+
+    return 0;
 }
 
 /* Create an IPC process. */
@@ -194,10 +218,10 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
 
     rlite_ipcps_fetch(&rc->loop);
 
-    if (strcmp(dif_type, "normal") == 0 && *result == 0 && resp) {
-        uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id);
+    if (type_has_uipcp(dif_type) && *result == 0 && resp) {
+        uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id, dif_type);
     } else {
-        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
+        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
     }
 
     return resp;
@@ -248,8 +272,8 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
         return ENOMEM;
     }
 
-    if (strcmp(dif_type, "normal") == 0) {
-        uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id);
+    if (type_has_uipcp(dif_type)) {
+        uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id, dif_type);
     }
 
     memset(msg, 0, sizeof(*msg));
@@ -265,7 +289,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     rlite_ipcps_fetch(&rc->loop);
 
-    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, ipcp_id);
+    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
 
     return result;
 }
@@ -307,7 +331,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
         rlite_ipcps_fetch(&rc->loop);
-        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
+        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
     }
 
     return result;
