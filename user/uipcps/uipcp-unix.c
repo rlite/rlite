@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <endian.h>
+#include <sys/stat.h>
 
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
@@ -517,6 +518,11 @@ int main(int argc, char **argv)
     if (ret) {
         perror("listen(AF_UNIX)");
         exit(EXIT_FAILURE);
+    }
+
+    if (chmod("/dev/rlite", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
+                        | S_IROTH | S_IWOTH)) {
+        perror("warning: fchmod(/dev/rlite) failed\n");
     }
 
     list_init(&uipcps->uipcps);
