@@ -467,6 +467,7 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
             PD("Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
                ep->port_id, ep->kevent_id, ep->fd);
             close(ep->fd);
+            list_del(&ep->node);
             free(ep);
             return 0;
         }
