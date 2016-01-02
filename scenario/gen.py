@@ -42,6 +42,9 @@ while 1:
 
     line = line.replace('\n', '')
 
+    if line.startswith('#'):
+        continue
+
     m = re.match(r'\s*vm\s+(\w+)', line)
     if m:
         name = m.group(1)
