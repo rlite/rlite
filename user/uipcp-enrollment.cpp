@@ -117,12 +117,18 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
     if (ret) {
         PE("message serialization failed\n");
         if (serbuf) {
-            delete serbuf;
+            delete [] serbuf;
         }
         return -1;
     }
 
-    return mgmt_write_to_local_port(rib->uipcp, port_id, serbuf, serlen);
+    ret = mgmt_write_to_local_port(rib->uipcp, port_id, serbuf, serlen);
+
+    if (serbuf) {
+        delete [] serbuf;
+    }
+
+    return ret;
 }
 
 void
