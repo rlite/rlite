@@ -167,6 +167,16 @@ struct FlowCtrlConfig {
     uint8_t fc_type;
     WindowBasedFlowCtrlConfig win;
     RateBasedFlowCtrlConfig rate;
+    uint64_t sent_bytes_th;
+    uint64_t sent_bytes_perc_th;
+    uint64_t sent_buffer_th;
+    uint64_t rcv_bytes_th;
+    uint64_t rcv_bytes_perc_th;
+    uint64_t rcv_buffers_th;
+    PolicyDescr closed_win;
+    PolicyDescr flow_ctrl_overrun;
+    PolicyDescr reconcile_flow_ctrl;
+    PolicyDescr receiving_flow_ctrl;
 
     FlowCtrlConfig() { }
     FlowCtrlConfig(const char *buf, unsigned int size);

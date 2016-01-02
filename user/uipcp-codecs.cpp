@@ -614,6 +614,16 @@ gpb2FlowCtrlConfig(FlowCtrlConfig& cfg,
     }
     gpb2WindowBasedFlowCtrlConfig(cfg.win, gm.windowbasedconfig());
     gpb2RateBasedFlowCtrlConfig(cfg.rate, gm.ratebasedconfig());
+    cfg.sent_bytes_th = gm.sentbytesthreshold();
+    cfg.sent_bytes_perc_th = gm.sentbytespercentthreshold();
+    cfg.sent_buffer_th = gm.sentbuffersthreshold();
+    cfg.rcv_bytes_th = gm.rcvbytesthreshold();
+    cfg.rcv_bytes_perc_th = gm.rcvbytespercentthreshold();
+    cfg.rcv_buffers_th = gm.rcvbuffersthreshold();
+    gpb2PolicyDescr(cfg.closed_win, gm.closedwindowpolicy());
+    gpb2PolicyDescr(cfg.flow_ctrl_overrun, gm.flowcontroloverrunpolicy());
+    gpb2PolicyDescr(cfg.reconcile_flow_ctrl, gm.reconcileflowcontrolpolicy());
+    gpb2PolicyDescr(cfg.receiving_flow_ctrl, gm.receivingflowcontrolpolicy());
 }
 
 static int
@@ -622,6 +632,7 @@ FlowCtrlConfig2gpb(const FlowCtrlConfig& cfg,
 {
     gpb::dtcpWindowBasedFlowControlConfig_t *w;
     gpb::dtcpRateBasedFlowControlConfig_t *r;
+    gpb::policyDescriptor_t *p;
 
     gm.set_windowbased(cfg.fc_type == RINA_FC_T_WIN);
     gm.set_ratebased(cfg.fc_type == RINA_FC_T_RATE);
@@ -633,6 +644,29 @@ FlowCtrlConfig2gpb(const FlowCtrlConfig& cfg,
     r = new gpb::dtcpRateBasedFlowControlConfig_t;
     RateBasedFlowCtrlConfig2gpb(cfg.rate, *r);
     gm.set_allocated_ratebasedconfig(r);
+
+    gm.set_sentbytesthreshold(cfg.sent_bytes_th);
+    gm.set_sentbytespercentthreshold(cfg.sent_bytes_perc_th);
+    gm.set_sentbuffersthreshold(cfg.sent_buffer_th);
+    gm.set_rcvbytesthreshold(cfg.rcv_bytes_th);
+    gm.set_rcvbytespercentthreshold(cfg.rcv_bytes_perc_th);
+    gm.set_rcvbuffersthreshold(cfg.rcv_buffers_th);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.closed_win, *p);
+    gm.set_allocated_closedwindowpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.flow_ctrl_overrun, *p);
+    gm.set_allocated_flowcontroloverrunpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.reconcile_flow_ctrl, *p);
+    gm.set_allocated_reconcileflowcontrolpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.receiving_flow_ctrl, *p);
+    gm.set_allocated_receivingflowcontrolpolicy(p);
 
     return 0;
 }
