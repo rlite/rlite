@@ -473,8 +473,12 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
     struct rina_pci *pci = RINA_BUF_PCI(rb);
     struct flow_entry *flow = flow_lookup(pci->conn_id.dst_cep);
-    struct dtp *dtp;
+    uint64_t seqnum = pci->seqnum;
     struct rina_buf *crb = NULL;
+    unsigned int a = 0;
+    struct dtp *dtp;
+    bool deliver;
+    bool drop;
     int ret = 0;
 
     if (!flow) {
@@ -509,8 +513,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         /* Flush reassembly queue */
 
-        dtp->rcv_lwe = pci->seqnum + 1;
-        dtp->max_seq_num_rcvd = pci->seqnum;
+        dtp->rcv_lwe = seqnum + 1;
+        dtp->max_seq_num_rcvd = seqnum;
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
@@ -521,11 +525,11 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         goto snd_crb;
     }
 
-    if (unlikely(pci->seqnum < dtp->rcv_lwe)) {
+    if (unlikely(seqnum < dtp->rcv_lwe)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
         PD("%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
-                (long unsigned)pci->seqnum);
+                (long unsigned)seqnum);
         rina_buf_free(rb);
 
         if (flow->cfg.dtcp.flow_control &&
@@ -542,100 +546,95 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         goto snd_crb;
 
+    }
+
+    if (unlikely(dtp->rcv_lwe < seqnum &&
+                seqnum <= dtp->max_seq_num_rcvd)) {
+        /* This may go in a gap or be a duplicate
+         * amongst the gaps. */
+
+        PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
+                __func__, (long unsigned)dtp->rcv_lwe,
+                (unsigned long)seqnum + 1);
+
+    } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
+        /* In order PDU. */
+
     } else {
-        bool drop;
-        bool deliver;
-        unsigned int a = 0;
-        uint64_t seqnum = pci->seqnum;
+        /* Out of order. */
+        PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+                __func__, (long unsigned)dtp->rcv_lwe,
+                (unsigned long)seqnum + 1);
+    }
 
-        if (unlikely(dtp->rcv_lwe < seqnum &&
-                    seqnum <= dtp->max_seq_num_rcvd)) {
-            /* This may go in a gap or be a duplicate
-             * amongst the gaps. */
+    if (seqnum > dtp->max_seq_num_rcvd) {
+        dtp->max_seq_num_rcvd = seqnum;
+    }
 
-            PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
-                    __func__, (long unsigned)dtp->rcv_lwe,
-                    (unsigned long)seqnum + 1);
+    /* Here we may have received a PDU that it's not the next expected
+     * sequence number or generally that does no meet the max_sdu_gap
+     * constraint.
+     * This can happen because of lost PDUs and/or out of order PDUs
+     * arrival. In this case we never drop it when:
+     *
+     * - The flow does not require in order delivery and DTCP is
+     *   not present, simply because in this case the flow is
+     *   completely unreliable. Note that in this case the
+     *   max_sdu_gap constraint is ignored.
+     *
+     * - There is RTX control, because the gaps could be filled by
+     *   future retransmissions.
+     *
+     * - The A timeout is more than zero, because gaps could be
+     *   filled by PDUs arriving out of order or retransmitted
+     *   __before__ the A timer expires.
+     */
+    drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) &&
+            !a && !flow->cfg.dtcp.rtx_control &&
+            seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
 
-        } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
-            /* In order PDU. */
+    deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
 
-        } else {
-            /* Out of order. */
-            PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
-                    __func__, (long unsigned)dtp->rcv_lwe,
-                    (unsigned long)seqnum + 1);
-        }
+    if (deliver) {
+        /* Update rcv_lwe only if this PDU is going to be
+         * delivered. */
+        dtp->rcv_lwe = seqnum + 1;
+    }
 
-        if (seqnum > dtp->max_seq_num_rcvd) {
-            dtp->max_seq_num_rcvd = seqnum;
-        }
+    if (deliver) {
+        struct list_head qrbs;
+        struct rina_buf *qrb;
 
-        /* Here we may have received a PDU that it's not the next expected
-         * sequence number or generally that does no meet the max_sdu_gap
-         * constraint.
-         * This can happen because of lost PDUs and/or out of order PDUs
-         * arrival. In this case we never drop it when:
-         *
-         * - The flow does not require in order delivery and DTCP is
-         *   not present, simply because in this case the flow is
-         *   completely unreliable. Note that in this case the
-         *   max_sdu_gap constraint is ignored.
-         *
-         * - There is RTX control, because the gaps could be filled by
-         *   future retransmissions.
-         *
-         * - The A timeout is more than zero, because gaps could be
-         *   filled by PDUs arriving out of order or retransmitted
-         *   __before__ the A timer expires.
-         */
-        drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) &&
-                !a && !flow->cfg.dtcp.rtx_control &&
-                seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
-
-        deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
-
-        if (deliver) {
-            /* Update rcv_lwe only if this PDU is going to be
-             * delivered. */
-            dtp->rcv_lwe = seqnum + 1;
-        }
-
-        if (deliver) {
-            struct list_head qrbs;
-            struct rina_buf *qrb;
-
-            seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
-
-            crb = sdu_rx_sv_update(ipcp, flow);
-
-            spin_unlock(&dtp->lock);
-
-            ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-
-            list_for_each_entry(qrb, &qrbs, node) {
-                ret |= rina_sdu_rx(ipcp, qrb, pci->conn_id.dst_cep);
-            }
-
-            goto snd_crb;
-        }
-
-        if (drop) {
-            PD("%s: dropping PDU [%lu] to meet QoS requirements\n",
-                    __func__, (long unsigned)seqnum);
-            rina_buf_free(rb);
-
-        } else {
-            /* What is not dropped nor delivered goes in the
-             * sequencing queue.
-             */
-            seqq_push(dtp, rb);
-        }
+        seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
         spin_unlock(&dtp->lock);
+
+        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+
+        list_for_each_entry(qrb, &qrbs, node) {
+            ret |= rina_sdu_rx(ipcp, qrb, pci->conn_id.dst_cep);
+        }
+
+        goto snd_crb;
     }
+
+    if (drop) {
+        PD("%s: dropping PDU [%lu] to meet QoS requirements\n",
+                __func__, (long unsigned)seqnum);
+        rina_buf_free(rb);
+
+    } else {
+        /* What is not dropped nor delivered goes in the
+         * sequencing queue.
+         */
+        seqq_push(dtp, rb);
+    }
+
+    crb = sdu_rx_sv_update(ipcp, flow);
+
+    spin_unlock(&dtp->lock);
 
 snd_crb:
     if (crb) {
