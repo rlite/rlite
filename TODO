@@ -28,3 +28,6 @@
   buttare questi pacchetti
 
 - limitare le dimensioni della seqq
+
+- shim-eth: implementare la funzionalità di unpadding per estrarre rina_name
+  serializzati dai messaggi ARP.

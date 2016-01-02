@@ -33,6 +33,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
+#include <linux/spinlock.h>
 
 
 #define ETH_P_RINA  0xD1F0
@@ -54,6 +55,7 @@ struct rina_shim_eth {
     struct net_device *netdev;
     char *upper_name_s;
     struct list_head arp_table;
+    spinlock_t arpt_lock;
 };
 
 static void *
@@ -70,6 +72,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     priv->netdev = NULL;
     priv->upper_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
+    spin_lock_init(&priv->arpt_lock);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -82,10 +85,12 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     struct rina_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
 
+    spin_lock(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del(&entry->node);
         kfree(entry);
     }
+    spin_unlock(&priv->arpt_lock);
 
     if (priv->netdev) {
         rtnl_lock();
@@ -150,6 +155,7 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
     return 0;
 }
 
+/* To be called under arpt_lock. */
 static struct arpt_entry *
 arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
 {
@@ -165,11 +171,13 @@ arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
     return NULL;
 }
 
+/* To be called under arpt_lock. */
+/* XXX remove this one */
 static int
 arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app,
                   struct arpt_entry **ret)
 {
-    char *name_s = rina_name_to_string(dst_app);
+    char *name_s = __rina_name_to_string(dst_app, 0);
 
     *ret = NULL;
 
@@ -270,28 +278,32 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         return -ENXIO;
     }
 
+    spin_lock(&priv->arpt_lock);
     ret = arp_lookup_direct(priv, &flow->remote_application, &entry);
     if (ret) {
         return ret;
     }
 
     if (entry) {
+        spin_unlock(&priv->arpt_lock);
         /* ARP entry already exist for remote application. Nothing
          * to do here. */
         return 0;
     }
 
-    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+    entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
     if (!entry) {
         goto nomem;
     }
 
-    entry->tpa = rina_name_to_string(&flow->remote_application);
+    entry->tpa = __rina_name_to_string(&flow->remote_application, 0);
     if (!entry->tpa) {
         goto nomem;
     }
     entry->complete = false;
     list_add_tail(&entry->node, &priv->arp_table);
+
+    spin_unlock(&priv->arpt_lock);
 
     spa = rina_name_to_string(&flow->local_application);
     tpa = rina_name_to_string(&flow->remote_application);
@@ -371,15 +383,20 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
         /* Update the ARP table with an entry SPA --> SHA. */
-        struct arpt_entry *entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
+        struct arpt_entry *entry;
 
+        spin_lock(&priv->arpt_lock);
+
+        entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
         if (!entry) {
+            spin_unlock(&priv->arpt_lock);
             /* Gratuitous ARP reply. Don't accept it (for now). */
             PI("%s: Dropped gratuitous ARP reply\n", __func__);
             return;
         }
 
         if (arp->ar_hln != sizeof(entry->tha)) {
+            spin_unlock(&priv->arpt_lock);
             /* Only support 48-bits hardware address (for now). */
             PI("%s: Dropped ARP reply with SHA/THA len of %d\n",
                __func__, arp->ar_hln);
@@ -392,6 +409,8 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
            __func__, entry->tpa, entry->tha[0], entry->tha[1],
            entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
+
+        spin_unlock(&priv->arpt_lock);
     } else {
         PI("%s: Unknown RINA ARP operation %04X\n", __func__,
                 ntohs(arp->ar_op));
