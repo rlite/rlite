@@ -264,17 +264,26 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     struct pending_entry *entry;
     char serbuf[4096];
     unsigned int serlen;
+    int has_response = 1;
     int ret;
 
-    /* Store the request in the pending queue before issuing the request
-     * itself to the kernel. This is necessary in order to avoid race
-     * conditions between the event loop and this thread, resulting in
-     * the event loop not being able to find the pending request. */
-    entry = malloc(sizeof(*entry));
-    if (!entry) {
-        rina_msg_free(rina_kernel_numtables, msg);
-        printf("%s: Out of memory\n", __func__);
-        return NULL;
+    if (!loop->handlers[msg->msg_type + 1]) {
+        /* The event loop user did not specify a response
+         * handler for this message. */
+        has_response = 0;
+    }
+
+    if (has_response) {
+        /* Store the request in the pending queue before issuing the request
+         * itself to the kernel. This is necessary in order to avoid race
+         * conditions between the event loop and this thread, resulting in
+         * the event loop not being able to find the pending request. */
+        entry = malloc(sizeof(*entry));
+        if (!entry) {
+            rina_msg_free(rina_kernel_numtables, msg);
+            printf("%s: Out of memory\n", __func__);
+            return NULL;
+        }
     }
 
     pthread_mutex_lock(&loop->lock);
@@ -285,14 +294,16 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     }
     msg->event_id = loop->event_id_counter;
 
-    entry->next = NULL;
-    entry->msg = msg;
-    entry->msg_len = msg_len;
-    entry->resp = NULL;
-    entry->wait_for_completion = wait_for_completion;
-    entry->op_complete = 0;
-    pthread_cond_init(&entry->op_complete_cond, NULL);
-    pending_queue_enqueue(&loop->pqueue, entry);
+    if (has_response) {
+        entry->next = NULL;
+        entry->msg = msg;
+        entry->msg_len = msg_len;
+        entry->resp = NULL;
+        entry->wait_for_completion = wait_for_completion;
+        entry->op_complete = 0;
+        pthread_cond_init(&entry->op_complete_cond, NULL);
+        pending_queue_enqueue(&loop->pqueue, entry);
+    }
 
     /* Serialize the message. */
     serlen = rina_msg_serlen(rina_kernel_numtables, msg);
@@ -309,6 +320,9 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     /* Issue the request to the kernel. */
     ret = write(loop->rfd, serbuf, serlen);
     if (ret != serlen) {
+        if (has_response) {
+            /* TODO remove element from pending_queue. */
+        }
         if (ret < 0) {
             perror("write(rfd)");
         } else {
@@ -317,7 +331,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         }
     }
 
-    if (entry->wait_for_completion) {
+    if (has_response && entry->wait_for_completion) {
         while (!entry->op_complete) {
             pthread_cond_wait(&entry->op_complete_cond, &loop->lock);
         }
