@@ -253,7 +253,7 @@ evloop_function(void *arg)
         }
 
         /* Deserialize the message from serbuf into msgbuf. */
-        ret = deserialize_rina_msg(rina_msg_numtables, serbuf, ret, msgbuf, sizeof(msgbuf));
+        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret, msgbuf, sizeof(msgbuf));
         if (ret) {
             printf("%s: Problems during deserialization [%d]\n",
                     __func__, ret);
@@ -271,7 +271,7 @@ evloop_function(void *arg)
 
 free_entry:
         /* Free the pending queue entry and the associated request message. */
-        rina_msg_free(rina_msg_numtables, req_entry->msg);
+        rina_msg_free(rina_kernel_numtables, req_entry->msg);
         free(req_entry);
     }
 
@@ -305,7 +305,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
      * the event loop not being able to find the pending request. */
     entry = malloc(sizeof(*entry));
     if (!entry) {
-        rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)msg);
+        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)msg);
         return ENOMEM;
     }
 
@@ -319,16 +319,16 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
     pending_queue_enqueue(&ipcm->pqueue, entry);
 
     /* Serialize the message. */
-    serlen = rina_msg_serlen(rina_msg_numtables, msg);
+    serlen = rina_msg_serlen(rina_kernel_numtables, msg);
     if (serlen > sizeof(serbuf)) {
         printf("%s: Serialized message would be too long [%u]\n",
                     __func__, serlen);
         free(entry);
         pthread_mutex_unlock(&ipcm->lock);
-        rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)msg);
+        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)msg);
         return ENOBUFS;
     }
-    serlen = serialize_rina_msg(rina_msg_numtables, serbuf, msg);
+    serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, msg);
 
     /* Issue the request to the kernel. */
     ret = write(ipcm->rfd, serbuf, serlen);

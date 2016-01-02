@@ -155,13 +155,13 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rina_msg_serlen(rina_msg_numtables, rmsg);
+    serlen = rina_msg_serlen(rina_kernel_numtables, rmsg);
     serbuf = kmalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         return -ENOMEM;
     }
-    serlen = serialize_rina_msg(rina_msg_numtables, serbuf, rmsg);
+    serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, rmsg);
 
     entry->sermsg = serbuf;
     entry->serlen = serlen;
@@ -318,7 +318,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return 0;
 
 err3:
-    rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)resp);
+    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
 err2:
     ipcp_del(ipcp_id);
 
@@ -356,7 +356,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return 0;
 
 err1:
-    rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)resp);
+    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
 
     return ret;
 }
@@ -410,7 +410,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     return 0;
 
 err1:
-    rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)resp);
+    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
 
     return ret;
 }
@@ -464,7 +464,7 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return 0;
 
 err3:
-    rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)resp);
+    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
 
     return ret;
 }
@@ -603,7 +603,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return 0;
 
 err3:
-    rina_msg_free(rina_msg_numtables, (struct rina_msg_base *)resp);
+    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
 
     return ret;
 }
@@ -648,7 +648,7 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
         return -EFAULT;
     }
 
-    ret = deserialize_rina_msg(rina_msg_numtables, kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
+    ret = deserialize_rina_msg(rina_kernel_numtables, kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);
         return -EINVAL;

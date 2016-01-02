@@ -1,7 +1,7 @@
 #include <rina/rina-utils.h>
 
 
-struct rina_msg_layout rina_msg_numtables[] = {
+struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_CTRL_CREATE_IPCP] = {
         .copylen = sizeof(struct rina_msg_ipcp_create) -
                    sizeof(struct rina_name),
