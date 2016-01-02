@@ -246,9 +246,11 @@ NeighFlow::keepalive_tmr_stop()
     }
 }
 
-Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
+Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
+                   bool initiator_)
 {
     rib = rib_;
+    initiator = initiator_;
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = ~0U;
@@ -873,13 +875,13 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
 }
 
 Neighbor *
-uipcp_rib::get_neighbor(const struct rina_name *neigh_name)
+uipcp_rib::get_neighbor(const struct rina_name *neigh_name, bool initiator)
 {
     RinaName _neigh_name_(neigh_name);
     string neigh_name_s = static_cast<string>(_neigh_name_);
 
     if (!neighbors.count(neigh_name_s)) {
-        neighbors[neigh_name_s] = new Neighbor(this, neigh_name);
+        neighbors[neigh_name_s] = new Neighbor(this, neigh_name, initiator);
     }
 
     return neighbors[neigh_name_s];
@@ -1140,7 +1142,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 
     pthread_mutex_lock(&rib->lock);
 
-    neigh = rib->get_neighbor(&req->neigh_ipcp_name);
+    neigh = rib->get_neighbor(&req->neigh_ipcp_name, true);
     if (!neigh) {
         UPE(uipcp, "Failed to add neighbor\n");
         pthread_mutex_unlock(&rib->lock);
@@ -1191,7 +1193,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
                       unsigned int neigh_port_id,
                       unsigned int lower_ipcp_id)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name);
+    Neighbor *neigh = rib->get_neighbor(neigh_name, false);
 
     if (!neigh) {
         UPE(rib->uipcp, "Failed to get neighbor\n");
@@ -1220,7 +1222,7 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       unsigned int neigh_port_id, int neigh_fd)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name);
+    Neighbor *neigh = rib->get_neighbor(neigh_name, false);
 
     if (!neigh) {
         UPE(rib->uipcp, "Failed to get neighbor\n");
@@ -1254,6 +1256,10 @@ normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
     for (map<string, Neighbor*>::iterator nit = rib->neighbors.begin();
                         nit != rib->neighbors.end(); nit++) {
         Neighbor *neigh = nit->second;
+
+        if (!neigh->initiator) {
+            continue;
+        }
 
         ni = static_cast<struct enrolled_neigh *>(malloc(sizeof(*ni)));
         if (!ni) {

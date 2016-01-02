@@ -91,8 +91,15 @@ struct NeighFlow {
 
 /* Holds the information about a neighbor IPCP. */
 struct Neighbor {
+    /* Backpointer to the RIB. */
     struct uipcp_rib *rib;
+
+    /* Name of the neighbor. */
     RinaName ipcp_name;
+
+    /* Did we initiate the enrollment procedure towards this neighbor
+     * or were we the target? */
+    bool initiator;
 
     std::map<unsigned int, NeighFlow *> flows;
     unsigned int mgmt_port_id;
@@ -101,9 +108,12 @@ struct Neighbor {
                                                   const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
-    Neighbor(struct uipcp_rib *rib, const struct rina_name *name);
-    bool operator==(const Neighbor& other) const { return ipcp_name == other.ipcp_name; }
-    bool operator!=(const Neighbor& other) const { return !(*this == other); }
+    Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
+             bool initiator);
+    bool operator==(const Neighbor& other) const
+        { return ipcp_name == other.ipcp_name; }
+    bool operator!=(const Neighbor& other) const
+        { return !(*this == other); }
     ~Neighbor();
 
     const char *enrollment_state_repr(state_t s) const;
@@ -220,7 +230,7 @@ struct uipcp_rib {
     char *dump() const;
 
     int set_address(uint64_t address);
-    Neighbor *get_neighbor(const struct rina_name *neigh_name);
+    Neighbor *get_neighbor(const struct rina_name *neigh_name, bool initiator);
     int del_neighbor(const RinaName& neigh_name);
     int dft_lookup(const RinaName& appl_name, uint64_t& dstaddr) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);

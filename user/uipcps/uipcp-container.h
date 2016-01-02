@@ -78,7 +78,7 @@ struct uipcp_ops {
                             const struct rlite_msg_base *b_resp,
                             const struct rlite_msg_base *b_req);
 
-    int (*get_enrolled_neighs)(struct uipcp *, struct list_head *neighs);
+    int (*get_enrollment_targets)(struct uipcp *, struct list_head *neighs);
 };
 
 struct ipcp_node {

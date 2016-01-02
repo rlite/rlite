@@ -491,11 +491,11 @@ persistent_ipcp_enroll_dump(struct uipcps *uipcps)
         struct enrolled_neigh *en, *tmp;
         struct list_head neighs;
 
-        if (!uipcp->ops.get_enrolled_neighs) {
+        if (!uipcp->ops.get_enrollment_targets) {
             continue;
         }
 
-        if (uipcp->ops.get_enrolled_neighs(uipcp, &neighs)) {
+        if (uipcp->ops.get_enrollment_targets(uipcp, &neighs)) {
             PE("get_enrolled_neighs() failed for uipcp [%u]\n",
                uipcp->ipcp_id);
             continue;
