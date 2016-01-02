@@ -43,6 +43,7 @@ struct rina_shim_inet4 {
 };
 
 struct shim_inet4_flow {
+    struct flow_entry *flow;
     struct socket *sock;
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk);
@@ -75,51 +76,75 @@ rina_shim_inet4_destroy(struct ipcp_entry *ipcp)
     PD("IPCP [%p] destroyed\n", priv);
 }
 
+static int
+peek_head_len(struct sock *sk)
+{
+    struct sk_buff *head;
+    int len = 0;
+    unsigned long flags;
+
+    spin_lock_irqsave(&sk->sk_receive_queue.lock, flags);
+    head = skb_peek(&sk->sk_receive_queue);
+    if (likely(head)) {
+        len = head->len;
+#if 0
+        if (vlan_tx_tag_present(head))
+            len += VLAN_HLEN;
+#endif
+    }
+    spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
+
+    return len;
+}
+
 static void
 inet4_rx_worker(struct work_struct *w)
 {
     struct shim_inet4_flow *priv =
             container_of(w, struct shim_inet4_flow, rxw);
-    struct msghdr msghdr;
+    struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
+    struct msghdr msghdr;
     struct rina_buf *rb;
     struct iovec iov;
-    int size;
+    int ret, peek_len;
 
-    PD("called\n");
+    while ((peek_len = peek_head_len(sock->sk))) {
+        memset(&msghdr, 0, sizeof(msghdr));
+        msghdr.msg_flags = MSG_DONTWAIT;
 
-    memset(&msghdr, 0, sizeof(msghdr));
-    msghdr.msg_flags = MSG_DONTWAIT;
+        PD("peek_len %d\n", peek_len);
 
-    /* Peek length from socket rxq. TODO */
-    rb = rina_buf_alloc(1000, 3, GFP_ATOMIC);
-    if (!rb) {
-        PE("Out of memory\n");
-        return;
-    }
-
-    iov.iov_base = RINA_BUF_DATA(rb);
-    iov.iov_len = rb->len;
-    msghdr.msg_iov = &iov;
-    msghdr.msg_iovlen = 1;
-
-printk(KERN_CRIT "GOT HERE\n");
-
-    size = sock->ops->recvmsg(NULL, sock, &msghdr, rb->len,
-                              MSG_DONTWAIT | MSG_TRUNC);
-/*    size = kernel_recvmsg(sk->sk_socket, &msghdr, (struct kvec *)&iov, 1,
-                          rb->len, msghdr.msg_flags); */
-    if (unlikely(size < 0)) {
-        if (size == -EAGAIN) {
-            PD("recvmsg(): got EAGAIN\n");
-        } else {
-            PE("recvmsg(): %d\n", size);
+        rb = rina_buf_alloc(peek_len, 3, GFP_ATOMIC);
+        if (!rb) {
+            PE("Out of memory\n");
+            return;
         }
+
+        iov.iov_base = RINA_BUF_DATA(rb);
+        iov.iov_len = rb->len;
+        msghdr.msg_iov = &iov;
+        msghdr.msg_iovlen = 1;
+
+        ret = sock->ops->recvmsg(NULL, sock, &msghdr, rb->len,
+                                 MSG_DONTWAIT | MSG_TRUNC);
+        /*    ret = kernel_recvmsg(sk->sk_socket, &msghdr, (struct kvec *)&iov, 1,
+              rb->len, msghdr.msg_flags); */
+        if (unlikely(ret != peek_len)) {
+            if (ret >= 0) {
+                PE("Partial read %d/%d\n", ret, peek_len);
+
+            } else if (ret == -EAGAIN) {
+                PD("recvmsg(): got EAGAIN\n");
+
+            } else {
+                PE("recvmsg(): %d\n", ret);
+            }
+        }
+
+        PD("read %d bytes\n", ret);
+        rina_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
     }
-
-    PD("read %d bytes\n", size);
-
-    rina_buf_free(rb);
 }
 
 static void
@@ -161,6 +186,7 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     priv->sock = sock;
     INIT_WORK(&priv->rxw, inet4_rx_worker);
+    priv->flow = flow;
     flow->priv = priv;
 
     return 0;
