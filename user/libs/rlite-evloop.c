@@ -1423,17 +1423,23 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
     return event_id;
 }
 
-struct rlite_msg_base_resp *
-rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
+static struct rlite_msg_base_resp *
+rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
+                    uint32_t event_id)
 {
     struct rlite_msg_base_resp *resp;
     struct pending_entry *entry;
     fd_set rdfs;
     int ret;
 
-    /* Try to match the event_id with a response that has already been read. */
+    /* Try to match the msg_type or the event_id against a response that has
+     * already been read. */
     pthread_mutex_lock(&ctrl->lock);
-    entry = pending_queue_remove_by_event_id(&ctrl->pqueue, event_id);
+    if (msg_type) {
+        entry = pending_queue_remove_by_msg_type(&ctrl->pqueue, msg_type);
+    } else {
+        entry = pending_queue_remove_by_event_id(&ctrl->pqueue, event_id);
+    }
     pthread_mutex_unlock(&ctrl->lock);
 
     if (entry) {
@@ -1463,11 +1469,27 @@ rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
             continue;
         }
 
+        if (msg_type && resp->msg_type == msg_type) {
+            /* We found it. */
+            return resp;
+        }
+
         if (resp->event_id == event_id) {
             /* We found it. */
             return resp;
         }
 
+        /* Filter out certain types of message. */
+        switch (resp->msg_type) {
+            case RLITE_KER_IPCP_UPDATE:
+                free(resp);
+                continue;
+
+            default:
+                break;
+        }
+
+        /* Store the message for subsequent use. */
         entry = malloc(sizeof(*entry));
         if (!entry) {
             PE("Out of memory\n");
@@ -1485,8 +1507,14 @@ rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
     return NULL;
 }
 
-struct rlite_msg_base *
+struct rlite_msg_base_resp *
+rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
+{
+    return rl_ctrl_wait_common(ctrl, 0, event_id);
+}
+
+struct rlite_msg_base_resp *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
 {
-    return NULL;
+    return rl_ctrl_wait_common(ctrl, msg_type, 0);
 }

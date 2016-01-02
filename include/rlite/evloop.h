@@ -224,7 +224,7 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
 struct rlite_msg_base_resp *
 rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id);
 
-struct rlite_msg_base *
+struct rlite_msg_base_resp *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
 
 #ifdef __cplusplus
