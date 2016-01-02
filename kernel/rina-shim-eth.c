@@ -38,11 +38,13 @@
 #define ETH_P_RINA  0xD1F0
 
 struct arpt_entry {
-    /* Targed Hardware Address. */
+    /* Targed Hardware Address. Only support 48-bit addresses for now. */
     uint8_t tha[6];
 
-    /* Targed Protocol Address is flow->remote_application. */
-    struct flow_entry *flow;
+    /* Targed Protocol Address, represented as a serialized string. */
+    char *tpa;
+
+    bool complete;
 
     struct list_head node;
 };
@@ -149,17 +151,36 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
 }
 
 static struct arpt_entry *
-arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app)
+arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
 {
     struct arpt_entry *entry;
 
     list_for_each_entry(entry, &priv->arp_table, node) {
-        if (rina_name_cmp(&entry->flow->remote_application, dst_app) == 0) {
+        if (len >= strlen(entry->tpa) &&
+                strncmp(entry->tpa, dst_app, len) == 0) {
             return entry;
         }
     }
 
     return NULL;
+}
+
+static int
+arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app,
+                  struct arpt_entry **ret)
+{
+    char *name_s = rina_name_to_string(dst_app);
+
+    *ret = NULL;
+
+    if (!name_s) {
+        PE("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    *ret = arp_lookup_direct_b(priv, name_s, strlen(name_s));
+
+    return 0;
 }
 
 /* This function is taken after net/ipv4/arp.c:arp_create() */
@@ -243,41 +264,64 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     struct sk_buff *skb;
     char *spa = NULL; /* Sender Protocol Address. */
     char *tpa = NULL; /* Target Protocol Address. */
+    int ret;
 
     if (!priv->netdev) {
         return -ENXIO;
     }
 
-    entry = arp_lookup_direct(priv, &flow->remote_application);
+    ret = arp_lookup_direct(priv, &flow->remote_application, &entry);
+    if (ret) {
+        return ret;
+    }
+
     if (entry) {
-        return -EBUSY;
+        /* ARP entry already exist for remote application. Nothing
+         * to do here. */
+        return 0;
     }
 
-    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
-        PE("%s: Out of memory\n", __func__);
-        return -ENOMEM;
+        goto nomem;
     }
 
-    entry->flow = flow; /* XXX flow_get() ? */
+    entry->tpa = rina_name_to_string(&flow->remote_application);
+    if (!entry->tpa) {
+        goto nomem;
+    }
+    entry->complete = false;
     list_add_tail(&entry->node, &priv->arp_table);
 
     spa = rina_name_to_string(&flow->local_application);
     tpa = rina_name_to_string(&flow->remote_application);
     if (!spa || !tpa) {
-        if (spa) kfree(spa);
-        if (tpa) kfree(tpa);
-        return -ENOMEM;
+        goto nomem;
     }
 
     skb = arp_create(priv, ARPOP_REQUEST, spa, tpa, NULL, GFP_KERNEL);
     if (!skb) {
-        return -ENOMEM;
+        goto nomem;
     }
 
     dev_queue_xmit(skb);
 
     return 0;
+
+nomem:
+    PE("%s: Out of memory\n", __func__);
+
+    if (spa) kfree(spa);
+    if (tpa) kfree(tpa);
+    if (entry) {
+        list_del(&entry->node);
+        if (entry->tpa) {
+            kfree(entry->tpa);
+        }
+        kfree(entry);
+    }
+
+    return -ENOMEM;
 }
 
 static int
@@ -327,6 +371,27 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
         /* Update the ARP table with an entry SPA --> SHA. */
+        struct arpt_entry *entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
+
+        if (!entry) {
+            /* Gratuitous ARP reply. Don't accept it (for now). */
+            PI("%s: Dropped gratuitous ARP reply\n", __func__);
+            return;
+        }
+
+        if (arp->ar_hln != sizeof(entry->tha)) {
+            /* Only support 48-bits hardware address (for now). */
+            PI("%s: Dropped ARP reply with SHA/THA len of %d\n",
+               __func__, arp->ar_hln);
+            return;
+        }
+
+        memcpy(entry->tha, sha, arp->ar_hln);
+        entry->complete = true;
+
+        PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
+           __func__, entry->tpa, entry->tha[0], entry->tha[1],
+           entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
     } else {
         PI("%s: Unknown RINA ARP operation %04X\n", __func__,
                 ntohs(arp->ar_op));
@@ -355,7 +420,7 @@ shim_eth_rx_handler(struct sk_buff **skbp)
             shim_eth_arp_rx(priv, arp, skb->len);
 
         } else {
-            /* This ARP operation belongs to regular stack. */
+            /* This ARP message belongs to Linux stack. */
             return RX_HANDLER_PASS;
         }
 
@@ -368,7 +433,7 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         return RX_HANDLER_PASS;
     }
 
-    /* Steal the skb from the kernel stack. */
+    /* Steal the skb from the Linux stack. */
     dev_consume_skb_any(skb);
 
     return RX_HANDLER_CONSUMED;
