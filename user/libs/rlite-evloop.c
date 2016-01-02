@@ -100,6 +100,21 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
     return 0;
 }
 
+uint32_t
+rlite_evloop_get_id(struct rlite_evloop *loop)
+{
+    uint32_t ret;
+
+    pthread_mutex_lock(&loop->lock);
+    if (++loop->event_id_counter == (1 << 30)) {
+        loop->event_id_counter = 1;
+    }
+    ret = loop->event_id_counter;
+    pthread_mutex_unlock(&loop->lock);
+
+    return ret;
+}
+
 /* Fetch information about a single IPC process. */
 static struct rina_kmsg_fetch_ipcp_resp *
 ipcp_fetch(struct rlite_evloop *loop, int *result)
@@ -115,6 +130,7 @@ ipcp_fetch(struct rlite_evloop *loop, int *result)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_FETCH;
+    msg->event_id = rlite_evloop_get_id(loop);
 
     NPD("Requesting IPC processes fetch...\n");
 
@@ -514,12 +530,6 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
     }
 
     pthread_mutex_lock(&loop->lock);
-
-    loop->event_id_counter++;
-    if (loop->event_id_counter == (1 << 30)) {
-        loop->event_id_counter = 1;
-    }
-    msg->event_id = loop->event_id_counter;
 
     if (has_response) {
         entry->msg = msg;

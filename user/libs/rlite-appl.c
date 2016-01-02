@@ -136,8 +136,8 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 struct rina_kmsg_appl_register_resp *
-rlite_appl_register_req(struct rlite_appl *application,
-                        unsigned int wait_for_completion,
+rlite_appl_register_req(struct rlite_appl *application, uint32_t event_id,
+                        unsigned int wait_ms,
                         int reg, unsigned int ipcp_id,
                         const struct rina_name *appl_name)
 {
@@ -153,6 +153,7 @@ rlite_appl_register_req(struct rlite_appl *application,
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_APPL_REGISTER;
+    req->event_id = event_id;
     req->ipcp_id = ipcp_id;
     req->reg = reg;
     rina_name_copy(&req->appl_name, appl_name);
@@ -161,7 +162,7 @@ rlite_appl_register_req(struct rlite_appl *application,
 
     return (struct rina_kmsg_appl_register_resp *)
            rlite_issue_request(&application->loop, RINALITE_RMB(req),
-                               sizeof(*req), 1, wait_for_completion, &result);
+                               sizeof(*req), 1, wait_ms, &result);
 }
 
 void
@@ -185,8 +186,8 @@ rlite_flow_cfg_default(struct rina_flow_config *cfg)
 }
 
 static struct rina_kmsg_fa_resp_arrived *
-flow_allocate_req(struct rlite_appl *application,
-                  unsigned int wait_for_completion, uint16_t ipcp_id,
+flow_allocate_req(struct rlite_appl *application, uint32_t event_id,
+                  unsigned int wait_ms, uint16_t ipcp_id,
                   uint16_t upper_ipcp_id,
                   const struct rina_name *local_appl,
                   const struct rina_name *remote_appl,
@@ -198,11 +199,13 @@ flow_allocate_req(struct rlite_appl *application,
     req = malloc(sizeof(*req));
     if (!req) {
         PE("Out of memory\n");
+        *result = -1;
         return NULL;
     }
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_FA_REQ;
+    req->event_id = event_id;
     req->ipcp_id = ipcp_id;
     req->upper_ipcp_id = upper_ipcp_id;
     if (flowspec) {
@@ -217,7 +220,7 @@ flow_allocate_req(struct rlite_appl *application,
 
     return (struct rina_kmsg_fa_resp_arrived *)
            rlite_issue_request(&application->loop, RINALITE_RMB(req),
-                         sizeof(*req), 1, wait_for_completion, result);
+                         sizeof(*req), 1, wait_ms, result);
 }
 
 int
@@ -237,6 +240,7 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
     memset(req, 0, sizeof(*req));
 
     req->msg_type = RINA_KERN_FA_RESP;
+    req->event_id = 1;
     req->kevent_id = kevent_id;
     req->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
     req->upper_ipcp_id = upper_ipcp_id;
@@ -254,8 +258,8 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
 }
 
 struct rina_kmsg_appl_register_resp *
-rlite_appl_register(struct rlite_appl *application,
-                    unsigned int wait_for_completion, int reg,
+rlite_appl_register(struct rlite_appl *application, uint32_t event_id,
+                    unsigned int wait_ms, int reg,
                     const struct rina_name *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name)
@@ -272,8 +276,8 @@ rlite_appl_register(struct rlite_appl *application,
     }
 
     /* Forward the request to the kernel. */
-    return rlite_appl_register_req(application, wait_for_completion, reg,
-                                   rlite_ipcp->ipcp_id, appl_name);
+    return rlite_appl_register_req(application, event_id, wait_ms,
+                                   reg, rlite_ipcp->ipcp_id, appl_name);
 }
 
 int
@@ -284,9 +288,10 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
                          unsigned int wait_ms)
 {
     struct rina_kmsg_appl_register_resp *resp;
+    uint32_t event_id = rlite_evloop_get_id(&application->loop);
     int ret = 0;
 
-    resp = rlite_appl_register(application, wait_ms, reg, dif_name,
+    resp = rlite_appl_register(application, event_id, wait_ms, reg, dif_name,
                                ipcp_name, appl_name);
 
     if (!resp) {
@@ -305,14 +310,14 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
 }
 
 int
-rlite_flow_allocate(struct rlite_appl *application,
-              const struct rina_name *dif_name,
-              const struct rina_name *ipcp_name,
-              const struct rina_name *local_appl,
-              const struct rina_name *remote_appl,
-              const struct rina_flow_spec *flowspec,
-              unsigned int *port_id, unsigned int wait_ms,
-              uint16_t upper_ipcp_id)
+rlite_flow_allocate(struct rlite_appl *application, uint32_t event_id,
+                    const struct rina_name *dif_name,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl,
+                    const struct rina_flow_spec *flowspec,
+                    unsigned int *port_id, unsigned int wait_ms,
+                    uint16_t upper_ipcp_id)
 {
     struct rina_kmsg_fa_resp_arrived *kresp;
     struct rlite_ipcp *rlite_ipcp;
@@ -327,13 +332,20 @@ rlite_flow_allocate(struct rlite_appl *application,
         return -1;
     }
 
-    kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              rlite_ipcp->ipcp_id, upper_ipcp_id,
-                              local_appl,
+    kresp = flow_allocate_req(application, event_id, wait_ms ? wait_ms : ~0U,
+                              rlite_ipcp->ipcp_id, upper_ipcp_id, local_appl,
                               remote_appl, flowspec, &result);
     if (!kresp) {
-        PE("Flow allocation request failed\n");
-        return -1;
+        if (wait_ms || result) {
+            PE("Flow allocation request failed\n");
+            return -1;
+        }
+
+        /* (wait_ms == 0 && result == 0) means non-blocking invocation, so
+         * it is ok to get NULL. */
+        *port_id = ~0U;
+
+        return 0;
     }
 
     PI("Flow allocation response: ret = %u, port-id = %u\n",
@@ -412,11 +424,21 @@ rlite_flow_allocate_open(struct rlite_appl *application,
                    unsigned int wait_ms)
 {
     unsigned int port_id;
+    uint32_t event_id;
     int ret;
 
-    ret = rlite_flow_allocate(application, dif_name, ipcp_name,
-                        local_appl, remote_appl, flowspec,
-                        &port_id, wait_ms, 0xffff);
+    if (wait_ms == 0) {
+        /* If the user wants to work in non-blocking mode, it
+         * must use rlite_flow_allocate() directly. */
+        PE("Cannot work in non-blocking mode\n");
+        return -1;
+    }
+
+    event_id = rlite_evloop_get_id(&application->loop);
+
+    ret = rlite_flow_allocate(application, event_id, dif_name, ipcp_name,
+                              local_appl, remote_appl, flowspec,
+                              &port_id, wait_ms, 0xffff);
     if (ret) {
         return -1;
     }

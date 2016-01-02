@@ -748,7 +748,7 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* This fetch is necessary to use rlite_appl_register(). */
+    /* This fetch is necessary to use rlite_appl_register_wait(). */
     rlite_ipcps_fetch(&rp.application.loop);
 
     /* Rinaperf-specific initialization. */

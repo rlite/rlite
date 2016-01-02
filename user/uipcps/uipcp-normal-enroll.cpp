@@ -853,6 +853,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     struct rlite_ipcp *info;
     unsigned int lower_ipcp_id_ = ~0U;
     unsigned int port_id_;
+    unsigned int event_id;
     int flow_fd_;
     int ret;
 
@@ -877,8 +878,10 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
         }
     }
 
+    event_id = rlite_evloop_get_id(&rib->uipcp->appl.loop);
+
     /* Allocate a flow for the enrollment. */
-    ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, NULL,
+    ret = rlite_flow_allocate(&rib->uipcp->appl, event_id, supp_dif_name, NULL,
                               &info->ipcp_name, &neigh_name, NULL,
                               &port_id_, 2000, info->ipcp_id);
     rina_name_free(&neigh_name);

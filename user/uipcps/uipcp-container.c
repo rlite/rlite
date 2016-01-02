@@ -62,6 +62,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_IPCP_PDUFT_SET;
+    req->event_id = 1;
     req->ipcp_id = ipcp_id;
     req->dest_addr = dest_addr;
     req->local_port = local_port;
@@ -92,6 +93,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_IPCP_PDUFT_FLUSH;
+    req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
@@ -125,6 +127,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_UIPCP_FA_REQ_ARRIVED;
+    req->event_id = 1;
     req->kevent_id = kevent_id;
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
@@ -167,6 +170,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_UIPCP_FA_RESP_ARRIVED;
+    req->event_id = 1;
     req->ipcp_id = uipcp->ipcp_id;
     req->local_port = local_port;
     req->remote_port = remote_port;
@@ -205,6 +209,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_IPCP_UIPCP_SET;
+    req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
     UPD(uipcp, "Requesting IPCP uipcp set...\n");

@@ -275,6 +275,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     map<int, RinaName>::iterator mit;
     struct rina_flow_spec flowspec;
     unsigned int event_id;
+    unsigned int unused;
     int cfd;
     int ret;
 
@@ -293,11 +294,12 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     }
 
     strcpy(flowspec.cubename, "rel");
+    event_id = rlite_evloop_get_id(loop);
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rlite_flow_allocate(appl, &mit->second.dif_name_r, NULL,
+    ret = rlite_flow_allocate(appl, event_id, &mit->second.dif_name_r, NULL,
                               &gw->appl_name, &mit->second.name_r, &flowspec,
-                              &event_id, 0, 0);
+                              &unused, 0, 0);
     if (ret) {
         PE("Flow allocation failed");
         return;

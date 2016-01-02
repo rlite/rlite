@@ -176,7 +176,7 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
 
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
-rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
+rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
                  const struct rina_name *name, const char *dif_type,
                  const char *dif_name, int *result)
 {
@@ -192,6 +192,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_CREATE;
+    msg->event_id = rlite_evloop_get_id(&rc->loop);
     rina_name_copy(&msg->name, name);
     msg->dif_type = strdup(dif_type);
     msg->dif_name = strdup(dif_name);
@@ -200,7 +201,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
            rlite_issue_request(&rc->loop, RINALITE_RMB(msg),
-                         sizeof(*msg), 1, wait_for_completion, result);
+                         sizeof(*msg), 1, wait_ms, result);
 
     rlite_ipcps_fetch(&rc->loop);
 
@@ -264,6 +265,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_DESTROY;
+    msg->event_id = 1;
     msg->ipcp_id = ipcp_id;
 
     PD("Requesting IPC process destruction...\n");
