@@ -280,7 +280,6 @@ clos:
 static void
 sigint_handler(int signum)
 {
-    unlink(RINA_IPCM_UNIX_NAME);
     exit(EXIT_SUCCESS);
 }
 
