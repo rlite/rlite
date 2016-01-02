@@ -93,14 +93,14 @@ ipcp_fetch_resp(struct ipcm *ipcm,
         (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
     struct ipcp *ipcp;
 
-    printf("%s: Fetch IPCP response id=%u, type=%u\n",
-            __func__, resp->ipcp_id, resp->dif_type);
-
     if (resp->end) {
         /* This response is just to say there are no
          * more IPCPs --> nothing to do. */
         return 0;
     }
+
+    printf("%s: Fetch IPCP response id=%u, type=%u\n",
+            __func__, resp->ipcp_id, resp->dif_type);
 
     ipcp = malloc(sizeof(*ipcp));
     if (ipcp) {
@@ -358,11 +358,14 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
     return resp;
 }
 
+int ipcps_fetch(struct ipcm *ipcm);
+
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
 ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 {
     struct rina_kmsg_ipcp_create *msg;
+    struct rina_kmsg_ipcp_create_resp *resp;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -378,9 +381,13 @@ ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 
     printf("Requesting IPC process creation...\n");
 
-    return (struct rina_kmsg_ipcp_create_resp *)
+    resp = (struct rina_kmsg_ipcp_create_resp *)
            issue_request(ipcm, (struct rina_msg_base *)msg,
                                 sizeof(*msg));
+
+    ipcps_fetch(ipcm);
+
+    return resp;
 }
 
 /* Destroy an IPC process. */
@@ -388,6 +395,7 @@ static struct rina_msg_base_resp *
 ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 {
     struct rina_kmsg_ipcp_destroy *msg;
+    struct rina_msg_base_resp *resp;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -402,9 +410,13 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 
     printf("Requesting IPC process destruction...\n");
 
-    return (struct rina_msg_base_resp *)
+    resp = (struct rina_msg_base_resp *)
            issue_request(ipcm, (struct rina_msg_base *)msg,
                                 sizeof(*msg));
+
+    ipcps_fetch(ipcm);
+
+    return resp;
 }
 
 /* Fetch information about a single IPC process. */
@@ -461,8 +473,19 @@ int
 ipcps_fetch(struct ipcm *ipcm)
 {
     struct rina_kmsg_fetch_ipcp_resp *resp;
+    struct ipcp *ipcp;
+    struct list_head *elem;
     int end = 0;
 
+    /* Purge the IPCPs list. */
+    pthread_mutex_lock(&ipcm->lock);
+    while ((elem = list_pop_front(&ipcm->ipcps))) {
+        ipcp = container_of(elem, struct ipcp, node);
+        free(ipcp);
+    }
+    pthread_mutex_unlock(&ipcm->lock);
+
+    /* Reload the IPCPs list. */
     while (!end) {
         resp = ipcp_fetch(ipcm);
         if (!resp) {
@@ -936,7 +959,7 @@ int main()
     }
 
     /* Run the script thread. */
-    test(&ipcm);
+    if (0) test(&ipcm);
 
     ret = pthread_join(evloop_th, NULL);
     if (ret < 0) {

@@ -30,6 +30,26 @@ list_add_tail(struct list_head *list, struct list_head *elem)
         list->prev = elem;
 }
 
+static inline struct list_head *
+list_pop_front(struct list_head *list)
+{
+    struct list_head *ret;
+
+    if (list->succ == list) {
+        /* Empty list. */
+        return NULL;
+    }
+
+    ret = list->succ;
+
+    ret->succ->prev = list;
+    list->succ = ret->succ;
+
+    ret->succ = ret->prev = ret;
+
+    return ret;
+}
+
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 #define container_of(ptr, type, member) ({                      \
