@@ -94,37 +94,37 @@ test_cdap_server(int port)
                 break;
 
             case gpb::M_RELEASE:
-                rm.m_release_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_release_r(gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_CREATE:
-                rm.m_create_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_create_r(gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, obj_inst_cnt++,
                                 0, string());
                 break;
 
             case gpb::M_DELETE:
-                rm.m_delete_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_delete_r(gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, m->obj_inst,
                                 0, string());
                 break;
 
             case gpb::M_READ:
-                rm.m_read_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_read_r(gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, m->obj_inst,
                                 0, string());
                 break;
 
             case gpb::M_WRITE:
-                rm.m_write_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_write_r(gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_START:
-                rm.m_start_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_start_r(gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_STOP:
-                rm.m_stop_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_stop_r(gpb::F_NO_FLAGS, 0, string());
                 break;
 
             default:

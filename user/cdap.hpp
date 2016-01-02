@@ -233,8 +233,7 @@ struct CDAPMessage {
 
     int m_release(gpb::flagValues_t flags);
 
-    int m_release_r(const struct CDAPMessage *req,
-                    gpb::flagValues_t flags, int result,
+    int m_release_r(gpb::flagValues_t flags, int result,
                     const std::string& result_reason);
 
     int m_create(gpb::flagValues_t flags,
@@ -242,8 +241,7 @@ struct CDAPMessage {
                  const std::string& obj_name, long obj_inst,
                  int scope, const std::string& filter);
 
-    int m_create_r(const struct CDAPMessage *req,
-                   gpb::flagValues_t flags, const std::string& obj_class,
+    int m_create_r(gpb::flagValues_t flags, const std::string& obj_class,
                    const std::string& obj_name, long obj_inst,
                    int result, const std::string& result_reason);
 
@@ -252,8 +250,7 @@ struct CDAPMessage {
                  const std::string& obj_name, long obj_inst,
                  int scope, const std::string& filter);
 
-    int m_delete_r(const struct CDAPMessage *req,
-                   gpb::flagValues_t flags, const std::string& obj_class,
+    int m_delete_r(gpb::flagValues_t flags, const std::string& obj_class,
                    const std::string& obj_name, long obj_inst,
                    int result, const std::string& result_reason);
 
@@ -262,8 +259,7 @@ struct CDAPMessage {
                const std::string& obj_name, long obj_inst,
                int scope, const std::string& filter);
 
-    int m_read_r(const struct CDAPMessage *req,
-                 gpb::flagValues_t flags, const std::string& obj_class,
+    int m_read_r(gpb::flagValues_t flags, const std::string& obj_class,
                  const std::string& obj_name, long obj_inst,
                  int result, const std::string& result_reason);
 
@@ -272,14 +268,12 @@ struct CDAPMessage {
                 const std::string& obj_name, long obj_inst,
                 int scope, const std::string& filter);
 
-    int m_write_r(const struct CDAPMessage *req,
-                  gpb::flagValues_t flags, int result,
+    int m_write_r(gpb::flagValues_t flags, int result,
                   const std::string& result_reason);
 
     int m_cancelread(gpb::flagValues_t flags);
 
-    int m_cancelread_r(const struct CDAPMessage *req,
-                       gpb::flagValues_t flags, int result,
+    int m_cancelread_r(gpb::flagValues_t flags, int result,
                        const std::string& result_reason);
 
     int m_start(gpb::flagValues_t flags,
@@ -287,8 +281,7 @@ struct CDAPMessage {
                const std::string& obj_name, long obj_inst,
                int scope, const std::string& filter);
 
-    int m_start_r(const struct CDAPMessage *req,
-                  gpb::flagValues_t flags, int result,
+    int m_start_r(gpb::flagValues_t flags, int result,
                   const std::string& result_reason);
 
     int m_stop(gpb::flagValues_t flags,
@@ -296,8 +289,7 @@ struct CDAPMessage {
                const std::string& obj_name, long obj_inst,
                int scope, const std::string& filter);
 
-    int m_stop_r(const struct CDAPMessage *req,
-                 gpb::flagValues_t flags, int result,
+    int m_stop_r(gpb::flagValues_t flags, int result,
                  const std::string& result_reason);
 
 private:
@@ -307,8 +299,7 @@ private:
                  int scope, const std::string& filter,
                  gpb::opCode_t op_code);
 
-    int m_common_r(const struct CDAPMessage *req,
-                   gpb::flagValues_t flags,
+    int m_common_r(gpb::flagValues_t flags,
                    const std::string& obj_class,
                    const std::string& obj_name, long obj_inst,
                    int result, const std::string& result_reason,

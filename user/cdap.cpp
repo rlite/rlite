@@ -963,9 +963,8 @@ CDAPMessage::m_release(gpb::flagValues_t flags_)
 }
 
 int
-CDAPMessage::m_release_r(const struct CDAPMessage *req,
-                      gpb::flagValues_t flags_, int result_,
-                      const std::string& result_reason_)
+CDAPMessage::m_release_r(gpb::flagValues_t flags_, int result_,
+                         const std::string& result_reason_)
 {
     op_code = gpb::M_RELEASE_R;
     flags = flags_;
@@ -995,8 +994,7 @@ CDAPMessage::m_common(gpb::flagValues_t flags_,
 }
 
 int
-CDAPMessage::m_common_r(const struct CDAPMessage *req,
-                     gpb::flagValues_t flags_,
+CDAPMessage::m_common_r(gpb::flagValues_t flags_,
                      const std::string& obj_class_,
                      const std::string& obj_name_, long obj_inst_,
                      int result_, const std::string& result_reason_,
@@ -1025,12 +1023,11 @@ CDAPMessage::m_create(gpb::flagValues_t flags,
 }
 
 int
-CDAPMessage::m_create_r(const struct CDAPMessage *req,
-                     gpb::flagValues_t flags, const std::string& obj_class,
+CDAPMessage::m_create_r(gpb::flagValues_t flags, const std::string& obj_class,
                      const std::string& obj_name, long obj_inst,
                      int result, const std::string& result_reason)
 {
-    return m_common_r(req, flags, obj_class, obj_name, obj_inst,
+    return m_common_r(flags, obj_class, obj_name, obj_inst,
                       result, result_reason, gpb::M_CREATE_R);
 }
 
@@ -1045,12 +1042,11 @@ CDAPMessage::m_delete(gpb::flagValues_t flags,
 }
 
 int
-CDAPMessage::m_delete_r(const struct CDAPMessage *req,
-                     gpb::flagValues_t flags, const std::string& obj_class,
+CDAPMessage::m_delete_r(gpb::flagValues_t flags, const std::string& obj_class,
                      const std::string& obj_name, long obj_inst,
                      int result, const std::string& result_reason)
 {
-    return m_common_r(req, flags, obj_class, obj_name, obj_inst,
+    return m_common_r(flags, obj_class, obj_name, obj_inst,
                       result, result_reason, gpb::M_DELETE_R);
 }
 
@@ -1065,12 +1061,11 @@ CDAPMessage::m_read(gpb::flagValues_t flags,
 }
 
 int
-CDAPMessage::m_read_r(const struct CDAPMessage *req,
-                     gpb::flagValues_t flags, const std::string& obj_class,
+CDAPMessage::m_read_r(gpb::flagValues_t flags, const std::string& obj_class,
                      const std::string& obj_name, long obj_inst,
                      int result, const std::string& result_reason)
 {
-    return m_common_r(req, flags, obj_class, obj_name, obj_inst,
+    return m_common_r(flags, obj_class, obj_name, obj_inst,
                       result, result_reason, gpb::M_READ_R);
 }
 
@@ -1092,8 +1087,7 @@ CDAPMessage::m_write(gpb::flagValues_t flags_,
 }
 
 int
-CDAPMessage::m_write_r(const struct CDAPMessage *req,
-                    gpb::flagValues_t flags_, int result_,
+CDAPMessage::m_write_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
     op_code = gpb::M_WRITE_R;
@@ -1115,8 +1109,7 @@ CDAPMessage::m_cancelread(gpb::flagValues_t flags_)
 }
 
 int
-CDAPMessage::m_cancelread_r(const struct CDAPMessage *req,
-                         gpb::flagValues_t flags_, int result_,
+CDAPMessage::m_cancelread_r(gpb::flagValues_t flags_, int result_,
                          const std::string& result_reason_)
 {
     op_code = gpb::M_CANCELREAD_R;
@@ -1139,8 +1132,7 @@ CDAPMessage::m_start(gpb::flagValues_t flags,
 }
 
 int
-CDAPMessage::m_start_r(const struct CDAPMessage *req,
-                    gpb::flagValues_t flags_, int result_,
+CDAPMessage::m_start_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
     op_code = gpb::M_START_R;
@@ -1163,8 +1155,7 @@ CDAPMessage::m_stop(gpb::flagValues_t flags,
 }
 
 int
-CDAPMessage::m_stop_r(const struct CDAPMessage *req,
-                    gpb::flagValues_t flags_, int result_,
+CDAPMessage::m_stop_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
     op_code = gpb::M_STOP_R;

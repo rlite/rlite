@@ -1405,7 +1405,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     cand.lower_difs = enr_info.lower_difs;
     rib->cand_neighbors[static_cast<string>(ipcp_name)] = cand;
 
-    m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
+    m.m_start_r(gpb::F_NO_FLAGS, 0, string());
 
     ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
     if (ret) {
@@ -1565,7 +1565,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     /* Here we may M_READ from the slave. */
 
-    m.m_stop_r(rm, gpb::F_NO_FLAGS, 0, string());
+    m.m_stop_r(gpb::F_NO_FLAGS, 0, string());
 
     ret = send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
