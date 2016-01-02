@@ -39,3 +39,5 @@
   getting ERR in the logs
 
 - rina-*-numtables --> rlite, rina_ipcp* --> rlite_ipcp*
+
+- convert DIF to a string EVERYWHERE

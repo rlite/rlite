@@ -523,17 +523,32 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     Worker *w = gw->workers[0];
     RinaName dst_name;
     char *dst_name_s;
+    char *dif_name_s;
     int cfd;
     int rfd;
     int ret;
 
-    dst_name_s = rina_name_to_string(&req->remote_appl);
+    dst_name_s = rina_name_to_string(&req->local_appl);
     if (!dst_name_s) {
-        PE("rina_name_to_string() failed\n");
+        PE("rina_name_to_string(local_appl) failed\n");
         return 0;
     }
 
-    dst_name = RinaName(string(dst_name_s), string());
+    dif_name_s = rina_name_to_string(&req->dif_name);
+    if (!dif_name_s) {
+        PE("rina_name_to_string(dif_name) failed\n");
+        return 0;
+    }
+
+    try {
+        dst_name = RinaName(string(dst_name_s), string(dif_name_s));
+    } catch (...) {
+        PE("Failed to build RinaName out of '%s' and '%s'\n",
+           dst_name_s, dif_name_s);
+        free(dst_name_s);
+        return 0;
+    }
+
     free(dst_name_s);
 
     mit = gw->dst_map.find(dst_name);
@@ -549,9 +564,9 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    cfd = connect(cfd, (struct sockaddr *)&mit->second.addr,
+    ret = connect(cfd, (struct sockaddr *)&mit->second.addr,
                   sizeof(mit->second.addr));
-    if (cfd) {
+    if (ret) {
         perror("connect()");
         return 0;
     }
@@ -566,7 +581,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     }
 
     rfd = rlite_open_appl_port(req->port_id);
-    if (rfd) {
+    if (rfd < 0) {
         PE("rlite_open_appl_port() failed\n");
         close(cfd);
         return 0;

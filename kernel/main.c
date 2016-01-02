@@ -1862,14 +1862,17 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     req.kevent_id = kevent_id;
     req.ipcp_id = ipcp->id;
     req.port_id = flow_entry->local_port;
+    rina_name_copy(&req.local_appl, local_appl);
     rina_name_copy(&req.remote_appl, remote_appl);
+    rina_name_fill(&req.dif_name, ipcp->dif->name, NULL, NULL, NULL);
 
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rlite_msg_base *)&req);
     if (ret) {
         flow_put(flow_entry);
     }
-    rina_name_free(&req.remote_appl);
+    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+                   (struct rlite_msg_base *)&req);
 out:
     ipcp_application_put(app);
 

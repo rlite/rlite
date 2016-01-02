@@ -47,8 +47,8 @@ struct rlite_msg_layout rina_kernel_numtables[] = {
     },
     [RLITE_KER_FA_REQ_ARRIVED] = {
         .copylen = sizeof(struct rl_kmsg_fa_req_arrived) -
-                    1 * sizeof(struct rina_name),
-        .names = 1,
+                    3 * sizeof(struct rina_name),
+        .names = 3,
     },
     [RLITE_KER_IPCP_CONFIG] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_config) -

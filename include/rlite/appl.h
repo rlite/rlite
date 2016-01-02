@@ -16,6 +16,8 @@ struct rlite_pending_flow_req {
     uint16_t ipcp_id;
     uint32_t port_id;
     struct rina_name remote_appl;
+    struct rina_name local_appl;
+    struct rina_name dif_name;
 
     struct list_head node;
 };
@@ -24,6 +26,8 @@ static inline void
 rlite_pending_flow_req_free(struct rlite_pending_flow_req *pfr)
 {
     rina_name_free(&pfr->remote_appl);
+    rina_name_free(&pfr->local_appl);
+    rina_name_free(&pfr->dif_name);
     free(pfr);
 }
 

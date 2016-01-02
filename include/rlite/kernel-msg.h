@@ -144,7 +144,9 @@ struct rl_kmsg_fa_req_arrived {
     uint32_t kevent_id;
     uint32_t port_id;
     uint16_t ipcp_id;
+    struct rina_name local_appl;
     struct rina_name remote_appl;
+    struct rina_name dif_name;
 } __attribute__((packed));
 
 /* application --> kernel to respond to an incoming flow request. */

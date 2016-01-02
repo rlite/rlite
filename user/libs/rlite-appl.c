@@ -74,13 +74,15 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
         /* Negative flow allocation response. */
         return rlite_flow_allocate_resp(appl, req->kevent_id,
                                         req->ipcp_id, 0xffff,
-                                        req->port_id, 1);
+                                        req->port_id, RLITE_ERR);
     }
 
     pfr->kevent_id = req->kevent_id;
     pfr->ipcp_id = req->ipcp_id;
     pfr->port_id = req->port_id;
     rina_name_copy(&pfr->remote_appl, &req->remote_appl);
+    rina_name_copy(&pfr->local_appl, &req->local_appl);
+    rina_name_copy(&pfr->dif_name, &req->dif_name);
 
     pthread_mutex_lock(&appl->lock);
     list_add_tail(&pfr->node, &appl->pending_flow_reqs);
