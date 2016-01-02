@@ -700,6 +700,9 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 {
     int ret;
 
+    /* Stop if nobody has already stopped. */
+    rlite_evloop_stop(loop);
+
     pthread_mutex_lock(&loop->lock);
     rlite_ipcps_purge(loop, loop->ipcps);
     rlite_ipcps_purge(loop, loop->ipcps_next);
