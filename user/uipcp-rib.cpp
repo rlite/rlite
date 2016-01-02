@@ -403,11 +403,11 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 
     dft_slice.entries.push_back(dft_entry);
 
-    remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
-
     PD("Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
             uipcp->ipcp_id);
+
+    remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     return 0;
 }
@@ -1642,9 +1642,10 @@ uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
 {
     for (map<string, Neighbor>::const_iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
-        if (exclude && neigh->second != *exclude) {
-            remote_sync_neigh(neigh->second, create, obj_class, obj_name, obj_value);
+        if (exclude && neigh->second == *exclude) {
+            continue;
         }
+        remote_sync_neigh(neigh->second, create, obj_class, obj_name, obj_value);
     }
 
     return 0;
@@ -1747,7 +1748,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
             AData adata(objbuf, objlen);
 
             if (!adata.cdap) {
-                PE("A_DATA does not contained encapsulated CDAP message\n");
+                PE("A_DATA does not contain an encapsulated CDAP message\n");
                 return 0;
             }
 
