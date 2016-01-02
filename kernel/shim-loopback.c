@@ -114,6 +114,8 @@ rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
 {
     struct rina_shim_loopback *priv = ipcp->priv;
 
+    cancel_work_sync(&priv->rcv);
+
     while (priv->rdh != priv->rdt) {
         rina_buf_free(priv->rxr[priv->rdh].rb);
         priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);

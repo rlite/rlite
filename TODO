@@ -39,8 +39,6 @@
 
 - testare normal-over-normal-over-shim e flussi concorrenti
 
-- aggiungere flush_scheduled_work() a shim_loopback_destroy()
-
-- in shim_inet4_flow_deallocated() dovremmo chiamare flush_scheduled_work(),
+- in shim_inet4_flow_deallocated() dovremmo chiamare cancel_work_sync(),
   ma questo non è attualmente possibile perchè flow_put() può essere
   eseguita in atomic-context --> cambiare schema
