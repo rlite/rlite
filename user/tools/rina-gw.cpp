@@ -214,6 +214,22 @@ parse_conf(const char *confname)
     return 0;
 }
 
+static int
+gw_fa_req_arrived(struct rlite_evloop *loop,
+                  const struct rina_msg_base_resp *b_resp,
+                  const struct rina_msg_base *b_req)
+{
+    return 0;
+}
+
+static int
+gw_fa_resp_arrived(struct rlite_evloop *loop,
+                   const struct rina_msg_base_resp *b_resp,
+                   const struct rina_msg_base *b_req)
+{
+    return 0;
+}
+
 static void
 accept_inet_conn(struct rlite_evloop *loop, int fd)
 {
@@ -263,6 +279,19 @@ inet_server_socket(const InetName& inet_name)
 static int
 setup()
 {
+    int ret;
+
+    /* Register the handler for incoming flow allocation requests and
+     * response, since we'll not be using rlite/appl.h functionalities for
+     * that. */
+    ret = rlite_evloop_set_handler(&gw.appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                   gw_fa_req_arrived);
+    ret |= rlite_evloop_set_handler(&gw.appl.loop, RINA_KERN_FA_RESP_ARRIVED,
+                                    gw_fa_resp_arrived);
+    if (ret) {
+        return -1;
+    }
+
     for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
                                     mit != gw.srv_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
