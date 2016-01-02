@@ -645,7 +645,7 @@ static struct rlite_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, uint64_t ack_nack_seq_num)
 {
-    struct rlite_buf *rb = rlite_buf_alloc_ctrl(2, GFP_ATOMIC);
+    struct rlite_buf *rb = rlite_buf_alloc_ctrl(RLITE_MAX_LAYERS, GFP_ATOMIC);
     struct rlite_pci_ctrl *pcic;
 
     if (rb) {
