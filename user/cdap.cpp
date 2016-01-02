@@ -340,7 +340,7 @@ CDAPMessage::~CDAPMessage()
     rina_name_free(&dst_appl);
     if (obj_value.ty == BYTES && obj_value.u.buf.owned
                 && obj_value.u.buf.ptr) {
-        delete obj_value.u.buf.ptr;
+        delete [] obj_value.u.buf.ptr;
     }
 }
 
