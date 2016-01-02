@@ -789,36 +789,6 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     return resp;
 }
 
-static int
-rl_evloop_barrier(struct rlite_evloop *loop)
-{
-    struct rlite_msg_base *msg;
-    int result;
-
-    msg = malloc(sizeof(*msg));
-    if (!msg) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    memset(msg, 0, sizeof(*msg));
-
-    msg->msg_type = RLITE_KER_BARRIER;
-    msg->event_id = rl_ctrl_get_id(&loop->ctrl);
-
-    msg = rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, &result);
-
-    if (!msg) {
-        PE("Failed to put a barrier\n");
-        return -1;
-    }
-
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
-    free(msg);
-
-    return 0;
-}
-
 int
 rl_evloop_init(struct rlite_evloop *loop, const char *dev,
                rlite_resp_handler_t *handlers,
@@ -882,7 +852,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
             return ret;
         }
         loop->running = 1;
-        ret = rl_evloop_barrier(loop);
     }
 
     return ret;
@@ -900,15 +869,6 @@ rl_evloop_run(struct rlite_evloop *loop)
     }
     loop->running = 1;
     pthread_mutex_unlock(&loop->lock);
-
-    if (rl_evloop_barrier(loop)) {
-        PE("barrier() failed\n");
-        pthread_mutex_lock(&loop->lock);
-        loop->running = 0;
-        pthread_mutex_unlock(&loop->lock);
-
-        return -1;
-    }
 
     evloop_function(loop);
 
