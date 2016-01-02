@@ -242,31 +242,6 @@ application_unregister(int argc, char **argv)
     return application_register_common(&application_name, dif_name, 0);
 }
 
-static int flow_allocate(int argc, char **argv)
-{
-    struct rina_amsg_flow_allocate_req req;
-    const char *local_apn;
-    const char *local_api;
-    const char *remote_apn;
-    const char *remote_api;
-    const char *dif_name;
-
-    assert(argc >= 5);
-    dif_name = argv[0];
-    local_apn = argv[1];
-    local_api = argv[2];
-    remote_apn = argv[3];
-    remote_api = argv[4];
-
-    req.msg_type = RINA_APPL_FLOW_ALLOCATE_REQ;
-    req.event_id = 0;
-    rina_name_fill(&req.local_application, local_apn, local_api, NULL, NULL);
-    rina_name_fill(&req.remote_application, remote_apn, remote_api, NULL, NULL);
-    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
-
-    return request_response((struct rina_msg_base *)&req);
-}
-
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -304,12 +279,6 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME IPCP_APN IPCP_API",
         .num_args = 3,
         .func = assign_to_dif,
-    },
-    {
-        .name = "flow-allocate",
-        .usage = "DIF_NAME LOCAL_APN LOCAL_API REMOTE_APN REMOTE_API",
-        .num_args = 5,
-        .func = flow_allocate,
     },
 };
 

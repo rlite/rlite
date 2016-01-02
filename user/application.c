@@ -72,7 +72,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
-/*static XXX*/struct rina_kmsg_flow_allocate_resp *
+static struct rina_kmsg_flow_allocate_resp *
 flow_allocate_req(struct application *application, int wait_for_completion,
                   uint16_t ipcp_id, struct rina_name *local_application,
                   struct rina_name *remote_application)
@@ -100,6 +100,35 @@ flow_allocate_req(struct application *application, int wait_for_completion,
                          sizeof(*req), wait_for_completion);
 }
 
+static int allocate_flow(struct application *application,
+                         struct rina_name *dif_name,
+                         struct rina_name *local_application,
+                         struct rina_name *remote_application)
+{
+    unsigned int ipcp_id;
+    struct rina_kmsg_flow_allocate_resp *resp;
+
+    ipcps_fetch(&application->loop);
+    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
+
+    if (ipcp_id == ~0U) {
+        printf("%s: No suitable IPCP found\n", __func__);
+        return -1;
+    }
+
+    resp = flow_allocate_req(application, 1, ipcp_id, local_application,
+                             remote_application);
+    if (!resp) {
+        printf("%s: Flow allocation request failed\n", __func__);
+        return -1;
+    }
+
+    printf("%s: Flow allocation response: ret = %u, port-id = %u\n",
+                __func__, resp->result, resp->port_id);
+
+    return 0;
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -107,7 +136,24 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-int main()
+static void
+process(int argc, char **argv, struct application *application)
+{
+    struct rina_name dif_name;
+    struct rina_name this_application;
+    struct rina_name remote_application;
+
+    (void) argc;
+    (void) argv;
+
+    rina_name_fill(&dif_name, "d.DIF", "", "", "");
+    rina_name_fill(&this_application, "client", "1", NULL, NULL);
+    rina_name_fill(&remote_application, "server", "1", NULL, NULL);
+    allocate_flow(application, &dif_name, &this_application,
+                  &remote_application);
+}
+
+int main(int argc, char **argv)
 {
     struct application application;
     struct sigaction sa;
@@ -131,6 +177,8 @@ int main()
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
+
+    process(argc, argv, &application);
 
     rina_evloop_fini(&application.loop);
 

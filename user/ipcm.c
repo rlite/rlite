@@ -115,42 +115,6 @@ application_register_resp(struct rina_evloop *loop,
     return 0;
 }
 
-static int
-flow_allocate_resp(struct rina_evloop *loop,
-                        const struct rina_msg_base_resp *b_resp,
-                        const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_flow_allocate_req *req =
-            (struct rina_kmsg_flow_allocate_req *)b_req;
-    struct rina_kmsg_flow_allocate_resp *resp =
-            (struct rina_kmsg_flow_allocate_resp *)b_resp;
-    char *local_s = NULL;
-    char *remote_s = NULL;
-
-    local_s = rina_name_to_string(&req->local_application);
-    remote_s = rina_name_to_string(&req->remote_application);
-
-    if (resp->result) {
-        printf("%s: Failed to allocate a flow between local application "
-               "'%s' and remote application '%s'\n", __func__,
-                local_s, remote_s);
-    } else {
-        printf("%s: Allocated flow between local application "
-               "'%s' and remote application '%s' [port-id = %u]\n",
-                __func__, local_s, remote_s, resp->port_id);
-    }
-
-    if (local_s) {
-        free(local_s);
-    }
-
-    if (remote_s) {
-        free(remote_s);
-    }
-
-    return 0;
-}
-
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call issue_request(), in
@@ -165,7 +129,6 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
-    [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -282,34 +245,6 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     return (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(req),
-                         sizeof(*req), wait_for_completion);
-}
-
-static struct rina_kmsg_flow_allocate_resp *
-flow_allocate_req(struct ipcm *ipcm, int wait_for_completion,
-                  uint16_t ipcp_id, struct rina_name *local_application,
-                  struct rina_name *remote_application)
-{
-    struct rina_kmsg_flow_allocate_req *req;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        printf("%s: Out of memory\n", __func__);
-        return NULL;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ;
-    req->ipcp_id = ipcp_id;
-    req->qos = 0;  /* Not currently used. */
-    rina_name_copy(&req->local_application, local_application);
-    rina_name_copy(&req->remote_application, remote_application);
-
-    printf("Requesting flow allocation...\n");
-
-    return (struct rina_kmsg_flow_allocate_resp *)
            issue_request(&ipcm->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
@@ -547,39 +482,6 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
-static int
-rina_appl_flow_allocate_req(struct ipcm *ipcm, int sfd,
-                            const struct rina_msg_base *b_req)
-{
-    unsigned int ipcp_id;
-    struct rina_amsg_flow_allocate_req *req =
-                        (struct rina_amsg_flow_allocate_req *)b_req;
-    struct rina_amsg_flow_allocate_resp resp;
-    struct rina_kmsg_flow_allocate_resp *kresp;
-    uint8_t result = 1;
-    uint16_t port_id = 0;  /* Not valid. */
-
-    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
-    if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        kresp = flow_allocate_req(ipcm, 1, ipcp_id,
-                                  &req->local_application,
-                                  &req->remote_application);
-        if (kresp) {
-            result = kresp->result;
-            port_id = kresp->port_id;
-            rina_msg_free(rina_kernel_numtables, RMB(kresp));
-        }
-    }
-
-    resp.result = result;
-    resp.port_id = port_id;
-
-    return rina_appl_response(sfd, RMB(req), RMBR(&resp));
-}
-
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -590,7 +492,6 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
     [RINA_APPL_REGISTER] = rina_appl_register,
     [RINA_APPL_UNREGISTER] = rina_appl_unregister,
-    [RINA_APPL_FLOW_ALLOCATE_REQ] = rina_appl_flow_allocate_req,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 

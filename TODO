@@ -4,3 +4,5 @@
 - testare cosa succede se si crea più volte un IPC process con lo stesso
   nome
 - fare il cleanup delle tabelle kernel quando si scarica il modulo principale
+- implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
+  le applicazioni che è necessario rifare un ipcps_fetch()
