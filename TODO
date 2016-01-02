@@ -16,9 +16,6 @@
 - quando un ipcp normale viene distrutto, fare il cleanup completo delle
   strutture dati
 
-- rina_upqueue_append(): deallocare rmsg oppure passargli un buffer allocato
-  staticamente sulla pila
-
 - rimuovere usleep() hack in uipcp_server
 
 - rina-utils: routine di deserializzazione devono gestire errori di lunghezza

@@ -665,7 +665,7 @@ static int
 rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_create *req = (struct rina_kmsg_ipcp_create *)bmsg;
-    struct rina_kmsg_ipcp_create_resp *resp;
+    struct rina_kmsg_ipcp_create_resp resp;
     char *name_s = rina_name_to_string(&req->name);
     unsigned int ipcp_id;
     int ret;
@@ -675,20 +675,15 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         return ret;
     }
 
-    /* Create the response message. */
-    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        ret = -ENOMEM;
-        goto err2;
-    }
-    resp->msg_type = RINA_KERN_IPCP_CREATE_RESP;
-    resp->event_id = req->event_id;
-    resp->ipcp_id = ipcp_id;
+    memset(&resp, 0, sizeof(resp));
+    resp.msg_type = RINA_KERN_IPCP_CREATE_RESP;
+    resp.event_id = req->event_id;
+    resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
     if (ret) {
-        goto err3;
+        goto err;
     }
 
     printk("%s: IPC process %s created\n", __func__, name_s);
@@ -698,9 +693,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     return 0;
 
-err3:
-    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-err2:
+err:
     ipcp_del(ipcp_id);
 
     return ret;
@@ -726,30 +719,25 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 static int
 rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 {
-    struct rina_kmsg_fetch_ipcp_resp *resp;
+    struct rina_kmsg_fetch_ipcp_resp resp;
     struct ipcp_entry *entry;
     bool stop_next;
     bool no_next = true;
     int bucket;
-    int ret;
 
-    /* Create the response message. */
-    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        return -ENOMEM;
-    }
-    resp->msg_type = RINA_KERN_IPCP_FETCH_RESP;
-    resp->event_id = req->event_id;
+    memset(&resp, 0, sizeof(resp));
+    resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
+    resp.event_id = req->event_id;
     mutex_lock(&rina_dm.lock);
     stop_next = (rina_dm.ipcp_fetch_last == NULL);
     hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
         if (stop_next) {
-            resp->end = 0;
-            resp->ipcp_id = entry->id;
-            resp->dif_type = entry->dif_type;
-            resp->ipcp_addr = entry->addr;
-            rina_name_copy(&resp->ipcp_name, &entry->name);
-            rina_name_copy(&resp->dif_name, &entry->dif_name);
+            resp.end = 0;
+            resp.ipcp_id = entry->id;
+            resp.dif_type = entry->dif_type;
+            resp.ipcp_addr = entry->addr;
+            rina_name_copy(&resp.ipcp_name, &entry->name);
+            rina_name_copy(&resp.dif_name, &entry->dif_name);
             rina_dm.ipcp_fetch_last = entry;
             no_next = false;
             break;
@@ -758,24 +746,14 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
         }
     }
     if (no_next) {
-            resp->end = 1;
-            memset(&resp->ipcp_name, 0, sizeof(resp->ipcp_name));
-            memset(&resp->dif_name, 0, sizeof(resp->dif_name));
+            resp.end = 1;
+            memset(&resp.ipcp_name, 0, sizeof(resp.ipcp_name));
+            memset(&resp.dif_name, 0, sizeof(resp.dif_name));
             rina_dm.ipcp_fetch_last = NULL;
     }
     mutex_unlock(&rina_dm.lock);
 
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
-    if (ret) {
-        goto err1;
-    }
-
-    return 0;
-
-err1:
-    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-
-    return ret;
+    return rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
 }
 
 static int
@@ -1064,27 +1042,16 @@ static int
 rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
 {
-    struct rina_kmsg_fa_resp_arrived *resp;
-    int ret;
+    struct rina_kmsg_fa_resp_arrived resp;
 
-    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        return -ENOMEM;
-    }
-
-    resp->msg_type = RINA_KERN_FA_RESP_ARRIVED;
-    resp->event_id = event_id;
-    resp->port_id = port_id;
-    resp->result = result;
+    memset(&resp, 0, sizeof(resp));
+    resp.msg_type = RINA_KERN_FA_RESP_ARRIVED;
+    resp.event_id = event_id;
+    resp.port_id = port_id;
+    resp.result = result;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
-    if (ret) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-        return ret;
-    }
-
-    return 0;
+    return rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
 }
 
 static int
@@ -1211,14 +1178,9 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
-    struct rina_kmsg_fa_req_arrived *req;
+    struct rina_kmsg_fa_req_arrived req;
     struct upper_ref upper;
     int ret = -EINVAL;
-
-    req = kzalloc(sizeof(*req), GFP_KERNEL);
-    if (!req) {
-        return -ENOMEM;
-    }
 
     if (locked) {
         mutex_lock(&rina_dm.lock);
@@ -1247,15 +1209,15 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     PI("%s: Flow allocation request arrived to IPC process %u, "
         "port-id %u\n", __func__, ipcp->id, flow_entry->local_port);
 
-    req->msg_type = RINA_KERN_FA_REQ_ARRIVED;
-    req->event_id = 0;
-    req->ipcp_id = ipcp->id;
-    req->port_id = flow_entry->local_port;
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RINA_KERN_FA_REQ_ARRIVED;
+    req.event_id = 0;
+    req.ipcp_id = ipcp->id;
+    req.port_id = flow_entry->local_port;
 
     /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)req);
+    ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);
     if (ret) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
         flow_del_entry(flow_entry, 0);
     }
 out:
