@@ -46,4 +46,6 @@ void rina_name_fill(struct rina_name *name, const char *apn,
                     const char *api, const char *aen, const char *aei);
 int rina_name_valid(const struct rina_name *name);
 
+void flow_config_dump(const struct rina_flow_config *c);
+
 #endif  /* __RINA_SERDES_H__ */

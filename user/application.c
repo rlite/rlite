@@ -144,6 +144,7 @@ flow_config_default(struct rina_flow_config *cfg)
     cfg->in_order_delivery = 0;
     cfg->max_sdu_gap = -1;
     cfg->dtcp_present = 0;
+    cfg->dtcp.fc.fc_type = RINA_FC_TYPE_NONE;
 }
 
 static struct rina_kmsg_fa_resp_arrived *

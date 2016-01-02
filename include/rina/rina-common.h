@@ -85,6 +85,7 @@ struct window_based_config {
     uint64_t initial_credit;
 } __attribute__((packed));
 
+#define RINA_FC_TYPE_NONE           0
 #define RINA_FC_TYPE_WINDOW_BASED   1
 #define RINA_FC_TYPE_RATE_BASED     2
 

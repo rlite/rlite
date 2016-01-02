@@ -478,3 +478,46 @@ rina_name_valid(const struct rina_name *name)
     return 1;
 }
 COMMON_EXPORT(rina_name_valid);
+
+void
+flow_config_dump(const struct rina_flow_config *c)
+{
+    if (!c) {
+        return;
+    }
+
+    COMMON_PRINT("Flow configuration:\n"
+                "   partial_delivery=%u\n"
+                "   incomplete_delivery=%u\n"
+                "   in_order_delivery=%u\n"
+                "   max_sdu_gap=%d\n"
+                "   dtcp_present=%u\n"
+                "   dtcp.flow_control=%u\n"
+                "   dtcp.rtx_control=%u\n",
+                c->partial_delivery,
+                c->incomplete_delivery,
+                c->in_order_delivery,
+                c->max_sdu_gap,
+                c->dtcp_present,
+                c->dtcp.flow_control,
+                c->dtcp.rtx_control);
+
+    if (c->dtcp.fc.fc_type == RINA_FC_TYPE_WINDOW_BASED) {
+        COMMON_PRINT("   dtcp.fc.max_cwq_len=%lu\n"
+                    "   dtcp.fc.inital_credit=%lu\n",
+                    (long unsigned)c->dtcp.fc.cfg.w.max_cwq_len,
+                    (long unsigned)c->dtcp.fc.cfg.w.initial_credit);
+    } else if (c->dtcp.fc.fc_type == RINA_FC_TYPE_RATE_BASED) {
+        COMMON_PRINT("   dtcp.fc.sending_rate=%lu\n"
+                    "   dtcp.fc.time_period=%lu\n",
+                    (long unsigned)c->dtcp.fc.cfg.r.sending_rate,
+                    (long unsigned)c->dtcp.fc.cfg.r.time_period);
+    }
+
+    COMMON_PRINT("   dtcp.rtx.max_time_to_retry=%u\n"
+                "   dtcp.rtx.data_rxms_max=%u\n"
+                "   dtcp.rtx.initial_rtx_max=%u\n",
+                c->dtcp.rtx.max_time_to_retry,
+                c->dtcp.rtx.data_rxms_max,
+                c->dtcp.rtx.initial_rtx_max);
+}
