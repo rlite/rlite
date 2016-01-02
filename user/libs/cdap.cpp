@@ -420,6 +420,135 @@ CDAPMessage::operator=(const CDAPMessage& o)
     return *this;
 }
 
+bool
+CDAPMessage::is_type(obj_value_t tt) const
+{
+    return obj_value.ty == tt;
+}
+
+void
+CDAPMessage::get_obj_value(int32_t& v) const
+{
+    v = 0;
+    if (obj_value.ty == I32) {
+        v = obj_value.u.i32;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(int32_t v)
+{
+    obj_value.ty = I32;
+    obj_value.u.i32 = v;
+}
+
+void
+CDAPMessage::get_obj_value(int64_t& v) const
+{
+    v = 0;
+    if (obj_value.ty == I64) {
+        v = obj_value.u.i64;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(int64_t v)
+{
+    obj_value.ty = I64;
+    obj_value.u.i64 = v;
+}
+
+void
+CDAPMessage::get_obj_value(float& v) const
+{
+    v = 0.0;
+    if (obj_value.ty == FLOAT) {
+        v = obj_value.u.fp_single;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(float v)
+{
+    obj_value.ty = FLOAT;
+    obj_value.u.fp_single = v;
+}
+
+void
+CDAPMessage::get_obj_value(double& v) const
+{
+    v = 0.0;
+    if (obj_value.ty == DOUBLE) {
+        v = obj_value.u.fp_double;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(double v)
+{
+    obj_value.ty = DOUBLE;
+    obj_value.u.fp_double = v;
+}
+
+void
+CDAPMessage::get_obj_value(bool& v) const
+{
+    v = false;
+    if (obj_value.ty == BOOL) {
+        v = obj_value.u.boolean;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(bool v)
+{
+    obj_value.ty = BOOL;
+    obj_value.u.boolean = v;
+}
+
+void
+CDAPMessage::get_obj_value(std::string& v) const
+{
+    v = std::string();
+    if (obj_value.ty == STRING) {
+        v = obj_value.str;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(const std::string& v)
+{
+    obj_value.ty = STRING;
+    obj_value.str = v;
+}
+
+void
+CDAPMessage::set_obj_value(const char *v)
+{
+    obj_value.ty = STRING;
+    obj_value.str = std::string(v);
+}
+
+void
+CDAPMessage::get_obj_value(const char *& p, size_t& l) const
+{
+    p = NULL;
+    l = 0;
+    if (obj_value.ty == BYTES) {
+        p = obj_value.u.buf.ptr;
+        l = obj_value.u.buf.len;
+    }
+}
+
+void
+CDAPMessage::set_obj_value(const char *buf, size_t len)
+{
+    obj_value.ty = BYTES;
+    obj_value.u.buf.ptr = const_cast<char *>(buf);
+    obj_value.u.buf.len = len;
+    obj_value.u.buf.owned = false;
+}
+
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 {
     const char *apn, *api, *aen, *aei;

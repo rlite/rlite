@@ -105,7 +105,7 @@ struct CDAPMessage {
         STRING,
     };
 
-    bool is(obj_value_t tt) const { return obj_value.ty == tt; }
+    bool is_type(obj_value_t tt) const;
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
 
@@ -121,113 +121,21 @@ struct CDAPMessage {
 
     bool valid(bool check_invoke_id) const;
 
-    void get_obj_value(int32_t& v) const
-    {
-        v = 0;
-        if (obj_value.ty == I32) {
-            v = obj_value.u.i32;
-        }
-    }
-
-    void set_obj_value(int32_t v)
-    {
-        obj_value.ty = I32;
-        obj_value.u.i32 = v;
-    }
-
-    void get_obj_value(int64_t& v) const
-    {
-        v = 0;
-        if (obj_value.ty == I64) {
-            v = obj_value.u.i64;
-        }
-    }
-
-    void set_obj_value(int64_t v)
-    {
-        obj_value.ty = I64;
-        obj_value.u.i64 = v;
-    }
-
-    void get_obj_value(float& v) const
-    {
-        v = 0.0;
-        if (obj_value.ty == FLOAT) {
-            v = obj_value.u.fp_single;
-        }
-    }
-
-    void set_obj_value(float v)
-    {
-        obj_value.ty = FLOAT;
-        obj_value.u.fp_single = v;
-    }
-
-    void get_obj_value(double& v) const
-    {
-        v = 0.0;
-        if (obj_value.ty == DOUBLE) {
-            v = obj_value.u.fp_double;
-        }
-    }
-
-    void set_obj_value(double v)
-    {
-        obj_value.ty = DOUBLE;
-        obj_value.u.fp_double = v;
-    }
-
-    void get_obj_value(bool& v) const
-    {
-        v = false;
-        if (obj_value.ty == BOOL) {
-            v = obj_value.u.boolean;
-        }
-    }
-
-    void set_obj_value(bool v)
-    {
-        obj_value.ty = BOOL;
-        obj_value.u.boolean = v;
-    }
-
-    void get_obj_value(std::string& v) const
-    {
-        v = std::string();
-        if (obj_value.ty == STRING) {
-            v = obj_value.str;
-        }
-    }
-
-    void set_obj_value(const std::string& v)
-    {
-        obj_value.ty = STRING;
-        obj_value.str = v;
-    }
-
-    void set_obj_value(const char *v)
-    {
-        obj_value.ty = STRING;
-        obj_value.str = std::string(v);
-    }
-
-    void get_obj_value(const char *& p, size_t& l) const
-    {
-        p = NULL;
-        l = 0;
-        if (obj_value.ty == BYTES) {
-            p = obj_value.u.buf.ptr;
-            l = obj_value.u.buf.len;
-        }
-    }
-
-    void set_obj_value(const char *buf, size_t len)
-    {
-        obj_value.ty = BYTES;
-        obj_value.u.buf.ptr = const_cast<char *>(buf);
-        obj_value.u.buf.len = len;
-        obj_value.u.buf.owned = false;
-    }
+    void get_obj_value(int32_t& v) const;
+    void set_obj_value(int32_t v);
+    void get_obj_value(int64_t& v) const;
+    void set_obj_value(int64_t v);
+    void get_obj_value(float& v) const;
+    void set_obj_value(float v);
+    void get_obj_value(double& v) const;
+    void set_obj_value(double v);
+    void get_obj_value(bool& v) const;
+    void set_obj_value(bool v);
+    void get_obj_value(std::string& v) const;
+    void set_obj_value(const std::string& v);
+    void set_obj_value(const char *v);
+    void get_obj_value(const char *& p, size_t& l) const;
+    void set_obj_value(const char *buf, size_t len);
 
     int m_connect(gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value,
@@ -334,8 +242,8 @@ private:
                 bool owned;
             } buf; /* byteval */
         } u;
-        std::string              str; /* strval */
-    }                   obj_value;
+        std::string         str; /* strval */
+    } obj_value;
 };
 
 #endif /* __RLITE_CDAP_H__ */
