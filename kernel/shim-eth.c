@@ -827,7 +827,7 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     if (unlikely(rb->len > ETH_DATA_LEN)) {
         RPD(5, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
-        return -EINVAL;
+        return -EMSGSIZE;
     }
 
     spin_lock_bh(&priv->tx_lock);
