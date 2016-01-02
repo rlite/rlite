@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
+#include <assert.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
 #include <rina/rina-utils.h>
@@ -40,24 +41,6 @@ ipcp_create_resp(struct rina_evloop *loop,
 
     printf("%s: Assigned id %d\n", __func__, resp->ipcp_id);
     (void)req;
-
-    return 0;
-}
-
-static int
-ipcp_destroy_resp(struct rina_evloop *loop,
-                  const struct rina_msg_base_resp *b_resp,
-                  const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_ipcp_destroy *req =
-            (struct rina_kmsg_ipcp_destroy *)b_req;
-
-    if (b_resp->result) {
-        printf("%s: Failed to destroy IPC process %d\n", __func__,
-                req->ipcp_id);
-    } else {
-        printf("%s: Destroyed IPC process %d\n", __func__, req->ipcp_id);
-    }
 
     return 0;
 }
@@ -125,7 +108,6 @@ application_register_resp(struct rina_evloop *loop,
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
-    [RINA_KERN_IPCP_DESTROY_RESP] = ipcp_destroy_resp,
     [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
@@ -165,18 +147,18 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
 }
 
 /* Destroy an IPC process. */
-static struct rina_msg_base_resp *
-ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id,
-             int *result)
+static int
+ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
 {
     struct rina_kmsg_ipcp_destroy *msg;
-    struct rina_msg_base_resp *resp;
+    struct rina_msg_base *resp;
+    int result;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
         printf("%s: Out of memory\n", __func__);
-        return NULL;
+        return ENOMEM;
     }
 
     memset(msg, 0, sizeof(*msg));
@@ -185,13 +167,15 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id,
 
     printf("Requesting IPC process destruction...\n");
 
-    resp = (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), wait_for_completion, result);
+    resp = issue_request(&ipcm->loop, RMB(msg),
+                         sizeof(*msg), wait_for_completion, &result);
+    assert(!resp);
+
+    printf("Destroy result: %d\n", result);
 
     ipcps_fetch(&ipcm->loop);
 
-    return resp;
+    return result;
 }
 
 static struct rina_msg_base_resp *
@@ -316,15 +300,8 @@ test(struct ipcm *ipcm)
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    resp = ipcp_destroy(ipcm, 0, 0, &result);
-    if (resp) {
-        rina_msg_free(rina_kernel_numtables, RMB(resp));
-    }
-
-    resp = ipcp_destroy(ipcm, 0, 1, &result);
-    if (resp) {
-        rina_msg_free(rina_kernel_numtables, RMB(resp));
-    }
+    ipcp_destroy(ipcm, 0, 0);
+    ipcp_destroy(ipcm, 0, 1);
 
     return 0;
 }
@@ -381,9 +358,7 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
 {
     struct rina_amsg_ipcp_destroy *req = (struct rina_amsg_ipcp_destroy *)b_req;
     struct rina_msg_base_resp resp;
-    struct rina_msg_base_resp *kresp;
     unsigned int ipcp_id;
-    int result;
 
     resp.result = 1;
 
@@ -393,11 +368,7 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
         printf("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        kresp = ipcp_destroy(ipcm, 1, ipcp_id, &result);
-        if (kresp) {
-            rina_msg_free(rina_kernel_numtables, RMB(kresp));
-            resp.result = kresp->result;
-        }
+        resp.result = ipcp_destroy(ipcm, 1, ipcp_id);
     }
 
     return rina_appl_response(sfd, RMB(req), &resp);

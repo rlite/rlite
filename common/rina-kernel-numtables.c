@@ -16,10 +16,6 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_destroy),
         .names = 0,
     },
-    [RINA_KERN_IPCP_DESTROY_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
     [RINA_KERN_IPCP_FETCH] = {
         .copylen = sizeof(struct rina_msg_base),
         .names = 0,

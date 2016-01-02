@@ -384,35 +384,16 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_destroy *req =
                         (struct rina_kmsg_ipcp_destroy *)bmsg;
-    struct rina_msg_base_resp *resp;
-    int ret;
-
-    /* Create the response message. */
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        return -ENOMEM;
-    }
-    resp->msg_type = RINA_KERN_IPCP_DESTROY_RESP;
-    resp->event_id = req->event_id;
+    int result;
 
     /* Release the IPC process ID. */
-    resp->result = ipcp_del(req->ipcp_id);
+    result = ipcp_del(req->ipcp_id);
 
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
-    if (ret) {
-        goto err1;
-    }
-
-    if (resp->result == 0) {
+    if (result == 0) {
         printk("%s: IPC process %u destroyed\n", __func__, req->ipcp_id);
     }
 
-    return 0;
-
-err1:
-    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-
-    return ret;
+    return result;
 }
 
 static int
