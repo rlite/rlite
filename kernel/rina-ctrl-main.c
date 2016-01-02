@@ -103,7 +103,10 @@ struct rina_dm {
     /* Lock for IPCPs table. */
     spinlock_t ipcps_lock;
 
-    /* Lock for ipcp_factories list and DIFs list. */
+    /* Lock for DIFs list. */
+    spinlock_t difs_lock;
+
+    /* Lock for ipcp_factories list. */
     struct mutex general_lock;
 };
 
@@ -255,7 +258,7 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
 
     *err = 0;
 
-    mutex_lock(&rina_dm.general_lock);
+    spin_lock_bh(&rina_dm.difs_lock);
 
     list_for_each_entry(cur, &rina_dm.difs, node) {
         if (strcmp(cur->name, dif_name) == 0) {
@@ -272,13 +275,13 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
     }
 
     /* A DIF called 'dif_name' does not exist yet. */
-    cur = kzalloc(sizeof(*cur), GFP_KERNEL);
+    cur = kzalloc(sizeof(*cur), GFP_ATOMIC);
     if (!cur) {
         *err = -ENOMEM;
         goto out;
     }
 
-    cur->name = kstrdup(dif_name, GFP_KERNEL);
+    cur->name = kstrdup(dif_name, GFP_ATOMIC);
     if (!cur->name) {
         kfree(cur);
         cur = NULL;
@@ -295,7 +298,7 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
     PD("%s: DIF %s [type %u] created\n", __func__, cur->name, cur->ty);
 
 out:
-    mutex_unlock(&rina_dm.general_lock);
+    spin_unlock_bh(&rina_dm.difs_lock);
 
     return cur;
 }
@@ -307,7 +310,7 @@ dif_put(struct dif *dif)
         return;
     }
 
-    mutex_lock(&rina_dm.general_lock);
+    spin_lock_bh(&rina_dm.difs_lock);
     dif->refcnt--;
     if (dif->refcnt) {
         goto out;
@@ -320,7 +323,7 @@ dif_put(struct dif *dif)
     kfree(dif);
 
 out:
-    mutex_unlock(&rina_dm.general_lock);
+    spin_unlock_bh(&rina_dm.difs_lock);
 }
 
 static struct ipcp_entry *
@@ -2324,6 +2327,7 @@ rina_ctrl_init(void)
     mutex_init(&rina_dm.general_lock);
     spin_lock_init(&rina_dm.flows_lock);
     spin_lock_init(&rina_dm.ipcps_lock);
+    spin_lock_init(&rina_dm.difs_lock);
     rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
     INIT_LIST_HEAD(&rina_dm.difs);
