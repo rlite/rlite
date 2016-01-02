@@ -1824,6 +1824,9 @@ rina_io_release_internal(struct rina_io *rio)
             break;
     }
 
+    /* Reset mode for consistency. */
+    rio->mode = 0;
+
     return 0;
 }
 

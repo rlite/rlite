@@ -1,1 +1,2 @@
-user/rinaperf -tperf -c 20 -s 4000 -i 200000 -f dtcp.flow_control -f dtcp.fc.max_cwq_len=3 -f dtcp.fc.initial_credit=5
+user/rinaperf -l -pn.IPCP -P1
+user/rinaperf -t perf -pn.IPCP -P2 -f dtcp.fc.max_cwq_len=100 -f dtcp.fc.initial_credit=100 -i 100 -c 200
