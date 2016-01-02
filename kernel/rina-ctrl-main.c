@@ -916,12 +916,13 @@ rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
 
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
+    mutex_unlock(&rina_dm.lock);
+
     if (ipcp) {
         ret = rina_flow_allocate_req_arrived(ipcp, req->remote_port,
                                              &req->local_application,
                                              &req->remote_application);
     }
-    mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
