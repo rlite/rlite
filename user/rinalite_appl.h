@@ -4,7 +4,7 @@
 #include <rina/rina-common.h>
 #include <stdint.h>
 #include "list.h"
-#include "evloop.h"
+#include "rinalite_evloop.h"
 
 
 struct rinalite_pending_flow_req {

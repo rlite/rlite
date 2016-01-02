@@ -80,7 +80,7 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
     uint8_t mgmtsdu[sizeof(cmd) + sizeof(local_addr)];
 
     /* Exchange IPCP addresses. */
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+    ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
                                  &local_addr);
     assert(!ret);
     local_addr = htole64(local_addr);
@@ -175,7 +175,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     PD("Requesting IPCP pdu forwarding table set...\n");
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -230,7 +230,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     PD("[uipcp %u] Issuing UIPCP_FA_REQ_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -301,7 +301,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -614,7 +614,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     PD("Requesting IPCP uipcp set...\n");
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -663,14 +663,14 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     /* Set the evloop handlers for flow allocation request/response
      * reflected messages. */
-    ret = rina_evloop_set_handler(&uipcp->appl.loop,
+    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
                                   RINA_KERN_FA_REQ,
                                   uipcp_fa_req);
     if (ret) {
         goto err2;
     }
 
-    ret = rina_evloop_set_handler(&uipcp->appl.loop,
+    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
                                   RINA_KERN_FA_RESP,
                                   uipcp_fa_resp);
     if (ret) {
@@ -691,7 +691,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err2;
     }
 
-    rina_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
+    rinalite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
 
     ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
     if (ret) {
@@ -732,7 +732,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         // TODO empty the list
     }
 
-    rina_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
+    rinalite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
 
     close(uipcp->mgmtfd);
 

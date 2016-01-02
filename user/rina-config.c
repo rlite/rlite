@@ -14,7 +14,7 @@
 
 #include "rina/rina-conf-msg.h"
 #include "helpers.h"
-#include "evloop.h"
+#include "rinalite_evloop.h"
 
 
 struct rinaconf {
@@ -187,7 +187,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
     PD("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
-           rinalite_issue_request(&rc->loop, RMB(msg),
+           rinalite_issue_request(&rc->loop, RINALITE_RMB(msg),
                          sizeof(*msg), 1, wait_for_completion, result);
 
     rinalite_ipcps_fetch(&rc->loop);
@@ -237,7 +237,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
     kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, &result);
     if (kresp) {
-        rina_msg_free(rina_kernel_numtables, RMB(kresp));
+        rina_msg_free(rina_kernel_numtables, RINALITE_RMB(kresp));
     }
 
     return result;
@@ -269,7 +269,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     PD("Requesting IPC process destruction...\n");
 
-    resp = rinalite_issue_request(&rc->loop, RMB(msg),
+    resp = rinalite_issue_request(&rc->loop, RINALITE_RMB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -297,7 +297,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* Does the request specifies an existing IPC process ? */
-    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     if (!rinalite_ipcp) {
         PE("%s: No such IPCP process\n", __func__);
     } else {
@@ -331,7 +331,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
 
     PD("Requesting IPCP config...\n");
 
-    resp = rinalite_issue_request(&rc->loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&rc->loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -365,7 +365,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     if (!rinalite_ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
@@ -393,7 +393,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     /* Lookup the id of the registering IPCP. */
-    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
     if (!rinalite_ipcp) {
         PE("%s: Could not find the IPC process to register\n", __func__);
         return -1;
@@ -441,7 +441,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     supp_dif_name = argv[5];
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
     if (!rinalite_ipcp) {
         PE("%s: Could not find enrolling IPC process\n", __func__);
         return -1;
@@ -482,7 +482,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     }
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     rina_name_free(&ipcp_name);
     if (!rinalite_ipcp) {
         PE("%s: Could not find IPC process\n", __func__);
@@ -524,7 +524,7 @@ test(struct rinaconf *rc)
     icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
     assert(icresp);
     if (icresp) {
-        rina_msg_free(rina_kernel_numtables, RMB(icresp));
+        rina_msg_free(rina_kernel_numtables, RINALITE_RMB(icresp));
     }
     icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
     assert(!icresp);

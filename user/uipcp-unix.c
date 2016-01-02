@@ -18,7 +18,7 @@
 
 #include "list.h"
 #include "helpers.h"
-#include "evloop.h"
+#include "rinalite_evloop.h"
 #include "rinalite_appl.h"
 #include "uipcp-container.h"
 
@@ -45,7 +45,7 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
     resp->msg_type = RINA_CONF_BASE_RESP;
     resp->event_id = req->event_id;
 
-    return rina_msg_write(sfd, RMB(resp));
+    return rina_msg_write(sfd, RINALITE_RMB(resp));
 }
 
 static void
@@ -141,7 +141,7 @@ rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
-    return rina_conf_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
 }
 
 static int
@@ -176,7 +176,7 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     resp.result = 0;
 
 out:
-    return rina_conf_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
 }
 
 static int
@@ -205,7 +205,7 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     resp.result = 0;
 
 out:
-    return rina_conf_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
 }
 
 static int
@@ -241,7 +241,7 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
     resp.result = 0;
 
 out:
-    return rina_conf_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
 }
 
 typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
@@ -292,7 +292,7 @@ unix_server(void *arg)
         }
 
         /* Lookup the message type. */
-        req = RMB(msgbuf);
+        req = RINALITE_RMB(msgbuf);
         if (rina_config_handlers[req->msg_type] == NULL) {
             struct rina_msg_base_resp resp;
 

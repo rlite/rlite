@@ -17,7 +17,7 @@
 #include "rina/rina-utils.h"
 
 #include "pending_queue.h"
-#include "evloop.h"
+#include "rinalite_evloop.h"
 
 
 static int
@@ -134,7 +134,7 @@ rinalite_ipcps_fetch(struct rinalite_evloop *loop)
         } else {
             end = resp->end;
             rina_msg_free(rina_kernel_numtables,
-                          RMB(resp));
+                          RINALITE_RMB(resp));
         }
     }
 
@@ -221,7 +221,7 @@ evloop_function(void *arg)
         }
 
         /* Here we can malloc the maximum kernel message size. */
-        resp = RMBR(malloc(max_resp_size));
+        resp = RINALITE_RMBR(malloc(max_resp_size));
         if (!resp) {
             PE("%s: Out of memory\n", __func__);
             continue;
@@ -287,14 +287,14 @@ notify_requestor:
              * complete, reporting the response in the 'resp' pointer field. */
             pthread_mutex_lock(&loop->lock);
             req_entry->op_complete = 1;
-            req_entry->resp = RMB(resp);
+            req_entry->resp = RINALITE_RMB(resp);
             pthread_cond_signal(&req_entry->op_complete_cond);
         } else {
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
             rina_msg_free(rina_kernel_numtables, req_entry->msg);
             free(req_entry);
-            rina_msg_free(rina_kernel_numtables, RMB(resp));
+            rina_msg_free(rina_kernel_numtables, RINALITE_RMB(resp));
         }
         pthread_mutex_unlock(&loop->lock);
     }
@@ -537,7 +537,7 @@ rinalite_evloop_fini(struct rinalite_evloop *loop)
 }
 
 int
-rina_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
+rinalite_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
                         rina_resp_handler_t handler)
 {
     if (index >= RINA_KERN_MSG_MAX) {
@@ -550,7 +550,7 @@ rina_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
 }
 
 int
-rina_evloop_fdcb_add(struct rinalite_evloop *loop, int fd, rina_evloop_fdcb_t cb)
+rinalite_evloop_fdcb_add(struct rinalite_evloop *loop, int fd, rinalite_evloop_fdcb_t cb)
 {
     struct rinalite_evloop_fdcb *fdcb;
 
@@ -574,7 +574,7 @@ rina_evloop_fdcb_add(struct rinalite_evloop *loop, int fd, rina_evloop_fdcb_t cb
 }
 
 int
-rina_evloop_fdcb_del(struct rinalite_evloop *loop, int fd)
+rinalite_evloop_fdcb_del(struct rinalite_evloop *loop, int fd)
 {
     struct rinalite_evloop_fdcb *fdcb;
 
@@ -589,7 +589,7 @@ rina_evloop_fdcb_del(struct rinalite_evloop *loop, int fd)
 }
 
 struct rinalite_ipcp *
-select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name *dif_name,
+rinalite_select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name *dif_name,
                    int fallback)
 {
     struct rinalite_ipcp *cur;
@@ -622,7 +622,7 @@ select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name *dif_nam
 }
 
 struct rinalite_ipcp *
-lookup_ipcp_by_name(struct rinalite_evloop *loop, const struct rina_name *name)
+rinalite_lookup_ipcp_by_name(struct rinalite_evloop *loop, const struct rina_name *name)
 {
     struct rinalite_ipcp *rinalite_ipcp;
 
@@ -639,7 +639,7 @@ lookup_ipcp_by_name(struct rinalite_evloop *loop, const struct rina_name *name)
 }
 
 int
-lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
+rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                        uint64_t *addr)
 {
     struct rinalite_ipcp *rinalite_ipcp;

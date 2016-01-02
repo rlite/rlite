@@ -1,5 +1,5 @@
-#ifndef __RINA_EVLOOP_H__
-#define __RINA_EVLOOP_H__
+#ifndef __RINALITE_EVLOOP_H__
+#define __RINALITE_EVLOOP_H__
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -24,8 +24,8 @@ struct rinalite_ipcp {
 };
 
 /* Some useful macros for casting. */
-#define RMB(m) (struct rina_msg_base *)(m)
-#define RMBR(m) (struct rina_msg_base_resp *)(m)
+#define RINALITE_RMB(m) (struct rina_msg_base *)(m)
+#define RINALITE_RMBR(m) (struct rina_msg_base_resp *)(m)
 
 struct rinalite_evloop;
 
@@ -34,11 +34,11 @@ typedef int (*rina_resp_handler_t)(struct rinalite_evloop *loop,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
-typedef void (*rina_evloop_fdcb_t)(struct rinalite_evloop *loop, int fd);
+typedef void (*rinalite_evloop_fdcb_t)(struct rinalite_evloop *loop, int fd);
 
 struct rinalite_evloop_fdcb {
     int fd;
-    rina_evloop_fdcb_t cb;
+    rinalite_evloop_fdcb_t cb;
 
     struct list_head node;
 };
@@ -78,7 +78,8 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int has_response,
               unsigned int wait_for_completion, int *result);
 
-int rinalite_evloop_stop(struct rinalite_evloop *loop);
+int
+rinalite_evloop_stop(struct rinalite_evloop *loop);
 
 int
 rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
@@ -88,15 +89,15 @@ int
 rinalite_evloop_fini(struct rinalite_evloop *loop);
 
 int
-rina_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
+rinalite_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
                         rina_resp_handler_t handler);
 
 int
-rina_evloop_fdcb_add(struct rinalite_evloop *loop, int fd,
-                     rina_evloop_fdcb_t cb);
+rinalite_evloop_fdcb_add(struct rinalite_evloop *loop, int fd,
+                     rinalite_evloop_fdcb_t cb);
 
 int
-rina_evloop_fdcb_del(struct rinalite_evloop *loop, int fd);
+rinalite_evloop_fdcb_del(struct rinalite_evloop *loop, int fd);
 
 int
 rinalite_ipcps_print(struct rinalite_evloop *loop);
@@ -106,16 +107,16 @@ int
 rinalite_ipcps_fetch(struct rinalite_evloop *loop);
 
 struct rinalite_ipcp *
-select_ipcp_by_dif(struct rinalite_evloop *loop,
-                   const struct rina_name *dif_name,
-                   int fallback);
+rinalite_select_ipcp_by_dif(struct rinalite_evloop *loop,
+                            const struct rina_name *dif_name,
+                            int fallback);
 
 struct rinalite_ipcp *
-lookup_ipcp_by_name(struct rinalite_evloop *loop,
-                    const struct rina_name *name);
+rinalite_lookup_ipcp_by_name(struct rinalite_evloop *loop,
+                             const struct rina_name *name);
 
 int
-lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
+rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                        uint64_t *addr);
 
-#endif  /* __RINA_EVLOOP_H__ */
+#endif  /* __RINALITE_EVLOOP_H__ */

@@ -16,7 +16,7 @@
 #include "rina/rina-utils.h"
 
 #include "list.h"
-#include "evloop.h"
+#include "rinalite_evloop.h"
 #include "rinalite_appl.h"
 
 
@@ -127,7 +127,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
 
     PD("Requesting application %sregistration...\n", (reg ? "": "un"));
 
-    resp = rinalite_issue_request(&application->loop, RMB(req),
+    resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -179,7 +179,7 @@ flow_allocate_req(struct rinalite_appl *application,
     PD("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_fa_resp_arrived *)
-           rinalite_issue_request(&application->loop, RMB(req),
+           rinalite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 1, wait_for_completion, result);
 }
 
@@ -206,7 +206,7 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 
     PD("Responding to flow allocation request...\n");
 
-    resp = rinalite_issue_request(&application->loop, RMB(req),
+    resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -222,9 +222,9 @@ rinalite_appl_register(struct rinalite_appl *application, int reg,
 {
     struct rinalite_ipcp *rinalite_ipcp;
 
-    rinalite_ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&application->loop, ipcp_name);
     if (!rinalite_ipcp) {
-        rinalite_ipcp = select_ipcp_by_dif(&application->loop, dif_name, fallback);
+        rinalite_ipcp = rinalite_select_ipcp_by_dif(&application->loop, dif_name, fallback);
     }
     if (!rinalite_ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
@@ -250,9 +250,9 @@ rinalite_flow_allocate(struct rinalite_appl *application,
     struct rinalite_ipcp *rinalite_ipcp;
     int result;
 
-    rinalite_ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&application->loop, ipcp_name);
     if (!rinalite_ipcp) {
-        rinalite_ipcp = select_ipcp_by_dif(&application->loop, dif_name,
+        rinalite_ipcp = rinalite_select_ipcp_by_dif(&application->loop, dif_name,
                                   dif_fallback);
     }
     if (!rinalite_ipcp) {
@@ -272,7 +272,7 @@ rinalite_flow_allocate(struct rinalite_appl *application,
                 __func__, kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
-    rina_msg_free(rina_kernel_numtables, RMB(kresp));
+    rina_msg_free(rina_kernel_numtables, RINALITE_RMB(kresp));
 
     return result;
 }
