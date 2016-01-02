@@ -76,27 +76,6 @@ rina_shim_inet4_destroy(struct ipcp_entry *ipcp)
     PD("IPCP [%p] destroyed\n", priv);
 }
 
-#if 0
-static int
-peek_head_len(struct sock *sk)
-{
-    struct sk_buff *head;
-    int len = 0;
-    unsigned long flags;
-
-    spin_lock_irqsave(&sk->sk_receive_queue.lock, flags);
-    head = skb_peek(&sk->sk_receive_queue);
-    if (likely(head)) {
-        len = head->len;
-        if (vlan_tx_tag_present(head))
-            len += VLAN_HLEN;
-    }
-    spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
-
-    return len;
-}
-#endif
-
 /* This must be called in process context. */
 static void
 inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
@@ -127,7 +106,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         }
 
         lenhdr = ntohs(lenhdr);
-        PD("lenhdr %d, ret = %d\n", lenhdr, ret);
+        NPD("lenhdr %d, ret = %d\n", lenhdr, ret);
 
         if (!lenhdr) {
             PE("Warning: zero lenght packet\n");
@@ -155,7 +134,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
             break;
         }
 
-        PD("read %d bytes\n", ret);
+        NPD("read %d bytes\n", ret);
         rina_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
     }
 }
@@ -295,7 +274,7 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
         }
 
     } else {
-        PD("sock_sendmsg(%d + 2)\n", (int)rb->len);
+        NPD("sock_sendmsg(%d + 2)\n", (int)rb->len);
     }
 
     rina_buf_free(rb);
