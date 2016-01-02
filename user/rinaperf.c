@@ -177,7 +177,9 @@ echo_server(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            printf("%s: timeout occurred\n", __func__);
+            PI("%s: timeout occurred\n", __func__);
+            PI("%s: received %u PDUs out of %u\n", __func__,
+                    i, rp->test_config.cnt);
             break;
         }
 
