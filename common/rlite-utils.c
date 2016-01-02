@@ -287,7 +287,9 @@ rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
 
     str = (string_t *)(name);
     for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
-        COMMON_FREE(*str);
+        if (*str) {
+            COMMON_FREE(*str);
+        }
     }
 }
 COMMON_EXPORT(rlite_msg_free);

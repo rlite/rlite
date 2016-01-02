@@ -1270,6 +1270,8 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     }
 
     {
+        /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+         * opened ctrl device. */
         struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
         struct rl_kmsg_ipcp_update upd;
         struct rlite_ctrl *rcur;
@@ -1280,8 +1282,6 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             PE("Out of memory\n");
 
         } else {
-            /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
-             * opened ctrl device. */
             mutex_lock(&rlite_dm.general_lock);
             list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
                 rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
@@ -1314,6 +1314,29 @@ rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     if (ret == 0) {
         PI("IPC process %u destroyed\n", req->ipcp_id);
+
+        {
+            /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+             * opened ctrl device. */
+            struct rl_kmsg_ipcp_update upd;
+            struct rlite_ctrl *rcur;
+
+            memset(&upd, 0, sizeof(upd));
+            upd.msg_type = RLITE_KER_IPCP_UPDATE;
+            upd.update_type = RLITE_UPDATE_DEL;
+            upd.ipcp_id = req->ipcp_id;
+            /* All the other fields are zeroed, since they are
+             * not useful to userspace. */
+
+            mutex_lock(&rlite_dm.general_lock);
+            list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
+                rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
+            }
+            mutex_unlock(&rlite_dm.general_lock);
+
+            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                    (struct rlite_msg_base *)&upd);
+        }
     }
 
     return ret;
