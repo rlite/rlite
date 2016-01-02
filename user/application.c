@@ -143,7 +143,7 @@ application_register_req(struct application *application,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     resp = issue_request(&application->loop, RMB(req),
-                         sizeof(*req), wait_for_completion, &result);
+                         sizeof(*req), 0, wait_for_completion, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -175,7 +175,7 @@ flow_allocate_req(struct application *application, int wait_for_completion,
 
     return (struct rina_kmsg_flow_allocate_resp_arrived *)
            issue_request(&application->loop, RMB(req),
-                         sizeof(*req), wait_for_completion, result);
+                         sizeof(*req), 1, wait_for_completion, result);
 }
 
 static int
@@ -201,7 +201,7 @@ flow_allocate_resp(struct application *application,
     printf("Responding to flow allocation request...\n");
 
     resp = issue_request(&application->loop, RMB(req),
-                         sizeof(*req), 0, &result);
+                         sizeof(*req), 0, 0, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 

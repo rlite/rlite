@@ -83,7 +83,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
            issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), wait_for_completion, result);
+                         sizeof(*msg), 1, wait_for_completion, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -112,7 +112,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
     printf("Requesting IPC process destruction...\n");
 
     resp = issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), wait_for_completion, &result);
+                         sizeof(*msg), 0, wait_for_completion, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -144,7 +144,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting DIF assignment...\n");
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         wait_for_completion, &result);
+                         0, wait_for_completion, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -179,7 +179,7 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
 
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         wait_for_completion, &result);
+                         0, wait_for_completion, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 

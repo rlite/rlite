@@ -68,7 +68,7 @@ struct rina_evloop {
  * @msg. */
 struct rina_msg_base *
 issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int wait_for_completion,
+              size_t msg_len, int has_response, int wait_for_completion,
               int *result);
 
 int

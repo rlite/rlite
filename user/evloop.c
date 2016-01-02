@@ -71,7 +71,7 @@ ipcp_fetch(struct rina_evloop *loop, int *result)
     printf("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(loop, msg, sizeof(*msg), 1, result);
+           issue_request(loop, msg, sizeof(*msg), 1, 1, result);
 }
 
 int
@@ -260,22 +260,16 @@ notify_requestor:
  * @msg. */
 struct rina_msg_base *
 issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int wait_for_completion, int *result)
+              size_t msg_len, int has_response, int wait_for_completion,
+              int *result)
 {
     struct rina_msg_base *resp = NULL;
     struct pending_entry *entry;
     char serbuf[4096];
     unsigned int serlen;
-    int has_response = 1;
     int ret;
 
     *result = 0;
-
-    if (!loop->handlers[msg->msg_type + 1]) {
-        /* The event loop user did not specify a response
-         * handler for this message. */
-        has_response = 0;
-    }
 
     if (has_response) {
         /* Store the request in the pending queue before issuing the request
