@@ -479,6 +479,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->application_name);
     struct ipcp_entry *entry;
+    int reg = req->msg_type == RINA_CTRL_APPLICATION_REGISTER ? 1 : 0;
     int ret;
 
     /* Create the response message. */
@@ -493,17 +494,24 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     /* Find the IPC process entry corresponding to req->ipcp_id. */
     entry = ipcp_table_find(req->ipcp_id);
     if (entry) {
-        if (entry->ops.application_register) {
-            ret = entry->ops.application_register(entry->priv,
+        ret = 0;
+        if (reg) {
+            if (entry->ops.application_register) {
+                ret = entry->ops.application_register(entry->priv,
                                             &req->application_name);
+            }
         } else {
-            ret = 0;
+            if (entry->ops.application_unregister) {
+                ret = entry->ops.application_unregister(entry->priv,
+                                            &req->application_name);
+            }
         }
         resp->result = (ret ? 1 : 0);  /* Report result. */
     }
     mutex_unlock(&rina_dm.lock);
 
-    resp->msg_type = RINA_CTRL_APPLICATION_REGISTER_RESP;
+    resp->msg_type = reg ? RINA_CTRL_APPLICATION_REGISTER_RESP
+                         : RINA_CTRL_APPLICATION_UNREGISTER_RESP;
     resp->event_id = req->event_id;
 
     /* Enqueue the response into the upqueue. */
@@ -513,8 +521,8 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     if (resp->result == 0) {
-        printk("%s: Registering application process %s to IPC process %u\n",
-                __func__, name_s, req->ipcp_id);
+        printk("%s: Application process %s %sregistered to IPC process %u\n",
+                __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
     }
     if (name_s) {
         kfree(name_s);
@@ -539,6 +547,7 @@ static rina_msg_handler_t rina_handlers[] = {
     [RINA_CTRL_FETCH_IPCP] = rina_ipcp_fetch,
     [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_CTRL_APPLICATION_REGISTER] = rina_application_register,
+    [RINA_CTRL_APPLICATION_UNREGISTER] = rina_application_register,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 

@@ -109,6 +109,42 @@ rina_shim_dummy_application_register(void *data, struct rina_name *application_n
 }
 
 static int
+rina_shim_dummy_application_unregister(void *data, struct rina_name *application_name)
+{
+    struct registered_application *app;
+    struct rina_shim_dummy *priv = data;
+    int found = 0;
+    char *name_s;
+
+    mutex_lock(&priv->lock);
+
+    list_for_each_entry(app, &priv->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            found = 1;
+            break;
+        }
+    }
+
+    if (found) {
+        list_del(&app->node);
+    }
+
+    mutex_unlock(&priv->lock);
+
+    if (!found) {
+        return -EINVAL;
+    }
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s unregistered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+}
+
+static int
 rina_shim_dummy_assign_to_dif(void *data, struct rina_name *dif_name)
 {
     return 0;
@@ -125,6 +161,7 @@ rina_shim_dummy_init(void)
     memset(&factory.ops, 0, sizeof(factory.ops));
     factory.ops.destroy = rina_shim_dummy_destroy;
     factory.ops.application_register = rina_shim_dummy_application_register;
+    factory.ops.application_unregister = rina_shim_dummy_application_unregister;
     factory.ops.assign_to_dif = rina_shim_dummy_assign_to_dif;
 
     ret = rina_ipcp_factory_register(&factory);

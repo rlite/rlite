@@ -139,15 +139,16 @@ application_register_resp(struct ipcm *ipcm,
     struct rina_msg_application_register *req =
             (struct rina_msg_application_register *)b_req;
     char *name_s = NULL;
+    int reg = resp->msg_type == RINA_CTRL_APPLICATION_REGISTER_RESP ? 1 : 0;
 
     name_s = rina_name_to_string(&req->application_name);
 
     if (resp->result) {
-        printf("%s: Failed to register application %s to IPC process %u\n",
-                __func__, name_s, req->ipcp_id);
+        printf("%s: Failed to %sregister application %s to IPC process %u\n",
+                __func__, (reg ? "" : "un"), name_s, req->ipcp_id);
     } else {
-        printf("%s: Registered application %s to IPC process %u\n",
-                __func__, name_s, req->ipcp_id);
+        printf("%s: Application %s %sregistered to IPC process %u\n",
+                __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
     }
 
     if (name_s) {
@@ -169,6 +170,7 @@ static rina_resp_handler_t rina_handlers[] = {
     [RINA_CTRL_FETCH_IPCP_RESP] = fetch_ipcp_resp,
     [RINA_CTRL_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_CTRL_APPLICATION_REGISTER_RESP] = application_register_resp,
+    [RINA_CTRL_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
@@ -421,7 +423,7 @@ assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 }
 
 static int
-application_register(struct ipcm *ipcm, unsigned int ipcp_id,
+application_register(struct ipcm *ipcm, int reg, unsigned int ipcp_id,
                      struct rina_name *application_name)
 {
     struct rina_msg_application_register *req;
@@ -433,11 +435,12 @@ application_register(struct ipcm *ipcm, unsigned int ipcp_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_CTRL_APPLICATION_REGISTER;
+    req->msg_type = reg ? RINA_CTRL_APPLICATION_REGISTER
+                        : RINA_CTRL_APPLICATION_UNREGISTER;
     req->ipcp_id = ipcp_id;
     rina_name_copy(&req->application_name, application_name);
 
-    printf("Requesting application registration...\n");
+    printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     return issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
 }
@@ -465,10 +468,20 @@ test(struct ipcm *ipcm)
     /* Fetch IPC processes table. */
     ret = fetch_ipcps(ipcm);
 
+    /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, &name);
+    application_register(ipcm, 1, 0, &name);
+    rina_name_free(&name);
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    application_register(ipcm, 1, &name);
+    application_register(ipcm, 1, 1, &name);
+    rina_name_free(&name);
+
+    /* Unregister the applications. */
+    rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
+    application_register(ipcm, 0, 0, &name);
+    rina_name_free(&name);
+    rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
+    application_register(ipcm, 0, 1, &name);
     rina_name_free(&name);
 
     /* Destroy the IPCP. */
