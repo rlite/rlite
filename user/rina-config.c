@@ -238,6 +238,34 @@ static int ipcp_unregister(int argc, char **argv)
     return ipcp_register_common(argc, argv, 0);
 }
 
+static int ipcp_enroll(int argc, char **argv)
+{
+    struct rina_amsg_ipcp_enroll req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    const char *neigh_ipcp_apn;
+    const char *neigh_ipcp_api;
+    const char *dif_name;
+    const char *supp_dif_name;
+
+    assert(argc >= 6);
+    dif_name = argv[0];
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
+    neigh_ipcp_apn = argv[3];
+    neigh_ipcp_api = argv[4];
+    supp_dif_name = argv[5];
+
+    req.msg_type = RINA_APPL_IPCP_ENROLL;
+    req.event_id = 0;
+    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
+    rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -281,6 +309,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME IPCP_APN IPCP_API",
         .num_args = 3,
         .func = ipcp_unregister,
+    },
+    {
+        .name = "ipcp-enroll",
+        .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
+        .num_args = 6,
+        .func = ipcp_enroll,
     },
 };
 

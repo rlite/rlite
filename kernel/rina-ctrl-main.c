@@ -725,19 +725,57 @@ rina_ipcp_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_register *req =
                     (struct rina_kmsg_ipcp_register *)bmsg;
-    struct ipcp_entry *entry_who;
+    struct ipcp_entry *entry;
     int ret = 0;
 
     mutex_lock(&rina_dm.lock);
 
-    entry_who = ipcp_table_find(req->ipcp_id_who);
-    if (!entry_who) {
+    entry = ipcp_table_find(req->ipcp_id_who);
+    if (!entry) {
         ret = -EINVAL;
+        goto out;
     }
 
-    ret = rina_common_register(req->reg, req->ipcp_id_where, &entry_who->name,
-                               NULL, entry_who);
+    if (entry->dif_type != DIF_TYPE_NORMAL) {
+        /* Shim DIFs cannot register to other IPCPs. */
+        ret = -EINVAL;
+        goto out;
+    }
 
+    ret = rina_common_register(req->reg, req->ipcp_id_where, &entry->name,
+                               NULL, entry);
+
+out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+rina_ipcp_enroll(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_enroll *req =
+                    (struct rina_kmsg_ipcp_enroll *)bmsg;
+    struct ipcp_entry *entry;
+    struct ipcp_entry *supp_entry;
+    int ret = 0;
+
+    mutex_lock(&rina_dm.lock);
+
+    entry = ipcp_table_find(req->ipcp_id);
+    if (!entry) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    supp_entry = ipcp_table_find(req->supp_ipcp_id);
+    if (!supp_entry) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    //TODO
+out:
     mutex_unlock(&rina_dm.lock);
 
     return ret;
@@ -1154,6 +1192,7 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_IPCP_REGISTER] = rina_ipcp_register,
+    [RINA_KERN_IPCP_ENROLL] = rina_ipcp_enroll,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 

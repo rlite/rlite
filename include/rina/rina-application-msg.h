@@ -19,7 +19,8 @@ enum {
     RINA_APPL_ASSIGN_TO_DIF_RESP, /* 6 */
     RINA_APPL_IPCP_CONFIG,        /* 7 */
     RINA_APPL_IPCP_REGISTER,      /* 8 */
-    RINA_APPL_BASE_RESP,          /* 9 */
+    RINA_APPL_IPCP_ENROLL,        /* 9 */
+    RINA_APPL_BASE_RESP,          /* 10 */
 
     RINA_APPL_MSG_MAX,
 };
@@ -74,6 +75,18 @@ struct rina_amsg_ipcp_register {
     uint8_t reg;
     struct rina_name ipcp_name;
     struct rina_name dif_name;
+} __attribute__((packed));
+
+/* Application --> IPCM message to enroll an IPC process
+ * to another IPC process */
+struct rina_amsg_ipcp_enroll {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    struct rina_name dif_name;
+    struct rina_name ipcp_name;
+    struct rina_name neigh_ipcp_name;
+    struct rina_name supp_dif_name;
 } __attribute__((packed));
 
 #endif  /* __RINA_APPLICATION_MSG_H__ */

@@ -34,6 +34,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
     RINA_KERN_IPCP_CONFIG, /* 17 */
     RINA_KERN_IPCP_REGISTER, /* 18 */
+    RINA_KERN_IPCP_ENROLL, /* 19 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -158,6 +159,18 @@ struct rina_kmsg_ipcp_register {
     uint16_t ipcp_id_where;
     /* Register or unregister ? */
     uint8_t reg;
+};
+
+struct rina_kmsg_ipcp_enroll {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    /* Who wants to enroll ? */
+    uint16_t ipcp_id;
+    /* What IPC process is to be used in the supporting DIF ? */
+    uint16_t supp_ipcp_id;
+    /* Who to enroll to ? */
+    struct rina_name neigh_ipcp_name;
 };
 
 #endif  /* __RINA_KERN_H__ */

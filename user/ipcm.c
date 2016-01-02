@@ -216,6 +216,38 @@ ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
 }
 
 static int
+ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
+            const struct rina_name *neigh_ipcp_name,
+            uint16_t supp_ipcp_id)
+{
+    struct rina_kmsg_ipcp_enroll *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_ENROLL;
+    req->ipcp_id = ipcp_id;
+    rina_name_copy(&req->neigh_ipcp_name, neigh_ipcp_name);
+    req->supp_ipcp_id = supp_ipcp_id;
+
+    PD("Requesting IPCP enrollment...\n");
+
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -401,6 +433,35 @@ out:
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
+static int
+rina_appl_ipcp_enroll(struct ipcm *ipcm, int sfd,
+                      const struct rina_msg_base *b_req)
+{
+    unsigned int ipcp_id, supp_ipcp_id;
+    struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
+    struct rina_msg_base_resp resp;
+
+    resp.result = 1;  /* Report failure by default. */
+
+    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    if (ipcp_id == ~0U) {
+        PE("%s: Could not find enrolling IPC process\n", __func__);
+        goto out;
+    }
+
+    supp_ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->supp_dif_name, 0);
+    if (supp_ipcp_id == ~0U) {
+        PE("%s: Could not find a supporting IPC process\n", __func__);
+        goto out;
+    }
+    /* Forward the request to the kernel. */
+    resp.result = ipcp_enroll(ipcm, ipcp_id, &req->neigh_ipcp_name,
+                              supp_ipcp_id);
+
+out:
+    return rina_appl_response(sfd, RMB(req), &resp);
+}
+
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -411,6 +472,7 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
     [RINA_APPL_IPCP_CONFIG] = rina_appl_ipcp_config,
     [RINA_APPL_IPCP_REGISTER] = rina_appl_ipcp_register,
+    [RINA_APPL_IPCP_ENROLL] = rina_appl_ipcp_enroll,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 
