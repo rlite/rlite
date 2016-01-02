@@ -17,10 +17,22 @@
 
 using namespace std;
 
+namespace obj_class {
+    static string dft = "dft";
+    static string neighbors = "neighbors";
+    static string enrollment = "enrollment";
+    static string status = "operational_status";
+    static string address = "address";
+};
 
-static string dft_obj_name = "/dif/mgmt/fa/dft";
-static string dft_obj_class = "dft";
-static string whatevercast_obj_name = "/daf/mgmt/naming/whatevercast";
+namespace obj_name {
+    static string dft = "/dif/mgmt/fa/" + obj_class::dft;
+    static string neighbors = "/daf/mgmt/" + obj_class::neighbors;
+    static string enrollment = "/def/mgmt/" + obj_class::enrollment;
+    static string status = "/daf/mgmt/" + obj_class::status;
+    static string address = "/def/mgmt/naming" + obj_class::address;
+    static string whatevercast = "/daf/mgmt/naming/whatevercast";
+};
 
 struct Neighbor {
     struct rina_name ipcp_name;
@@ -91,9 +103,9 @@ rib_create(struct uipcp *uipcp)
 
     /* Insert the handlers for the RIB objects. */
 
-    rib->handlers.insert(make_pair(dft_obj_name, dft_handler));
+    rib->handlers.insert(make_pair(obj_name::dft, dft_handler));
 
-    rib->handlers.insert(make_pair(whatevercast_obj_name,
+    rib->handlers.insert(make_pair(obj_name::whatevercast,
                                    whatevercast_handler));
 
     return rib;
@@ -208,7 +220,7 @@ rib_application_register(struct uipcp_rib *rib, int reg,
         create = false;
     }
 
-    rib_remote_sync(rib, create, dft_obj_class, dft_obj_name, 10329);
+    rib_remote_sync(rib, create, obj_class::dft, obj_name::dft, 10329);
 
     PD("%s: Application %s %sregistered %s uipcp %d\n", __func__,
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
