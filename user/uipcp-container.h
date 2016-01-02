@@ -63,6 +63,14 @@ struct uipcp_ops {
                             const struct rina_msg_base *b_req);
 };
 
+struct flow_edge {
+    struct uipcp *uipcp;
+    unsigned int marked;
+    unsigned int up_depth;
+    unsigned int down_depth;
+
+    struct list_head node;
+};
 
 struct uipcp {
     struct rlite_appl appl;
@@ -70,8 +78,10 @@ struct uipcp {
     unsigned int ipcp_id;
 
     struct uipcp_ops ops;
-
     void *priv;
+
+    struct list_head lowers;
+    struct list_head uppers;
 
     struct list_head node;
 };
@@ -86,11 +96,11 @@ struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 
 int uipcps_fetch(struct uipcps *uipcps);
 
-int uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
-                            unsigned int lower);
+int uipcp_lower_flow_added(struct uipcp *uipcp, unsigned int upper,
+                           unsigned int lower);
 
-int uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
-                              unsigned int lower);
+int uipcp_lower_flow_removed(struct uipcp *uipcp, unsigned int upper,
+                             unsigned int lower);
 
 int uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
                              uint8_t response,

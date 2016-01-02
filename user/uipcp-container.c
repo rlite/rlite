@@ -270,6 +270,8 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
     uipcp->uipcps = uipcps;
     uipcp->ops = *ops;
     uipcp->priv = NULL;
+    list_init(&uipcp->uppers);
+    list_init(&uipcp->lowers);
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
@@ -378,8 +380,8 @@ uipcps_fetch(struct uipcps *uipcps)
 }
 
 int
-uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
-                        unsigned int lower)
+uipcp_lower_flow_added(struct uipcp *uipcp, unsigned int upper,
+                       unsigned int lower)
 {
     PD("Adding flow %d -> %d\n", upper, lower);
 
@@ -387,8 +389,8 @@ uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
 }
 
 int
-uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
-                          unsigned int lower)
+uipcp_lower_flow_removed(struct uipcp *uipcp, unsigned int upper,
+                         unsigned int lower)
 {
     PD("Removing flow %d -> %d\n", upper, lower);
 
