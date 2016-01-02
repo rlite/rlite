@@ -114,7 +114,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
-    dtp->rcv_lwe = 0;
+    dtp->rcv_lwe = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
@@ -123,6 +123,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
         dtp->snd_rwe += fc->cfg.w.initial_credit;
+        dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }
 
     return 0;
@@ -340,6 +341,26 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     return 0;
 }
 
+static void
+sdu_rx_sv_update(struct dtp *dtp, const struct rina_flow_config *cfg,
+                 uint64_t seqnum)
+{
+    if (cfg->dtcp.flow_control) {
+        /* POL: RcvrFlowControl */
+        /* We should not unconditionally increment the receiver RWE,
+         * but instead use some logic related to buffer management
+         * (e.g. see the amount of receiver buffer available). */
+        dtp->rcv_rwe++;
+
+        if (!cfg->dtcp.rtx_control) {
+            /* POL: ReceivingFlowControl */
+            if (cfg->dtcp.fc.fc_type == RINA_FC_T_WIN) {
+                /* TODO Send a flow control only control PDU. */
+            }
+        }
+    }
+}
+
 static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
@@ -371,6 +392,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
             dtp->rcv_lwe = pci->seqnum + 1;
             dtp->max_seq_num_rcvd = pci->seqnum;
+
+            sdu_rx_sv_update(dtp, &flow->cfg, pci->seqnum);
 
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
         } else {

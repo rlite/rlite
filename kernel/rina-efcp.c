@@ -54,11 +54,12 @@ void
 dtp_dump(struct dtp *dtp)
 {
     printk("DTP: set_drf=%u,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
-            "last_seq_num_sent=%lu,rcv_lwe=%lu\n",
+            "last_seq_num_sent=%lu,rcv_lwe=%lu,rcv_rwe=%lu\n",
             dtp->set_drf, (long unsigned)dtp->snd_lwe,
             (long unsigned)dtp->snd_rwe,
             (long unsigned)dtp->next_seq_num_to_send,
             (long unsigned)dtp->last_seq_num_sent,
-            (long unsigned)dtp->rcv_lwe);
+            (long unsigned)dtp->rcv_lwe,
+            (long unsigned)dtp->rcv_rwe);
 }
 EXPORT_SYMBOL_GPL(dtp_dump);
