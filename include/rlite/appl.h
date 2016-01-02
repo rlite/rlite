@@ -11,33 +11,9 @@
 extern "C" {
 #endif
 
-struct rlite_pending_flow_req {
-    uint32_t kevent_id;
-    uint16_t ipcp_id;
-    uint32_t port_id;
-    struct rina_name remote_appl;
-    struct rina_name local_appl;
-    char *dif_name;
-
-    struct list_head node;
-};
-
-static inline void
-rl_pfr_free(struct rlite_pending_flow_req *pfr)
-{
-    rina_name_free(&pfr->remote_appl);
-    rina_name_free(&pfr->local_appl);
-    free(pfr->dif_name);
-    free(pfr);
-}
-
 /* Application data model. */
 struct rlite_appl {
     struct rlite_evloop loop;
-
-    pthread_cond_t flow_req_arrived_cond;
-    struct list_head pending_flow_reqs;
-    pthread_mutex_t lock;
 };
 
 int rl_appl_init(struct rlite_appl *appl, unsigned int flags);
@@ -71,8 +47,6 @@ int rl_appl_fa_resp(struct rlite_appl *appl,
                              uint32_t kevent_id, uint16_t ipcp_id,
                              uint16_t upper_ipcp_id, uint32_t port_id,
                              uint8_t response);
-
-struct rlite_pending_flow_req *rl_appl_flow_accept(struct rlite_appl *appl);
 
 #ifdef __cplusplus
 }

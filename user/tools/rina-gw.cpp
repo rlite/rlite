@@ -550,8 +550,8 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     }
 
     ret = rl_appl_fa_resp(&gw->appl, req->kevent_id,
-                                   req->ipcp_id, 0xffff,
-                                   req->port_id, RLITE_SUCC);
+                          req->ipcp_id, 0xffff,
+                          req->port_id, RLITE_SUCC);
     if (ret != RLITE_SUCC) {
         PE("rl_appl_fa_resp() failed\n");
         close(cfd);
@@ -719,9 +719,9 @@ setup()
      * response, since we'll not be using rlite/appl.h functionalities for
      * that. */
     ret = rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_REQ_ARRIVED,
-                                   gw_fa_req_arrived);
+                                gw_fa_req_arrived);
     ret |= rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_RESP_ARRIVED,
-                                    gw_fa_resp_arrived);
+                                 gw_fa_resp_arrived);
     if (ret) {
         return -1;
     }

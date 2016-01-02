@@ -56,44 +56,6 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
 }
 
 static int
-flow_allocate_req_arrived(struct rlite_evloop *loop,
-                          const struct rlite_msg_base_resp *b_resp,
-                          const struct rlite_msg_base *b_req)
-{
-    struct rlite_appl *appl = container_of(loop,
-                                       struct rlite_appl, loop);
-    struct rl_kmsg_fa_req_arrived *req =
-            (struct rl_kmsg_fa_req_arrived *)b_resp;
-    struct rlite_pending_flow_req *pfr = NULL;
-
-    assert(b_req == NULL);
-    pfr = malloc(sizeof(*pfr));
-    if (!pfr) {
-        PE("Out of memory\n");
-        /* Negative flow allocation response. */
-        return rl_appl_fa_resp(appl, req->kevent_id,
-                               req->ipcp_id, 0xffff,
-                               req->port_id, RLITE_ERR);
-    }
-
-    pfr->kevent_id = req->kevent_id;
-    pfr->ipcp_id = req->ipcp_id;
-    pfr->port_id = req->port_id;
-    rina_name_copy(&pfr->remote_appl, &req->remote_appl);
-    rina_name_copy(&pfr->local_appl, &req->local_appl);
-    pfr->dif_name = strdup(req->dif_name);
-
-    pthread_mutex_lock(&appl->lock);
-    list_add_tail(&pfr->node, &appl->pending_flow_reqs);
-    pthread_cond_signal(&appl->flow_req_arrived_cond);
-    pthread_mutex_unlock(&appl->lock);
-
-    PI("port-id %u\n", req->port_id);
-
-    return 0;
-}
-
-static int
 appl_register_resp(struct rlite_evloop *loop,
                    const struct rlite_msg_base_resp *b_resp,
                    const struct rlite_msg_base *b_req)
@@ -130,7 +92,7 @@ appl_register_resp(struct rlite_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rlite_resp_handler_t rlite_kernel_handlers[] = {
-    [RLITE_KER_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
+    [RLITE_KER_FA_REQ_ARRIVED] = NULL,
     [RLITE_KER_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
     [RLITE_KER_APPL_REGISTER_RESP] = appl_register_resp,
     [RLITE_KER_MSG_MAX] = NULL,
@@ -291,29 +253,10 @@ rl_appl_flow_alloc(struct rlite_appl *appl, uint32_t event_id,
     return result;
 }
 
-struct rlite_pending_flow_req *
-rl_appl_flow_accept(struct rlite_appl *appl)
-{
-    struct list_head *elem = NULL;
-
-    pthread_mutex_lock(&appl->lock);
-    while ((elem = list_pop_front(&appl->pending_flow_reqs)) == NULL) {
-        pthread_cond_wait(&appl->flow_req_arrived_cond,
-                          &appl->lock);
-    }
-    pthread_mutex_unlock(&appl->lock);
-
-    return container_of(elem, struct rlite_pending_flow_req, node);
-}
-
 int
 rl_appl_init(struct rlite_appl *appl, unsigned int flags)
 {
     int ret;
-
-    pthread_mutex_init(&appl->lock, NULL);
-    pthread_cond_init(&appl->flow_req_arrived_cond, NULL);
-    list_init(&appl->pending_flow_reqs);
 
     ret = rl_evloop_init(&appl->loop, "/dev/rlite",
                             rlite_kernel_handlers, flags);
