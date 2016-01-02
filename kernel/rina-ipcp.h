@@ -152,18 +152,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     txrx->ipcp = ipcp;
 }
 
-static inline void
-dtp_init(struct dtp *dtp)
-{
-    hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-}
-
-static inline void
-dtp_fini(struct dtp *dtp)
-{
-    hrtimer_cancel(&dtp->snd_inact_tmr);
-    hrtimer_cancel(&dtp->rcv_inact_tmr);
-}
+void dtp_init(struct dtp *dtp);
+void dtp_fini(struct dtp *dtp);
 
 #endif  /* __RINA_IPCP_H__ */
