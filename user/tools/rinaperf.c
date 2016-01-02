@@ -336,10 +336,11 @@ perf_server(struct rinaperf *rp)
         n = poll(&pfd, 1, 3000);
         if (n < 0) {
             perror("poll(flow)");
+
         } else if (n == 0) {
             /* Timeout */
-            PI("timeout occurred\n");
-            PI("received %u PDUs out of %u\n",
+            PI("Timeout occurred\n");
+            PI("Received %u PDUs out of %u\n",
                     i, rp->test_config.cnt);
             break;
         }
@@ -349,6 +350,12 @@ perf_server(struct rinaperf *rp)
         if (n < 0) {
             perror("read(flow)");
             return -1;
+
+        } else if (n==0) {
+            PI("Flow deallocated remotely\n");
+            PI("Received %u PDUs out of %u\n",
+                    i, rp->test_config.cnt);
+            break;
         }
 
         rate_bytes += n;
