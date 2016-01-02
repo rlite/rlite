@@ -391,7 +391,7 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         kfree(tpa);
 
         if (ret == 0) {
-            rina_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0);
+            rina_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, NULL);
         }
 
         return ret;
@@ -626,7 +626,7 @@ out:
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
-        rina_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0);
+        rina_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0, NULL);
     }
 
     if (skb) {

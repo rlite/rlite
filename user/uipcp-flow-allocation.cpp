@@ -123,6 +123,9 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
+    string cubename;
+    struct rina_flow_config flowcfg;
+    map<string, struct rina_flow_config>::iterator qcmi;
 
     if (!remote_addr) {
         /* Return a negative flow allocation response immediately. */
@@ -131,7 +134,8 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 
         return uipcp_fa_resp_arrived(uipcp, req->local_port,
                                      0 /* don't care */,
-                                     0 /* dont't care */, 1);
+                                     0 /* dont't care */,
+                                     1, NULL);
     }
 
     ipcp = ipcp_info();
@@ -150,8 +154,22 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     freq.cur_conn_idx = 0;
     freq.state = true;
 
-    flowcfg2policies(&req->flowcfg, freq.qos, freq.policies);
+    /* Translate the flow specification into a QoSCube.
+     * For now this is accomplished by just specifying the
+     * QoSCube name in the flow specification. */
+    cubename = string(req->flowspec.cubename);
+    qcmi = qos_cubes.find(cubename);
+    if (qcmi == qos_cubes.end()) {
+        PI("Cannot find QoSCube '%s': Using default flow configuration\n",
+           cubename.c_str());
+        rlite_flow_cfg_default(&flowcfg);
+    } else {
+        flowcfg = qcmi->second;
+    }
 
+    flowcfg2policies(&flowcfg, freq.qos, freq.policies);
+
+    freq.flowcfg = flowcfg;
     freq.max_create_flow_retries = 3;
     freq.create_flow_retries = 0;
     freq.hop_cnt = 0;
@@ -295,7 +313,7 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
     freq.dst_port = remote_freq.dst_port;
 
     return uipcp_fa_resp_arrived(uipcp, freq.src_port, freq.dst_port,
-                                 freq.dst_addr, rm->result);
+                                 freq.dst_addr, rm->result, &freq.flowcfg);
 }
 
 int

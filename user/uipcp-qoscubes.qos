@@ -12,7 +12,7 @@ relfc.dtcp_present = true
 relfc.dtcp.intial_a = 10
 relfc.dtcp.flow_control = true
 relfc.dtcp.rtx_control = false
-relfc.dtcp.fc.max_cwq_len = 75
+relfc.dtcp.fc.max_cwq_len = 100
 relfc.dtcp.fc.initial_credit = 50
 
 relrtx.partial_delivery = false
@@ -35,7 +35,7 @@ rel.dtcp_present = true
 rel.dtcp.intial_a = 10
 rel.dtcp.flow_control = true
 rel.dtcp.rtx_control = true
-rel.dtcp.fc.max_cwq_len = 75
+rel.dtcp.fc.max_cwq_len = 100
 rel.dtcp.fc.initial_credit = 50
 rel.dtcp.rtx.max_time_to_retry = 15
 rel.dtcp.rtx.data_rxms_max = 15

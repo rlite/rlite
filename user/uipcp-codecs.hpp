@@ -256,7 +256,10 @@ struct FlowRequest : public UipcpObject {
     uint32_t create_flow_retries;
     uint32_t hop_cnt;
 
-    int invoke_id; /* Local storage. */
+     /* Local storage. */
+    int invoke_id;
+    struct rina_flow_config flowcfg;
+    /* End of local storage. */
 
     FlowRequest() : access_ctrl(NULL) { }
     FlowRequest(const char *buf, unsigned int size);

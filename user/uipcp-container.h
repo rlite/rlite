@@ -65,7 +65,8 @@ int uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                      const struct rina_flow_config *flowcfg);
 int uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                           uint32_t remote_port, uint64_t remote_addr,
-                          uint8_t response);
+                          uint8_t response,
+                          const struct rina_flow_config *flowcfg);
 
 /* uipcp RIB definitions */
 struct uipcp_rib *rib_create(struct uipcp *uipcp);

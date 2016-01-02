@@ -194,7 +194,8 @@ int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                          uint32_t local_port,
                          uint32_t remote_port,
                          uint64_t remote_addr,
-                         uint8_t response);
+                         uint8_t response,
+                         struct rina_flow_config *flowcfg);
 
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);

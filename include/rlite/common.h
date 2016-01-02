@@ -131,6 +131,10 @@ struct rina_flow_config {
     struct dtcp_config dtcp;
 } __attribute__((packed));
 
+struct rina_flow_spec {
+    char cubename[32];  /* This is just temporary. */
+};
+
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */

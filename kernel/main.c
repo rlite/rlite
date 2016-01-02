@@ -812,19 +812,20 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
                      (unsigned long)entry);
         INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
         dtp_init(&entry->dtp);
-        if (flowcfg) {
-            memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
-        }
         FUNLOCK();
 
         PLOCK();
         ipcp->refcnt++;
         PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
         PUNLOCK();
-        if (ipcp->ops.flow_init) {
-            /* Let the IPCP do some
-             * specific initialization. */
-            ipcp->ops.flow_init(ipcp, entry);
+
+        if (flowcfg) {
+            memcpy(&entry->cfg, flowcfg, sizeof(entry->cfg));
+            if (ipcp->ops.flow_init) {
+                /* Let the IPCP do some
+                 * specific initialization. */
+                ipcp->ops.flow_init(ipcp, entry);
+            }
         }
     } else {
         FUNLOCK();
@@ -1396,8 +1397,7 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
-                                     struct rina_msg_base *bmsg)
+rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req =
                     (struct rina_kmsg_uipcp_fa_req_arrived *)bmsg;
@@ -1429,7 +1429,7 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
                                    req->remote_port, req->remote_addr,
-                                   req->response);
+                                   req->response, &req->flowcfg);
     }
     ipcp_put(ipcp);
 
@@ -1478,7 +1478,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, &req->flowcfg, &flow_entry,
+                   remote_application, NULL, &flow_entry,
                    GFP_KERNEL);
     if (ret) {
         goto out;
@@ -1500,7 +1500,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * arguments. */
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                       ipcp_entry->addr, remote_application,
-                                      local_application, &req->flowcfg);
+                                      local_application, NULL /* XXX */);
             ipcp_application_put(app);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
@@ -1655,9 +1655,8 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
              * and directly invoke rina_fa_resp_arrived, with reversed
              * arguments. */
             ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
-                    flow_entry->local_port,
-                    ipcp->addr,
-                    response);
+                                       flow_entry->local_port, ipcp->addr,
+                                       response, NULL);
         } else if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
              * to this IPCP. */
@@ -1767,7 +1766,8 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
                      uint64_t remote_addr,
-                     uint8_t response)
+                     uint8_t response,
+                     struct rina_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
@@ -1784,6 +1784,14 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                                           : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
     flow_entry->remote_addr = remote_addr;
+    if (flowcfg) {
+        memcpy(&flow_entry->cfg, flowcfg, sizeof(*flowcfg));
+        if (ipcp->ops.flow_init) {
+            /* Let the IPCP do some
+             * specific initialization. */
+            ipcp->ops.flow_init(ipcp, flow_entry);
+        }
+    }
 
     PI("Flow allocation response arrived to IPC process %u, "
             "port-id %u, remote addr %llu\n", ipcp->id,

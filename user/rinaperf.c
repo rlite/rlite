@@ -568,8 +568,7 @@ main(int argc, char **argv)
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
-    struct rina_flow_config flowcfg;
-    int fconfigured = 0;
+    struct rina_flow_spec flowspec;
     int listen = 0;
     int cnt = 1;
     int size = 1;
@@ -581,7 +580,7 @@ main(int argc, char **argv)
     int i;
 
     /* Start with a default flow configuration (unreliable flow). */
-    rlite_flow_cfg_default(&flowcfg);
+    rlite_flow_spec_default(&flowspec);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:x")) != -1) {
         switch (opt) {
@@ -634,12 +633,9 @@ main(int argc, char **argv)
                 break;
 
             case 'f':
-                /* Update the flow configuration. */
-                if (update_flow_config(&flowcfg, optarg)) {
-                    printf("    Invalid flow config %s\n", optarg);
-                    return -1;
-                }
-                fconfigured = 1;
+                /* Set the flow specification. */
+                strncpy(flowspec.cubename, optarg, sizeof(flowspec.cubename));
+                (void)update_flow_config;
                 break;
 
             case 'b':
@@ -663,10 +659,6 @@ main(int argc, char **argv)
     }
 
     if (!listen) {
-        if (fconfigured) {
-            flow_config_dump(&flowcfg);
-        }
-
         for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
             if (strcmp(descs[i].name, type) == 0) {
                 perf_function = descs[i].client_function;
@@ -746,7 +738,7 @@ main(int argc, char **argv)
         /* We're the client: allocate a flow and run the perf function. */
         rp.dfd = rlite_flow_allocate_open(&rp.application, &rp.dif_name, 1,
                                     &rp.ipcp_name, &rp.client_appl_name,
-                                    &rp.server_appl_name, &flowcfg, 1500);
+                                    &rp.server_appl_name, &flowspec, 1500);
         if (rp.dfd < 0) {
             return rp.dfd;
         }

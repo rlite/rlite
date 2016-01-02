@@ -136,6 +136,14 @@ rlite_appl_register_req(struct rlite_appl *application,
 }
 
 void
+rlite_flow_spec_default(struct rina_flow_spec *spec)
+{
+    memset(spec, 0, sizeof(*spec));
+    strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
+}
+
+/* This is used by uipcp, not by application. */
+void
 rlite_flow_cfg_default(struct rina_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
@@ -153,7 +161,7 @@ flow_allocate_req(struct rlite_appl *application,
                   uint16_t upper_ipcp_id,
                   const struct rina_name *local_application,
                   const struct rina_name *remote_application,
-                  const struct rina_flow_config *flowcfg, int *result)
+                  const struct rina_flow_spec *flowspec, int *result)
 {
     struct rina_kmsg_fa_req *req;
 
@@ -168,10 +176,10 @@ flow_allocate_req(struct rlite_appl *application,
     req->msg_type = RINA_KERN_FA_REQ;
     req->ipcp_id = ipcp_id;
     req->upper_ipcp_id = upper_ipcp_id;
-    if (flowcfg) {
-        memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+    if (flowspec) {
+        memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
     } else {
-        rlite_flow_cfg_default(&req->flowcfg);
+        rlite_flow_spec_default(&req->flowspec);
     }
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
@@ -242,7 +250,7 @@ rlite_flow_allocate(struct rlite_appl *application,
               struct rina_name *ipcp_name,
               const struct rina_name *local_application,
               const struct rina_name *remote_application,
-              const struct rina_flow_config *flowcfg,
+              const struct rina_flow_spec *flowspec,
               unsigned int *port_id, unsigned int wait_ms,
               uint16_t upper_ipcp_id)
 {
@@ -262,7 +270,7 @@ rlite_flow_allocate(struct rlite_appl *application,
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
                               rlite_ipcp->ipcp_id, upper_ipcp_id, local_application,
-                              remote_application, flowcfg, &result);
+                              remote_application, flowspec, &result);
     if (!kresp) {
         PE("Flow allocation request failed\n");
         return -1;
@@ -338,14 +346,14 @@ rlite_flow_allocate_open(struct rlite_appl *application,
                    struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
                    const struct rina_name *remote_application,
-                   const struct rina_flow_config *flowcfg,
+                   const struct rina_flow_spec *flowspec,
                    unsigned int wait_ms)
 {
     unsigned int port_id;
     int ret;
 
     ret = rlite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
-                        local_application, remote_application, flowcfg,
+                        local_application, remote_application, flowspec,
                         &port_id, wait_ms, 0xffff);
     if (ret) {
         return -1;

@@ -186,8 +186,8 @@ flow_allocate_resp_work(struct work_struct *w)
                         struct flow_allocate_resp_work, w);
     int ret;
 
-    ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port,
-                               farw->remote_port, 0, farw->response);
+    ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
+                               0, farw->response, NULL);
     if (ret) {
         printk("failed to report flow allocation response\n");
     }

@@ -173,7 +173,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
 int
 uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                       uint32_t remote_port, uint64_t remote_addr,
-                      uint8_t response)
+                      uint8_t response, const struct rina_flow_config *flowcfg)
 {
     struct rina_kmsg_uipcp_fa_resp_arrived *req;
     struct rina_msg_base *resp;
@@ -193,6 +193,11 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     req->remote_port = remote_port;
     req->remote_addr = remote_addr;
     req->response = response;
+    if (flowcfg) {
+        memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+    } else {
+        rlite_flow_cfg_default(&req->flowcfg);
+    }
 
     PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
         uipcp->ipcp_id);
