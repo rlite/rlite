@@ -138,6 +138,8 @@ struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
 
+    int mgmtfd;
+
     /* RIB lock. */
     pthread_mutex_t lock;
 
@@ -238,5 +240,7 @@ int rib_neigh_set_port_id(struct uipcp_rib *rib,
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           int neigh_fd);
+
+#define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 
 #endif  /* __UIPCP_RIB_H__ */

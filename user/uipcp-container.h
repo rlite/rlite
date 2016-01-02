@@ -75,9 +75,7 @@ struct uipcp {
 
     struct uipcp_ops ops;
 
-    /* Data used by normal IPCP only. */
-    int mgmtfd;
-    struct uipcp_rib *rib;
+    void *priv;
 
     struct list_head node;
 };

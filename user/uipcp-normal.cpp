@@ -47,6 +47,7 @@ static int
 mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
            void *buf, size_t buflen)
 {
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
     char *mgmtbuf;
     int n;
     int ret = 0;
@@ -66,7 +67,7 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
     memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
     buflen += sizeof(*mhdr);
 
-    n = write(uipcp->mgmtfd, mgmtbuf, buflen);
+    n = write(rib->mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
         PE("write(): %d\n", n);
         ret = n;
@@ -200,11 +201,12 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rina_mgmt_hdr *mhdr;
     int n;
 
-    assert(fd == uipcp->mgmtfd);
+    assert(fd == rib->mgmtfd);
 
     /* Read a buffer that contains a management header followed by
      * a management SDU. */
@@ -224,25 +226,45 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     assert(mhdr->type == RINA_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
-    rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
-                  n - sizeof(*mhdr));
+    rib_msg_rcvd(rib, mhdr, ((char *)(mhdr + 1)),
+                 n - sizeof(*mhdr));
 }
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 {
+    int ret;
+
     pthread_mutex_init(&lock, NULL);
 
-    load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos");
+    mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
+    if (mgmtfd < 0) {
+        ret = mgmtfd;
+        throw std::exception();
+    }
+
+    ret = rlite_evloop_fdcb_add(&uipcp->appl.loop, mgmtfd, mgmt_fd_ready);
+    if (ret) {
+        close(mgmtfd);
+        throw std::exception();
+    }
+
+    if (load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos")) {
+        close(mgmtfd);
+        throw std::exception();
+    }
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
     handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
+
 }
 
 uipcp_rib::~uipcp_rib()
 {
+    rlite_evloop_fdcb_del(&uipcp->appl.loop, mgmtfd);
+    close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }
 
@@ -575,9 +597,10 @@ normal_appl_register(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
-    ScopeLock(uipcp->rib->lock);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
 
-    uipcp->rib->appl_register(req);
+    rib->appl_register(req);
 
     return 0;
 }
@@ -591,14 +614,15 @@ normal_fa_req(struct rlite_evloop *loop,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
-    ScopeLock(uipcp->rib->lock);
+    ScopeLock(rib->lock);
 
-    return uipcp->rib->fa_req(req);
+    return rib->fa_req(req);
 }
 
 static int
@@ -611,6 +635,7 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req_arrived *req =
                     (struct rina_kmsg_fa_req_arrived *)b_resp;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
     int flow_fd;
     int result = 0;
     int ret;
@@ -625,7 +650,7 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
-    ret = rib_neigh_set_port_id(uipcp->rib, &req->remote_appl,
+    ret = rib_neigh_set_port_id(rib, &req->remote_appl,
                                 req->port_id);
     if (ret) {
         PE("rib_neigh_set_port_id() failed\n");
@@ -645,7 +670,7 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    ret = rib_neigh_set_flow_fd(uipcp->rib, &req->remote_appl, flow_fd);
+    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, flow_fd);
     if (ret) {
         goto err;
     }
@@ -653,7 +678,7 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
     return 0;
 
 err:
-    uipcp->rib->del_neighbor(RinaName(&req->remote_appl));
+    rib->del_neighbor(RinaName(&req->remote_appl));
 
     return 0;
 }
@@ -668,14 +693,15 @@ normal_fa_resp(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
-    ScopeLock(uipcp->rib->lock);
+    ScopeLock(rib->lock);
 
-    return uipcp->rib->fa_resp(resp);
+    return rib->fa_resp(resp);
 }
 
 static int
@@ -688,9 +714,10 @@ normal_flow_deallocated(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
                 (struct rina_kmsg_flow_deallocated *)b_resp;
-    ScopeLock(uipcp->rib->lock);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
 
-    uipcp->rib->flow_deallocated(req);
+    rib->flow_deallocated(req);
 
     return 0;
 }
@@ -698,41 +725,24 @@ normal_flow_deallocated(struct rlite_evloop *loop,
 static int
 normal_init(struct uipcp *uipcp)
 {
-    int ret;
-
     try {
-        uipcp->rib = new uipcp_rib(uipcp);
+        uipcp->priv = new uipcp_rib(uipcp);
 
     } catch (std::bad_alloc) {
         PE("Out of memory\n");
         return -1;
-    }
-
-    uipcp->mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
-    if (uipcp->mgmtfd < 0) {
-        ret = uipcp->mgmtfd;
-        goto err;
-    }
-
-    ret = rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
-    if (ret) {
-        close(uipcp->mgmtfd);
-        goto err;
+    } catch (std::exception) {
+        PE("RIB initialization failed\n");
+        return -1;
     }
 
     return 0;
-
-err:
-    delete uipcp->rib;
-
-    return -1;
 }
 
 static int
 normal_fini(struct uipcp *uipcp)
 {
-    close(uipcp->mgmtfd);
-    delete uipcp->rib;
+    delete UIPCP_RIB(uipcp);
 
     return 0;
 }
@@ -743,6 +753,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
                      unsigned int ipcp_id,
                      const struct rina_name *ipcp_name)
 {
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
     string name;
     int result;
 
@@ -761,9 +772,9 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 
     name = string(lower_dif->apn);
 
-    ScopeLock(uipcp->rib->lock);
+    ScopeLock(rib->lock);
 
-    result = uipcp->rib->register_to_lower(reg, name);
+    result = rib->register_to_lower(reg, name);
 
     return result;
 }
@@ -771,17 +782,19 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 static int
 normal_ipcp_dft_set(struct uipcp *uipcp, struct rina_cmsg_ipcp_dft_set *req)
 {
-    ScopeLock(uipcp->rib->lock);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
 
-    return uipcp->rib->dft_set(RinaName(&req->appl_name), req->remote_addr);
+    return rib->dft_set(RinaName(&req->appl_name), req->remote_addr);
 }
 
 static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
-    ScopeLock(uipcp->rib->lock);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
 
-    return uipcp->rib->dump();
+    return rib->dump();
 }
 
 struct uipcp_ops normal_ops = {

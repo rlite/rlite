@@ -262,6 +262,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
     uipcp->ops = *ops;
+    uipcp->priv = NULL;
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
@@ -331,8 +332,6 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         /* The specified IPCP is a Shim IPCP. */
         return 0;
     }
-
-    rlite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
 
     rlite_evloop_stop(&uipcp->appl.loop);
 

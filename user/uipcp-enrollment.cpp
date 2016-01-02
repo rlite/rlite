@@ -824,10 +824,11 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 int
 normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 {
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
     int ret;
 
-    neigh = uipcp->rib->get_neighbor(&req->neigh_ipcp_name);
+    neigh = rib->get_neighbor(&req->neigh_ipcp_name);
     if (!neigh) {
         PE("Failed to add neighbor\n");
         return -1;
