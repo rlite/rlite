@@ -336,7 +336,11 @@ arp_resolver_cb(unsigned long arg)
 static void
 arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
 {
-    entry->flow = flow;  /* XXX flow_get() ? */
+    /* We cannot flow_get() here, otherwise flows wouldn't never be
+     * removed. However, it would not be necessary, since the core
+     * will notify us with ops->flow_deallocated, so that we can
+     * unbind. */
+    entry->flow = flow;
     flow->priv = entry;
 }
 
@@ -451,7 +455,6 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct arpt_entry *entry;
     char *remote_app_s;
     struct rina_buf *rb, *tmp;
-    struct list_head q;
     int ret = -ENXIO;
 
     remote_app_s = rina_name_to_string(&flow->remote_application);
@@ -460,29 +463,33 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -ENOMEM;
     }
 
-    INIT_LIST_HEAD(&q);
-
     spin_lock_bh(&priv->arpt_lock);
 
     entry = arp_lookup_direct_b(priv, remote_app_s, strlen(remote_app_s));
     if (entry) {
-        arpt_flow_bind(entry, flow);
-        ret = 0;
+        /* Drain the temporary rx queue. Calling rina_sdu_rx_flow() while
+         * holding the ARP table spinlock it's not the best option, but
+         * at least we don't introduce reordering due to race conditions
+         * between the drain cycle and new PDUs coming. Previous
+         * implementation used to move the PDUs into another temporary
+         * queue local to this function and calling rina_sdu_rx_flow()
+         * out of the critical section, but it used to suffer from
+         * reordering. True is that shim-eth does not have to guarantee
+         * in order delivery, but the reordering problem complicates
+         * testing. This is bsically a tradeoff, so I went for this
+         * solution since it could not have any drawbacks. */
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmp_q, node) {
             list_del(&rb->node);
-            list_add_tail(&rb->node, &q);
+            rina_sdu_rx_flow(ipcp, flow, rb);
             PD("%s: Pop PDU from rx_tmp_q\n", __func__);
         }
+        arpt_flow_bind(entry, flow);
+        ret = 0;
     }
 
     spin_unlock_bh(&priv->arpt_lock);
 
     kfree(remote_app_s);
-
-    list_for_each_entry_safe(rb, tmp, &q, node) {
-        list_del(&rb->node);
-        rina_sdu_rx_flow(ipcp, flow, rb);
-    }
 
     return ret;
 }
@@ -844,7 +851,8 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
         if (entry->flow == flow) {
             struct rina_buf *rb, *tmp;
 
-            PD("%s: Detaching from flow %p\n", __func__, entry->flow);
+            /* Unbind the flow from this ARP table entry. */
+            PD("%s: Unbinding from flow %p\n", __func__, entry->flow);
             flow->priv = NULL;
             entry->flow = NULL;
             entry->fa_req_arrived = false;
