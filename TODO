@@ -1,8 +1,24 @@
 - dif_type had better be a string
+
 - manage NULL strings (mainly struct rina_name) so that NULL <==> ""
+
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
+
 - flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
+
 - passare ad autotools
+
 - limitare la lunghezza delle code nel kernel
+
 - vmpi_provider_find_instance non dovrebbe essere bloccante
+
+- quando l'ipcm viene terminato, gli uipcp (o meglio, gli IPCP corrispondenti)
+  vengono automaticamente deregistrati dagli (N-1) IPCP a cui sono registrati.
+  Se quindi si rilancia l'ipcm (che ricrea gli uipcp) e si riprova a fare
+  l'enrollment, questo fallisce, poichè gli uipcp non sono registrati. Per
+  risolvere questo problema, bisognerebbe che l'ipcm memorizzasse (su disco)
+  le registrazioni effettuate e le riproducesse quando l'uipcp viene ricreato.
+  Questo comportamento potrebbe essere opzionale.
+
+- spostare il codice uipcp in un file separato
