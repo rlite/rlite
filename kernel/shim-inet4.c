@@ -307,15 +307,14 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
 
     msghdr.msg_flags = MSG_DONTWAIT;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
-    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 2,
+    iov_iter_init(&msghdr.msg_iter, WRITE, iov, 2,
                   totlen);
-    ret = sock_sendmsg(priv->sock, &msghdr, totlen);
 #else
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 2;
+#endif
     ret = kernel_sendmsg(priv->sock, &msghdr, (struct kvec *)iov, 2,
                          totlen);
-#endif
 
     if (unlikely(ret != totlen)) {
         PD("wspaces: %d, %lu\n", sk_stream_wspace(priv->sock->sk),
