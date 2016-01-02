@@ -426,6 +426,8 @@ for vm_name in vms:
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
+    outs += 'set -x\n'
+
     for level in range(1, args.levels + 1):
         outs += 'rinaperf -c 10 -d n.%(level)s.DIF\n' % {'level': level}
 
