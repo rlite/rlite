@@ -809,7 +809,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
         return -1;
     }
 
-    flow_fd_ = rlite_open_appl_port(port_id);
+    flow_fd_ = rlite_open_appl_port(port_id_);
     if (flow_fd_ < 0) {
         PE("Failed to access the flow towards the neighbor\n");
         return -1;
@@ -817,6 +817,10 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 
     port_id = port_id_;
     flow_fd = flow_fd_;
+
+    PD("N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
+       port_id);
+
 
     return 0;
 }
@@ -876,6 +880,9 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
     }
 
     neigh->flow_fd = neigh_fd;
+
+    PD("N-1 flow allocated [fd=%d, port_id=%u]\n", neigh->flow_fd,
+       neigh->port_id);
 
     return 0;
 }
