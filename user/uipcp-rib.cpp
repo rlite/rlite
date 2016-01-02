@@ -135,6 +135,7 @@ struct uipcp_rib {
     /* RIB handlers. */
     int dft_handler(const CDAPMessage *rm);
     int neighbors_handler(const CDAPMessage *rm);
+    int lfdb_handler(const CDAPMessage *rm);
 };
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
@@ -142,6 +143,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
     handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
+    handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
 }
 
 struct rinalite_ipcp *
@@ -530,6 +532,61 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm)
             } else {
                 cand_neighbors.erase(mit);
                 PD("Candidate neighbor %s removed remotely\n", key.c_str());
+            }
+
+        }
+    }
+
+    return 0;
+}
+
+int
+uipcp_rib::lfdb_handler(const CDAPMessage *rm)
+{
+    struct rinalite_ipcp *ipcp;
+    const char *objbuf;
+    size_t objlen;
+    bool add = true;
+
+    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+        PE("M_CREATE or M_DELETE expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_DELETE) {
+        add = false;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("M_START does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    ipcp = ipcp_info();
+
+    LowerFlowList lfl(objbuf, objlen);
+    RinaName my_name = RinaName(&ipcp->ipcp_name);
+
+    for (list<LowerFlow>::iterator f = lfl.flows.begin();
+                                f != lfl.flows.end(); f++) {
+        string key = static_cast<string>(*f);
+        map< string, LowerFlow >::iterator mit = lfdb.find(key);
+
+        if (add) {
+            if (mit == lfdb.end() || f->seqnum > mit->second.seqnum) {
+                lfdb[key] = *f;
+            }
+            PD("Lower flow %s added remotely\n", key.c_str());
+
+        } else {
+            if (mit == lfdb.end()) {
+                PI("Lower flow %s does not exist\n", key.c_str());
+
+            } else {
+                lfdb.erase(mit);
+                PD("Lower flow %s removed remotely\n", key.c_str());
             }
 
         }
