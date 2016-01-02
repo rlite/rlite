@@ -130,8 +130,6 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         !factory->ops.assign_to_dif ||
         !factory->ops.application_register ||
         !factory->ops.application_unregister ||
-        !factory->ops.flow_allocate_req ||
-        !factory->ops.flow_allocate_resp ||
         !factory->ops.sdu_write ||
         !factory->ops.config) {
         return -EINVAL;
@@ -174,7 +172,7 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
 
 static int
-rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
+rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -951,7 +949,8 @@ static int
 rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
                             uint32_t event_id,
                             const struct rina_name *local_application,
-                            const struct rina_name *remote_application)
+                            const struct rina_name *remote_application,
+                            const struct rina_kmsg_flow_allocate_req *req)
 {
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
@@ -960,33 +959,46 @@ rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
     /* Find the IPC process entry corresponding to ipcp_id. */
     ipcp_entry = ipcp_table_find(ipcp_id);
     if (!ipcp_entry) {
-        goto negative;
+        goto out;
     }
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, local_application,
                    remote_application, &flow_entry, 0);
     if (ret) {
-        goto negative;
+        goto out;
     }
     flow_entry->state = FLOW_STATE_PENDING;
 
-    ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+    if (ipcp_entry->ops.flow_allocate_req) {
+        /* This IPCP handles the flow allocation in kernel-space. This is
+         * currently true for shim IPCPs. */
+        ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+    } else {
+        /* This IPCP handles the flow allocation in user-space. This is
+         * currently true for normal IPCPs. */
+        if (!ipcp_entry->uipcp) {
+            /* No userspace IPCP to use, this should not happen. */
+        } else {
+            /* Reflect the flow allocation request message to userspace. */
+            ret = rina_upqueue_append(ipcp_entry->uipcp,
+                                      (const struct rina_msg_base *)req);
+        }
+    }
+
+out:
     if (ret) {
-        goto negative;
+        if (flow_entry) {
+            flow_del_entry(flow_entry, 0);
+        }
+
+        return ret;
     }
 
     printk("%s: Flow allocation requested to IPC process %u, "
                 "port-id %u\n", __func__, ipcp_id, flow_entry->local_port);
 
     return 0;
-
-negative:
-    if (flow_entry) {
-        flow_del_entry(flow_entry, 0);
-    }
-
-    return ret;
 }
 
 static int
@@ -1046,7 +1058,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     ret = rina_flow_allocate_internal(req->ipcp_id, upper,
                                       req->event_id, &req->local_application,
-                                      &req->remote_application);
+                                      &req->remote_application, req);
     mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {

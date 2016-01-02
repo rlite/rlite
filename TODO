@@ -15,3 +15,6 @@
 
 - quando un ipcp normale viene distrutto, fare il cleanup completo delle
   strutture dati
+
+- rina_upqueue_append(): deallocare rmsg oppure passargli un buffer allocato
+  staticamente sulla pila

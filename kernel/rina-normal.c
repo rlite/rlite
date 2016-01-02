@@ -104,102 +104,6 @@ rina_normal_assign_to_dif(struct ipcp_entry *ipcp,
     return 0;
 }
 
-struct flow_allocate_req_work {
-    struct work_struct w;
-    struct ipcp_entry *ipcp;
-    struct rina_name local_application;
-    struct rina_name remote_application;
-    uint32_t remote_port;
-};
-
-static void
-flow_allocate_req_work(struct work_struct *w)
-{
-    struct flow_allocate_req_work *faw = container_of(w,
-                        struct flow_allocate_req_work, w);
-    int ret;
-
-    ret = rina_flow_allocate_req_arrived(faw->ipcp, faw->remote_port,
-                                         &faw->local_application,
-                                         &faw->remote_application);
-    if (ret) {
-        printk("%s: failed to report flow allocation request\n",
-                __func__);
-    }
-
-    kfree(faw);
-}
-
-static int
-rina_normal_flow_allocate_req(struct ipcp_entry *ipcp,
-                                  struct flow_entry *flow)
-{
-    struct flow_allocate_req_work *faw;
-
-    faw = kzalloc(sizeof(*faw), GFP_KERNEL);
-    if (!faw) {
-        printk("%s: Out of memory\n", __func__);
-        return -ENOMEM;
-    }
-
-    rina_name_copy(&faw->remote_application, &flow->local_application);
-    rina_name_copy(&faw->local_application, &flow->remote_application);
-    faw->remote_port = flow->local_port;
-    faw->ipcp = ipcp;
-    INIT_WORK(&faw->w, flow_allocate_req_work);
-    schedule_work(&faw->w);
-
-    return 0;
-}
-
-struct flow_allocate_resp_work {
-    struct work_struct w;
-    struct ipcp_entry *ipcp;
-    uint32_t local_port;
-    uint32_t remote_port;
-    uint8_t response;
-};
-
-static void
-flow_allocate_resp_work(struct work_struct *w)
-{
-    struct flow_allocate_resp_work *farw = container_of(w,
-                        struct flow_allocate_resp_work, w);
-    int ret;
-
-    ret = rina_flow_allocate_resp_arrived(farw->ipcp, farw->local_port,
-                                          farw->remote_port, farw->response);
-    if (ret) {
-        printk("%s: failed to report flow allocation response\n",
-                __func__);
-    }
-
-    kfree(farw);
-}
-
-static int
-rina_normal_flow_allocate_resp(struct ipcp_entry *ipcp,
-                                   struct flow_entry *flow,
-                                   uint8_t response)
-{
-    struct flow_allocate_resp_work *farw;
-
-    farw = kzalloc(sizeof(*farw), GFP_KERNEL);
-    if (!farw) {
-        printk("%s: Out of memory\n", __func__);
-        return -ENOMEM;
-    }
-
-    farw->ipcp = ipcp;
-    farw->local_port = flow->remote_port;
-    farw->remote_port = flow->local_port;
-    farw->response = response;
-    INIT_WORK(&farw->w, flow_allocate_resp_work);
-    schedule_work(&farw->w);
-
-    return 0;
-}
-
 static struct flow_entry *
 pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 {
@@ -360,8 +264,8 @@ rina_normal_init(void)
     factory.ops.application_register = rina_normal_application_register;
     factory.ops.application_unregister = rina_normal_application_unregister;
     factory.ops.assign_to_dif = rina_normal_assign_to_dif;
-    factory.ops.flow_allocate_req = rina_normal_flow_allocate_req;
-    factory.ops.flow_allocate_resp = rina_normal_flow_allocate_resp;
+    factory.ops.flow_allocate_req = NULL; /* Reflect to userspace. */
+    factory.ops.flow_allocate_resp = NULL; /* Reflect to userspace. */
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
