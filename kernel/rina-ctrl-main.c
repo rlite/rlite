@@ -1890,7 +1890,6 @@ static long
 rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
-    long ret = 0;
 
     flow = flow_get(info->port_id);
     if (!flow) {
@@ -1920,7 +1919,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
     }
 
-    return ret;
+    return 0;
 }
 
 /* To be called under global lock. */
@@ -1928,7 +1927,6 @@ static long
 rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 {
     struct ipcp_entry *ipcp;
-    long ret = 0;
 
     /* Lookup the IPCP to manage. */
     ipcp = ipcp_table_find(info->ipcp_id);
@@ -1948,7 +1946,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
     PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     ipcp->mgmt_txrx = rio->txrx;
 
-    return ret;
+    return 0;
 }
 
 /* To be called under global lock. */
@@ -2024,7 +2022,13 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
             break;
     }
 
-    rio->mode = info.mode;
+    if (ret == 0) {
+        /* Set the mode only if the ioctl operation was successful.
+         * This is very important because rina_io_release_internal()
+         * looks at the mode to perform its action, assuming some pointers
+         * to be not NULL depending on the mode. */
+        rio->mode = info.mode;
+    }
 
     mutex_unlock(&rina_dm.lock);
 
