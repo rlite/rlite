@@ -68,8 +68,7 @@ struct uipcp_ops {
 struct ipcp_node {
     unsigned int ipcp_id;
     unsigned int marked;
-    unsigned int up_depth;
-    unsigned int down_depth;
+    unsigned int depth;
     unsigned int refcnt;
 
     struct list_head lowers;
