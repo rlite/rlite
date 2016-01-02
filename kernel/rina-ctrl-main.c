@@ -993,8 +993,9 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
                                       ipcp_entry->addr, remote_application,
                                       local_application, 0);
         } else if (!ipcp_entry->uipcp) {
-            /* No userspace IPCP to use, this should not happen. */
-            BUG_ON(1);
+            /* No userspace IPCP to use, this happens when no uipcp is assigned
+             * to this IPCP. */
+            ret = -ENXIO;
         } else {
             /* This IPCP handles the flow allocation in user-space. This is
              * currently true for normal IPCPs.
@@ -1119,8 +1120,9 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
                     ipcp->addr,
                     response, 0);
         } else if (!ipcp->uipcp) {
-            /* No userspace IPCP to use, this should not happen. */
-            BUG_ON(1);
+            /* No userspace IPCP to use, this happens when no uipcp is assigned
+             * to this IPCP. */
+            ret = -ENXIO;
         } else {
             /* This IPCP handles the flow allocation in user-space. This is
              * currently true for normal IPCPs.
