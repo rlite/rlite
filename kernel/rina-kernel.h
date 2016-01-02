@@ -168,7 +168,7 @@ void rina_write_restart(uint32_t local_port);
 
 struct flow_entry *flow_lookup(unsigned int port_id);
 
-struct flow_entry *flow_put(struct flow_entry *flow, int locked);
+struct flow_entry *flow_put(struct flow_entry *flow);
 
 struct flow_entry *flow_get(unsigned int port_id);
 

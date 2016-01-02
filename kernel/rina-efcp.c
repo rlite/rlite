@@ -41,7 +41,7 @@ remove_flow_work(struct work_struct *work)
     }
     spin_unlock_irq(&dtp->lock);
 
-    flow_put(flow, 1);
+    flow_put(flow);
 }
 
 void

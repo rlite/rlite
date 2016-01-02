@@ -573,7 +573,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 }
 
 struct flow_entry *
-flow_put(struct flow_entry *entry, int locked)
+flow_put(struct flow_entry *entry)
 {
     struct rina_buf *rb;
     struct rina_buf *tmp;
@@ -703,7 +703,7 @@ flow_rc_unbind(struct rina_ctrl *rc)
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
                  * remove the flow. */
-                flow_put(flow, 0);
+                flow_put(flow);
             } else {
                 /* If no rina_io device binds to this allocated flow,
                  * the associated memory will never be released.
@@ -957,7 +957,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
     mutex_unlock(&rina_dm.lock);
 
-    flow_put(flow, 1);
+    flow_put(flow);
 
     if (ret == 0) {
         printk("%s: Set IPC process %u PDUFT entry: %llu --> %u\n", __func__,
@@ -1130,7 +1130,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 out:
     if (ret) {
         if (flow_entry) {
-            flow_put(flow_entry, 0);
+            flow_put(flow_entry);
         }
 
         return ret;
@@ -1255,7 +1255,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
     }
 
     if (ret || response) {
-        flow_put(flow_entry, 0);
+        flow_put(flow_entry);
     }
 out:
 
@@ -1283,7 +1283,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     ret = rina_fa_resp_internal(flow_entry, req->response, req);
     mutex_unlock(&rina_dm.lock);
 
-    flow_entry = flow_put(flow_entry, 1);
+    flow_entry = flow_put(flow_entry);
     /* Here reference counter is (likely) 1. Reset it to 0, so that
      * proper flow destruction happens in rina_io_release(). If we
      * didn't do it, the flow would live forever with its refcount
@@ -1343,7 +1343,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);
     if (ret) {
-        flow_put(flow_entry, 0);
+        flow_put(flow_entry);
     }
     rina_name_free(&req.remote_appl);
 out:
@@ -1393,11 +1393,11 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     if (response) {
         /* Negative response --> delete the flow. */
-        flow_put(flow_entry, 0);
+        flow_put(flow_entry);
     }
 
 out:
-    flow_entry = flow_put(flow_entry, 0);
+    flow_entry = flow_put(flow_entry);
     /* Same operation as above. */
     flow_orphan(flow_entry);
 
@@ -1466,7 +1466,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
-    flow_put(flow, 1);
+    flow_put(flow);
 
     return ret;
 }
@@ -1492,7 +1492,7 @@ rina_write_restart(uint32_t local_port)
         }
         spin_unlock(&flow->rmtq_lock);
 
-        flow_put(flow, 1);
+        flow_put(flow);
     }
 }
 EXPORT_SYMBOL_GPL(rina_write_restart);
@@ -1910,7 +1910,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         ipcp = ipcp_table_find(info->ipcp_id);
         if (!ipcp) {
             printk("%s: Error: No such ipcp\n", __func__);
-            flow_put(flow, 0);
+            flow_put(flow);
 
             return -ENXIO;
         }
@@ -1964,7 +1964,7 @@ rina_io_release_internal(struct rina_io *rio)
                 PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
                 ipcp_del_entry(rio->flow->upper.ipcp, 0);
             }
-            flow_put(rio->flow, 0);
+            flow_put(rio->flow);
             rio->flow = NULL;
             rio->txrx = NULL;
             break;

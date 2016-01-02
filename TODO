@@ -35,5 +35,4 @@
 
 - lo schema di locking non è consistente con i tipi di contesto: un mutex non
   può essere chiamato nel ramo di ricezione (rina_tx_restart() inclusa) nè nel
-  tasklet di completamento trasmissione; flow_put(): schedulare la
-  ipcp_del_entry() tramite una workqueue.
+  tasklet di completamento trasmissione;

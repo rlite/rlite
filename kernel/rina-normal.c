@@ -342,12 +342,12 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
             rina_buf_free(rb);
 
             if (lower_flow) {
-                flow_put(lower_flow, 1);
+                flow_put(lower_flow);
             }
 
             return 0;
         }
-        flow_put(lower_flow, 1);
+        flow_put(lower_flow);
     } else {
         rina_buf_free(rb);
 
@@ -683,7 +683,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     if (pci->pdu_type != PDU_T_DT) {
         /* This is a control PDU. */
         ret = sdu_rx_ctrl(ipcp, flow, rb);
-        flow_put(flow, 1);
+        flow_put(flow);
 
         return ret;
     }
@@ -836,7 +836,7 @@ snd_crb:
         rmt_tx(ipcp, flow->remote_addr, crb, false);
     }
 
-    flow_put(flow, 1);
+    flow_put(flow);
 
     return ret;
 }
