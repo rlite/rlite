@@ -37,6 +37,26 @@ create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
     return 0;
 }
 
+static int
+destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
+                 const struct rina_ctrl_base_msg *b_req, size_t req_len)
+{
+    struct rina_ctrl_destroy_ipcp_resp *resp =
+            (struct rina_ctrl_destroy_ipcp_resp *)b_resp;
+    struct rina_ctrl_destroy_ipcp *req =
+            (struct rina_ctrl_destroy_ipcp *)b_req;
+
+    if (resp_len != sizeof(*resp) || req_len != sizeof(*req)) {
+        printf("%s: Invalid message size\n", __func__);
+        return EINVAL;
+    }
+
+    printf("%s: Destroyed IPC process %d, result = %d\n", __func__,
+            req->ipcp_id, resp->result);
+
+    return 0;
+}
+
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
                                    size_t resp_len,
@@ -46,6 +66,7 @@ typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
 /* The table containing all response handlers. */
 static rina_resp_handler_t rina_handlers[] = {
     [RINA_CTRL_CREATE_IPCP_RESP] = create_ipcp_resp,
+    [RINA_CTRL_DESTROY_IPCP_RESP] = destroy_ipcp_resp,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
@@ -173,6 +194,8 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
         return ret;
     }
 
+    printf("Requesting IPC process creation...\n");
+
     /* Issue the request to the kernel. */
     ret = write(ipcm->rfd, msg, sizeof(*msg));
     if (ret != sizeof(*msg)) {
@@ -183,8 +206,6 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
                     ret, sizeof(*msg));
         }
     }
-
-    printf("IPC process creation requested\n");
 
     return ret;
 }
@@ -218,6 +239,8 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
         return ret;
     }
 
+    printf("Requesting IPC process destruction...\n");
+
     /* Issue the request to the kernel. */
     ret = write(ipcm->rfd, msg, sizeof(*msg));
     if (ret != sizeof(*msg)) {
@@ -228,8 +251,6 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
                     ret, sizeof(*msg));
         }
     }
-
-    printf("IPC process destruction requested\n");
 
     return ret;
 }
@@ -243,9 +264,9 @@ test(struct ipcm *ipcm)
     /* Create an IPC process of type shim-dummy. */
     rina_name_fill(&ipcp_name, "prova.IPCP", "1", NULL, NULL);
     ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
-    if (0) {
-        destroy_ipcp(ipcm, 349);
-    }
+
+    /* Destroy the IPCP. */
+    destroy_ipcp(ipcm, 0);
 
     return ret;
 }
