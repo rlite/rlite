@@ -589,6 +589,14 @@ Neighbor::enrolled(NeighFlow *nf, const CDAPMessage *rm)
     return rib->cdap_dispatch(rm, this);
 }
 
+bool
+Neighbor::enrollment_ongoing()
+{
+    return has_mgmt_flow() &&
+           mgmt_conn()->enrollment_state >= S_WAIT_START &&
+           mgmt_conn()->enrollment_state < ENROLLED;
+}
+
 int
 Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
 {

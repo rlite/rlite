@@ -96,14 +96,15 @@ struct Neighbor {
     bool operator!=(const Neighbor& other) const { return !(*this == other); }
     ~Neighbor();
 
-    NeighFlow *mgmt_conn();
     const char *enrollment_state_repr(state_t s) const;
-    bool has_mgmt_flow() const { return flows.size() > 0; }
-    int alloc_flow(const char *supp_dif_name);
 
+    NeighFlow *mgmt_conn();
+    bool has_mgmt_flow() const { return flows.size() > 0; }
+    bool enrollment_ongoing();
+    int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
+    int alloc_flow(const char *supp_dif_name);
     int send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;
-    int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
     int none(NeighFlow *nf, const CDAPMessage *rm);
