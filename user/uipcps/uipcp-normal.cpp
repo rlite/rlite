@@ -112,7 +112,6 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     CDAPMessage *m = NULL;
-    Neighbor *neigh;
     NeighFlow *flow;
     int ret;
 
@@ -167,7 +166,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
         ScopeLock(rib->lock);
 
         /* Lookup neighbor by port id. */
-        ret = rib->lookup_neigh_by_port_id(mhdr->local_port, &neigh, &flow);
+        ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &flow);
         if (ret) {
             UPE(rib->uipcp, "Received message from unknown port id %d\n",
                 mhdr->local_port);
@@ -186,7 +185,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
         }
 
         /* Feed the enrollment state machine. */
-        ret = neigh->enroll_fsm_run(flow, m);
+        ret = flow->neigh->enroll_fsm_run(flow, m);
 
     } catch (std::bad_alloc) {
         UPE(rib->uipcp, "Out of memory\n");
@@ -575,7 +574,7 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
         }
 
         if (const_cast<Neighbor &>(neigh->second).
-                        cur_conn()->enrollment_state != ENROLLED) {
+                        mgmt_conn()->enrollment_state != ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }

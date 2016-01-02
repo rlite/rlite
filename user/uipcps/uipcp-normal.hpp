@@ -96,7 +96,7 @@ struct Neighbor {
     bool operator!=(const Neighbor& other) const { return !(*this == other); }
     ~Neighbor();
 
-    NeighFlow *cur_conn();
+    NeighFlow *mgmt_conn();
     const char *enrollment_state_repr(state_t s) const;
     bool has_mgmt_flow() const { return flows.size() > 0; }
     int alloc_flow(const char *supp_dif_name);
@@ -221,8 +221,8 @@ struct uipcp_rib {
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
-    int lookup_neigh_by_port_id(unsigned int port_id, Neighbor **np,
-                                NeighFlow **nfp);
+    int lookup_neigh_flow_by_port_id(unsigned int port_id,
+                                     NeighFlow **nfp);
     int commit_lower_flow(uint64_t local_addr, const Neighbor& neigh);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);

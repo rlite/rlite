@@ -94,7 +94,7 @@ Neighbor::enrollment_state_repr(state_t s) const
 }
 
 NeighFlow *
-Neighbor::cur_conn()
+Neighbor::mgmt_conn()
 {
     map<unsigned int, NeighFlow>::iterator mit;
 
@@ -625,7 +625,7 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
     int ret;
 
     if (!nf) {
-        nf = const_cast<Neighbor*>(this)->cur_conn();
+        nf = const_cast<Neighbor*>(this)->mgmt_conn();
     }
 
     if (create) {
@@ -799,7 +799,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(uipcp, "M_START does not contain a nested message\n");
-        neigh->abort(neigh->cur_conn());
+        neigh->abort(neigh->mgmt_conn());
         return 0;
     }
 
@@ -847,10 +847,9 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
 }
 
 int
-uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id, Neighbor **np,
-                                   NeighFlow **nfp)
+uipcp_rib::lookup_neigh_flow_by_port_id(unsigned int port_id,
+                                        NeighFlow **nfp)
 {
-    *np = NULL;
     *nfp = NULL;
 
     for (map<string, Neighbor>::iterator nit = neighbors.begin();
@@ -858,8 +857,8 @@ uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id, Neighbor **np,
         Neighbor& neigh = nit->second;
 
         if (neigh.flows.count(port_id)) {
-            *np = &neigh;
             *nfp = &neigh.flows[port_id];
+            assert((*nfp)->neigh);
 
             return 0;
         }
@@ -954,7 +953,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
     assert(neigh->has_mgmt_flow());
 
     /* Start the enrollment procedure as initiator. */
-    neigh->enroll_fsm_run(neigh->cur_conn(), NULL);
+    neigh->enroll_fsm_run(neigh->mgmt_conn(), NULL);
 
     return 0;
 }

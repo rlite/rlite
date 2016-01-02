@@ -256,7 +256,7 @@ uipcp_rib::pduft_sync()
         }
 
         /* Just take one for now. */
-        next_hop_to_port_id[r->second] = neigh->second.cur_conn()->port_id;
+        next_hop_to_port_id[r->second] = neigh->second.mgmt_conn()->port_id;
     }
 
     /* Generate PDUFT entries. */
