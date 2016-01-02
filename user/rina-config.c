@@ -109,6 +109,7 @@ request_response(struct rina_msg_base *req)
 static const char *dif_types[] = {
     [DIF_TYPE_NORMAL] = "normal",
     [DIF_TYPE_SHIM_DUMMY] = "shim-dummy",
+    [DIF_TYPE_SHIM_HV] = "shim-hv",
 };
 
 static int ipcp_create(int argc, char **argv)
