@@ -1,10 +1,10 @@
-#include <rina/rina-ctrl.h>
 #include <rina/rina-utils.h>
 
 #ifdef __KERNEL__
 
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/types.h>
 
 #define COMMON_ALLOC(_sz)   kmalloc(_sz, GFP_KERNEL)
 #define COMMON_FREE(_p)   kfree(_p)
@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define COMMON_ALLOC(_sz)   malloc(_sz)
 #define COMMON_FREE(_p)   free(_p)

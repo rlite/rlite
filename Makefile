@@ -3,6 +3,7 @@ CFLAGS=-Wall -Werror
 CFLAGS += -I$(PWD)/include
 LDFLAGS += -lpthread
 EXES=user/ipcm user/application
+HEADERS=$(shell find include/rina)
 
 KER=`uname -r`
 
@@ -13,7 +14,7 @@ ker:
 
 user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o
 
-user/ipcm.o: include/rina/rina-ctrl.h user/pending_queue.h
+user/ipcm.o:  $(HEADERS) user/pending_queue.h
 
 user/pending_queue.o: user/pending_queue.h
 
