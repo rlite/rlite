@@ -78,6 +78,10 @@ struct upper_ref {
     struct ipcp_entry   *ipcp;
 };
 
+struct dtp {
+    uint64_t next_seq_num_to_send;
+};
+
 struct flow_entry {
     uint16_t            local_port;  /* flow table key */
     uint16_t            remote_port;
@@ -91,6 +95,7 @@ struct flow_entry {
     struct list_head    rxq;
     wait_queue_head_t   rxq_wqh;
     spinlock_t          rxq_lock;
+    struct dtp          dtp;
 
     struct mutex        lock; /* Unused */
     unsigned int        refcnt;

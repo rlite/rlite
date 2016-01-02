@@ -189,14 +189,44 @@ rina_normal_flow_allocate_resp(struct ipcp_entry *ipcp,
     return 0;
 }
 
+static struct flow_entry *
+pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
+{
+    struct flow_entry *entry;
+    struct hlist_head *head;
+
+    head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->pduft_dest_addr == dest_addr) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static int
 rina_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rina_buf *rb)
 {
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
     struct rina_pci *pci;
+    struct flow_entry *lower_flow;
+    struct ipcp_entry *lower_ipcp;
+
+    lower_flow = pduft_lookup(priv, flow->pduft_dest_addr);
+    if (unlikely(!lower_flow)) {
+        PD("%s: No route to IPCP %lu, dropping packet\n", __func__,
+            (long unsigned)flow->pduft_dest_addr);
+        rina_buf_free(rb);
+        return 0;
+    }
+    lower_ipcp = lower_flow->ipcp;
+    BUG_ON(!lower_ipcp);
 
     rina_buf_pci_push(rb);
+
     pci = RINA_BUF_PCI(rb);
     pci->dst_addr = flow->pduft_dest_addr;
     pci->src_addr = ipcp->addr;
@@ -205,11 +235,11 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.src_cep = flow->local_port;
     pci->pdu_type = PDU_TYPE_DT;
     pci->pdu_flags = 0;
-    pci->seqnum = 0; /* TODO next_seq_num_to_send */
+    pci->seqnum = flow->dtp.next_seq_num_to_send++;
 
-    rina_buf_free(rb); /* TODO pass it to the RMT */
-
-    return 0; /* TODO return len on success. */
+    /* Directly call the underlying IPCP for now. RMT component
+     * is not implemented explicitely for now. */
+    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
 }
 
 static int
@@ -232,22 +262,6 @@ rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     (void)priv;
 
     return ret;
-}
-
-static struct flow_entry *
-pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
-{
-    struct flow_entry *entry;
-    struct hlist_head *head;
-
-    head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
-    hlist_for_each_entry(entry, head, node) {
-        if (entry->pduft_dest_addr == dest_addr) {
-            return entry;
-        }
-    }
-
-    return NULL;
 }
 
 static int
