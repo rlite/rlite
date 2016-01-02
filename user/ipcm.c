@@ -19,6 +19,34 @@
 #include "helpers.h"
 
 
+struct rina_evloop;
+
+/* The signature of a response handler. */
+typedef int (*rina_resp_handler_t)(struct rina_evloop *loop,
+                                   const struct rina_msg_base_resp *b_resp,
+                                   const struct rina_msg_base *b_req);
+
+struct rina_evloop {
+    /* Handler for the event loop thread. */
+    pthread_t evloop_th;
+
+    /* Table containing the kernel handlers. */
+    rina_resp_handler_t *handlers;
+
+    /* File descriptor for the RINA control device ("/dev/rina-ctrl") */
+    int rfd;
+
+    /* A FIFO queue that stores pending RINA events. */
+    struct pending_queue pqueue;
+
+    /* What event-id to use for the next request issued to the kernel. */
+    uint32_t event_id_counter;
+
+    /* Synchronization variables used to implement mutual exclusion between the
+     * event-loop thread and the script thead. */
+    pthread_mutex_t lock;
+};
+
 /* Some useful macros for casting. */
 #define RMB(m) (struct rina_msg_base *)(m)
 #define RMBR(m) (struct rina_msg_base_resp *)(m)
@@ -34,18 +62,7 @@ struct ipcp {
 
 /* IPC Manager data model. */
 struct ipcm {
-    /* File descriptor for the RINA control device ("/dev/rina-ctrl") */
-    int rfd;
-
-    /* A FIFO queue that stores pending RINA events. */
-    struct pending_queue pqueue;
-
-    /* What event-id to use for the next request issued to the kernel. */
-    uint32_t event_id_counter;
-
-    /* Synchronization variables used to implement mutual exclusion between the
-     * event-loop thread and the script thead. */
-    pthread_mutex_t lock;
+    struct rina_evloop loop;
 
     struct list_head ipcps;
 
@@ -55,7 +72,7 @@ struct ipcm {
 };
 
 static int
-ipcp_create_resp(struct ipcm *ipcm,
+ipcp_create_resp(struct rina_evloop *loop,
                  const struct rina_msg_base_resp *b_resp,
                  const struct rina_msg_base *b_req)
 {
@@ -71,7 +88,7 @@ ipcp_create_resp(struct ipcm *ipcm,
 }
 
 static int
-ipcp_destroy_resp(struct ipcm *ipcm,
+ipcp_destroy_resp(struct rina_evloop *loop,
                   const struct rina_msg_base_resp *b_resp,
                   const struct rina_msg_base *b_req)
 {
@@ -89,10 +106,11 @@ ipcp_destroy_resp(struct ipcm *ipcm,
 }
 
 static int
-ipcp_fetch_resp(struct ipcm *ipcm,
+ipcp_fetch_resp(struct rina_evloop *loop,
                 const struct rina_msg_base_resp *b_resp,
                 const struct rina_msg_base *b_req)
 {
+    struct ipcm *ipcm = container_of(loop, struct ipcm, loop);
     const struct rina_kmsg_fetch_ipcp_resp *resp =
         (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
     struct ipcp *ipcp;
@@ -123,7 +141,7 @@ ipcp_fetch_resp(struct ipcm *ipcm,
 }
 
 static int
-assign_to_dif_resp(struct ipcm *ipcm,
+assign_to_dif_resp(struct rina_evloop *loop,
                    const struct rina_msg_base_resp *b_resp,
                    const struct rina_msg_base *b_req)
 {
@@ -149,7 +167,7 @@ assign_to_dif_resp(struct ipcm *ipcm,
 }
 
 static int
-application_register_resp(struct ipcm *ipcm,
+application_register_resp(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
@@ -176,7 +194,7 @@ application_register_resp(struct ipcm *ipcm,
 }
 
 static int
-flow_allocate_resp(struct ipcm *ipcm,
+flow_allocate_resp(struct rina_evloop *loop,
                         const struct rina_msg_base_resp *b_resp,
                         const struct rina_msg_base *b_req)
 {
@@ -211,11 +229,6 @@ flow_allocate_resp(struct ipcm *ipcm,
     return 0;
 }
 
-/* The signature of a response handler. */
-typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
-                                   const struct rina_msg_base_resp *b_resp,
-                                   const struct rina_msg_base *b_req);
-
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call issue_request(), in
@@ -239,7 +252,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 static void *
 evloop_function(void *arg)
 {
-    struct ipcm *ipcm = (struct ipcm *)arg;
+    struct rina_evloop *loop = (struct rina_evloop *)arg;
     struct pending_entry *req_entry;
     char serbuf[4096];
     unsigned int max_resp_size = rina_numtables_max_size(
@@ -252,21 +265,21 @@ evloop_function(void *arg)
         int ret;
 
         FD_ZERO(&rdfs);
-        FD_SET(ipcm->rfd, &rdfs);
+        FD_SET(loop->rfd, &rdfs);
 
-        ret = select(ipcm->rfd + 1, &rdfs, NULL, NULL, NULL);
+        ret = select(loop->rfd + 1, &rdfs, NULL, NULL, NULL);
         if (ret == -1) {
             perror("select()");
             continue;
-        } else if (ret == 0 || !FD_ISSET(ipcm->rfd, &rdfs)) {
-            /* Timeout or ipcm->rfd is not ready. */
+        } else if (ret == 0 || !FD_ISSET(loop->rfd, &rdfs)) {
+            /* Timeout or loop->rfd is not ready. */
             continue;
         }
 
-        pthread_mutex_lock(&ipcm->lock);
+        pthread_mutex_lock(&loop->lock);
 
         /* Read the next message posted by the kernel. */
-        ret = read(ipcm->rfd, serbuf, sizeof(serbuf));
+        ret = read(loop->rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
             perror("read(rfd)");
             continue;
@@ -297,8 +310,8 @@ evloop_function(void *arg)
 
         /* Try to match the event_id in the response to the event_id of
          * a previous request. */
-        req_entry = pending_queue_remove_by_event_id(&ipcm->pqueue, resp->event_id);
-        pthread_mutex_unlock(&ipcm->lock);
+        req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
+        pthread_mutex_unlock(&loop->lock);
         if (!req_entry) {
             printf("%s: No pending request matching event-id [%u]\n", __func__,
                     resp->event_id);
@@ -315,7 +328,7 @@ evloop_function(void *arg)
         printf("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler, without holding the IPCM lock. */
-        ret = rina_kernel_handlers[resp->msg_type](ipcm, resp, req_entry->msg);
+        ret = rina_kernel_handlers[resp->msg_type](loop, resp, req_entry->msg);
         if (ret) {
             printf("%s: Error while handling message type [%d]\n", __func__,
                     resp->msg_type);
@@ -325,7 +338,7 @@ notify_requestor:
         if (req_entry->wait_for_completion) {
             /* Signal the issue_request() caller that the operation is
              * complete, reporting the response in the 'resp' pointer field. */
-            pthread_mutex_lock(&ipcm->lock);
+            pthread_mutex_lock(&loop->lock);
             req_entry->op_complete = 1;
             req_entry->resp = RMB(resp);
             pthread_cond_signal(&req_entry->op_complete_cond);
@@ -336,7 +349,7 @@ notify_requestor:
             free(req_entry);
             rina_msg_free(rina_kernel_numtables, RMB(resp));
         }
-        pthread_mutex_unlock(&ipcm->lock);
+        pthread_mutex_unlock(&loop->lock);
     }
 
     return NULL;
@@ -345,7 +358,7 @@ notify_requestor:
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 static struct rina_msg_base *
-issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
+issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int wait_for_completion)
 {
     struct rina_msg_base *resp = NULL;
@@ -365,9 +378,9 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
         return NULL;
     }
 
-    pthread_mutex_lock(&ipcm->lock);
+    pthread_mutex_lock(&loop->lock);
 
-    msg->event_id = ipcm->event_id_counter++;
+    msg->event_id = loop->event_id_counter++;
 
     entry->next = NULL;
     entry->msg = msg;
@@ -376,7 +389,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
     entry->wait_for_completion = wait_for_completion;
     entry->op_complete = 0;
     pthread_cond_init(&entry->op_complete_cond, NULL);
-    pending_queue_enqueue(&ipcm->pqueue, entry);
+    pending_queue_enqueue(&loop->pqueue, entry);
 
     /* Serialize the message. */
     serlen = rina_msg_serlen(rina_kernel_numtables, msg);
@@ -384,14 +397,14 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
         printf("%s: Serialized message would be too long [%u]\n",
                     __func__, serlen);
         free(entry);
-        pthread_mutex_unlock(&ipcm->lock);
+        pthread_mutex_unlock(&loop->lock);
         rina_msg_free(rina_kernel_numtables, msg);
         return NULL;
     }
     serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, msg);
 
     /* Issue the request to the kernel. */
-    ret = write(ipcm->rfd, serbuf, serlen);
+    ret = write(loop->rfd, serbuf, serlen);
     if (ret != serlen) {
         if (ret < 0) {
             perror("write(rfd)");
@@ -403,7 +416,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
 
     if (entry->wait_for_completion) {
         while (!entry->op_complete) {
-            pthread_cond_wait(&entry->op_complete_cond, &ipcm->lock);
+            pthread_cond_wait(&entry->op_complete_cond, &loop->lock);
         }
         pthread_cond_destroy(&entry->op_complete_cond);
 
@@ -413,7 +426,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
         free(entry);
     }
 
-    pthread_mutex_unlock(&ipcm->lock);
+    pthread_mutex_unlock(&loop->lock);
 
     return resp;
 }
@@ -443,7 +456,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
-           issue_request(ipcm, RMB(msg),
+           issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -472,7 +485,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
     printf("Requesting IPC process destruction...\n");
 
     resp = (struct rina_msg_base_resp *)
-           issue_request(ipcm, RMB(msg),
+           issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -499,7 +512,7 @@ ipcp_fetch(struct ipcm *ipcm)
     printf("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(ipcm, msg, sizeof(*msg), 1);
+           issue_request(&ipcm->loop, msg, sizeof(*msg), 1);
 }
 
 static int
@@ -539,12 +552,12 @@ ipcps_fetch(struct ipcm *ipcm)
     int end = 0;
 
     /* Purge the IPCPs list. */
-    pthread_mutex_lock(&ipcm->lock);
+    pthread_mutex_lock(&ipcm->loop.lock);
     while ((elem = list_pop_front(&ipcm->ipcps))) {
         ipcp = container_of(elem, struct ipcp, node);
         free(ipcp);
     }
-    pthread_mutex_unlock(&ipcm->lock);
+    pthread_mutex_unlock(&ipcm->loop.lock);
 
     /* Reload the IPCPs list. */
     while (!end) {
@@ -585,7 +598,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting DIF assignment...\n");
 
     resp = (struct rina_msg_base_resp *)
-           issue_request(ipcm, RMB(req),
+           issue_request(&ipcm->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -616,7 +629,7 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     return (struct rina_msg_base_resp *)
-           issue_request(ipcm, RMB(req),
+           issue_request(&ipcm->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
 
@@ -644,7 +657,7 @@ flow_allocate_req(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_flow_allocate_resp *)
-           issue_request(ipcm, RMB(req),
+           issue_request(&ipcm->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
 
@@ -1034,29 +1047,75 @@ sigpipe_handler(int signum)
     printf("SIGPIPE received\n");
 }
 
-int main()
+static int
+rina_evloop_init(struct rina_evloop *loop, const char *dev,
+                 rina_resp_handler_t *handlers)
 {
-    struct ipcm ipcm;
-    pthread_t evloop_th;
-    pthread_t unix_th;
-    struct sockaddr_un server_address;
-    struct sigaction sa;
     int ret;
 
+    if (!dev) {
+        dev = "/dev/rina-ctrl";
+    }
+
+    if (!handlers) {
+        printf("NULL handlers\n");
+        exit(EXIT_FAILURE);
+    }
+
     /* Open the RINA control device. */
-    ipcm.rfd = open("/dev/rina-ctrl", O_RDWR);
-    if (ipcm.rfd < 0) {
-        perror("open(/dev/rinactrl)");
+    loop->rfd = open(dev, O_RDWR);
+    if (loop->rfd < 0) {
+        printf("Cannot open '%s'\n", dev);
+        perror("open(ctrldev)");
         exit(EXIT_FAILURE);
     }
 
     /* Set non-blocking operation for the RINA control device, so that
      * the event-loop can synchronize with the kernel through select(). */
-    ret = fcntl(ipcm.rfd, F_SETFL, O_NONBLOCK);
+    ret = fcntl(loop->rfd, F_SETFL, O_NONBLOCK);
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
         exit(EXIT_FAILURE);
     }
+
+    pthread_mutex_init(&loop->lock, NULL);
+    pending_queue_init(&loop->pqueue);
+    loop->event_id_counter = 1;
+    loop->handlers = handlers;
+
+    /* Create and start the event-loop thread. */
+    ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
+    if (ret) {
+        perror("pthread_create(event-loop)");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+static int
+rina_evloop_fini(struct rina_evloop *loop)
+{
+    int ret = pthread_join(loop->evloop_th, NULL);
+
+    if (ret < 0) {
+        perror("pthread_join(event-loop)");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+int main()
+{
+    struct ipcm ipcm;
+    pthread_t unix_th;
+    struct sockaddr_un server_address;
+    struct sigaction sa;
+    int ret;
+
+    rina_evloop_init(&ipcm.loop, "/dev/rina-ctrl",
+                     rina_kernel_handlers);
 
     /* Open a Unix domain socket to listen to. */
     ipcm.lfd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -1117,17 +1176,7 @@ int main()
 
     /* Initialize the remaining fields of the IPC Manager data model
      * instance. */
-    pthread_mutex_init(&ipcm.lock, NULL);
-    pending_queue_init(&ipcm.pqueue);
-    ipcm.event_id_counter = 1;
     list_init(&ipcm.ipcps);
-
-    /* Create and start the event-loop thread. */
-    ret = pthread_create(&evloop_th, NULL, evloop_function, &ipcm);
-    if (ret) {
-        perror("pthread_create(event-loop)");
-        exit(EXIT_FAILURE);
-    }
 
     /* Create and start the unix server thread. */
     ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
@@ -1140,17 +1189,13 @@ int main()
     ipcps_fetch(&ipcm);
     if (0) test(&ipcm);
 
-    ret = pthread_join(evloop_th, NULL);
-    if (ret < 0) {
-        perror("pthread_join(event-loop)");
-        exit(EXIT_FAILURE);
-    }
-
     ret = pthread_join(unix_th, NULL);
     if (ret < 0) {
         perror("pthread_join(unix)");
         exit(EXIT_FAILURE);
     }
+
+    rina_evloop_fini(&ipcm.loop);
 
     return 0;
 }
