@@ -40,7 +40,8 @@
 struct rina_normal {
     struct ipcp_entry *ipcp;
 
-    /* Hash table to implement the PDU forwarding table. */
+    /* Implementation of the PDU forwarding table. */
+    struct flow_entry *default_gateway;
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
 };
 
@@ -55,6 +56,8 @@ rina_normal_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
+    priv->default_gateway = NULL;
+    hash_init(priv->pdu_ft);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 

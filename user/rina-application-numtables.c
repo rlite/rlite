@@ -25,6 +25,11 @@ struct rina_msg_layout rina_application_numtables[] = {
         .names = 1,
         .strings = 2,
     },
+    [RINA_APPL_IPCP_REGISTER] = {
+        .copylen = sizeof(struct rina_amsg_ipcp_register) -
+                   2 * sizeof(struct rina_name),
+        .names = 2,
+    },
     [RINA_APPL_BASE_RESP] = {
         .copylen = sizeof(struct rina_msg_base_resp),
     },

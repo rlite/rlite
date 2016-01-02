@@ -185,6 +185,37 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
 }
 
 static int
+ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
+              uint16_t ipcp_id_where, uint8_t reg)
+{
+    struct rina_kmsg_ipcp_register *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        printf("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_REGISTER;
+    req->ipcp_id_who = ipcp_id_who;
+    req->ipcp_id_where = ipcp_id_where;
+    req->reg = reg;
+
+    printf("Requesting IPCP register...\n");
+
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    printf("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -342,6 +373,34 @@ rina_appl_ipcp_config(struct ipcm *ipcm, int sfd,
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
+static int
+rina_appl_ipcp_register(struct ipcm *ipcm, int sfd,
+                       const struct rina_msg_base *b_req)
+{
+    unsigned int ipcp_id_who, ipcp_id_where;
+    struct rina_amsg_ipcp_register *req = (struct rina_amsg_ipcp_register *)b_req;
+    struct rina_msg_base_resp resp;
+
+    resp.result = 1;  /* Report failure by default. */
+
+    ipcp_id_who = lookup_ipcp_by_name(ipcm, &req->ipcp_who_name);
+    if (ipcp_id_who == ~0U) {
+        printf("%s: Could not find who IPC process\n", __func__);
+        goto out;
+    }
+
+    ipcp_id_where = lookup_ipcp_by_name(ipcm, &req->ipcp_where_name);
+    if (ipcp_id_where == ~0U) {
+        printf("%s: Could not find where IPC process\n", __func__);
+        goto out;
+    }
+    /* Forward the request to the kernel. */
+    resp.result = ipcp_register(ipcm, ipcp_id_who, ipcp_id_where, req->reg);
+
+out:
+    return rina_appl_response(sfd, RMB(req), &resp);
+}
+
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -351,6 +410,7 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
     [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
     [RINA_APPL_IPCP_CONFIG] = rina_appl_ipcp_config,
+    [RINA_APPL_IPCP_REGISTER] = rina_appl_ipcp_register,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 

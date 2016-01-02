@@ -33,6 +33,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_RESP, /* 15 */
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
     RINA_KERN_IPCP_CONFIG, /* 17 */
+    RINA_KERN_IPCP_REGISTER, /* 18 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -146,5 +147,17 @@ struct rina_kmsg_ipcp_config {
     char *name;
     char *value;
 } __attribute__((packed));
+
+struct rina_kmsg_ipcp_register {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    /* Who (un)registers ? */
+    uint16_t ipcp_id_who;
+    /* Where to (un)register ? */
+    uint16_t ipcp_id_where;
+    /* Register or unregister ? */
+    uint8_t reg;
+};
 
 #endif  /* __RINA_KERN_H__ */

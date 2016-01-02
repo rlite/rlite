@@ -207,6 +207,39 @@ static int ipcp_config(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int ipcp_register_common(int argc, char **argv, unsigned int reg)
+{
+    struct rina_amsg_ipcp_register req;
+    const char *ipcp_who_apn;
+    const char *ipcp_who_api;
+    const char *ipcp_where_apn;
+    const char *ipcp_where_api;
+
+    assert(argc >= 4);
+    ipcp_who_apn = argv[0];
+    ipcp_who_api = argv[1];
+    ipcp_where_apn = argv[2];
+    ipcp_where_api = argv[3];
+
+    req.msg_type = RINA_APPL_IPCP_REGISTER;
+    req.event_id = 0;
+    rina_name_fill(&req.ipcp_who_name, ipcp_who_apn, ipcp_who_api, NULL, NULL);
+    rina_name_fill(&req.ipcp_where_name, ipcp_where_apn, ipcp_where_api, NULL, NULL);
+    req.reg = reg;
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
+static int ipcp_register(int argc, char **argv)
+{
+    return ipcp_register_common(argc, argv, 1);
+}
+
+static int ipcp_unregister(int argc, char **argv)
+{
+    return ipcp_register_common(argc, argv, 0);
+}
+
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -238,6 +271,18 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_APN IPCP_API PARAM_NAME PARAM_VALUE",
         .num_args = 4,
         .func = ipcp_config,
+    },
+    {
+        .name = "ipcp-register",
+        .usage = "IPCP_WHO_APN IPCP_WHO_API IPCP_WHERE_APN IPCP_WHERE_API",
+        .num_args = 4,
+        .func = ipcp_register,
+    },
+    {
+        .name = "ipcp-unregister",
+        .usage = "IPCP_WHO_APN IPCP_WHO_API IPCP_WHERE_APN IPCP_WHERE_API",
+        .num_args = 4,
+        .func = ipcp_unregister,
     },
 };
 

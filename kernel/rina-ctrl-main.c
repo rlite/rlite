@@ -578,6 +578,34 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
+static int
+rina_ipcp_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_register *req =
+                    (struct rina_kmsg_ipcp_register *)bmsg;
+    struct ipcp_entry *entry_who;
+    struct ipcp_entry *entry_where;
+    int ret = 0;
+
+    mutex_lock(&rina_dm.lock);
+    entry_who = ipcp_table_find(req->ipcp_id_who);
+    if (!entry_who) {
+        ret = -EINVAL;
+    }
+    entry_where = ipcp_table_find(req->ipcp_id_where);
+    if (!entry_where) {
+        ret = -EINVAL;
+    }
+    // TODO
+    mutex_unlock(&rina_dm.lock);
+
+    if (ret == 0) {
+        printk("%s: OOOOOOK [%u]\n", __func__, req->reg);
+    }
+
+    return ret;
+}
+
 static struct registered_application *
 ipcp_application_lookup(struct ipcp_entry *ipcp,
                         struct rina_name *application_name)
@@ -1098,6 +1126,7 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
+    [RINA_KERN_IPCP_REGISTER] = rina_ipcp_register,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
