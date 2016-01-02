@@ -116,6 +116,14 @@ test_cdap_server(int port)
                 conn.m_write_r(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
+            case gpb::M_START:
+                conn.m_start_r(m, gpb::F_NO_FLAGS, 0, string());
+                break;
+
+            case gpb::M_STOP:
+                conn.m_stop_r(m, gpb::F_NO_FLAGS, 0, string());
+                break;
+
             default:
                 PE("Unmanaged op_code %d\n", m->op_code);
                 break;
@@ -239,6 +247,41 @@ client_read_some(CDAPConn *conn)
 }
 
 static int
+client_startstop_some(CDAPConn *conn)
+{
+    struct CDAPMessage *m;
+    int invoke_id;
+
+    if (conn->m_start(&invoke_id, gpb::F_NO_FLAGS,
+                     "class_A", "x", 0, 0, string())) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
+    if (conn->m_stop(&invoke_id, gpb::F_NO_FLAGS,
+                     "class_A", "x", 0, 0, string())) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
+    return 0;
+}
+
+static int
 client_delete_some(CDAPConn *conn)
 {
     struct CDAPMessage *m;
@@ -310,6 +353,7 @@ test_cdap_client(int port)
     client_create_some(&conn);
     client_write_some(&conn);
     client_read_some(&conn);
+    client_startstop_some(&conn);
     client_delete_some(&conn);
 
     client_disconnect(&conn);
