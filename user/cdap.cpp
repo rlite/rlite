@@ -236,6 +236,7 @@ CDAPConn::reset()
     rina_name_free(&remote_appl);
     memset(&local_appl, 0, sizeof(local_appl));
     memset(&remote_appl, 0, sizeof(remote_appl));
+    invoke_id_mgr = InvokeIdMgr();
     PD("Connection reset to %s\n", conn_state_repr(state));
 }
 
