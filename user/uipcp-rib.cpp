@@ -977,6 +977,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
     ipcp = ipcp_info();
 
     LowerFlowList lfl(objbuf, objlen);
+    LowerFlowList prop_lfl;
     RinaName my_name = RinaName(&ipcp->ipcp_name);
     bool modified = false;
 
@@ -989,6 +990,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
             if (mit == lfdb.end() || f->seqnum > mit->second.seqnum) {
                 lfdb[key] = *f;
                 modified = true;
+                prop_lfl.flows.push_back(*f);
             }
             PD("Lower flow %s added remotely\n", key.c_str());
 
@@ -999,6 +1001,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
             } else {
                 lfdb.erase(mit);
                 modified = true;
+                prop_lfl.flows.push_back(*f);
                 PD("Lower flow %s removed remotely\n", key.c_str());
             }
 
@@ -1006,6 +1009,10 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
     }
 
     if (modified) {
+        /* Send the received lower flows to the other neighbors. */
+        remote_sync_excluding(NULL, add, obj_class::lfdb,
+                              obj_name::lfdb, &prop_lfl);
+
         /* Update the routing table. */
         spe.run(ipcp_info()->ipcp_addr, lfdb);
         pduft_sync();
@@ -1160,7 +1167,7 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     }
 
 #if 1
-    PD_S("Graph:\n");
+    PD_S("Graph [%lu]:\n", db.size());
     for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         PD_S("%lu: {", (long unsigned)g->first);
@@ -1201,7 +1208,7 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
             break;
         }
 
-        PD("Selecting node %lu\n", (long unsigned)min);
+        PD_S("Selecting node %lu\n", (long unsigned)min);
 
         list<Edge>& edges = graph[min];
         Info& info_min = info[min];
