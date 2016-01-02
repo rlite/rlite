@@ -254,6 +254,28 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err1;
     }
 
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                   uipcp->ops.fa_req_arrived);
+
+    /* Set the evloop handlers for flow allocation request/response and
+     * registration reflected messages. */
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+                                    uipcp->ops.fa_req);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+                                    uipcp->ops.fa_resp);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                   RINA_KERN_APPL_REGISTER,
+                                   uipcp->ops.appl_register);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                    RINA_KERN_FLOW_DEALLOCATED,
+                                    uipcp->ops.flow_deallocated);
+    if (ret) {
+        goto err2;
+    }
+
     /* Tell the kernel what is the event loop to be associated to
      * the ipcp_id specified, so that reflected messages for that
      * IPCP are redirected to this uipcp. */

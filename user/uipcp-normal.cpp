@@ -726,28 +726,6 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
-                                   normal_fa_req_arrived);
-
-    /* Set the evloop handlers for flow allocation request/response and
-     * registration reflected messages. */
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
-                                    normal_fa_req);
-
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
-                                    normal_fa_resp);
-
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
-                                   RINA_KERN_APPL_REGISTER,
-                                   normal_appl_register);
-
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
-                                    RINA_KERN_FLOW_DEALLOCATED,
-                                    normal_flow_deallocated);
-    if (ret) {
-        goto err;
-    }
-
     uipcp->mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
     if (uipcp->mgmtfd < 0) {
         ret = uipcp->mgmtfd;
