@@ -179,6 +179,36 @@ flow_allocate_req(struct application *application, int wait_for_completion,
 }
 
 static int
+flow_allocate_resp(struct application *application,
+                       struct pending_flow_req *pfr, uint8_t response)
+{
+    struct rina_kmsg_flow_allocate_resp *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    req = malloc(sizeof(*req));
+    if (!req) {
+        printf("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+    memset(req, 0, sizeof(*req));
+
+    req->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP;
+    req->ipcp_id = pfr->ipcp_id;
+    req->port_id = pfr->port_id;
+    req->response = response;
+
+    printf("Responding to flow allocation request...\n");
+
+    resp = issue_request(&application->loop, RMB(req),
+                         sizeof(*req), 0, &result);
+    assert(!resp);
+    printf("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
 application_register(struct application *application, int reg,
                      struct rina_name *dif_name,
                      struct rina_name *application_name)
@@ -278,10 +308,16 @@ server_function(void *arg)
     struct pending_flow_req *pfr = NULL;
 
     for (;;) {
+        int result;
+
         pfr = flow_request_wait(application);
         printf("%s: flow request arrived: [ipcp_id = %u, port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
+
+        /* Always accept incoming connection, for now. */
+        result = flow_allocate_resp(application, pfr, 1);
         free(pfr);
+        (void) result;
     }
 
     return NULL;

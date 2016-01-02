@@ -7,5 +7,4 @@
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 - flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
-- evloop: aggiungere supporto per richieste che non hanno risposta (i.e. che
-  usano il risultato della write).
+- userspace: rimuovere wait_for_completion dove non ha senso

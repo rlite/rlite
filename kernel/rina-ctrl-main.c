@@ -805,34 +805,34 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct rina_kmsg_flow_allocate_resp *req =
                     (struct rina_kmsg_flow_allocate_resp *)bmsg;
     struct flow_entry *flow_entry = NULL;
+    int ret = -EINVAL;
 
     mutex_lock(&rina_dm.lock);
     /* Lookup the flow corresponding to the port-id specified
      * by the request. */
     flow_entry = flow_table_find(req->port_id);
     if (!flow_entry) {
-        mutex_unlock(&rina_dm.lock);
         printk("%s: no pending flow corresponding to port-id %u\n",
                 __func__, req->port_id);
-        return -EINVAL;
+        goto out;
     }
 
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
     if (flow_entry->state != FLOW_STATE_PENDING) {
-        mutex_unlock(&rina_dm.lock);
         printk("%s: flow %u is in invalid state %u\n",
                 __func__, flow_entry->local_port, flow_entry->state);
-        return -EINVAL;
+        goto out;
     }
     flow_entry->state = FLOW_STATE_ALLOCATED;
+    ret = 0;
 
     /* Notify the involved IPC process about the response. TODO */
 
+out:
     mutex_unlock(&rina_dm.lock);
 
-    /* No response message to userspace . */
-    return 0;
+    return ret;
 }
 
 int

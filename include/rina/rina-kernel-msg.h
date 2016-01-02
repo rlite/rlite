@@ -132,7 +132,7 @@ struct rina_kmsg_flow_allocate_resp {
      * global, while the architecture says they should be unique only per
      * IPCP. */
     uint16_t ipcp_id;
-    uint8_t result;
+    uint8_t response;
     uint32_t port_id;
 } __attribute__((packed));
 
