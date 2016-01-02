@@ -35,12 +35,6 @@ echo_client(struct rinaperf *rp)
         size = sizeof(buf);
     }
 
-    ipcps_fetch(&rp->application.loop);
-
-    rina_name_fill(&rp->dif_name, "d.DIF", "", "", "");
-    rina_name_fill(&rp->this_application, "client", "1", NULL, NULL);
-    rina_name_fill(&rp->remote_application, "server", "1", NULL, NULL);
-
     ret = flow_allocate(&rp->application, &rp->dif_name, &rp->this_application,
                         &rp->remote_application, &data_port_id);
     if (ret) {
@@ -85,18 +79,6 @@ static int
 echo_server(struct rinaperf *rp)
 {
     struct pending_flow_req *pfr = NULL;
-    int ret;
-
-    ipcps_fetch(&rp->application.loop);
-
-    rina_name_fill(&rp->dif_name, "d.DIF", "", "", "");
-    rina_name_fill(&rp->this_application, "server", "1", NULL, NULL);
-
-    ret = application_register(&rp->application, 1, &rp->dif_name,
-                               &rp->this_application);
-    if (ret) {
-        return ret;
-    }
 
     for (;;) {
         unsigned int data_port_id;
@@ -172,6 +154,7 @@ main(int argc, char **argv)
     struct rinaperf rp;
     const struct perf_function_desc *descs = client_descs;
     const char *type = "echo";
+    const char *dif_name = "d.DIF";
     perf_function_t perf_function = NULL;
     int listen = 0;
     int ret;
@@ -190,9 +173,13 @@ main(int argc, char **argv)
                 type = optarg;
                 break;
 
+            case 'd':
+                dif_name = optarg;
+                break;
+
             default:
                 printf("    Unrecognized option %c\n", opt);
-                exit(EXIT_FAILURE);
+                return -1;
         }
     }
 
@@ -208,12 +195,32 @@ main(int argc, char **argv)
 
     if (perf_function == NULL) {
         printf("    Unknown test type %s\n", type);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     ret = rina_application_init(&rp.application);
     if (ret) {
         return ret;
+    }
+
+    /* This fetch is necessary to use application_register(). */
+    ipcps_fetch(&rp.application.loop);
+
+    /* Rinaperf-specific initialization. */
+    rina_name_fill(&rp.dif_name, dif_name, "", "", "");
+    if (listen) {
+        rina_name_fill(&rp.this_application, "server", "1", NULL, NULL);
+        rina_name_fill(&rp.remote_application, "client", "1", NULL, NULL);
+
+        /* In listen mode also register the application. */
+        ret = application_register(&rp.application, 1, &rp.dif_name,
+                                   &rp.this_application);
+        if (ret) {
+            return ret;
+        }
+    } else {
+        rina_name_fill(&rp.this_application, "client", "1", NULL, NULL);
+        rina_name_fill(&rp.remote_application, "server", "1", NULL, NULL);
     }
 
     /* Run the perf function. */
