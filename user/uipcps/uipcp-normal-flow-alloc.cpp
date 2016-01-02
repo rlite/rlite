@@ -118,7 +118,6 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_appl);
     uint64_t remote_addr;
-    struct rlite_ipcp *ipcp;
     CDAPMessage m;
     FlowRequest freq;
     ConnId conn_id;
@@ -141,8 +140,6 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
                                      1, NULL);
     }
 
-    ipcp = ipcp_info();
-
     conn_id.qos_id = 0;
     conn_id.src_cep = req->local_cep;
     conn_id.dst_cep = 0;
@@ -151,7 +148,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     freq.dst_app = dest_appl;
     freq.src_port = req->local_port;
     freq.dst_port = 0;
-    freq.src_addr = ipcp->ipcp_addr;
+    freq.src_addr = ipcp_info()->ipcp_addr;
     freq.dst_addr = remote_addr;
     freq.connections.push_back(conn_id);
     freq.cur_conn_idx = 0;
@@ -269,7 +266,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         return send_to_dst_addr(m, freq.src_addr, freq);
     }
 
-    if (dft_next_hop) {
+    if (dft_next_hop != ipcp_info()->ipcp_addr) {
         /* freq.dst_app is not registered with us, we have
          * to forward the request. TODO */
         CDAPMessage m;

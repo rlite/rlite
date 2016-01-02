@@ -602,7 +602,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
                               &gw->appl_name, &mit->second.name_r, &flowspec,
                               &unused, 0, 0xffff);
     if (ret) {
-        PE("Flow allocation failed");
+        PE("Flow allocation failed\n");
         return;
     }
 

@@ -474,7 +474,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
 
     m.invoke_id = invoke_id_mgr.get_invoke_id();
 
-    if (dst_addr == 0) {
+    if (dst_addr == ipcp->ipcp_addr) {
         /* This is a message to be delivered to myself. */
         return cdap_dispatch(&m, NULL);
     }

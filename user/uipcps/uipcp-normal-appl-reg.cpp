@@ -29,7 +29,7 @@ uipcp_rib::dft_lookup(const RinaName& appl_name,
         return -1;
     }
 
-    dstaddr = mit->second.local ? 0 : mit->second.address;
+    dstaddr = mit->second.address;
 
     return 0;
 }
