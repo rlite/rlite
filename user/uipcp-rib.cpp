@@ -67,7 +67,9 @@ struct Neighbor {
 
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
              int fd, unsigned int port_id);
-    Neighbor(const Neighbor &other);
+    Neighbor(const Neighbor& other);
+    bool operator==(const Neighbor& other) const { return port_id == other.port_id; }
+    bool operator!=(const Neighbor& other) const { return !(*this == other); }
     ~Neighbor();
 
     const char *enrollment_state_repr(state_t s) const;
@@ -154,8 +156,13 @@ struct uipcp_rib {
     int remote_sync_neigh(const Neighbor& neigh, bool create,
                           const string& obj_class, const string& obj_name,
                           const UipcpObject *obj_value) const;
-    int remote_sync(bool create, const string& obj_class,
-                    const string& obj_name, const UipcpObject *obj_value) const;
+    int remote_sync_excluding(const Neighbor *exclude, bool create,
+                              const string& obj_class,
+                              const string& obj_name,
+                              const UipcpObject *obj_value) const;
+    int remote_sync_all(bool create, const string& obj_class,
+                        const string& obj_name,
+                        const UipcpObject *obj_value) const;
 
     int cdap_dispatch(const CDAPMessage *rm);
 
@@ -366,7 +373,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 
     dft_slice.entries.push_back(dft_entry);
 
-    remote_sync(create, obj_class::dft, obj_name::dft, &dft_slice);
+    remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     PD("Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
@@ -411,16 +418,21 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
     lf.age = 0;
     lfdb[static_cast<string>(lf)] = lf;
 
-    /* Send our lower flow database to the neighbor. */
     LowerFlowList lfl;
 
+    /* Send our lower flow database to the neighbor. */
     for (map<string, LowerFlow>::iterator mit = lfdb.begin();
                                         mit != lfdb.end(); mit++) {
         lfl.flows.push_back(mit->second);
     }
-
     ret = remote_sync_neigh(neigh, true, obj_class::lfdb,
                             obj_name::lfdb, &lfl);
+
+    /* Send the new lower flow to the other neighbors. */
+    lfl.flows.clear();
+    lfl.flows.push_back(lf);
+    ret |= remote_sync_excluding(&neigh, true, obj_class::lfdb,
+                                 obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
     spf.run(ipcp_info()->ipcp_addr, lfdb);
@@ -1363,16 +1375,27 @@ uipcp_rib::remote_sync_neigh(const Neighbor& neigh, bool create,
 }
 
 int
-uipcp_rib::remote_sync(bool create, const string& obj_class,
-                       const string& obj_name,
-                       const UipcpObject *obj_value) const
+uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
+                                 bool create, const string& obj_class,
+                                 const string& obj_name,
+                                 const UipcpObject *obj_value) const
 {
     for (list<Neighbor>::const_iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
-        remote_sync_neigh(*neigh, create, obj_class, obj_name, obj_value);
+        if (exclude && *neigh != *exclude) {
+            remote_sync_neigh(*neigh, create, obj_class, obj_name, obj_value);
+        }
     }
 
     return 0;
+}
+
+int
+uipcp_rib::remote_sync_all(bool create, const string& obj_class,
+                           const string& obj_name,
+                           const UipcpObject *obj_value) const
+{
+    return remote_sync_excluding(NULL, create, obj_class, obj_name, obj_value);
 }
 
 extern "C"
