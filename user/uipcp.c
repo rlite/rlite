@@ -3,8 +3,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
-#include <rina/rina-utils.h>
-#include <rina/rina-conf-msg.h>
+#include "rina/rina-utils.h"
+#include "rina/rina-conf-msg.h"
 #include "uipcp-server.h"
 
 

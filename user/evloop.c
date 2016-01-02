@@ -12,9 +12,9 @@
 #include <signal.h>
 #include <assert.h>
 #include <sys/eventfd.h>
-#include <rina/rina-kernel-msg.h>
-#include <rina/rina-conf-msg.h>
-#include <rina/rina-utils.h>
+#include "rina/rina-kernel-msg.h"
+#include "rina/rina-conf-msg.h"
+#include "rina/rina-utils.h"
 
 #include "pending_queue.h"
 #include "evloop.h"

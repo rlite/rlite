@@ -1,5 +1,5 @@
-#include <rina/rina-utils.h>
-#include <rina/rina-conf-msg.h>
+#include "rina/rina-utils.h"
+#include "rina/rina-conf-msg.h"
 
 
 struct rina_msg_layout rina_conf_numtables[] = {

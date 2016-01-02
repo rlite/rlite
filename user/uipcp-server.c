@@ -12,9 +12,9 @@
 #include <signal.h>
 #include <assert.h>
 #include <endian.h>
-#include <rina/rina-kernel-msg.h>
-#include <rina/rina-conf-msg.h>
-#include <rina/rina-utils.h>
+#include "rina/rina-kernel-msg.h"
+#include "rina/rina-conf-msg.h"
+#include "rina/rina-utils.h"
 
 #include "list.h"
 #include "helpers.h"

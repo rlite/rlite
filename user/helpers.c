@@ -6,8 +6,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <rina/rina-utils.h>
-#include <rina/rina-conf-msg.h>
+#include "rina/rina-utils.h"
+#include "rina/rina-conf-msg.h"
 
 
 int rina_msg_write(int sfd, struct rina_msg_base *msg)

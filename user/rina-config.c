@@ -12,7 +12,7 @@
 #include <signal.h>
 #include <assert.h>
 
-#include <rina/rina-conf-msg.h>
+#include "rina/rina-conf-msg.h"
 #include "helpers.h"
 #include "evloop.h"
 
