@@ -349,19 +349,23 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
 
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
-            ret = uipcp_add(uipcps, upd->ipcp_id, upd->dif_type);
+            if (upd->dif_type && type_has_uipcp(upd->dif_type)) {
+                /* We only care about IPCP with userspace implementation. */
+                ret = uipcp_add(uipcps, upd->ipcp_id, upd->dif_type);
+            }
             break;
 
         case RLITE_UPDATE_DEL:
-            /* Track all the unregistrations of the destroyed IPCP in
-             * the persistent registrations list. */
-            track_ipcp_registration(uipcps, 0, NULL, upd->ipcp_id, NULL);
-
             uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
-            if (!uipcp) {
-                PE("Could not find uipcp for IPC process %u\n", upd->ipcp_id);
-            } else {
+            if (uipcp) {
+                /* Track all the unregistrations of the destroyed IPCP in
+                 * the persistent registrations list. */
+                track_ipcp_registration(uipcps, 0, NULL, upd->ipcp_id, NULL);
                 ret = uipcp_del(uipcps, upd->ipcp_id);
+
+            } else {
+                /* This is an IPCP with no userspace implementation. */
+                ret = 0;
             }
             break;
 

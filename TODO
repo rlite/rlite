@@ -37,5 +37,3 @@
 - RLITE_RMB() --> RLITE_MB(), and use it extensively
 
 - make sure uipcp_set fails if called twice
-
-- uipcps_uipcp_update: only consider dif_types that have uipcp
