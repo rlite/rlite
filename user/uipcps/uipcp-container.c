@@ -8,7 +8,7 @@
 #include "rlite/conf-msg.h"
 
 #include "uipcp-container.h"
-#include "rlite/conf.h"
+#include "rlite/evloop.h"
 
 
 int
@@ -481,8 +481,8 @@ uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
             continue;
         }
 
-        ret = rlite_ipcp_config(&uipcps->loop, ipn->ipcp_id, "depth",
-                                strbuf);
+        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->ipcp_id, "depth",
+                                    strbuf);
         if (ret) {
             PE("'ipcp-config depth %u' failed\n", depth);
         }

@@ -223,6 +223,9 @@ write_msg(int rfd, struct rlite_msg_base *msg)
         PE("Error: partial write [%d/%u]\n",
                 ret, serlen);
         ret = -1;
+
+    } else {
+        ret = 0;
     }
 
     return ret;
@@ -500,6 +503,20 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
     resp->upper_ipcp_id = upper_ipcp_id;
     resp->port_id = port_id;
     resp->response = response;
+
+    return 0;
+}
+
+int
+rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, uint16_t ipcp_id,
+                    const char *param_name, const char *param_value)
+{
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_IPCP_CONFIG;
+    req->event_id = 1;
+    req->ipcp_id = ipcp_id;
+    req->name = strdup(param_name);
+    req->value = strdup(param_value);
 
     return 0;
 }

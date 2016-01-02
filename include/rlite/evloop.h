@@ -150,6 +150,9 @@ int rl_evloop_fa_resp(struct rlite_evloop *loop,
                       uint16_t upper_ipcp_id, uint32_t port_id,
                       uint8_t response);
 
+int rl_evloop_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
+                          const char *param_name, const char *param_value);
+
 int
 rlite_flows_print(struct rlite_evloop *loop);
 

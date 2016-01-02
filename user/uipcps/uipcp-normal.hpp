@@ -10,7 +10,6 @@
 #include "rlite/utils.h"
 #include "rlite/conf-msg.h"
 #include "rlite/evloop.h"
-#include "rlite/conf.h"
 #include "rlite/cdap.hpp"
 
 #include "uipcp-normal-codecs.hpp"

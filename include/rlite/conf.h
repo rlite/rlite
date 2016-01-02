@@ -8,8 +8,18 @@
 extern "C" {
 #endif
 
-int rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
-                      const char *param_name, const char *param_value);
+long int
+rlconf_ipcp_create(struct rlite_ctrl *ctrl,
+                   const struct rina_name *name, const char *dif_type,
+                   const char *dif_name);
+
+int
+rlconf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+                    const char *dif_type);
+
+int
+rlconf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+                    const char *param_name, const char *param_value);
 
 #ifdef __cplusplus
 }

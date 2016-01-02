@@ -413,8 +413,8 @@ uipcp_rib::set_address(uint64_t address)
     stringstream addr_ss;
 
     addr_ss << address;
-    return rlite_ipcp_config(&uipcp->loop, uipcp->ipcp_id,
-                                "address", addr_ss.str().c_str());
+    return rl_evloop_ipcp_config(&uipcp->loop, uipcp->ipcp_id,
+                                 "address", addr_ss.str().c_str());
 }
 
 int
