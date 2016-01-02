@@ -594,5 +594,5 @@ int main(int argc, char **argv)
 
     rl_ctrl_fini(&ctrl);
 
-    return 0;
+    return ret;
 }
