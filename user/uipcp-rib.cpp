@@ -28,6 +28,7 @@ namespace obj_class {
     static string enrollment = "enrollment";
     static string status = "operational_status";
     static string address = "address";
+    static string lfdb = "fsodb"; /* Lower Flow DB */
 };
 
 namespace obj_name {
@@ -35,7 +36,8 @@ namespace obj_name {
     static string neighbors = "/daf/mgmt/" + obj_class::neighbors;
     static string enrollment = "/def/mgmt/" + obj_class::enrollment;
     static string status = "/daf/mgmt/" + obj_class::status;
-    static string address = "/def/mgmt/naming" + obj_class::address;
+    static string address = "/daf/mgmt/naming" + obj_class::address;
+    static string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
     static string whatevercast = "/daf/mgmt/naming/whatevercast";
 };
 

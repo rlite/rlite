@@ -12,6 +12,8 @@
 #include "DirectoryForwardingTableEntryMessage.pb.h"
 #include "NeighborMessage.pb.h"
 #include "NeighborArrayMessage.pb.h"
+#include "FlowStateMessage.pb.h"
+#include "FlowStateGroupMessage.pb.h"
 
 using namespace std;
 
@@ -273,6 +275,81 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 
         neigh = gm.add_neighbor();
         ret = NeighborCandidate2gpb(*c, *neigh);
+        if (ret) {
+            return ret;
+        }
+    }
+
+    return ser_common(gm, buf, size);
+}
+
+static void
+gpb2LowerFlow(LowerFlow& cand, const gpb::flowStateObject_t &gm)
+{
+    cand.local_addr = gm.address();
+    cand.remote_addr = gm.neighbor_address();
+    cand.cost = gm.cost();
+    cand.seqnum = gm.sequence_number();
+    cand.state = gm.state();
+    cand.age = gm.age();
+}
+
+static int
+LowerFlow2gpb(const LowerFlow& cand, gpb::flowStateObject_t &gm)
+{
+    gm.set_address(cand.local_addr);
+    gm.set_neighbor_address(cand.remote_addr);
+    gm.set_cost(cand.cost);
+    gm.set_sequence_number(cand.seqnum);
+    gm.set_state(cand.state);
+    gm.set_age(cand.age);
+
+    return 0;
+}
+
+LowerFlow::LowerFlow(const char *buf, unsigned int size)
+{
+    gpb::flowStateObject_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2LowerFlow(*this, gm);
+}
+
+int
+LowerFlow::serialize(char *buf, unsigned int size) const
+{
+    gpb::flowStateObject_t gm;
+
+    LowerFlow2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
+LowerFlowList::LowerFlowList(const char *buf, unsigned int size)
+{
+    gpb::flowStateObjectGroup_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    for (int i = 0; i < gm.flow_state_objects_size(); i++) {
+        flows.push_back(LowerFlow());
+        gpb2LowerFlow(flows.back(), gm.flow_state_objects(i));
+    }
+}
+
+int
+LowerFlowList::serialize(char *buf, unsigned int size) const
+{
+    gpb::flowStateObjectGroup_t gm;
+
+    for (list<LowerFlow>::const_iterator f = flows.begin();
+                    f != flows.end(); f++) {
+        gpb::flowStateObject_t *flow;
+        int ret;
+
+        flow = gm.add_flow_state_objects();
+        ret = LowerFlow2gpb(*f, *flow);
         if (ret) {
             return ret;
         }

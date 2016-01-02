@@ -77,4 +77,25 @@ struct NeighborCandidateList : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct LowerFlow : public UipcpObject {
+    uint64_t local_addr;
+    uint64_t remote_addr;
+    unsigned int cost;
+    unsigned int seqnum;
+    bool state;
+    unsigned int age;
+
+    LowerFlow() { }
+    LowerFlow(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+struct LowerFlowList : public UipcpObject {
+    std::list<LowerFlow> flows;
+
+    LowerFlowList() { }
+    LowerFlowList(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
