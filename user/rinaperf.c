@@ -259,13 +259,17 @@ perf_client(struct rinaperf *rp)
         }
 
         if (interval && --cdown == 0) {
-            gettimeofday(&w1, NULL);
-            for (;;) {
-                gettimeofday(&w2, NULL);
-                us = 1000000 * (w2.tv_sec - w1.tv_sec) +
-                    (w2.tv_usec - w1.tv_usec);
-                if (us >= interval) {
-                    break;
+            if (interval > 15) {
+                usleep(interval);
+            } else {
+                gettimeofday(&w1, NULL);
+                for (;;) {
+                    gettimeofday(&w2, NULL);
+                    us = 1000000 * (w2.tv_sec - w1.tv_sec) +
+                        (w2.tv_usec - w1.tv_usec);
+                    if (us >= interval) {
+                        break;
+                    }
                 }
             }
             cdown = burst;
