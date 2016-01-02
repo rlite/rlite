@@ -76,6 +76,8 @@ struct NeighFlow {
     NeighFlow(Neighbor *n, unsigned int pid, int ffd,
               unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
                                   lower_ipcp_id(lid), conn(NULL),
+                                  enroll_timeout_id(0),
+                                  keepalive_timeout_id(0),
                                   enrollment_state(NEIGH_NONE) { }
 
     bool enrollment_starting(const CDAPMessage *m) const;

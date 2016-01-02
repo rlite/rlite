@@ -538,7 +538,7 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
     list_init(&loop->timer_events);
     pthread_mutex_init(&loop->timer_lock, NULL);
     loop->timer_events_cnt = 0;
-    loop->timer_next_id = 0;
+    loop->timer_next_id = 1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
     loop->running = 0;
@@ -749,8 +749,8 @@ rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
     /* Insert 'e' right before 'cur'. */
     list_add_tail(&e->node, &cur->node);
     loop->timer_events_cnt++;
-    if (++loop->timer_next_id >= TIMER_EVENTS_MAX) {
-        loop->timer_next_id = 0;
+    if (++loop->timer_next_id > TIMER_EVENTS_MAX) {
+        loop->timer_next_id = 1;
     }
 #if 0
     printf("TIMERLIST: [");
