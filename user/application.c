@@ -334,7 +334,7 @@ int main(int argc, char **argv)
     struct sigaction sa;
     int ret;
 
-    rina_evloop_init(&application.loop, "/dev/rina-flow-ctrl",
+    rina_evloop_init(&application.loop, "/dev/rina-app-ctrl",
                      rina_kernel_handlers);
     pthread_mutex_init(&application.lock, NULL);
     pthread_cond_init(&application.flow_req_arrived_cond, NULL);

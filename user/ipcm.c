@@ -469,7 +469,7 @@ int main()
     struct sigaction sa;
     int ret;
 
-    rina_evloop_init(&ipcm.loop, "/dev/rina-ctrl",
+    rina_evloop_init(&ipcm.loop, "/dev/rina-ipcm-ctrl",
                      rina_kernel_handlers);
 
     /* Open a Unix domain socket to listen to. */

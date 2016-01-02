@@ -963,7 +963,7 @@ out:
 EXPORT_SYMBOL_GPL(rina_flow_allocate_resp_arrived);
 
 /* The table containing all the message handlers. */
-static rina_msg_handler_t rina_ctrl_handlers[] = {
+static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
@@ -973,7 +973,7 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
-static rina_msg_handler_t rina_flow_ctrl_handlers[] = {
+static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
@@ -1135,7 +1135,7 @@ rina_ctrl_open_common(struct inode *inode, struct file *f)
 }
 
 static int
-rina_ctrl_open(struct inode *inode, struct file *f)
+rina_ipcm_ctrl_open(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc;
 
@@ -1155,7 +1155,7 @@ rina_ctrl_open(struct inode *inode, struct file *f)
         return -ENOMEM;
     }
 
-    rc->handlers = rina_ctrl_handlers;
+    rc->handlers = rina_ipcm_ctrl_handlers;
 
     mutex_unlock(&rina_dm.lock);
 
@@ -1163,7 +1163,7 @@ rina_ctrl_open(struct inode *inode, struct file *f)
 }
 
 static int
-rina_flow_ctrl_open(struct inode *inode, struct file *f)
+rina_app_ctrl_open(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = rina_ctrl_open_common(inode, f);
 
@@ -1171,7 +1171,7 @@ rina_flow_ctrl_open(struct inode *inode, struct file *f)
         return -ENOMEM;
     }
 
-    rc->handlers = rina_flow_ctrl_handlers;
+    rc->handlers = rina_app_ctrl_handlers;
 
     return 0;
 }
@@ -1181,7 +1181,7 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
 
-    if (rc->handlers == rina_ctrl_handlers) {
+    if (rc->handlers == rina_ipcm_ctrl_handlers) {
         /* The rina ctrl device is being closed. Unset the
          * global rina_dm.ctrl pointer. */
         mutex_lock(&rina_dm.lock);
@@ -1202,36 +1202,36 @@ rina_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
-static const struct file_operations rina_ctrl_fops = {
+static const struct file_operations rina_ipcm_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rina_ctrl_release,
-    .open           = rina_ctrl_open,
+    .open           = rina_ipcm_ctrl_open,
     .write          = rina_ctrl_write,
     .read           = rina_ctrl_read,
     .poll           = rina_ctrl_poll,
     .llseek         = noop_llseek,
 };
 
-static struct miscdevice rina_ctrl_misc = {
+static struct miscdevice rina_ipcm_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rina-ctrl",
-    .fops = &rina_ctrl_fops,
+    .name = "rina-ipcm-ctrl",
+    .fops = &rina_ipcm_ctrl_fops,
 };
 
-static const struct file_operations rina_flow_ctrl_fops = {
+static const struct file_operations rina_app_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rina_ctrl_release,
-    .open           = rina_flow_ctrl_open,
+    .open           = rina_app_ctrl_open,
     .write          = rina_ctrl_write,
     .read           = rina_ctrl_read,
     .poll           = rina_ctrl_poll,
     .llseek         = noop_llseek,
 };
 
-static struct miscdevice rina_flow_ctrl_misc = {
+static struct miscdevice rina_app_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rina-flow-ctrl",
-    .fops = &rina_flow_ctrl_fops,
+    .name = "rina-app-ctrl",
+    .fops = &rina_app_ctrl_fops,
 };
 
 static int __init
@@ -1246,15 +1246,15 @@ rina_ctrl_init(void)
     rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
 
-    ret = misc_register(&rina_ctrl_misc);
+    ret = misc_register(&rina_ipcm_ctrl_misc);
     if (ret) {
         printk("%s: Failed to register rina-ctrl misc device\n", __func__);
         return ret;
     }
 
-    ret = misc_register(&rina_flow_ctrl_misc);
+    ret = misc_register(&rina_app_ctrl_misc);
     if (ret) {
-        misc_deregister(&rina_ctrl_misc);
+        misc_deregister(&rina_ipcm_ctrl_misc);
         printk("%s: Failed to register rina-flow-ctrl misc device\n", __func__);
         return ret;
     }
@@ -1265,8 +1265,8 @@ rina_ctrl_init(void)
 static void __exit
 rina_ctrl_fini(void)
 {
-    misc_deregister(&rina_ctrl_misc);
-    misc_deregister(&rina_flow_ctrl_misc);
+    misc_deregister(&rina_ipcm_ctrl_misc);
+    misc_deregister(&rina_app_ctrl_misc);
 }
 
 module_init(rina_ctrl_init);
