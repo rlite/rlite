@@ -108,6 +108,8 @@ struct uipcp_rib {
 
     struct rinalite_ipcp *ipcp_info() const;
 
+    int add_neighbor(const struct rina_name *neigh_name, int neigh_flow_fd,
+                     unsigned int neigh_port_id, bool start_enrollment);
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
     int remote_sync(bool create, const string& obj_class,
@@ -136,6 +138,21 @@ uipcp_rib::ipcp_info() const
     assert(ipcp);
 
     return ipcp;
+}
+
+int
+uipcp_rib::add_neighbor(const struct rina_name *neigh_name,
+                       int neigh_flow_fd, unsigned int neigh_port_id,
+                       bool start_enrollment)
+{
+    neighbors.push_back(Neighbor(this, neigh_name,
+                                 neigh_flow_fd, neigh_port_id));
+
+    if (start_enrollment) {
+        return neighbors.back().enroll_fsm_run(NULL);
+    }
+
+    return 0;
 }
 
 int
@@ -930,12 +947,9 @@ int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
     }
 
     /* Start the enrollment procedure as initiator. */
+    ret = rib->add_neighbor(&req->neigh_ipcp_name, flow_fd, port_id,
+                            true);
 
-    rib->neighbors.push_back(Neighbor(rib, &req->neigh_ipcp_name,
-                                      flow_fd, port_id));
-
-    //return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-    ret = rib->neighbors.back().enroll_fsm_run(NULL);
     if (ret == 0) {
         return 0;
     }
@@ -969,10 +983,7 @@ rib_neighbor_flow(struct uipcp_rib *rib,
 
     /* Start the enrollment procedure as slave. */
 
-    rib->neighbors.push_back(Neighbor(rib, neigh_name, neigh_fd,
-                                      neigh_port_id));
-
-    return 0;
+    return rib->add_neighbor(neigh_name, neigh_fd, neigh_port_id, false);
 }
 
 extern "C" int
