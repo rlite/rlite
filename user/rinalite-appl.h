@@ -7,6 +7,10 @@
 #include "rinalite-evloop.h"
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct rinalite_pending_flow_req {
     uint16_t ipcp_id;
     uint32_t port_id;
@@ -70,5 +74,9 @@ int rinalite_flow_allocate_open(struct rinalite_appl *application,
 int rinalite_flow_req_wait_open(struct rinalite_appl *application);
 
 void rinalite_flow_cfg_default(struct rina_flow_config *cfg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* __RINALITE_APPL_H__ */

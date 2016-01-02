@@ -122,6 +122,9 @@ int
 rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                                 uint64_t *addr);
 
+struct rinalite_ipcp *
+rinalite_lookup_ipcp_by_id(struct rinalite_evloop *loop, unsigned int id);
+
 #ifdef __cplusplus
 }
 #endif

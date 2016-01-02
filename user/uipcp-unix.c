@@ -168,7 +168,7 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     rinalite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform enrollment in userspace. */
-    ret = uipcp_enroll(uipcp, req);
+    ret = uipcp_enroll(uipcp->rib, req);
     if (ret) {
         goto out;
     }

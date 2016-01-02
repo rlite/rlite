@@ -49,7 +49,7 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
     return ret;
 }
 
-static int
+int
 mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                          void *buf, size_t buflen)
 {
@@ -93,67 +93,6 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
     ret = mgmt_write_to_local_port(uipcp, port_id, mgmtsdu, sizeof(mgmtsdu));
 
     return ret;
-}
-
-int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
-{
-    struct enrolled_neighbor *neigh;
-    unsigned int port_id;
-    int ret;
-
-    list_for_each_entry(neigh, &uipcp->enrolled_neighbors, node) {
-        if (rina_name_cmp(&neigh->ipcp_name, &req->neigh_ipcp_name) == 0) {
-            char *ipcp_s = rina_name_to_string(&req->neigh_ipcp_name);
-
-            PI("[uipcp %u] Already enrolled to %s", uipcp->ipcp_id, ipcp_s);
-            if (ipcp_s) {
-                free(ipcp_s);
-            }
-
-            return -1;
-        }
-    }
-
-    neigh = malloc(sizeof(*neigh));
-    if (!neigh) {
-        PE("%s: Out of memory\n", __func__);
-        return -1;
-    }
-    memset(neigh, 0, sizeof(*neigh));
-    rina_name_copy(&neigh->ipcp_name, &req->neigh_ipcp_name);
-    list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
-
-    /* Allocate a flow for the enrollment. */
-    ret = rinalite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
-                         &req->ipcp_name, &req->neigh_ipcp_name, NULL,
-                         &port_id, 2000, uipcp->ipcp_id);
-    if (ret) {
-        goto err;
-    }
-
-    neigh->flow_fd = rinalite_open_appl_port(port_id);
-    if (neigh->flow_fd < 0) {
-        goto err;
-    }
-
-    /* Request an enrollment. */
-
-    ret = rib_neighbor_add(uipcp->rib, &req->neigh_ipcp_name,
-                           neigh->flow_fd, port_id);
-    if (ret) {
-        goto err2;
-    }
-
-    return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-
-err2:
-    close(neigh->flow_fd);
-err:
-    list_del(&neigh->node);
-    rina_name_free(&neigh->ipcp_name);
-    free(neigh);
-
-    return -1;
 }
 
 int
@@ -565,18 +504,11 @@ uipcp_server(void *arg)
     struct uipcp *uipcp = arg;
 
     for (;;) {
-        struct enrolled_neighbor *neigh;
         struct rinalite_pending_flow_req *pfr;
         unsigned int port_id;
+        int flow_fd;
         int result;
         int ret;
-
-        neigh = malloc(sizeof(*neigh));
-        if (!neigh) {
-            usleep(200000);
-            continue;
-        }
-        memset(neigh, 0, sizeof(*neigh));
 
         pfr = rinalite_flow_req_wait(&uipcp->appl);
         port_id = pfr->port_id;
@@ -588,32 +520,28 @@ uipcp_server(void *arg)
 
         if (result) {
             rinalite_pending_flow_req_free(pfr);
-            free(neigh);
             continue;
         }
 
-        neigh->flow_fd = rinalite_open_appl_port(port_id);
-        if (neigh->flow_fd < 0) {
+        flow_fd = rinalite_open_appl_port(port_id);
+        if (flow_fd < 0) {
             rinalite_pending_flow_req_free(pfr);
-            free(neigh);
             continue;
         }
-        rina_name_copy(&neigh->ipcp_name, &pfr->remote_appl);
-        list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
         rinalite_pending_flow_req_free(pfr);
 
-        ret = rib_neighbor_add(uipcp->rib, &pfr->remote_appl,
-                               neigh->flow_fd, port_id);
+        ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
+                                flow_fd, port_id);
         if (ret) {
-            PE("%s: rib_neighbor_add() failed\n", __func__);
+            PE("%s: rib_neighbor_flow() failed\n", __func__);
         }
 
         /* XXX This usleep() is a temporary hack to make sure that the
          * flow allocation response has the time to be processed by the neighbor,
          * so that the flow 'port_id' is setup properly and can receive the
          * enrollment management sdu. */
-        usleep(100000);
-        uipcp_enroll_send_mgmtsdu(uipcp, port_id);
+        //usleep(100000);
+        //uipcp_enroll_send_mgmtsdu(uipcp, port_id);
 
         fflush(stdout);
     }
@@ -679,7 +607,6 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
     list_init(&uipcp->dft);
-    list_init(&uipcp->enrolled_neighbors);
 
     uipcp->rib = rib_create(uipcp);
     if (!uipcp->rib) {
@@ -755,7 +682,6 @@ err0:
 int
 uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 {
-    struct enrolled_neighbor *neigh;
     struct uipcp *uipcp;
     int ret;
 
@@ -763,13 +689,6 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
     if (!uipcp) {
         /* The specified IPCP is a Shim IPCP. */
         return 0;
-    }
-
-    /* Unenroll from all the neighbors. */
-    list_for_each_entry(neigh, &uipcp->enrolled_neighbors, node) {
-        //close(neigh->flow_fd); // XXX closed in rib_destroy()
-        rina_name_free(&neigh->ipcp_name);
-        // TODO empty the list
     }
 
     rinalite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);

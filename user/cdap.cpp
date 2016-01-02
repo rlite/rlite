@@ -752,7 +752,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
     gm = static_cast<gpb::CDAPMessage>(*m);
 
     *len = gm.ByteSize();
-    *buf = (char *)malloc(*len);
+    *buf = new char[*len];
 
     if (!(*buf)) {
         PE("%s: Out of memory\n", __func__);
@@ -785,6 +785,8 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
         }
         return -1;
     }
+
+    delete serbuf;
 
     return 0;
 }

@@ -625,13 +625,13 @@ rinalite_select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name
 struct rinalite_ipcp *
 rinalite_lookup_ipcp_by_name(struct rinalite_evloop *loop, const struct rina_name *name)
 {
-    struct rinalite_ipcp *rinalite_ipcp;
+    struct rinalite_ipcp *ipcp;
 
     if (rina_name_valid(name)) {
-        list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
-            if (rina_name_valid(&rinalite_ipcp->ipcp_name)
-                    && rina_name_cmp(&rinalite_ipcp->ipcp_name, name) == 0) {
-                return rinalite_ipcp;
+        list_for_each_entry(ipcp, &loop->ipcps, node) {
+            if (rina_name_valid(&ipcp->ipcp_name)
+                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
+                return ipcp;
             }
         }
     }
@@ -643,11 +643,11 @@ int
 rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                        uint64_t *addr)
 {
-    struct rinalite_ipcp *rinalite_ipcp;
+    struct rinalite_ipcp *ipcp;
 
-    list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
-        if (rinalite_ipcp->ipcp_id == id) {
-            *addr = rinalite_ipcp->ipcp_addr;
+    list_for_each_entry(ipcp, &loop->ipcps, node) {
+        if (ipcp->ipcp_id == id) {
+            *addr = ipcp->ipcp_addr;
             return 0;
         }
     }
@@ -655,3 +655,16 @@ rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
     return -1;
 }
 
+struct rinalite_ipcp *
+rinalite_lookup_ipcp_by_id(struct rinalite_evloop *loop, unsigned int id)
+{
+    struct rinalite_ipcp *ipcp;
+
+    list_for_each_entry(ipcp, &loop->ipcps, node) {
+        if (rina_name_valid(&ipcp->ipcp_name) && ipcp->ipcp_id == id) {
+            return ipcp;
+        }
+    }
+
+    return NULL;
+}
