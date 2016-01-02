@@ -140,7 +140,6 @@ ipcp_factories_find(const char *dif_type)
 int
 rina_ipcp_factory_register(struct ipcp_factory *factory)
 {
-    struct ipcp_factory *f;
     int ret = 0;
 
     if (!factory || !factory->create || !factory->owner
@@ -168,16 +167,10 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         goto out;
     }
 
-    /* Build a copy and insert it into the IPC process factories
-     * list. */
-    f = kzalloc(sizeof(*f), GFP_KERNEL);
-    if (!f) {
-        ret = -ENOMEM;
-        goto out;
-    }
-    memcpy(f, factory, sizeof(*f));
-
-    list_add_tail(&f->node, &rina_dm.ipcp_factories);
+    /* Insert the new factory into the IPC process factories
+     * list. Ownership is not passed, it stills remains to
+     * the invoking IPCP module. */
+    list_add_tail(&factory->node, &rina_dm.ipcp_factories);
 
     printk("%s: IPC processes factory '%s' registered\n",
             __func__, factory->dif_type);
@@ -201,11 +194,11 @@ rina_ipcp_factory_unregister(const char *dif_type)
         return -EINVAL;
     }
 
+    /* Just remove from the list, we don't have ownership of
+     * the factory object. */
     list_del(&factory->node);
 
     mutex_unlock(&rina_dm.general_lock);
-
-    kfree(factory);
 
     printk("%s: IPC processes factory '%s' unregistered\n",
             __func__, dif_type);
