@@ -327,8 +327,8 @@ unix_server(void *arg)
         }
 
         /* Deserialize into a formatted message. */
-        ret = deserialize_rina_msg(rina_conf_numtables, serbuf, n,
-                                        msgbuf, sizeof(msgbuf));
+        ret = deserialize_rina_msg(rina_conf_numtables, RINA_CONF_MSG_MAX,
+                                   serbuf, n, msgbuf, sizeof(msgbuf));
         if (ret) {
             PE("deserialization error [%d]\n", ret);
         }

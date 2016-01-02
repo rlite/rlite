@@ -52,14 +52,16 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     int ret;
     uint8_t *serbuf;
 
-    serlen = rina_msg_serlen(rina_shim_hv_numtables, msg);
+    serlen = rina_msg_serlen(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
+                             msg);
     serbuf = kmalloc(serlen, GFP_ATOMIC);
     if (!serbuf) {
         printk("Out of memory\n");
         return -ENOMEM;
     }
 
-    ret = serialize_rina_msg(rina_shim_hv_numtables, serbuf, msg);
+    ret = serialize_rina_msg(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
+                             serbuf, msg);
     if (ret != serlen) {
         printk("Error while serializing\n");
         return -EINVAL;
@@ -85,7 +87,8 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
     if (ty == RINA_SHIM_HV_FA_REQ) {
         struct rina_hmsg_fa_req req;
 
-        ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
+        ret = deserialize_rina_msg(rina_shim_hv_numtables,
+                                   RINA_SHIM_HV_MSG_MAX, serbuf, serlen,
                                    &req, sizeof(req));
         if (ret) {
             goto des_fail;
@@ -99,7 +102,8 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
     } else if (ty == RINA_SHIM_HV_FA_RESP) {
         struct rina_hmsg_fa_resp resp;
 
-        ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
+        ret = deserialize_rina_msg(rina_shim_hv_numtables,
+                                   RINA_SHIM_HV_MSG_MAX, serbuf, serlen,
                                    &resp, sizeof(resp));
         if (ret) {
             goto des_fail;

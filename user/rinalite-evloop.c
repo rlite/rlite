@@ -228,8 +228,8 @@ evloop_function(void *arg)
         }
 
         /* Deserialize the message from serbuf into resp. */
-        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret,
-                                   (void *)resp, max_resp_size);
+        ret = deserialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                                   serbuf, ret, (void *)resp, max_resp_size);
         if (ret) {
             PE("Problems during deserialization [%d]\n",
                     ret);
@@ -382,7 +382,7 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
     }
 
     /* Serialize the message. */
-    serlen = rina_msg_serlen(rina_kernel_numtables, msg);
+    serlen = rina_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
     if (serlen > sizeof(serbuf)) {
         PE("Serialized message would be too long [%u]\n",
                     serlen);
@@ -392,7 +392,8 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
         *result = ENOBUFS;
         return NULL;
     }
-    serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, msg);
+    serlen = serialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                                serbuf, msg);
 
     /* Issue the request to the kernel. */
     ret = write(loop->rfd, serbuf, serlen);

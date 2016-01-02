@@ -147,12 +147,21 @@ deserialize_rina_name(const void **pptr, struct rina_name *name)
 
 unsigned int
 rina_msg_serlen(struct rina_msg_layout *numtables,
+                size_t num_entries,
                 const struct rina_msg_base *msg)
 {
-    unsigned int ret = numtables[msg->msg_type].copylen;
+    unsigned int ret;
     struct rina_name *name;
     string_t *str;
     int i;
+
+    if (msg->msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+
+        return -1;
+    }
+
+    ret = numtables[msg->msg_type].copylen;
 
     name = (struct rina_name *)(((void *)msg) + ret);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
@@ -170,7 +179,7 @@ COMMON_EXPORT(rina_msg_serlen);
 
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rina_msg(struct rina_msg_layout *numtables,
+serialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
                    void *serbuf, const struct rina_msg_base *msg)
 {
     void *serptr = serbuf;
@@ -179,6 +188,12 @@ serialize_rina_msg(struct rina_msg_layout *numtables,
     struct rina_name *name;
     string_t *str;
     int i;
+
+    if (msg->msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+
+        return -1;
+    }
 
     copylen = numtables[msg->msg_type].copylen;
     memcpy(serbuf, msg, copylen);
@@ -202,7 +217,7 @@ COMMON_EXPORT(serialize_rina_msg);
 
 /* Deserialize from serbuf into msgbuf. */
 int
-deserialize_rina_msg(struct rina_msg_layout *numtables,
+deserialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
                      const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
@@ -213,6 +228,12 @@ deserialize_rina_msg(struct rina_msg_layout *numtables,
     const void *desptr;
     int ret;
     int i;
+
+    if (bmsg->msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", bmsg->msg_type);
+
+        return -1;
+    }
 
     copylen = numtables[bmsg->msg_type].copylen;
     memcpy(msgbuf, serbuf, copylen);

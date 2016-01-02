@@ -17,14 +17,16 @@ unsigned rina_name_serlen(const struct rina_name *name);
 void serialize_string(void **pptr, const char *s);
 void serialize_rina_name(void **pptr, const struct rina_name *name);
 unsigned int serialize_rina_msg(struct rina_msg_layout *numtables,
+                                size_t num_entries,
                                 void *serbuf,
                                 const struct rina_msg_base *msg);
 int deserialize_string(const void **pptr, char **s);
 int deserialize_rina_name(const void **pptr, struct rina_name *name);
-int deserialize_rina_msg(struct rina_msg_layout *numtables,
+int deserialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
                          const void *serbuf, unsigned int serbuf_len,
                          void *msgbuf, unsigned int msgbuf_len);
 unsigned int rina_msg_serlen(struct rina_msg_layout *numtables,
+                             size_t num_entries,
                              const struct rina_msg_base *msg);
 unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
                                 unsigned int n);

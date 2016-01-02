@@ -221,14 +221,15 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rina_msg_serlen(rina_kernel_numtables, rmsg);
+    serlen = rina_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, rmsg);
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, rmsg);
+    serlen = serialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                                serbuf, rmsg);
 
     entry->sermsg = serbuf;
     entry->serlen = serlen;
@@ -1961,7 +1962,8 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
         return -EFAULT;
     }
 
-    ret = deserialize_rina_msg(rina_kernel_numtables, kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
+    ret = deserialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                               kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);
         return -EINVAL;
