@@ -1,7 +1,22 @@
+#include <ctime>
+
 #include "uipcp-rib.hpp"
 
 using namespace std;
 
+
+static uint64_t time64()
+{
+    struct timespec tv;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
+        PE("clock_gettime() failed\n");
+        tv.tv_sec = 0;
+        tv.tv_nsec = 0;
+    }
+
+    return (tv.tv_sec << 32) | (tv.tv_nsec & ((1L << 32) - 1L));
+}
 
 uint64_t
 uipcp_rib::dft_lookup(const RinaName& appl_name) const
@@ -24,6 +39,7 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 
     entry.address = remote_addr;
     entry.appl_name = appl_name;
+    entry.timestamp = time64();
 
     dft[key] = entry;
 
@@ -51,6 +67,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 
     dft_entry.address = local_addr;
     dft_entry.appl_name = appl_name;
+    dft_entry.timestamp = time64();
     name_str = static_cast<string>(dft_entry.appl_name);
 
     mit = dft.find(name_str);
@@ -91,62 +108,6 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 }
 
 int
-uipcp_rib::pduft_sync()
-{
-    map<uint64_t, unsigned int> next_hop_to_port_id;
-
-    /* Flush previous entries. */
-    uipcp_pduft_flush(uipcp, uipcp->ipcp_id);
-
-    /* Precompute the port-ids corresponding to all the possible
-     * next-hops. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
-        map<string, Neighbor>::iterator neigh;
-        string neigh_name;
-
-        if (next_hop_to_port_id.count(r->second)) {
-            continue;
-        }
-
-        neigh_name = static_cast<string>(
-                                lookup_neighbor_by_address(r->second));
-        if (neigh_name == string()) {
-            PE("Could not find neighbor with address %lu\n",
-                    (long unsigned)r->second);
-            continue;
-        }
-
-        neigh = neighbors.find(neigh_name);
-
-        if (neigh == neighbors.end()) {
-            PE("Could not find neighbor with name %s\n",
-                    neigh_name.c_str());
-            continue;
-        }
-
-        next_hop_to_port_id[r->second] = neigh->second.port_id;
-    }
-
-    /* Generate PDUFT entries. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
-            unsigned int port_id = next_hop_to_port_id[r->second];
-            int ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,
-                                      port_id);
-            if (ret) {
-                PE("Failed to insert %lu --> %u PDUFT entry\n",
-                    (long unsigned)r->first, port_id);
-            } else {
-                PD("Add PDUFT entry %lu --> %u\n",
-                    (long unsigned)r->first, port_id);
-            }
-    }
-
-    return 0;
-}
-
-int
 uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     const char *objbuf;
@@ -178,9 +139,12 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
         map< string, DFTEntry >::iterator mit = dft.find(key);
 
         if (add) {
-            dft[key] = *e;
-            PD("DFT entry %s %s remotely\n", key.c_str(),
-                    (mit != dft.end() ? "updated" : "added"));
+            if (mit == dft.end() || e->timestamp > mit->second.timestamp) {
+                dft[key] = *e;
+                prop_dft.entries.push_back(*e);
+                PD("DFT entry %s %s remotely\n", key.c_str(),
+                        (mit != dft.end() ? "updated" : "added"));
+            }
 
         } else {
             if (mit == dft.end()) {
@@ -194,14 +158,9 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
         }
     }
 
-    if (add) {
-        prop_dft = dft_slice;
-    }
-
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        /* TODO loops are not managed here! */
         remote_sync_excluding(neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
