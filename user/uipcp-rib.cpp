@@ -731,6 +731,50 @@ SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
                 (long unsigned)i->second.prev, i->second.visited);
     }
 
+    set<uint64_t> unassociated;
+    map<uint64_t, uint64_t> next_hops;
+
+    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
+                                            g != graph.end(); g++) {
+        if (g->first != local_addr) {
+            unassociated.insert(g->first);
+        }
+    }
+
+    while (unassociated.size()) {
+        list<uint64_t> associated;
+        uint64_t addr = *(unassociated.begin());
+        uint64_t next_hop;
+        uint64_t last = UINT_MAX;
+
+        do {
+            associated.push_back(addr);
+            unassociated.erase(addr);
+            last = addr;
+            addr = info[addr].prev;
+        } while (addr != local_addr && unassociated.count(addr)
+                 && unassociated.size());
+
+        if (addr == local_addr) {
+            next_hop = last;
+        } else {
+            next_hop = next_hops[addr];
+        }
+
+        for (list<uint64_t>::iterator l = associated.begin();
+                                    l != associated.end(); l++) {
+            next_hops[*l] = next_hop;
+        }
+    }
+
+    PD_S("Routing table:\n");
+    for (map<uint64_t, uint64_t>::iterator h = next_hops.begin();
+                                        h != next_hops.end(); h++) {
+        PD_S("    Address: %lu, Next hop: %lu\n",
+             (long unsigned)h->first, (long unsigned)h->second);
+    }
+
+
     return 0;
 }
 
