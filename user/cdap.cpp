@@ -37,14 +37,17 @@ static const char *opcode_names_table[] = {
 #define MAX_CDAP_OPCODE gpb::M_STOP_R
 #define MAX_CDAP_FIELD  gpb::CDAPMessage::kVersionFieldNumber
 
-#define ENTRY_FILL(FL, OP, VA)   \
-        tab[((MAX_CDAP_OPCODE + 1) * gpb::CDAPMessage::k##FL##FieldNumber + gpb::OP)] = VA
+#define FLNUM(_FL)  gpb::CDAPMessage::k##_FL##FieldNumber
 
+#define ENTRY_FILL(FL, OP, VA)   \
+        tab[((MAX_CDAP_OPCODE + 1) * FLNUM(FL) + gpb::OP)] = VA
+
+#define CAN_EXIST       0
 #define MUST_EXIST      1
 #define MUST_NOT_EXIST  2
 
 #define COMBO(FL, OP)   \
-        ((MAX_CDAP_OPCODE + 1) * gpb::CDAPMessage::k##FL##FieldNumber + OP)
+        ((MAX_CDAP_OPCODE + 1) * FLNUM(FL) + OP)
 
 #define TAB_FILL(FL, VA)    \
         for (unsigned _i = gpb::M_CONNECT; _i <= MAX_CDAP_OPCODE; _i++) tab[COMBO(FL, _i)] = VA
@@ -53,7 +56,29 @@ struct CDAPValidationTable {
     char tab[(MAX_CDAP_OPCODE + 1) * (1 + MAX_CDAP_FIELD)];
 
     CDAPValidationTable();
+
+    bool check(int field, const char *flname, gpb::opCode_t op, bool observed);
 };
+
+bool CDAPValidationTable::check(int field, const char *flname,
+                                gpb::opCode_t op, bool observed)
+{
+    char expected = tab[(MAX_CDAP_OPCODE + 1) * field + op];
+
+    if (expected == MUST_EXIST && !observed) {
+        PE("%s: Invalid message: %s must contain field %s\n",
+            __func__, opcode_names_table[op], flname);
+        return false;
+    }
+
+    if (expected == MUST_NOT_EXIST && observed) {
+        PE("%s: Invalid message: %s must not contain field %s\n",
+            __func__, opcode_names_table[op], flname);
+        return false;
+    }
+
+    return true;
+}
 
 CDAPValidationTable::CDAPValidationTable()
 {
@@ -440,7 +465,54 @@ CDAPMessage::operator gpb::CDAPMessage() const
 bool
 CDAPMessage::valid() const
 {
-    return true;
+    bool ret = true;
+
+    ret = ret && vt.check(FLNUM(AbsSyntax), "abs_syntax", op_code,
+                          abs_syntax != 0);
+
+    ret = ret && vt.check(FLNUM(AuthMech), "auth_mech", op_code,
+                          auth_mech != gpb::AUTH_NONE);
+
+    ret = ret && vt.check(FLNUM(AuthValue), "auth_value", op_code,
+                          !auth_value.empty());
+
+    ret = ret && vt.check(FLNUM(SrcApName), "src_appl", op_code,
+                          rina_name_valid(&src_appl));
+
+    ret = ret && vt.check(FLNUM(DestApName), "dst_appl", op_code,
+                          rina_name_valid(&dst_appl));
+
+    ret = ret && vt.check(FLNUM(Filter), "filter", op_code,
+                          filter != string());
+
+    ret = ret && vt.check(FLNUM(InvokeID), "invoke_id", op_code,
+                          invoke_id != 0);
+
+    ret = ret && vt.check(FLNUM(ObjClass), "obj_class", op_code,
+                          obj_class != string());
+
+    ret = ret && vt.check(FLNUM(ObjInst), "obj_inst", op_code,
+                          obj_inst != 0);
+
+    ret = ret && vt.check(FLNUM(ObjName), "obj_name", op_code,
+                          obj_name != string());
+
+    ret = ret && vt.check(FLNUM(ObjValue), "obj_value", op_code,
+                          obj_value.ty != NONE);
+
+    ret = ret && vt.check(FLNUM(Result), "result", op_code,
+                          result != 0);
+
+    ret = ret && vt.check(FLNUM(ResultReason), "result_reason", op_code,
+                          result_reason != string());
+
+    ret = ret && vt.check(FLNUM(Scope), "scope", op_code,
+                          scope != 0);
+
+    ret = ret && vt.check(FLNUM(Version), "version", op_code,
+                          version != 0);
+
+    return ret;
 }
 
 void
