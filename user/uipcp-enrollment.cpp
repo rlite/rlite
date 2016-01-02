@@ -85,8 +85,8 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
 {
     char objbuf[4096];
     int objlen;
-    char *serbuf;
-    size_t serlen;
+    char *serbuf = NULL;
+    size_t serlen = 0;
     int ret;
 
     if (obj) {
@@ -107,7 +107,9 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
 
     if (ret) {
         PE("message serialization failed\n");
-        delete serbuf;
+        if (serbuf) {
+            delete serbuf;
+        }
         return -1;
     }
 
@@ -137,8 +139,7 @@ Neighbor::abort()
     }
 
     if (conn) {
-        delete conn;
-        conn = NULL;
+        conn->reset();
     }
 
     return;
@@ -594,6 +595,13 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     assert(enrollment_state >= NONE &&
            enrollment_state < ENROLLMENT_STATE_LAST);
     assert(enroll_fsm_handlers[enrollment_state]);
+
+    if (!rm && enrollment_state != NONE) {
+        PI("Enrollment already in progress, current state"
+            "is %s\n", enrollment_state_repr(enrollment_state));
+        return 0;
+    }
+
     ret = (this->*(enroll_fsm_handlers[enrollment_state]))(rm);
 
     if (old_state != enrollment_state) {
@@ -611,12 +619,19 @@ uipcp_rib::add_neighbor(const struct rina_name *neigh_name,
                        bool start_enrollment)
 {
     RinaName _neigh_name_(neigh_name);
+    string neigh_name_s = static_cast<string>(_neigh_name_);
+    map<string, Neighbor>::iterator mit;
 
-    Neighbor& neigh = neighbors[static_cast<string>(_neigh_name_)] =
+    mit = neighbors.find(neigh_name_s);
+    if (mit == neighbors.end()) {
+        neighbors[neigh_name_s] =
                 Neighbor(this, neigh_name, neigh_flow_fd, neigh_port_id);
+        mit = neighbors.find(neigh_name_s);
+        assert(mit != neighbors.end());
+    }
 
     if (start_enrollment) {
-        return neigh.enroll_fsm_run(NULL);
+        return mit->second.enroll_fsm_run(NULL);
     }
 
     return 0;
@@ -759,6 +774,12 @@ uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
     return neighbors.end();
 }
 
+map<string, Neighbor>::iterator
+uipcp_rib::lookup_neigh_by_name(const RinaName& name)
+{
+    return neighbors.find(name);
+}
+
 extern "C"
 int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
 {
@@ -766,14 +787,6 @@ int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
     unsigned int port_id;
     int flow_fd;
     int ret;
-
-    if (rib->neighbors.count(RinaName(&req->neigh_ipcp_name))) {
-        string ipcp_s = static_cast<string>(RinaName(&req->neigh_ipcp_name));
-
-        PI("[uipcp %u] Already enrolled to %s", uipcp->ipcp_id, ipcp_s.c_str());
-
-        return -1;
-    }
 
     /* Allocate a flow for the enrollment. */
     ret = rlite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
@@ -807,18 +820,7 @@ rib_neighbor_flow(struct uipcp_rib *rib,
                   const struct rina_name *neigh_name,
                   int neigh_fd, unsigned int neigh_port_id)
 {
-    struct uipcp *uipcp = rib->uipcp;
-
-    if (rib->neighbors.count(RinaName(neigh_name))) {
-        string ipcp_s = static_cast<string>(RinaName(neigh_name));
-
-        PI("[uipcp %u] Already enrolled to %s", uipcp->ipcp_id, ipcp_s.c_str());
-
-        return -1;
-    }
-
     /* Start the enrollment procedure as slave. */
-
     return rib->add_neighbor(neigh_name, neigh_fd, neigh_port_id, false);
 }
 

@@ -63,7 +63,8 @@ struct Neighbor {
     typedef int (Neighbor::*enroll_fsm_handler_t)(const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[ENROLLMENT_STATE_LAST];
 
-    Neighbor() : conn(NULL), rib(NULL) { } /* Required to use the map. */
+    /* Required to use the map. */
+    Neighbor() : flow_fd(-1), conn(NULL), rib(NULL) { }
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
              int fd, unsigned int port_id);
     Neighbor(const Neighbor& other);
@@ -72,6 +73,7 @@ struct Neighbor {
     ~Neighbor();
 
     const char *enrollment_state_repr(state_t s) const;
+    bool has_mgmt_flow() const { return flow_fd != -1; }
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;
@@ -184,12 +186,14 @@ struct uipcp_rib {
     int flow_deallocated(struct rina_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
+    std::map<std::string, Neighbor>::iterator
+                lookup_neigh_by_port_id(unsigned int port_id);
+    std::map<std::string, Neighbor>::iterator
+                lookup_neigh_by_name(const RinaName& name);
     int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
     int fa_req(struct rina_kmsg_fa_req *req);
     int fa_resp(struct rina_kmsg_fa_resp *resp);
     int pduft_sync();
-    std::map<std::string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int
-                                                            port_id);
     uint64_t address_allocate() const;
 
     int send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,

@@ -61,6 +61,8 @@ public:
     struct CDAPMessage * msg_recv();
     struct CDAPMessage * msg_deser(const char *serbuf, size_t serlen);
 
+    void reset();
+
     struct rina_name local_appl;
     struct rina_name remote_appl;
     int fd;

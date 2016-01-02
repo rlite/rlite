@@ -223,6 +223,17 @@ CDAPConn::~CDAPConn()
     rina_name_free(&remote_appl);
 }
 
+void
+CDAPConn::reset()
+{
+    state = NONE;
+    rina_name_free(&local_appl);
+    rina_name_free(&remote_appl);
+    memset(&local_appl, 0, sizeof(local_appl));
+    memset(&remote_appl, 0, sizeof(remote_appl));
+    PD("Connection reset to %s\n", conn_state_repr(state));
+}
+
 const char *
 CDAPConn::conn_state_repr(int st)
 {
@@ -782,6 +793,9 @@ int
 CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
                   char **buf, size_t *len)
 {
+    *buf = NULL;
+    *len = 0;
+
     m->version = version;
 
     if (!m->valid(false)) {
