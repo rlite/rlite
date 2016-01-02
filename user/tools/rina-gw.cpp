@@ -640,7 +640,7 @@ inet_server_socket(const InetName& inet_name)
         return -1;
     }
 
-    return 0;
+    return fd;
 }
 
 static int
