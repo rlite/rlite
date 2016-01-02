@@ -700,8 +700,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                 int ret;
 
                 if (state != NONE) {
-                    PE("Cannot %s M_CONNECT message: Invalid state %d\n",
-                            action, state);
+                    PE("Cannot %s M_CONNECT message: Invalid state %s\n",
+                            action, conn_state_repr(state));
                     return -1;
                 }
 
@@ -726,8 +726,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_CONNECT_R:
             if (state != AWAITCON) {
-                PE("Cannot %s M_CONNECT_R message: Invalid state %d\n",
-                                    action, state);
+                PE("Cannot %s M_CONNECT_R message: Invalid state %s\n",
+                                    action, conn_state_repr(state));
                 return -1;
             }
             state = CONNECTED;
@@ -735,8 +735,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_RELEASE:
             if (state != CONNECTED) {
-                PE("Cannot %s M_RELEASE message: Invalid state %d\n",
-                                    action, state);
+                PE("Cannot %s M_RELEASE message: Invalid state %s\n",
+                                    action, conn_state_repr(state));
                 return -1;
             }
             rina_name_free(&local_appl);
@@ -746,8 +746,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_RELEASE_R:
             if (state != AWAITCLOSE) {
-                PE("Cannot %s M_RELEASE message: Invalid state %d\n",
-                                    action, state);
+                PE("Cannot %s M_RELEASE message: Invalid state %s\n",
+                                    action, conn_state_repr(state));
                 return -1;
             }
             state = NONE;
@@ -756,8 +756,9 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
         default:
             /* All the operational messages. */
             if (state != CONNECTED) {
-                PE("Cannot %s %s message: Invalid state %d\n",
-                    action, opcode_names_table[m->op_code], state);
+                PE("Cannot %s %s message: Invalid state %s\n",
+                    action, opcode_names_table[m->op_code],
+                    conn_state_repr(state));
                 return -1;
             }
     }

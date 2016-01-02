@@ -5,13 +5,12 @@
 using namespace std;
 
 
-Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
-                   int fd, unsigned int port_id_)
+Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
 {
     rib = rib_;
     ipcp_name = RinaName(name);
-    flow_fd = fd;
-    port_id = port_id_;
+    flow_fd = -1;
+    port_id = 0; /* Not valid. */
     conn = NULL;
     enrollment_state = NONE;
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
@@ -613,28 +612,18 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     return ret;
 }
 
-int
-uipcp_rib::add_neighbor(const struct rina_name *neigh_name,
-                       int neigh_flow_fd, unsigned int neigh_port_id,
-                       bool start_enrollment)
+Neighbor *
+uipcp_rib::add_neighbor(const struct rina_name *neigh_name)
 {
     RinaName _neigh_name_(neigh_name);
     string neigh_name_s = static_cast<string>(_neigh_name_);
-    map<string, Neighbor>::iterator mit;
 
-    mit = neighbors.find(neigh_name_s);
-    if (mit == neighbors.end()) {
+    if (!neighbors.count(neigh_name_s)) {
         neighbors[neigh_name_s] =
-                Neighbor(this, neigh_name, neigh_flow_fd, neigh_port_id);
-        mit = neighbors.find(neigh_name_s);
-        assert(mit != neighbors.end());
+                Neighbor(this, neigh_name);
     }
 
-    if (start_enrollment) {
-        return mit->second.enroll_fsm_run(NULL);
-    }
-
-    return 0;
+    return &neighbors[neigh_name_s];
 }
 
 int
@@ -780,39 +769,81 @@ uipcp_rib::lookup_neigh_by_name(const RinaName& name)
     return neighbors.find(name);
 }
 
-extern "C"
-int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
+int
+Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 {
-    struct uipcp *uipcp = rib->uipcp;
-    unsigned int port_id;
-    int flow_fd;
+    struct rlite_ipcp *info;
+    unsigned int port_id_;
+    struct rina_name neigh_name;
+    int flow_fd_;
     int ret;
 
-    /* Allocate a flow for the enrollment. */
-    ret = rlite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
-                         &req->ipcp_name, &req->neigh_ipcp_name, NULL,
-                         &port_id, 2000, uipcp->ipcp_id);
-    if (ret) {
-        goto err;
-    }
-
-    flow_fd = rlite_open_appl_port(port_id);
-    if (flow_fd < 0) {
-        goto err;
-    }
-
-    /* Start the enrollment procedure as initiator. */
-    ret = rib->add_neighbor(&req->neigh_ipcp_name, flow_fd, port_id,
-                            true);
-
-    if (ret == 0) {
+    if (has_mgmt_flow()) {
+        PI("Management flow already allocated\n");
         return 0;
     }
 
-    close(flow_fd);
+    info = rib->ipcp_info();
+    ipcp_name.rina_name_fill(&neigh_name);
 
-err:
-    return -1;
+    /* Allocate a flow for the enrollment. */
+    ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, 0, NULL,
+                         &info->ipcp_name, &neigh_name, NULL,
+                         &port_id_, 2000, info->ipcp_id);
+    if (ret) {
+        PE("Failed to allocate a flow towards neighbor\n");
+        return -1;
+    }
+
+    flow_fd_ = rlite_open_appl_port(port_id);
+    if (flow_fd_ < 0) {
+        PE("Failed to access the flow towards the neighbor\n");
+        return -1;
+    }
+
+    port_id = port_id_;
+    flow_fd = flow_fd_;
+
+    return 0;
+}
+
+int
+Neighbor::add_flow(int flow_fd_, unsigned int port_id_)
+{
+    if (has_mgmt_flow()) {
+        PI("Management flow already allocated\n");
+        return 0;
+    }
+
+    flow_fd = flow_fd_;
+    port_id = port_id_;
+
+    return 0;
+}
+
+extern "C"
+int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
+{
+    Neighbor *neigh;
+    int ret;
+
+    neigh = rib->add_neighbor(&req->neigh_ipcp_name);
+    if (!neigh) {
+        PE("Failed to add neighbor\n");
+        return -1;
+    }
+
+    ret = neigh->alloc_flow(&req->supp_dif_name);
+    if (ret) {
+        return ret;
+    }
+
+    assert(neigh->has_mgmt_flow());
+
+    /* Start the enrollment procedure as initiator. */
+    neigh->enroll_fsm_run(NULL);
+
+    return 0;
 }
 
 extern "C" int
@@ -820,8 +851,16 @@ rib_neighbor_flow(struct uipcp_rib *rib,
                   const struct rina_name *neigh_name,
                   int neigh_fd, unsigned int neigh_port_id)
 {
+    Neighbor *neigh;
+
     /* Start the enrollment procedure as slave. */
-    return rib->add_neighbor(neigh_name, neigh_fd, neigh_port_id, false);
+    neigh = rib->add_neighbor(neigh_name);
+    if (!neigh) {
+        PE("Failed to add neighbor\n");
+        return -1;
+    }
+
+    return neigh->add_flow(neigh_fd, neigh_port_id);
 }
 
 extern "C" int
