@@ -381,7 +381,7 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
 }
 COMMON_EXPORT(rina_name_copy);
 
-COMMON_STATIC void
+COMMON_STATIC int
 __rina_name_fill(struct rina_name *name, const char *apn,
                  const char *api, const char *aen, const char *aei,
                  int maysleep)
@@ -390,14 +390,26 @@ __rina_name_fill(struct rina_name *name, const char *apn,
     name->api = (api && strlen(api)) ? COMMON_STRDUP(api, maysleep) : NULL;
     name->aen = (aen && strlen(aen)) ? COMMON_STRDUP(aen, maysleep) : NULL;
     name->aei = (aei && strlen(aei)) ? COMMON_STRDUP(aei, maysleep) : NULL;
+
+    if ((apn && strlen(apn) && !name->apn) ||
+            (api && strlen(api) && !name->api) ||
+            (aen && strlen(aen) && !name->aen) ||
+            (aei && strlen(aei) && !name->aei)) {
+        rina_name_free(name);
+        PE("FAILED\n");
+        return -1;
+    }
+
+    return 0;
+
 }
 COMMON_EXPORT(__rina_name_fill);
 
-void
+int
 rina_name_fill(struct rina_name *name, const char *apn,
                const char *api, const char *aen, const char *aei)
 {
-    __rina_name_fill(name, apn, api, aen, aei, 1);
+    return __rina_name_fill(name, apn, api, aen, aei, 1);
 }
 COMMON_EXPORT(rina_name_fill);
 

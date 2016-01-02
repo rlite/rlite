@@ -38,15 +38,15 @@ int rina_name_copy(struct rina_name *dst, const struct rina_name *src);
 char *rina_name_to_string(const struct rina_name *name);
 int rina_name_from_string(const char *str, struct rina_name *name);
 int rina_name_cmp(const struct rina_name *one, const struct rina_name *two);
-void rina_name_fill(struct rina_name *name, const char *apn,
-                    const char *api, const char *aen, const char *aei);
+int rina_name_fill(struct rina_name *name, const char *apn,
+                   const char *api, const char *aen, const char *aei);
 int rina_name_valid(const struct rina_name *name);
 
 void flow_config_dump(const struct rina_flow_config *c);
 
 #ifdef __KERNEL__
 /* GFP variations of some of the functions above. */
-void __rina_name_fill(struct rina_name *name, const char *apn,
+int __rina_name_fill(struct rina_name *name, const char *apn,
                       const char *api, const char *aen, const char *aei,
                       int maysleep);
 
