@@ -119,10 +119,10 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
 
-    lower_flow = pduft_lookup(priv, flow->pduft_dest_addr);
+    lower_flow = pduft_lookup(priv, flow->remote_addr);
     if (unlikely(!lower_flow)) {
         PD("%s: No route to IPCP %lu, dropping packet\n", __func__,
-            (long unsigned)flow->pduft_dest_addr);
+            (long unsigned)flow->remote_addr);
         rina_buf_free(rb);
         return 0;
     }
@@ -132,7 +132,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     rina_buf_pci_push(rb);
 
     pci = RINA_BUF_PCI(rb);
-    pci->dst_addr = flow->pduft_dest_addr;
+    pci->dst_addr = flow->remote_addr;
     pci->src_addr = ipcp->addr;
     pci->conn_id.qos_id = 0;
     pci->conn_id.dst_cep = flow->remote_port;

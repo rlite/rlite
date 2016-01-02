@@ -1265,7 +1265,8 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     flow_entry->remote_addr = remote_addr;
 
     PI("%s: Flow allocation response arrived to IPC process %u, "
-            "port-id %u\n", __func__, ipcp->id, local_port);
+            "port-id %u, remote addr %llu\n", __func__, ipcp->id,
+            local_port, (long long unsigned)remote_addr);
 
     ret = rina_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
             flow_entry->event_id,

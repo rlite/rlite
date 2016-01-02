@@ -220,6 +220,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     req->ipcp_id = uipcp->ipcp_id;
     req->local_port = local_port;
     req->remote_port = remote_port;
+    req->remote_addr = remote_addr;
     req->response = response;
 
     PD("Issuing UIPCP_FA_RESP_ARRIVED message...\n");
