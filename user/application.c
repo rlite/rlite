@@ -119,7 +119,6 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 
 static int
 application_register_req(struct application *application,
-                         int wait_for_completion,
                          int reg, unsigned int ipcp_id,
                          struct rina_name *application_name)
 {
@@ -143,7 +142,7 @@ application_register_req(struct application *application,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     resp = issue_request(&application->loop, RMB(req),
-                         sizeof(*req), 0, wait_for_completion, &result);
+                         sizeof(*req), 0, 0, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -222,7 +221,7 @@ application_register(struct application *application, int reg,
     }
 
     /* Forward the request to the kernel. */
-    return application_register_req(application, 1, reg, ipcp_id,
+    return application_register_req(application, reg, ipcp_id,
                                      application_name);
 }
 

@@ -92,7 +92,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
 
 /* Destroy an IPC process. */
 static int
-ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
+ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 {
     struct rina_kmsg_ipcp_destroy *msg;
     struct rina_msg_base *resp;
@@ -112,7 +112,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
     printf("Requesting IPC process destruction...\n");
 
     resp = issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), 0, wait_for_completion, &result);
+                         sizeof(*msg), 0, 0, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -122,7 +122,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
 }
 
 static int
-assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
+assign_to_dif(struct ipcm *ipcm,
               uint16_t ipcp_id, struct rina_name *dif_name)
 {
     struct rina_kmsg_assign_to_dif *req;
@@ -144,7 +144,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting DIF assignment...\n");
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, wait_for_completion, &result);
+                         0, 0, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -154,7 +154,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
 }
 
 static int
-application_register(struct ipcm *ipcm, int wait_for_completion,
+application_register(struct ipcm *ipcm,
                      int reg, unsigned int ipcp_id,
                      struct rina_name *application_name)
 {
@@ -179,7 +179,7 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
 
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, wait_for_completion, &result);
+                         0, 0, &result);
     assert(!resp);
     printf("%s: result: %d\n", __func__, result);
 
@@ -210,7 +210,7 @@ test(struct ipcm *ipcm)
 
     /* Assign to DIF. */
     rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
-    result = assign_to_dif(ipcm, 0, 0, &name);
+    result = assign_to_dif(ipcm, 0, &name);
     rina_name_free(&name);
 
     /* Fetch IPC processes table. */
@@ -218,25 +218,25 @@ test(struct ipcm *ipcm)
 
     /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 1, 0, &name);
+    application_register(ipcm, 1, 0, &name);
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 1, 1, &name);
+    application_register(ipcm, 1, 1, &name);
     rina_name_free(&name);
 
     /* Unregister the applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 0, 0, &name);
+    application_register(ipcm, 0, 0, &name);
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 0, 1, &name);
+    application_register(ipcm, 0, 1, &name);
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    ipcp_destroy(ipcm, 0, 0);
-    ipcp_destroy(ipcm, 0, 1);
+    ipcp_destroy(ipcm, 0);
+    ipcp_destroy(ipcm, 1);
 
     return 0;
 }
@@ -303,7 +303,7 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
         printf("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        resp.result = ipcp_destroy(ipcm, 1, ipcp_id);
+        resp.result = ipcp_destroy(ipcm, ipcp_id);
     }
 
     return rina_appl_response(sfd, RMB(req), &resp);
@@ -325,7 +325,7 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        resp.result = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name);
+        resp.result = assign_to_dif(ipcm, ipcp_id, &req->dif_name);
     }
 
     return rina_appl_response(sfd, RMB(req), &resp);
@@ -346,7 +346,7 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        resp.result = application_register(ipcm, 1, 1, ipcp_id,
+        resp.result = application_register(ipcm, 1, ipcp_id,
                                       &req->application_name);
     }
 
@@ -368,7 +368,7 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        resp.result = application_register(ipcm, 1, 0, ipcp_id,
+        resp.result = application_register(ipcm, 0, ipcp_id,
                                      &req->application_name);
     }
 

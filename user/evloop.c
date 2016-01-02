@@ -271,6 +271,15 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
 
     *result = 0;
 
+    if (!has_response && wait_for_completion) {
+        /* It does not make any sense to wait if there is not going
+         * to be a response to wait for. */
+        printf("%s: has_response == 0 --> wait_for_completion "
+                "== 0\n", __func__);
+        *result = EINVAL;
+        return NULL;
+    }
+
     if (has_response) {
         /* Store the request in the pending queue before issuing the request
          * itself to the kernel. This is necessary in order to avoid race
