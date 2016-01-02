@@ -1515,72 +1515,6 @@ upper_ipcp_flow_bind(uint16_t upper_ipcp_id, struct flow_entry *flow)
 }
 
 static int
-rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
-                     uint32_t event_id,
-                     const struct rina_name *local_appl,
-                     const struct rina_name *remote_appl,
-                     struct rina_kmsg_fa_req *req)
-{
-    struct ipcp_entry *ipcp_entry = NULL;
-    struct flow_entry *flow_entry = NULL;
-    int ret = -EINVAL;
-
-    /* Find the IPC process entry corresponding to ipcp_id. */
-    ipcp_entry = ipcp_get(ipcp_id);
-    if (!ipcp_entry) {
-        goto out;
-    }
-
-    /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, upper, event_id, local_appl,
-                   remote_appl, NULL, &flow_entry,
-                   GFP_KERNEL);
-    if (ret) {
-        goto out;
-    }
-
-    if (ipcp_entry->ops.flow_allocate_req) {
-        /* This IPCP handles the flow allocation in kernel-space. This is
-         * currently true for shim IPCPs. */
-        ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
-    } else {
-        if (!ipcp_entry->uipcp) {
-            /* No userspace IPCP to use, this happens when no uipcp is assigned
-             * to this IPCP. */
-            ret = -ENXIO;
-        } else {
-            /* This IPCP handles the flow allocation in user-space. This is
-             * currently true for normal IPCPs.
-             * Reflect the flow allocation request message to userspace. */
-            req->event_id = 0;
-            req->local_port = flow_entry->local_port;
-            req->local_cep = flow_entry->local_cep;
-            ret = rina_upqueue_append(ipcp_entry->uipcp,
-                    (const struct rina_msg_base *)req);
-        }
-    }
-
-    if (!ret && req->upper_ipcp_id != 0xffff) {
-        ret = upper_ipcp_flow_bind(req->upper_ipcp_id, flow_entry);
-    }
-
-out:
-    ipcp_put(ipcp_entry);
-    if (ret) {
-        if (flow_entry) {
-            flow_put(flow_entry);
-        }
-
-        return ret;
-    }
-
-    printk("Flow allocation requested to IPC process %u, "
-                "port-id %u\n", ipcp_id, flow_entry->local_port);
-
-    return 0;
-}
-
-static int
 rina_appl_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_appl_register *req =
@@ -1712,14 +1646,64 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_fa_req *req =
                     (struct rina_kmsg_fa_req *)bmsg;
-    int ret;
+    struct ipcp_entry *ipcp_entry = NULL;
+    struct flow_entry *flow_entry = NULL;
     struct upper_ref upper = {
             .rc = rc,
         };
+    int ret = -EINVAL;
 
-    ret = rina_fa_req_internal(req->ipcp_id, upper, req->event_id,
-                               &req->local_appl,
-                               &req->remote_appl, req);
+    /* Find the IPC process entry corresponding to ipcp_id. */
+    ipcp_entry = ipcp_get(req->ipcp_id);
+    if (!ipcp_entry) {
+        goto out;
+    }
+
+    /* Allocate a port id and the associated flow entry. */
+    ret = flow_add(ipcp_entry, upper, req->event_id, &req->local_appl,
+                   &req->remote_appl, NULL, &flow_entry,
+                   GFP_KERNEL);
+    if (ret) {
+        goto out;
+    }
+
+    if (ipcp_entry->ops.flow_allocate_req) {
+        /* This IPCP handles the flow allocation in kernel-space. This is
+         * currently true for shim IPCPs. */
+        ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+    } else {
+        if (!ipcp_entry->uipcp) {
+            /* No userspace IPCP to use, this happens when no uipcp is assigned
+             * to this IPCP. */
+            ret = -ENXIO;
+        } else {
+            /* This IPCP handles the flow allocation in user-space. This is
+             * currently true for normal IPCPs.
+             * Reflect the flow allocation request message to userspace. */
+            req->event_id = 0;
+            req->local_port = flow_entry->local_port;
+            req->local_cep = flow_entry->local_cep;
+            ret = rina_upqueue_append(ipcp_entry->uipcp,
+                    (const struct rina_msg_base *)req);
+        }
+    }
+
+    if (!ret && req->upper_ipcp_id != 0xffff) {
+        ret = upper_ipcp_flow_bind(req->upper_ipcp_id, flow_entry);
+    }
+
+out:
+    ipcp_put(ipcp_entry);
+    if (ret) {
+        if (flow_entry) {
+            flow_put(flow_entry);
+        }
+
+    } else {
+        printk("Flow allocation requested to IPC process %u, "
+               "port-id %u\n", req->ipcp_id, flow_entry->local_port);
+    }
+
     if (ret == 0) {
         return 0;
     }
