@@ -136,7 +136,6 @@ struct dtp {
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
-    struct delayed_work remove;
     struct list_head seqq;
     unsigned int seqq_len;
     struct list_head rtxq;
@@ -169,6 +168,7 @@ struct flow_entry {
 
     void                *priv;
 
+    struct delayed_work remove;
     unsigned int        refcnt;
     bool                never_bound;
     struct hlist_node   node;

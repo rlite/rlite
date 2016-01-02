@@ -698,6 +698,36 @@ tx_completion_func(unsigned long arg)
     }
 }
 
+static void
+remove_flow_work(struct work_struct *work)
+{
+    struct flow_entry *flow = container_of(work, struct flow_entry, remove.work);
+    struct dtp *dtp = &flow->dtp;
+    struct rina_buf *rb, *tmp;
+
+    spin_lock_bh(&dtp->lock);
+
+    PD("Delayed flow removal, dropping %u PDUs from cwq\n",
+            dtp->cwq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+        dtp->cwq_len--;
+    }
+
+    PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
+            dtp->rtxq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+        dtp->rtxq_len--;
+    }
+
+    spin_unlock_bh(&dtp->lock);
+
+    flow_put(flow);
+}
+
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
@@ -740,6 +770,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         spin_lock_init(&entry->rmtq_lock);
         tasklet_init(&entry->tx_completion, tx_completion_func,
                      (unsigned long)entry);
+        INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
         dtp_init(&entry->dtp);
         if (flowcfg) {
             memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
@@ -791,7 +822,7 @@ flow_put(struct flow_entry *entry)
         goto out;
     }
 
-    if (entry->cfg.dtcp_present && !work_busy(&dtp->remove.work)) {
+    if (entry->cfg.dtcp_present && !work_busy(&entry->remove.work)) {
         /* If DTCP is present, check if we should postopone flow
          * removal. The work_busy() function is invoked to make sure
          * that this flow_entry() invocation is not due to a postponed
@@ -813,7 +844,7 @@ flow_put(struct flow_entry *entry)
         spin_unlock_bh(&dtp->lock);
 
         if (postpone) {
-            schedule_delayed_work(&dtp->remove, 2 * HZ);
+            schedule_delayed_work(&entry->remove, 2 * HZ);
             /* Reference counter is zero here, but since the delayed
              * worker is going to use the flow, we reset the reference
              * counter to 1. The delayed worker will invoke flow_put()

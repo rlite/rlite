@@ -25,43 +25,12 @@
 #include "rinalite-kernel.h"
 
 
-static void
-remove_flow_work(struct work_struct *work)
-{
-    struct dtp *dtp = container_of(work, struct dtp, remove.work);
-    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
-    struct rina_buf *rb, *tmp;
-
-    spin_lock_bh(&dtp->lock);
-
-    PD("Delayed flow removal, dropping %u PDUs from cwq\n",
-            dtp->cwq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-        list_del(&rb->node);
-        rina_buf_free(rb);
-        dtp->cwq_len--;
-    }
-
-    PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
-            dtp->rtxq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        list_del(&rb->node);
-        rina_buf_free(rb);
-        dtp->rtxq_len--;
-    }
-
-    spin_unlock_bh(&dtp->lock);
-
-    flow_put(flow);
-}
-
 void
 dtp_init(struct dtp *dtp)
 {
     spin_lock_init(&dtp->lock);
     init_timer(&dtp->snd_inact_tmr);
     init_timer(&dtp->rcv_inact_tmr);
-    INIT_DELAYED_WORK(&dtp->remove, remove_flow_work);
     INIT_LIST_HEAD(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
     INIT_LIST_HEAD(&dtp->seqq);
