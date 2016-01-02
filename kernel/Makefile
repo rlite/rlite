@@ -1,5 +1,5 @@
 obj-m += rinalite.o
-rinalite-y := rinalite-main.o rinalite-utils.o rina-kernel-numtables.o rina-bufs.o rina-efcp.o
+rinalite-y := main.o rinalite-utils.o rina-kernel-numtables.o bufs.o efcp-utils.o
 
 obj-m += rinalite-shim-loopback.o
 rinalite-shim-loopback-y := shim-loopback.o
