@@ -395,8 +395,8 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         if (cfg->fc.fc_type == RINA_FC_T_WIN) {
-            PD("%s: rcv_lwe [%lu] --> [%lu]\n", __func__,
-                    (long unsigned)flow->dtp.rcv_lwe,
+            PD("%s: rcv_rwe [%lu] --> [%lu]\n", __func__,
+                    (long unsigned)flow->dtp.rcv_rwe,
                     (long unsigned)(flow->dtp.rcv_lwe +
                         flow->cfg.dtcp.fc.cfg.w.initial_credit));
             /* We should not unconditionally increment the receiver RWE,
@@ -486,9 +486,10 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         PD("%s: Lost control PDUs: [%lu] --> [%lu]\n", __func__,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd,
             (long unsigned)pcic->base.seqnum);
-    } else if (unlikely(pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
+    } else if (unlikely(dtp->last_ctrl_seq_num_rcvd &&
+                    pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
         /* Duplicated control PDU: just drop it. */
-        PD("%s: Duplicated control PDU [%lu], last [%lu]", __func__,
+        PD("%s: Duplicated control PDU [%lu], last [%lu]\n", __func__,
             (long unsigned)pcic->base.seqnum,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 
@@ -557,7 +558,7 @@ out:
 
         PD("%s: sending [%lu] from cwq\n", __func__,
                 (long unsigned)pci->seqnum);
-        rmt_tx(ipcp, pci->seqnum, qrb);
+        rmt_tx(ipcp, pci->dst_addr, qrb);
     }
 
     return 0;
