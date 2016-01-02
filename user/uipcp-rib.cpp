@@ -347,11 +347,6 @@ Neighbor::none(const CDAPMessage *rm)
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
         conn = new CDAPConn(flow_fd, 1);
-        if (!conn) {
-            PE("Out of memory\n");
-            abort();
-            return -1;
-        }
 
         ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
                           &ipcp_name);
@@ -672,10 +667,13 @@ uipcp_rib::address_allocate() const
 extern "C" struct uipcp_rib *
 rib_create(struct uipcp *uipcp)
 {
-    struct uipcp_rib *rib = new uipcp_rib(uipcp);
+    struct uipcp_rib *rib = NULL;
 
-    if (!rib) {
-        return NULL;
+    try {
+        rib = new uipcp_rib(uipcp);
+
+    } catch (std::bad_alloc) {
+        PE("Out of memory\n");
     }
 
     return rib;
@@ -819,28 +817,27 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     list<Neighbor>::iterator neigh;
     CDAPMessage *m;
 
-    /* Lookup neighbor by port id. */
-    neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
-    if (neigh == rib->neighbors.end()) {
-        PE("Received message from unknown port id %d\n",
-            mhdr->local_port);
-        return -1;
-    }
-
-    if (!neigh->conn) {
-        neigh->conn = new CDAPConn(neigh->flow_fd, 1);
-        if (!neigh->conn) {
-            PE("Out of memory\n");
-            neigh->abort();
+    try {
+        /* Lookup neighbor by port id. */
+        neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
+        if (neigh == rib->neighbors.end()) {
+            PE("Received message from unknown port id %d\n",
+                    mhdr->local_port);
             return -1;
         }
-    }
 
-    /* Deserialize the received CDAP message. */
-    m = neigh->conn->msg_deser(serbuf, serlen);
-    if (!m) {
-        PE("msg_deser() failed\n");
-        return -1;
+        if (!neigh->conn) {
+            neigh->conn = new CDAPConn(neigh->flow_fd, 1);
+        }
+
+        /* Deserialize the received CDAP message. */
+        m = neigh->conn->msg_deser(serbuf, serlen);
+        if (!m) {
+            PE("msg_deser() failed\n");
+            return -1;
+        }
+    } catch (std::bad_alloc) {
+        PE("Out of memory\n");
     }
 
     /* Feed the enrollment state machine. */
