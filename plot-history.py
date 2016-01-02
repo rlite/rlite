@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 # Requires the following packages
 #  math/py-matplotlib
 #  math/py-numpy

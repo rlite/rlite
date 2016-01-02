@@ -1,6 +1,6 @@
 #!/bin/bash
 
-git log --pretty=format:"%H%n" | tac > .shas
+git log --no-merges --pretty=format:"%H%n" | tac > .shas
 
 test -f hist && rm hist
 
@@ -19,7 +19,8 @@ for l in $(cat .shas); do
     git checkout $s &> /dev/null
 
     # count the number lines
-    c=$(find . -type f -and \( -name "*.c" -or -name "*.h" \) | xargs wc -l | tail -n 1 | sed 's|^[ \t]\+||g' | cut -d' ' -f 1)
+    c=$(find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | xargs wc -l | tail -n 1 | sed 's|^[ \t]\+||g' | cut -d' ' -f 1)
+    echo "$t: $c"
     echo $t $c >> hist
 done
 
