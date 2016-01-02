@@ -23,6 +23,7 @@ struct InetName {
     InetName(const struct sockaddr_in& a) : addr(a) { }
 
     bool operator<(const InetName& other) const;
+    operator std::string() const;
 };
 
 bool
@@ -33,6 +34,18 @@ InetName::operator<(const InetName& other) const
     }
 
     return addr.sin_port < other.addr.sin_port;
+}
+
+InetName::operator std::string() const
+{
+    char strbuf[20];
+    stringstream ss;
+
+    inet_ntop(AF_INET, &addr.sin_addr, strbuf, sizeof(strbuf));
+
+    ss << strbuf << ":" << ntohs(addr.sin_port);
+
+    return ss.str();
 }
 
 struct RinaName {
@@ -47,6 +60,8 @@ struct RinaName {
     bool operator<(const RinaName& other) const {
         return name_s < other.name_s;
     }
+
+    operator std::string() const { return name_s; }
 };
 
 RinaName::RinaName(const string& n) : name_s(n)
@@ -78,9 +93,9 @@ struct Gateway {
 
 Gateway gw;
 
-int main()
+static int
+parse_conf(const char *confname)
 {
-    const char *confname = "rina-gw.conf";
     ifstream fin(confname);
 
     if (fin.fail()) {
@@ -148,6 +163,39 @@ int main()
             }
         }
     }
+
+    return 0;
+}
+
+static int
+setup()
+{
+    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
+                                    mit != gw.srv_map.end(); mit++) {
+        cout << "SRV: " << static_cast<string>(mit->first) << " --> "
+                << static_cast<string>(mit->second) << endl;
+    }
+
+    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
+                                    mit != gw.dst_map.end(); mit++) {
+        cout << "DST: " << static_cast<string>(mit->first) << " --> "
+                << static_cast<string>(mit->second) << endl;
+    }
+
+    return 0;
+}
+
+int main()
+{
+    const char *confname = "rina-gw.conf";
+    int ret;
+
+    ret = parse_conf(confname);
+    if (ret) {
+        return ret;
+    }
+
+    setup();
 
     return 0;
 }
