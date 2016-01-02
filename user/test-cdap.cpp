@@ -45,7 +45,9 @@ struct CDAPMessage {
     bool is(obj_value_t tt) const { return obj_value.ty == tt; }
 
     CDAPMessage(gpb::opCode_t);
+
     CDAPMessage(const gpb::CDAPMessage& gm);
+    operator gpb::CDAPMessage() const;
 
 private:
     /* Representation of the object value. */
@@ -83,7 +85,7 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
     obj_name = gm.objname();
     obj_inst = gm.objinst();
 
-    /* Decode object value. */
+    /* Convert object value. */
     if (objvalue.has_intval()) {
         obj_value.u.i32 = objvalue.intval();
         obj_value.ty = I32;
@@ -147,6 +149,81 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 
     result_reason = gm.resultreason();
     version = gm.version();
+}
+
+CDAPMessage::operator gpb::CDAPMessage() const
+{
+    gpb::CDAPMessage gm;
+    gpb::objVal_t *objvalue = new gpb::objVal_t();
+    gpb::authValue_t *authvalue = new gpb::authValue_t();
+
+    gm.set_abssyntax(abs_syntax);
+    gm.set_opcode(op_code);
+    gm.set_invokeid(invoke_id);
+    gm.set_flags(flags);
+    gm.set_objclass(obj_class);
+    gm.set_objname(obj_name);
+    gm.set_objinst(obj_inst);
+
+    /* Convert object value. */
+    switch (obj_value.ty) {
+        case I32:
+            objvalue->set_intval(obj_value.u.i32);
+            break;
+
+        case I64:
+            objvalue->set_int64val(obj_value.u.i64);
+            break;
+
+        case STRING:
+            objvalue->set_strval(obj_value.str);
+            break;
+
+        case FLOAT:
+            objvalue->set_floatval(obj_value.u.fp_single);
+            break;
+
+        case DOUBLE:
+            objvalue->set_doubleval(obj_value.u.fp_double);
+            break;
+
+        case BOOL:
+            objvalue->set_boolval(obj_value.u.boolean);
+            break;
+
+        case BYTES:
+            objvalue->set_byteval(obj_value.str);
+            break;
+    }
+
+    if (obj_value.ty != NONE) {
+        gm.set_allocated_objvalue(objvalue);
+    }
+
+    gm.set_result(result);
+    gm.set_scope(scope);
+    gm.set_filter(filter);
+    gm.set_authmech(auth_mech);
+
+    authvalue->set_authname(auth_value.name);
+    authvalue->set_authpassword(auth_value.password);
+    authvalue->set_authother(auth_value.other);
+    gm.set_allocated_authvalue(authvalue);
+
+    gm.set_destapname(std::string(dst_appl.apn));
+    gm.set_destapinst(std::string(dst_appl.api));
+    gm.set_destaename(std::string(dst_appl.aen));
+    gm.set_destaeinst(std::string(dst_appl.aei));
+
+    gm.set_srcapname(std::string(src_appl.apn));
+    gm.set_srcapinst(std::string(src_appl.api));
+    gm.set_srcaename(std::string(src_appl.aen));
+    gm.set_srcaeinst(std::string(src_appl.aei));
+
+    gm.set_resultreason(result_reason);
+    gm.set_version(version);
+
+    return gm;
 }
 
 int main()
