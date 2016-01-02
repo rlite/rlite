@@ -782,6 +782,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     uint64_t seqnum = pci->seqnum;
     struct rina_buf *crb = NULL;
     unsigned int a = 0;
+    uint64_t gap;
     struct dtp *dtp;
     bool deliver;
     bool drop;
@@ -867,7 +868,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         /* This may go in a gap or be a duplicate
          * amongst the gaps. */
 
-        PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
+        PD("%s: Possible gap fill, RLWE would jump %lu --> %lu\n",
                 __func__, (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
 
@@ -876,7 +877,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     } else {
         /* Out of order. */
-        PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+        PD("%s: Out of order packet, RLWE would jump %lu --> %lu\n",
                 __func__, (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
     }
@@ -884,6 +885,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     if (seqnum > dtp->max_seq_num_rcvd) {
         dtp->max_seq_num_rcvd = seqnum;
     }
+
+    gap = seqnum - dtp->rcv_lwe;
 
     /* Here we may have received a PDU that it's not the next expected
      * sequence number or generally that does no meet the max_sdu_gap
@@ -905,9 +908,10 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
      */
     drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) &&
             !a && !flow->cfg.dtcp.rtx_control &&
-            seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
+            gap > flow->cfg.max_sdu_gap);
 
-    deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
+    deliver = !drop && (gap <= flow->cfg.max_sdu_gap) &&
+                (!flow->cfg.dtcp.rtx_control || !gap);
 
     if (deliver) {
         struct list_head qrbs;
