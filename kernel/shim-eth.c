@@ -817,9 +817,9 @@ shim_eth_skb_destructor(struct sk_buff *skb)
 
 static int
 rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
-                        struct flow_entry *flow,
-                        struct rlite_buf *rb,
-                        bool maysleep)
+                         struct flow_entry *flow,
+                         struct rlite_buf *rb,
+                         bool maysleep)
 {
     struct rlite_shim_eth *priv = ipcp->priv;
     struct net_device *netdev = priv->netdev;
@@ -828,7 +828,10 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     struct arpt_entry *entry = flow->priv;
     int ret;
 
-    BUG_ON(!entry);
+    if (unlikely(!entry)) {
+        RPD(3, "%s() called on deallocated entry\n", __func__);
+        return -ENXIO;
+    }
 
     if (unlikely(rb->len > ETH_DATA_LEN)) {
         RPD(5, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);

@@ -299,8 +299,10 @@ static int
 rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
        bool maysleep)
 {
+    DECLARE_WAITQUEUE(wait, current);
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
+    int ret;
 
     lower_flow = pduft_lookup((struct rlite_normal *)ipcp->priv,
                               remote_addr);
@@ -311,63 +313,61 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
         return -EHOSTUNREACH;
     }
 
-    if (lower_flow) {
-        /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
-        DECLARE_WAITQUEUE(wait, current);
-        int ret;
-
-        lower_ipcp = lower_flow->txrx.ipcp;
-        BUG_ON(!lower_ipcp);
-
-        if (maysleep) {
-            add_wait_queue(lower_flow->txrx.tx_wqh, &wait);
-        }
-
-        for (;;) {
-            current->state = TASK_INTERRUPTIBLE;
-
-            /* Push down to the underlying IPCP. */
-            ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow,
-                                            rb, maysleep);
-
-            if (unlikely(ret == -EAGAIN)) {
-                if (!maysleep) {
-                    /* Enqueue in the RMT queue, if possible. */
-
-                    spin_lock_bh(&lower_ipcp->rmtq_lock);
-                    if (lower_ipcp->rmtq_len < RMTQ_MAX_LEN) {
-                        rb->tx_compl_flow = lower_flow;
-                        list_add_tail(&rb->node, &lower_ipcp->rmtq);
-                        lower_ipcp->rmtq_len++;
-                    } else {
-                        RPD(5, "rmtq overrun: dropping PDU\n");
-                        rlite_buf_free(rb);
-                    }
-                    spin_unlock_bh(&lower_ipcp->rmtq_lock);
-
-                } else {
-                    /* Cannot restart system call from here... */
-
-                    /* No room to write, let's sleep. */
-                    schedule();
-                    continue;
-                }
-            }
-
-            break;
-        }
-
-        current->state = TASK_RUNNING;
-        if (maysleep) {
-            remove_wait_queue(lower_flow->txrx.tx_wqh, &wait);
-        }
-
-        return ret;
+    if (!lower_flow) {
+        /* This SDU gets loopbacked to this IPCP, since this is a
+         * self flow (flow->remote_addr == ipcp->addr). */
+        return ipcp->ops.sdu_rx(ipcp, rb);
     }
 
-    /* This SDU gets loopbacked to this IPCP, since this is a
-     * self flow (flow->remote_addr == ipcp->addr). */
-    return ipcp->ops.sdu_rx(ipcp, rb);
+    /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
+
+    lower_ipcp = lower_flow->txrx.ipcp;
+    BUG_ON(!lower_ipcp);
+
+    if (maysleep) {
+        add_wait_queue(lower_flow->txrx.tx_wqh, &wait);
+    }
+
+    for (;;) {
+        current->state = TASK_INTERRUPTIBLE;
+
+        /* Push down to the underlying IPCP. */
+        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow,
+                                        rb, maysleep);
+
+        if (unlikely(ret == -EAGAIN)) {
+            if (!maysleep) {
+                /* Enqueue in the RMT queue, if possible. */
+
+                spin_lock_bh(&lower_ipcp->rmtq_lock);
+                if (lower_ipcp->rmtq_len < RMTQ_MAX_LEN) {
+                    rb->tx_compl_flow = lower_flow;
+                    list_add_tail(&rb->node, &lower_ipcp->rmtq);
+                    lower_ipcp->rmtq_len++;
+                } else {
+                    RPD(5, "rmtq overrun: dropping PDU\n");
+                    rlite_buf_free(rb);
+                }
+                spin_unlock_bh(&lower_ipcp->rmtq_lock);
+
+            } else {
+                /* Cannot restart system call from here... */
+
+                /* No room to write, let's sleep. */
+                schedule();
+                continue;
+            }
+        }
+
+        break;
+    }
+
+    current->state = TASK_RUNNING;
+    if (maysleep) {
+        remove_wait_queue(lower_flow->txrx.tx_wqh, &wait);
+    }
+
+    return ret;
 }
 
 /* Called under DTP lock */
