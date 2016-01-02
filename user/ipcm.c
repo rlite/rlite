@@ -7,6 +7,9 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <signal.h>
 #include <rina/rina-ctrl.h>
 #include "pending_queue.h"
 #include <rina/rina-utils.h>
@@ -14,12 +17,25 @@
 
 /* IPC Manager data model. */
 struct ipcm {
+    /* File descriptor for the RINA control device ("/dev/rina-ctrl") */
     int rfd;
+
+    /* A FIFO queue that stores pending RINA events. */
     struct pending_queue pqueue;
+
+    /* What event-id to use for the next request issued to the kernel. */
     uint32_t event_id_counter;
+
+    /* Synchronization variables used to implement mutual exclusion between the
+     * event-loop thread and the script thead, and waiting for an event to
+     * happen. */
     pthread_mutex_t lock;
     int fetch_complete;
     pthread_cond_t fetch_complete_cond;
+
+    /* Unix domain socket file descriptor used to accept request from
+     * applications. */
+    int lfd;
 };
 
 static int
@@ -505,24 +521,85 @@ test(struct ipcm *ipcm)
     return ret;
 }
 
+#define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
+
+static void
+sigint_handler(int signum)
+{
+    unlink(UNIX_DOMAIN_SOCKNAME);
+    exit(EXIT_SUCCESS);
+}
+
 int main()
 {
     struct ipcm ipcm;
     pthread_t evloop_th;
+    struct sockaddr_un server_address;
+    struct sigaction sa;
     int ret;
 
-    /* Open the RINA control device and initialize the IPC Manager
-     * data model instance. */
+    /* Open the RINA control device. */
     ipcm.rfd = open("/dev/rina-ctrl", O_RDWR);
     if (ipcm.rfd < 0) {
         perror("open(/dev/rinactrl)");
         exit(EXIT_FAILURE);
     }
+
+    /* Set non-blocking operation for the RINA control device, so that
+     * the event-loop can synchronize with the kernel through select(). */
     ret = fcntl(ipcm.rfd, F_SETFL, O_NONBLOCK);
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
         exit(EXIT_FAILURE);
     }
+
+    /* Open a Unix domain socket to listen to. */
+    ipcm.lfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (ipcm.lfd < 0) {
+        perror("socket(AF_UNIX)");
+        exit(EXIT_FAILURE);
+    }
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sun_family = AF_UNIX;
+    strncpy(server_address.sun_path, UNIX_DOMAIN_SOCKNAME,
+            sizeof(server_address.sun_path) - 1);
+    if (unlink(UNIX_DOMAIN_SOCKNAME) == 0) {
+        /* This should not happen if everything behaves correctly.
+         * However, if something goes wrong, the Unix domain socket
+         * could still exist and so the following bind() would fail.
+         * This unlink() will clean up in this situation. */
+        printf("info: cleaned up existing unix domain socket\n");
+    }
+    ret = bind(ipcm.lfd, (struct sockaddr *)&server_address,
+                sizeof(server_address));
+    if (ret) {
+        perror("bind(AF_UNIX, path)");
+        exit(EXIT_FAILURE);
+    }
+    ret = listen(ipcm.lfd, 50);
+    if (ret) {
+        perror("listen(AF_UNIX)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Set an handler for SIGINT and SIGTERM so that we can remove
+     * the Unix domain socket used to access the IPCM server. */
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    ret = sigaction(SIGINT, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGINT)");
+        exit(EXIT_FAILURE);
+    }
+    ret = sigaction(SIGTERM, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGTERM)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Initialize the remaining field of the IPC Manager data model
+     * instance. */
     pthread_mutex_init(&ipcm.lock, NULL);
     pthread_cond_init(&ipcm.fetch_complete_cond, NULL);
     ipcm.fetch_complete = 0;
@@ -536,6 +613,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
+    /* Run the script thread. */
     test(&ipcm);
 
     ret = pthread_join(evloop_th, NULL);
