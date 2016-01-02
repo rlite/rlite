@@ -560,7 +560,19 @@ test(struct ipcm *ipcm)
 static int
 rina_appl_register(struct ipcm *ipcm, const struct rina_msg_base *b_req)
 {
-    printf("Received application register request\n");
+    struct ipcp *ipcp = NULL;
+    struct ipcp *cur;
+    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+
+    list_for_each_entry(cur, &ipcm->ipcps, node) {
+        if (rina_name_valid(&cur->dif_name) &&
+                rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
+            ipcp = cur;
+            break;
+        }
+    }
+
+    printf("Received application register request, selected %p\n", ipcp);
     return 0;
 }
 

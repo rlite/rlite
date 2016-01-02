@@ -387,3 +387,14 @@ rina_name_fill(struct rina_name *name, char *apn,
     name->aei = aei ? COMMON_STRDUP(aei) : NULL;
 }
 COMMON_EXPORT(rina_name_fill);
+
+int
+rina_name_valid(struct rina_name *name)
+{
+    if (!name || !name->apn || strlen(name->apn) == 0) {
+        return 0;
+    }
+
+    return 1;
+}
+COMMON_EXPORT(rina_name_valid);
