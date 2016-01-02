@@ -353,6 +353,8 @@ uipcps_update(struct uipcps *uipcps)
 
     ipcps_fetch(&loop);
 
+    ipcps_print(&loop);
+
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(ipcp, &loop.ipcps, node) {
         if (ipcp->dif_type == DIF_TYPE_NORMAL) {

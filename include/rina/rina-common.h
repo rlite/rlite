@@ -138,8 +138,9 @@ struct rina_flow_config {
 #define PI(formt, ...)
 #endif
 
-#define PN(format, ...)
 #define PE(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+
+#define NPD(format, ...)
 
 #ifdef __KERNEL__
 
@@ -156,8 +157,6 @@ struct rina_flow_config {
         if (__cnt++ < lps)                              \
         PD(format, ##__VA_ARGS__);                      \
     } while (0)
-
-#define NPD(format, ...)
 
 #endif
 

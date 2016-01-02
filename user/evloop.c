@@ -35,7 +35,7 @@ ipcp_fetch_resp(struct rina_evloop *loop,
         return 0;
     }
 
-    PN("%s: Fetch IPCP response id=%u, type=%u\n",
+    NPD("%s: Fetch IPCP response id=%u, type=%u\n",
        __func__, resp->ipcp_id, resp->dif_type);
 
     ipcp = malloc(sizeof(*ipcp));
@@ -71,7 +71,7 @@ ipcp_fetch(struct rina_evloop *loop, int *result)
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_FETCH;
 
-    PD("Requesting IPC processes fetch...\n");
+    NPD("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
            issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
@@ -137,8 +137,6 @@ ipcps_fetch(struct rina_evloop *loop)
                           RMB(resp));
         }
     }
-
-    ipcps_print(loop);
 
     return 0;
 }
@@ -274,7 +272,7 @@ evloop_function(void *arg)
             goto notify_requestor;
         }
 
-        PD("Message type %d received from kernel\n", resp->msg_type);
+        NPD("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler, without holding the loop lock. */
         ret = loop->handlers[resp->msg_type](loop, resp, req_entry->msg);
@@ -499,7 +497,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
     /* If not redefined, setup default fetch handler. */
     if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
-        PD("%s: setting default fetch handler\n", __func__);
+        NPD("%s: setting default fetch handler\n", __func__);
         loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 

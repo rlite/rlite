@@ -750,11 +750,18 @@ uipcps_fetch(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
     int ret;
+    int first = 1;
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         ret = ipcps_fetch(&uipcp->appl.loop);
         if (ret) {
             return ret;
+        }
+
+        if (first) {
+            /* This is just for debugging purposes. */
+            first = 0;
+            ipcps_print(&uipcp->appl.loop);
         }
     }
 
