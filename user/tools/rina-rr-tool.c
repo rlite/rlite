@@ -30,10 +30,11 @@ struct rina_rr {
 static int
 client(struct rina_rr *rr)
 {
-    int ret = 0;
+    const char *msg = "Hello guys, this is a test message!";
     char buf[SDU_SIZE_MAX];
-    int size = 20;
     struct pollfd pfd;
+    int ret = 0;
+    int size;
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
@@ -47,7 +48,8 @@ client(struct rina_rr *rr)
     pfd.fd = dfd;
     pfd.events = POLLIN;
 
-    memset(buf, 'x', size);
+    strncpy(buf, msg, SDU_SIZE_MAX);
+    size = strlen(buf) + 1;
 
     ret = write(dfd, buf, size);
     if (ret != size) {
@@ -72,8 +74,11 @@ client(struct rina_rr *rr)
     if (ret < 0) {
         perror("read(buf");
     }
+    buf[ret] = '\0';
 
     close(dfd);
+
+    PI("Response: '%s'\n", buf);
 
     return 0;
 }
@@ -119,6 +124,9 @@ server(struct rina_rr *rr)
             perror("read(flow)");
             return -1;
         }
+
+        buf[n] = '\0';
+        PI("Request: '%s'\n", buf);
 
         ret = write(dfd, buf, n);
         if (ret != n) {
@@ -252,7 +260,6 @@ main(int argc, char **argv)
     /* This fetch is necessary to use rlite_appl_register_wait(). */
     rlite_ipcps_fetch(&rr.application.loop);
 
-    /* Rinaperf-specific initialization. */
     rina_name_fill(&rr.dif_name, dif_name, NULL, NULL, NULL);
     rina_name_fill(&client_ctrl_name, "rina_rr-ctrl", "client", NULL, NULL);
     rina_name_fill(&server_ctrl_name, "rina_rr-ctrl", "server", NULL, NULL);
