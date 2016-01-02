@@ -127,7 +127,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
             break;
         }
 
-        PD("read %d bytes\n", ret);
+        NPD("read %d bytes\n", ret);
 
         priv->cur_rx_buflen += ret;
 
@@ -220,6 +220,8 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     sock->sk->sk_user_data = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
+    sock_reset_flag(sock->sk, SOCK_USE_WRITE_QUEUE);
+
     PD("Got socket %p\n", sock);
 
     priv->sock = sock;
@@ -292,6 +294,11 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
     int totlen = rb->len + sizeof(lenhdr);
     int ret;
 
+    if (sk_stream_wspace(priv->sock->sk) < totlen + 2) {
+        /* Backpressure: We will be called again. */
+        return -EAGAIN;
+    }
+
     memset(&msghdr, 0, sizeof(msghdr));
     iov[0].iov_base = &lenhdr;
     iov[0].iov_len = sizeof(lenhdr);
@@ -310,12 +317,9 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                          totlen);
 #endif
 
-    if (ret == -EAGAIN) {
-        /* Backpressure: We will be called again. */
-        return -EAGAIN;
-    }
-
     if (unlikely(ret != totlen)) {
+        PD("wspaces: %d, %lu\n", sk_stream_wspace(priv->sock->sk),
+                                 sock_wspace(priv->sock->sk));
         if (ret < 0) {
             PE("kernel_sendmsg(): failed [%d]\n", ret);
 
