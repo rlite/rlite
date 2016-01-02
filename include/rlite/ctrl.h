@@ -112,6 +112,8 @@ rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);
 int
 rl_ctrl_fini(struct rlite_ctrl *ctrl);
 
+/* Asynchronous API. */
+
 uint32_t
 rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
                const struct rina_name *ipcp_name,
@@ -131,6 +133,8 @@ rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id);
 struct rlite_msg_base_resp *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
 
+/* Synchronous API (higher level, implemented by means of the
+ * asynchronous API. */
 int
 rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *ipcp_name,
