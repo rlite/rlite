@@ -93,6 +93,7 @@ struct rina_dm {
     struct list_head ipcp_factories;
 
     spinlock_t flows_lock;
+    spinlock_t ipcps_lock;
 
     struct mutex lock;
 };
@@ -101,6 +102,8 @@ static struct rina_dm rina_dm;
 
 #define FLOCK() spin_lock_irq(&rina_dm.flows_lock)
 #define FUNLOCK() spin_unlock_irq(&rina_dm.flows_lock)
+#define PLOCK() spin_lock_irq(&rina_dm.ipcps_lock)
+#define PUNLOCK() spin_unlock_irq(&rina_dm.ipcps_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(uint8_t dif_type)
@@ -208,7 +211,7 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     return 0;
 }
 
-static int ipcp_del_entry(struct ipcp_entry *entry);
+static int ipcp_put(struct ipcp_entry *entry);
 
 static void
 ipcp_remove_work(struct work_struct *w)
@@ -217,22 +220,28 @@ ipcp_remove_work(struct work_struct *w)
 
     mutex_lock(&rina_dm.lock);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_del_entry(ipcp);
+    ipcp_put(ipcp);
     mutex_unlock(&rina_dm.lock);
 }
 
 static struct ipcp_entry *
-ipcp_table_find(unsigned int ipcp_id)
+ipcp_get(unsigned int ipcp_id)
 {
     struct ipcp_entry *entry;
     struct hlist_head *head;
 
+    PLOCK();
+
     head = &rina_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->id == ipcp_id) {
+            entry->refcnt++;
+            PUNLOCK();
             return entry;
         }
     }
+
+    PUNLOCK();
 
     return NULL;
 }
@@ -282,6 +291,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
         INIT_WORK(&entry->remove, ipcp_remove_work);
+        spin_lock_init(&entry->lock);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
     } else {
@@ -340,7 +350,7 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 
 out:
     if (ret) {
-        ipcp_del_entry(entry);
+        ipcp_put(entry);
     }
     mutex_unlock(&rina_dm.lock);
 
@@ -372,7 +382,7 @@ ipcp_application_del_entry(struct ipcp_entry *ipcp,
 
     list_del(&app->node);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_del_entry(ipcp);
+    ipcp_put(ipcp);
     rina_name_free(&app->name);
     kfree(app);
 }
@@ -430,7 +440,7 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
-/* Code improvement: we may merge ipcp_table_find() and flow_get()
+/* Code improvement: we may merge ipcp_get() and flow_get()
  * into a template (a macro). */
 struct flow_entry *
 flow_get(unsigned int port_id)
@@ -754,12 +764,25 @@ flow_orphan(struct flow_entry *flow)
 
 /* Must be called under global lock. */
 static int
-ipcp_del_entry(struct ipcp_entry *entry)
+ipcp_put(struct ipcp_entry *entry)
 {
+    PLOCK();
+
     entry->refcnt--;
     if (entry->refcnt) {
+        PUNLOCK();
         return 0;
     }
+
+    hash_del(&entry->node);
+    bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
+
+    /* Invalid the IPCP fetch pointer, if necessary. */
+    if (entry == rina_dm.ipcp_fetch_last) {
+        rina_dm.ipcp_fetch_last = NULL;
+    }
+
+    PUNLOCK();
 
     /* Inoke the destructor method, if the constructor
      * was called. */
@@ -776,14 +799,9 @@ ipcp_del_entry(struct ipcp_entry *entry)
         module_put(entry->owner);
     }
 
-    hash_del(&entry->node);
     rina_name_free(&entry->name);
     rina_name_free(&entry->dif_name);
-    /* Invalid the IPCP fetch pointer, if necessary. */
-    if (entry == rina_dm.ipcp_fetch_last) {
-        rina_dm.ipcp_fetch_last = NULL;
-    }
-    bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
+
     kfree(entry);
 
     return 0;
@@ -803,14 +821,15 @@ ipcp_del(unsigned int ipcp_id)
     mutex_lock(&rina_dm.lock);
     /* Lookup and remove the IPC process entry in the hash table corresponding
      * to the given ipcp_id. */
-    entry = ipcp_table_find(ipcp_id);
+    entry = ipcp_get(ipcp_id);
     if (!entry) {
         ret = -ENXIO;
         goto out;
     }
 
-    ret = ipcp_del_entry(entry);
+    ret = ipcp_put(entry);
 out:
+    ret = ipcp_put(entry); /* To match the ipcp_get(). */
     mutex_unlock(&rina_dm.lock);
 
     return ret;
@@ -932,7 +951,7 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
-    entry = ipcp_table_find(req->ipcp_id);
+    entry = ipcp_get(req->ipcp_id);
     if (entry) {
         if (strcmp(req->name, "dif") == 0) {
             rina_name_free(&entry->dif_name);
@@ -942,6 +961,7 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
             ret = entry->ops.config(entry, req->name, req->value);
         }
     }
+    ipcp_put(entry);
     mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {
@@ -964,7 +984,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     flow = flow_get(req->local_port);
 
     mutex_lock(&rina_dm.lock);
-    ipcp = ipcp_table_find(req->ipcp_id);
+    ipcp = ipcp_get(req->ipcp_id);
     mutex_unlock(&rina_dm.lock);
 
     if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set) {
@@ -977,6 +997,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     flow_put(flow);
+    ipcp_put(ipcp);
 
     if (ret == 0) {
         printk("%s: Set IPC process %u PDUFT entry: %llu --> %u\n", __func__,
@@ -998,11 +1019,12 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
-    entry = ipcp_table_find(req->ipcp_id);
+    entry = ipcp_get(req->ipcp_id);
     if (entry) {
         entry->uipcp = rc;
         ret = 0;
     }
+    ipcp_put(entry);
     mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {
@@ -1023,13 +1045,14 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     int ret = -EINVAL;  /* Report failure by default. */
 
     mutex_lock(&rina_dm.lock);
-    ipcp = ipcp_table_find(req->ipcp_id);
+    ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
                                   &req->local_application,
                                   &req->remote_application, &req->flowcfg, 0);
     }
 
+    ipcp_put(ipcp);
     mutex_unlock(&rina_dm.lock);
 
     return ret;
@@ -1045,12 +1068,13 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     int ret = -EINVAL;  /* Report failure by default. */
 
     mutex_lock(&rina_dm.lock);
-    ipcp = ipcp_table_find(req->ipcp_id);
+    ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
                                    req->remote_port, req->remote_addr,
                                    req->response, 0);
     }
+    ipcp_put(ipcp);
     mutex_unlock(&rina_dm.lock);
 
 
@@ -1067,7 +1091,7 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
     int ret = -EINVAL;  /* Report failure by default. */
 
     /* Find the IPC process entry corresponding to req->ipcp_id. */
-    entry = ipcp_table_find(ipcp_id);
+    entry = ipcp_get(ipcp_id);
     if (entry) {
         ret = 0;
         if (reg) {
@@ -1076,6 +1100,8 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
             ret = ipcp_application_del(entry, appl_name);
         }
     }
+
+    ipcp_put(entry);
 
     if (ret == 0) {
         printk("%s: Application process %s %sregistered to IPC process %u\n",
@@ -1101,7 +1127,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     int ret = -EINVAL;
 
     /* Find the IPC process entry corresponding to ipcp_id. */
-    ipcp_entry = ipcp_table_find(ipcp_id);
+    ipcp_entry = ipcp_get(ipcp_id);
     if (!ipcp_entry) {
         goto out;
     }
@@ -1147,6 +1173,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     }
 
 out:
+    ipcp_put(ipcp_entry);
     if (ret) {
         if (flow_entry) {
             flow_put(flow_entry);
@@ -1943,7 +1970,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         struct ipcp_entry *ipcp;
 
         /* Lookup the IPCP user of 'flow'. */
-        ipcp = ipcp_table_find(info->ipcp_id);
+        ipcp = ipcp_get(info->ipcp_id);
         if (!ipcp) {
             printk("%s: Error: No such ipcp\n", __func__);
             flow_put(flow);
@@ -1951,7 +1978,6 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
             return -ENXIO;
         }
         rio->flow->upper.ipcp = ipcp;
-        rio->flow->upper.ipcp->refcnt++;
         PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id,
                 rio->flow->upper.ipcp->refcnt);
     }
@@ -1966,7 +1992,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
     struct ipcp_entry *ipcp;
 
     /* Lookup the IPCP to manage. */
-    ipcp = ipcp_table_find(info->ipcp_id);
+    ipcp = ipcp_get(info->ipcp_id);
     if (!ipcp) {
         PE("%s: Error: No such ipcp\n", __func__);
         return -ENXIO;
@@ -1974,12 +2000,12 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 
     rio->txrx = kzalloc(sizeof(*(rio->txrx)), GFP_KERNEL);
     if (!rio->txrx) {
+        ipcp_put(ipcp);
         PE("%s: Out of memory\n", __func__);
         return -ENOMEM;
     }
 
     txrx_init(rio->txrx, ipcp);
-    ipcp->refcnt++;
     PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     ipcp->mgmt_txrx = rio->txrx;
 
@@ -2010,7 +2036,7 @@ rina_io_release_internal(struct rina_io *rio)
             rio->txrx->ipcp->mgmt_txrx = NULL;
             PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id,
                     rio->txrx->ipcp->refcnt);
-            ipcp_del_entry(rio->txrx->ipcp);
+            ipcp_put(rio->txrx->ipcp);
             kfree(rio->txrx);
             rio->txrx = NULL;
             break;
@@ -2125,6 +2151,7 @@ rina_ctrl_init(void)
     hash_init(rina_dm.ipcp_table);
     mutex_init(&rina_dm.lock);
     spin_lock_init(&rina_dm.flows_lock);
+    spin_lock_init(&rina_dm.ipcps_lock);
     rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
 
