@@ -37,3 +37,5 @@
 - implementare un semplice livello di protezione, ad esempio distinguendo
   quelle operazioni che possono essere effettuate solo da UIPCP, ed altre
   che possono essere fatte da tutte le applicazioni
+
+- implementare list_for_each_entry_safe()

@@ -29,7 +29,7 @@ static int
 parse_directory(int addr2sock, struct sockaddr_in *addr,
                 struct rina_name *appl_name)
 {
-    char *appl_name_s = rina_name_to_string(appl_name);
+    char *appl_name_s = NULL;
     const char *dirfile = "/etc/rlite/shim-inet4-dir";
     FILE *fin;
     char *linebuf = NULL;
@@ -37,9 +37,12 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
     size_t n;
     int found = 0;
 
-    if (!appl_name_s) {
-        PE("Out of memory\n");
-        return -1;
+    if (addr2sock) {
+        appl_name_s = rina_name_to_string(appl_name);
+        if (!appl_name_s) {
+            PE("Out of memory\n");
+            return -1;
+        }
     }
 
     fin = fopen(dirfile, "r");
@@ -128,6 +131,13 @@ appl_name_to_sock_addr(const struct rina_name *appl_name,
     return parse_directory(1, addr, (struct rina_name *)appl_name);
 }
 
+static int
+sock_addr_to_appl_name(const struct sockaddr_in *addr,
+                       struct rina_name *appl_name)
+{
+    return parse_directory(0, (struct sockaddr_in *)addr, appl_name);
+}
+
 /* ep->addr must be filled in before calling this function */
 static int
 open_bound_socket(struct inet4_endpoint *ep)
@@ -157,10 +167,7 @@ open_bound_socket(struct inet4_endpoint *ep)
     return 0;
 }
 
-static void
-accept_conn(struct rlite_evloop *loop, int fd)
-{
-}
+static void accept_conn(struct rlite_evloop *loop, int lfd);
 
 static int
 shim_inet4_appl_unregister(struct uipcp *uipcp,
@@ -339,6 +346,80 @@ err1:
     free(ep);
 
     return -1;
+}
+
+static int
+lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
+{
+    struct inet4_endpoint *ep;
+
+    list_for_each_entry(ep, &shim->endpoints, node) {
+        if (lfd == ep->fd) {
+            return rina_name_from_string(ep->appl_name_s, name);
+        }
+    }
+
+    return -1;
+}
+
+static void
+accept_conn(struct rlite_evloop *loop, int lfd)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct shim_inet4 *shim = SHIM(uipcp);
+    struct sockaddr_in remote_addr;
+    socklen_t addrlen = sizeof(remote_addr);
+    struct rina_name remote_appl, local_appl;
+    struct inet4_endpoint *ep;
+    int sfd;
+
+    /* First of all let's call accept, so that we consume the event
+     * on lfd, independently of what happen next. This is important
+     * in order to avoid spinning on this fd. */
+    sfd = accept(lfd, (struct sockaddr *)&remote_addr, &addrlen);
+    if (sfd < 0) {
+        PE("Accept failed\n");
+        return;
+    }
+
+    /* Lookup the local registered application that is listening on lfd. */
+    if (lfd_to_appl_name(shim, lfd, &local_appl)) {
+        PE("Cannot find the local application corresponding "
+           "to fd %d\n", lfd);
+        return;
+    }
+
+    ep = malloc(sizeof(*ep));
+    if (!ep) {
+        PE("Out of memory\n");
+        return;
+    }
+
+    ep->fd = sfd;
+    memcpy(&ep->addr, &remote_addr, sizeof(remote_addr));
+
+    /* Lookup the remote IP address and port. */
+    if (sock_addr_to_appl_name(&ep->addr, &remote_appl)) {
+        PE("Failed to get appl_name from remote address\n");
+        goto err1;
+    }
+
+    ep->appl_name_s = rina_name_to_string(&remote_appl);
+    if (ep->appl_name_s) {
+        PE("Out of memory\n");
+        goto err1;
+    }
+
+    list_add_tail(&ep->node, &shim->endpoints);
+
+    uipcp_issue_fa_req_arrived(uipcp, 0, 0,
+                               &local_appl, &remote_appl, NULL);
+    return;
+
+err1:
+    free(ep);
 }
 
 static int
