@@ -116,6 +116,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->last_seq_num_sent = -1;
     dtp->rcv_lwe = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
+    dtp->last_snd_data_ack = 0;
     dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
@@ -423,12 +424,37 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
                     (long unsigned)pci->seqnum);
                 rina_buf_free(rb);
 
-                /* Send ACK flow PDU */
+                if (flow->cfg.dtcp.flow_control &&
+                            dtp->rcv_lwe >= dtp->last_snd_data_ack) {
+                    /* Send ACK flow control PDU */
+                    rb = rina_buf_alloc_ctrl(2, GFP_ATOMIC);
+                    if (rb) {
+                        struct rina_pci_ctrl *pcic;
 
-                return 0;
-            }
+                        pcic = (struct rina_pci_ctrl *)RINA_BUF_DATA(rb);
+                        pcic->base.dst_addr = flow->remote_addr;
+                        pcic->base.src_addr = ipcp->addr;
+                        pcic->base.conn_id.qos_id = 0;
+                        pcic->base.conn_id.dst_cep = flow->remote_port;
+                        pcic->base.conn_id.src_cep = flow->local_port;
+                        pcic->base.pdu_type = PDU_TYPE_ACK_AND_FC;
+                        pcic->base.pdu_flags = 0;
+                        pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
+                        pcic->last_ctrl_seq_num_rcvd =
+                            flow->dtp.last_ctrl_seq_num_rcvd;
+                        pcic->ack_nack_seq_num = dtp->rcv_lwe;
+                        pcic->new_rwe = flow->dtp.rcv_rwe;
+                        pcic->new_lwe = flow->dtp.rcv_lwe;
+                        pcic->my_rwe = flow->dtp.snd_rwe;
+                        pcic->my_lwe = flow->dtp.snd_lwe;
+                        if (!rmt_tx(ipcp, flow, rb)) {
+                            dtp->last_snd_data_ack = dtp->rcv_lwe;
+                        }
+                    }
+                }
 
-            if (unlikely(dtp->rcv_lwe < pci->seqnum &&
+                ret = 0;
+            } else if (unlikely(dtp->rcv_lwe < pci->seqnum &&
                                 pci->seqnum <= dtp->max_seq_num_rcvd)) {
                 /* This may go in a gap or be a duplicate
                  * amongst the gaps. */

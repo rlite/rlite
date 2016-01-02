@@ -102,6 +102,7 @@ struct dtp {
     uint64_t rcv_lwe;
     uint64_t rcv_rwe;
     uint64_t max_seq_num_rcvd;
+    uint64_t last_snd_data_ack;
     uint64_t next_snd_ctl_seq;
     uint64_t last_ctrl_seq_num_rcvd;
     struct hrtimer snd_inact_tmr;
