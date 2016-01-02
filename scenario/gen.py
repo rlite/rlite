@@ -21,7 +21,7 @@ argparser.add_argument('-l', '--levels',
                        type = int, default = 1)
 argparser.add_argument('-t', '--type',
                        help = "",
-                       choices = ['eth', 'inet4'], default = 'eth')
+                       choices = ['eth', 'inet4', 'null'], default = 'eth')
 
 args = argparser.parse_args()
 
@@ -160,6 +160,8 @@ for i in sorted(vms):
             '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'sudo hostname %(name)s\n'\
+            '\n'\
+            '[ "%(shimtype)s" == "null" ] && cd /usr/bin/ && sudo ln -sf true rlite-config\n'\
             '\n'\
             'sudo modprobe rlite\n'\
             'sudo modprobe rlite-shim-%(shimtype)s\n'\
