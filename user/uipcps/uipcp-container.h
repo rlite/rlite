@@ -44,7 +44,6 @@ struct uipcp_ops {
 
     int (*register_to_lower)(struct uipcp *uipcp, int reg,
                              const char *dif_name,
-                             unsigned int ipcp_id,
                              const struct rina_name *ipcp_name);
 
     int (*enroll)(struct uipcp *, struct rl_cmsg_ipcp_enroll *);
@@ -107,6 +106,9 @@ int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
+
+struct uipcp *uipcp_lookup_by_name(struct uipcps *uipcps,
+                                   const struct rina_name *ipcp_name);
 
 int uipcps_print(struct uipcps *uipcps);
 

@@ -763,7 +763,6 @@ normal_fini(struct uipcp *uipcp)
 static int
 normal_register_to_lower(struct uipcp *uipcp, int reg,
                          const char *lower_dif,
-                         unsigned int ipcp_id,
                          const struct rina_name *ipcp_name)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);

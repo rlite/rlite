@@ -17,14 +17,16 @@ struct rlite_msg_layout rlite_conf_numtables[] = {
     },
     [RLITE_CFG_IPCP_DFT_SET] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_dft_set) -
-                   1 * sizeof(struct rina_name),
-        .names = 1,
+                   2 * sizeof(struct rina_name),
+        .names = 2,
     },
     [RLITE_CFG_BASE_RESP] = {
         .copylen = sizeof(struct rlite_msg_base_resp),
     },
     [RLITE_CFG_IPCP_RIB_SHOW_REQ] = {
-        .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_req),
+        .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_req) -
+                   1 * sizeof(struct rina_name),
+        .names = 1,
     },
     [RLITE_CFG_IPCP_RIB_SHOW_RESP] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_resp) -

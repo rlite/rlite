@@ -34,7 +34,6 @@ struct rl_cmsg_ipcp_register {
     uint32_t event_id;
 
     uint8_t reg;
-    uint16_t ipcp_id;
     struct rina_name ipcp_name;
     char *dif_name;
 } __attribute__((packed));
@@ -45,7 +44,6 @@ struct rl_cmsg_ipcp_enroll {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
     struct rina_name ipcp_name;
     struct rina_name neigh_ipcp_name;
     char *dif_name;
@@ -57,8 +55,8 @@ struct rl_cmsg_ipcp_dft_set {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
     uint64_t remote_addr;
+    struct rina_name ipcp_name;
     struct rina_name appl_name;
 } __attribute__((packed));
 
@@ -67,8 +65,7 @@ struct rl_cmsg_ipcp_rib_show_req {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
-    char *dif_type;
+    struct rina_name ipcp_name;
 } __attribute__((packed));
 
 /* rinaconf <-- uipcps message to report a RIB dump */

@@ -234,7 +234,6 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     req.msg_type = RLITE_CFG_IPCP_REGISTER;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     req.dif_name = strdup(dif_name);
     req.reg = reg;
 
@@ -282,7 +281,6 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
 
     req.msg_type = RLITE_CFG_IPCP_ENROLL;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     req.dif_name = strdup(dif_name);
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     req.supp_dif_name = strdup(supp_dif_name);
@@ -299,7 +297,6 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *appl_apn;
     const char *appl_api;
     unsigned long remote_addr;
-    struct rina_name ipcp_name;
     struct rlite_ipcp *rlite_ipcp;
 
     assert(argc >= 5);
@@ -314,9 +311,8 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
         return -1;
     }
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    rina_name_free(&ipcp_name);
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find IPC process\n");
         return -1;
@@ -324,7 +320,6 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
 
     req.msg_type = RLITE_CFG_IPCP_DFT_SET;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
@@ -371,16 +366,14 @@ ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
     struct rl_cmsg_ipcp_rib_show_req req;
     const char *ipcp_apn;
     const char *ipcp_api;
-    struct rina_name ipcp_name;
     struct rlite_ipcp *rlite_ipcp;
 
     assert(argc >= 2);
     ipcp_apn = argv[0];
     ipcp_api = argv[1];
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    rina_name_free(&ipcp_name);
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find IPC process\n");
         return -1;
@@ -388,7 +381,6 @@ ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 
     req.msg_type = RLITE_CFG_IPCP_RIB_SHOW_REQ;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
 
     return request_response(RLITE_MB(&req),
                             ipcp_rib_show_handler);

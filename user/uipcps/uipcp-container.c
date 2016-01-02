@@ -271,6 +271,30 @@ select_uipcp_ops(const char *dif_type)
 
 /* To be called under uipcps lock. */
 struct uipcp *
+uipcp_lookup_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
+{
+    struct rlite_ipcp *rlite_ipcp;
+    struct uipcp *uipcp;
+
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&uipcps->loop.ctrl, ipcp_name);
+    if (!rlite_ipcp) {
+        char *s = rina_name_to_string(ipcp_name);
+
+        PE("No such IPCP '%s'\n", s);
+        if (s) free(s);
+        return NULL;
+    }
+
+    uipcp = uipcp_lookup(uipcps, rlite_ipcp->ipcp_id);
+    if (!uipcp) {
+        PE("No uipcp for [%u]\n", rlite_ipcp->ipcp_id);
+    }
+
+    return uipcp;
+}
+
+/* To be called under uipcps lock. */
+struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct uipcp *cur;
