@@ -147,13 +147,13 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 }
 
 static int
-rmt_tx(struct rina_normal *priv, struct ipcp_entry *ipcp,
-       struct flow_entry *flow, struct rina_buf *rb)
+rmt_tx(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rina_buf *rb)
 {
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
 
-    lower_flow = pduft_lookup(priv, flow->remote_addr);
+    lower_flow = pduft_lookup((struct rina_normal *)ipcp->priv,
+                              flow->remote_addr);
     if (unlikely(!lower_flow && flow->remote_addr != ipcp->addr)) {
         PD("%s: No route to IPCP %lu, dropping packet\n", __func__,
             (long unsigned)flow->remote_addr);
@@ -180,7 +180,6 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rina_buf *rb)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
     struct rina_pci *pci;
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
@@ -234,7 +233,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->last_seq_num_sent = pci->seqnum;
     }
 
-    ret = rmt_tx(priv, ipcp, flow, rb);
+    ret = rmt_tx(ipcp, flow, rb);
 
     /* 3 * (MPL + R + A) */
     hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
@@ -374,7 +373,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     pcic->new_lwe = flow->dtp.rcv_lwe;
                     pcic->my_rwe = flow->dtp.snd_rwe;
                     pcic->my_lwe = flow->dtp.snd_lwe;
-                    rina_buf_free(rb); //TODO
+                    rmt_tx(ipcp, flow, rb);
                 }
             }
         }
