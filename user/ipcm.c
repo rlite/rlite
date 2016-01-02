@@ -40,11 +40,8 @@ struct ipcm {
     uint32_t event_id_counter;
 
     /* Synchronization variables used to implement mutual exclusion between the
-     * event-loop thread and the script thead, and waiting for an event to
-     * happen. */
+     * event-loop thread and the script thead. */
     pthread_mutex_t lock;
-    int fetch_complete;
-    pthread_cond_t fetch_complete_cond;
 
     struct list_head ipcps;
 
@@ -179,7 +176,14 @@ typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
-/* The table containing all kernel response handlers. */
+/* The table containing all kernel response handlers, executed
+ * in the event-loop context.
+ * Response handlers must not call issue_request(), in
+ * order to avoid deadlocks.
+ * These would happen because issue_request() may block for
+ * completion, and is waken up by the event-loop thread itself.
+ * Therefore, the event-loop thread would wait for itself, i.e.
+ * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
     [RINA_KERN_IPCP_DESTROY_RESP] = ipcp_destroy_resp,
@@ -301,7 +305,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
     if (!entry) {
         rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)msg);
         printf("%s: Out of memory\n", __func__);
-        return NULL; // TODO report the error to the caller
+        return NULL;
     }
 
     pthread_mutex_lock(&ipcm->lock);
@@ -312,7 +316,6 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
     entry->msg = msg;
     entry->msg_len = msg_len;
     entry->resp = NULL;
-    //pthread_mutex_init(&entry->lock, NULL);  //XXX do we need this ?
     pthread_cond_init(&entry->op_complete_cond, NULL);
     entry->op_complete = 0;
     pending_queue_enqueue(&ipcm->pqueue, entry);
@@ -846,8 +849,6 @@ int main()
     /* Initialize the remaining fields of the IPC Manager data model
      * instance. */
     pthread_mutex_init(&ipcm.lock, NULL);
-    pthread_cond_init(&ipcm.fetch_complete_cond, NULL);
-    ipcm.fetch_complete = 0;
     pending_queue_init(&ipcm.pqueue);
     ipcm.event_id_counter = 1;
     list_init(&ipcm.ipcps);

@@ -10,7 +10,6 @@ struct pending_entry {
     size_t msg_len;
     struct rina_msg_base *resp;
 
-    pthread_mutex_t lock;
     int op_complete;
     pthread_cond_t op_complete_cond;
 };
