@@ -249,7 +249,6 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 {
     struct rina_kmsg_ipcp_destroy *msg;
     struct rina_msg_base *resp;
-    rina_msg_t update_type;
     int result;
 
     /* Allocate and create a request message. */
@@ -257,6 +256,10 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
     if (!msg) {
         PE("%s: Out of memory\n", __func__);
         return ENOMEM;
+    }
+
+    if (dif_type == DIF_TYPE_NORMAL) {
+        uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id);
     }
 
     memset(msg, 0, sizeof(*msg));
@@ -272,11 +275,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     ipcps_fetch(&rc->loop);
 
-    update_type = RINA_CONF_UIPCP_UPDATE;
-    if (dif_type == DIF_TYPE_NORMAL) {
-        update_type = RINA_CONF_UIPCP_DESTROY;
-    }
-    uipcp_update(rc, update_type, ipcp_id);
+    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, ipcp_id);
 
     return result;
 }
