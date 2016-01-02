@@ -1124,6 +1124,7 @@ int
 normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
     Neighbor *neigh;
     NeighFlow *nf;
     int ret;
