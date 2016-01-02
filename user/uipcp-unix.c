@@ -214,7 +214,7 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
     resp.result = 1; /* Report failure by default. */
 
     if (req->msg_type == RINA_CONF_UIPCP_CREATE) {
-        resp.result = uipcp_add(uipcps, req->ipcp_id);
+        resp.result = uipcp_add(uipcps, req->ipcp_id, req->dif_type);
 
     } else if (req->msg_type == RINA_CONF_UIPCP_DESTROY) {
         /* Track all the unregistrations of the destroyed IPCP in
@@ -404,7 +404,8 @@ uipcps_update(struct uipcps *uipcps)
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(rlite_ipcp, &loop.ipcps, node) {
         if (type_has_uipcp(rlite_ipcp->dif_type)) {
-            ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id);
+            ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id,
+                            rlite_ipcp->dif_type);
             if (ret) {
                 return ret;
             }

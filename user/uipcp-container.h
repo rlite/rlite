@@ -92,7 +92,7 @@ enum {
 
 void *uipcp_server(void *arg);
 
-int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
+int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
 
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 

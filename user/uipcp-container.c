@@ -236,9 +236,8 @@ uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 }
 
 int
-uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
+uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 {
-    const char *dif_type = "normal";
     const struct uipcp_ops *ops = select_uipcp_ops(dif_type);
     struct uipcp *uipcp;
     int ret = -1;
