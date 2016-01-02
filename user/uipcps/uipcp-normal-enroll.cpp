@@ -182,13 +182,38 @@ Neighbor::abort(NeighFlow *nf)
     }
 }
 
+#define NEIGH_KEEPALIVE_INTVAL  2000
+#define NEIGH_ENROLL_TO         1500
+
+static void
+keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
+{
+    NeighFlow *nf = static_cast<NeighFlow *>(arg);
+    ScopeLock(nf->neigh->rib->lock);
+    CDAPMessage m;
+    int ret;
+
+    UPI(nf->neigh->rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+        static_cast<string>(nf->neigh->ipcp_name).c_str());
+
+    m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
+             0, 0, string());
+
+    ret = nf->neigh->send_to_port_id(nf, &m, 0, NULL);
+    if (ret) {
+        UPE(nf->neigh->rib->uipcp, "send_to_port_id() failed\n");
+    }
+
+    nf->keepalive_timeout_id = rl_evloop_schedule(loop, NEIGH_KEEPALIVE_INTVAL,
+                                                  keepalive_timeout_cb, nf);
+}
+
 static void
 enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     ScopeLock(nf->neigh->rib->lock);
 
-    (void)loop;
     UPI(nf->neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
         static_cast<string>(nf->neigh->ipcp_name).c_str());
 
@@ -198,7 +223,8 @@ enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
 void
 Neighbor::enroll_tmr_start(NeighFlow *nf)
 {
-    nf->enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop, 1000,
+    nf->enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
+                                               NEIGH_ENROLL_TO,
                                                enroll_timeout_cb, nf);
 }
 
@@ -537,6 +563,9 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
     if (enr_info.start_early) {
         UPI(rib->uipcp, "Initiator is allowed to start early\n");
         enroll_tmr_stop(nf);
+        nf->keepalive_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
+                                                      NEIGH_KEEPALIVE_INTVAL,
+                                                      keepalive_timeout_cb, nf);
         nf->enrollment_state = NEIGH_ENROLLED;
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -590,6 +619,9 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     enroll_tmr_stop(nf);
+    nf->keepalive_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
+                                                  NEIGH_KEEPALIVE_INTVAL,
+                                                  keepalive_timeout_cb, nf);
     nf->enrollment_state = NEIGH_ENROLLED;
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -891,6 +923,36 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
             }
 
         }
+    }
+
+    return 0;
+}
+
+int
+uipcp_rib::keepalive_handler(const CDAPMessage *rm, Neighbor *neigh)
+{
+    CDAPMessage m;
+    int ret;
+
+    if (rm->op_code != gpb::M_READ && rm->op_code != gpb::M_READ_R) {
+        UPE(uipcp, "M_READ or M_READ_R expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_READ_R) {
+        UPD(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
+            static_cast<string>(neigh->ipcp_name).c_str());
+        return 0;
+    }
+
+    /* Just reply back to tell the neighbor we are alive. */
+
+    m.m_read_r(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
+               0, 0, string());
+
+    ret = neigh->send_to_port_id(neigh->mgmt_conn(), &m, rm->invoke_id, NULL);
+    if (ret) {
+        UPE(uipcp, "send_to_port_id() failed\n");
     }
 
     return 0;

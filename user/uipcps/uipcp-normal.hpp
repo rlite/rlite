@@ -25,6 +25,7 @@ namespace obj_class {
     extern std::string lfdb; /* Lower Flow DB */
     extern std::string flows; /* Supported flows */
     extern std::string flow;
+    extern std::string keepalive;
 };
 
 namespace obj_name {
@@ -37,6 +38,7 @@ namespace obj_name {
     extern std::string lfdb;
     extern std::string whatevercast;
     extern std::string flows;
+    extern std::string keepalive;
 };
 
 /* Time interval (in seconds) between two consecutive increments
@@ -67,6 +69,7 @@ struct NeighFlow {
     CDAPConn *conn;
 
     int enroll_timeout_id;
+    int keepalive_timeout_id;
     enum state_t enrollment_state;
 
     NeighFlow() : neigh(NULL), conn(NULL) { }
@@ -252,6 +255,7 @@ struct uipcp_rib {
     int neighbors_handler(const CDAPMessage *rm, Neighbor *neigh);
     int lfdb_handler(const CDAPMessage *rm, Neighbor *neigh);
     int flows_handler(const CDAPMessage *rm, Neighbor *neigh);
+    int keepalive_handler(const CDAPMessage *rm, Neighbor *neigh);
 
     int flows_handler_create(const CDAPMessage *rm, Neighbor *neigh);
     int flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh);

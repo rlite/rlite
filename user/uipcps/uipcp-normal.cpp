@@ -27,6 +27,7 @@ namespace obj_class {
     string lfdb = "fsodb"; /* Lower Flow DB */
     string flows = "flows"; /* Supported flows */
     string flow = "flow";
+    string keepalive = "keepalive";
 };
 
 namespace obj_name {
@@ -39,6 +40,7 @@ namespace obj_name {
     string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
     string whatevercast = "/daf/mgmt/naming/whatevercast";
     string flows = "/dif/ra/fa/" + obj_class::flows;
+    string keepalive = "/daf/mgmt/" + obj_class::keepalive;
 };
 
 #define MGMTBUF_SIZE_MAX 4096
@@ -260,6 +262,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
                               &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
+    handlers.insert(make_pair(obj_name::keepalive, &uipcp_rib::keepalive_handler));
 
     /* Start timers for periodic tasks. */
     rl_evloop_schedule(&uipcp->loop, RL_AGE_INCR_INTERVAL * 1000,
