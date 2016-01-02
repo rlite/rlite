@@ -51,12 +51,13 @@ struct Neighbor {
 
     enum {
         NONE = 0,
-        I_CONNECT_SENT,
-        S_CONNECT_R_SENT,
-        I_START_SENT,
-        S_START_R_SENT,
-        S_STOP_SENT,
-        I_STOP_R_SENT,
+        I_WAIT_CONNECT_R,
+        S_WAIT_START,
+        I_WAIT_START_R,
+        S_WAIT_STOP_R,
+        I_WAIT_STOP,
+        I_WAIT_START,
+        ENROLLED,
         ENROLLMENT_STATE_LAST,
     } enrollment_state;
 
@@ -73,10 +74,13 @@ struct Neighbor {
 
     /* Enrollment state machine handlers. */
     int none(const CDAPMessage *rm);
-    int i_connect_sent(const CDAPMessage *rm);
-    int s_connect_r_sent(const CDAPMessage *rm);
-    int i_start_sent(const CDAPMessage *rm);
-    int s_stop_sent(const CDAPMessage *rm);
+    int i_wait_connect_r(const CDAPMessage *rm);
+    int s_wait_start(const CDAPMessage *rm);
+    int i_wait_start_r(const CDAPMessage *rm);
+    int i_wait_stop(const CDAPMessage *rm);
+    int s_wait_stop_r(const CDAPMessage *rm);
+    int i_wait_start(const CDAPMessage *rm);
+    int enrolled(const CDAPMessage *rm);
 };
 
 typedef int (*rib_handler_t)(struct uipcp_rib *);
@@ -113,6 +117,13 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     enrollment_state = NONE;
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     enroll_fsm_handlers[NONE] = &Neighbor::none;
+    enroll_fsm_handlers[I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
+    enroll_fsm_handlers[S_WAIT_START] = &Neighbor::s_wait_start;
+    enroll_fsm_handlers[I_WAIT_START_R] = &Neighbor::i_wait_start_r;
+    enroll_fsm_handlers[S_WAIT_STOP_R] = &Neighbor::s_wait_stop_r;
+    enroll_fsm_handlers[I_WAIT_STOP] = &Neighbor::i_wait_stop;
+    enroll_fsm_handlers[I_WAIT_START] = &Neighbor::i_wait_start;
+    enroll_fsm_handlers[ENROLLED] = &Neighbor::enrolled;
     address = 0;
 }
 
@@ -197,7 +208,7 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
-        enrollment_state = I_CONNECT_SENT;
+        enrollment_state = I_WAIT_CONNECT_R;
 
     } else {
         /* (1) S <-- I: M_CONNECT
@@ -212,14 +223,14 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
-        enrollment_state = S_CONNECT_R_SENT;
+        enrollment_state = S_WAIT_START;
     }
 
     return send_to_port_id(&m, NULL);
 }
 
 int
-Neighbor::i_connect_sent(const CDAPMessage *rm)
+Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 {
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START */
@@ -233,13 +244,13 @@ Neighbor::i_connect_sent(const CDAPMessage *rm)
 
     enr_info.lower_difs = rib->lower_difs;
 
-    enrollment_state = I_START_SENT;
+    enrollment_state = I_WAIT_START_R;
 
     return send_to_port_id(&m, &enr_info);
 }
 
 int
-Neighbor::s_connect_r_sent(const CDAPMessage *rm)
+Neighbor::s_wait_start(const CDAPMessage *rm)
 {
     /* (3) S <-- I: M_START
      * (4) S --> I: M_START_R
@@ -275,8 +286,6 @@ Neighbor::s_connect_r_sent(const CDAPMessage *rm)
 
     m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
 
-    enrollment_state = S_START_R_SENT;
-
     ret = send_to_port_id(&m, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
@@ -295,13 +304,13 @@ Neighbor::s_connect_r_sent(const CDAPMessage *rm)
     m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
              0, 0, string());
 
-    enrollment_state = S_STOP_SENT;
+    enrollment_state = S_WAIT_STOP_R;
 
     return send_to_port_id(&m, &enr_info);
 }
 
 int
-Neighbor::i_start_sent(const CDAPMessage *rm)
+Neighbor::i_wait_start_r(const CDAPMessage *rm)
 {
     /* (4) I <-- S: M_START_R */
     const char *objbuf;
@@ -314,22 +323,112 @@ Neighbor::i_start_sent(const CDAPMessage *rm)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("%s: M_START does not contain a nested message\n");
+        PE("%s: M_START_R does not contain a nested message\n");
         return 0;
     }
 
     EnrollmentInfo enr_info(objbuf, objlen);
 
+    /* The slave may have specified an address for us. */
     if (enr_info.address) {
         address = enr_info.address;
+    }
+
+    enrollment_state = I_WAIT_STOP;
+
+    return 0;
+}
+
+int
+Neighbor::i_wait_stop(const CDAPMessage *rm)
+{
+    /* (6) I <-- S: M_STOP
+     * (7) I --> S: M_STOP_R */
+    const char *objbuf;
+    size_t objlen;
+    CDAPMessage m;
+    int ret;
+
+    if (rm->op_code != gpb::M_STOP) {
+        PE("%s: M_STOP expected\n", __func__);
+        return 0;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("%s: M_STOP does not contain a nested message\n");
+        return 0;
+    }
+
+    EnrollmentInfo enr_info(objbuf, objlen);
+
+    /* If operational state indicates that we (the initiator) are already
+     * DIF member, we can send our dynamic information to the slave. */
+
+    /* Here we may M_READ from the slave. */
+
+    m.m_stop_r(rm, gpb::F_NO_FLAGS, 0, string());
+
+    ret = send_to_port_id(&m, NULL);
+
+    if (enr_info.start_early) {
+        enrollment_state = ENROLLED;
+        PI("%s: Initiator is allowed to start early\n");
+
+    } else {
+        enrollment_state = I_WAIT_START;
+        PI("%s: Initiator is not allowed to start early\n");
     }
 
     return 0;
 }
 
 int
-Neighbor::s_stop_sent(const CDAPMessage *rm)
+Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 {
+    /* (7) S <-- I: M_STOP_R */
+    /* (8) S --> I: M_START(status) */
+    CDAPMessage m;
+    int ret;
+
+    if (rm->op_code != gpb::M_STOP_R) {
+        PE("%s: M_START_R expected\n", __func__);
+        return 0;
+    }
+
+    m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
+              0, 0, string());
+
+    ret = send_to_port_id(&m, NULL);
+    if (ret) {
+        PE("%s: send_to_port_id failed\n", __func__);
+        return ret;
+    }
+
+    enrollment_state = ENROLLED;
+
+    return 0;
+}
+
+int
+Neighbor::i_wait_start(const CDAPMessage *rm)
+{
+    assert(0);
+    return 0;
+}
+
+int
+Neighbor::enrolled(const CDAPMessage *rm)
+{
+    if (rm->op_code == gpb::M_START && rm->obj_class == obj_class::status
+                && rm->obj_name == obj_name::status) {
+        /* This is OK, but we didn't need it, as
+         * we started early. */
+        PI("%s: Ignoring M_START(status)\n", __func__);
+        return 0;
+    }
+
+    return 0;
 }
 
 int
