@@ -59,6 +59,9 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
     fin = fopen(dirfile, "r");
     if (!fin) {
         PE("Could not open directory file '%s'\n", dirfile);
+        if (appl_name_s) {
+            free(appl_name_s);
+        }
         return -1;
     }
 
@@ -124,6 +127,10 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
         }
 
         NPD("dir '%s' '%s'[%d] '%d'\n", nm, ip, ret, atoi(port));
+    }
+
+    if (appl_name_s) {
+        free(appl_name_s);
     }
 
     if (linebuf) {
@@ -572,6 +579,8 @@ shim_inet4_fini(struct uipcp *uipcp)
             free(ep);
         }
     }
+
+    free(shim);
 
     return 0;
 }
