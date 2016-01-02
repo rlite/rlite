@@ -345,16 +345,26 @@ extern "C" int
 rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
-    list<Neighbor>::iterator neigh =
-                    rib->lookup_neigh_by_port_id(mhdr->local_port);
+    list<Neighbor>::iterator neigh;
+    CDAPMessage *m;
 
+    /* Lookup neighbor by port id. */
+    neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
     if (neigh == rib->neighbors.end()) {
         PE("%s: Received message from unknown port id %d\n", __func__,
             mhdr->local_port);
         return -1;
     }
 
-    return 0;
+    /* Deserialize the received CDAP message. */
+    m = neigh->conn->msg_deser(serbuf, serlen);
+    if (!m) {
+        PE("%s: msg_deser() failed\n", __func__);
+        return -1;
+    }
+
+    /* Feed the enrollment state machine. */
+    return neigh->fsm_run(m);
 }
 
 extern "C" int
