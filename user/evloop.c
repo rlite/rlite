@@ -384,3 +384,36 @@ rina_evloop_fini(struct rina_evloop *loop)
     return 0;
 }
 
+unsigned int
+select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
+                   int fallback)
+{
+    struct ipcp *cur;
+
+    if (rina_name_valid(dif_name)) {
+        /* The request specifies a DIF: lookup that. */
+        list_for_each_entry(cur, &loop->ipcps, node) {
+            if (rina_name_valid(&cur->dif_name)
+                    && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
+                return cur->ipcp_id;
+            }
+        }
+    } else if (fallback) {
+        struct ipcp *ipcp = NULL;
+
+        /* The request does not specify a DIF: select any DIF,
+         * giving priority to normal DIFs. */
+        list_for_each_entry(cur, &loop->ipcps, node) {
+            if (rina_name_valid(&cur->dif_name) &&
+                    (cur->dif_type == DIF_TYPE_NORMAL ||
+                        !ipcp)) {
+                ipcp = cur;
+            }
+        }
+
+        return ipcp ? ipcp->ipcp_id : ~0U;
+    }
+
+    return ~0U;
+}
+

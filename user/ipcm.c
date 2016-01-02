@@ -492,39 +492,6 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
-static unsigned int
-select_ipcp_by_dif(struct ipcm *ipcm, const struct rina_name *dif_name,
-                   int fallback)
-{
-    struct ipcp *cur;
-
-    if (rina_name_valid(dif_name)) {
-        /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &ipcm->loop.ipcps, node) {
-            if (rina_name_valid(&cur->dif_name)
-                    && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
-                return cur->ipcp_id;
-            }
-        }
-    } else if (fallback) {
-        struct ipcp *ipcp = NULL;
-
-        /* The request does not specify a DIF: select any DIF,
-         * giving priority to normal DIFs. */
-        list_for_each_entry(cur, &ipcm->loop.ipcps, node) {
-            if (rina_name_valid(&cur->dif_name) &&
-                    (cur->dif_type == DIF_TYPE_NORMAL ||
-                        !ipcp)) {
-                ipcp = cur;
-            }
-        }
-
-        return ipcp ? ipcp->ipcp_id : ~0U;
-    }
-
-    return ~0U;
-}
-
 static int
 rina_appl_register(struct ipcm *ipcm, int sfd,
                    const struct rina_msg_base *b_req)
@@ -535,7 +502,7 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
     struct rina_msg_base_resp *kresp;
     uint8_t result = 1;
 
-    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 1);
+    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 1);
     if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
@@ -562,7 +529,7 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     struct rina_msg_base_resp *kresp;
     uint8_t result = 1;
 
-    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 0);
+    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
     if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
@@ -592,7 +559,7 @@ rina_appl_flow_allocate_req(struct ipcm *ipcm, int sfd,
     uint8_t result = 1;
     uint16_t port_id = 0;  /* Not valid. */
 
-    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 0);
+    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
     if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
