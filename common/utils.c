@@ -10,7 +10,7 @@
 #define COMMON_FREE(_p)             kfree(_p)
 #define COMMON_PRINT(format, ...)   printk(format, ##__VA_ARGS__)
 #define COMMON_STRDUP(_s, _sl)      kstrdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC)
-#define COMMON_EXPORT(_n)           EXPORT_SYMBOL_GPL(_n)
+#define COMMON_EXPORT(_n)           EXPORT_SYMBOL(_n)
 #define COMMON_STATIC
 
 #else

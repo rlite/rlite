@@ -39,7 +39,7 @@ dtp_init(struct dtp *dtp)
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
     init_timer(&dtp->rtx_tmr);
 }
-EXPORT_SYMBOL_GPL(dtp_init);
+EXPORT_SYMBOL(dtp_init);
 
 void
 dtp_fini(struct dtp *dtp)
@@ -95,4 +95,4 @@ dtp_dump(struct dtp *dtp)
             (long unsigned)dtp->next_snd_ctl_seq,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 }
-EXPORT_SYMBOL_GPL(dtp_dump);
+EXPORT_SYMBOL(dtp_dump);

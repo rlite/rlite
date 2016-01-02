@@ -33,14 +33,14 @@ rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 
     return rb;
 }
-EXPORT_SYMBOL_GPL(rlite_buf_alloc);
+EXPORT_SYMBOL(rlite_buf_alloc);
 
 struct rlite_buf *
 rlite_buf_alloc_ctrl(size_t num_pci, gfp_t gfp)
 {
     return rlite_buf_alloc(sizeof(struct rina_pci_ctrl), num_pci, gfp);
 }
-EXPORT_SYMBOL_GPL(rlite_buf_alloc_ctrl);
+EXPORT_SYMBOL(rlite_buf_alloc_ctrl);
 
 struct rlite_buf *
 rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp)
@@ -63,7 +63,7 @@ rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp)
 
     return crb;
 }
-EXPORT_SYMBOL_GPL(rlite_buf_clone);
+EXPORT_SYMBOL(rlite_buf_clone);
 
 void
 rlite_buf_free(struct rlite_buf *rb)
@@ -73,7 +73,7 @@ rlite_buf_free(struct rlite_buf *rb)
     }
     kfree(rb);
 }
-EXPORT_SYMBOL_GPL(rlite_buf_free);
+EXPORT_SYMBOL(rlite_buf_free);
 
 void
 rina_pci_dump(struct rina_pci *pci)
@@ -84,4 +84,4 @@ rina_pci_dump(struct rina_pci *pci)
         pci->conn_id.dst_cep, pci->conn_id.src_cep,
         pci->pdu_type, pci->pdu_flags, (long unsigned)pci->seqnum);
 }
-EXPORT_SYMBOL_GPL(rina_pci_dump);
+EXPORT_SYMBOL(rina_pci_dump);

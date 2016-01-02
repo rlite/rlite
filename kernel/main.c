@@ -200,7 +200,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rlite_ipcp_factory_register);
+EXPORT_SYMBOL(rlite_ipcp_factory_register);
 
 int
 rlite_ipcp_factory_unregister(const char *dif_type)
@@ -226,7 +226,7 @@ rlite_ipcp_factory_unregister(const char *dif_type)
 
     return 0;
 }
-EXPORT_SYMBOL_GPL(rlite_ipcp_factory_unregister);
+EXPORT_SYMBOL(rlite_ipcp_factory_unregister);
 
 static int
 rlite_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
@@ -690,7 +690,7 @@ flow_get(rl_port_t port_id)
 
     return NULL;
 }
-EXPORT_SYMBOL_GPL(flow_get);
+EXPORT_SYMBOL(flow_get);
 
 struct flow_entry *
 flow_get_by_cep(unsigned int cep_id)
@@ -714,7 +714,7 @@ flow_get_by_cep(unsigned int cep_id)
 
     return NULL;
 }
-EXPORT_SYMBOL_GPL(flow_get_by_cep);
+EXPORT_SYMBOL(flow_get_by_cep);
 
 void
 flow_get_ref(struct flow_entry *flow)
@@ -727,7 +727,7 @@ flow_get_ref(struct flow_entry *flow)
     flow->refcnt++;
     FUNLOCK();
 }
-EXPORT_SYMBOL_GPL(flow_get_ref);
+EXPORT_SYMBOL(flow_get_ref);
 
 static void
 tx_completion_func(unsigned long arg)
@@ -997,7 +997,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(flow_put);
+EXPORT_SYMBOL(flow_put);
 
 static void
 application_del_by_rc(struct rlite_ctrl *rc)
@@ -2085,7 +2085,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rlite_fa_req_arrived);
+EXPORT_SYMBOL(rlite_fa_req_arrived);
 
 int
 rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
@@ -2143,7 +2143,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rlite_fa_resp_arrived);
+EXPORT_SYMBOL(rlite_fa_resp_arrived);
 
 /* Userspace queue threshold. */
 #define USR_Q_TH        128
@@ -2219,7 +2219,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rlite_sdu_rx_flow);
+EXPORT_SYMBOL(rlite_sdu_rx_flow);
 
 int
 rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, rl_port_t local_port)
@@ -2237,7 +2237,7 @@ rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, rl_port_t local_port
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rlite_sdu_rx);
+EXPORT_SYMBOL(rlite_sdu_rx);
 
 static void
 rlite_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
@@ -2262,14 +2262,14 @@ rlite_write_restart_flow(struct flow_entry *flow)
 {
     rlite_write_restart_wqh(flow->txrx.ipcp, flow->txrx.tx_wqh);
 }
-EXPORT_SYMBOL_GPL(rlite_write_restart_flow);
+EXPORT_SYMBOL(rlite_write_restart_flow);
 
 void
 rlite_write_restart_flows(struct ipcp_entry *ipcp)
 {
     rlite_write_restart_wqh(ipcp, &ipcp->tx_wqh);
 }
-EXPORT_SYMBOL_GPL(rlite_write_restart_flows);
+EXPORT_SYMBOL(rlite_write_restart_flows);
 
 void
 rlite_write_restart_port(rl_port_t local_port)
@@ -2282,7 +2282,7 @@ rlite_write_restart_port(rl_port_t local_port)
         flow_put(flow);
     }
 }
-EXPORT_SYMBOL_GPL(rlite_write_restart_port);
+EXPORT_SYMBOL(rlite_write_restart_port);
 
 /* Share the same tx_wqh with other flows supported by the same IPCP. */
 void
@@ -2290,7 +2290,7 @@ rlite_flow_share_tx_wqh(struct flow_entry *flow)
 {
     flow->txrx.tx_wqh = &flow->txrx.ipcp->tx_wqh;
 }
-EXPORT_SYMBOL_GPL(rlite_flow_share_tx_wqh);
+EXPORT_SYMBOL(rlite_flow_share_tx_wqh);
 
 /* The table containing all the message handlers. */
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
