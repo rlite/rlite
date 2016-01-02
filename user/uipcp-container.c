@@ -97,7 +97,7 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
 
 int
 uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
-               uint64_t dest_addr, uint32_t local_port)
+                uint64_t dest_addr, uint32_t local_port)
 {
     struct rina_kmsg_ipcp_pduft_set *req;
     struct rina_msg_base *resp;

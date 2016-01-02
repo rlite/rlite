@@ -27,10 +27,6 @@ struct uipcps {
 
 #define RINA_PERSISTENT_REG_FILE   "/var/rinalite/uipcps-pers-reg"
 
-int
-ipcp_pduft_set(struct uipcps *uipcps, uint16_t ipcp_id,
-               uint64_t dest_addr, uint32_t local_port);
-
 struct uipcp {
     struct rinalite_appl appl;
     struct uipcps *uipcps;
@@ -56,6 +52,8 @@ struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcps_fetch(struct uipcps *uipcps);
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
+int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
+                    uint64_t dest_addr, uint32_t local_port);
 
 /* uipcp RIB definitions */
 struct uipcp_rib *rib_create(struct uipcp *uipcp);

@@ -65,7 +65,7 @@ struct Neighbor {
     typedef int (Neighbor::*enroll_fsm_handler_t)(const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[ENROLLMENT_STATE_LAST];
 
-    Neighbor() :conn(NULL), rib(NULL) { } /* Required to use the map. */
+    Neighbor() : conn(NULL), rib(NULL) { } /* Required to use the map. */
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
              int fd, unsigned int port_id);
     Neighbor(const Neighbor& other);
@@ -92,10 +92,10 @@ struct Neighbor {
     void abort();
 };
 
-/* Shortest Path First algorithm. */
-class SPFEngine {
+/* Shortest Path algorithm. */
+class SPEngine {
 public:
-    SPFEngine() {};
+    SPEngine() {};
     int run(uint64_t, const map<string, LowerFlow >& db);
 
     /* The routing table computed by run(). */
@@ -139,7 +139,7 @@ struct uipcp_rib {
     /* Lower Flow Database. */
     map< string, LowerFlow > lfdb;
 
-    SPFEngine spf;
+    SPEngine spe;
 
     uipcp_rib(struct uipcp *_u);
 
@@ -153,6 +153,7 @@ struct uipcp_rib {
     int ipcp_register(int reg, string lower_dif);
     int application_register(int reg, const RinaName& appl_name);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
+    RinaName lookup_neighbor_by_address(uint64_t address);
     int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
     int pduft_sync();
     map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
@@ -404,6 +405,21 @@ uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
     return 0;
 }
 
+RinaName
+uipcp_rib::lookup_neighbor_by_address(uint64_t address)
+{
+    map<string, NeighborCandidate>::iterator nit;
+
+    for (nit = cand_neighbors.begin(); nit != cand_neighbors.end(); nit++) {
+        if (nit->second.address == address) {
+            return RinaName(nit->second.apn, nit->second.api,
+                            string(), string());
+        }
+    }
+
+    return RinaName();
+}
+
 int
 uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 {
@@ -443,7 +459,8 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
                                  obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
-    spf.run(ipcp_info()->ipcp_addr, lfdb);
+    spe.run(ipcp_info()->ipcp_addr, lfdb);
+    pduft_sync();
 
     return ret;
 }
@@ -453,8 +470,39 @@ uipcp_rib::pduft_sync()
 {
     /* Here we should also flush previous entries. */
 
-    for (map<uint64_t, uint64_t>::iterator r = spf.next_hops.begin();
-                                        r !=  spf.next_hops.end(); r++) {
+
+    /* XXX Since the number of different next hops is expected to be
+     * way smaller than the number of nodes in the network, it would
+     * be convenient to precompute port-ids for all the next-hops. */
+    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
+                                        r !=  spe.next_hops.end(); r++) {
+            string neigh_name = static_cast<string>(
+                                lookup_neighbor_by_address(r->second));
+            int ret;
+
+            if (neigh_name == string()) {
+                PE("Could not find neighbor with address %lu\n",
+                   (long unsigned)r->second);
+                continue;
+            }
+
+            map<string, Neighbor>::iterator neigh = neighbors.find(neigh_name);
+
+            if (neigh == neighbors.end()) {
+                PE("Could not find neighbor with name %s\n",
+                   neigh_name.c_str());
+                continue;
+            }
+
+            ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,
+                                  neigh->second.port_id);
+            if (ret) {
+                PE("Failed to insert %lu --> %u PDUFT entry\n",
+                    (long unsigned)r->first, neigh->second.port_id);
+            } else {
+                PD("Add PDUFT entry %lu --> %u\n",
+                    (long unsigned)r->first, neigh->second.port_id);
+            }
     }
 
     return 0;
@@ -662,14 +710,15 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
     if (modified) {
         /* Update the routing table. */
-        spf.run(ipcp_info()->ipcp_addr, lfdb);
+        spe.run(ipcp_info()->ipcp_addr, lfdb);
+        pduft_sync();
     }
 
     return 0;
 }
 
 int
-SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
+SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 {
     /* Clean up state left from the previous run. */
     next_hops.clear();
@@ -770,9 +819,6 @@ SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
         PD_S("    Address: %lu, Next hop: %lu\n",
              (long unsigned)h->first, (long unsigned)h->second);
     }
-
-    //uipcp_pduft_set(uipcp, uipcp->ipcp_id, remote_addr,
-    //               mhdr->local_port);
 
     return 0;
 }
