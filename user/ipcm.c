@@ -234,7 +234,7 @@ static int
 rina_appl_response(int sfd, struct rina_msg_base *req,
                    struct rina_msg_base_resp *resp)
 {
-    resp->msg_type = req->msg_type + 1;
+    resp->msg_type = RINA_APPL_BASE_RESP;
     resp->event_id = req->event_id;
 
     return rina_msg_write(sfd, RMB(resp));
