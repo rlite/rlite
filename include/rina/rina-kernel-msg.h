@@ -31,8 +31,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_RESP, /* 10 */
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 11 */
     RINA_KERN_IPCP_CONFIG, /* 12 */
-    RINA_KERN_IPCP_ENROLL, /* 13 */
-    RINA_KERN_IPCP_ENROLL_RESP, /* 14 */
+    RINA_KERN_IPCP_BIND_FLOW, /* 13 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -148,16 +147,14 @@ struct rina_kmsg_ipcp_config {
     char *value;
 } __attribute__((packed));
 
-struct rina_kmsg_ipcp_enroll {
+struct rina_kmsg_ipcp_bind_flow {
     rina_msg_t msg_type;
     uint32_t event_id;
 
-    /* Who wants to enroll ? */
+    /* Where to bind to. */
     uint16_t ipcp_id;
-    /* What IPC process is to be used in the supporting DIF ? */
-    uint16_t supp_ipcp_id;
-    /* Who to enroll to ? */
-    struct rina_name neigh_ipcp_name;
+    /* What to bind. */
+    uint32_t port_id;
 } __attribute__((packed));
 
 

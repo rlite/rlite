@@ -56,20 +56,6 @@ ipcp_create_resp(struct rina_evloop *loop,
     return 0;
 }
 
-static int
-ipcp_enroll_resp(struct rina_evloop *loop,
-                 const struct rina_msg_base_resp *b_resp,
-                 const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_ipcp_enroll *req =
-            (struct rina_kmsg_ipcp_enroll *)b_req;
-
-    PI("%s: IPCP enrollment result [%d]\n", __func__, b_resp->result);
-    (void)req;
-
-    return 0;
-}
-
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call issue_request(), in
@@ -80,7 +66,6 @@ ipcp_enroll_resp(struct rina_evloop *loop,
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
-    [RINA_KERN_IPCP_ENROLL_RESP] = ipcp_enroll_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -374,15 +359,11 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     return result;
 }
 
-/* XXX This code is going to be reused for allocation
- * of IPCP2IPCP transport flows.
-
-struct rina_msg_base_resp *
-ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
-            const struct rina_name *neigh_ipcp_name,
-            uint16_t supp_ipcp_id)
+/*static */struct rina_msg_base_resp *
+ipcp_bind_flow(struct ipcm *ipcm, uint16_t ipcp_id,
+               uint32_t port_id)
 {
-    struct rina_kmsg_ipcp_enroll *req;
+    struct rina_kmsg_ipcp_bind_flow *req;
     struct rina_msg_base_resp *resp;
     int result;
 
@@ -393,20 +374,18 @@ ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_ENROLL;
+    req->msg_type = RINA_KERN_IPCP_BIND_FLOW;
     req->ipcp_id = ipcp_id;
-    rina_name_copy(&req->neigh_ipcp_name, neigh_ipcp_name);
-    req->supp_ipcp_id = supp_ipcp_id;
+    req->port_id = port_id;
 
-    PD("Requesting IPCP enrollment...\n");
+    PD("Requesting IPCP flow binding...\n");
     resp = (struct rina_msg_base_resp *)
            issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         1, 5000, &result);
+                         0, 0, &result);
     PD("%s: result: %d\n", __func__, result);
 
     return resp;
 }
-*/
 
 static int
 test(struct ipcm *ipcm)

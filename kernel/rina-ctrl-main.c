@@ -910,31 +910,32 @@ negative:
 }
 
 static int
-rina_ipcp_enroll(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_bind_flow(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_enroll *req =
-                    (struct rina_kmsg_ipcp_enroll *)bmsg;
-    struct ipcp_entry *entry;
+    struct rina_kmsg_ipcp_bind_flow *req =
+                    (struct rina_kmsg_ipcp_bind_flow *)bmsg;
+    struct ipcp_entry *ipcp;
+    struct flow_entry *flow;
     int ret = 0;
-    struct upper_ref upper;
 
     mutex_lock(&rina_dm.lock);
 
-    /* Lookup the IPC process to enroll. */
-    entry = ipcp_table_find(req->ipcp_id);
-    if (!entry) {
+    ipcp = ipcp_table_find(req->ipcp_id);
+    if (!ipcp) {
         ret = -EINVAL;
         goto out;
     }
 
-    /* Try to allocate a flow towards the specified neighbor,
-     * using the specified N-1 IPCP. */
-    upper.userspace = 0;
-    upper.rc = rc;
-    upper.ipcp = entry;
-    ret = rina_flow_allocate_internal(req->supp_ipcp_id, upper,
-                                      req->event_id, &entry->name,
-                                      &req->neigh_ipcp_name);
+    flow = flow_table_find(req->port_id);
+    if (!flow) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    /* Bind the flow to the (kernel) IPCP. */
+    flow->upper.userspace = 0;
+    flow->upper.rc = NULL;
+    flow->upper.ipcp = ipcp;
 out:
     mutex_unlock(&rina_dm.lock);
 
@@ -1176,40 +1177,11 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
     } else {
         /* This response is for a local IPCP. */
         struct ipcp_entry *upper_ipcp = flow_entry->upper.ipcp;
-        struct rina_msg_base_resp *resp;
 
         if (upper_ipcp->ops.flow_allocate_resp_arrived) {
             ret = upper_ipcp->ops.flow_allocate_resp_arrived(upper_ipcp,
                                                              flow_entry,
                                                              response);
-        }
-
-        /* Create an enrollment response message for the IPC manager. */
-        resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-        if (!resp) {
-            PE("%s: Out of memory\n", __func__);
-            ret = -ENOMEM;
-        } else {
-            char *name_s = rina_name_to_string(&flow_entry->remote_application);
-
-            resp->msg_type = RINA_KERN_IPCP_ENROLL_RESP;
-            resp->event_id = flow_entry->event_id;
-            resp->result = response;
-
-            PI("%s: Enrollment completed [%u] with IPCP %s\n", __func__,
-                    response, name_s);
-            if (name_s) {
-                kfree(name_s);
-            }
-
-            /* Enqueue the response into the upqueue. */
-            BUG_ON(!flow_entry->upper.rc);
-            ret = rina_upqueue_append(flow_entry->upper.rc,
-                                      (struct rina_msg_base *)resp);
-            if (ret) {
-                rina_msg_free(rina_kernel_numtables,
-                              (struct rina_msg_base *)resp);
-            }
         }
     }
 
@@ -1259,7 +1231,7 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
-    [RINA_KERN_IPCP_ENROLL] = rina_ipcp_enroll,
+    [RINA_KERN_IPCP_BIND_FLOW] = rina_ipcp_bind_flow,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
