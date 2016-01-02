@@ -557,6 +557,10 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct ipcp_entry *entry;
     int ret = -EINVAL;  /* Report failure by default. */
 
+    if (!req->name || !req->value) {
+        return -EINVAL;
+    }
+
     mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */

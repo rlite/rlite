@@ -201,7 +201,7 @@ rina_shim_dummy_config(struct ipcp_entry *ipcp,
                        const char *param_name,
                        const char *param_value)
 {
-    return -1;
+    return -EINVAL;
 }
 
 static int __init

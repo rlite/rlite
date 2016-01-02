@@ -19,6 +19,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/string.h>
 #include <rina/rina-utils.h>
 #include <rina/rina-ipcp-types.h>
 #include <vmpi-provider.h>
@@ -152,9 +153,6 @@ static void *
 rina_shim_hv_create(struct ipcp_entry *ipcp)
 {
     struct rina_shim_hv *priv;
-    unsigned int provider = VMPI_PROVIDER_AUTO;
-    unsigned int id = 0; // XXX
-    int ret;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -162,19 +160,7 @@ rina_shim_hv_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-
-    ret = vmpi_provider_find_instance(provider, id, &priv->vmpi_ops);
-    if (ret) {
-        printk("vmpi_provider_find(%u, %u) failed\n", provider, id);
-        return NULL;
-    }
-
-    ret = priv->vmpi_ops.register_read_callback(&priv->vmpi_ops,
-            shim_hv_read_callback, priv);
-    if (ret) {
-        printk("register_read_callback() failed\n");
-        return NULL;
-    }
+    priv->vmpi_id = ~0U;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -253,6 +239,10 @@ rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
     struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;
     ssize_t ret;
 
+    if (unlikely(!vmpi_ops->write)) {
+        return -ENXIO;
+    }
+
     iov.iov_base = rb->ptr;
     iov.iov_len = rb->size;
 
@@ -268,7 +258,32 @@ rina_shim_hv_config(struct ipcp_entry *ipcp,
                     const char *param_name,
                     const char *param_value)
 {
-    return -1;
+    struct rina_shim_hv *priv = (struct rina_shim_hv *)ipcp->priv;
+    int ret = -EINVAL;
+
+    if (strcmp(param_name, "vmpi-id") == 0) {
+        unsigned int provider = VMPI_PROVIDER_AUTO;
+
+        ret = kstrtouint(param_value, 10, &priv->vmpi_id);
+        if (ret == 0) {
+            printk("vmpi id set to %u\n", priv->vmpi_id);
+        }
+
+        ret = vmpi_provider_find_instance(provider, priv->vmpi_id, &priv->vmpi_ops);
+        if (ret) {
+            printk("vmpi_provider_find(%u, %u) failed\n", provider, priv->vmpi_id);
+            return ret;
+        }
+
+        ret = priv->vmpi_ops.register_read_callback(&priv->vmpi_ops,
+                shim_hv_read_callback, priv);
+        if (ret) {
+            printk("register_read_callback() failed\n");
+            return ret;
+        }
+    }
+
+    return ret;
 }
 
 static int __init
