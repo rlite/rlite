@@ -26,6 +26,9 @@
 #include "uipcp-container.h"
 
 
+const char *ctrl_dev_name = "/dev/rlite";
+const char *io_dev_name = "/dev/rlite-io";
+
 struct registered_ipcp {
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
@@ -487,7 +490,7 @@ uipcps_update(struct uipcps *uipcps)
     struct rl_ipcp *rl_ipcp;
     int ret = 0;
 
-    ret = rl_evloop_init(&uipcps->loop, "/dev/rlite", NULL, 0);
+    ret = rl_evloop_init(&uipcps->loop, ctrl_dev_name, NULL, 0);
     if (ret) {
         return ret;
     }
@@ -598,6 +601,14 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
+static int
+char_device_exists(const char *path)
+{
+    struct stat s;
+
+    return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
+}
+
 int main(int argc, char **argv)
 {
     struct uipcps *uipcps = &guipcps;
@@ -608,6 +619,16 @@ int main(int argc, char **argv)
     /* We require root permissions. */
     if (geteuid() != 0) {
         PE("uipcps daemon needs root permissions\n");
+        return -1;
+    }
+
+    if (!char_device_exists(ctrl_dev_name)) {
+        PE("Device %s not found", ctrl_dev_name);
+        return -1;
+    }
+
+    if (!char_device_exists(io_dev_name)) {
+        PE("Device %s not found", io_dev_name);
         return -1;
     }
 
@@ -651,19 +672,19 @@ int main(int argc, char **argv)
      * Unix socket, so that anyone can read and write. This
      * a temporary solution, to be used until a precise
      * permission scheme is designed. */
-    if (chmod("/dev/rlite", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
+    if (chmod(ctrl_dev_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
                             | S_IROTH | S_IWOTH)) {
-        perror("warning: chmod(/dev/rlite) failed\n");
+        perror("warning: chmod(/dev/rlite) failed");
     }
 
-    if (chmod("/dev/rlite-io", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
+    if (chmod(io_dev_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
                                | S_IROTH | S_IWOTH)) {
-        perror("warning: chmod(/dev/rlite-io) failed\n");
+        perror("warning: chmod(/dev/rlite-io) failed");
     }
 
     if (chmod(RLITE_UIPCPS_UNIX_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
                                      | S_IROTH | S_IWOTH)) {
-        perror("warning: chmod(/var/rlite/uipcp-server) failed\n");
+        perror("warning: chmod(/var/rlite/uipcp-server) failed");
     }
 
     list_init(&uipcps->uipcps);
