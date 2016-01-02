@@ -196,9 +196,10 @@ rina_shim_dummy_init(void)
     struct ipcp_factory factory;
     int ret;
 
+    memset(&factory, 0, sizeof(factory));
+    factory.owner = THIS_MODULE;
     factory.dif_type = DIF_TYPE_SHIM_DUMMY;
     factory.create = rina_shim_dummy_create;
-    memset(&factory.ops, 0, sizeof(factory.ops));
     factory.ops.destroy = rina_shim_dummy_destroy;
     factory.ops.application_register = rina_shim_dummy_application_register;
     factory.ops.application_unregister = rina_shim_dummy_application_unregister;

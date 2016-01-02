@@ -116,7 +116,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 {
     struct ipcp_factory *f;
 
-    if (!factory || !factory->create) {
+    if (!factory || !factory->create || !factory->owner) {
         return -EINVAL;
     }
 
@@ -257,6 +257,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         rina_name_move(&entry->name, &req->name);
         entry->dif_type = req->dif_type;
         entry->priv = NULL;
+        entry->owner = NULL;
         mutex_init(&entry->lock);
         entry->refcnt = 0;
         INIT_LIST_HEAD(&entry->registered_applications);
@@ -295,6 +296,20 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
         goto out;
     }
 
+    /* Take a reference on the module that will own the new IPC
+     * process, in order to prevent the owner to be unloaded
+     * while the IPC process is in use.
+     * Note that this operation **must** happen before the
+     * constructor invocation (factory->create()), in order to
+     * avoid race conditions. */
+    if (!try_module_get(factory->owner)) {
+        printk("%s: IPC process module [%u] unexpectedly "
+                "disappeared\n", __func__, factory->dif_type);
+        ret = -ENXIO;
+        goto out;
+    }
+    entry->owner = factory->owner;
+
     entry->priv = factory->create(entry);
     if (!entry->priv) {
         ret = -EINVAL;
@@ -327,9 +342,19 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
         goto out;
     }
 
+    /* Inoke the destructor method, if the constructor
+     * was called. */
     if (entry->priv) {
         BUG_ON(entry->ops.destroy == NULL);
         entry->ops.destroy(entry);
+    }
+
+    /* If the module was refcounted for this IPC process instance,
+     * remove the reference. Note that this operation **must** happen
+     * after the destructor invokation, in order to avoid a race
+     * conditions that may lead to kernel page faults. */
+    if (entry->owner) {
+        module_put(entry->owner);
     }
 
     hash_del(&entry->node);

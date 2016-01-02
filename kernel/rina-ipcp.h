@@ -41,12 +41,16 @@ struct ipcp_entry {
     void                *priv;
     struct list_head    registered_applications;
 
+    /* The module that owns this IPC process. */
+    struct module       *owner;
     struct mutex        lock;
     unsigned int        refcnt;
     struct hlist_node   node;
 };
 
 struct ipcp_factory {
+    /* The module providing this factory. */
+    struct module *owner;
     uint8_t dif_type;
     void *(*create)(struct ipcp_entry *ipcp);
     struct ipcp_ops ops;
