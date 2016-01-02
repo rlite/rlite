@@ -518,6 +518,19 @@ rina_evloop_fini(struct rina_evloop *loop)
     return 0;
 }
 
+int
+rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
+                        rina_resp_handler_t handler)
+{
+    if (index >= RINA_KERN_MSG_MAX) {
+        return -1;
+    }
+
+    loop->handlers[index] = handler;
+
+    return 0;
+}
+
 unsigned int
 select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
                    int fallback)

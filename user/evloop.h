@@ -77,6 +77,9 @@ int
 rina_evloop_fini(struct rina_evloop *loop);
 
 int
+rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
+                        rina_resp_handler_t handler);
+int
 ipcps_print(struct rina_evloop *loop);
 
 /* Fetch information about all IPC processes. */
