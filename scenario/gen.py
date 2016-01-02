@@ -190,7 +190,7 @@ for i in vms:
                 outs += 'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n' % vars_dict
         elif args.type == 'inet4':
                 outs += 'sudo ip addr add 10.71.%(brid)s.%(id)s/24 dev $PORT\n' % vars_dict
-                entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.IPCP/%(idx)s//' % vars_dict
+                entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.DIF///' % vars_dict
                 outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
                 inet4_dir.append(entry)
         outs += 'rina-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
