@@ -24,12 +24,12 @@
 #define RMBR(m) (struct rina_msg_base_resp *)(m)
 
 struct ipcp {
-        unsigned int ipcp_id;
-        struct rina_name ipcp_name;
-        unsigned int dif_type;
-        struct rina_name dif_name;
+    unsigned int ipcp_id;
+    struct rina_name ipcp_name;
+    unsigned int dif_type;
+    struct rina_name dif_name;
 
-        struct list_head node;
+    struct list_head node;
 };
 
 /* IPC Manager data model. */
@@ -725,8 +725,6 @@ test(struct ipcm *ipcm)
     return 0;
 }
 
-#define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
-
 static int
 rina_appl_response(int sfd, struct rina_msg_base *req,
                    struct rina_msg_base_resp *resp)
@@ -1026,7 +1024,7 @@ unix_server(void *arg)
 static void
 sigint_handler(int signum)
 {
-    unlink(UNIX_DOMAIN_SOCKNAME);
+    unlink(RINA_IPCM_UNIX_NAME);
     exit(EXIT_SUCCESS);
 }
 
@@ -1068,9 +1066,9 @@ int main()
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, UNIX_DOMAIN_SOCKNAME,
+    strncpy(server_address.sun_path, RINA_IPCM_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
-    if (unlink(UNIX_DOMAIN_SOCKNAME) == 0) {
+    if (unlink(RINA_IPCM_UNIX_NAME) == 0) {
         /* This should not happen if everything behaves correctly.
          * However, if something goes wrong, the Unix domain socket
          * could still exist and so the following bind() would fail.

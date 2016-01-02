@@ -16,8 +16,6 @@
 #include "helpers.h"
 
 
-#define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
-
 static void usage(void);
 
 static int
@@ -35,7 +33,7 @@ ipcm_connect()
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, UNIX_DOMAIN_SOCKNAME,
+    strncpy(server_address.sun_path, RINA_IPCM_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
     ret = connect(sfd, (struct sockaddr *)&server_address,
                     sizeof(server_address));

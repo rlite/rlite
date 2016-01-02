@@ -1,6 +1,8 @@
 #ifndef __RINA_COMMON_H__
 #define __RINA_COMMON_H__
 
+#define RINA_IPCM_UNIX_NAME     "/tmp/rina-ipcm"
+
 /* Application naming information:
  *   - Application Process Name
  *   - Application Process Instance

@@ -17,7 +17,8 @@
 
 
 /* Message types. They **must** be listed alternating requests with
- * the corresponding responses. */
+ * the corresponding responses. Moreover, request messages **must**
+ * be odd numbers and response messages **must** be even numbers. */
 enum {
     RINA_KERN_IPCP_CREATE = 1,
     RINA_KERN_IPCP_CREATE_RESP, /* 2 */
