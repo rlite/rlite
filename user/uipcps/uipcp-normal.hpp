@@ -45,15 +45,15 @@ namespace obj_name {
 #define RL_AGE_INCR_INTERVAL    2
 
 enum state_t {
-    NONE = 0,
-    I_WAIT_CONNECT_R,
-    S_WAIT_START,
-    I_WAIT_START_R,
-    S_WAIT_STOP_R,
-    I_WAIT_STOP,
-    I_WAIT_START,
-    ENROLLED,
-    ENROLLMENT_STATE_LAST,
+    NEIGH_NONE = 0,
+    NEIGH_I_WAIT_CONNECT_R,
+    NEIGH_S_WAIT_START,
+    NEIGH_I_WAIT_START_R,
+    NEIGH_S_WAIT_STOP_R,
+    NEIGH_I_WAIT_STOP,
+    NEIGH_I_WAIT_START,
+    NEIGH_ENROLLED,
+    NEIGH_STATE_LAST,
 };
 
 struct Neighbor;
@@ -73,7 +73,7 @@ struct NeighFlow {
     NeighFlow(Neighbor *n, unsigned int pid, int ffd,
               unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
                                   lower_ipcp_id(lid), conn(NULL),
-                                  enrollment_state(NONE) { }
+                                  enrollment_state(NEIGH_NONE) { }
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -86,7 +86,7 @@ struct Neighbor {
 
     typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
                                                   const CDAPMessage *rm);
-    enroll_fsm_handler_t enroll_fsm_handlers[ENROLLMENT_STATE_LAST];
+    enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
     /* Required to use the map. */
     Neighbor() : rib(NULL) { }

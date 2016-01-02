@@ -574,7 +574,7 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
         }
 
         if (const_cast<Neighbor &>(neigh->second).
-                        mgmt_conn()->enrollment_state != ENROLLED) {
+                        mgmt_conn()->enrollment_state != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }

@@ -11,14 +11,14 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = ~0U;
-    enroll_fsm_handlers[NONE] = &Neighbor::none;
-    enroll_fsm_handlers[I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
-    enroll_fsm_handlers[S_WAIT_START] = &Neighbor::s_wait_start;
-    enroll_fsm_handlers[I_WAIT_START_R] = &Neighbor::i_wait_start_r;
-    enroll_fsm_handlers[S_WAIT_STOP_R] = &Neighbor::s_wait_stop_r;
-    enroll_fsm_handlers[I_WAIT_STOP] = &Neighbor::i_wait_stop;
-    enroll_fsm_handlers[I_WAIT_START] = &Neighbor::i_wait_start;
-    enroll_fsm_handlers[ENROLLED] = &Neighbor::enrolled;
+    enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
+    enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
+    enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
+    enroll_fsm_handlers[NEIGH_I_WAIT_START_R] = &Neighbor::i_wait_start_r;
+    enroll_fsm_handlers[NEIGH_S_WAIT_STOP_R] = &Neighbor::s_wait_stop_r;
+    enroll_fsm_handlers[NEIGH_I_WAIT_STOP] = &Neighbor::i_wait_stop;
+    enroll_fsm_handlers[NEIGH_I_WAIT_START] = &Neighbor::i_wait_start;
+    enroll_fsm_handlers[NEIGH_ENROLLED] = &Neighbor::enrolled;
 }
 
 Neighbor::Neighbor(const Neighbor& other)
@@ -62,28 +62,28 @@ const char *
 Neighbor::enrollment_state_repr(state_t s) const
 {
     switch (s) {
-        case NONE:
+        case NEIGH_NONE:
             return "NONE";
 
-        case I_WAIT_CONNECT_R:
+        case NEIGH_I_WAIT_CONNECT_R:
             return "I_WAIT_CONNECT_R";
 
-        case S_WAIT_START:
+        case NEIGH_S_WAIT_START:
             return "S_WAIT_START";
 
-        case I_WAIT_START_R:
+        case NEIGH_I_WAIT_START_R:
             return "I_WAIT_START_R";
 
-        case S_WAIT_STOP_R:
+        case NEIGH_S_WAIT_STOP_R:
             return "S_WAIT_STOP_R";
 
-        case I_WAIT_STOP:
+        case NEIGH_I_WAIT_STOP:
             return "I_WAIT_STOP";
 
-        case I_WAIT_START:
+        case NEIGH_I_WAIT_START:
             return "I_WAIT_START";
 
-        case ENROLLED:
+        case NEIGH_ENROLLED:
             return "ENROLLED";
 
         default:
@@ -155,11 +155,11 @@ Neighbor::abort(NeighFlow *nf)
 
     UPE(rib->uipcp, "Aborting enrollment\n");
 
-    if (nf->enrollment_state == NONE) {
+    if (nf->enrollment_state == NEIGH_NONE) {
         return;
     }
 
-    nf->enrollment_state = NONE;
+    nf->enrollment_state = NEIGH_NONE;
 
     m.m_release(gpb::F_NO_FLAGS);
 
@@ -234,7 +234,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
             return -1;
         }
 
-        next_state = I_WAIT_CONNECT_R;
+        next_state = NEIGH_I_WAIT_CONNECT_R;
 
     } else {
         /* (1) S <-- I: M_CONNECT
@@ -252,7 +252,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
 
         invoke_id = rm->invoke_id;
 
-        next_state = S_WAIT_START;
+        next_state = NEIGH_S_WAIT_START;
     }
 
     ret = send_to_port_id(nf, &m, invoke_id, NULL);
@@ -304,7 +304,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 
     enroll_tmr_stop(nf);
     enroll_tmr_start(nf);
-    nf->enrollment_state = I_WAIT_START_R;
+    nf->enrollment_state = NEIGH_I_WAIT_START_R;
 
     return 0;
 }
@@ -400,7 +400,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     enroll_tmr_stop(nf);
     enroll_tmr_start(nf);
-    nf->enrollment_state = S_WAIT_STOP_R;
+    nf->enrollment_state = NEIGH_S_WAIT_STOP_R;
 
     return 0;
 }
@@ -441,7 +441,7 @@ Neighbor::i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
 
     enroll_tmr_stop(nf);
     enroll_tmr_start(nf);
-    nf->enrollment_state = I_WAIT_STOP;
+    nf->enrollment_state = NEIGH_I_WAIT_STOP;
 
     return 0;
 }
@@ -500,7 +500,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
     if (enr_info.start_early) {
         UPI(rib->uipcp, "Initiator is allowed to start early\n");
         enroll_tmr_stop(nf);
-        nf->enrollment_state = ENROLLED;
+        nf->enrollment_state = NEIGH_ENROLLED;
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
          * the new neighbor. */
@@ -512,7 +512,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         UPI(rib->uipcp, "Initiator is not allowed to start early\n");
         enroll_tmr_stop(nf);
         enroll_tmr_start(nf);
-        nf->enrollment_state = I_WAIT_START;
+        nf->enrollment_state = NEIGH_I_WAIT_START;
     }
 
     return 0;
@@ -553,7 +553,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     enroll_tmr_stop(nf);
-    nf->enrollment_state = ENROLLED;
+    nf->enrollment_state = NEIGH_ENROLLED;
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
@@ -593,8 +593,8 @@ bool
 Neighbor::enrollment_ongoing()
 {
     return has_mgmt_flow() &&
-           mgmt_conn()->enrollment_state >= S_WAIT_START &&
-           mgmt_conn()->enrollment_state < ENROLLED;
+           mgmt_conn()->enrollment_state >= NEIGH_S_WAIT_START &&
+           mgmt_conn()->enrollment_state < NEIGH_ENROLLED;
 }
 
 int
@@ -603,15 +603,9 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
     state_t old_state = nf->enrollment_state;
     int ret;
 
-    assert(nf->enrollment_state >= NONE &&
-           nf->enrollment_state < ENROLLMENT_STATE_LAST);
+    assert(nf->enrollment_state >= NEIGH_NONE &&
+           nf->enrollment_state < NEIGH_STATE_LAST);
     assert(enroll_fsm_handlers[nf->enrollment_state]);
-
-    if (!rm && nf->enrollment_state != NONE) {
-        UPI(rib->uipcp, "Enrollment already in progress, current state "
-            "is %s\n", enrollment_state_repr(nf->enrollment_state));
-        return 0;
-    }
 
     ret = (this->*(enroll_fsm_handlers[nf->enrollment_state]))(nf, rm);
 
@@ -945,6 +939,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
+    NeighFlow *nf;
     int ret;
 
     neigh = rib->get_neighbor(&req->neigh_ipcp_name);
@@ -960,8 +955,16 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 
     assert(neigh->has_mgmt_flow());
 
+    nf = neigh->mgmt_conn();
+
     /* Start the enrollment procedure as initiator. */
-    neigh->enroll_fsm_run(neigh->mgmt_conn(), NULL);
+    if (nf->enrollment_state != NEIGH_NONE) {
+        UPI(rib->uipcp, "Enrollment already in progress, current state "
+            "is %s\n", neigh->enrollment_state_repr(nf->enrollment_state));
+        return 0;
+    }
+
+    neigh->enroll_fsm_run(nf, NULL);
 
     return 0;
 }
