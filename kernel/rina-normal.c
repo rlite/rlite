@@ -121,14 +121,16 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
-    if (unlikely(!lower_flow)) {
+    if (unlikely(!lower_flow && flow->remote_addr != ipcp->addr)) {
         PD("%s: No route to IPCP %lu, dropping packet\n", __func__,
             (long unsigned)flow->remote_addr);
         rina_buf_free(rb);
         return 0;
     }
-    lower_ipcp = lower_flow->txrx.ipcp;
-    BUG_ON(!lower_ipcp);
+    if (lower_flow) {
+        lower_ipcp = lower_flow->txrx.ipcp;
+        BUG_ON(!lower_ipcp);
+    }
 
     rina_buf_pci_push(rb);
 
@@ -142,11 +144,18 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_flags = 0;
     pci->seqnum = flow->dtp.next_seq_num_to_send++;
 
-    /* Directly call the underlying IPCP for now. RMT component
-     * is not implemented explicitely for now. */
-    ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
-    if (likely(ret >= sizeof(struct rina_pci))) {
-        ret -= sizeof(struct rina_pci);
+    if (lower_flow) {
+        /* Directly call the underlying IPCP for now. RMT component
+         * is not implemented explicitely for now. */
+        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+        if (likely(ret >= sizeof(struct rina_pci))) {
+            ret -= sizeof(struct rina_pci);
+        }
+    } else {
+        int len = rb->len - sizeof(struct rina_pci);
+
+        ret = ipcp->ops.sdu_rx(ipcp, rb);
+        ret = (ret == 0) ? len : ret;
     }
 
     return ret;
