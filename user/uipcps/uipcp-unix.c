@@ -199,37 +199,13 @@ out:
 
 static int
 rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
-                       const struct rlite_msg_base *b_req)
+                        const struct rlite_msg_base *b_req)
 {
     struct rl_cmsg_uipcp_update *req = (struct rl_cmsg_uipcp_update *)b_req;
     struct rlite_msg_base_resp resp;
-    struct uipcp *uipcp;
-
-    resp.result = RLITE_ERR; /* Report failure by default. */
-
-    if (req->msg_type == RLITE_CFG_UIPCP_CREATE) {
-        resp.result = uipcp_add(uipcps, req->ipcp_id, req->dif_type);
-
-    } else if (req->msg_type == RLITE_CFG_UIPCP_DESTROY) {
-        /* Track all the unregistrations of the destroyed IPCP in
-         * the persistent registrations list. */
-        track_ipcp_registration(uipcps, 0, NULL, req->ipcp_id, NULL);
-
-        uipcp = uipcp_lookup(uipcps, req->ipcp_id);
-        if (!uipcp) {
-            PE("Could not find uipcp for IPC process %u\n",
-                req->ipcp_id);
-            goto out;
-        }
-
-        resp.result = uipcp_del(uipcps, req->ipcp_id);
-    }
-
-    uipcps_print(uipcps);
 
     resp.result = RLITE_SUCC;
 
-out:
     return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
 }
 
@@ -381,7 +357,40 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
                    const struct rlite_msg_base_resp *b_resp,
                    const struct rlite_msg_base *b_req)
 {
-    PD("CALLED\n");
+    struct uipcps *uipcps = container_of(loop, struct uipcps, loop);
+    struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
+    struct uipcp *uipcp;
+    int ret = -1;
+
+    switch (upd->update_type) {
+        case RLITE_UPDATE_ADD:
+            ret = uipcp_add(uipcps, upd->ipcp_id, upd->dif_type);
+            break;
+
+        case RLITE_UPDATE_DEL:
+            /* Track all the unregistrations of the destroyed IPCP in
+             * the persistent registrations list. */
+            track_ipcp_registration(uipcps, 0, NULL, upd->ipcp_id, NULL);
+
+            uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
+            if (!uipcp) {
+                PE("Could not find uipcp for IPC process %u\n", upd->ipcp_id);
+            } else {
+                ret = uipcp_del(uipcps, upd->ipcp_id);
+            }
+            break;
+
+        default:
+            ret = 0;
+            break;
+    }
+
+    if (ret) {
+        PE("IPCP update synchronization failed\n");
+    }
+
+    uipcps_print(uipcps);
+
     return 0;
 }
 
