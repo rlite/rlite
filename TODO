@@ -21,3 +21,12 @@
 - fix permissions to /var/rina/ directory
 
 - add help() function to rinaperf
+
+- aggiustare il locking:
+    a) flow_lookup() dovrebbe sparire
+    b) il global lock deve sparire, almeno nel datapath.
+    c) il punto b) non è solo una questione di performance. È anzi prima di tutto
+       un modo di poter invocare lock diversi a diversy layer lungo il datapath
+       di ricezione e trasmissione
+    d) attualmente il locking non è safe nel datapath (per esempio vedi
+       rina_normal_sdu_write() o rina_normal_sdu_rx()

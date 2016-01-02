@@ -113,6 +113,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
+    dtp->rcv_lwe = 0;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
@@ -199,7 +200,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     }
 
     /* 3 * (MPL + R + A) */
-    hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30), HRTIMER_MODE_REL);
+    hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
+                  HRTIMER_MODE_REL);
 
     return ret;
 }
@@ -308,12 +310,71 @@ static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
     struct rina_pci *pci = RINA_BUF_PCI(rb);
+    struct flow_entry *flow = flow_lookup(pci->conn_id.dst_cep);
+    struct dtp *dtp;
+
+    if (!flow) {
+        PI("%s: No flow for port-id %u: dropping PDU",
+                __func__, pci->conn_id.dst_cep);
+        rina_buf_free(rb);
+        return 0;
+    }
+
+    dtp = &flow->dtp;
+
+    hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
 
     rina_buf_pci_pop(rb);
 
     if (pci->pdu_type == PDU_TYPE_DT) {
         /* Data transfer PDU. */
-        return rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        int ret;
+
+        if (pci->pdu_flags & 1) {
+            /* DRF is set: either first PDU or new run. */
+
+            /* Flush reassembly queue */
+
+            dtp->rcv_lwe = pci->seqnum + 1;
+
+            ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        } else {
+            if (unlikely(pci->seqnum < dtp->rcv_lwe)) {
+                /* This is a duplicate. */
+                PD("%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
+                    (long unsigned)pci->seqnum);
+                rina_buf_free(rb);
+
+                /* Send ACK flow PDU */
+
+                return 0;
+            }
+
+            if (unlikely(pci->seqnum > dtp->rcv_lwe)) {
+                /* This may go in a gap or be a duplicate
+                 * amongst the gaps. */
+
+                PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+                    __func__, (long unsigned)dtp->rcv_lwe,
+                    (unsigned long)pci->seqnum + 1);
+
+                // TODO, for now just pass it up, and ignore gaps
+
+                dtp->rcv_lwe = pci->seqnum + 1;
+                ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+            } else { /* pci->seqnum == dtp->rcv_lwe */
+                /* In order PDU. */
+
+                dtp->rcv_lwe++;
+                ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+            }
+        }
+
+        /* 2 * (MPL + R + A) */
+        hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
+                      HRTIMER_MODE_REL);
+
+        return ret;
     }
 
     /* Control PDU. TODO */

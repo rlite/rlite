@@ -39,3 +39,14 @@ rina_buf_free(struct rina_buf *rb)
     kfree(rb);
 }
 EXPORT_SYMBOL_GPL(rina_buf_free);
+
+void
+rina_pci_dump(struct rina_pci *pci)
+{
+    printk("PCI: dst=%lu,src=%lu,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
+            "seq=%lu\n", (long unsigned)pci->dst_addr,
+            (long unsigned)pci->src_addr, pci->conn_id.qos_id,
+            pci->conn_id.dst_cep, pci->conn_id.src_cep,
+            pci->pdu_type, pci->pdu_flags, (long unsigned)pci->seqnum);
+}
+EXPORT_SYMBOL_GPL(rina_pci_dump);
