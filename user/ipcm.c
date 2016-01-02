@@ -330,37 +330,6 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     return result;
 }
 
-static int
-ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
-              uint16_t ipcp_id_where, uint8_t reg)
-{
-    struct rina_kmsg_ipcp_register *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_REGISTER;
-    req->ipcp_id_who = ipcp_id_who;
-    req->ipcp_id_where = ipcp_id_where;
-    req->reg = reg;
-
-    PD("Requesting IPCP register...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    return result;
-}
-
 /* XXX This code is going to be reused for allocation
  * of IPCP2IPCP transport flows.
 
@@ -557,25 +526,27 @@ static int
 rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
-    unsigned int ipcp_id_who, ipcp_id_where;
+    unsigned int ipcp_id;
     struct rina_amsg_ipcp_register *req = (struct rina_amsg_ipcp_register *)b_req;
     struct rina_msg_base_resp resp;
+    struct uipcp *uipcp;
 
     resp.result = 1;  /* Report failure by default. */
 
-    ipcp_id_who = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
-    if (ipcp_id_who == ~0U) {
+    /* Lookup the id of the registering IPCP. */
+    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    if (ipcp_id == ~0U) {
         PE("%s: Could not find who IPC process\n", __func__);
         goto out;
     }
 
-    ipcp_id_where = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
-    if (ipcp_id_where == ~0U) {
-        PE("%s: Could not find where IPC process\n", __func__);
-        goto out;
-    }
-    /* Forward the request to the kernel. */
-    resp.result = ipcp_register(ipcm, ipcp_id_who, ipcp_id_where, req->reg);
+    /* Grab the corresponding userspace IPCP. */
+    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    assert(uipcp);
+
+    /* Perform the registration. */
+    resp.result = application_register(&uipcp->appl, req->reg, &req->dif_name,
+                                       0, &req->ipcp_name);
 
 out:
     return rina_conf_response(sfd, RMB(req), &resp);

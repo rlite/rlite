@@ -27,6 +27,7 @@ int rina_application_fini(struct application *application);
 
 int application_register(struct application *application,
                          int reg, struct rina_name *dif_name,
+                         int fallback,
                          struct rina_name *application_name);
 
 int flow_allocate(struct application *application,

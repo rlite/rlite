@@ -398,12 +398,12 @@ main(int argc, char **argv)
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
-        ret = application_register(&rp.application, 1, &rp.dif_name,
+        ret = application_register(&rp.application, 1, &rp.dif_name, 1,
                                    &server_ctrl_name);
         if (ret) {
             return ret;
         }
-        ret = application_register(&rp.application, 1, &rp.dif_name,
+        ret = application_register(&rp.application, 1, &rp.dif_name, 1,
                                    &rp.server_appl_name);
         if (ret) {
             return ret;

@@ -195,12 +195,12 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
 
 int
 application_register(struct application *application, int reg,
-                     struct rina_name *dif_name,
+                     struct rina_name *dif_name, int fallback,
                      struct rina_name *application_name)
 {
     unsigned int ipcp_id;
 
-    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
+    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, fallback);
     if (ipcp_id == ~0U) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
         return -1;
