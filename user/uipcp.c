@@ -172,7 +172,8 @@ static int
 uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                      uint64_t remote_addr,
                      const struct rina_name *local_application,
-                     const struct rina_name *remote_application)
+                     const struct rina_name *remote_application,
+                     const struct rina_flow_config *flowcfg)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req;
     struct rina_msg_base *resp;
@@ -190,7 +191,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
     req->remote_addr = remote_addr;
-    flow_config_default(&req->flowcfg);
+    memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
@@ -212,6 +213,7 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     struct rina_name local_application, remote_application;
     const void *ptr = buf;
     uint32_t remote_port;
+    struct rina_flow_config flowcfg;
     int ret;
 
     PD("%s: [uipcp %u] Received fa req management SDU from IPCP addr %lu\n",
@@ -219,6 +221,9 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 
     remote_port = le32toh(*((uint32_t *)ptr));
     ptr += sizeof(uint32_t);
+
+    memcpy(&flowcfg, ptr, sizeof(flowcfg)); /* unsafe... */
+    ptr += sizeof(flowcfg);
 
     ret = deserialize_rina_name(&ptr, &remote_application);
     if (ret) {
@@ -231,7 +236,8 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     }
 
     uipcp_fa_req_arrived(uipcp, remote_port, mhdr->remote_addr,
-                         &local_application, &remote_application);
+                         &local_application, &remote_application,
+                         &flowcfg);
 
     return 0;
 }
@@ -426,6 +432,7 @@ uipcp_fa_req(struct rina_evloop *loop,
     }
 
     len = 1 + sizeof(req->local_port) +
+            sizeof(req->flowcfg) +
             rina_name_serlen(&req->local_application) +
             rina_name_serlen(&req->remote_application);
     mgmtsdu = malloc(len);
@@ -438,6 +445,8 @@ uipcp_fa_req(struct rina_evloop *loop,
     cur = mgmtsdu + 1;
     *((uint32_t *)cur) = htole32(req->local_port);
     cur += sizeof(req->local_port);
+    memcpy(cur, &req->flowcfg, sizeof(req->flowcfg)); /* unsafe */
+    cur += sizeof(req->flowcfg);
     serialize_rina_name(&cur, &req->local_application);
     serialize_rina_name(&cur, &req->remote_application);
 
