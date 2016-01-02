@@ -165,6 +165,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
         rlite_flow_cfg_default(&flowcfg);
     } else {
         flowcfg = qcmi->second;
+        PI("QoSCube '%s' selected\n", qcmi->first.c_str());
     }
 
     flowcfg2policies(&flowcfg, freq.qos, freq.policies);
