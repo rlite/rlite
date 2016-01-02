@@ -33,7 +33,17 @@ struct uipcps {
     struct rlite_evloop loop;
 };
 
-#define RLITE_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
+#define RLITE_PERSISTENCE_FILE   "/var/rlite/uipcps-persist"
+
+struct enrolled_neigh {
+    // TODO these can be serialized names
+    char *dif_name;
+    struct rina_name ipcp_name;
+    struct rina_name neigh_name;
+    char *supp_dif;
+
+    struct list_head node;
+};
 
 struct uipcp;
 
@@ -42,14 +52,12 @@ struct uipcp_ops {
 
     int (*fini)(struct uipcp *);
 
-    int (*register_to_lower)(struct uipcp *uipcp, int reg,
-                             const char *dif_name,
-                             unsigned int ipcp_id,
-                             const struct rina_name *ipcp_name);
+    int (*register_to_lower)(struct uipcp *uipcp,
+                             const struct rl_cmsg_ipcp_register *req);
 
-    int (*enroll)(struct uipcp *, struct rl_cmsg_ipcp_enroll *);
+    int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *);
 
-    int (*dft_set)(struct uipcp *, struct rl_cmsg_ipcp_dft_set *);
+    int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
 
     char * (*rib_show)(struct uipcp *);
 
@@ -68,6 +76,8 @@ struct uipcp_ops {
     int (*flow_deallocated)(struct rlite_evloop *loop,
                             const struct rlite_msg_base *b_resp,
                             const struct rlite_msg_base *b_req);
+
+    int (*get_enrollment_targets)(struct uipcp *, struct list_head *neighs);
 };
 
 struct ipcp_node {
@@ -107,6 +117,9 @@ int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
+
+struct uipcp *uipcp_lookup_by_name(struct uipcps *uipcps,
+                                   const struct rina_name *ipcp_name);
 
 int uipcps_print(struct uipcps *uipcps);
 

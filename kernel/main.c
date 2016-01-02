@@ -57,7 +57,6 @@ struct rlite_ctrl {
     wait_queue_head_t upqueue_wqh;
 
     struct list_head flows_fetch_q;
-
     struct list_head node;
 };
 
@@ -438,6 +437,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->depth = RLITE_DEFAULT_LAYERS;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
+        init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
         hash_add(rlite_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
@@ -1542,6 +1542,7 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         } else {
             entry->uipcp = rc;
             ret = 0;
+            wake_up_interruptible(&entry->uipcp_wqh);
         }
         mutex_unlock(&entry->lock);
     }
@@ -1551,6 +1552,53 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         PI("IPC process %u attached to uipcp %p\n",
                 req->ipcp_id, rc);
     }
+
+    return ret;
+}
+
+static int
+rlite_ipcp_uipcp_wait(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_uipcp_wait *req =
+                    (struct rl_kmsg_ipcp_uipcp_wait *)bmsg;
+    DECLARE_WAITQUEUE(wait, current);
+    struct ipcp_entry *entry;
+    int ret = 0;
+
+    /* Find the IPC process entry corresponding to req->ipcp_id and wait
+     * for the entry->uipcp field to be filled. */
+    entry = ipcp_get(req->ipcp_id);
+    if (!entry) {
+        return -EINVAL;
+    }
+
+    add_wait_queue(&entry->uipcp_wqh, &wait);
+
+    while (1) {
+        struct rlite_ctrl *uipcp;
+
+        current->state = TASK_INTERRUPTIBLE;
+
+        mutex_lock(&entry->lock);
+        uipcp = entry->uipcp;
+        mutex_unlock(&entry->lock);
+
+        if (uipcp) {
+            break;
+        }
+
+        if (signal_pending(current)) {
+            ret = -ERESTARTSYS;
+            break;
+        }
+
+        schedule();
+    }
+
+    current->state = TASK_RUNNING;
+    remove_wait_queue(&entry->uipcp_wqh, &wait);
+
+    ipcp_put(entry);
 
     return ret;
 }
@@ -2202,6 +2250,7 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_FA_REQ] = rlite_fa_req,
     [RLITE_KER_FA_RESP] = rlite_fa_resp,
     [RLITE_KER_IPCP_UIPCP_SET] = rlite_ipcp_uipcp_set,
+    [RLITE_KER_IPCP_UIPCP_WAIT] = rlite_ipcp_uipcp_wait,
     [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rlite_uipcp_fa_req_arrived,
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
@@ -2262,7 +2311,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         case RLITE_KER_UIPCP_FA_RESP_ARRIVED:
         case RLITE_KER_FLOW_DEALLOC:
         case RLITE_KER_FLOW_FETCH:
-#if 0
+#if 0  // Skip the check for now, just to ease testing
             if (!capable(CAP_SYS_ADMIN)) {
                 kfree(kbuf);
                 return -EPERM;
@@ -2290,7 +2339,7 @@ rlite_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
     struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
-    int blocking = !(f->f_flags & O_NONBLOCK);
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     int ret = 0;
 
     if (blocking) {
@@ -2474,6 +2523,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
     struct rlite_buf *rb;
     struct rlite_mgmt_hdr mhdr;
     size_t orig_len = ulen;
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     ssize_t ret;
 
     if (unlikely(!rio->txrx)) {
@@ -2506,7 +2556,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 
     if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
         if (rio->mode == RLITE_IO_MODE_IPCP_MGMT) {
-            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
+            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb, blocking);
         } else {
             PE("Unknown mode, this should not happen\n");
             ret = -EINVAL;
@@ -2515,16 +2565,22 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         /* Regular application write. */
         DECLARE_WAITQUEUE(wait, current);
 
-        add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        if (blocking) {
+            add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        }
 
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
 
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, true);
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, blocking);
 
             if (unlikely(ret == -EAGAIN)) {
                 if (signal_pending(current)) {
                     ret = -ERESTARTSYS;
+                    break;
+                }
+
+                if (!blocking) {
                     break;
                 }
 
@@ -2537,7 +2593,9 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         }
 
         current->state = TASK_RUNNING;
-        remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        if (blocking) {
+            remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        }
     }
 
     if (unlikely(ret < 0)) {
@@ -2551,6 +2609,7 @@ static ssize_t
 rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
     ssize_t ret = 0;
@@ -2559,7 +2618,10 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         return -ENXIO;
     }
 
-    add_wait_queue(&txrx->rx_wqh, &wait);
+    if (blocking) {
+        add_wait_queue(&txrx->rx_wqh, &wait);
+    }
+
     while (len) {
         ssize_t copylen;
         struct rlite_buf *rb;
@@ -2578,6 +2640,11 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             spin_unlock_bh(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
+                break;
+            }
+
+            if (!blocking) {
+                ret = -EAGAIN;
                 break;
             }
 
@@ -2613,7 +2680,10 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&txrx->rx_wqh, &wait);
+
+    if (blocking) {
+        remove_wait_queue(&txrx->rx_wqh, &wait);
+    }
 
     return ret;
 }

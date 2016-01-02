@@ -6,7 +6,7 @@ using namespace std;
 
 
 int
-uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
+uipcp_rib::commit_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 {
     LowerFlow lf;
     uint64_t remote_addr = lookup_neighbor_address(neigh.ipcp_name);
@@ -29,19 +29,10 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 
     LowerFlowList lfl;
 
-    /* Send our lower flow database to the neighbor. */
-    for (map<string, LowerFlow>::iterator mit = lfdb.begin();
-                                        mit != lfdb.end(); mit++) {
-        lfl.flows.push_back(mit->second);
-    }
-    ret = neigh.remote_sync_obj(true, obj_class::lfdb,
-                                obj_name::lfdb, &lfl);
-
     /* Send the new lower flow to the other neighbors. */
-    lfl.flows.clear();
     lfl.flows.push_back(lf);
-    ret |= remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
-                                     obj_name::lfdb, &lfl);
+    ret = remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
+                                    obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
     spe.run(ipcp_info()->ipcp_addr, lfdb);
@@ -51,9 +42,9 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 }
 
 int
-uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
@@ -110,7 +101,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_obj_excluding(neigh, add, obj_class::lfdb,
+        remote_sync_obj_excluding(nf->neigh, add, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
@@ -241,7 +232,7 @@ uipcp_rib::pduft_sync()
      * next-hops. */
     for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
                                         r !=  spe.next_hops.end(); r++) {
-        map<string, Neighbor>::iterator neigh;
+        map<string, Neighbor*>::iterator neigh;
         string neigh_name;
 
         if (next_hop_to_port_id.count(r->second)) {
@@ -264,7 +255,8 @@ uipcp_rib::pduft_sync()
             continue;
         }
 
-        next_hop_to_port_id[r->second] = neigh->second.port_id;
+        /* Just take one for now. */
+        next_hop_to_port_id[r->second] = neigh->second->mgmt_conn()->port_id;
     }
 
     /* Generate PDUFT entries. */
@@ -297,5 +289,6 @@ age_incr_cb(struct rlite_evloop *loop, void *arg)
     }
 
     /* Reschedule */
-    rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000, age_incr_cb, rib);
+    rib->age_incr_tmrid = rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000,
+                                             age_incr_cb, rib);
 }

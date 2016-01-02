@@ -228,8 +228,24 @@ evloop_function(void *arg)
             perror("select()");
             continue;
 
-        } else if (ret == 0) {
-            /* Timeout. Process expired timers. Timer callbacks
+        }
+
+        if (FD_ISSET(loop->eventfd, &rdfs)) {
+            /* Stop request arrived. */
+            uint64_t x;
+            int n;
+
+            n = read(loop->eventfd, &x, sizeof(x));
+            if (n != sizeof(x)) {
+                perror("read(eventfd)");
+            }
+
+            /* Stop the event loop. */
+            break;
+        }
+
+        {
+            /* Process expired timers. Timer callbacks
              * are allowed to call rl_evloop_schedule(), so
              * rescheduling is possible. */
             struct timespec now;
@@ -263,23 +279,10 @@ evloop_function(void *arg)
                 te->cb(loop, te->arg);
                 free(te);
             }
+        }
 
-            continue;
-
-        } else if (FD_ISSET(loop->eventfd, &rdfs)) {
-            /* Stop request arrived. */
-            uint64_t x;
-            int n;
-
-            n = read(loop->eventfd, &x, sizeof(x));
-            if (n != sizeof(x)) {
-                perror("read(eventfd)");
-            }
-
-            /* Stop the event loop. */
-            break;
-        } else {
-            /* First look for fdcb events. */
+        {
+            /* Process fdcb events. */
             list_for_each_entry(fdcb, &loop->fdcbs, node) {
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
                     fdcb->cb(loop, fdcb->fd);
@@ -291,6 +294,10 @@ evloop_function(void *arg)
                  * available on the rlite control device. */
                 continue;
             }
+        }
+
+        if (!FD_ISSET(loop->ctrl.rfd, &rdfs)) {
+            continue;
         }
 
         /* Read the next message posted by the kernel. */
@@ -531,7 +538,7 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
     list_init(&loop->timer_events);
     pthread_mutex_init(&loop->timer_lock, NULL);
     loop->timer_events_cnt = 0;
-    loop->timer_next_id = 0;
+    loop->timer_next_id = 1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
     loop->running = 0;
@@ -742,8 +749,8 @@ rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
     /* Insert 'e' right before 'cur'. */
     list_add_tail(&e->node, &cur->node);
     loop->timer_events_cnt++;
-    if (++loop->timer_next_id >= TIMER_EVENTS_MAX) {
-        loop->timer_next_id = 0;
+    if (++loop->timer_next_id > TIMER_EVENTS_MAX) {
+        loop->timer_next_id = 1;
     }
 #if 0
     printf("TIMERLIST: [");
@@ -820,14 +827,14 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
                     const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register *req;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int result;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return NULL;
     }
@@ -839,7 +846,7 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
         return NULL;
     }
 
-    rl_register_req_fill(req, event_id, rlite_ipcp->ipcp_id, reg,
+    rl_register_req_fill(req, event_id, rl_ipcp->ipcp_id, reg,
                          appl_name);
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
@@ -890,14 +897,14 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
 {
     struct rl_kmsg_fa_req *req;
     struct rl_kmsg_fa_resp_arrived *kresp;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int result;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("No suitable IPCP found\n");
         return -1;
     }
@@ -908,7 +915,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
         PE("Out of memory\n");
         return -1;
     }
-    rl_fa_req_fill(req, event_id, rlite_ipcp->ipcp_id, dif_name, ipcp_name,
+    rl_fa_req_fill(req, event_id, rl_ipcp->ipcp_id, dif_name, ipcp_name,
                    local_appl, remote_appl, flowspec, upper_ipcp_id);
 
     PD("Requesting flow allocation...\n");

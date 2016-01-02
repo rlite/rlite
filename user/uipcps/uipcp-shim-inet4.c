@@ -541,12 +541,12 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
 static int
 shim_inet4_init(struct uipcp *uipcp)
 {
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     struct shim_inet4 *shim;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl,
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl,
                                            uipcp->ipcp_id);
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);
         return -1;
     }
@@ -561,7 +561,7 @@ shim_inet4_init(struct uipcp *uipcp)
 
     /* Store the name of the DIF, it will be
      * used during the registration. */
-    shim->dif_name = strdup(rlite_ipcp->dif_name);
+    shim->dif_name = strdup(rl_ipcp->dif_name);
     if (!shim->dif_name) {
         UPE(uipcp, "Out of memory\n");
         free(shim);

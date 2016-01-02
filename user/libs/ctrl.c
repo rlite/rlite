@@ -25,18 +25,18 @@
 static void
 rl_ipcps_purge(struct list_head *ipcps)
 {
-    struct rlite_ipcp *rlite_ipcp, *tmp;
+    struct rl_ipcp *rl_ipcp, *tmp;
 
     /* Purge the IPCPs list. */
 
-    list_for_each_entry_safe(rlite_ipcp, tmp, ipcps, node) {
-        if (rlite_ipcp->dif_type) {
-            free(rlite_ipcp->dif_type);
+    list_for_each_entry_safe(rl_ipcp, tmp, ipcps, node) {
+        if (rl_ipcp->dif_type) {
+            free(rl_ipcp->dif_type);
         }
-        rina_name_free(&rlite_ipcp->ipcp_name);
-        free(rlite_ipcp->dif_name);
-        list_del(&rlite_ipcp->node);
-        free(rlite_ipcp);
+        rina_name_free(&rl_ipcp->ipcp_name);
+        free(rl_ipcp->dif_name);
+        list_del(&rl_ipcp->node);
+        free(rl_ipcp);
     }
 }
 
@@ -44,8 +44,8 @@ int
 rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
                     const struct rl_kmsg_ipcp_update *upd)
 {
-    struct rlite_ipcp *rlite_ipcp = NULL;
-    struct rlite_ipcp *cur;
+    struct rl_ipcp *rl_ipcp = NULL;
+    struct rl_ipcp *cur;
 
     NPD("UPDATE IPCP update_type=%d, id=%u, addr=%lu, depth=%u, dif_name=%s "
        "dif_type=%s\n",
@@ -56,14 +56,14 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
 
     list_for_each_entry(cur, &ctrl->ipcps, node) {
         if (cur->ipcp_id == upd->ipcp_id) {
-            rlite_ipcp = cur;
+            rl_ipcp = cur;
             break;
         }
     }
 
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
-            if (rlite_ipcp) {
+            if (rl_ipcp) {
                 PE("UPDATE IPCP [ADD]: ipcp %u already exists\n", upd->ipcp_id);
                 goto out;
             }
@@ -71,7 +71,7 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
 
         case RLITE_UPDATE_UPD:
         case RLITE_UPDATE_DEL:
-            if (!rlite_ipcp) {
+            if (!rl_ipcp) {
                 PE("UPDATE IPCP [UPD/DEL]: ipcp %u does not exists\n", upd->ipcp_id);
                 goto out;
             }
@@ -85,32 +85,32 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
     if (upd->update_type == RLITE_UPDATE_UPD ||
             upd->update_type == RLITE_UPDATE_DEL) {
         /* Free the entry. */
-        if (rlite_ipcp->dif_type) {
-            free(rlite_ipcp->dif_type);
+        if (rl_ipcp->dif_type) {
+            free(rl_ipcp->dif_type);
         }
-        rina_name_free(&rlite_ipcp->ipcp_name);
-        free(rlite_ipcp->dif_name);
-        list_del(&rlite_ipcp->node);
-        free(rlite_ipcp);
+        rina_name_free(&rl_ipcp->ipcp_name);
+        free(rl_ipcp->dif_name);
+        list_del(&rl_ipcp->node);
+        free(rl_ipcp);
     }
 
     if (upd->update_type == RLITE_UPDATE_ADD ||
             upd->update_type == RLITE_UPDATE_UPD) {
         /* Create a new entry. */
-        rlite_ipcp = malloc(sizeof(*rlite_ipcp));
-        if (!rlite_ipcp) {
+        rl_ipcp = malloc(sizeof(*rl_ipcp));
+        if (!rl_ipcp) {
             PE("Out of memory\n");
             goto out;
         }
 
-        rlite_ipcp->ipcp_id = upd->ipcp_id;
-        rlite_ipcp->dif_type = strdup(upd->dif_type);
-        rlite_ipcp->ipcp_addr = upd->ipcp_addr;
-        rlite_ipcp->depth = upd->depth;
-        rina_name_copy(&rlite_ipcp->ipcp_name, &upd->ipcp_name);
-        rlite_ipcp->dif_name = strdup(upd->dif_name);
+        rl_ipcp->ipcp_id = upd->ipcp_id;
+        rl_ipcp->dif_type = strdup(upd->dif_type);
+        rl_ipcp->ipcp_addr = upd->ipcp_addr;
+        rl_ipcp->depth = upd->depth;
+        rina_name_copy(&rl_ipcp->ipcp_name, &upd->ipcp_name);
+        rl_ipcp->dif_name = strdup(upd->dif_name);
 
-        list_add_tail(&rlite_ipcp->node, &ctrl->ipcps);
+        list_add_tail(&rl_ipcp->node, &ctrl->ipcps);
     }
 
 out:
@@ -136,21 +136,21 @@ rl_ctrl_get_id(struct rlite_ctrl *ctrl)
 int
 rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl)
 {
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
 
     pthread_mutex_lock(&ctrl->lock);
 
     PI_S("IPC Processes table:\n");
-    list_for_each_entry(rlite_ipcp, &ctrl->ipcps, node) {
+    list_for_each_entry(rl_ipcp, &ctrl->ipcps, node) {
             char *ipcp_name_s = NULL;
 
-            ipcp_name_s = rina_name_to_string(&rlite_ipcp->ipcp_name);
+            ipcp_name_s = rina_name_to_string(&rl_ipcp->ipcp_name);
             PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                     " address = %llu, depth = %u\n",
-                        rlite_ipcp->ipcp_id, ipcp_name_s, rlite_ipcp->dif_type,
-                        rlite_ipcp->dif_name,
-                        (long long unsigned int)rlite_ipcp->ipcp_addr,
-                        rlite_ipcp->depth);
+                        rl_ipcp->ipcp_id, ipcp_name_s, rl_ipcp->dif_type,
+                        rl_ipcp->dif_name,
+                        (long long unsigned int)rl_ipcp->ipcp_addr,
+                        rl_ipcp->depth);
 
             if (ipcp_name_s) {
                     free(ipcp_name_s);
@@ -231,11 +231,11 @@ rl_write_msg(int rfd, struct rlite_msg_base *msg)
     return ret;
 }
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
                            const char *dif_name)
 {
-    struct rlite_ipcp *cur;
+    struct rl_ipcp *cur;
 
     pthread_mutex_lock(&ctrl->lock);
 
@@ -249,20 +249,20 @@ rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
         }
 
     } else {
-        struct rlite_ipcp *rlite_ipcp = NULL;
+        struct rl_ipcp *rl_ipcp = NULL;
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
         list_for_each_entry(cur, &ctrl->ipcps, node) {
             if ((strcmp(cur->dif_type, "normal") == 0 ||
-                        !rlite_ipcp)) {
-                rlite_ipcp = cur;
+                        !rl_ipcp)) {
+                rl_ipcp = cur;
             }
         }
 
         pthread_mutex_unlock(&ctrl->lock);
 
-        return rlite_ipcp;
+        return rl_ipcp;
     }
 
     pthread_mutex_unlock(&ctrl->lock);
@@ -270,11 +270,11 @@ rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
     return NULL;
 }
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
                             const struct rina_name *name)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
 
     pthread_mutex_lock(&ctrl->lock);
 
@@ -297,7 +297,7 @@ int
 rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
                                uint64_t *addr)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
 
     pthread_mutex_lock(&ctrl->lock);
 
@@ -314,10 +314,10 @@ rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
     return -1;
 }
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
 
     pthread_mutex_lock(&ctrl->lock);
 
@@ -610,22 +610,22 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
                const struct rlite_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     uint32_t event_id;
     int ret;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("No suitable IPCP found\n");
         return 0;
     }
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_fa_req_fill(&req, event_id, rlite_ipcp->ipcp_id,
+    ret = rl_fa_req_fill(&req, event_id, rl_ipcp->ipcp_id,
                          dif_name, ipcp_name, local_appl, remote_appl,
                          flowspec, 0xffff);
     if (ret) {
@@ -652,22 +652,22 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
                 const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register req;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     uint32_t event_id;
     int ret;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return 0;
     }
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_register_req_fill(&req, event_id, rlite_ipcp->ipcp_id,
+    ret = rl_register_req_fill(&req, event_id, rl_ipcp->ipcp_id,
                                reg, appl_name);
     if (ret) {
         PE("Failed to fill (un)register request\n");

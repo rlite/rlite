@@ -123,6 +123,7 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *dif_type;
     const char *dif_name;
     long int ipcp_id;
+    int ret;
 
     assert(argc >= 4);
     ipcp_apn = argv[0];
@@ -139,6 +140,17 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
            (unsigned int)ipcp_id);
     }
 
+    if (type_has_uipcp(dif_type)) {
+        ret = rl_conf_ipcp_uipcp_wait(ctrl, (unsigned int)ipcp_id);
+        if (ret) {
+            PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
+            rl_conf_ipcp_destroy(ctrl, (unsigned int)ipcp_id);
+
+        } else {
+            PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
+        }
+    }
+
     return ipcp_id < 0 ? -1 : 0;
 }
 
@@ -148,7 +160,7 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int ret = -1;
 
     assert(argc >= 2);
@@ -158,17 +170,17 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* Does the request specifies an existing IPC process ? */
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    if (!rlite_ipcp) {
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
+    if (!rl_ipcp) {
         PE("No such IPCP process\n");
         return -1;
 
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rl_conf_ipcp_destroy(ctrl, rlite_ipcp->ipcp_id, rlite_ipcp->dif_type);
+    ret = rl_conf_ipcp_destroy(ctrl, rl_ipcp->ipcp_id);
     if (!ret) {
-        PI("IPCP %u destroyed\n", rlite_ipcp->ipcp_id);
+        PI("IPCP %u destroyed\n", rl_ipcp->ipcp_id);
     }
 
     return ret;
@@ -182,7 +194,7 @@ ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *param_name;
     const char *param_value;
     struct rina_name ipcp_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 4);
@@ -194,14 +206,14 @@ ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    if (!rlite_ipcp) {
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
+    if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
-        ret = rl_conf_ipcp_config(ctrl, rlite_ipcp->ipcp_id, param_name, param_value);
+        ret = rl_conf_ipcp_config(ctrl, rl_ipcp->ipcp_id, param_name, param_value);
         if (!ret) {
-            PI("IPCP %u configured correctly: %s <== %s\n", rlite_ipcp->ipcp_id,
+            PI("IPCP %u configured correctly: %s <== %s\n", rl_ipcp->ipcp_id,
                param_name, param_value);
         }
     }
@@ -217,7 +229,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
 
     assert(argc >= 3);
     dif_name = argv[0];
@@ -226,15 +238,14 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     /* Lookup the id of the registering IPCP. */
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
-    if (!rlite_ipcp) {
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
+    if (!rl_ipcp) {
         PE("Could not find the IPC process to register\n");
         return -1;
     }
 
     req.msg_type = RLITE_CFG_IPCP_REGISTER;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     req.dif_name = strdup(dif_name);
     req.reg = reg;
 
@@ -263,7 +274,7 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *neigh_ipcp_api;
     const char *dif_name;
     const char *supp_dif_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
 
     assert(argc >= 6);
     dif_name = argv[0];
@@ -274,17 +285,16 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
     supp_dif_name = argv[5];
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
-    if (!rlite_ipcp) {
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
+    if (!rl_ipcp) {
         PE("Could not find enrolling IPC process\n");
         return -1;
     }
 
     req.msg_type = RLITE_CFG_IPCP_ENROLL;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     req.dif_name = strdup(dif_name);
-    rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
+    rina_name_fill(&req.neigh_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     req.supp_dif_name = strdup(supp_dif_name);
 
     return request_response(RLITE_MB(&req), NULL);
@@ -299,8 +309,7 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *appl_apn;
     const char *appl_api;
     unsigned long remote_addr;
-    struct rina_name ipcp_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
 
     assert(argc >= 5);
     ipcp_apn = argv[0];
@@ -314,17 +323,15 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
         return -1;
     }
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    rina_name_free(&ipcp_name);
-    if (!rlite_ipcp) {
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
+    if (!rl_ipcp) {
         PE("Could not find IPC process\n");
         return -1;
     }
 
     req.msg_type = RLITE_CFG_IPCP_DFT_SET;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
@@ -371,24 +378,21 @@ ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
     struct rl_cmsg_ipcp_rib_show_req req;
     const char *ipcp_apn;
     const char *ipcp_api;
-    struct rina_name ipcp_name;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
 
     assert(argc >= 2);
     ipcp_apn = argv[0];
     ipcp_api = argv[1];
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &ipcp_name);
-    rina_name_free(&ipcp_name);
-    if (!rlite_ipcp) {
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, &req.ipcp_name);
+    if (!rl_ipcp) {
         PE("Could not find IPC process\n");
         return -1;
     }
 
     req.msg_type = RLITE_CFG_IPCP_RIB_SHOW_REQ;
     req.event_id = 0;
-    req.ipcp_id = rlite_ipcp->ipcp_id;
 
     return request_response(RLITE_MB(&req),
                             ipcp_rib_show_handler);
@@ -419,11 +423,11 @@ test(struct rlite_ctrl *ctrl)
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0);
     assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 1, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 1);
     assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0);
     assert(ret);
 
     return 0;
@@ -594,5 +598,5 @@ int main(int argc, char **argv)
 
     rl_ctrl_fini(&ctrl);
 
-    return 0;
+    return ret;
 }

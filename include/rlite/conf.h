@@ -26,8 +26,10 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
                     const char *dif_name);
 
 int
-rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
-                     const char *dif_type);
+rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, unsigned int ipcp_id);
+
+int
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id);
 
 int
 rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,

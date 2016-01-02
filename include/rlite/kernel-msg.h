@@ -40,6 +40,7 @@ enum {
     RLITE_KER_IPCP_UPDATE, /* 20 */
     RLITE_KER_FLOW_FETCH, /* 21 */
     RLITE_KER_FLOW_FETCH_RESP, /* 22 */
+    RLITE_KER_IPCP_UIPCP_WAIT, /* 23 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -222,6 +223,8 @@ struct rl_kmsg_ipcp_uipcp_set {
 
     uint16_t ipcp_id;
 } __attribute__((packed));
+
+#define rl_kmsg_ipcp_uipcp_wait rl_kmsg_ipcp_uipcp_set
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation request has arrived. */

@@ -88,6 +88,9 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
     [RLITE_KER_BARRIER_RESP] = {
         .copylen = sizeof(struct rlite_msg_base),
     },
+    [RLITE_KER_IPCP_UIPCP_WAIT] = {
+        .copylen = sizeof(struct rl_kmsg_ipcp_uipcp_wait),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

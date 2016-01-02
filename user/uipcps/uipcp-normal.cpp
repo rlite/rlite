@@ -27,18 +27,20 @@ namespace obj_class {
     string lfdb = "fsodb"; /* Lower Flow DB */
     string flows = "flows"; /* Supported flows */
     string flow = "flow";
+    string keepalive = "keepalive";
 };
 
 namespace obj_name {
     string adata = "a_data";
     string dft = "/dif/mgmt/fa/" + obj_class::dft;
     string neighbors = "/daf/mgmt/" + obj_class::neighbors;
-    string enrollment = "/def/mgmt/" + obj_class::enrollment;
+    string enrollment = "/daf/mgmt/" + obj_class::enrollment;
     string status = "/daf/mgmt/" + obj_class::status;
     string address = "/daf/mgmt/naming" + obj_class::address;
     string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
     string whatevercast = "/daf/mgmt/naming/whatevercast";
     string flows = "/dif/ra/fa/" + obj_class::flows;
+    string keepalive = "/daf/mgmt/" + obj_class::keepalive;
 };
 
 #define MGMTBUF_SIZE_MAX 4096
@@ -108,11 +110,11 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 }
 
 static int
-rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
+rib_recv_msg(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
-    map<string, Neighbor>::iterator neigh;
     CDAPMessage *m = NULL;
+    NeighFlow *flow;
     int ret;
 
     try {
@@ -166,26 +168,26 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
         ScopeLock(rib->lock);
 
         /* Lookup neighbor by port id. */
-        neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
-        if (neigh == rib->neighbors.end()) {
+        ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &flow);
+        if (ret) {
             UPE(rib->uipcp, "Received message from unknown port id %d\n",
-                    mhdr->local_port);
+                mhdr->local_port);
             return -1;
         }
 
-        if (!neigh->second.conn) {
-            neigh->second.conn = new CDAPConn(neigh->second.flow_fd, 1);
+        if (!flow->conn) {
+            flow->conn = new CDAPConn(flow->flow_fd, 1);
         }
 
         /* Deserialize the received CDAP message. */
-        m = neigh->second.conn->msg_deser(serbuf, serlen);
+        m = flow->conn->msg_deser(serbuf, serlen);
         if (!m) {
             UPE(rib->uipcp, "msg_deser() failed\n");
             return -1;
         }
 
         /* Feed the enrollment state machine. */
-        ret = neigh->second.enroll_fsm_run(m);
+        ret = flow->neigh->enroll_fsm_run(flow, m);
 
     } catch (std::bad_alloc) {
         UPE(rib->uipcp, "Out of memory\n");
@@ -225,7 +227,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
-    rib_msg_rcvd(rib, mhdr, ((char *)(mhdr + 1)),
+    rib_recv_msg(rib, mhdr, ((char *)(mhdr + 1)),
                  n - sizeof(*mhdr));
 }
 
@@ -260,23 +262,32 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
                               &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
+    handlers.insert(make_pair(obj_name::keepalive,
+                              &uipcp_rib::keepalive_handler));
 
     /* Start timers for periodic tasks. */
-    rl_evloop_schedule(&uipcp->loop, RL_AGE_INCR_INTERVAL * 1000,
-                       age_incr_cb, this);
+    age_incr_tmrid = rl_evloop_schedule(&uipcp->loop,
+                                        RL_AGE_INCR_INTERVAL * 1000,
+                                        age_incr_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
 {
+    for (map<string, Neighbor*>::iterator mit = neighbors.begin();
+                                    mit != neighbors.end(); mit++) {
+        delete mit->second;
+    }
+
     rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
+    rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }
 
-struct rlite_ipcp *
+struct rl_ipcp *
 uipcp_rib::ipcp_info() const
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
 
     ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
     assert(ipcp);
@@ -293,7 +304,7 @@ char *
 uipcp_rib::dump() const
 {
     stringstream ss;
-    struct rlite_ipcp *ipcp = ipcp_info();
+    struct rl_ipcp *ipcp = ipcp_info();
 
     ss << "QoS cubes" << endl;
     for (map<string, struct rlite_flow_config>::const_iterator
@@ -456,7 +467,7 @@ int
 uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
                             const UipcpObject *obj)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     AData adata;
     CDAPMessage am;
     char objbuf[4096];
@@ -529,7 +540,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
 
 /* To be called under RIB lock. */
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
@@ -552,7 +563,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
         return -1;
     }
 
-    return (this->*(hi->second))(rm, neigh);
+    return (this->*(hi->second))(rm, nf);
 }
 
 uint64_t
@@ -567,18 +578,20 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
                                  const string& obj_name,
                                  const UipcpObject *obj_value) const
 {
-    for (map<string, Neighbor>::const_iterator neigh = neighbors.begin();
+    for (map<string, Neighbor*>::const_iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
-        if (exclude && neigh->second == *exclude) {
+        if (exclude && neigh->second == exclude) {
             continue;
         }
 
-        if (neigh->second.enrollment_state != Neighbor::ENROLLED) {
+        if (const_cast<Neighbor*>(neigh->second)->
+                        mgmt_conn()->enrollment_state != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }
 
-        neigh->second.remote_sync_obj(create, obj_class, obj_name, obj_value);
+        neigh->second->remote_sync_obj(NULL, create, obj_class,
+                                      obj_name, obj_value);
     }
 
     return 0;
@@ -649,7 +662,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
-    ret = rib_neigh_set_port_id(rib, &req->remote_appl,
+    ret = rib_neigh_set_port_id(rib, &req->remote_appl, req->dif_name,
                                 req->port_id, req->ipcp_id);
     if (ret) {
         UPE(uipcp, "rib_neigh_set_port_id() failed\n");
@@ -669,7 +682,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, flow_fd);
+    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, req->port_id, flow_fd);
     if (ret) {
         goto err;
     }
@@ -748,36 +761,35 @@ normal_fini(struct uipcp *uipcp)
 }
 
 static int
-normal_ipcp_register(struct uipcp *uipcp, int reg,
-                     const char *lower_dif,
-                     unsigned int ipcp_id,
-                     const struct rina_name *ipcp_name)
+normal_register_to_lower(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_register *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int ret;
 
     /* Perform the registration. */
-    ret = rl_evloop_register(&uipcp->loop, reg, lower_dif,
-                                      NULL, ipcp_name, 2000);
+    ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
+                             NULL, &req->ipcp_name, 2000);
 
     if (ret) {
         return ret;
     }
 
-    if (!lower_dif) {
-        UPE(uipcp, "lower_dif name is not specified\n");
+    if (!req->dif_name) {
+        UPE(uipcp, "lower DIF name is not specified\n");
         return -1;
     }
 
     ScopeLock(rib->lock);
 
-    ret = rib->register_to_lower(reg, string(lower_dif));
+    ret = rib->register_to_lower(req->reg, string(req->dif_name));
 
     return ret;
 }
 
 static int
-normal_ipcp_dft_set(struct uipcp *uipcp, struct rl_cmsg_ipcp_dft_set *req)
+normal_ipcp_dft_set(struct uipcp *uipcp,
+                    const struct rl_cmsg_ipcp_dft_set *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
@@ -797,7 +809,7 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 struct uipcp_ops normal_ops = {
     .init = normal_init,
     .fini = normal_fini,
-    .register_to_lower = normal_ipcp_register,
+    .register_to_lower = normal_register_to_lower,
     .enroll = normal_ipcp_enroll,
     .dft_set = normal_ipcp_dft_set,
     .rib_show = normal_ipcp_rib_show,
@@ -805,5 +817,6 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
+    .get_enrollment_targets = normal_get_enrollment_targets,
 };
 

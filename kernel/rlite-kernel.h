@@ -48,7 +48,7 @@ struct ipcp_ops {
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,
                           const struct rlite_mgmt_hdr *hdr,
-                          struct rlite_buf *rb);
+                          struct rlite_buf *rb, bool mayblock);
 };
 
 struct txrx {
@@ -86,13 +86,14 @@ struct ipcp_entry {
     uint8_t             depth;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
-    struct rlite_ctrl    *uipcp;
+    struct rlite_ctrl   *uipcp;
     struct txrx         *mgmt_txrx;
 
     /* The module that owns this IPC process. */
     struct module       *owner;
     unsigned int        refcnt;
     struct mutex        lock;
+    wait_queue_head_t   uipcp_wqh;
     struct hlist_node   node;
 };
 
