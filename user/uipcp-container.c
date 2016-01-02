@@ -206,7 +206,7 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     return 0;
 }
 
-static int
+int
 uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                       uint32_t remote_port, uint64_t remote_addr,
                       uint8_t response)

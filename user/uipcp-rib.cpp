@@ -170,11 +170,12 @@ struct uipcp_rib {
     int fa_req(struct rina_kmsg_fa_req *req);
     int fa_resp(struct rina_kmsg_fa_resp *resp);
     int pduft_sync();
-    map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
+    map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int
+                                                            port_id);
     uint64_t address_allocate() const;
 
-    int send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
-                         const string& obj_class, const string& obj_name);
+    int send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
+                         const UipcpObject& obj);
 
     /* Synchronize neighbors. */
     int remote_sync_neigh(const Neighbor& neigh, bool create,
@@ -196,6 +197,9 @@ struct uipcp_rib {
     int neighbors_handler(const CDAPMessage *rm);
     int lfdb_handler(const CDAPMessage *rm);
     int flows_handler(const CDAPMessage *rm);
+
+    int flows_handler_create(const CDAPMessage *rm);
+    int flows_handler_create_r(const CDAPMessage *rm);
 };
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
@@ -625,11 +629,10 @@ policies2flowcfg(struct rina_flow_config *cfg,
 }
 
 int
-uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
-                            const string& obj_class, const string& obj_name)
+uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
+                            const UipcpObject& obj)
 {
     struct rinalite_ipcp *ipcp;
-    CDAPMessage m;
     AData adata;
     CDAPMessage am;
     char objbuf[4096];
@@ -641,9 +644,6 @@ uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
     int ret;
 
     ipcp = ipcp_info();
-
-    m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
-               0, 0, string());
 
     objlen = obj.serialize(objbuf, sizeof(objbuf));
     if (objlen < 0) {
@@ -687,12 +687,14 @@ uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
     return mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
 }
 
+/* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
 uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_application);
     uint64_t remote_addr = dft_lookup(dest_appl);
     struct rinalite_ipcp *ipcp;
+    CDAPMessage m;
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
@@ -729,16 +731,49 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     obj_name << obj_name::flows << "/" << freq.src_addr
                 << "-" << req->local_port;
 
-    return send_to_dst_addr(freq.dst_addr, freq, obj_class::flow,
-                            obj_name.str());
+    m.m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
+               0, 0, string());
+
+    freq.invoke_id = 0;  /* invoke_id is actually set in send_to_dst_addr() */
+    flow_reqs[obj_name.str()] = freq;
+
+    return send_to_dst_addr(m, freq.dst_addr, freq);
 }
 
+/* (3) Slave FA <-- Slave application : FA_RESP */
 int
 uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
 {
+    stringstream obj_name;
+    map<string, FlowRequest>::iterator f;
+    string reason;
+    CDAPMessage m;
+
     /* Lookup the corresponding FlowRequest. */
 
-    return 0;
+    obj_name << obj_name::flows << "/" << resp->remote_addr
+                << "-" << resp->remote_port;
+
+    f = flow_reqs.find(obj_name.str());
+    if (f == flow_reqs.end()) {
+        PE("Spurious flow allocation response, no object with name %s\n",
+            obj_name.str().c_str());
+        return -1;
+    }
+
+    FlowRequest& freq = f->second;
+
+    if (resp->response) {
+        reason = "Application refused the accept the flow request";
+    } else {
+        /* Update the freq object with the port-id allocated by
+         * the kernel. */
+        freq.dst_port = resp->port_id;
+    }
+    m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
+                 resp->response ? -1 : 0, reason);
+
+    return send_to_dst_addr(m, freq.src_addr, freq);
 }
 
 int
@@ -765,6 +800,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
         return -1;
     }
 
+    /* TODO delete rm */
     return (this->*(hi->second))(rm);
 }
 
@@ -962,29 +998,16 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
     return 0;
 }
 
+/* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-uipcp_rib::flows_handler(const CDAPMessage *rm)
+uipcp_rib::flows_handler_create(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
-    bool add = true;
-
-    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        PE("M_CREATE or M_DELETE expected\n");
-        return 0;
-    }
-
-    if (rm->op_code == gpb::M_DELETE) {
-        add = false;
-        PI("M_DELETE not supported yet\n");
-        return 0;
-    }
-
-    (void)add;
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("M_START does not contain a nested message\n");
+        PE("M_CREATE does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -992,6 +1015,9 @@ uipcp_rib::flows_handler(const CDAPMessage *rm)
     FlowRequest freq(objbuf, objlen);
     struct rina_name local_appl, remote_appl;
     struct rina_flow_config flowcfg;
+
+    /* TODO check that freq.dst_app is hosted by this node, otherwise
+     * forward the freq. */
 
     freq.dst_app.rina_name_fill(&local_appl);
     freq.src_app.rina_name_fill(&remote_appl);
@@ -1003,7 +1029,64 @@ uipcp_rib::flows_handler(const CDAPMessage *rm)
     rina_name_free(&local_appl);
     rina_name_free(&remote_appl);
 
+    freq.invoke_id = rm->invoke_id;
     flow_reqs[rm->obj_name] = freq;
+
+    return 0;
+}
+
+/* (4) Initiator FA <-- Slave FA : M_CREATE_R */
+int
+uipcp_rib::flows_handler_create_r(const CDAPMessage *rm)
+{
+    const char *objbuf;
+    size_t objlen;
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("M_CREATE_R does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    FlowRequest remote_freq(objbuf, objlen);
+    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
+
+    if (f == flow_reqs.end()) {
+        PE("M_CREATE_R for '%s' does not match any pending request\n",
+                rm->obj_name.c_str());
+        return 0;
+    }
+
+    FlowRequest& freq = f->second;
+
+    /* Update the local freq object with the remote one. */
+    freq.dst_port = remote_freq.dst_port;
+
+    return uipcp_fa_resp_arrived(uipcp, freq.src_port, freq.dst_port,
+                                 freq.dst_addr, rm->result);
+}
+
+int
+uipcp_rib::flows_handler(const CDAPMessage *rm)
+{
+    switch (rm->op_code) {
+        case gpb::M_CREATE:
+            return flows_handler_create(rm);
+
+        case gpb::M_CREATE_R:
+            return flows_handler_create_r(rm);
+
+        case gpb::M_DELETE:
+        case gpb::M_DELETE_R:
+            PE("NOT SUPPORTED YET");
+            assert(0);
+            break;
+
+        default:
+            PE("M_CREATE, M_CREATE_R, M_DELETE or M_DELETE_R expected\n");
+            break;
+    }
 
     return 0;
 }
