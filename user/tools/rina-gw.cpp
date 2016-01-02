@@ -462,7 +462,7 @@ parse_conf(const char *confname)
             try {
                 memset(&inet_addr, 0, sizeof(inet_addr));
                 inet_addr.sin_family = AF_INET;
-                inet_addr.sin_port = atoi(tokens[4].c_str());
+                inet_addr.sin_port = htons(atoi(tokens[4].c_str()));
                 if (inet_addr.sin_port >= 65536) {
                     PI("Invalid configuration entry at line %d: "
                        "invalid port number '%s'\n", lines_cnt,
