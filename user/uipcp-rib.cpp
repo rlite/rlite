@@ -76,18 +76,25 @@ rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
                 const string& obj_name, int x)
 {
     struct enrolled_neighbor *neigh;
+#if 0
     CDAPConn conn(neigh->flow_fd, 1);
+#endif
+    CDAPMessage m;
     int invoke_id;
 
     list_for_each_entry(neigh, &rib->uipcp->enrolled_neighbors, node) {
-        if (0 && create) {
-            conn.m_create(&invoke_id, gpb::F_NO_FLAGS, obj_class, obj_name,
-                           0, 0, "");
-        } else if (0) {
-            conn.m_delete(&invoke_id, gpb::F_NO_FLAGS, obj_class, obj_name,
-                            0, 0, "");
+        if (create) {
+            m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
+                       0, 0, "");
+        } else {
+            m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
+                       0, 0, "");
         }
     }
+
+#if 0
+    conn.msg_send(&m, 0);
+#endif
 }
 
 extern "C" int

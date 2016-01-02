@@ -59,6 +59,8 @@ test_cdap_server(int port)
     addrlen = sizeof(remote);
 
     while (1) {
+        CDAPMessage rm;
+
         /* read a datagram from the socket (put result in bufin) */
         n = recvfrom(ld, bufin, sizeof(bufin), 0,
                 (struct sockaddr *)&remote, &addrlen);
@@ -88,47 +90,49 @@ test_cdap_server(int port)
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
-                conn.m_connect_r(m, 0, string());
+                rm.m_connect_r(m, 0, string());
                 break;
 
             case gpb::M_RELEASE:
-                conn.m_release_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_release_r(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_CREATE:
-                conn.m_create_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_create_r(m, gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, obj_inst_cnt++,
                                 0, string());
                 break;
 
             case gpb::M_DELETE:
-                conn.m_delete_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_delete_r(m, gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, m->obj_inst,
                                 0, string());
                 break;
 
             case gpb::M_READ:
-                conn.m_read_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                rm.m_read_r(m, gpb::F_NO_FLAGS, m->obj_class,
                                 m->obj_name, m->obj_inst,
                                 0, string());
                 break;
 
             case gpb::M_WRITE:
-                conn.m_write_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_write_r(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_START:
-                conn.m_start_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_start_r(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
             case gpb::M_STOP:
-                conn.m_stop_r(m, gpb::F_NO_FLAGS, 0, string());
+                rm.m_stop_r(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
             default:
                 PE("Unmanaged op_code %d\n", m->op_code);
                 break;
         }
+
+        conn.msg_send(&rm, m->invoke_id);
 
         n = read(pipefds[0], bufin, sizeof(bufin));
         if (n < 0) {
@@ -156,6 +160,7 @@ client_connect(CDAPConn *conn)
     struct CDAPAuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
@@ -165,8 +170,9 @@ client_connect(CDAPConn *conn)
     rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
     rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
 
-    if (conn->m_connect(&invoke_id, gpb::AUTH_NONE,
-                            &av, &local_appl, &remote_appl)) {
+    if (req.m_connect(gpb::AUTH_NONE,
+                      &av, &local_appl, &remote_appl) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -184,11 +190,13 @@ client_connect(CDAPConn *conn)
 static int
 client_create_some(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_create(&invoke_id, gpb::F_NO_FLAGS,
-                            "class_A", "x", 0, 0, string())) {
+    if (req.m_create(gpb::F_NO_FLAGS,
+                     "class_A", "x", 0, 0, string()) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -206,16 +214,19 @@ client_create_some(CDAPConn *conn)
 static int
 client_write_some(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_write(&invoke_id, gpb::F_NO_FLAGS,
-                      "class_A", "x", 0, 0, string(), 18)) {
+    if (req.m_write(gpb::F_NO_FLAGS,
+                    "class_A", "x", 0, 0, string(), 18) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    if (conn->m_write(&invoke_id, gpb::F_NO_FLAGS,
-                      "class_A", "x", 0, 0, string(), "ciccio")) {
+    if (req.m_write(gpb::F_NO_FLAGS,
+                    "class_A", "x", 0, 0, string(), "ciccio") ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -241,11 +252,13 @@ client_write_some(CDAPConn *conn)
 static int
 client_read_some(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_read(&invoke_id, gpb::F_NO_FLAGS,
-                     "class_A", "x", 0, 0, string())) {
+    if (req.m_read(gpb::F_NO_FLAGS,
+                    "class_A", "x", 0, 0, string()) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -263,11 +276,13 @@ client_read_some(CDAPConn *conn)
 static int
 client_startstop_some(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_start(&invoke_id, gpb::F_NO_FLAGS,
-                     "class_A", "x", 0, 0, string())) {
+    if (req.m_start(gpb::F_NO_FLAGS,
+                    "class_A", "x", 0, 0, string()) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -279,8 +294,9 @@ client_startstop_some(CDAPConn *conn)
 
     m->print();
 
-    if (conn->m_stop(&invoke_id, gpb::F_NO_FLAGS,
-                     "class_A", "x", 0, 0, string())) {
+    if (req.m_stop(gpb::F_NO_FLAGS,
+                   "class_A", "x", 0, 0, string()) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -298,11 +314,13 @@ client_startstop_some(CDAPConn *conn)
 static int
 client_delete_some(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_delete(&invoke_id, gpb::F_NO_FLAGS,
-                            "class_A", "x", 0, 0, string())) {
+    if (req.m_delete(gpb::F_NO_FLAGS,
+                     "class_A", "x", 0, 0, string()) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -320,10 +338,12 @@ client_delete_some(CDAPConn *conn)
 static int
 client_disconnect(CDAPConn *conn)
 {
+    struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (conn->m_release(&invoke_id, gpb::F_NO_FLAGS)) {
+    if (req.m_release(gpb::F_NO_FLAGS) ||
+            conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
