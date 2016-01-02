@@ -3,3 +3,5 @@
 - implement pending_queue using list.h
 - quando si registra una ipcp_factory, controllare che tutti i
   metodi siano non NULL.
+- ipcm: riutilizzare il codice in coda alle funzioni rina_appl_*()
+- ipcm: implementa select_ipcp_by_dif() per riutilizzare codice
