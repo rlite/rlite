@@ -488,42 +488,6 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     return ret;
 }
 
-extern "C" int
-rib_appl_register(struct uipcp_rib *rib,
-                  const struct rina_kmsg_appl_register *req)
-{
-    ScopeLock(rib->lock);
-
-    return rib->appl_register(req);
-}
-
-extern "C" int
-rib_flow_deallocated(struct uipcp_rib *rib,
-                     struct rina_kmsg_flow_deallocated *req)
-{
-    ScopeLock(rib->lock);
-
-    return rib->flow_deallocated(req);
-}
-
-extern "C" int
-rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req)
-{
-    ScopeLock(rib->lock);
-
-    return rib->fa_req(req);
-}
-
-extern "C" int
-rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp)
-{
-    ScopeLock(rib->lock);
-
-    return rib->fa_resp(resp);
-}
-
-/**********************************/
-
 #define MGMTBUF_SIZE_MAX 4096
 
 static int
@@ -623,23 +587,24 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 }
 
 static int
-uipcp_appl_register(struct rlite_evloop *loop,
-                           const struct rina_msg_base_resp *b_resp,
-                           const struct rina_msg_base *b_req)
+normal_appl_register(struct rlite_evloop *loop,
+                     const struct rina_msg_base_resp *b_resp,
+                     const struct rina_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
+    ScopeLock(uipcp->rib->lock);
 
-    rib_appl_register(uipcp->rib, req);
+    uipcp->rib->appl_register(req);
 
     return 0;
 }
 
 static int
-uipcp_fa_req(struct rlite_evloop *loop,
+normal_fa_req(struct rlite_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
              const struct rina_msg_base *b_req)
 {
@@ -652,13 +617,15 @@ uipcp_fa_req(struct rlite_evloop *loop,
 
     assert(b_req == NULL);
 
-    return rib_fa_req(uipcp->rib, req);
+    ScopeLock(uipcp->rib->lock);
+
+    return uipcp->rib->fa_req(req);
 }
 
 static int
-uipcp_fa_req_arrived(struct rlite_evloop *loop,
-                     const struct rina_msg_base_resp *b_resp,
-                     const struct rina_msg_base *b_req)
+normal_fa_req_arrived(struct rlite_evloop *loop,
+                      const struct rina_msg_base_resp *b_resp,
+                      const struct rina_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -713,7 +680,7 @@ err:
 }
 
 static int
-uipcp_fa_resp(struct rlite_evloop *loop,
+normal_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
@@ -727,11 +694,13 @@ uipcp_fa_resp(struct rlite_evloop *loop,
 
     assert(b_req == NULL);
 
-    return rib_fa_resp(uipcp->rib, resp);
+    ScopeLock(uipcp->rib->lock);
+
+    return uipcp->rib->fa_resp(resp);
 }
 
 static int
-uipcp_flow_deallocated(struct rlite_evloop *loop,
+normal_flow_deallocated(struct rlite_evloop *loop,
                        const struct rina_msg_base_resp *b_resp,
                        const struct rina_msg_base *b_req)
 {
@@ -740,8 +709,9 @@ uipcp_flow_deallocated(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
                 (struct rina_kmsg_flow_deallocated *)b_resp;
+    ScopeLock(uipcp->rib->lock);
 
-    rib_flow_deallocated(uipcp->rib, req);
+    uipcp->rib->flow_deallocated(req);
 
     return 0;
 }
@@ -757,23 +727,23 @@ normal_init(struct uipcp *uipcp)
     }
 
     ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
-                                   uipcp_fa_req_arrived);
+                                   normal_fa_req_arrived);
 
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
-                                   uipcp_fa_req);
+                                    normal_fa_req);
 
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
-                                   uipcp_fa_resp);
+                                    normal_fa_resp);
 
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
                                    RINA_KERN_APPL_REGISTER,
-                                   uipcp_appl_register);
+                                   normal_appl_register);
 
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
-                                   RINA_KERN_FLOW_DEALLOCATED,
-                                   uipcp_flow_deallocated);
+                                    RINA_KERN_FLOW_DEALLOCATED,
+                                    normal_flow_deallocated);
     if (ret) {
         goto err;
     }
@@ -862,5 +832,10 @@ struct uipcp_ops normal_ops = {
     .ipcp_enroll = normal_ipcp_enroll,
     .ipcp_dft_set = normal_ipcp_dft_set,
     .ipcp_rib_show = normal_ipcp_rib_show,
+    .appl_register = normal_appl_register,
+    .fa_req = normal_fa_req,
+    .fa_req_arrived = normal_fa_req_arrived,
+    .fa_resp = normal_fa_resp,
+    .flow_deallocated = normal_flow_deallocated,
 };
 

@@ -32,15 +32,41 @@ struct uipcp;
 
 struct uipcp_ops {
     const char *dif_type;
+
     int (*init)(struct uipcp *);
+
     int (*fini)(struct uipcp *);
+
     int (*ipcp_register)(struct uipcp *uipcp, int reg,
                          const struct rina_name *dif_name,
                          unsigned int ipcp_id,
                          const struct rina_name *ipcp_name);
+
     int (*ipcp_enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
+
     int (*ipcp_dft_set)(struct uipcp *, struct rina_cmsg_ipcp_dft_set *);
+
     char * (*ipcp_rib_show)(struct uipcp *);
+
+    int (*appl_register)(struct rlite_evloop *loop,
+                         const struct rina_msg_base_resp *b_resp,
+                         const struct rina_msg_base *b_req);
+
+    int (*fa_req)(struct rlite_evloop *loop,
+                  const struct rina_msg_base_resp *b_resp,
+                  const struct rina_msg_base *b_req);
+
+    int (*fa_req_arrived)(struct rlite_evloop *loop,
+                          const struct rina_msg_base_resp *b_resp,
+                          const struct rina_msg_base *b_req);
+
+    int (*fa_resp)(struct rlite_evloop *loop,
+                   const struct rina_msg_base_resp *b_resp,
+                   const struct rina_msg_base *b_req);
+
+    int (*flow_deallocated)(struct rlite_evloop *loop,
+                            const struct rina_msg_base_resp *b_resp,
+                            const struct rina_msg_base *b_req);
 };
 
 
@@ -103,12 +129,6 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 struct uipcp_rib *rib_create(struct uipcp *uipcp);
 void rib_destroy(struct uipcp_rib *rib);
 
-int rib_appl_register(struct uipcp_rib *rib,
-                      const struct rina_kmsg_appl_register *req);
-
-int rib_flow_deallocated(struct uipcp_rib *rib,
-                         struct rina_kmsg_flow_deallocated *req);
-
 int rib_neigh_set_port_id(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           unsigned int neigh_port_id);
@@ -122,9 +142,6 @@ int rib_del_neighbor(struct uipcp_rib *rib,
 
 int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                   char *serbuf, int serlen);
-
-int rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req);
-int rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp);
 
 #ifdef __cplusplus
 }
