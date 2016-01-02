@@ -118,6 +118,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct rina_pci *pci;
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
+    int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
     if (unlikely(!lower_flow)) {
@@ -143,7 +144,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 
     /* Directly call the underlying IPCP for now. RMT component
      * is not implemented explicitely for now. */
-    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    if (likely(ret >= sizeof(struct rina_pci))) {
+        ret -= sizeof(struct rina_pci);
+    }
+
+    return ret;
 }
 
 static int
