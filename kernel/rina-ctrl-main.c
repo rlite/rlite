@@ -279,7 +279,6 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->owner = NULL;
         entry->uipcp = NULL;
         entry->mgmt_txrx = NULL;
-        mutex_init(&entry->lock);
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
         INIT_WORK(&entry->remove, ipcp_remove_work);
@@ -386,18 +385,14 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     struct registered_application *app;
     int ret = 0;
 
-    mutex_lock(&ipcp->lock);
-
     app = ipcp_application_lookup(ipcp, application_name);
     if (app) {
             /* Application is already registered. */
-            mutex_unlock(&ipcp->lock);
             return -EINVAL;
     }
 
     app = kzalloc(sizeof(*app), GFP_KERNEL);
     if (!app) {
-        mutex_unlock(&ipcp->lock);
         return -ENOMEM;
     }
     rina_name_copy(&app->name, application_name);
@@ -406,8 +401,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
 
     list_add_tail(&app->node, &ipcp->registered_applications);
-
-    mutex_unlock(&ipcp->lock);
 
     if (ipcp->ops.application_register) {
         ret = ipcp->ops.application_register(ipcp, application_name, 1);
@@ -425,14 +418,10 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 {
     struct registered_application *app;
 
-    mutex_lock(&ipcp->lock);
-
     app = ipcp_application_lookup(ipcp, application_name);
     if (app) {
         ipcp_application_del_entry(ipcp, app);
     }
-
-    mutex_unlock(&ipcp->lock);
 
     if (!app) {
         return -EINVAL;
