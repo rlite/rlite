@@ -104,7 +104,22 @@ struct uipcp_rib {
     map< string, uint64_t > dft;
 
     uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
+
+    list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
 };
+
+list<Neighbor>::iterator
+uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
+{
+    for (list<Neighbor>::iterator neigh = neighbors.begin();
+                        neigh != neighbors.end(); neigh++) {
+        if (neigh->port_id == port_id) {
+            return neigh;
+        }
+    }
+
+    return neighbors.end();
+}
 
 static int
 dft_handler(struct uipcp_rib *)
@@ -322,6 +337,22 @@ rib_neighbor_flow(struct uipcp_rib *rib,
 
     rib->neighbors.push_back(Neighbor(rib, neigh_name, neigh_fd,
                                       neigh_port_id));
+
+    return 0;
+}
+
+extern "C" int
+rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
+             char *serbuf, int serlen)
+{
+    list<Neighbor>::iterator neigh =
+                    rib->lookup_neigh_by_port_id(mhdr->local_port);
+
+    if (neigh == rib->neighbors.end()) {
+        PE("%s: Received message from unknown port id %d\n", __func__,
+            mhdr->local_port);
+        return -1;
+    }
 
     return 0;
 }

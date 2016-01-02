@@ -307,8 +307,12 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
     mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RINA_MGMT_HDR_T_IN);
 
-    /* Grab the management command (this and the following will be replaced
-     * by CDAP). */
+    rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
+                  n - sizeof(*mhdr));
+    goto out;
+
+    /* Grab the management command (XXX this and the following has been
+     * replaced by CDAP). */
     cmd = *((uint8_t *)(mhdr + 1));
     buf = ((uint8_t *)(mhdr + 1)) + 1;
     buflen = n - sizeof(*mhdr) - 1;

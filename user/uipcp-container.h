@@ -82,6 +82,9 @@ int rib_neighbor_flow(struct uipcp_rib *rib,
 
 int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req);
 
+int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
+                  char *serbuf, int serlen);
+
 #ifdef __cplusplus
 }
 #endif
