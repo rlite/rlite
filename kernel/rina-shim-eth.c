@@ -31,6 +31,7 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <linux/netdevice.h>
+#include <linux/if_arp.h>
 
 
 #define ETH_P_RINA  0xD1F0
@@ -104,10 +105,91 @@ arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app)
     return NULL;
 }
 
+/* This function is taken after net/ipv4/arp.c:arp_create() */
 static struct sk_buff *
 arp_request_create(struct rina_shim_eth *priv,
                    struct flow_entry *flow)
 {
+    char *spa = NULL;  /* Sender Protocol Address */
+    char *tpa = NULL;  /* Target Protocol Address */
+    int spa_len, tpa_len;
+    int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
+    struct sk_buff *skb = NULL;
+    struct arphdr *arp;
+    int arp_msg_len;
+    int pa_len;
+    uint8_t *ptr;
+
+    spa = rina_name_to_string(&flow->local_application);
+    tpa = rina_name_to_string(&flow->remote_application);
+    if (!spa || !tpa) {
+        goto err;
+    }
+
+    spa_len = strlen(spa);
+    tpa_len = strlen(tpa);
+    pa_len = (tpa_len > spa_len) ? tpa_len : spa_len;
+
+    arp_msg_len = sizeof(*arp) + 2 * (pa_len + priv->netdev->addr_len);
+
+    skb = alloc_skb(hhlen + arp_msg_len + priv->netdev->needed_tailroom,
+                    GFP_KERNEL);
+    if (!skb) {
+        goto err;
+    }
+
+    skb_reserve(skb, hhlen);
+    skb_reset_network_header(skb);
+    arp = (struct arphdr *)skb_put(skb, arp_msg_len);
+    skb->dev = priv->netdev;
+    skb->protocol = htons(ETH_P_ARP);
+
+    if (dev_hard_header(skb, skb->dev, ETH_P_ARP, priv->netdev->broadcast,
+                        priv->netdev->dev_addr, skb->len)) {
+        goto err;
+    }
+
+    arp->ar_hrd = htons(priv->netdev->type);
+    arp->ar_pro = htons(ETH_P_RINA);
+    arp->ar_hln = priv->netdev->addr_len;
+    arp->ar_pln = pa_len;
+    arp->ar_op = htons(ARPOP_REQUEST);
+
+    ptr = (uint8_t *)(arp + 1);
+
+    /* Fill in the Sender Hardware Address. */
+    memcpy(ptr, priv->netdev->dev_addr, priv->netdev->addr_len);
+    ptr += priv->netdev->addr_len;
+
+    /* Fill in the zero-padded Sender Protocol Address. */
+    memcpy(ptr, spa, spa_len);
+    memset(ptr + spa_len, 0, pa_len - spa_len);
+    ptr += pa_len;
+
+    /* Fill in the Target Hardware Address (unknown). */
+    memset(ptr, 0, priv->netdev->addr_len);
+    ptr += priv->netdev->addr_len;
+
+    /* Fill in the zero-padded Target Protocol Address. */
+    memcpy(ptr, tpa, tpa_len);
+    memset(ptr + tpa_len, 0, pa_len - tpa_len);
+    ptr += pa_len;
+
+    return skb;
+
+err:
+    if (skb) {
+        kfree_skb(skb);
+    }
+
+    if (spa) {
+        kfree(spa);
+    }
+
+    if (tpa) {
+        kfree(tpa);
+    }
+
     return NULL;
 }
 
