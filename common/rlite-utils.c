@@ -221,7 +221,7 @@ deserialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
                      const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
-    struct rlite_msg_base *bmsg = (struct rlite_msg_base *)serbuf;
+    struct rlite_msg_base *bmsg = RLITE_MB(serbuf);
     struct rina_name *name;
     string_t *str;
     unsigned int copylen;

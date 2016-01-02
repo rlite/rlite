@@ -38,10 +38,6 @@ struct rlite_flow {
     struct list_head node;
 };
 
-/* Some useful macros for casting. */
-#define RLITE_RMB(m) (struct rlite_msg_base *)(m)
-#define RLITE_RMBR(m) (struct rlite_msg_base_resp *)(m)
-
 struct rlite_evloop;
 
 /* The signature of a response handler. */

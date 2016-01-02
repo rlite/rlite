@@ -33,5 +33,3 @@
   getting ERR in the logs
 
 - add copy constructor to CDAPMessage class
-
-- RLITE_RMB() --> RLITE_MB(), and use it extensively

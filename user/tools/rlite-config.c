@@ -110,7 +110,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    resp = (struct rlite_msg_base_resp *)msgbuf;
+    resp = RLITE_MBR(msgbuf);
     ret = (resp->result) == 0 ? 0 : -1;
 
     PI("uipcps response [type=%u] --> %d\n", resp->msg_type, ret);
@@ -172,7 +172,7 @@ rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
     PD("Requesting IPC process creation...\n");
 
     resp = (struct rl_kmsg_ipcp_create_resp *)
-           rlite_issue_request(&rc->loop, RLITE_RMB(msg),
+           rlite_issue_request(&rc->loop, RLITE_MB(msg),
                          sizeof(*msg), 1, wait_ms, result);
 
     return resp;
@@ -200,7 +200,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
     kresp = rlconf_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                      RLITE_RMB(kresp));
+                      RLITE_MB(kresp));
         free(kresp);
     }
 
@@ -230,7 +230,7 @@ rlconf_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     PD("Requesting IPC process destruction...\n");
 
-    resp = rlite_issue_request(&rc->loop, RLITE_RMB(msg),
+    resp = rlite_issue_request(&rc->loop, RLITE_MB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -333,7 +333,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     req.dif_name = strdup(dif_name);
     req.reg = reg;
 
-    return request_response((struct rlite_msg_base *)&req, NULL);
+    return request_response(RLITE_MB(&req), NULL);
 }
 
 static int
@@ -382,7 +382,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     req.supp_dif_name = strdup(supp_dif_name);
 
-    return request_response((struct rlite_msg_base *)&req, NULL);
+    return request_response(RLITE_MB(&req), NULL);
 }
 
 static int
@@ -423,7 +423,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
-    return request_response((struct rlite_msg_base *)&req, NULL);
+    return request_response(RLITE_MB(&req), NULL);
 }
 
 static int
@@ -481,7 +481,7 @@ ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
 
-    return request_response((struct rlite_msg_base *)&req,
+    return request_response(RLITE_MB(&req),
                             ipcp_rib_show_handler);
 }
 
@@ -506,7 +506,7 @@ test(struct rinaconf *rc)
     assert(icresp);
     if (icresp) {
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                      RLITE_RMB(icresp));
+                      RLITE_MB(icresp));
     }
     icresp = rlconf_ipcp_create(rc, ~0U, &name, "shim-loopback",
                               "test-shim-loopback.DIF", &result);

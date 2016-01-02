@@ -192,7 +192,7 @@ rlite_shim_hv_fa_req(struct ipcp_entry *ipcp,
     rina_name_copy(&req.remote_appl, &flow->remote_appl);
     req.local_port = flow->local_port;
 
-    return shim_hv_send_ctrl_msg(ipcp, (struct rlite_msg_base *)&req);
+    return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&req));
 }
 
 static int
@@ -208,7 +208,7 @@ rlite_shim_hv_fa_resp(struct ipcp_entry *ipcp,
     resp.remote_port = flow->remote_port;
     resp.response = response;
 
-    return shim_hv_send_ctrl_msg(ipcp, (struct rlite_msg_base *)&resp);
+    return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&resp));
 }
 
 static int

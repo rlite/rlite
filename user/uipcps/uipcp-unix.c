@@ -47,7 +47,7 @@ rlite_conf_response(int sfd, struct rlite_msg_base *req,
     resp->msg_type = RLITE_CFG_BASE_RESP;
     resp->event_id = req->event_id;
 
-    return rlite_msg_write_fd(sfd, RLITE_RMB(resp));
+    return rlite_msg_write_fd(sfd, RLITE_MB(resp));
 }
 
 static void
@@ -143,7 +143,7 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     resp.result = rlite_ipcp_register(uipcps, req->reg, req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
-    return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
+    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -169,7 +169,7 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     }
 
 out:
-    return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
+    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -194,7 +194,7 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     }
 
 out:
-    return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
+    return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -228,7 +228,7 @@ out:
     resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
-    ret = rlite_msg_write_fd(sfd, RLITE_RMB(&resp));
+    ret = rlite_msg_write_fd(sfd, RLITE_MB(&resp));
 
     if (resp.dump) {
         free(resp.dump);
@@ -282,7 +282,7 @@ unix_server(struct uipcps *uipcps)
         }
 
         /* Lookup the message type. */
-        req = RLITE_RMB(msgbuf);
+        req = RLITE_MB(msgbuf);
         if (rlite_config_handlers[req->msg_type] == NULL) {
             struct rlite_msg_base_resp resp;
 
@@ -291,7 +291,7 @@ unix_server(struct uipcps *uipcps)
             resp.msg_type = RLITE_CFG_BASE_RESP;
             resp.event_id = req->event_id;
             resp.result = RLITE_ERR;
-            rlite_msg_write_fd(cfd, (struct rlite_msg_base *)&resp);
+            rlite_msg_write_fd(cfd, RLITE_MB(&resp));
         } else {
             /* Valid message type: handle the request. */
             ret = rlite_config_handlers[req->msg_type](uipcps, cfd, req);

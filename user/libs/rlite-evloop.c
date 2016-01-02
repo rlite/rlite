@@ -298,7 +298,7 @@ rlite_flows_fetch(struct rlite_evloop *loop)
         } else {
             end = resp->end;
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_RMB(resp));
+                          RLITE_MB(resp));
             free(resp);
         }
     }
@@ -502,7 +502,7 @@ evloop_function(void *arg)
         }
 
         /* Here we can malloc the maximum kernel message size. */
-        resp = RLITE_RMBR(malloc(max_resp_size));
+        resp = RLITE_MBR(malloc(max_resp_size));
         if (!resp) {
             PE("Out of memory\n");
             continue;
@@ -522,7 +522,7 @@ evloop_function(void *arg)
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_RMB(resp));
+                          RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -536,7 +536,7 @@ evloop_function(void *arg)
                                         resp->msg_type);
             }
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_RMB(resp));
+                          RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -551,7 +551,7 @@ evloop_function(void *arg)
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_RMB(resp));
+                          RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -578,7 +578,7 @@ notify_requestor:
             /* Signal the rlite_issue_request() caller that the operation is
              * complete, reporting the response in the 'resp' pointer field. */
             req_entry->op_complete = 1;
-            req_entry->resp = RLITE_RMB(resp);
+            req_entry->resp = RLITE_MB(resp);
             pthread_cond_signal(&req_entry->op_complete_cond);
         } else {
             /* Free the pending queue entry and the associated request message,
@@ -588,7 +588,7 @@ notify_requestor:
             free(req_entry->msg);
             free(req_entry);
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_RMB(resp));
+                          RLITE_MB(resp));
             free(resp);
         }
         pthread_mutex_unlock(&loop->lock);

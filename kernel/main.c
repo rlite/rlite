@@ -1261,13 +1261,13 @@ ipcp_update_all(uint16_t ipcp_id, int update_type)
 
     mutex_lock(&rlite_dm.general_lock);
     list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
-        rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
+        rlite_upqueue_append(rcur, RLITE_MB(&upd));
     }
     mutex_unlock(&rlite_dm.general_lock);
 
 out:
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-            (struct rlite_msg_base *)&upd);
+                   RLITE_MB(&upd));
     ipcp_put(ipcp);
 
     return ret;
@@ -1293,7 +1293,7 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rlite_upqueue_append(rc, (struct rlite_msg_base *)&resp);
+    ret = rlite_upqueue_append(rc, RLITE_MB(&resp));
     if (ret) {
         goto err;
     }
@@ -1343,12 +1343,12 @@ rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
             mutex_lock(&rlite_dm.general_lock);
             list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
-                rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
+                rlite_upqueue_append(rcur, RLITE_MB(&upd));
             }
             mutex_unlock(&rlite_dm.general_lock);
 
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                    (struct rlite_msg_base *)&upd);
+                           RLITE_MB(&upd));
         }
     }
 
@@ -1406,9 +1406,9 @@ rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
-        ret = rlite_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
+        ret = rlite_upqueue_append(rc, RLITE_MB(&fqe->resp));
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                      (struct rlite_msg_base *)&fqe->resp);
+                       RLITE_MB(&fqe->resp));
         kfree(fqe);
     }
 
@@ -1792,7 +1792,7 @@ rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id
     resp.result = result;
 
     /* Enqueue the response into the upqueue. */
-    return rlite_upqueue_append(rc, (struct rlite_msg_base *)&resp);
+    return rlite_upqueue_append(rc, RLITE_MB(&resp));
 }
 
 static int
@@ -1991,12 +1991,12 @@ rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     }
 
     /* Enqueue the request into the upqueue. */
-    ret = rlite_upqueue_append(app->rc, (struct rlite_msg_base *)&req);
+    ret = rlite_upqueue_append(app->rc, RLITE_MB(&req));
     if (ret) {
         flow_put(flow_entry);
     }
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                   (struct rlite_msg_base *)&req);
+                   RLITE_MB(&req));
 out:
     ipcp_application_put(app);
 
@@ -2241,7 +2241,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EINVAL;
     }
 
-    bmsg = (struct rlite_msg_base *)rc->msgbuf;
+    bmsg = RLITE_MB(rc->msgbuf);
 
     /* Demultiplex the message to the right message handler. */
     if (bmsg->msg_type > RLITE_KER_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
@@ -2382,7 +2382,7 @@ initial_ipcp_update(struct rlite_ctrl *rc)
         rlite_upqueue_append(rc, (const struct rlite_msg_base *)&upd);
 
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                (struct rlite_msg_base *)&upd);
+                       RLITE_MB(&upd));
     }
 
     PUNLOCK();

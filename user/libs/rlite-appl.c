@@ -163,7 +163,7 @@ rlite_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
 
     return (struct rl_kmsg_appl_register_resp *)
-           rlite_issue_request(&appl->loop, RLITE_RMB(req),
+           rlite_issue_request(&appl->loop, RLITE_MB(req),
                                sizeof(*req), 1, wait_ms, &result);
 }
 
@@ -221,7 +221,7 @@ flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
     PD("Requesting flow allocation...\n");
 
     return (struct rl_kmsg_fa_resp_arrived *)
-           rlite_issue_request(&appl->loop, RLITE_RMB(req),
+           rlite_issue_request(&appl->loop, RLITE_MB(req),
                          sizeof(*req), 1, wait_ms, result);
 }
 
@@ -251,7 +251,7 @@ rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
 
     PD("Responding to flow allocation request...\n");
 
-    resp = rlite_issue_request(&appl->loop, RLITE_RMB(req),
+    resp = rlite_issue_request(&appl->loop, RLITE_MB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -305,7 +305,7 @@ rlite_appl_register_wait(struct rlite_appl *appl, int reg,
     }
 
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                  RLITE_RMB(resp));
+                  RLITE_MB(resp));
     free(resp);
 
     return ret;
@@ -355,7 +355,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
     result = kresp->result;
     *port_id = kresp->port_id;
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                  RLITE_RMB(kresp));
+                  RLITE_MB(kresp));
     free(kresp);
 
     return result;

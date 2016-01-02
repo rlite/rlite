@@ -51,6 +51,10 @@ struct rlite_msg_base_resp {
     uint8_t result;
 } __attribute__((packed));
 
+/* Some useful macros for casting. */
+#define RLITE_MB(m) (struct rlite_msg_base *)(m)
+#define RLITE_MBR(m) (struct rlite_msg_base_resp *)(m)
+
 /* Bind the flow identified by port_id to
  * this rlite_io device. */
 #define RLITE_IO_MODE_APPL_BIND    86
