@@ -497,7 +497,7 @@ parse_conf(const char *confname)
 
 static int
 gw_fa_req_arrived(struct rlite_evloop *loop,
-                  const struct rlite_msg_base_resp *b_resp,
+                  const struct rlite_msg_base *b_resp,
                   const struct rlite_msg_base *b_req)
 {
     Gateway * gw = container_of(loop, struct Gateway, loop);
@@ -577,7 +577,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
 
 static int
 gw_fa_resp_arrived(struct rlite_evloop *loop,
-                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_resp,
                    const struct rlite_msg_base *b_req)
 {
     Gateway * gw = container_of(loop, struct Gateway, loop);

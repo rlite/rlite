@@ -100,7 +100,7 @@ rlite_open_appl_port(uint32_t port_id);
 int
 rlite_open_mgmt_port(uint16_t ipcp_id);
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 read_next_msg(int rfd);
 
 int
@@ -127,10 +127,10 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
                 const struct rina_name *ipcp_name,
                 const struct rina_name *appl_name);
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id);
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
 
 /* Synchronous API (higher level, implemented by means of the

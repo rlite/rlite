@@ -25,7 +25,7 @@ struct rinaconf {
 /* Kernel response handlers. */
 static int
 ipcp_create_resp(struct rlite_evloop *loop,
-                 const struct rlite_msg_base_resp *b_resp,
+                 const struct rlite_msg_base *b_resp,
                  const struct rlite_msg_base *b_req)
 {
     struct rl_kmsg_ipcp_create_resp *resp =

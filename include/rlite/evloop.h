@@ -31,7 +31,7 @@ struct rlite_evloop;
 
 /* The signature of a response handler. */
 typedef int (*rlite_resp_handler_t)(struct rlite_evloop *loop,
-                                    const struct rlite_msg_base_resp *b_resp,
+                                    const struct rlite_msg_base *b_resp,
                                     const struct rlite_msg_base *b_req);
 
 /* The signature of file descriptor callback. */

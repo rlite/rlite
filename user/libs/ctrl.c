@@ -162,13 +162,13 @@ rlite_ipcps_print(struct rlite_ctrl *ctrl)
     return 0;
 }
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 read_next_msg(int rfd)
 {
     unsigned int max_resp_size = rlite_numtables_max_size(
                 rlite_ker_numtables,
                 sizeof(rlite_ker_numtables)/sizeof(struct rlite_msg_layout));
-    struct rlite_msg_base_resp *resp;
+    struct rlite_msg_base *resp;
     char serbuf[4096];
     int ret;
 
@@ -179,7 +179,7 @@ read_next_msg(int rfd)
     }
 
     /* Here we can malloc the maximum kernel message size. */
-    resp = RLITE_MBR(malloc(max_resp_size));
+    resp = RLITE_MB(malloc(max_resp_size));
     if (!resp) {
         PE("Out of memory\n");
         return NULL;
@@ -612,11 +612,11 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
     return event_id;
 }
 
-static struct rlite_msg_base_resp *
+static struct rlite_msg_base *
 rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
                     uint32_t event_id)
 {
-    struct rlite_msg_base_resp *resp;
+    struct rlite_msg_base *resp;
     struct pending_entry *entry;
     fd_set rdfs;
     int ret;
@@ -632,7 +632,7 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
     pthread_mutex_unlock(&ctrl->lock);
 
     if (entry) {
-        resp = RLITE_MBR(entry->msg);
+        resp = RLITE_MB(entry->msg);
         free(entry);
 
         return resp;
@@ -702,13 +702,13 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
     return NULL;
 }
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
 {
     return rl_ctrl_wait_common(ctrl, 0, event_id);
 }
 
-struct rlite_msg_base_resp *
+struct rlite_msg_base *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
 {
     return rl_ctrl_wait_common(ctrl, msg_type, 0);

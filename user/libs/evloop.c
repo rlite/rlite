@@ -52,7 +52,7 @@ rlite_flows_purge(struct list_head *flows)
 
 static int
 flow_fetch_resp(struct rlite_evloop *loop,
-                const struct rlite_msg_base_resp *b_resp,
+                const struct rlite_msg_base *b_resp,
                 const struct rlite_msg_base *b_req)
 {
     const struct rl_kmsg_flow_fetch_resp *resp =
@@ -99,7 +99,7 @@ flow_fetch_resp(struct rlite_evloop *loop,
 
 static int
 flow_allocate_resp_arrived(struct rlite_evloop *loop,
-                           const struct rlite_msg_base_resp *b_resp,
+                           const struct rlite_msg_base *b_resp,
                            const struct rlite_msg_base *b_req)
 {
     struct rl_kmsg_fa_req *req =
@@ -135,7 +135,7 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
 
 static int
 appl_register_resp(struct rlite_evloop *loop,
-                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_resp,
                    const struct rlite_msg_base *b_req)
 {
     struct rl_kmsg_appl_register_resp *resp =
@@ -163,7 +163,7 @@ appl_register_resp(struct rlite_evloop *loop,
 
 static int
 evloop_ipcp_update(struct rlite_evloop *loop,
-                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_resp,
                    const struct rlite_msg_base *b_req)
 {
     const struct rl_kmsg_ipcp_update *upd =
@@ -184,7 +184,7 @@ evloop_ipcp_update(struct rlite_evloop *loop,
 
 static int
 barrier_resp(struct rlite_evloop *loop,
-             const struct rlite_msg_base_resp *b_resp,
+             const struct rlite_msg_base *b_resp,
              const struct rlite_msg_base *b_req)
 {
     /* Nothing to do, this is just a synchronization point. */
@@ -296,7 +296,7 @@ evloop_function(void *arg)
     struct pending_entry *req_entry;
 
     for (;;) {
-        struct rlite_msg_base_resp *resp;
+        struct rlite_msg_base *resp;
         struct rl_evloop_fdcb *fdcb;
         struct timeval to;
         struct timeval *top = NULL;
@@ -812,7 +812,7 @@ rl_evloop_fini(struct rlite_evloop *loop)
 
 int
 rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                         rlite_resp_handler_t handler)
+                      rlite_resp_handler_t handler)
 {
     if (index >= RLITE_KER_MSG_MAX) {
         return -1;

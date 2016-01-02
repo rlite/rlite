@@ -352,7 +352,7 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
 
 static int
 uipcps_ipcp_update(struct rlite_evloop *loop,
-                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_resp,
                    const struct rlite_msg_base *b_req)
 {
     struct uipcps *uipcps = container_of(loop, struct uipcps, loop);
@@ -413,7 +413,7 @@ uipcps_update(struct uipcps *uipcps)
     }
 
     rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
-                             uipcps_ipcp_update);
+                          uipcps_ipcp_update);
 
     rlite_ipcps_print(&uipcps->loop.ctrl);
 
