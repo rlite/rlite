@@ -31,9 +31,10 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <linux/workqueue.h>
-#include <linux/hashtable.h>
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
+#include <linux/net.h>
+#include <linux/file.h>
 
 
 struct rina_shim_inet4 {
@@ -52,7 +53,7 @@ rina_shim_inet4_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
 
-    printk("New IPC created [%p]\n", priv);
+    PD("New IPCP created [%p]\n", priv);
 
     return priv;
 }
@@ -64,12 +65,46 @@ rina_shim_inet4_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("IPC [%p] destroyed\n", priv);
+    PD("IPCP [%p] destroyed\n", priv);
 }
 
 static int
 rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
+    struct socket *sock;
+    int err;
+
+    /* This increments the file descriptor reference counter. */
+    sock = sockfd_lookup(flow->cfg.fd, &err);
+    if (!sock) {
+        PE("Cannot find socket corresponding to file descriptor %d\n", flow->cfg.fd);
+        return err;
+    }
+
+    PD("Got socket %p\n", sock);
+
+    flow->priv = sock;
+
+    return 0;
+}
+
+static int
+rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
+                                 struct flow_entry *flow)
+{
+    struct socket *sock = flow->priv;
+
+    if (!sock) {
+        return 0;
+    }
+
+    /* Decrement the file descriptor reference counter, in order to
+     * match flow_init(). */
+    fput(sock->file);
+    flow->priv = NULL;
+
+    PD("Released socket %p\n", sock);
+
     return 0;
 }
 
@@ -106,6 +141,7 @@ static struct ipcp_factory shim_inet4_factory = {
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
     .ops.flow_init = rina_shim_inet4_flow_init,
+    .ops.flow_deallocated = rina_shim_inet4_flow_deallocated,
     .ops.sdu_write = rina_shim_inet4_sdu_write,
     .ops.config = rina_shim_inet4_config,
 };
