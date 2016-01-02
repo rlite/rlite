@@ -80,6 +80,7 @@ struct ipcp_factory {
     uint8_t dif_type;
     void *(*create)(struct ipcp_entry *ipcp);
     struct ipcp_ops ops;
+
     struct list_head node;
 };
 
@@ -114,6 +115,7 @@ struct dtp {
     unsigned int max_cwq_len;
     struct delayed_work remove;
     struct list_head seqq;
+    struct list_head rtxq;
 };
 
 struct flow_entry {

@@ -165,10 +165,10 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb)
     }
 
     if (lower_flow) {
+        /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
         DECLARE_WAITQUEUE(wait, current);
         int ret;
 
-        /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
         lower_ipcp = lower_flow->txrx.ipcp;
         BUG_ON(!lower_ipcp);
 
@@ -244,32 +244,46 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->seqnum = dtp->next_seq_num_to_send++;
 
     dtp->set_drf = false;
-    if (fc->fc_type == RINA_FC_T_WIN) {
-        if (pci->seqnum > dtp->snd_rwe) {
-            /* PDU not in the sender window, let's
-             * insert it into the Closed Window Queue.
-             * Because of the check above, we are sure
-             * that dtp->cwq_len < dtp->max_cwq_len. */
-            list_add_tail(&rb->node, &dtp->cwq);
-            dtp->cwq_len++;
-            PD("%s: push [%lu] into cwq\n", __func__,
-                    (long unsigned)pci->seqnum);
-            rb = NULL; /* Ownership passed. */
-        } else {
-            /* PDU in the sender window. */
-            /* POL: TxControl. */
-            dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
-            dtp->last_seq_num_sent = pci->seqnum;
-            PD("%s: sending [%lu] through sender window\n", __func__,
-                    (long unsigned)pci->seqnum);
-        }
-    } else {
+    if (!dtcp_present) {
         /* DTCP not present */
         dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
         dtp->last_seq_num_sent = pci->seqnum;
-    }
 
-    if (dtcp_present) {
+    } else {
+        if (fc->fc_type == RINA_FC_T_WIN) {
+            if (pci->seqnum > dtp->snd_rwe) {
+                /* PDU not in the sender window, let's
+                 * insert it into the Closed Window Queue.
+                 * Because of the check above, we are sure
+                 * that dtp->cwq_len < dtp->max_cwq_len. */
+                list_add_tail(&rb->node, &dtp->cwq);
+                dtp->cwq_len++;
+                PD("%s: push [%lu] into cwq\n", __func__,
+                        (long unsigned)pci->seqnum);
+                rb = NULL; /* Ownership passed. */
+            } else {
+                /* PDU in the sender window. */
+                /* POL: TxControl. */
+                dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
+                dtp->last_seq_num_sent = pci->seqnum;
+                PD("%s: sending [%lu] through sender window\n", __func__,
+                        (long unsigned)pci->seqnum);
+            }
+        }
+
+        if (flow->cfg.dtcp.rtx_control) {
+            struct rina_buf *crb = rina_buf_clone(rb, GFP_ATOMIC);
+
+            if (unlikely(!crb)) {
+                spin_unlock_irq(&dtp->lock);
+                PE("%s: Out of memory\n", __func__);
+                rina_buf_free(rb);
+                return -ENOMEM;
+            }
+
+            list_add_tail(&crb->node, &dtp->rtxq);
+        }
+
         /* 3 * (MPL + R + A) */
         hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
                 HRTIMER_MODE_REL);

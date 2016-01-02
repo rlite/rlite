@@ -62,6 +62,7 @@ rina_buf_clone(struct rina_buf *rb, gfp_t gfp)
 
     return crb;
 }
+EXPORT_SYMBOL_GPL(rina_buf_clone);
 
 void
 rina_buf_free(struct rina_buf *rb)

@@ -54,6 +54,7 @@ dtp_init(struct dtp *dtp)
     INIT_LIST_HEAD(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
     INIT_LIST_HEAD(&dtp->seqq);
+    INIT_LIST_HEAD(&dtp->rtxq);
 }
 EXPORT_SYMBOL_GPL(dtp_init);
 
@@ -73,6 +74,11 @@ dtp_fini(struct dtp *dtp)
     dtp->cwq_len = 0;
 
     list_for_each_entry_safe(rb, next, &dtp->seqq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+    }
+
+    list_for_each_entry_safe(rb, next, &dtp->rtxq, node) {
         list_del(&rb->node);
         rina_buf_free(rb);
     }
