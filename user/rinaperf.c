@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <endian.h>
 #include <signal.h>
+#include <poll.h>
 #include <rina/rina-utils.h>
 
 #include "application.h"
@@ -101,11 +102,15 @@ echo_client(struct rinaperf *rp)
     int size = rp->test_config.size;
     unsigned int interval = rp->interval;
     unsigned int i = 0;
+    struct pollfd pfd;
 
     if (size > sizeof(buf)) {
         PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
+
+    pfd.fd = rp->dfd;
+    pfd.events = POLLIN;
 
     memset(buf, 'x', size);
 
@@ -121,6 +126,16 @@ echo_client(struct rinaperf *rp)
             }
         }
 
+        ret = poll(&pfd, 1, 3000);
+        if (ret < 0) {
+            perror("poll(flow)");
+        } else if (ret == 0) {
+            /* Timeout */
+            printf("%s: timeout occurred\n", __func__);
+            break;
+        }
+
+        /* Ready to read. */
         ret = read(rp->dfd, buf, sizeof(buf));
         if (ret < 0) {
             perror("read(buf");
@@ -135,9 +150,9 @@ echo_client(struct rinaperf *rp)
     us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
             (t_end.tv_usec - t_start.tv_usec);
 
-    if (rp->test_config.cnt) {
+    if (i) {
         printf("SDU size: %d bytes, latency: %lu us\n", ret,
-                us/rp->test_config.cnt);
+                us/i);
     }
 
     close(rp->dfd);
@@ -151,8 +166,22 @@ echo_server(struct rinaperf *rp)
     int n, ret;
     unsigned int i;
     char buf[SDU_SIZE_MAX];
+    struct pollfd pfd;
+
+    pfd.fd = rp->dfd;
+    pfd.events = POLLIN;
 
     for (i = 0; i < rp->test_config.cnt; i++) {
+        n = poll(&pfd, 1, 3000);
+        if (n < 0) {
+            perror("poll(flow)");
+        } else if (n == 0) {
+            /* Timeout */
+            printf("%s: timeout occurred\n", __func__);
+            break;
+        }
+
+        /* File descriptor is ready for reading. */
         n = read(rp->dfd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
@@ -241,8 +270,22 @@ perf_server(struct rinaperf *rp)
     int n;
     unsigned int i;
     char buf[SDU_SIZE_MAX];
+    struct pollfd pfd;
+
+    pfd.fd = rp->dfd;
+    pfd.events = POLLIN;
 
     for (i = 0; i < rp->test_config.cnt; i++) {
+        n = poll(&pfd, 1, 3000);
+        if (n < 0) {
+            perror("poll(flow)");
+        } else if (n == 0) {
+            /* Timeout */
+            printf("%s: timeout occurred\n", __func__);
+            break;
+        }
+
+        /* Ready to read. */
         n = read(rp->dfd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
