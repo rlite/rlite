@@ -507,41 +507,6 @@ rib_flow_deallocated(struct uipcp_rib *rib,
 }
 
 extern "C" int
-rib_ipcp_register(struct uipcp_rib *rib, int reg,
-                  const struct rina_name *lower_dif)
-{
-    string name;
-
-    if (!rina_name_valid(lower_dif)) {
-        PE("lower_dif name is not valid\n");
-        return -1;
-    }
-
-    name = string(lower_dif->apn);
-
-    ScopeLock(rib->lock);
-
-    return rib->ipcp_register(reg, name);
-}
-
-extern "C" char *
-rib_dump(struct uipcp_rib *rib)
-{
-    ScopeLock(rib->lock);
-
-    return rib->dump();
-}
-
-extern "C" int
-rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
-            uint64_t remote_addr)
-{
-    ScopeLock(rib->lock);
-
-    return rib->dft_set(RinaName(appl_name), remote_addr);
-}
-
-extern "C" int
 rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req)
 {
     ScopeLock(rib->lock);
@@ -844,40 +809,49 @@ normal_fini(struct uipcp *uipcp)
 
 static int
 normal_ipcp_register(struct uipcp *uipcp, int reg,
-                     const struct rina_name *dif_name,
+                     const struct rina_name *lower_dif,
                      unsigned int ipcp_id,
                      const struct rina_name *ipcp_name)
 {
+    string name;
     int result;
 
     /* Perform the registration. */
-    result = rlite_appl_register_wait(&uipcp->appl, reg, dif_name,
+    result = rlite_appl_register_wait(&uipcp->appl, reg, lower_dif,
                                       0, NULL, ipcp_name);
 
-    if (result == 0) {
-        rib_ipcp_register(uipcp->rib, reg, dif_name);
+    if (result) {
+        return result;
     }
+
+    if (!rina_name_valid(lower_dif)) {
+        PE("lower_dif name is not valid\n");
+        return -1;
+    }
+
+    name = string(lower_dif->apn);
+
+    ScopeLock(uipcp->rib->lock);
+
+    result = uipcp->rib->ipcp_register(reg, name);
 
     return result;
 }
 
 static int
-normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
-{
-    /* Perform enrollment in userspace. */
-    return rib_enroll(uipcp->rib, req);
-}
-
-static int
 normal_ipcp_dft_set(struct uipcp *uipcp, struct rina_cmsg_ipcp_dft_set *req)
 {
-    return rib_dft_set(uipcp->rib, &req->appl_name, req->remote_addr);
+    ScopeLock(uipcp->rib->lock);
+
+    return uipcp->rib->dft_set(RinaName(&req->appl_name), req->remote_addr);
 }
 
 static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
-    return rib_dump(uipcp->rib);
+    ScopeLock(uipcp->rib->lock);
+
+    return uipcp->rib->dump();
 }
 
 struct uipcp_ops normal_ops = {

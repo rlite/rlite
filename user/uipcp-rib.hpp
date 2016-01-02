@@ -226,4 +226,6 @@ private:
     int load_qos_cubes(const char *);
 };
 
+int normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
+
 #endif  /* __UIPCP_RIB_H__ */

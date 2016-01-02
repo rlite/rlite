@@ -120,21 +120,11 @@ int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
 int rib_del_neighbor(struct uipcp_rib *rib,
                      const struct rina_name *neigh_name);
 
-int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req);
-
 int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                   char *serbuf, int serlen);
 
-int rib_ipcp_register(struct uipcp_rib *rib, int reg,
-                      const struct rina_name *lower_dif);
-
-int rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
-                uint64_t remote_addr);
-
 int rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req);
 int rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp);
-
-char *rib_dump(struct uipcp_rib *rib);
 
 #ifdef __cplusplus
 }
