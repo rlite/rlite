@@ -451,6 +451,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
          * to be a response to wait for. */
         PE("has_response == 0 --> wait_for_completion == 0\n");
         rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        free(msg);
         *result = EINVAL;
         return NULL;
     }
@@ -463,6 +464,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         entry = malloc(sizeof(*entry));
         if (!entry) {
             rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+            free(msg);
             PE("Out of memory\n");
             *result = ENOMEM;
             return NULL;
@@ -495,6 +497,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         free(entry);
         pthread_mutex_unlock(&loop->lock);
         rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        free(msg);
         *result = ENOBUFS;
         return NULL;
     }
@@ -519,6 +522,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
             *result = EINVAL;
         }
         rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        free(msg);
 
     } else if (has_response && entry->wait_for_completion) {
         while (!entry->op_complete && *result == 0) {
@@ -548,6 +552,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
 
         /* Free the pending queue entry and the associated request message. */
         rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, entry->msg);
+        free(entry->msg);
         resp = entry->resp;
         free(entry);
     }
