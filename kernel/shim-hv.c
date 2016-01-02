@@ -300,3 +300,4 @@ rlite_shim_hv_fini(void)
 module_init(rlite_shim_hv_init);
 module_exit(rlite_shim_hv_fini);
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

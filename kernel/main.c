@@ -3006,3 +3006,4 @@ rlite_ctrl_fini(void)
 module_init(rlite_ctrl_init);
 module_exit(rlite_ctrl_fini);
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

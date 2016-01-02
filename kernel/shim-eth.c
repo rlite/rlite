@@ -1047,3 +1047,4 @@ rlite_shim_eth_fini(void)
 module_init(rlite_shim_eth_init);
 module_exit(rlite_shim_eth_fini);
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");
