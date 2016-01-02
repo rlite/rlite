@@ -366,8 +366,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         return -ENXIO;
     }
 
-    tpa = rina_name_to_string(&flow->remote_application);
-    spa = rina_name_to_string(&flow->local_application);
+    tpa = rina_name_to_string(&flow->remote_appl);
+    spa = rina_name_to_string(&flow->local_appl);
     if (!tpa || !spa) {
         goto nomem;
     }
@@ -414,8 +414,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
 
     spin_unlock_bh(&priv->arpt_lock);
 
-    spa = rina_name_to_string(&flow->local_application);
-    tpa = rina_name_to_string(&flow->remote_application);
+    spa = rina_name_to_string(&flow->local_appl);
+    tpa = rina_name_to_string(&flow->remote_appl);
     if (!spa || !tpa) {
         goto nomem;
     }
@@ -466,7 +466,7 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_buf *rb, *tmp;
     int ret = -ENXIO;
 
-    remote_app_s = rina_name_to_string(&flow->remote_application);
+    remote_app_s = rina_name_to_string(&flow->remote_appl);
     if (!remote_app_s) {
         PE("Out of memory\n");
         return -ENOMEM;

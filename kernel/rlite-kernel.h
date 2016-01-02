@@ -153,8 +153,8 @@ struct flow_entry {
     uint16_t            remote_port;
     uint64_t            remote_addr;
     uint8_t             state;
-    struct rina_name    local_application;
-    struct rina_name    remote_application;
+    struct rina_name    local_appl;
+    struct rina_name    remote_appl;
     struct upper_ref    upper;
     uint32_t            event_id; /* requestor event id */
     struct txrx         txrx;
@@ -191,8 +191,8 @@ int rina_ipcp_factory_unregister(const char *dif_type);
 
 int rina_fa_req_arrived(struct ipcp_entry *ipcp,
                         uint32_t remote_port, uint64_t remote_addr,
-                        const struct rina_name *local_application,
-                        const struct rina_name *remote_application,
+                        const struct rina_name *local_appl,
+                        const struct rina_name *remote_appl,
                         const struct rina_flow_config *flowcfg);
 
 int rina_fa_resp_arrived(struct ipcp_entry *ipcp,

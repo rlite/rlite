@@ -101,8 +101,8 @@ int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
                      uint32_t remote_port, uint64_t remote_addr,
-                     const struct rina_name *local_application,
-                     const struct rina_name *remote_application,
+                     const struct rina_name *local_appl,
+                     const struct rina_name *remote_appl,
                      const struct rina_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,

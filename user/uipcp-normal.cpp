@@ -592,9 +592,9 @@ normal_appl_register(struct rlite_evloop *loop,
                      const struct rina_msg_base_resp *b_resp,
                      const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -610,9 +610,9 @@ normal_fa_req(struct rlite_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
              const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
@@ -630,9 +630,9 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
                       const struct rina_msg_base_resp *b_resp,
                       const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_fa_req_arrived *req =
                     (struct rina_kmsg_fa_req_arrived *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -688,9 +688,9 @@ normal_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -709,9 +709,9 @@ normal_flow_deallocated(struct rlite_evloop *loop,
                        const struct rina_msg_base_resp *b_resp,
                        const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
                 (struct rina_kmsg_flow_deallocated *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);

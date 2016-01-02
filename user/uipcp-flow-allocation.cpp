@@ -116,7 +116,7 @@ policies2flowcfg(struct rina_flow_config *cfg,
 int
 uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 {
-    RinaName dest_appl(&req->remote_application);
+    RinaName dest_appl(&req->remote_appl);
     uint64_t remote_addr = dft_lookup(dest_appl);
     struct rlite_ipcp *ipcp;
     CDAPMessage m;

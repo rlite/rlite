@@ -221,9 +221,9 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
                          const struct rina_msg_base_resp *b_resp,
                          const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
@@ -290,9 +290,9 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
                   const struct rina_msg_base_resp *b_resp,
                   const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                   loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
@@ -311,15 +311,15 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
 
     ep->port_id = req->local_port;
 
-    ret = appl_name_to_sock_addr(&req->local_application, &ep->addr);
+    ret = appl_name_to_sock_addr(&req->local_appl, &ep->addr);
     if (ret) {
-        PE("Failed to get inet4 address for local application\n");
+        PE("Failed to get inet4 address for local appl\n");
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(&req->remote_application, &remote_addr);
+    ret = appl_name_to_sock_addr(&req->remote_appl, &remote_addr);
     if (ret) {
-        PE("Failed to get inet4 address for remote application\n");
+        PE("Failed to get inet4 address for remote appl\n");
         goto err1;
     }
 
@@ -367,9 +367,9 @@ lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
 static void
 accept_conn(struct rlite_evloop *loop, int lfd)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
@@ -387,9 +387,9 @@ accept_conn(struct rlite_evloop *loop, int lfd)
         return;
     }
 
-    /* Lookup the local registered application that is listening on lfd. */
+    /* Lookup the local registered appl that is listening on lfd. */
     if (lfd_to_appl_name(shim, lfd, &local_appl)) {
-        PE("Cannot find the local application corresponding "
+        PE("Cannot find the local appl corresponding "
            "to fd %d\n", lfd);
         return;
     }
@@ -427,9 +427,9 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
 
@@ -447,9 +447,9 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
                        const struct rina_msg_base_resp *b_resp,
                        const struct rina_msg_base *b_req)
 {
-    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
-    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
                 (struct rina_kmsg_flow_deallocated *)b_resp;
 

@@ -127,8 +127,8 @@ rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
 struct flow_allocate_req_work {
     struct work_struct w;
     struct ipcp_entry *ipcp;
-    struct rina_name local_application;
-    struct rina_name remote_application;
+    struct rina_name local_appl;
+    struct rina_name remote_appl;
     uint32_t remote_port;
 };
 
@@ -140,8 +140,8 @@ flow_allocate_req_work(struct work_struct *w)
     int ret;
 
     ret = rina_fa_req_arrived(faw->ipcp, faw->remote_port, 0,
-                              &faw->local_application,
-                              &faw->remote_application, NULL);
+                              &faw->local_appl,
+                              &faw->remote_appl, NULL);
     if (ret) {
         printk("failed to report flow allocation request\n");
     }
@@ -161,8 +161,8 @@ rina_shim_loopback_fa_req(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    rina_name_copy(&faw->remote_application, &flow->local_application);
-    rina_name_copy(&faw->local_application, &flow->remote_application);
+    rina_name_copy(&faw->remote_appl, &flow->local_appl);
+    rina_name_copy(&faw->local_appl, &flow->remote_appl);
     faw->remote_port = flow->local_port;
     faw->ipcp = ipcp;
     INIT_WORK(&faw->w, flow_allocate_req_work);

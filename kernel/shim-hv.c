@@ -95,7 +95,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         }
 
         ret = rina_fa_req_arrived(priv->ipcp, req.local_port, 0,
-                    &req.remote_application, &req.local_application, NULL);
+                    &req.remote_appl, &req.local_appl, NULL);
         if (ret) {
             printk("failed to report flow allocation request\n");
         }
@@ -186,8 +186,8 @@ rina_shim_hv_fa_req(struct ipcp_entry *ipcp,
 
     req.msg_type = RINA_SHIM_HV_FA_REQ;
     req.event_id = 0;
-    rina_name_copy(&req.local_application, &flow->local_application);
-    rina_name_copy(&req.remote_application, &flow->remote_application);
+    rina_name_copy(&req.local_appl, &flow->local_appl);
+    rina_name_copy(&req.remote_appl, &flow->remote_appl);
     req.local_port = flow->local_port;
 
     return shim_hv_send_ctrl_msg(ipcp, (struct rina_msg_base *)&req);

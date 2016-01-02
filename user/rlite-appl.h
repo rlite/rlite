@@ -54,8 +54,8 @@ int rlite_appl_register_wait(struct rlite_appl *application,
 int rlite_flow_allocate(struct rlite_appl *application,
                   struct rina_name *dif_name, int dif_fallback,
                   struct rina_name *ipcp_name, /* Useful for testing. */
-                  const struct rina_name *local_application,
-                  const struct rina_name *remote_application,
+                  const struct rina_name *local_appl,
+                  const struct rina_name *remote_appl,
                   const struct rina_flow_spec *flowcfg,
                   unsigned int *port_id, unsigned int wait_ms,
                   uint16_t upper_ipcp_id);
@@ -73,8 +73,8 @@ int rlite_open_mgmt_port(uint16_t ipcp_id);
 int rlite_flow_allocate_open(struct rlite_appl *application,
                        struct rina_name *dif_name, int dif_fallback,
                        struct rina_name *ipcp_name,
-                       const struct rina_name *local_application,
-                       const struct rina_name *remote_application,
+                       const struct rina_name *local_appl,
+                       const struct rina_name *remote_appl,
                        const struct rina_flow_spec *flowcfg,
                        unsigned int wait_ms);
 

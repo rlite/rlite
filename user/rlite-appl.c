@@ -32,8 +32,8 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
     char *local_s = NULL;
     char *remote_s = NULL;
 
-    local_s = rina_name_to_string(&req->local_application);
-    remote_s = rina_name_to_string(&req->remote_application);
+    local_s = rina_name_to_string(&req->local_appl);
+    remote_s = rina_name_to_string(&req->remote_appl);
 
     if (resp->result) {
         PE("Failed to allocate a flow between local application "
@@ -185,8 +185,8 @@ static struct rina_kmsg_fa_resp_arrived *
 flow_allocate_req(struct rlite_appl *application,
                   unsigned int wait_for_completion, uint16_t ipcp_id,
                   uint16_t upper_ipcp_id,
-                  const struct rina_name *local_application,
-                  const struct rina_name *remote_application,
+                  const struct rina_name *local_appl,
+                  const struct rina_name *remote_appl,
                   const struct rina_flow_spec *flowspec, int *result)
 {
     struct rina_kmsg_fa_req *req;
@@ -207,8 +207,8 @@ flow_allocate_req(struct rlite_appl *application,
     } else {
         rlite_flow_spec_default(&req->flowspec);
     }
-    rina_name_copy(&req->local_application, local_application);
-    rina_name_copy(&req->remote_application, remote_application);
+    rina_name_copy(&req->local_appl, local_appl);
+    rina_name_copy(&req->remote_appl, remote_appl);
 
     PD("Requesting flow allocation...\n");
 
@@ -302,8 +302,8 @@ int
 rlite_flow_allocate(struct rlite_appl *application,
               struct rina_name *dif_name, int dif_fallback,
               struct rina_name *ipcp_name,
-              const struct rina_name *local_application,
-              const struct rina_name *remote_application,
+              const struct rina_name *local_appl,
+              const struct rina_name *remote_appl,
               const struct rina_flow_spec *flowspec,
               unsigned int *port_id, unsigned int wait_ms,
               uint16_t upper_ipcp_id)
@@ -324,8 +324,8 @@ rlite_flow_allocate(struct rlite_appl *application,
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
                               rlite_ipcp->ipcp_id, upper_ipcp_id,
-                              local_application,
-                              remote_application, flowspec, &result);
+                              local_appl,
+                              remote_appl, flowspec, &result);
     if (!kresp) {
         PE("Flow allocation request failed\n");
         return -1;
@@ -401,8 +401,8 @@ int
 rlite_flow_allocate_open(struct rlite_appl *application,
                    struct rina_name *dif_name, int dif_fallback,
                    struct rina_name *ipcp_name,
-                   const struct rina_name *local_application,
-                   const struct rina_name *remote_application,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
                    const struct rina_flow_spec *flowspec,
                    unsigned int wait_ms)
 {
@@ -410,7 +410,7 @@ rlite_flow_allocate_open(struct rlite_appl *application,
     int ret;
 
     ret = rlite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
-                        local_application, remote_application, flowspec,
+                        local_appl, remote_appl, flowspec,
                         &port_id, wait_ms, 0xffff);
     if (ret) {
         return -1;

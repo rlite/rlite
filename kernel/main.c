@@ -786,8 +786,8 @@ notify_flow_removal(struct work_struct *work)
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
-         const struct rina_name *local_application,
-         const struct rina_name *remote_application,
+         const struct rina_name *local_appl,
+         const struct rina_name *remote_appl,
          const struct rina_flow_config *flowcfg,
          struct flow_entry **pentry, gfp_t gfp)
 {
@@ -807,8 +807,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     if (entry->local_port < PORT_ID_BITMAP_SIZE) {
         bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
         /* Build and insert a flow entry in the hash table. */
-        rina_name_copy(&entry->local_application, local_application);
-        rina_name_copy(&entry->remote_application, remote_application);
+        rina_name_copy(&entry->local_appl, local_appl);
+        rina_name_copy(&entry->remote_appl, remote_appl);
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_PENDING;
@@ -975,8 +975,8 @@ flow_put(struct flow_entry *entry)
     }
 
     hash_del(&entry->node);
-    rina_name_free(&entry->local_application);
-    rina_name_free(&entry->remote_application);
+    rina_name_free(&entry->local_appl);
+    rina_name_free(&entry->remote_appl);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
     printk("flow entry %u removed\n", entry->local_port);
     kfree(entry);
@@ -1424,8 +1424,8 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
-                                  &req->local_application,
-                                  &req->remote_application, &req->flowcfg);
+                                  &req->local_appl,
+                                  &req->remote_appl, &req->flowcfg);
     }
 
     ipcp_put(ipcp);
@@ -1479,8 +1479,8 @@ upper_ipcp_flow_bind(uint16_t upper_ipcp_id, struct flow_entry *flow)
 static int
 rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
                      uint32_t event_id,
-                     const struct rina_name *local_application,
-                     const struct rina_name *remote_application,
+                     const struct rina_name *local_appl,
+                     const struct rina_name *remote_appl,
                      struct rina_kmsg_fa_req *req)
 {
     struct ipcp_entry *ipcp_entry = NULL;
@@ -1494,8 +1494,8 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, NULL, &flow_entry,
+    ret = flow_add(ipcp_entry, upper, event_id, local_appl,
+                   remote_appl, NULL, &flow_entry,
                    GFP_KERNEL);
     if (ret) {
         goto out;
@@ -1508,7 +1508,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     } else {
         struct registered_appl *app;
 
-        app = ipcp_application_get(ipcp_entry, remote_application);
+        app = ipcp_application_get(ipcp_entry, remote_appl);
         if (app) {
             /* If the remote application is registered within this very
              * IPCP, the allocating flow can managed entirely inside this
@@ -1516,8 +1516,8 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * and directly invoke rina_fa_req_arrived, with reversed
              * arguments. */
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
-                                      ipcp_entry->addr, remote_application,
-                                      local_application, NULL /* XXX */);
+                                      ipcp_entry->addr, remote_appl,
+                                      local_appl, NULL /* XXX */);
             ipcp_application_put(app);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
@@ -1687,8 +1687,8 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         };
 
     ret = rina_fa_req_internal(req->ipcp_id, upper, req->event_id,
-                               &req->local_application,
-                               &req->remote_application, req);
+                               &req->local_appl,
+                               &req->remote_appl, req);
     if (ret == 0) {
         return 0;
     }
@@ -1791,8 +1791,8 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 int
 rina_fa_req_arrived(struct ipcp_entry *ipcp,
                     uint32_t remote_port, uint64_t remote_addr,
-                    const struct rina_name *local_application,
-                    const struct rina_name *remote_application,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl,
                     const struct rina_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
@@ -1803,7 +1803,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
 
     /* See whether the local application is registered to this
      * IPC process. */
-    app = ipcp_application_get(ipcp, local_application);
+    app = ipcp_application_get(ipcp, local_appl);
     if (!app) {
         goto out;
     }
@@ -1811,8 +1811,8 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     /* Allocate a port id and the associated flow entry. */
     upper.rc = app->rc;
     upper.ipcp = NULL;
-    ret = flow_add(ipcp, upper, 0, local_application,
-                   remote_application, flowcfg, &flow_entry,
+    ret = flow_add(ipcp, upper, 0, local_appl,
+                   remote_appl, flowcfg, &flow_entry,
                    GFP_ATOMIC);
     if (ret) {
         goto out;
@@ -1828,7 +1828,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     req.event_id = 0;
     req.ipcp_id = ipcp->id;
     req.port_id = flow_entry->local_port;
-    rina_name_copy(&req.remote_appl, remote_application);
+    rina_name_copy(&req.remote_appl, remote_appl);
 
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);

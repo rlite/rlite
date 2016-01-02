@@ -32,8 +32,8 @@ struct rina_hmsg_fa_req {
     uint32_t event_id;
 
     uint32_t local_port;
-    struct rina_name local_application;
-    struct rina_name remote_application;
+    struct rina_name local_appl;
+    struct rina_name remote_appl;
 } __attribute__((packed));
 
 /* Message to respond to a flow allocation request. */
