@@ -656,12 +656,12 @@ process_args(int argc, char **argv, struct rinaconf *rc)
     int i;
 
     if (argc < 2) {
-        /* No command. */
-        usage(-1);
-        return -1;
-    }
+        /* No command, assume ipcps-show. */
+        cmd = "ipcps-show";
 
-    cmd = argv[1];
+    } else {
+        cmd = argv[1];
+    }
 
     for (i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
