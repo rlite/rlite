@@ -803,6 +803,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, 0, NULL,
                          &info->ipcp_name, &neigh_name, NULL,
                          &port_id_, 2000, info->ipcp_id);
+    rina_name_free(&neigh_name);
     if (ret) {
         PE("Failed to allocate a flow towards neighbor\n");
         return -1;
