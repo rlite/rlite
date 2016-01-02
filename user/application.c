@@ -255,10 +255,10 @@ static int flow_allocate(struct application *application,
 
     printf("%s: Flow allocation response: ret = %u, port-id = %u\n",
                 __func__, kresp->result, kresp->port_id);
-
+    result = kresp->result;
     rina_msg_free(rina_kernel_numtables, RMB(kresp));
 
-    return 0;
+    return result;
 }
 
 static struct pending_flow_req *

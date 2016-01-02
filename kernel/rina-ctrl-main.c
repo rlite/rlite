@@ -900,6 +900,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
         mutex_unlock(&rina_dm.lock);
         return ret;
     }
+    flow_entry->remote_port = remote_port;
     flow_entry->state = FLOW_STATE_PENDING;
 
     req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
