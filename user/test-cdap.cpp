@@ -87,7 +87,7 @@ test_cdap_server(int port)
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
-                cdap_m_connect_r_send(&mgr, pipefds[1], m);
+                mgr.m_connect_r_send(m);
                 break;
 
             default:
@@ -131,7 +131,7 @@ client_connect(int sfd)
     rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
     rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
 
-    if (cdap_m_connect_send(&mgr, sfd, &invoke_id, gpb::AUTH_NONE,
+    if (mgr.m_connect_send(&invoke_id, gpb::AUTH_NONE,
                             &av, &local_appl, &remote_appl)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }

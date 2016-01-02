@@ -11,6 +11,8 @@
 using namespace std;
 
 
+#define CDAP_ABS_SYNTAX    73
+
 CDAPManager::CDAPManager(int arg_fd)
 {
     invoke_id_next = 1;
@@ -81,11 +83,17 @@ CDAPManager::put_invoke_id_remote(int invoke_id)
 
 CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
 {
-    op_code = op_code_arg;
-    obj_value.ty = NONE;
-    flags = gpb::F_NO_FLAGS;
+    abs_syntax = CDAP_ABS_SYNTAX;
     memset(&src_appl, 0, sizeof(src_appl));
     memset(&dst_appl, 0, sizeof(dst_appl));
+    flags = gpb::F_NO_FLAGS;
+    invoke_id = 0;
+    obj_inst = 0;
+    op_code = op_code_arg;
+    obj_value.ty = NONE;
+    result = 0;
+    scope = 0;
+    version = 0;
 }
 
 CDAPMessage::~CDAPMessage()
@@ -427,7 +435,7 @@ CDAPManager::msg_recv()
 }
 
 int
-cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
+CDAPManager::m_connect_send(int *invoke_id,
                     gpb::authTypes_t auth_mech,
                     const struct CDAPAuthValue *auth_value,
                     const struct rina_name *local_appl,
@@ -446,11 +454,11 @@ cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
         return ret;
     }
 
-    return mgr->msg_send(&m, 0);
+    return msg_send(&m, 0);
 }
 
 int
-cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
+CDAPManager::m_connect_r_send(const struct CDAPMessage *req)
 {
     struct CDAPMessage m(gpb::M_CONNECT_R);
     int ret;
@@ -465,5 +473,5 @@ cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
         return ret;
     }
 
-    return mgr->msg_send(&m, req->invoke_id);
+    return msg_send(&m, req->invoke_id);
 }

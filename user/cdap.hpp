@@ -35,6 +35,14 @@ public:
 
     struct CDAPMessage * msg_recv();
 
+    int m_connect_send(int *invoke_id, gpb::authTypes_t auth_mech,
+                        const struct CDAPAuthValue *auth_value,
+                        const struct rina_name *local_appl,
+                        const struct rina_name *remote_appl);
+
+    int m_connect_r_send(const struct CDAPMessage *req);
+
+
     struct rina_name local_appl;
     struct rina_name remote_appl;
     int fd;
@@ -98,14 +106,5 @@ private:
 
     CDAPMessage() { } /* This cannot be called. */
 };
-
-int cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
-                        gpb::authTypes_t auth_mech,
-                        const struct CDAPAuthValue *auth_value,
-                        const struct rina_name *local_appl,
-                        const struct rina_name *remote_appl);
-
-int cdap_m_connect_r_send(CDAPManager *mgr, int fd,
-                          const struct CDAPMessage *req);
 
 #endif /* __RINALITE_CDAP_H__ */
