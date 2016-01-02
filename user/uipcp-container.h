@@ -54,6 +54,8 @@ int uipcps_fetch(struct uipcps *uipcps);
 int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
+int mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
+                           void *buf, size_t buflen);
 int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
                     uint64_t dest_addr, uint32_t local_port);
 

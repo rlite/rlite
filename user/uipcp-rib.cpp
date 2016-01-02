@@ -33,6 +33,7 @@ namespace obj_class {
     static string address = "address";
     static string lfdb = "fsodb"; /* Lower Flow DB */
     static string flows = "flows"; /* Supported flows */
+    static string flow = "flow";
 };
 
 namespace obj_name {
@@ -144,6 +145,9 @@ struct uipcp_rib {
     map< string, LowerFlow > lfdb;
 
     SPEngine spe;
+
+    /* For A-DATA messages. */
+    InvokeIdMgr invoke_id_mgr;
 
     uipcp_rib(struct uipcp *_u);
 
@@ -613,9 +617,61 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     freq.create_flow_retries = 0;
     freq.hop_cnt = 0;
 
-    /* TODO send */
+    // TODO move in a separate function
+    CDAPMessage m;
+    AData adata;
+    CDAPMessage am;
+    char objbuf[4096];
+    char aobjbuf[4096];
+    char *serbuf;
+    int objlen;
+    int aobjlen;
+    size_t serlen;
+    int ret;
 
-    return 0;
+    m.m_create(gpb::F_NO_FLAGS, obj_class::flows, obj_class::flow,
+               0, 0, string());
+
+    objlen = freq.serialize(objbuf, sizeof(objbuf));
+    if (objlen < 0) {
+        PE("serialization failed\n");
+        return -1;
+    }
+
+    m.set_obj_value(objbuf, objlen);
+
+    m.invoke_id = invoke_id_mgr.get_invoke_id();
+
+    adata.src_addr = freq.src_addr;
+    adata.dst_addr = freq.dst_addr;
+    adata.cdap = &m;
+
+    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata,
+               0, 0, string());
+
+    aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
+    if (aobjlen < 0) {
+        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        PE("serialization failed\n");
+        return -1;
+    }
+
+    am.set_obj_value(aobjbuf, aobjlen);
+
+    try {
+        ret = msg_ser_stateless(&am, &serbuf, &serlen);
+    } catch (std::bad_alloc) {
+        ret = -1;
+    }
+
+    if (ret) {
+        PE("message serialization failed\n");
+        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        delete serbuf;
+        return -1;
+    }
+
+    return mgmt_write_to_dst_addr(uipcp, freq.dst_addr, serbuf, serlen);
 }
 
 int
@@ -1011,14 +1067,13 @@ int
 Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
                           const UipcpObject *obj) const
 {
+    char objbuf[4096];
+    int objlen;
     char *serbuf;
     size_t serlen;
     int ret;
 
     if (obj) {
-        char objbuf[4096];
-        int objlen;
-
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             PE("serialization failed\n");
@@ -1675,11 +1730,30 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 
     try {
         m = msg_deser_stateless(serbuf, serlen);
+
         if (m->obj_class == obj_class::adata &&
                     m->obj_name == obj_name::adata) {
             /* A-DATA message, does not belong to any CDAP
              * session. */
-            delete m; // TODO
+            const char *objbuf;
+            size_t objlen;
+
+            m->get_obj_value(objbuf, objlen);
+            if (!objbuf) {
+                PE("CDAP message does not contain a nested message\n");
+                return 0;
+            }
+
+            AData adata(objbuf, objlen);
+
+            if (!adata.cdap) {
+                PE("A_DATA does not contained encapsulated CDAP message\n");
+                return 0;
+            }
+
+            rib->cdap_dispatch(adata.cdap);
+
+            delete m;
         }
 
         /* This is not an A-DATA message, so we try to match it
@@ -1718,6 +1792,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 
     /* Feed the enrollment state machine. */
     return neigh->second.enroll_fsm_run(m);
+    // TODO delete m
 }
 
 extern "C" int

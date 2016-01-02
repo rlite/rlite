@@ -61,7 +61,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
-static int
+int
 mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
                        void *buf, size_t buflen)
 {
