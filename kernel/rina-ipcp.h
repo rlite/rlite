@@ -6,13 +6,8 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 
+#include "rina-bufs.h"
 
-struct rina_buf {
-    uint8_t *ptr;
-    size_t size;
-
-    struct list_head node;
-};
 
 struct ipcp_entry;
 struct flow_entry;

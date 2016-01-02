@@ -1335,7 +1335,6 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     struct rina_io *rio = (struct rina_io *)f->private_data;
     struct ipcp_entry *ipcp;
     struct rina_buf *rb;
-    uint8_t *kbuf;
 
     if (unlikely(!rio->flow)) {
         printk("%s: Error: Flow not assigned\n", __func__);
@@ -1343,19 +1342,10 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     }
     ipcp = rio->flow->ipcp;
 
-    rb = kmalloc(sizeof(*rb), GFP_KERNEL);
-    if (unlikely(!rb)) {
-        printk("%s: Out of memory\n", __func__);
+    rb = rina_buf_alloc(len);
+    if (!rb) {
         return -ENOMEM;
     }
-    kbuf = kmalloc(len, GFP_KERNEL);
-    if (unlikely(!kbuf)) {
-        kfree(rb);
-        printk("%s: Out of memory\n", __func__);
-        return -ENOMEM;
-    }
-    rb->ptr = kbuf;
-    rb->size = len;
 
     if (copy_from_user(rb->ptr, ubuf, rb->size)) {
         printk("%s: copy_from_user()\n", __func__);
@@ -1410,7 +1400,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             ret = -EFAULT;
         }
 
-        kfree(rb->ptr);
+        rina_buf_free(rb);
 
         break;
     }

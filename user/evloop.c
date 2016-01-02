@@ -398,7 +398,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
     /* If not redefined, setup default fetch handler. */
     if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
-printf("SETTING DEFAULT FETCH\n");
+        printf("%s: setting default fetch handler\n", __func__);
         loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 
