@@ -30,7 +30,7 @@ target_include_directories(test-cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(rinaperf rinalite)
 target_link_libraries(rinalite-uipcps rinalite)
 target_link_libraries(rina-config rinalite)
-target_link_libraries(test-cdap ${PROTOBUF_LIBRARY})
+target_link_libraries(test-cdap rinalite ${PROTOBUF_LIBRARY})
 
 install(TARGETS rinaperf rinalite-uipcps rina-config DESTINATION usr/bin)
 install(TARGETS rinalite DESTINATION usr/lib)

@@ -11,6 +11,10 @@
 #include <stdint.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define RINA_UIPCPS_UNIX_NAME     "/var/rinalite/uipcp-server"
 
 /* Application naming information:
@@ -168,6 +172,10 @@ struct rina_flow_config {
         PD(format, ##__VA_ARGS__);                      \
     } while (0)
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __RINA_COMMON_H__ */

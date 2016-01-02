@@ -3,6 +3,10 @@
 
 #include <rinalite/rinalite-common.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct rina_msg_layout {
     unsigned int copylen;
     unsigned int names;
@@ -47,6 +51,10 @@ void __rina_name_fill(struct rina_name *name, const char *apn,
 char * __rina_name_to_string(const struct rina_name *name, int maysleep);
 int __rina_name_from_string(const char *str, struct rina_name *name,
                             int maysleep);
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif  /* __RINA_SERDES_H__ */
