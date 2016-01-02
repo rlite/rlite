@@ -616,6 +616,11 @@ flow_put(struct flow_entry *entry)
                     "%u PDUs and rtxq is %sempty\n", __func__,
                     dtp->cwq_len, list_empty(&dtp->rtxq) ? "" : "not ");
             postpone = true;
+
+            /* No one can write or read from this flow anymore, so there
+             * is no reason to have the inactivity timer running. */
+            del_timer(&dtp->snd_inact_tmr);
+            del_timer(&dtp->rcv_inact_tmr);
         }
         spin_unlock_irq(&dtp->lock);
 
