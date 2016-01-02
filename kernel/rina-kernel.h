@@ -169,6 +169,8 @@ struct flow_entry *flow_lookup(unsigned int port_id);
 
 int flow_put(struct flow_entry *flow, int locked);
 
+struct flow_entry * flow_get(unsigned int port_id);
+
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 {

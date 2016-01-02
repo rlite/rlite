@@ -334,7 +334,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
         }
         dst_addr = mhdr->remote_addr;
     } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
-        lower_flow = flow_lookup(mhdr->local_port);
+        lower_flow = flow_get(mhdr->local_port);
         if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
             PI("%s: Invalid mgmt header local port %u, "
                     "dropping packet\n", __func__,
@@ -653,7 +653,7 @@ static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
     struct rina_pci *pci = RINA_BUF_PCI(rb);
-    struct flow_entry *flow = flow_lookup(pci->conn_id.dst_cep);
+    struct flow_entry *flow = flow_get(pci->conn_id.dst_cep);
     uint64_t seqnum = pci->seqnum;
     struct rina_buf *crb = NULL;
     unsigned int a = 0;

@@ -429,7 +429,7 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 
 /* Code improvement: we may merge ipcp_table_find() and flow_get()
  * into a template (a macro). */
-static struct flow_entry *
+struct flow_entry *
 flow_get(unsigned int port_id)
 {
     struct flow_entry *entry;
@@ -449,20 +449,7 @@ flow_get(unsigned int port_id)
 
     return NULL;
 }
-
-/* Exported (and locked) version of flow_get(). */
-struct flow_entry *
-flow_lookup(unsigned int port_id)
-{
-    struct flow_entry *flow;
-
-    mutex_lock(&rina_dm.lock);
-    flow = flow_get(port_id);
-    mutex_unlock(&rina_dm.lock);
-
-    return flow;
-}
-EXPORT_SYMBOL_GPL(flow_lookup);
+EXPORT_SYMBOL_GPL(flow_get);
 
 static void
 tx_completion_func(unsigned long arg)
