@@ -42,7 +42,7 @@ struct rx_entry {
 #define RX_POW      8
 #define RX_ENTRIES  (1 << RX_POW)
 
-struct rina_shim_loopback {
+struct rlite_shim_loopback {
     struct ipcp_entry *ipcp;
 
     unsigned int drop_fract;
@@ -61,8 +61,8 @@ struct rina_shim_loopback {
 static void
 rcv_work(struct work_struct *w)
 {
-    struct rina_shim_loopback *priv =
-            container_of(w, struct rina_shim_loopback, rcv);
+    struct rlite_shim_loopback *priv =
+            container_of(w, struct rlite_shim_loopback, rcv);
 
     for (;;) {
         struct rlite_buf *rb = NULL;
@@ -81,16 +81,16 @@ rcv_work(struct work_struct *w)
         if (!rb) {
             break;
         }
-        rina_sdu_rx(priv->ipcp, rb, remote_port);
+        rlite_sdu_rx(priv->ipcp, rb, remote_port);
 
-        rina_write_restart(local_port);
+        rlite_write_restart(local_port);
     }
 }
 
 static void *
-rina_shim_loopback_create(struct ipcp_entry *ipcp)
+rlite_shim_loopback_create(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_loopback *priv;
+    struct rlite_shim_loopback *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -110,9 +110,9 @@ rina_shim_loopback_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
+rlite_shim_loopback_destroy(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_loopback *priv = ipcp->priv;
+    struct rlite_shim_loopback *priv = ipcp->priv;
 
     cancel_work_sync(&priv->rcv);
 
@@ -141,7 +141,7 @@ flow_allocate_req_work(struct work_struct *w)
                         struct flow_allocate_req_work, w);
     int ret;
 
-    ret = rina_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0,
+    ret = rlite_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0,
                               &faw->local_appl,
                               &faw->remote_appl, NULL);
     if (ret) {
@@ -152,7 +152,7 @@ flow_allocate_req_work(struct work_struct *w)
 }
 
 static int
-rina_shim_loopback_fa_req(struct ipcp_entry *ipcp,
+rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
     struct flow_allocate_req_work *faw;
@@ -188,7 +188,7 @@ flow_allocate_resp_work(struct work_struct *w)
                         struct flow_allocate_resp_work, w);
     int ret;
 
-    ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
+    ret = rlite_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
                                0, 0, farw->response, NULL);
     if (ret) {
         PE("failed to report flow allocation response\n");
@@ -198,7 +198,7 @@ flow_allocate_resp_work(struct work_struct *w)
 }
 
 static int
-rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
+rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
                                    struct flow_entry *flow,
                                    uint8_t response)
 {
@@ -221,12 +221,12 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
+rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                              struct flow_entry *flow,
                              struct rlite_buf *rb,
                              bool maysleep)
 {
-    struct rina_shim_loopback *priv = ipcp->priv;
+    struct rlite_shim_loopback *priv = ipcp->priv;
 
     if (unlikely(priv->drop_fract)) {
         bool drop = false;
@@ -266,18 +266,18 @@ rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         schedule_work(&priv->rcv);
 
     } else {
-        rina_sdu_rx(ipcp, rb, flow->remote_port);
+        rlite_sdu_rx(ipcp, rb, flow->remote_port);
     }
 
     return 0;
 }
 
 static int
-rina_shim_loopback_config(struct ipcp_entry *ipcp,
+rlite_shim_loopback_config(struct ipcp_entry *ipcp,
                        const char *param_name,
                        const char *param_value)
 {
-    struct rina_shim_loopback *priv = (struct rina_shim_loopback *)ipcp->priv;
+    struct rlite_shim_loopback *priv = (struct rlite_shim_loopback *)ipcp->priv;
     int ret = -EINVAL;
 
     if (strcmp(param_name, "queued") == 0) {
@@ -317,26 +317,26 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
 static struct ipcp_factory shim_loopback_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
-    .create = rina_shim_loopback_create,
-    .ops.destroy = rina_shim_loopback_destroy,
-    .ops.flow_allocate_req = rina_shim_loopback_fa_req,
-    .ops.flow_allocate_resp = rina_shim_loopback_fa_resp,
-    .ops.sdu_write = rina_shim_loopback_sdu_write,
-    .ops.config = rina_shim_loopback_config,
+    .create = rlite_shim_loopback_create,
+    .ops.destroy = rlite_shim_loopback_destroy,
+    .ops.flow_allocate_req = rlite_shim_loopback_fa_req,
+    .ops.flow_allocate_resp = rlite_shim_loopback_fa_resp,
+    .ops.sdu_write = rlite_shim_loopback_sdu_write,
+    .ops.config = rlite_shim_loopback_config,
 };
 
 static int __init
-rina_shim_loopback_init(void)
+rlite_shim_loopback_init(void)
 {
-    return rina_ipcp_factory_register(&shim_loopback_factory);
+    return rlite_ipcp_factory_register(&shim_loopback_factory);
 }
 
 static void __exit
-rina_shim_loopback_fini(void)
+rlite_shim_loopback_fini(void)
 {
-    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rina_shim_loopback_init);
-module_exit(rina_shim_loopback_fini);
+module_init(rlite_shim_loopback_init);
+module_exit(rlite_shim_loopback_fini);
 MODULE_LICENSE("GPL");

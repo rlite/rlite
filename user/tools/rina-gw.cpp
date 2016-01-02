@@ -654,7 +654,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
     map<int, RinaName>::iterator mit;
-    struct rina_flow_spec flowspec;
+    struct rlite_flow_spec flowspec;
     unsigned int event_id;
     unsigned int unused;
     int cfd;

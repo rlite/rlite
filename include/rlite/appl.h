@@ -63,7 +63,7 @@ int rlite_flow_allocate(struct rlite_appl *appl,
                         const struct rina_name *ipcp_name, /* Useful for testing. */
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
-                        const struct rina_flow_spec *flowcfg,
+                        const struct rlite_flow_spec *flowcfg,
                         unsigned int *port_id, unsigned int wait_ms,
                         uint16_t upper_ipcp_id);
 
@@ -83,13 +83,13 @@ int rlite_flow_allocate_open(struct rlite_appl *appl,
                        const struct rina_name *ipcp_name,
                        const struct rina_name *local_appl,
                        const struct rina_name *remote_appl,
-                       const struct rina_flow_spec *flowcfg,
+                       const struct rlite_flow_spec *flowcfg,
                        unsigned int wait_ms);
 
 int rlite_flow_req_wait_open(struct rlite_appl *appl);
 
-void rlite_flow_spec_default(struct rina_flow_spec *spec);
-void rlite_flow_cfg_default(struct rina_flow_config *cfg);
+void rlite_flow_spec_default(struct rlite_flow_spec *spec);
+void rlite_flow_cfg_default(struct rlite_flow_config *cfg);
 
 #ifdef __cplusplus
 }

@@ -104,7 +104,7 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
 }
 
 static uint8_t
-rina_ipcp_register(struct uipcps *uipcps, int reg,
+rlite_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *dif_name,
                    unsigned int ipcp_id,
                    const struct rina_name *ipcp_name)
@@ -144,7 +144,7 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rlite_msg_base_resp resp;
 
-    resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
+    resp.result = rlite_ipcp_register(uipcps, req->reg, &req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
     return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
@@ -281,11 +281,11 @@ out:
     return ret;
 }
 
-typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
+typedef int (*rlite_req_handler_t)(struct uipcps *uipcps, int sfd,
                                    const struct rlite_msg_base * b_req);
 
 /* The table containing all application request handlers. */
-static rina_req_handler_t rlite_config_handlers[] = {
+static rlite_req_handler_t rlite_config_handlers[] = {
     [RLITE_CFG_IPCP_REGISTER] = rlite_conf_ipcp_register,
     [RLITE_CFG_IPCP_ENROLL] = rlite_conf_ipcp_enroll,
     [RLITE_CFG_IPCP_DFT_SET] = rlite_conf_ipcp_dft_set,
@@ -323,7 +323,7 @@ unix_server(void *arg)
         }
 
         /* Deserialize into a formatted message. */
-        ret = deserialize_rina_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+        ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
                                    serbuf, n, msgbuf, sizeof(msgbuf));
         if (ret) {
             PE("deserialization error [%d]\n", ret);
@@ -449,7 +449,7 @@ uipcps_update(struct uipcps *uipcps)
                 if (s1 && s2 && s3 && rina_name_from_string(s1, &dif_name) == 0
                         && rina_name_from_string(s3, &ipcp_name) == 0) {
                     ipcp_id = atoi(s2);
-                    reg_result = rina_ipcp_register(uipcps, 1, &dif_name,
+                    reg_result = rlite_ipcp_register(uipcps, 1, &dif_name,
                                                     ipcp_id, &ipcp_name);
                     PI("Automatic re-registration for %s --> %s\n",
                         s3, (reg_result == 0) ? "DONE" : "FAILED");

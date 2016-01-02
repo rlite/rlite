@@ -92,7 +92,7 @@ struct registered_appl {
 #define PORT_ID_HASHTABLE_BITS  7
 #define CEP_ID_HASHTABLE_BITS  7
 
-struct rina_dm {
+struct rlite_dm {
     /* Bitmap to manage IPC process ids. */
     DECLARE_BITMAP(ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
 
@@ -126,12 +126,12 @@ struct rina_dm {
     struct mutex general_lock;
 };
 
-static struct rina_dm rina_dm;
+static struct rlite_dm rlite_dm;
 
-#define FLOCK() spin_lock_bh(&rina_dm.flows_lock)
-#define FUNLOCK() spin_unlock_bh(&rina_dm.flows_lock)
-#define PLOCK() spin_lock_bh(&rina_dm.ipcps_lock)
-#define PUNLOCK() spin_unlock_bh(&rina_dm.ipcps_lock)
+#define FLOCK() spin_lock_bh(&rlite_dm.flows_lock)
+#define FUNLOCK() spin_unlock_bh(&rlite_dm.flows_lock)
+#define PLOCK() spin_lock_bh(&rlite_dm.ipcps_lock)
+#define PUNLOCK() spin_unlock_bh(&rlite_dm.ipcps_lock)
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
@@ -144,7 +144,7 @@ ipcp_factories_find(const char *dif_type)
         return NULL;
     }
 
-    list_for_each_entry(factory, &rina_dm.ipcp_factories, node) {
+    list_for_each_entry(factory, &rlite_dm.ipcp_factories, node) {
         if (strcmp(factory->dif_type, dif_type) == 0) {
             return factory;
         }
@@ -154,7 +154,7 @@ ipcp_factories_find(const char *dif_type)
 }
 
 int
-rina_ipcp_factory_register(struct ipcp_factory *factory)
+rlite_ipcp_factory_register(struct ipcp_factory *factory)
 {
     int ret = 0;
 
@@ -163,7 +163,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         return -EINVAL;
     }
 
-    mutex_lock(&rina_dm.general_lock);
+    mutex_lock(&rlite_dm.general_lock);
 
     if (ipcp_factories_find(factory->dif_type)) {
         ret = -EBUSY;
@@ -186,27 +186,27 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
     /* Insert the new factory into the IPC process factories
      * list. Ownership is not passed, it stills remains to
      * the invoking IPCP module. */
-    list_add_tail(&factory->node, &rina_dm.ipcp_factories);
+    list_add_tail(&factory->node, &rlite_dm.ipcp_factories);
 
     PI("IPC processes factory '%s' registered\n",
             factory->dif_type);
 out:
-    mutex_unlock(&rina_dm.general_lock);
+    mutex_unlock(&rlite_dm.general_lock);
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_ipcp_factory_register);
+EXPORT_SYMBOL_GPL(rlite_ipcp_factory_register);
 
 int
-rina_ipcp_factory_unregister(const char *dif_type)
+rlite_ipcp_factory_unregister(const char *dif_type)
 {
     struct ipcp_factory *factory;
 
-    mutex_lock(&rina_dm.general_lock);
+    mutex_lock(&rlite_dm.general_lock);
 
     factory = ipcp_factories_find(dif_type);
     if (!factory) {
-        mutex_unlock(&rina_dm.general_lock);
+        mutex_unlock(&rlite_dm.general_lock);
         return -EINVAL;
     }
 
@@ -214,17 +214,17 @@ rina_ipcp_factory_unregister(const char *dif_type)
      * the factory object. */
     list_del(&factory->node);
 
-    mutex_unlock(&rina_dm.general_lock);
+    mutex_unlock(&rlite_dm.general_lock);
 
     PI("IPC processes factory '%s' unregistered\n",
             dif_type);
 
     return 0;
 }
-EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
+EXPORT_SYMBOL_GPL(rlite_ipcp_factory_unregister);
 
 static int
-rina_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
+rlite_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -244,7 +244,7 @@ rina_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    serlen = serialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, rmsg);
 
     entry->sermsg = serbuf;
@@ -280,9 +280,9 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
 
     *err = 0;
 
-    spin_lock_bh(&rina_dm.difs_lock);
+    spin_lock_bh(&rlite_dm.difs_lock);
 
-    list_for_each_entry(cur, &rina_dm.difs, node) {
+    list_for_each_entry(cur, &rlite_dm.difs, node) {
         if (strcmp(cur->name, dif_name) == 0) {
             /* A DIF called 'dif_name' already exists. */
             if (strcmp(cur->ty, dif_type) == 0) {
@@ -323,12 +323,12 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
     cur->max_pdu_size = 8000;  /* Currently unused. */
     cur->max_pdu_life = MPL_MSECS_DEFAULT;
     cur->refcnt = 1;
-    list_add_tail(&cur->node, &rina_dm.difs);
+    list_add_tail(&cur->node, &rlite_dm.difs);
 
     PD("DIF %s [type '%s'] created\n", cur->name, cur->ty);
 
 out:
-    spin_unlock_bh(&rina_dm.difs_lock);
+    spin_unlock_bh(&rlite_dm.difs_lock);
 
     return cur;
 }
@@ -340,7 +340,7 @@ dif_put(struct dif *dif)
         return;
     }
 
-    spin_lock_bh(&rina_dm.difs_lock);
+    spin_lock_bh(&rlite_dm.difs_lock);
     dif->refcnt--;
     if (dif->refcnt) {
         goto out;
@@ -353,7 +353,7 @@ dif_put(struct dif *dif)
     kfree(dif);
 
 out:
-    spin_unlock_bh(&rina_dm.difs_lock);
+    spin_unlock_bh(&rlite_dm.difs_lock);
 }
 
 static struct ipcp_entry *
@@ -364,7 +364,7 @@ __ipcp_get(unsigned int ipcp_id)
 
     PLOCK();
 
-    head = &rina_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
+    head = &rlite_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rlite_dm.ipcp_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->id == ipcp_id) {
             entry->refcnt++;
@@ -399,7 +399,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
 
     /* Check if an IPC process with that name already exists.
      * This check is also performed by userspace. */
-    hash_for_each(rina_dm.ipcp_table, bucket, cur, node) {
+    hash_for_each(rlite_dm.ipcp_table, bucket, cur, node) {
         if (rina_name_cmp(&cur->name, &req->name) == 0) {
             PUNLOCK();
             kfree(entry);
@@ -416,10 +416,10 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
     }
 
     /* Try to alloc an IPC process id from the bitmap. */
-    entry->id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
+    entry->id = bitmap_find_next_zero_area(rlite_dm.ipcp_id_bitmap,
                             IPCP_ID_BITMAP_SIZE, 0, 1, 0);
     if (entry->id < IPCP_ID_BITMAP_SIZE) {
-        bitmap_set(rina_dm.ipcp_id_bitmap, entry->id, 1);
+        bitmap_set(rlite_dm.ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
         entry->dif = dif;
@@ -433,7 +433,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
         mutex_init(&entry->lock);
-        hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
+        hash_add(rlite_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
     } else {
         ret = -ENOSPC;
@@ -459,7 +459,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 
     BUG_ON(entry == NULL);
 
-    mutex_lock(&rina_dm.general_lock);
+    mutex_lock(&rlite_dm.general_lock);
 
     factory = ipcp_factories_find(req->dif_type);
     if (!factory) {
@@ -495,7 +495,7 @@ out:
     if (ret) {
         ipcp_put(entry);
     }
-    mutex_unlock(&rina_dm.general_lock);
+    mutex_unlock(&rlite_dm.general_lock);
 
     return ret;
 }
@@ -663,7 +663,7 @@ flow_get(unsigned int port_id)
 
     FLOCK();
 
-    head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
+    head = &rlite_dm.flow_table[hash_min(port_id, HASH_BITS(rlite_dm.flow_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->local_port == port_id) {
             entry->refcnt++;
@@ -686,8 +686,8 @@ flow_get_by_cep(unsigned int cep_id)
 
     FLOCK();
 
-    head = &rina_dm.flow_table_by_cep[hash_min(cep_id,
-                                      HASH_BITS(rina_dm.flow_table_by_cep))];
+    head = &rlite_dm.flow_table_by_cep[hash_min(cep_id,
+                                      HASH_BITS(rlite_dm.flow_table_by_cep))];
     hlist_for_each_entry(entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             entry->refcnt++;
@@ -783,7 +783,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
          const struct rina_name *local_appl,
          const struct rina_name *remote_appl,
-         const struct rina_flow_config *flowcfg,
+         const struct rlite_flow_config *flowcfg,
          struct flow_entry **pentry, gfp_t gfp)
 {
     struct flow_entry *entry;
@@ -798,11 +798,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     /* Try to alloc a port id and a cep id from the bitmaps, cep
      * ids being allocated only if needed. */
-    entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
+    entry->local_port = bitmap_find_next_zero_area(rlite_dm.port_id_bitmap,
                                                    PORT_ID_BITMAP_SIZE,
                                                    0, 1, 0);
     if (ipcp->use_cep_ids) {
-        entry->local_cep = bitmap_find_next_zero_area(rina_dm.cep_id_bitmap,
+        entry->local_cep = bitmap_find_next_zero_area(rlite_dm.cep_id_bitmap,
                                                       CEP_ID_BITMAP_SIZE,
                                                       0, 1, 0);
     } else {
@@ -811,10 +811,10 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     if (entry->local_port < PORT_ID_BITMAP_SIZE &&
                 entry->local_cep < CEP_ID_BITMAP_SIZE) {
-        bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
+        bitmap_set(rlite_dm.port_id_bitmap, entry->local_port, 1);
 
         if (ipcp->use_cep_ids) {
-            bitmap_set(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+            bitmap_set(rlite_dm.cep_id_bitmap, entry->local_cep, 1);
         }
 
         /* Build and insert a flow entry in the hash table. */
@@ -831,9 +831,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->sdu_rx_consumed = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
-        hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+        hash_add(rlite_dm.flow_table, &entry->node, entry->local_port);
         if (ipcp->use_cep_ids) {
-            hash_add(rina_dm.flow_table_by_cep, &entry->node_cep,
+            hash_add(rlite_dm.flow_table_by_cep, &entry->node_cep,
                      entry->local_cep);
         }
         INIT_LIST_HEAD(&entry->rmtq);
@@ -973,7 +973,7 @@ flow_put(struct flow_entry *entry)
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
 
-        rina_upqueue_append(ipcp->uipcp, (const struct rlite_msg_base *)&ntfy);
+        rlite_upqueue_append(ipcp->uipcp, (const struct rlite_msg_base *)&ntfy);
     }
 
     /* We are in process context here, so we can safely do the
@@ -989,10 +989,10 @@ flow_put(struct flow_entry *entry)
     hash_del(&entry->node);
     rina_name_free(&entry->local_appl);
     rina_name_free(&entry->remote_appl);
-    bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
+    bitmap_clear(rlite_dm.port_id_bitmap, entry->local_port, 1);
     if (ipcp->use_cep_ids) {
         hash_del(&entry->node_cep);
-        bitmap_clear(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+        bitmap_clear(rlite_dm.cep_id_bitmap, entry->local_cep, 1);
     }
     PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
@@ -1018,7 +1018,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
     PLOCK();
 
     /* For each IPC processes. */
-    hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
+    hash_for_each(rlite_dm.ipcp_table, bucket, ipcp, node) {
         RALOCK(ipcp);
 
         /* For each application registered to this IPC process. */
@@ -1067,7 +1067,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
             ntfy.ipcp_id = app->ipcp->id;
             ntfy.reg = false;
             rina_name_move(&ntfy.appl_name, &app->name);
-            rina_upqueue_append(app->ipcp->uipcp,
+            rlite_upqueue_append(app->ipcp->uipcp,
                                 (const struct rlite_msg_base *)&ntfy);
             rina_name_move(&app->name, &ntfy.appl_name);
         }
@@ -1084,7 +1084,7 @@ flow_rc_unbind(struct rlite_ctrl *rc)
     struct hlist_node *tmp;
     int bucket;
 
-    hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
+    hash_for_each_safe(rlite_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
             /* Since this 'rc' is going to disappear, we have to remove
              * the reference stored into this flow. */
@@ -1096,7 +1096,7 @@ flow_rc_unbind(struct rlite_ctrl *rc)
                  * remove the flow. */
                 flow_put(flow);
             } else {
-                /* If no rina_io device binds to this allocated flow,
+                /* If no rlite_io device binds to this allocated flow,
                  * the associated memory will never be released.
                  * Two solutions:
                  *      (a) - When the flows transitions into allocated
@@ -1118,7 +1118,7 @@ flow_make_mortal(struct flow_entry *flow)
 
         if (flow->never_bound) {
             /* Here reference counter is (likely) 2. Reset it to 1, so that
-             * proper flow destruction happens in rina_io_release(). If we
+             * proper flow destruction happens in rlite_io_release(). If we
              * didn't do it, the flow would live forever with its refcount
              * set to 1. */
             flow->never_bound = false;
@@ -1145,7 +1145,7 @@ __ipcp_put(struct ipcp_entry *entry)
     }
 
     hash_del(&entry->node);
-    bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
+    bitmap_clear(rlite_dm.ipcp_id_bitmap, entry->id, 1);
 
     PUNLOCK();
 
@@ -1201,7 +1201,7 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
-rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_create *req = (struct rl_kmsg_ipcp_create *)bmsg;
     struct rl_kmsg_ipcp_create_resp resp;
@@ -1220,7 +1220,7 @@ rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&resp);
+    ret = rlite_upqueue_append(rc, (struct rlite_msg_base *)&resp);
     if (ret) {
         goto err;
     }
@@ -1239,7 +1239,7 @@ err:
 }
 
 static int
-rina_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_destroy *req =
                         (struct rl_kmsg_ipcp_destroy *)bmsg;
@@ -1261,7 +1261,7 @@ struct ipcps_fetch_q_entry {
 };
 
 static int
-rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
+rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 {
     struct ipcps_fetch_q_entry *fqe;
     struct ipcp_entry *entry;
@@ -1271,7 +1271,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
     PLOCK();
 
     if (list_empty(&rc->ipcps_fetch_q)) {
-        hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
+        hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
             const char *dif_name = NULL;
 
             fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
@@ -1312,7 +1312,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
-        ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
+        ret = rlite_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       (struct rlite_msg_base *)&fqe->resp);
         kfree(fqe);
@@ -1324,7 +1324,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 }
 
 static int
-rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_config *req =
                     (struct rl_kmsg_ipcp_config *)bmsg;
@@ -1366,7 +1366,7 @@ rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_pduft_set *req =
                     (struct rl_kmsg_ipcp_pduft_set *)bmsg;
@@ -1400,7 +1400,7 @@ rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_pduft_flush *req =
                     (struct rl_kmsg_ipcp_pduft_flush *)bmsg;
@@ -1425,7 +1425,7 @@ rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_uipcp_set *req =
                     (struct rl_kmsg_ipcp_uipcp_set *)bmsg;
@@ -1452,7 +1452,7 @@ rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req =
                     (struct rl_kmsg_uipcp_fa_req_arrived *)bmsg;
@@ -1461,7 +1461,7 @@ rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rina_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
+        ret = rlite_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
                                   req->remote_cep,
                                   req->remote_addr, &req->local_appl,
                                   &req->remote_appl, &req->flowcfg);
@@ -1473,7 +1473,7 @@ rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
+rlite_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
                            struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req =
@@ -1483,7 +1483,7 @@ rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rina_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
+        ret = rlite_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
                                    req->remote_cep, req->remote_addr,
                                    req->response, &req->flowcfg);
     }
@@ -1493,7 +1493,7 @@ rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
 }
 
 static int
-rina_flow_dealloc(struct rlite_ctrl *rc,
+rlite_flow_dealloc(struct rlite_ctrl *rc,
                   struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_flow_dealloc *req =
@@ -1520,7 +1520,7 @@ rina_flow_dealloc(struct rlite_ctrl *rc,
 }
 
 /* Connect the upper IPCP which is using this flow
- * so that rina_sdu_rx() can deliver SDU to the IPCP. */
+ * so that rlite_sdu_rx() can deliver SDU to the IPCP. */
 static int
 upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
                      struct flow_entry *flow)
@@ -1550,7 +1550,7 @@ upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
 }
 
 static int
-rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req =
                     (struct rl_kmsg_appl_register *)bmsg;
@@ -1574,7 +1574,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             /* Reflect to userspace this (un)registration, so that
              * userspace IPCP can take appropriate actions. */
             req->event_id = 0;
-            rina_upqueue_append(ipcp->uipcp,
+            rlite_upqueue_append(ipcp->uipcp,
                     (const struct rlite_msg_base *)req);
         }
 
@@ -1590,7 +1590,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
             rina_name_move(&resp.appl_name, &req->appl_name);
 
-            rina_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
+            rlite_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
 
             if (!ret) {
                 PI("Application process %s %sregistered to IPC process %u\n",
@@ -1613,7 +1613,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register_resp *resp =
                     (struct rl_kmsg_appl_register_resp *)bmsg;
@@ -1646,7 +1646,7 @@ rina_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
                 PI("Application process %s %sregistered to IPC process %u\n",
                         name_s, (resp->reg ? "" : "un"), resp->ipcp_id);
             }
-            rina_upqueue_append(app->rc, (const struct rlite_msg_base *)resp);
+            rlite_upqueue_append(app->rc, (const struct rlite_msg_base *)resp);
         }
         ipcp_application_put(app);
     }
@@ -1661,7 +1661,7 @@ rina_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
+rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
 {
     struct rl_kmsg_fa_resp_arrived resp;
@@ -1673,11 +1673,11 @@ rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
     resp.result = result;
 
     /* Enqueue the response into the upqueue. */
-    return rina_upqueue_append(rc, (struct rlite_msg_base *)&resp);
+    return rlite_upqueue_append(rc, (struct rlite_msg_base *)&resp);
 }
 
 static int
-rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_fa_req *req =
                     (struct rl_kmsg_fa_req *)bmsg;
@@ -1725,7 +1725,7 @@ rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             req->event_id = 0;
             req->local_port = flow_entry->local_port;
             req->local_cep = flow_entry->local_cep;
-            ret = rina_upqueue_append(ipcp_entry->uipcp,
+            ret = rlite_upqueue_append(ipcp_entry->uipcp,
                     (const struct rlite_msg_base *)req);
         }
     }
@@ -1747,11 +1747,11 @@ out:
     }
 
     /* Create a negative response message. */
-    return rina_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
+    return rlite_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
 }
 
 static int
-rina_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rlite_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_fa_resp *resp =
                     (struct rl_kmsg_fa_resp *)bmsg;
@@ -1803,7 +1803,7 @@ rina_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
              * Reflect the flow allocation response message to userspace. */
             resp->event_id = 0;
             resp->cep_id = flow_entry->local_cep;
-            ret = rina_upqueue_append(ipcp->uipcp,
+            ret = rlite_upqueue_append(ipcp->uipcp,
                     (const struct rlite_msg_base *)resp);
         }
     }
@@ -1820,12 +1820,12 @@ out:
 
 /* This may be called from softirq context. */
 int
-rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
+rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                     uint32_t remote_port, uint32_t remote_cep,
                     uint64_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
-                    const struct rina_flow_config *flowcfg)
+                    const struct rlite_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_appl *app;
@@ -1867,7 +1867,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     rina_name_fill(&req.dif_name, ipcp->dif->name, NULL, NULL, NULL);
 
     /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(app->rc, (struct rlite_msg_base *)&req);
+    ret = rlite_upqueue_append(app->rc, (struct rlite_msg_base *)&req);
     if (ret) {
         flow_put(flow_entry);
     }
@@ -1878,16 +1878,16 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_fa_req_arrived);
+EXPORT_SYMBOL_GPL(rlite_fa_req_arrived);
 
 int
-rina_fa_resp_arrived(struct ipcp_entry *ipcp,
+rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
                      uint32_t remote_cep,
                      uint64_t remote_addr,
                      uint8_t response,
-                     struct rina_flow_config *flowcfg)
+                     struct rlite_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
@@ -1918,7 +1918,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
             "port-id %u, remote addr %llu\n", ipcp->id,
             local_port, (long long unsigned)remote_addr);
 
-    ret = rina_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
+    ret = rlite_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
                                                  flow_entry->event_id,
                                                  local_port, response);
 
@@ -1932,12 +1932,12 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_fa_resp_arrived);
+EXPORT_SYMBOL_GPL(rlite_fa_resp_arrived);
 
 /* Userspace queue threshold. */
 #define USR_Q_TH        128
 
-int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
+int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rlite_buf *rb, bool qlimit)
 {
     struct txrx *txrx;
@@ -1945,7 +1945,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (flow->upper.ipcp) {
         /* The flow on which the PDU is received is used by an IPCP. */
-        if (unlikely(rb->len < sizeof(struct rlite_pci))) {
+        if (unlikely(rb->len < sizeof(struct rina_pci))) {
             RPD(5, "Dropping SDU shorter [%u] than PCI\n",
                     (unsigned int)rb->len);
             rlite_buf_free(rb);
@@ -1958,7 +1958,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                       RLITE_BUF_PCI(rb)->dst_addr == 0))) {
             /* Management PDU for this IPC process. Post it to the userspace
              * IPCP. */
-            struct rina_mgmt_hdr *mhdr;
+            struct rlite_mgmt_hdr *mhdr;
             uint64_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
 
             if (!flow->upper.ipcp->mgmt_txrx) {
@@ -1974,7 +1974,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
              * by rlite_buf_pci_pop(). */
             ret = rlite_buf_custom_push(rb, sizeof(*mhdr));
             BUG_ON(ret);
-            mhdr = (struct rina_mgmt_hdr *)RLITE_BUF_DATA(rb);
+            mhdr = (struct rlite_mgmt_hdr *)RLITE_BUF_DATA(rb);
             mhdr->type = RLITE_MGMT_HDR_T_IN;
             mhdr->local_port = flow->local_port;
             mhdr->remote_addr = src_addr;
@@ -2008,10 +2008,10 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_sdu_rx_flow);
+EXPORT_SYMBOL_GPL(rlite_sdu_rx_flow);
 
 int
-rina_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
+rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
 {
     struct flow_entry *flow = flow_get(local_port);
     int ret;
@@ -2021,15 +2021,15 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
         return -ENXIO;
     }
 
-    ret = rina_sdu_rx_flow(ipcp, flow, rb, true);
+    ret = rlite_sdu_rx_flow(ipcp, flow, rb, true);
     flow_put(flow);
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_sdu_rx);
+EXPORT_SYMBOL_GPL(rlite_sdu_rx);
 
 void
-rina_write_restart_flow(struct flow_entry *flow)
+rlite_write_restart_flow(struct flow_entry *flow)
 {
     spin_lock_bh(&flow->rmtq_lock);
 
@@ -2046,37 +2046,37 @@ rina_write_restart_flow(struct flow_entry *flow)
 
     spin_unlock_bh(&flow->rmtq_lock);
 }
-EXPORT_SYMBOL_GPL(rina_write_restart_flow);
+EXPORT_SYMBOL_GPL(rlite_write_restart_flow);
 
 void
-rina_write_restart(uint32_t local_port)
+rlite_write_restart(uint32_t local_port)
 {
     struct flow_entry *flow;
 
     flow = flow_get(local_port);
     if (flow) {
-        rina_write_restart_flow(flow);
+        rlite_write_restart_flow(flow);
         flow_put(flow);
     }
 }
-EXPORT_SYMBOL_GPL(rina_write_restart);
+EXPORT_SYMBOL_GPL(rlite_write_restart);
 
 /* The table containing all the message handlers. */
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
-    [RLITE_KER_IPCP_CREATE] = rina_ipcp_create,
-    [RLITE_KER_IPCP_DESTROY] = rina_ipcp_destroy,
-    [RLITE_KER_IPCP_FETCH] = rina_ipcp_fetch,
-    [RLITE_KER_IPCP_CONFIG] = rina_ipcp_config,
-    [RLITE_KER_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
-    [RLITE_KER_IPCP_PDUFT_FLUSH] = rina_ipcp_pduft_flush,
-    [RLITE_KER_APPL_REGISTER] = rina_appl_register,
-    [RLITE_KER_APPL_REGISTER_RESP] = rina_appl_register_resp,
-    [RLITE_KER_FA_REQ] = rina_fa_req,
-    [RLITE_KER_FA_RESP] = rina_fa_resp,
-    [RLITE_KER_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
-    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rina_uipcp_fa_req_arrived,
-    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rina_uipcp_fa_resp_arrived,
-    [RLITE_KER_FLOW_DEALLOC] = rina_flow_dealloc,
+    [RLITE_KER_IPCP_CREATE] = rlite_ipcp_create,
+    [RLITE_KER_IPCP_DESTROY] = rlite_ipcp_destroy,
+    [RLITE_KER_IPCP_FETCH] = rlite_ipcp_fetch,
+    [RLITE_KER_IPCP_CONFIG] = rlite_ipcp_config,
+    [RLITE_KER_IPCP_PDUFT_SET] = rlite_ipcp_pduft_set,
+    [RLITE_KER_IPCP_PDUFT_FLUSH] = rlite_ipcp_pduft_flush,
+    [RLITE_KER_APPL_REGISTER] = rlite_appl_register,
+    [RLITE_KER_APPL_REGISTER_RESP] = rlite_appl_register_resp,
+    [RLITE_KER_FA_REQ] = rlite_fa_req,
+    [RLITE_KER_FA_RESP] = rlite_fa_resp,
+    [RLITE_KER_IPCP_UIPCP_SET] = rlite_ipcp_uipcp_set,
+    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rlite_uipcp_fa_req_arrived,
+    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
+    [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
@@ -2105,7 +2105,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EFAULT;
     }
 
-    ret = deserialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);
@@ -2266,16 +2266,16 @@ rlite_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
-struct rina_io {
+struct rlite_io {
     uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
 };
 
 static int
-rina_io_open(struct inode *inode, struct file *f)
+rlite_io_open(struct inode *inode, struct file *f)
 {
-    struct rina_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
+    struct rlite_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
 
     if (!rio) {
         PE("Out of memory\n");
@@ -2287,12 +2287,12 @@ rina_io_open(struct inode *inode, struct file *f)
 }
 
 static ssize_t
-rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
+rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct rlite_io *rio = (struct rlite_io *)f->private_data;
     struct ipcp_entry *ipcp;
     struct rlite_buf *rb;
-    struct rina_mgmt_hdr mhdr;
+    struct rlite_mgmt_hdr mhdr;
     size_t orig_len = ulen;
     ssize_t ret;
 
@@ -2368,9 +2368,9 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
 }
 
 static ssize_t
-rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
+rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct rlite_io *rio = (struct rlite_io *)f->private_data;
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
     ssize_t ret = 0;
@@ -2439,9 +2439,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 }
 
 static unsigned int
-rina_io_poll(struct file *f, poll_table *wait)
+rlite_io_poll(struct file *f, poll_table *wait)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct rlite_io *rio = (struct rlite_io *)f->private_data;
     struct txrx *txrx = rio->txrx;
     unsigned int mask = 0;
 
@@ -2467,7 +2467,7 @@ rina_io_poll(struct file *f, poll_table *wait)
 }
 
 static long
-rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
+rlite_io_ioctl_bind(struct rlite_io *rio, struct rlite_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
 
@@ -2488,7 +2488,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 }
 
 static long
-rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
+rlite_io_ioctl_mgmt(struct rlite_io *rio, struct rlite_ioctl_info *info)
 {
     struct ipcp_entry *ipcp;
 
@@ -2513,7 +2513,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 }
 
 static int
-rina_io_release_internal(struct rina_io *rio)
+rlite_io_release_internal(struct rlite_io *rio)
 {
     BUG_ON(!rio);
     switch (rio->mode) {
@@ -2549,11 +2549,11 @@ rina_io_release_internal(struct rina_io *rio)
 }
 
 static long
-rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+rlite_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct rlite_io *rio = (struct rlite_io *)f->private_data;
     void __user *argp = (void __user *)arg;
-    struct rina_ioctl_info info;
+    struct rlite_ioctl_info info;
     long ret = -EINVAL;
 
     /* We have only one command. This should be used and checked. */
@@ -2563,21 +2563,21 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         return -EFAULT;
     }
 
-    rina_io_release_internal(rio);
+    rlite_io_release_internal(rio);
 
     switch (info.mode) {
         case RLITE_IO_MODE_APPL_BIND:
-            ret = rina_io_ioctl_bind(rio, &info);
+            ret = rlite_io_ioctl_bind(rio, &info);
             break;
 
         case RLITE_IO_MODE_IPCP_MGMT:
-            ret = rina_io_ioctl_mgmt(rio, &info);
+            ret = rlite_io_ioctl_mgmt(rio, &info);
             break;
     }
 
     if (ret == 0) {
         /* Set the mode only if the ioctl operation was successful.
-         * This is very important because rina_io_release_internal()
+         * This is very important because rlite_io_release_internal()
          * looks at the mode to perform its action, assuming some pointers
          * to be not NULL depending on the mode. */
         rio->mode = info.mode;
@@ -2587,11 +2587,11 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 }
 
 static int
-rina_io_release(struct inode *inode, struct file *f)
+rlite_io_release(struct inode *inode, struct file *f)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct rlite_io *rio = (struct rlite_io *)f->private_data;
 
-    rina_io_release_internal(rio);
+    rlite_io_release_internal(rio);
 
     kfree(rio);
 
@@ -2614,21 +2614,21 @@ static struct miscdevice rlite_ctrl_misc = {
     .fops = &rlite_ctrl_fops,
 };
 
-static const struct file_operations rina_io_fops = {
+static const struct file_operations rlite_io_fops = {
     .owner          = THIS_MODULE,
-    .release        = rina_io_release,
-    .open           = rina_io_open,
-    .write          = rina_io_write,
-    .read           = rina_io_read,
-    .poll           = rina_io_poll,
-    .unlocked_ioctl = rina_io_ioctl,
+    .release        = rlite_io_release,
+    .open           = rlite_io_open,
+    .write          = rlite_io_write,
+    .read           = rlite_io_read,
+    .poll           = rlite_io_poll,
+    .unlocked_ioctl = rlite_io_ioctl,
     .llseek         = noop_llseek,
 };
 
-static struct miscdevice rina_io_misc = {
+static struct miscdevice rlite_io_misc = {
     .minor = MISC_DYNAMIC_MINOR,
     .name = "rlite-io",
-    .fops = &rina_io_fops,
+    .fops = &rlite_io_fops,
 };
 
 static int __init
@@ -2636,18 +2636,18 @@ rlite_ctrl_init(void)
 {
     int ret;
 
-    bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
-    hash_init(rina_dm.ipcp_table);
-    bitmap_zero(rina_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
-    hash_init(rina_dm.flow_table);
-    bitmap_zero(rina_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
-    hash_init(rina_dm.flow_table_by_cep);
-    mutex_init(&rina_dm.general_lock);
-    spin_lock_init(&rina_dm.flows_lock);
-    spin_lock_init(&rina_dm.ipcps_lock);
-    spin_lock_init(&rina_dm.difs_lock);
-    INIT_LIST_HEAD(&rina_dm.ipcp_factories);
-    INIT_LIST_HEAD(&rina_dm.difs);
+    bitmap_zero(rlite_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
+    hash_init(rlite_dm.ipcp_table);
+    bitmap_zero(rlite_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
+    hash_init(rlite_dm.flow_table);
+    bitmap_zero(rlite_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
+    hash_init(rlite_dm.flow_table_by_cep);
+    mutex_init(&rlite_dm.general_lock);
+    spin_lock_init(&rlite_dm.flows_lock);
+    spin_lock_init(&rlite_dm.ipcps_lock);
+    spin_lock_init(&rlite_dm.difs_lock);
+    INIT_LIST_HEAD(&rlite_dm.ipcp_factories);
+    INIT_LIST_HEAD(&rlite_dm.difs);
 
     ret = misc_register(&rlite_ctrl_misc);
     if (ret) {
@@ -2655,7 +2655,7 @@ rlite_ctrl_init(void)
         return ret;
     }
 
-    ret = misc_register(&rina_io_misc);
+    ret = misc_register(&rlite_io_misc);
     if (ret) {
         misc_deregister(&rlite_ctrl_misc);
         PE("Failed to register rlite-io misc device\n");
@@ -2668,7 +2668,7 @@ rlite_ctrl_init(void)
 static void __exit
 rlite_ctrl_fini(void)
 {
-    misc_deregister(&rina_io_misc);
+    misc_deregister(&rlite_io_misc);
     misc_deregister(&rlite_ctrl_misc);
 }
 

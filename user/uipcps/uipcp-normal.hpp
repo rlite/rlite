@@ -177,7 +177,7 @@ struct uipcp_rib {
     std::map< unsigned int, FlowRequest > flow_reqs_tmp;
 
     /* Available QoS cubes. */
-    std::map< std::string, struct rina_flow_config > qos_cubes;
+    std::map< std::string, struct rlite_flow_config > qos_cubes;
 
     uipcp_rib(struct uipcp *_u);
     ~uipcp_rib();

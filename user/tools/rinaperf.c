@@ -467,7 +467,7 @@ main(int argc, char **argv)
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
-    struct rina_flow_spec flowspec;
+    struct rlite_flow_spec flowspec;
     int listen = 0;
     int cnt = 1;
     int size = 1;

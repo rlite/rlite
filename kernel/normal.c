@@ -38,7 +38,7 @@
 
 #define PDUFT_HASHTABLE_BITS    3
 
-struct rina_normal {
+struct rlite_normal {
     struct ipcp_entry *ipcp;
 
     /* Implementation of the PDU Forwarding Table (PDUFT). */
@@ -48,9 +48,9 @@ struct rina_normal {
 };
 
 static void *
-rina_normal_create(struct ipcp_entry *ipcp)
+rlite_normal_create(struct ipcp_entry *ipcp)
 {
-    struct rina_normal *priv;
+    struct rlite_normal *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -67,9 +67,9 @@ rina_normal_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rina_normal_destroy(struct ipcp_entry *ipcp)
+rlite_normal_destroy(struct ipcp_entry *ipcp)
 {
-    struct rina_normal *priv = ipcp->priv;
+    struct rlite_normal *priv = ipcp->priv;
 
     kfree(priv);
 
@@ -176,7 +176,7 @@ rtx_tmr_cb(long unsigned arg)
     /* Send PDUs popped out from RTX queue. Note that the rrbq list
      * is not emptied and must not be used after the scan. */
     list_for_each_entry_safe(crb, tmp, &rrbq, node) {
-        struct rlite_pci *pci = RLITE_BUF_PCI(crb);
+        struct rina_pci *pci = RLITE_BUF_PCI(crb);
 
         PD("sending [%lu] from rtxq\n",
                 (long unsigned)pci->seqnum);
@@ -184,14 +184,14 @@ rtx_tmr_cb(long unsigned arg)
     }
 }
 
-static int rina_normal_sdu_rx_consumed(struct flow_entry *flow,
+static int rlite_normal_sdu_rx_consumed(struct flow_entry *flow,
                                        struct rlite_buf *rb);
 
 #define RTX_MSECS_DEFAULT   1000
 #define DATA_RXMS_MAX_DEFAULT   10
 
 static int
-rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
@@ -258,7 +258,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
-        flow->sdu_rx_consumed = rina_normal_sdu_rx_consumed;
+        flow->sdu_rx_consumed = rlite_normal_sdu_rx_consumed;
         NPD("flow->sdu_rx_consumed set\n");
     }
 
@@ -266,7 +266,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static struct pduft_entry *
-pduft_lookup_internal(struct rina_normal *priv, uint64_t dest_addr)
+pduft_lookup_internal(struct rlite_normal *priv, uint64_t dest_addr)
 {
     struct pduft_entry *entry;
     struct hlist_head *head;
@@ -282,7 +282,7 @@ pduft_lookup_internal(struct rina_normal *priv, uint64_t dest_addr)
 }
 
 static struct flow_entry *
-pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
+pduft_lookup(struct rlite_normal *priv, uint64_t dest_addr)
 {
     struct pduft_entry *entry;
 
@@ -302,7 +302,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
 
-    lower_flow = pduft_lookup((struct rina_normal *)ipcp->priv,
+    lower_flow = pduft_lookup((struct rlite_normal *)ipcp->priv,
                               remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
         RPD(5, "No route to IPCP %lu, dropping packet\n",
@@ -371,7 +371,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
 
 /* Called under DTP lock */
 static int
-rina_rtxq_push(struct dtp *dtp, struct rlite_buf *rb)
+rlite_rtxq_push(struct dtp *dtp, struct rlite_buf *rb)
 {
     struct rlite_buf *crb = rlite_buf_clone(rb, GFP_ATOMIC);
 
@@ -400,11 +400,11 @@ rina_rtxq_push(struct dtp *dtp, struct rlite_buf *rb)
 }
 
 static int
-rina_normal_sdu_write(struct ipcp_entry *ipcp,
+rlite_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rlite_buf *rb, bool maysleep)
 {
-    struct rlite_pci *pci;
+    struct rina_pci *pci;
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     bool dtcp_present = flow->cfg.dtcp_present;
@@ -475,7 +475,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         }
 
         if (rb && flow->cfg.dtcp.rtx_control) {
-            int ret = rina_rtxq_push(dtp, rb);
+            int ret = rlite_rtxq_push(dtp, rb);
 
             if (unlikely(ret)) {
                 spin_unlock_bh(&dtp->lock);
@@ -496,12 +496,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
-                           const struct rina_mgmt_hdr *mhdr,
+rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
+                           const struct rlite_mgmt_hdr *mhdr,
                            struct rlite_buf *rb)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
-    struct rlite_pci *pci;
+    struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
+    struct rina_pci *pci;
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
@@ -560,10 +560,10 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
+rlite_normal_config(struct ipcp_entry *ipcp, const char *param_name,
                    const char *param_value)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     int ret = -EINVAL;
 
     if (strcmp(param_name, "address") == 0) {
@@ -582,10 +582,10 @@ rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
-rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
+rlite_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
                       struct flow_entry *flow)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
     spin_lock_bh(&priv->pduft_lock);
@@ -615,9 +615,9 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
 }
 
 static int
-rina_normal_pduft_flush(struct ipcp_entry *ipcp)
+rlite_normal_pduft_flush(struct ipcp_entry *ipcp)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     struct pduft_entry *entry;
     struct hlist_node *tmp;
     int bucket;
@@ -636,9 +636,9 @@ rina_normal_pduft_flush(struct ipcp_entry *ipcp)
 }
 
 static int
-rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
+rlite_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
 
     spin_lock_bh(&priv->pduft_lock);
     list_del(&entry->fnode);
@@ -655,10 +655,10 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, uint64_t ack_nack_seq_num)
 {
     struct rlite_buf *rb = rlite_buf_alloc_ctrl(ipcp->depth, GFP_ATOMIC);
-    struct rlite_pci_ctrl *pcic;
+    struct rina_pci_ctrl *pcic;
 
     if (rb) {
-        pcic = (struct rlite_pci_ctrl *)RLITE_BUF_DATA(rb);
+        pcic = (struct rina_pci_ctrl *)RLITE_BUF_DATA(rb);
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;
         pcic->base.conn_id.qos_id = 0;
@@ -746,7 +746,7 @@ seqq_push(struct dtp *dtp, struct rlite_buf *rb)
     }
 
     list_for_each_entry(cur, &dtp->seqq, node) {
-        struct rlite_pci *pci = RLITE_BUF_PCI(cur);
+        struct rina_pci *pci = RLITE_BUF_PCI(cur);
 
         if (seqnum < pci->seqnum) {
             pos = &cur->node;
@@ -775,7 +775,7 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
 
     INIT_LIST_HEAD(qrbs);
     list_for_each_entry_safe(qrb, tmp, &dtp->seqq, node) {
-        struct rlite_pci *pci = RLITE_BUF_PCI(qrb);
+        struct rina_pci *pci = RLITE_BUF_PCI(qrb);
 
         if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
             list_del(&qrb->node);
@@ -792,7 +792,7 @@ static int
 sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
             struct rlite_buf *rb)
 {
-    struct rlite_pci_ctrl *pcic = RLITE_BUF_PCI_CTRL(rb);
+    struct rina_pci_ctrl *pcic = RLITE_BUF_PCI_CTRL(rb);
     struct dtp *dtp = &flow->dtp;
     struct list_head qrbs;
     struct rlite_buf *qrb, *tmp;
@@ -856,7 +856,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
 
                 if (flow->cfg.dtcp.rtx_control) {
-                    rina_rtxq_push(dtp, qrb);
+                    rlite_rtxq_push(dtp, qrb);
                 }
 
             }
@@ -869,7 +869,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
             case PDU_T_ACK:
                 list_for_each_entry_safe(cur, tmp, &dtp->rtxq, node) {
-                    struct rlite_pci *pci = RLITE_BUF_PCI(cur);
+                    struct rina_pci *pci = RLITE_BUF_PCI(cur);
 
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
                         NPD("Remove [%lu] from rtxq\n",
@@ -923,7 +923,7 @@ out:
     /* Send PDUs popped out from cwq, if any. Note that the qrbs list
      * is not emptied and must not be used after the scan.*/
     list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
-        struct rlite_pci *pci = RLITE_BUF_PCI(qrb);
+        struct rina_pci *pci = RLITE_BUF_PCI(qrb);
 
         NPD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
@@ -931,15 +931,15 @@ out:
     }
 
     /* This could be done conditionally. */
-    rina_write_restart_flow(flow);
+    rlite_write_restart_flow(flow);
 
     return 0;
 }
 
 static int
-rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
+rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 {
-    struct rlite_pci *pci = RLITE_BUF_PCI(rb);
+    struct rina_pci *pci = RLITE_BUF_PCI(rb);
     struct flow_entry *flow;
     uint64_t seqnum = pci->seqnum;
     struct rlite_buf *crb = NULL;
@@ -976,7 +976,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 
     dtp = &flow->dtp;
 
-    /* Ask rina_sdu_rx_flow() to limit the userspace queue only
+    /* Ask rlite_sdu_rx_flow() to limit the userspace queue only
      * if this flow does not use flow control. If flow control
      * is used, it will limit the userspace queue automatically. */
     qlimit = (flow->cfg.dtcp.flow_control == 0);
@@ -1005,7 +1005,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
             goto snd_crb;
         }
 
-        ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
+        ret = rlite_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         goto snd_crb;
     }
@@ -1105,18 +1105,18 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
             rlite_buf_free(rb);
             goto snd_crb;
         }
-        ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
+        ret = rlite_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         /* Also deliver PDUs just extracted from the seqq. Note
          * that we must use the safe version of list scanning, since
-         * rina_sdu_rx_flow() will modify qrb->node. */
+         * rlite_sdu_rx_flow() will modify qrb->node. */
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
             list_del(&qrb->node);
             if (unlikely(rlite_buf_pci_pop(qrb))) {
                 rlite_buf_free(qrb);
                 continue;
             }
-            ret |= rina_sdu_rx_flow(ipcp, flow, qrb, qlimit);
+            ret |= rlite_sdu_rx_flow(ipcp, flow, qrb, qlimit);
         }
 
         goto snd_crb;
@@ -1149,7 +1149,7 @@ snd_crb:
 }
 
 static int
-rina_normal_sdu_rx_consumed(struct flow_entry *flow,
+rlite_normal_sdu_rx_consumed(struct flow_entry *flow,
                             struct rlite_buf *rb)
 {
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
@@ -1176,33 +1176,33 @@ rina_normal_sdu_rx_consumed(struct flow_entry *flow,
 static struct ipcp_factory normal_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
-    .create = rina_normal_create,
+    .create = rlite_normal_create,
     .use_cep_ids = true,
-    .ops.destroy = rina_normal_destroy,
+    .ops.destroy = rlite_normal_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rina_normal_flow_init,
-    .ops.sdu_write = rina_normal_sdu_write,
-    .ops.config = rina_normal_config,
-    .ops.pduft_set = rina_normal_pduft_set,
-    .ops.pduft_flush = rina_normal_pduft_flush,
-    .ops.pduft_del = rina_normal_pduft_del,
-    .ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write,
-    .ops.sdu_rx = rina_normal_sdu_rx,
+    .ops.flow_init = rlite_normal_flow_init,
+    .ops.sdu_write = rlite_normal_sdu_write,
+    .ops.config = rlite_normal_config,
+    .ops.pduft_set = rlite_normal_pduft_set,
+    .ops.pduft_flush = rlite_normal_pduft_flush,
+    .ops.pduft_del = rlite_normal_pduft_del,
+    .ops.mgmt_sdu_write = rlite_normal_mgmt_sdu_write,
+    .ops.sdu_rx = rlite_normal_sdu_rx,
 };
 
 static int __init
-rina_normal_init(void)
+rlite_normal_init(void)
 {
-    return rina_ipcp_factory_register(&normal_factory);
+    return rlite_ipcp_factory_register(&normal_factory);
 }
 
 static void __exit
-rina_normal_fini(void)
+rlite_normal_fini(void)
 {
-    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rina_normal_init);
-module_exit(rina_normal_fini);
+module_init(rlite_normal_init);
+module_exit(rlite_normal_fini);
 MODULE_LICENSE("GPL");

@@ -24,10 +24,10 @@ enum {
 
 /* Numtables for shim-hv <==> shim-hv messages exchange. */
 
-extern struct rlite_msg_layout rina_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX+1];
+extern struct rlite_msg_layout rlite_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX+1];
 
 /* Message to allocate a new flow. */
-struct rina_hmsg_fa_req {
+struct rlite_hmsg_fa_req {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -37,7 +37,7 @@ struct rina_hmsg_fa_req {
 } __attribute__((packed));
 
 /* Message to respond to a flow allocation request. */
-struct rina_hmsg_fa_resp {
+struct rlite_hmsg_fa_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 

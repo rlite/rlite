@@ -16,7 +16,7 @@
 
 #define SDU_SIZE_MAX    65535
 
-struct rina_rr {
+struct rlite_rr {
     struct rlite_appl application;
 
     struct rina_name client_appl_name;
@@ -24,11 +24,11 @@ struct rina_rr {
     struct rina_name dif_name;
     struct rina_name *dif_name_ptr;
     struct rina_name ipcp_name;
-    struct rina_flow_spec flowspec;
+    struct rlite_flow_spec flowspec;
 };
 
 static int
-client(struct rina_rr *rr)
+client(struct rlite_rr *rr)
 {
     const char *msg = "Hello guys, this is a test message!";
     char buf[SDU_SIZE_MAX];
@@ -84,7 +84,7 @@ client(struct rina_rr *rr)
 }
 
 static int
-server(struct rina_rr *rr)
+server(struct rlite_rr *rr)
 {
     int n, ret, dfd;
     char buf[SDU_SIZE_MAX];
@@ -155,7 +155,7 @@ sigint_handler(int signum)
 static void
 usage(void)
 {
-    printf("rina_rr [OPTIONS]\n"
+    printf("rlite_rr [OPTIONS]\n"
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
@@ -164,10 +164,10 @@ usage(void)
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
         "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
-        "   -a APNAME : application process name of the rina_rr client\n"
-        "   -A APNAME : application process instance of the rina_rr client\n"
-        "   -z APNAME : application process name of the rina_rr server\n"
-        "   -Z APNAME : application process instance of the rina_rr server\n"
+        "   -a APNAME : application process name of the rlite_rr client\n"
+        "   -A APNAME : application process instance of the rlite_rr client\n"
+        "   -z APNAME : application process name of the rlite_rr server\n"
+        "   -Z APNAME : application process instance of the rlite_rr server\n"
           );
 }
 
@@ -175,10 +175,10 @@ int
 main(int argc, char **argv)
 {
     struct sigaction sa;
-    struct rina_rr rr;
+    struct rlite_rr rr;
     const char *dif_name = NULL;
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
-    const char *cli_appl_apn = "rina_rr-data", *cli_appl_api = "client";
+    const char *cli_appl_apn = "rlite_rr-data", *cli_appl_api = "client";
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
@@ -263,8 +263,8 @@ main(int argc, char **argv)
     rlite_ipcps_fetch(&rr.application.loop);
 
     rina_name_fill(&rr.dif_name, dif_name, NULL, NULL, NULL);
-    rina_name_fill(&client_ctrl_name, "rina_rr-ctrl", "client", NULL, NULL);
-    rina_name_fill(&server_ctrl_name, "rina_rr-ctrl", "server", NULL, NULL);
+    rina_name_fill(&client_ctrl_name, "rlite_rr-ctrl", "client", NULL, NULL);
+    rina_name_fill(&server_ctrl_name, "rlite_rr-ctrl", "server", NULL, NULL);
     rina_name_fill(&rr.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
     rina_name_fill(&rr.server_appl_name, srv_appl_apn, srv_appl_api, NULL, NULL);
     if (!ipcp_apn) {

@@ -24,7 +24,7 @@
 
 
 /* PCI header to be used for transfer PDUs. */
-struct rlite_pci {
+struct rina_pci {
     /* We miss the version field. */
     uint32_t dst_addr;
     uint32_t src_addr;
@@ -40,8 +40,8 @@ struct rlite_pci {
 } __attribute__((packed));
 
 /* PCI header to be used for control PDUs. */
-struct rlite_pci_ctrl {
-    struct rlite_pci base;
+struct rina_pci_ctrl {
+    struct rina_pci base;
     uint64_t last_ctrl_seq_num_rcvd;
     uint64_t ack_nack_seq_num;
     uint64_t new_rwe;
@@ -50,15 +50,15 @@ struct rlite_pci_ctrl {
     uint64_t my_rwe;
 } __attribute__((packed));
 
-struct rina_rawbuf {
+struct rlite_rawbuf {
     size_t size;
     atomic_t refcnt;
     uint8_t buf[0];
 };
 
 struct rlite_buf {
-    struct rina_rawbuf  *raw;
-    struct rlite_pci    *pci;
+    struct rlite_rawbuf  *raw;
+    struct rina_pci    *pci;
     size_t              len;
 
     unsigned long       rtx_jiffies;
@@ -77,13 +77,13 @@ void rlite_buf_free(struct rlite_buf *rb);
 static inline int
 rlite_buf_pci_pop(struct rlite_buf *rb)
 {
-    if (unlikely(rb->len < sizeof(struct rlite_pci))) {
+    if (unlikely(rb->len < sizeof(struct rina_pci))) {
         RPD(5, "No enough data to pop another PCI\n");
         return -1;
     }
 
     rb->pci++;
-    rb->len -= sizeof(struct rlite_pci);
+    rb->len -= sizeof(struct rina_pci);
 
     return 0;
 }
@@ -97,7 +97,7 @@ rlite_buf_pci_push(struct rlite_buf *rb)
     }
 
     rb->pci--;
-    rb->len += sizeof(struct rlite_pci);
+    rb->len += sizeof(struct rina_pci);
 
     return 0;
 }
@@ -109,16 +109,16 @@ static inline int rlite_buf_custom_push(struct rlite_buf *rb, size_t len)
         return -1;
     }
 
-    rb->pci = (struct rlite_pci *)(((uint8_t *)rb->pci) - len);
+    rb->pci = (struct rina_pci *)(((uint8_t *)rb->pci) - len);
     rb->len += len;
 
     return 0;
 }
 
-void rlite_pci_dump(struct rlite_pci *pci);
+void rina_pci_dump(struct rina_pci *pci);
 
 #define RLITE_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RLITE_BUF_PCI(rb) rb->pci
-#define RLITE_BUF_PCI_CTRL(rb) ((struct rlite_pci_ctrl *)rb->pci)
+#define RLITE_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
 
 #endif  /* __RLITE_BUFS_H__ */

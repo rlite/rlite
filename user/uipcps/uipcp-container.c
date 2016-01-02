@@ -112,7 +112,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            uint64_t remote_addr,
                            const struct rina_name *local_appl,
                            const struct rina_name *remote_appl,
-                           const struct rina_flow_config *flowcfg)
+                           const struct rlite_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req;
     struct rlite_msg_base *resp;
@@ -155,7 +155,7 @@ int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                             uint32_t remote_port, uint32_t remote_cep,
                             uint64_t remote_addr,
-                            uint8_t response, const struct rina_flow_config *flowcfg)
+                            uint8_t response, const struct rlite_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req;
     struct rlite_msg_base *resp;

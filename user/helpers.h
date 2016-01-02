@@ -23,7 +23,7 @@ rlite_msg_write_fd(int sfd, struct rlite_msg_base *msg)
         return -1;
     }
 
-    serialize_rina_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+    serialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
                        serbuf, msg);
 
     n = write(sfd, serbuf, serlen);

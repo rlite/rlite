@@ -130,7 +130,7 @@ appl_register_resp(struct rlite_evloop *loop,
  * completion, and is waken up by the event-loop thread itself.
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
-static rina_resp_handler_t rina_kernel_handlers[] = {
+static rlite_resp_handler_t rlite_kernel_handlers[] = {
     [RLITE_KER_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
     [RLITE_KER_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
     [RLITE_KER_APPL_REGISTER_RESP] = appl_register_resp,
@@ -168,7 +168,7 @@ rlite_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
 }
 
 void
-rlite_flow_spec_default(struct rina_flow_spec *spec)
+rlite_flow_spec_default(struct rlite_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
     strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
@@ -176,7 +176,7 @@ rlite_flow_spec_default(struct rina_flow_spec *spec)
 
 /* This is used by uipcp, not by appl. */
 void
-rlite_flow_cfg_default(struct rina_flow_config *cfg)
+rlite_flow_cfg_default(struct rlite_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->partial_delivery = 0;
@@ -193,7 +193,7 @@ flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
                   uint16_t upper_ipcp_id,
                   const struct rina_name *local_appl,
                   const struct rina_name *remote_appl,
-                  const struct rina_flow_spec *flowspec, int *result)
+                  const struct rlite_flow_spec *flowspec, int *result)
 {
     struct rl_kmsg_fa_req *req;
 
@@ -317,7 +317,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
-                    const struct rina_flow_spec *flowspec,
+                    const struct rlite_flow_spec *flowspec,
                     unsigned int *port_id, unsigned int wait_ms,
                     uint16_t upper_ipcp_id)
 {
@@ -379,7 +379,7 @@ rlite_flow_req_wait(struct rlite_appl *appl)
 static int
 open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 {
-    struct rina_ioctl_info info;
+    struct rlite_ioctl_info info;
     int fd;
     int ret;
 
@@ -422,7 +422,7 @@ rlite_flow_allocate_open(struct rlite_appl *appl,
                    const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
-                   const struct rina_flow_spec *flowspec,
+                   const struct rlite_flow_spec *flowspec,
                    unsigned int wait_ms)
 {
     unsigned int port_id;
@@ -484,7 +484,7 @@ rlite_appl_init(struct rlite_appl *appl)
     list_init(&appl->pending_flow_reqs);
 
     ret = rlite_evloop_init(&appl->loop, "/dev/rlite",
-                            rina_kernel_handlers);
+                            rlite_kernel_handlers);
     if (ret) {
         return ret;
     }

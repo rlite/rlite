@@ -38,7 +38,7 @@
 #include <net/sock.h>
 
 
-struct rina_shim_inet4 {
+struct rlite_shim_inet4 {
     struct ipcp_entry *ipcp;
 };
 
@@ -58,9 +58,9 @@ struct shim_inet4_flow {
 };
 
 static void *
-rina_shim_inet4_create(struct ipcp_entry *ipcp)
+rlite_shim_inet4_create(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_inet4 *priv;
+    struct rlite_shim_inet4 *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -75,9 +75,9 @@ rina_shim_inet4_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rina_shim_inet4_destroy(struct ipcp_entry *ipcp)
+rlite_shim_inet4_destroy(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_inet4 *priv = ipcp->priv;
+    struct rlite_shim_inet4 *priv = ipcp->priv;
 
     kfree(priv);
 
@@ -153,7 +153,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         } else if (!priv->cur_rx_hdr && priv->cur_rx_buflen ==
                                             priv->cur_rx_rblen) {
             /* We have completely read the SDU. */
-            rina_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
+            rlite_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
             priv->cur_rx_rb = NULL;
             priv->cur_rx_hdr = true;
             priv->cur_rx_rblen = 0;
@@ -190,11 +190,11 @@ inet4_write_space(struct sock *sk)
 {
     struct shim_inet4_flow *priv = sk->sk_user_data;
 
-    rina_write_restart_flow(priv->flow);
+    rlite_write_restart_flow(priv->flow);
 }
 
 static int
-rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rlite_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct shim_inet4_flow *priv;
     struct socket *sock;
@@ -252,7 +252,7 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
+rlite_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
                                  struct flow_entry *flow)
 {
     struct shim_inet4_flow *priv = flow->priv;
@@ -285,7 +285,7 @@ rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
+rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rlite_buf *rb, bool maysleep)
 {
@@ -339,10 +339,10 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
+rlite_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
                        const char *param_value)
 {
-    struct rina_shim_inet4 *priv = (struct rina_shim_inet4 *)ipcp->priv;
+    struct rlite_shim_inet4 *priv = (struct rlite_shim_inet4 *)ipcp->priv;
     int ret = -EINVAL;
 
     (void)priv;
@@ -356,28 +356,28 @@ static struct ipcp_factory shim_inet4_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .use_cep_ids = false,
-    .create = rina_shim_inet4_create,
-    .ops.destroy = rina_shim_inet4_destroy,
+    .create = rlite_shim_inet4_create,
+    .ops.destroy = rlite_shim_inet4_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rina_shim_inet4_flow_init,
-    .ops.flow_deallocated = rina_shim_inet4_flow_deallocated,
-    .ops.sdu_write = rina_shim_inet4_sdu_write,
-    .ops.config = rina_shim_inet4_config,
+    .ops.flow_init = rlite_shim_inet4_flow_init,
+    .ops.flow_deallocated = rlite_shim_inet4_flow_deallocated,
+    .ops.sdu_write = rlite_shim_inet4_sdu_write,
+    .ops.config = rlite_shim_inet4_config,
 };
 
 static int __init
-rina_shim_inet4_init(void)
+rlite_shim_inet4_init(void)
 {
-    return rina_ipcp_factory_register(&shim_inet4_factory);
+    return rlite_ipcp_factory_register(&shim_inet4_factory);
 }
 
 static void __exit
-rina_shim_inet4_fini(void)
+rlite_shim_inet4_fini(void)
 {
-    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rina_shim_inet4_init);
-module_exit(rina_shim_inet4_fini);
+module_init(rlite_shim_inet4_init);
+module_exit(rlite_shim_inet4_fini);
 MODULE_LICENSE("GPL");

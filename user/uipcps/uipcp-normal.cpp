@@ -44,7 +44,7 @@ namespace obj_name {
 #define MGMTBUF_SIZE_MAX 4096
 
 static int
-mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
+mgmt_write(struct uipcp *uipcp, const struct rlite_mgmt_hdr *mhdr,
            void *buf, size_t buflen)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -85,7 +85,7 @@ int
 mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                          void *buf, size_t buflen)
 {
-    struct rina_mgmt_hdr mhdr;
+    struct rlite_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
@@ -98,7 +98,7 @@ int
 mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
                        void *buf, size_t buflen)
 {
-    struct rina_mgmt_hdr mhdr;
+    struct rlite_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
@@ -108,7 +108,7 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 }
 
 static int
-rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
+rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     map<string, Neighbor>::iterator neigh;
@@ -203,7 +203,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
-    struct rina_mgmt_hdr *mhdr;
+    struct rlite_mgmt_hdr *mhdr;
     int n;
 
     assert(fd == rib->mgmtfd);
@@ -222,7 +222,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     }
 
     /* Grab the management header. */
-    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
+    mhdr = (struct rlite_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
@@ -293,9 +293,9 @@ uipcp_rib::dump() const
     struct rlite_ipcp *ipcp = ipcp_info();
 
     ss << "QoS cubes" << endl;
-    for (map<string, struct rina_flow_config>::const_iterator
+    for (map<string, struct rlite_flow_config>::const_iterator
                     i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
-            const struct rina_flow_config& c = i->second;
+            const struct rlite_flow_config& c = i->second;
 
             ss << i->first.c_str() << ": {" << endl;
             ss << "   partial_delivery=" << u82boolstr(c.partial_delivery)

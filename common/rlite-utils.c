@@ -179,7 +179,7 @@ COMMON_EXPORT(rlite_msg_serlen);
 
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
+serialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
                    void *serbuf, const struct rlite_msg_base *msg)
 {
     void *serptr = serbuf;
@@ -213,11 +213,11 @@ serialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
 
     return serlen;
 }
-COMMON_EXPORT(serialize_rina_msg);
+COMMON_EXPORT(serialize_rlite_msg);
 
 /* Deserialize from serbuf into msgbuf. */
 int
-deserialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
+deserialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
                      const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
@@ -261,7 +261,7 @@ deserialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
 
     return 0;
 }
-COMMON_EXPORT(deserialize_rina_msg);
+COMMON_EXPORT(deserialize_rlite_msg);
 
 void
 rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
@@ -292,7 +292,7 @@ rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
 }
 COMMON_EXPORT(rlite_msg_free);
 
-unsigned int rina_numtables_max_size(struct rlite_msg_layout *numtables,
+unsigned int rlite_numtables_max_size(struct rlite_msg_layout *numtables,
                                      unsigned int n)
 {
     unsigned int max = 0;
@@ -561,7 +561,7 @@ rina_name_valid(const struct rina_name *name)
 COMMON_EXPORT(rina_name_valid);
 
 void
-flow_config_dump(const struct rina_flow_config *c)
+flow_config_dump(const struct rlite_flow_config *c)
 {
     if (!c) {
         return;

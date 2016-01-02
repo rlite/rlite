@@ -47,7 +47,7 @@ ipcp_create_resp(struct rlite_evloop *loop,
  * completion, and is waken up by the event-loop thread itself.
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
-static rina_resp_handler_t rina_kernel_handlers[] = {
+static rlite_resp_handler_t rlite_kernel_handlers[] = {
     [RLITE_KER_IPCP_CREATE_RESP] = ipcp_create_resp,
     [RLITE_KER_MSG_MAX] = NULL,
 };
@@ -102,7 +102,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    ret = deserialize_rina_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+    ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
                                serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("error while deserializing response [%d]\n",
@@ -170,7 +170,7 @@ uipcp_update(struct rinaconf *rc, rlite_msg_t update_type, uint16_t ipcp_id,
 
 /* Create an IPC process. */
 static struct rl_kmsg_ipcp_create_resp *
-rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
+rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
                  const struct rina_name *name, const char *dif_type,
                  const char *dif_name, int *result)
 {
@@ -227,7 +227,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
+    kresp = rlconf_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       RLITE_RMB(kresp));
@@ -239,7 +239,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
 /* Destroy an IPC process. */
 static int
-rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
+rlconf_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
                   const char *dif_type)
 {
     struct rl_kmsg_ipcp_destroy *msg;
@@ -297,14 +297,14 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
         PE("No such IPCP process\n");
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        ret = rina_ipcp_destroy(rc, rlite_ipcp->ipcp_id, rlite_ipcp->dif_type);
+        ret = rlconf_ipcp_destroy(rc, rlite_ipcp->ipcp_id, rlite_ipcp->dif_type);
     }
 
     return ret;
 }
 
 static int
-rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
+rlconf_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
     int result = rlite_ipcp_config(&rc->loop, ipcp_id,
@@ -344,7 +344,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
         PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
-        ret = rina_ipcp_config(rc, rlite_ipcp->ipcp_id, param_name, param_value);
+        ret = rlconf_ipcp_config(rc, rlite_ipcp->ipcp_id, param_name, param_value);
     }
 
     return ret;
@@ -532,20 +532,20 @@ test(struct rinaconf *rc)
 
     /* Create an IPC process of type shim-loopback. */
     rina_name_fill(&name, "test-shim-loopback.IPCP", "1", NULL, NULL);
-    icresp = rina_ipcp_create(rc, 0, &name, "shim-loopback",
+    icresp = rlconf_ipcp_create(rc, 0, &name, "shim-loopback",
                               "test-shim-loopback.DIF", &result);
     assert(!icresp);
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-loopback.IPCP", "2", NULL, NULL);
-    icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",
+    icresp = rlconf_ipcp_create(rc, ~0U, &name, "shim-loopback",
                               "test-shim-loopback.DIF", &result);
     assert(icresp);
     if (icresp) {
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       RLITE_RMB(icresp));
     }
-    icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",
+    icresp = rlconf_ipcp_create(rc, ~0U, &name, "shim-loopback",
                               "test-shim-loopback.DIF", &result);
     assert(!icresp);
     rina_name_free(&name);
@@ -554,11 +554,11 @@ test(struct rinaconf *rc)
     rlite_ipcps_fetch(&rc->loop);
 
     /* Destroy the IPCPs. */
-    ret = rina_ipcp_destroy(rc, 0, "shim-loopback");
+    ret = rlconf_ipcp_destroy(rc, 0, "shim-loopback");
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 1, "shim-loopback");
+    ret = rlconf_ipcp_destroy(rc, 1, "shim-loopback");
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 0, "shim-loopback");
+    ret = rlconf_ipcp_destroy(rc, 0, "shim-loopback");
     assert(ret);
 
     return 0;
@@ -694,7 +694,7 @@ int main(int argc, char **argv)
     int ret;
 
     ret = rlite_evloop_init(&rc.loop, "/dev/rlite",
-                     rina_kernel_handlers);
+                     rlite_kernel_handlers);
     if (ret) {
         return ret;
     }

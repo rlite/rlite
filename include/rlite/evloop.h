@@ -34,7 +34,7 @@ struct rlite_ipcp {
 struct rlite_evloop;
 
 /* The signature of a response handler. */
-typedef int (*rina_resp_handler_t)(struct rlite_evloop *loop,
+typedef int (*rlite_resp_handler_t)(struct rlite_evloop *loop,
                                    const struct rlite_msg_base_resp *b_resp,
                                    const struct rlite_msg_base *b_req);
 
@@ -56,7 +56,7 @@ struct rlite_evloop {
     pthread_t evloop_th;
 
     /* Table containing the kernel handlers. */
-    rina_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
+    rlite_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
 
     /* File descriptor for the RLITE control device ("/dev/rlite") */
     int rfd;
@@ -105,14 +105,14 @@ rlite_evloop_join(struct rlite_evloop *loop);
 
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
-                  rina_resp_handler_t *handlers);
+                  rlite_resp_handler_t *handlers);
 
 int
 rlite_evloop_fini(struct rlite_evloop *loop);
 
 int
 rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                         rina_resp_handler_t handler);
+                         rlite_resp_handler_t handler);
 
 int
 rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd,

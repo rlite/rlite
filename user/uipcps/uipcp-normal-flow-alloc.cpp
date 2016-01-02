@@ -6,7 +6,7 @@ using namespace std;
 
 
 static void
-flowcfg2policies(const struct rina_flow_config *cfg,
+flowcfg2policies(const struct rlite_flow_config *cfg,
                  QosSpec &q,
                  ConnPolicies& p)
 {
@@ -44,7 +44,7 @@ flowcfg2policies(const struct rina_flow_config *cfg,
 }
 
 static void
-policies2flowcfg(struct rina_flow_config *cfg,
+policies2flowcfg(struct rlite_flow_config *cfg,
                  const QosSpec &q,
                  const ConnPolicies& p)
 {
@@ -90,8 +90,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     ConnId conn_id;
     stringstream obj_name;
     string cubename;
-    struct rina_flow_config flowcfg;
-    map<string, struct rina_flow_config>::iterator qcmi;
+    struct rlite_flow_config flowcfg;
+    map<string, struct rlite_flow_config>::iterator qcmi;
     int ret;
 
     ret = dft_lookup(dest_appl, remote_addr);
@@ -215,7 +215,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
 
     FlowRequest freq(objbuf, objlen);
     struct rina_name local_appl, remote_appl;
-    struct rina_flow_config flowcfg;
+    struct rlite_flow_config flowcfg;
     uint64_t dft_next_hop;
     int ret;
 

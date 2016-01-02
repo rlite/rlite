@@ -232,7 +232,7 @@ evloop_function(void *arg)
     struct rlite_evloop *loop = (struct rlite_evloop *)arg;
     struct pending_entry *req_entry;
     char serbuf[4096];
-    unsigned int max_resp_size = rina_numtables_max_size(
+    unsigned int max_resp_size = rlite_numtables_max_size(
                 rlite_ker_numtables,
                 sizeof(rlite_ker_numtables)/sizeof(struct rlite_msg_layout));
 
@@ -379,7 +379,7 @@ evloop_function(void *arg)
         }
 
         /* Deserialize the message from serbuf into resp. */
-        ret = deserialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                    serbuf, ret, (void *)resp, max_resp_size);
         if (ret) {
             PE("Problems during deserialization [%d]\n",
@@ -549,7 +549,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         *result = ENOBUFS;
         return NULL;
     }
-    serlen = serialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, msg);
 
     /* Issue the request to the kernel. */
@@ -624,7 +624,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
 
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
-                 rina_resp_handler_t *handlers)
+                 rlite_resp_handler_t *handlers)
 {
     int ret;
 
@@ -760,7 +760,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
 int
 rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                         rina_resp_handler_t handler)
+                         rlite_resp_handler_t handler)
 {
     if (index >= RLITE_KER_MSG_MAX) {
         return -1;

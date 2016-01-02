@@ -52,13 +52,13 @@ struct rlite_msg_base_resp {
 } __attribute__((packed));
 
 /* Bind the flow identified by port_id to
- * this rina_io device. */
+ * this rlite_io device. */
 #define RLITE_IO_MODE_APPL_BIND    86
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
 #define RLITE_IO_MODE_IPCP_MGMT    88
 
-struct rina_ioctl_info {
+struct rlite_ioctl_info {
     uint8_t mode;
     uint32_t port_id;
     uint16_t ipcp_id;
@@ -80,7 +80,7 @@ struct rina_ioctl_info {
  * When reading a management SDU, the header will contain the local port
  * where the SDU was received and the source (remote) address that sent it.
  */
-struct rina_mgmt_hdr {
+struct rlite_mgmt_hdr {
     uint8_t type;
     uint32_t local_port;
     uint64_t remote_addr;
@@ -125,7 +125,7 @@ struct dtcp_config {
     uint32_t initial_a;  /* A */
 } __attribute__((packed));
 
-struct rina_flow_config {
+struct rlite_flow_config {
     uint8_t partial_delivery;
     uint8_t incomplete_delivery;
     uint8_t in_order_delivery;
@@ -135,7 +135,7 @@ struct rina_flow_config {
     int32_t fd;  /* Currently used but shim-inet4. */
 } __attribute__((packed));
 
-struct rina_flow_spec {
+struct rlite_flow_spec {
     char cubename[32];  /* This is just temporary. */
 };
 

@@ -120,7 +120,7 @@ struct rl_kmsg_fa_req {
 
     uint16_t ipcp_id;
     uint16_t upper_ipcp_id;
-    struct rina_flow_spec flowspec;
+    struct rlite_flow_spec flowspec;
     uint32_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
     struct rina_name local_appl;
@@ -214,7 +214,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     uint32_t remote_port;
     uint32_t remote_cep;
     uint64_t remote_addr;
-    struct rina_flow_config flowcfg;
+    struct rlite_flow_config flowcfg;
     /* Requested application. */
     struct rina_name local_appl;
     /* Requesting application. */
@@ -233,7 +233,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     uint32_t remote_cep;
     uint64_t remote_addr;
     uint8_t response;
-    struct rina_flow_config flowcfg;
+    struct rlite_flow_config flowcfg;
 } __attribute__((packed));
 
 /* uipcp (application) <-- kernel to inform an uipcp that

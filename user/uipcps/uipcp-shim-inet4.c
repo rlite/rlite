@@ -321,7 +321,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
-    struct rina_flow_config cfg;
+    struct rlite_flow_config cfg;
     struct inet4_endpoint *ep;
     int ret;
 
@@ -402,7 +402,7 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     socklen_t addrlen = sizeof(remote_addr);
     struct rina_name remote_appl, local_appl;
     struct inet4_endpoint *ep;
-    struct rina_flow_config cfg;
+    struct rlite_flow_config cfg;
     int sfd;
 
     /* First of all let's call accept, so that we consume the event
