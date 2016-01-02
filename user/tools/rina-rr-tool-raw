@@ -107,7 +107,7 @@ class RinaRRTool:
 
 
 description = "RINA echo client/server (raw API version)"
-epilog = "2015 Vincenzo Maffione <v.maffione@gmail.com>"
+epilog = "2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
                                     epilog = epilog)

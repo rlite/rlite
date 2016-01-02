@@ -1,7 +1,7 @@
 /*
  * librlite core functionalities.
  *
- * Copyright (C) 2014-2015 Vincenzo Maffione <v.maffione@gmail.com>
+ * Copyright (C) 2016 Vincenzo Maffione <v.maffione@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

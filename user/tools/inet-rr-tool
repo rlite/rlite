@@ -94,7 +94,7 @@ def client(args):
 
 
 description = "TCP echo client/server"
-epilog = "2015 Vincenzo Maffione <v.maffione@gmail.com>"
+epilog = "2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
                                     epilog = epilog)

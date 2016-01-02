@@ -7,7 +7,7 @@ import common
 
 
 description = "Python script to launch a scenario"
-epilog = "2015 Vincenzo Maffione <v.maffione@gmail.com>"
+epilog = "2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
                                     epilog = epilog)
