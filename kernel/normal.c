@@ -305,10 +305,10 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
     lower_flow = pduft_lookup((struct rlite_normal *)ipcp->priv,
                               remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
-        RPD(5, "No route to IPCP %lu, dropping packet\n",
+        RPD(3, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
         rlite_buf_free(rb);
-        return 0;
+        return -EHOSTUNREACH;
     }
 
     if (lower_flow) {
@@ -960,8 +960,10 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
     int ret = 0;
 
     if (pci->dst_addr != ipcp->addr) {
-        /* The PDU is not for this IPCP, forward it. */
-        return rmt_tx(ipcp, pci->dst_addr, rb, false);
+        /* The PDU is not for this IPCP, forward it. Don't propagate the
+         * error code of rmt_tx(), since caller does not need it. */
+        rmt_tx(ipcp, pci->dst_addr, rb, false);
+        return 0;
     }
 
     flow = flow_get_by_cep(pci->conn_id.dst_cep);
