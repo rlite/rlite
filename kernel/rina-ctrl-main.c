@@ -768,37 +768,6 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 }
 
 static int
-rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
-{
-    struct rina_kmsg_assign_to_dif *req =
-                    (struct rina_kmsg_assign_to_dif *)bmsg;
-    char *name_s = rina_name_to_string(&req->dif_name);
-    struct ipcp_entry *entry;
-    int ret = -EINVAL;  /* Report failure by default. */
-
-    mutex_lock(&rina_dm.lock);
-    /* Find the IPC process entry corresponding to req->ipcp_id and
-     * fill the DIF name field. */
-    entry = ipcp_table_find(req->ipcp_id);
-    if (entry) {
-        rina_name_free(&entry->dif_name);
-        rina_name_copy(&entry->dif_name, &req->dif_name);
-        ret = 0; /* Report success. */
-    }
-    mutex_unlock(&rina_dm.lock);
-
-    if (ret == 0) {
-        printk("%s: Assigning IPC process %u to DIF %s\n", __func__,
-            req->ipcp_id, name_s);
-    }
-    if (name_s) {
-        kfree(name_s);
-    }
-
-    return ret;
-}
-
-static int
 rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_config *req =
@@ -1377,7 +1346,6 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
-    [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,

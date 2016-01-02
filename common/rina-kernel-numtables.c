@@ -22,11 +22,6 @@ struct rina_msg_layout rina_kernel_numtables[] = {
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_KERN_ASSIGN_TO_DIF] = {
-        .copylen = sizeof(struct rina_kmsg_assign_to_dif) -
-                    sizeof(struct rina_name),
-        .names = 1,
-    },
     [RINA_KERN_APPLICATION_REGISTER] = {
         .copylen = sizeof(struct rina_kmsg_application_register) -
                     sizeof(struct rina_name),

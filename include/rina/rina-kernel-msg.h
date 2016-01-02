@@ -24,17 +24,16 @@ enum {
     RINA_KERN_IPCP_DESTROY,     /* 3 */
     RINA_KERN_IPCP_FETCH, /* 4 */
     RINA_KERN_IPCP_FETCH_RESP, /* 5 */
-    RINA_KERN_ASSIGN_TO_DIF, /* 6 */
-    RINA_KERN_APPLICATION_REGISTER, /* 7 */
-    RINA_KERN_FA_REQ, /* 8 */
-    RINA_KERN_FA_RESP_ARRIVED, /* 9 */
-    RINA_KERN_FA_RESP, /* 10 */
-    RINA_KERN_FA_REQ_ARRIVED, /* 11 */
-    RINA_KERN_IPCP_CONFIG, /* 12 */
-    RINA_KERN_IPCP_PDUFT_SET, /* 13 */
-    RINA_KERN_IPCP_UIPCP_SET, /* 14 */
-    RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 15 */
-    RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 16 */
+    RINA_KERN_APPLICATION_REGISTER, /* 6 */
+    RINA_KERN_FA_REQ, /* 7 */
+    RINA_KERN_FA_RESP_ARRIVED, /* 8 */
+    RINA_KERN_FA_RESP, /* 9 */
+    RINA_KERN_FA_REQ_ARRIVED, /* 10 */
+    RINA_KERN_IPCP_CONFIG, /* 11 */
+    RINA_KERN_IPCP_PDUFT_SET, /* 12 */
+    RINA_KERN_IPCP_UIPCP_SET, /* 13 */
+    RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 14 */
+    RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 15 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -79,14 +78,6 @@ struct rina_kmsg_fetch_ipcp_resp {
     uint8_t dif_type;
     uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
     struct rina_name ipcp_name;
-    struct rina_name dif_name;
-} __attribute__((packed));
-
-struct rina_kmsg_assign_to_dif {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-
-    uint16_t ipcp_id;
     struct rina_name dif_name;
 } __attribute__((packed));
 

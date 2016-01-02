@@ -308,71 +308,6 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
 }
 
 static int
-rina_assign_to_dif(struct rinaconf *rc, uint16_t ipcp_id,
-                   struct rina_name *dif_name)
-{
-    struct rina_kmsg_assign_to_dif *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_ASSIGN_TO_DIF;
-    req->ipcp_id = ipcp_id;
-    rina_name_copy(&req->dif_name, dif_name);
-
-    PD("Requesting DIF assignment...\n");
-
-    resp = issue_request(&rc->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    ipcps_fetch(&rc->loop);
-
-    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
-
-    return result;
-}
-
-static int
-assign_to_dif(int argc, char **argv, struct rinaconf *rc)
-{
-    const char *ipcp_apn;
-    const char *ipcp_api;
-    const char *dif_name_s;
-    struct rina_name ipcp_name;
-    struct rina_name dif_name;
-    struct ipcp *ipcp;
-    int ret = -1;  /* Report failure by default. */
-
-    assert(argc >= 3);
-    dif_name_s = argv[0];
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
-
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rina_name_fill(&dif_name, dif_name_s, NULL, NULL, NULL);
-
-    /* The request specifies an IPCP: lookup that. */
-    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (!ipcp) {
-        PE("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        ret = rina_assign_to_dif(rc, ipcp->ipcp_id, &dif_name);
-    }
-
-    return ret;
-}
-
-static int
 rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
@@ -587,12 +522,10 @@ test(struct rinaconf *rc)
     rina_name_free(&name);
 
     /* Assign to DIF. */
-    rina_name_fill(&name, "test-shim-loopback.DIF", NULL, NULL, NULL);
-    ret = rina_assign_to_dif(rc, 0, &name);
+    ret = rina_ipcp_config(rc, 0, "dif", "test-shim-loopback.DIF");
     assert(!ret);
-    ret = rina_assign_to_dif(rc, 0, &name);
+    ret = rina_ipcp_config(rc, 0, "dif", "test-shim-loopback.DIF");
     assert(!ret);
-    rina_name_free(&name);
 
     /* Fetch IPC processes table. */
     ipcps_fetch(&rc->loop);
@@ -627,12 +560,6 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_APN IPCP_API",
         .num_args = 2,
         .func = ipcp_destroy,
-    },
-    {
-        .name = "assign-to-dif",
-        .usage = "DIF_NAME IPCP_APN IPCP_API",
-        .num_args = 3,
-        .func = assign_to_dif,
     },
     {
         .name = "ipcp-config",
