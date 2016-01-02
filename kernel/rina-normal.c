@@ -147,17 +147,11 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 }
 
 static int
-rina_normal_sdu_write(struct ipcp_entry *ipcp,
-                      struct flow_entry *flow,
-                      struct rina_buf *rb)
+rmt_tx(struct rina_normal *priv, struct ipcp_entry *ipcp,
+       struct flow_entry *flow, struct rina_buf *rb)
 {
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
-    struct rina_pci *pci;
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
-    struct dtp *dtp = &flow->dtp;
-    struct fc_config *fc = &flow->cfg.dtcp.fc;
-    int len = rb->len;
     int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
@@ -173,8 +167,35 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         BUG_ON(!lower_ipcp);
     }
 
+    if (lower_flow) {
+        /* Push down to the underlying IPCP. */
+        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    } else {
+        /* This SDU gets loopbacked to this IPCP, since this is a
+         * self flow (flow->remote_addr == ipcp->addr). */
+        size_t len = rb->len;
+
+        ret = ipcp->ops.sdu_rx(ipcp, rb);
+        ret = (ret == 0) ? len : ret;
+    }
+
+    return ret;
+}
+
+static int
+rina_normal_sdu_write(struct ipcp_entry *ipcp,
+                      struct flow_entry *flow,
+                      struct rina_buf *rb)
+{
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rina_pci *pci;
+    struct dtp *dtp = &flow->dtp;
+    struct fc_config *fc = &flow->cfg.dtcp.fc;
+    int ret;
+
     /* Stop the sender inactivity timer if it was activated or the callback
-     * running , but without waiting for the callback to finish. */
+     * running , but without waiting for the callback to finish.
+     * These needs probably to be done only whent DTCP is present. */
     hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
 
     rina_buf_pci_push(rb);
@@ -200,6 +221,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 dtp->cwq_len++;
             } else {
                 /* POL: FlowControlOverrun */
+                int len = rb->len;
 
                 /* TODO Set blocking write (backpressure) ? */
                 PD("%s: Dropping overrun PDU [%lu]", __func__,
@@ -220,19 +242,9 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->last_seq_num_sent = pci->seqnum;
     }
 
-    if (lower_flow) {
-        /* Directly call the underlying IPCP for now. RMT component
-         * is not implemented explicitely for now. */
-        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
-        if (likely(ret >= sizeof(struct rina_pci))) {
-            ret -= sizeof(struct rina_pci);
-        }
-    } else {
-        /* This SDU gets loopbacked to this IPCP, since this is a
-         * self flow (flow->remote_addr == ipcp->addr). */
-
-        ret = ipcp->ops.sdu_rx(ipcp, rb);
-        ret = (ret == 0) ? len : ret;
+    ret = rmt_tx(priv, ipcp, flow, rb);
+    if (likely(ret >= sizeof(struct rina_pci))) {
+        ret -= sizeof(struct rina_pci);
     }
 
     /* 3 * (MPL + R + A) */
@@ -374,6 +386,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
                     pcic->last_ctrl_seq_num_rcvd =
                             flow->dtp.last_ctrl_seq_num_rcvd;
+                    pcic->ack_nack_seq_num = 0;
                     pcic->new_rwe = flow->dtp.rcv_rwe;
                     pcic->new_lwe = flow->dtp.rcv_lwe;
                     pcic->my_rwe = flow->dtp.snd_rwe;

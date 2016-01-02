@@ -33,3 +33,8 @@
   permette di costruire topologie di DIF arbitrarie su un singolo host
 
 - rivedere se è la struct upper_ref è ancora necessaria, o se può essere rimossa
+
+- è vero che rina_io_write() ritorna la lunghezza della SDU trasmessa in caso di
+  successo, ma non c'è bisogno che le sdu_write callbacks facciano lo stesso: è
+  fastidioso dover condizionalmente sottrarre la lunghezza del PCI. Piuttosto
+  ritornare 0 in caso di successo.
