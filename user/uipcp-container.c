@@ -138,7 +138,8 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 
     /* Request an enrollment. */
 
-    ret = rib_cdap_connect(uipcp->rib, neigh, port_id);
+    ret = rib_neighbor_add(uipcp->rib, &req->neigh_ipcp_name,
+                           neigh->flow_fd, port_id);
     if (ret) {
         goto err2;
     }
@@ -568,6 +569,7 @@ uipcp_server(void *arg)
         struct rinalite_pending_flow_req *pfr;
         unsigned int port_id;
         int result;
+        int ret;
 
         neigh = malloc(sizeof(*neigh));
         if (!neigh) {
@@ -599,6 +601,12 @@ uipcp_server(void *arg)
         rina_name_copy(&neigh->ipcp_name, &pfr->remote_appl);
         list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
         rinalite_pending_flow_req_free(pfr);
+
+        ret = rib_neighbor_add(uipcp->rib, &pfr->remote_appl,
+                               neigh->flow_fd, port_id);
+        if (ret) {
+            PE("%s: rib_neighbor_add() failed\n", __func__);
+        }
 
         /* XXX This usleep() is a temporary hack to make sure that the
          * flow allocation response has the time to be processed by the neighbor,
@@ -759,7 +767,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 
     /* Unenroll from all the neighbors. */
     list_for_each_entry(neigh, &uipcp->enrolled_neighbors, node) {
-        close(neigh->flow_fd);
+        //close(neigh->flow_fd); // XXX closed in rib_destroy()
         rina_name_free(&neigh->ipcp_name);
         // TODO empty the list
     }

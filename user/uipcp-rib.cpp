@@ -1,8 +1,10 @@
 #include <vector>
+#include <list>
 #include <map>
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <unistd.h>
 #include <stdint.h>
 #include <cstdlib>
 #include <cassert>
@@ -20,6 +22,35 @@ static string dft_obj_name = "/dif/mgmt/fa/dft";
 static string dft_obj_class = "dft";
 static string whatevercast_obj_name = "/daf/mgmt/naming/whatevercast";
 
+struct Neighbor {
+    struct rina_name ipcp_name;
+    int flow_fd;
+    unsigned int port_id;
+
+    Neighbor(const struct rina_name *name, int fd, unsigned int port_id);
+    Neighbor(const Neighbor &other);
+    ~Neighbor();
+};
+
+Neighbor::Neighbor(const struct rina_name *name, int fd, unsigned int port_id_)
+{
+    rina_name_copy(&ipcp_name, name);
+    flow_fd = fd;
+    port_id = port_id_;
+}
+
+Neighbor::Neighbor(const Neighbor& other)
+{
+    rina_name_copy(&ipcp_name, &other.ipcp_name);
+    flow_fd = other.flow_fd;
+    port_id = other.port_id;
+}
+
+Neighbor::~Neighbor()
+{
+    rina_name_free(&ipcp_name);
+}
+
 typedef int (*rib_handler_t)(struct uipcp_rib *);
 
 struct uipcp_rib {
@@ -27,6 +58,9 @@ struct uipcp_rib {
     struct uipcp *uipcp;
 
     map< string, rib_handler_t > handlers;
+
+    /* Neighbors. */
+    list< Neighbor > neighbors;
 
     /* Directory Forwarding Table. */
     map< string, uint64_t > dft;
@@ -68,6 +102,17 @@ rib_create(struct uipcp *uipcp)
 extern "C" void
 rib_destroy(struct uipcp_rib *rib)
 {
+    int ret;
+
+    for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
+                        neigh != rib->neighbors.end(); neigh++) {
+        ret = close(neigh->flow_fd);
+        if (ret) {
+            PE("%s: Error deallocating N-1 flow fd %d\n", __func__,
+               neigh->flow_fd);
+        }
+    }
+
     delete rib;
 }
 
@@ -98,8 +143,8 @@ rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
 }
 
 extern "C" int
-rib_cdap_connect(struct uipcp_rib *rib, struct enrolled_neighbor *neigh,
-                 unsigned int port_id)
+rib_neighbor_add(struct uipcp_rib *rib, const struct rina_name *neigh_name,
+                 int neigh_fd, unsigned int neigh_port_id)
 {
     /*
     CDAPAuthValue av;
@@ -107,6 +152,9 @@ rib_cdap_connect(struct uipcp_rib *rib, struct enrolled_neighbor *neigh,
 
     m.m_connect(gpb::AUTH_NONE, &av, &local_appl, &neigh->ipcp_name);
     */
+
+    rib->neighbors.push_back(Neighbor(neigh_name, neigh_fd, neigh_port_id));
+
     return 0;
 }
 
