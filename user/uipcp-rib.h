@@ -5,7 +5,10 @@
 extern "C" {
 #endif
 
-void cxx_f(int x);
+struct uipcp_rib;
+
+struct uipcp_rib *rib_create(void);
+void rib_destroy(struct uipcp_rib *rib);
 
 #ifdef __cplusplus
 }

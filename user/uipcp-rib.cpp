@@ -1,22 +1,38 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <cstring>
+
+#include "rinalite/rinalite-common.h"
 
 #include "uipcp-rib.h"
 
 using namespace std;
 
 
-static void f(int x)
+struct uipcp_rib {
+};
+
+extern "C" struct uipcp_rib *
+rib_create(void)
 {
-    vector<int> v;
+    struct uipcp_rib *rib = new uipcp_rib();
 
-    v.push_back(x);
+    if (!rib) {
+        return NULL;
+    }
 
-    cout << "CXX_F CALLED" << endl;
+    PD("RIB created\n");
+
+    memset(rib, 0, sizeof(*rib));
+
+    return rib;
 }
 
-extern "C" void cxx_f(int x)
+extern "C" void
+rib_destroy(struct uipcp_rib *rib)
 {
-    f(x);
+    PD("RIB destroyed\n");
+
+    delete rib;
 }

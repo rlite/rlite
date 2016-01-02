@@ -3,8 +3,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+
 #include "rinalite/rinalite-utils.h"
 #include "rinalite/rina-conf-msg.h"
+
 #include "uipcp-container.h"
 #include "uipcp-rib.h"
 
@@ -677,6 +679,11 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     list_init(&uipcp->dft);
     list_init(&uipcp->enrolled_neighbors);
 
+    uipcp->rib = rib_create();
+    if (!uipcp->rib) {
+        goto err0;
+    }
+
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
     ret = rinalite_appl_init(&uipcp->appl);
@@ -736,6 +743,9 @@ err2:
     rinalite_appl_fini(&uipcp->appl);
 err1:
     list_del(&uipcp->node);
+err0:
+    rib_destroy(uipcp->rib);
+    free(uipcp);
 
     return ret;
 }
@@ -769,6 +779,8 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
     ret = rinalite_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);
+
+    rib_destroy(uipcp->rib);
 
     free(uipcp);
 

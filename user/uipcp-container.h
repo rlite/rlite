@@ -5,6 +5,8 @@
 #include "rinalite-list.h"
 #include "rinalite-appl.h"
 
+#include "uipcp-rib.h"
+
 
 /* User IPCP data model. */
 struct uipcps {
@@ -40,6 +42,8 @@ struct uipcp {
 
     /* List of neighbor IPCP process we are enrolled to. */
     struct list_head enrolled_neighbors;
+
+    struct uipcp_rib *rib;
 
     struct list_head node;
 };
