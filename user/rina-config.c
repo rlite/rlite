@@ -18,7 +18,7 @@
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
 
-static void usage_and_quit(void);
+static void usage(void);
 
 static int
 ipcm_connect()
@@ -84,12 +84,74 @@ read_response(int sfd)
     return ret;
 }
 
+static int
+request_response(struct rina_msg_base *req)
+{
+    int fd;
+    int ret;
+
+    fd = ipcm_connect();
+    if (fd < 0) {
+        return fd;
+    }
+
+    ret = rina_msg_write(fd, req);
+    if (ret) {
+        return ret;
+    }
+
+    ret = read_response(fd);
+    if (ret) {
+        return ret;
+    }
+
+    return ipcm_disconnect(fd);
+}
+
+static const char *dif_types[] = {
+    [DIF_TYPE_NORMAL] = "normal",
+    [DIF_TYPE_SHIM_DUMMY] = "shim-dummy",
+};
+
+static int ipcp_create(int argc, char **argv)
+{
+    struct rina_amsg_ipcp_create req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    int i;
+
+    assert(argc >= 3);
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
+
+    req.msg_type = RINA_APPL_IPCP_CREATE;
+    req.event_id = 0;
+    req.dif_type = DIF_TYPE_MAX;
+    for (i = 0; i < DIF_TYPE_MAX; i++) {
+        assert(dif_types[i]);
+        if (strcmp(argv[0], dif_types[i]) == 0) {
+            req.dif_type = i;
+            break;
+        }
+    }
+    if (req.dif_type == DIF_TYPE_MAX) {
+        /* No such dif type. Print the available types
+         * and exit. */
+        printf("No such dif type. Available DIF types:\n");
+        for (i = 0; i < DIF_TYPE_MAX; i++) {
+            printf("    %s\n", dif_types[i]);
+        }
+        return -1;
+    }
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 static int application_register_common(const struct rina_name *app_name,
                                        const char *dif_name, int reg)
 {
     struct rina_amsg_register msg;
-    int fd;
-    int ret;
 
     msg.msg_type = reg ? RINA_APPL_REGISTER : RINA_APPL_UNREGISTER;
     msg.event_id = 0;
@@ -106,22 +168,7 @@ static int application_register_common(const struct rina_name *app_name,
         return -1;
     }
 
-    fd = ipcm_connect();
-    if (fd < 0) {
-        return fd;
-    }
-
-    ret = rina_msg_write(fd, (struct rina_msg_base *)&msg);
-    if (ret) {
-        return ret;
-    }
-
-    ret = read_response(fd);
-    if (ret) {
-        return ret;
-    }
-
-    return ipcm_disconnect(fd);
+    return request_response((struct rina_msg_base *)&msg);
 }
 
 static int
@@ -132,10 +179,7 @@ application_register(int argc, char **argv)
     const char *ipcp_apn;
     const char *ipcp_api;
 
-    if (argc < 3) {
-        usage_and_quit();
-    }
-
+    assert(argc >= 3);
     dif_name = argv[0];
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
@@ -153,10 +197,7 @@ application_unregister(int argc, char **argv)
     const char *ipcp_apn;
     const char *ipcp_api;
 
-    if (argc < 3) {
-        usage_and_quit();
-    }
-
+    assert(argc >= 3);
     dif_name = argv[0];
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
@@ -169,6 +210,7 @@ application_unregister(int argc, char **argv)
 struct cmd_descriptor {
     const char *name;
     const char *usage;
+    unsigned int num_args;
     int (*func)(int argc, char **argv);
 };
 
@@ -176,21 +218,25 @@ static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "application-register",
         .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .num_args = 3,
         .func = application_register,
     },
     {
         .name = "application-unregister",
         .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .num_args = 3,
         .func = application_unregister,
     },
     {
         .name = "ipcp-create",
         .usage = "DIF_TYPE IPCP_APN IPCP_API",
-        .func = NULL,
+        .num_args = 3,
+        .func = ipcp_create,
     },
     {
         .name = "ipcp-destroy",
         .usage = "IPCP_APN IPCP_API",
+        .num_args = 2,
         .func = NULL,
     },
 };
@@ -198,17 +244,15 @@ static struct cmd_descriptor cmd_descriptors[] = {
 #define NUM_COMMANDS    (sizeof(cmd_descriptors)/sizeof(struct cmd_descriptor))
 
 static void
-usage_and_quit(void)
+usage(void)
 {
     int i;
 
-    printf("Available commands:\n");
+    printf("\nAvailable commands:\n");
 
     for (i = 0; i < NUM_COMMANDS; i++) {
         printf("    %s %s\n", cmd_descriptors[i].name, cmd_descriptors[i].usage);
     }
-
-    exit(EXIT_SUCCESS);
 }
 
 static int
@@ -219,7 +263,8 @@ process_args(int argc, char **argv)
 
     if (argc < 2) {
         /* No command. */
-        usage_and_quit();
+        usage();
+        return -1;
     }
 
     cmd = argv[1];
@@ -227,14 +272,22 @@ process_args(int argc, char **argv)
     for (i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
             assert(cmd_descriptors[i].func);
+
+            if (argc - 2 < cmd_descriptors[i].num_args) {
+                /* Not enough arguments. */
+                printf("Not enough arguments\n");
+                usage();
+                return -1;
+            }
+
             return cmd_descriptors[i].func(argc - 2, argv + 2);
         }
     }
 
     printf("Unknown command '%s'\n", cmd);
-    usage_and_quit();
+    usage();
 
-    return 0;
+    return -1;
 }
 
 static void

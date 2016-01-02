@@ -48,4 +48,8 @@ struct rina_msg_layout rina_application_numtables[] = {
         .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
+    [RINA_APPL_BASE_RESP] = {
+        .copylen = sizeof(struct rina_msg_base_resp),
+        .names = 0,
+    },
 };

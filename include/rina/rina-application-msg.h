@@ -21,6 +21,7 @@ enum {
     RINA_APPL_REGISTER_RESP,      /* 8 */
     RINA_APPL_UNREGISTER,         /* 9 */
     RINA_APPL_UNREGISTER_RESP,    /* 10 */
+    RINA_APPL_BASE_RESP,          /* 11 */
 
     RINA_APPL_MSG_MAX,
 };
