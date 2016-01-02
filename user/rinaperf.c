@@ -448,7 +448,8 @@ usage(void)
     printf("rinaperf [OPTIONS]\n"
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
-        "   -t TEST : specify the type of the test to be performed (ping, perf)\n"
+        "   -t TEST : specify the type of the test to be performed "
+            "(ping, perf)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
         "   -c NUM : number of SDUs to send during the test\n"
         "   -s NUM : size of the SDUs that are sent during the test\n"
@@ -457,6 +458,9 @@ usage(void)
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
+        "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
+        "   -b NUM : How many SDUs to send before waiting as "
+                "specified by -i option (default b=1)\n"
           );
 }
 
