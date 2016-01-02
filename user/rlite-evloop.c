@@ -214,24 +214,23 @@ evloop_function(void *arg)
              *        expire
              */
             struct timespec now;
-            struct rlite_tmr_event *cur;
+            struct rlite_tmr_event *te;
 
             pthread_mutex_lock(&loop->timer_lock);
 
             if (loop->timer_events_cnt) {
-                list_for_each_entry(cur, &loop->timer_events, node) {
-                    break;
-                }
+                te = list_first_entry(&loop->timer_events,
+                                       struct rlite_tmr_event, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
-                if (time_cmp(&now, &cur->exp) > 0) {
+                if (time_cmp(&now, &te->exp) > 0) {
                     to.tv_sec = 0;
                     to.tv_usec = 0;
                 } else {
                     unsigned long delta_ns;
 
-                    delta_ns = (cur->exp.tv_sec - now.tv_sec) * ONEBILLION +
-                        (cur->exp.tv_nsec - now.tv_nsec);
+                    delta_ns = (te->exp.tv_sec - now.tv_sec) * ONEBILLION +
+                        (te->exp.tv_nsec - now.tv_nsec);
 
                     to.tv_sec = delta_ns / ONEBILLION;
                     to.tv_usec = (delta_ns % ONEBILLION) / 1000;
@@ -259,34 +258,33 @@ evloop_function(void *arg)
             struct timespec now;
             struct list_head expired;
             struct list_head *elem;
-            struct rlite_tmr_event *cur;
+            struct rlite_tmr_event *te;
 
             list_init(&expired);
 
             pthread_mutex_lock(&loop->timer_lock);
 
             while (loop->timer_events_cnt) {
-                list_for_each_entry(cur, &loop->timer_events, node) {
-                    break;
-                }
+                te = list_first_entry(&loop->timer_events,
+                                       struct rlite_tmr_event, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
-                if (time_cmp(&cur->exp, &now) > 0) {
+                if (time_cmp(&te->exp, &now) > 0) {
                     break;
                 }
 
-                list_del(&cur->node);
+                list_del(&te->node);
                 loop->timer_events_cnt--;
-                list_add_tail(&cur->node, &expired);
+                list_add_tail(&te->node, &expired);
             }
 
             pthread_mutex_unlock(&loop->timer_lock);
 
             while ((elem = list_pop_front(&expired))) {
-                cur = container_of(elem, struct rlite_tmr_event, node);
-                NPD("Exec timer callback [%d]\n", cur->id);
-                cur->cb(loop);
-                free(cur);
+                te = container_of(elem, struct rlite_tmr_event, node);
+                NPD("Exec timer callback [%d]\n", te->id);
+                te->cb(loop);
+                free(te);
             }
 
             continue;

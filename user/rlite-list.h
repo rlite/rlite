@@ -74,4 +74,8 @@ list_del(struct list_head *elem)
              &_cur->_member != (_list);                                      \
             _cur = container_of(_cur->_member.succ, typeof(*_cur), _member))
 
+/* The list_first_entry() macro assumes a first entry exists. */
+#define list_first_entry(_list, _type, _member)                 \
+            container_of((_list)->succ, _type, _member)
+
 #endif  /* __TEMPLATE_LIST_H__ */
