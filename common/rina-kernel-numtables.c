@@ -30,10 +30,6 @@ struct rina_msg_layout rina_kernel_numtables[] = {
                     sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_ASSIGN_TO_DIF_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
     [RINA_KERN_APPLICATION_REGISTER] = {
         .copylen = sizeof(struct rina_kmsg_application_register) -
                     sizeof(struct rina_name),

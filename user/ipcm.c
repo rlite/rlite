@@ -46,32 +46,6 @@ ipcp_create_resp(struct rina_evloop *loop,
 }
 
 static int
-assign_to_dif_resp(struct rina_evloop *loop,
-                   const struct rina_msg_base_resp *b_resp,
-                   const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_assign_to_dif *req =
-            (struct rina_kmsg_assign_to_dif *)b_req;
-    char *name_s = NULL;
-
-    name_s = rina_name_to_string(&req->dif_name);
-
-    if (b_resp->result) {
-        printf("%s: Failed to assign IPC process %u to DIF %s\n",
-                __func__, req->ipcp_id, name_s);
-    } else {
-        printf("%s: Assigned IPC process %u to DIF %s\n",
-                __func__, req->ipcp_id, name_s);
-    }
-
-    if (name_s) {
-        free(name_s);
-    }
-
-    return 0;
-}
-
-static int
 application_register_resp(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
@@ -108,7 +82,6 @@ application_register_resp(struct rina_evloop *loop,
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
-    [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_MSG_MAX] = NULL,
@@ -170,26 +143,26 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
     resp = issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), wait_for_completion, &result);
     assert(!resp);
-
-    printf("Destroy result: %d\n", result);
+    printf("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
 
     return result;
 }
 
-static struct rina_msg_base_resp *
+static int
 assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
-              uint16_t ipcp_id, struct rina_name *dif_name, int *result)
+              uint16_t ipcp_id, struct rina_name *dif_name)
 {
     struct rina_kmsg_assign_to_dif *req;
-    struct rina_msg_base_resp *resp;
+    struct rina_msg_base *resp;
+    int result;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
         printf("%s: Out of memory\n", __func__);
-        return NULL;
+        return ENOMEM;
     }
 
     memset(req, 0, sizeof(*req));
@@ -199,13 +172,14 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
 
     printf("Requesting DIF assignment...\n");
 
-    resp = (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         wait_for_completion, result);
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         wait_for_completion, &result);
+    assert(!resp);
+    printf("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
 
-    return resp;
+    return result;
 }
 
 static struct rina_msg_base_resp *
@@ -260,10 +234,7 @@ test(struct ipcm *ipcm)
 
     /* Assign to DIF. */
     rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
-    resp = assign_to_dif(ipcm, 0, 0, &name, &result);
-    if (resp) {
-        rina_msg_free(rina_kernel_numtables, RMB(resp));
-    }
+    result = assign_to_dif(ipcm, 0, 0, &name);
     rina_name_free(&name);
 
     /* Fetch IPC processes table. */
@@ -381,10 +352,8 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     unsigned int ipcp_id;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
-    struct rina_msg_base_resp *kresp;
-    int result;
 
-    resp.result = 1;
+    resp.result = 1;  /* Report failure by default. */
 
     /* The request specifies an IPCP: lookup that. */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->application_name);
@@ -392,11 +361,7 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name, &result);
-        if (kresp) {
-            resp.result = kresp->result;
-            rina_msg_free(rina_kernel_numtables, RMB(kresp));
-        }
+        resp.result = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name);
     }
 
     return rina_appl_response(sfd, RMB(req), &resp);
