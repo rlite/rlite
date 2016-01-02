@@ -162,7 +162,7 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
 
     nf->keepalive_tmrid = 0;
 
-    UPD(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+    NPD(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(nf->neigh->ipcp_name).c_str());
 
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
@@ -1043,7 +1043,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
          * is alive on this flow. */
         nf->pending_keepalive_reqs = 0;
 
-        UPD(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
+        NPD(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
             static_cast<string>(nf->neigh->ipcp_name).c_str());
         return 0;
     }
