@@ -140,6 +140,8 @@ struct rina_kmsg_fa_resp {
     uint16_t ipcp_id;
     uint8_t response;
     uint32_t port_id;
+    uint32_t remote_port; /* Filled by kernel before reflecting to userspace. */
+    uint64_t remote_addr; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
 /* IPCM --> kernel to configure and IPC process. */
@@ -183,6 +185,7 @@ struct rina_kmsg_uipcp_fa_req_arrived {
 
     uint16_t ipcp_id;
     uint32_t remote_port;
+    uint64_t remote_addr;
     /* Requested application. */
     struct rina_name local_application;
     /* Requesting application. */
@@ -198,6 +201,7 @@ struct rina_kmsg_uipcp_fa_resp_arrived {
     uint16_t ipcp_id;
     uint32_t local_port;
     uint32_t remote_port;
+    uint64_t remote_addr;
     uint8_t response;
 } __attribute__((packed));
 

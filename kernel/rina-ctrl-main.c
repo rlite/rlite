@@ -483,6 +483,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         rina_name_copy(&entry->local_application, local_application);
         rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
+        entry->remote_addr = 0;  /* Not valid. */
         entry->pduft_dest_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
         entry->upper = upper;
@@ -903,9 +904,9 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     mutex_unlock(&rina_dm.lock);
 
     if (ipcp) {
-        ret = rina_fa_req_arrived(ipcp, req->remote_port,
-                                             &req->local_application,
-                                             &req->remote_application);
+        ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
+                                  &req->local_application,
+                                  &req->remote_application);
     }
 
     return ret;
@@ -926,8 +927,8 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
 
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
-                                              req->remote_port,
-                                              req->response);
+                                   req->remote_port, req->remote_addr,
+                                   req->response);
     }
 
     return ret;
@@ -1101,8 +1102,8 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 /* To be called under global lock. */
 static int
 rina_fa_resp_internal(struct flow_entry *flow_entry,
-                                 uint8_t response,
-                                 struct rina_kmsg_fa_resp *resp)
+                      uint8_t response,
+                      struct rina_kmsg_fa_resp *resp)
 {
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;
@@ -1134,6 +1135,8 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             /* No userspace IPCP to use, this should not happen. */
         } else {
             /* Reflect the flow allocation response message to userspace. */
+            resp->remote_port = flow_entry->remote_port;
+            resp->remote_addr = flow_entry->remote_addr;
             ret = rina_upqueue_append(ipcp->uipcp,
                                       (const struct rina_msg_base *)resp);
         }
@@ -1175,9 +1178,9 @@ out:
 
 int
 rina_fa_req_arrived(struct ipcp_entry *ipcp,
-                               uint32_t remote_port,
-                               const struct rina_name *local_application,
-                               const struct rina_name *remote_application)
+                    uint32_t remote_port, uint64_t remote_addr,
+                    const struct rina_name *local_application,
+                    const struct rina_name *remote_application)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
@@ -1211,6 +1214,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
         return ret;
     }
     flow_entry->remote_port = remote_port;
+    flow_entry->remote_addr = remote_addr;
     flow_entry->state = FLOW_STATE_PENDING;
 
     PI("%s: Flow allocation request arrived to IPC process %u, "
@@ -1235,9 +1239,10 @@ EXPORT_SYMBOL_GPL(rina_fa_req_arrived);
 
 int
 rina_fa_resp_arrived(struct ipcp_entry *ipcp,
-                                uint32_t local_port,
-                                uint32_t remote_port,
-                                uint8_t response)
+                     uint32_t local_port,
+                     uint32_t remote_port,
+                     uint64_t remote_addr,
+                     uint8_t response)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
@@ -1255,6 +1260,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
                                           : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
+    flow_entry->remote_addr = remote_addr;
 
     PI("%s: Flow allocation response arrived to IPC process %u, "
             "port-id %u\n", __func__, ipcp->id, local_port);

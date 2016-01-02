@@ -135,6 +135,7 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 
 static int
 uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
+                     uint64_t remote_addr,
                      const struct rina_name *local_application,
                      const struct rina_name *remote_application)
 {
@@ -153,6 +154,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     req->msg_type = RINA_KERN_UIPCP_FA_REQ_ARRIVED;
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
+    req->remote_addr = remote_addr;
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
@@ -191,8 +193,65 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
         PE("%s: deserialization error\n", __func__);
     }
 
-    uipcp_fa_req_arrived(uipcp, remote_port, &local_application,
-                         &remote_application);
+    uipcp_fa_req_arrived(uipcp, remote_port, mhdr->remote_addr,
+                         &local_application, &remote_application);
+
+    return 0;
+}
+
+static int
+uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
+                      uint32_t remote_port, uint64_t remote_addr,
+                      uint8_t response)
+{
+    struct rina_kmsg_uipcp_fa_resp_arrived *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_UIPCP_FA_RESP_ARRIVED;
+    req->ipcp_id = uipcp->ipcp_id;
+    req->local_port = local_port;
+    req->remote_port = remote_port;
+    req->response = response;
+
+    PD("Issuing UIPCP_FA_RESP_ARRIVED message...\n");
+
+    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
+uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
+                       uint8_t *buf, size_t buflen)
+{
+    const void *ptr = buf;
+    uint32_t remote_port, local_port;
+    uint8_t response;
+
+    PD("%s: Received fa resp management SDU from IPCP addr %lu\n",
+            __func__, (long unsigned)mhdr->remote_addr);
+
+    remote_port = le32toh(*((uint32_t *)ptr));
+    ptr += sizeof(uint32_t);
+    local_port = le32toh(*((uint32_t *)ptr));
+    ptr += sizeof(uint32_t);
+    response = *((uint8_t *)ptr);
+    ptr += sizeof(uint8_t);
+
+    uipcp_fa_resp_arrived(uipcp, local_port, remote_port,
+                          mhdr->remote_addr, response);
 
     return 0;
 }
@@ -242,42 +301,14 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
             uipcp_mgmt_sdu_fa_req(uipcp, mhdr, buf, buflen);
             break;
 
+        case IPCP_MGMT_FA_RESP:
+            uipcp_mgmt_sdu_fa_resp(uipcp, mhdr, buf, buflen);
+            break;
+
         default:
             PI("%s: Unknown cmd %u received\n", __func__, cmd);
             break;
     }
-}
-
-/*static */int
-uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
-                                 uint32_t remote_port, uint8_t response)
-{
-    struct rina_kmsg_uipcp_fa_resp_arrived *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_UIPCP_FA_RESP_ARRIVED;
-    req->ipcp_id = uipcp->ipcp_id;
-    req->local_port = local_port;
-    req->remote_port = remote_port;
-    req->response = response;
-
-    PD("Issuing UIPCP_FA_RESP_ARRIVED message...\n");
-
-    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    return result;
 }
 
 struct dft_entry {
@@ -374,6 +405,8 @@ uipcp_fa_req(struct rina_evloop *loop,
     mgmt_write_to_dst_addr(uipcp, dft_entry->remote_addr,
                            mgmtsdu, sizeof(mgmtsdu));
 
+    free(mgmtsdu);
+
     return 0;
 }
 
@@ -387,12 +420,37 @@ uipcp_fa_resp(struct rina_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
+    uint8_t *mgmtsdu;
+    void *cur;
+    size_t len;
 
     PD("%s: Got reflected message\n", __func__);
 
     assert(b_req == NULL);
     (void)uipcp;
     (void)resp;
+
+    len = 1 + sizeof(resp->port_id) + sizeof(resp->remote_port)
+            + sizeof(resp->response);
+
+    mgmtsdu = malloc(len);
+    if (!mgmtsdu) {
+        PE("%s: Out of memory\n", __func__);
+        return 0;
+    }
+
+    mgmtsdu[0] = IPCP_MGMT_FA_RESP;
+    cur = mgmtsdu + 1;
+    *((uint32_t *)cur) = htole32(resp->port_id);
+    cur += sizeof(resp->port_id);
+    *((uint32_t *)cur) = htole32(resp->remote_port);
+    cur += sizeof(resp->remote_port);
+    *((uint8_t *)cur) = resp->response;
+    cur += sizeof(resp->response);
+
+    mgmt_write_to_dst_addr(uipcp, resp->remote_addr,
+                           mgmtsdu, sizeof(mgmtsdu));
+    free(mgmtsdu);
 
     return 0;
 }

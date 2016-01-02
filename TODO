@@ -22,3 +22,4 @@
 - rimuovere usleep() hack in uipcp_server
 
 - rina-utils: routine di deserializzazione devono gestire errori di lunghezza
+
