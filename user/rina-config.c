@@ -294,24 +294,69 @@ static int ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     return ret;
 }
 
+static int
+rina_assign_to_dif(struct rinaconf *rc, uint16_t ipcp_id,
+                   struct rina_name *dif_name)
+{
+    struct rina_kmsg_assign_to_dif *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_ASSIGN_TO_DIF;
+    req->ipcp_id = ipcp_id;
+    rina_name_copy(&req->dif_name, dif_name);
+
+    PD("Requesting DIF assignment...\n");
+
+    resp = issue_request(&rc->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    ipcps_fetch(&rc->loop);
+    /* TODO notify uipcps
+    uipcps_fetch(ipcm);
+    */
+
+    return result;
+}
+
 static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_amsg_assign_to_dif req;
     const char *ipcp_apn;
     const char *ipcp_api;
-    const char *dif_name;
+    const char *dif_name_s;
+    struct rina_name ipcp_name;
+    struct rina_name dif_name;
+    unsigned int ipcp_id;
+    int ret = 1;  /* Report failure by default. */
 
     assert(argc >= 3);
-    dif_name = argv[0];
+    dif_name_s = argv[0];
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
-    req.msg_type = RINA_CONF_ASSIGN_TO_DIF;
-    req.event_id = 0;
-    rina_name_fill(&req.application_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
+    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&dif_name, dif_name_s, NULL, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req);
+    /* The request specifies an IPCP: lookup that. */
+    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (ipcp_id == ~0U) {
+        PE("%s: Could not find a suitable IPC process\n", __func__);
+    } else {
+        /* Forward the request to the kernel. */
+        ret = rina_assign_to_dif(rc, ipcp_id, &dif_name);
+    }
+
+    return ret;
 }
 
 static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
