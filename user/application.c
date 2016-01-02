@@ -390,7 +390,7 @@ rina_application_init(struct application *application)
     pthread_cond_init(&application->flow_req_arrived_cond, NULL);
     list_init(&application->pending_flow_reqs);
 
-    ret = rina_evloop_init(&application->loop, "/dev/rina-app-ctrl",
+    ret = rina_evloop_init(&application->loop, "/dev/rina-ctrl",
                      rina_kernel_handlers);
     if (ret) {
         return ret;

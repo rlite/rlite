@@ -666,7 +666,7 @@ int main(int argc, char **argv)
         enable_testing = 1;
     }
 
-    ret = rina_evloop_init(&ipcm->loop, "/dev/rina-ipcm-ctrl",
+    ret = rina_evloop_init(&ipcm->loop, "/dev/rina-ctrl",
                      rina_kernel_handlers);
     if (ret) {
         return ret;
