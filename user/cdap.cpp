@@ -13,6 +13,29 @@ using namespace std;
 
 #define CDAP_ABS_SYNTAX    73
 
+static const char *opcode_names_table[] = {
+    [gpb::M_CONNECT] = "M_CONNECT",
+    [gpb::M_CONNECT_R] = "M_CONNECT_R",
+    [gpb::M_RELEASE] = "M_RELEASE",
+    [gpb::M_RELEASE_R] = "M_RELEASE_R",
+    [gpb::M_CREATE] = "M_CREATE",
+    [gpb::M_CREATE_R] = "M_CREATE_R",
+    [gpb::M_DELETE] = "M_DELETE",
+    [gpb::M_DELETE_R] = "M_DELETE_R",
+    [gpb::M_READ] = "M_READ",
+    [gpb::M_READ_R] = "M_READ_R",
+    [gpb::M_CANCELREAD] = "M_CANCELREAD",
+    [gpb::M_CANCELREAD_R] = "M_CANCELREAD_R",
+    [gpb::M_WRITE] = "M_WRITE",
+    [gpb::M_WRITE_R] = "M_WRITE_R",
+    [gpb::M_START] = "M_START",
+    [gpb::M_START_R] = "M_START_R",
+    [gpb::M_STOP] = "M_STOP",
+    [gpb::M_STOP_R] = "M_STOP_R",
+};
+
+#define MAX_CDAP_OPCODE gpb::M_STOP_R
+
 CDAPConn::CDAPConn(int arg_fd)
 {
     invoke_id_next = 1;
@@ -275,7 +298,9 @@ CDAPMessage::print() const
 
     PD("CDAP Message { ");
     PD("abs_syntax: %d, ", abs_syntax);
-    PD("op_code: %d, ", op_code);
+    if (op_code <= MAX_CDAP_OPCODE) {
+        PD("op_code: %s, ", opcode_names_table[op_code]);
+    }
     PD("invoke_id: %d, ", invoke_id);
 
     if (flags != gpb::F_NO_FLAGS) {
