@@ -50,15 +50,26 @@ struct rina_ioctl_info {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
-#define RINA_MGMT_HDR_TYPE_LOCAL_PORT 1
-#define RINA_MGMT_HDR_TYPE_DST_ADDR 2
+#define RINA_MGMT_HDR_T_OUT_LOCAL_PORT      1
+#define RINA_MGMT_HDR_T_OUT_DST_ADDR        2
+#define RINA_MGMT_HDR_T_IN                  3
 
+/* Header used across user/kernel boundary when writing/reading
+ * management SDUs from rina-io devices working in RINA_IO_MODE_IPCP_MGMT
+ * mode.
+ * Userspace can write a management SDU specifying either a local
+ * port (type OUT_LOCAL_PORT) or a destination address (OUT_DST_ADDR). In
+ * the former case 'local_port' should refer to an existing N-1 flow
+ * ('remote_addr' is ignored), while in the latter 'remote_addr' should
+ * refer to an N-IPCP that will be reached as specified by the PDUFT
+ * ('local_port' is ignored).
+ * When reading a management SDU, the header will contain the local port
+ * where the SDU was received and the source (remote) address that sent it.
+ */
 struct rina_mgmt_hdr {
     uint8_t type;
-    union {
-        uint32_t local_port;
-        uint64_t dst_addr;
-    } u;
+    uint32_t local_port;
+    uint64_t remote_addr;
 } __attribute__((packed));
 
 /* Logging macros. */

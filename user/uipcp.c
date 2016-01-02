@@ -52,8 +52,8 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
 {
     struct rina_mgmt_hdr mhdr;
 
-    mhdr.type = RINA_MGMT_HDR_TYPE_LOCAL_PORT;
-    mhdr.u.local_port = local_port;
+    mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
+    mhdr.local_port = local_port;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
@@ -64,8 +64,8 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 {
     struct rina_mgmt_hdr mhdr;
 
-    mhdr.type = RINA_MGMT_HDR_TYPE_DST_ADDR;
-    mhdr.u.dst_addr = dst_addr;
+    mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.remote_addr = dst_addr;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
@@ -127,9 +127,9 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     PD("%s: Received enrollment management SDU from IPCP addr %lu\n",
             __func__, (long unsigned)remote_addr);
 
-    assert(mhdr->type == RINA_MGMT_HDR_TYPE_LOCAL_PORT);
+    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
     ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
-                   mhdr->u.local_port);
+                   mhdr->local_port);
 
     return 0;
 }

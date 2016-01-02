@@ -158,22 +158,22 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     uint64_t dst_addr = 0; /* Not valid. */
     int ret;
 
-    if (mhdr->type == RINA_MGMT_HDR_TYPE_DST_ADDR) {
-        lower_flow = pduft_lookup(priv, mhdr->u.dst_addr);
+    if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
+        lower_flow = pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!lower_flow)) {
             PI("%s: No route to IPCP %lu, dropping packet\n", __func__,
-                    (long unsigned)mhdr->u.dst_addr);
+                    (long unsigned)mhdr->remote_addr);
             rina_buf_free(rb);
 
             return 0;
         }
-        dst_addr = mhdr->u.dst_addr;
-    } else if (mhdr->type == RINA_MGMT_HDR_TYPE_LOCAL_PORT) {
-        lower_flow = flow_lookup(mhdr->u.local_port);
+        dst_addr = mhdr->remote_addr;
+    } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
+        lower_flow = flow_lookup(mhdr->local_port);
         if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
             PI("%s: Invalid mgmt header local port %u, "
                     "dropping packet\n", __func__,
-                    mhdr->u.local_port);
+                    mhdr->local_port);
             rina_buf_free(rb);
 
             return 0;

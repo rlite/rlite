@@ -1306,6 +1306,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
         } else if (flow->upper.ipcp->mgmt_txrx) {
             struct rina_mgmt_hdr *mhdr;
+            uint64_t src_addr = RINA_BUF_PCI(rb)->src_addr;
 
             txrx = flow->upper.ipcp->mgmt_txrx;
             rina_buf_pci_pop(rb);
@@ -1313,8 +1314,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
              * by rina_buf_pci_pop(). */
             rina_buf_custom_push(rb, sizeof(*mhdr));
             mhdr = (struct rina_mgmt_hdr *)RINA_BUF_DATA(rb);
-            mhdr->type = RINA_MGMT_HDR_TYPE_LOCAL_PORT;
-            mhdr->u.local_port = local_port;
+            mhdr->type = RINA_MGMT_HDR_T_IN;
+            mhdr->local_port = local_port;
+            mhdr->remote_addr = src_addr;
         } else {
             PE("%s: Missing mgmt_txrx\n", __func__);
             rina_buf_free(rb);
