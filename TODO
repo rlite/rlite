@@ -36,4 +36,4 @@
 
 - RLITE_RMB() --> RLITE_MB(), and use it extensively
 
-- uipcp-unix.c: unix thread is useless
+- make sure uipcp_set fails if called twice

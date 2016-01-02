@@ -289,10 +289,9 @@ static rlite_req_handler_t rlite_config_handlers[] = {
 };
 
 /* Unix server thread to manage configuration requests. */
-static void *
-unix_server(void *arg)
+static int
+unix_server(struct uipcps *uipcps)
 {
-    struct uipcps *uipcps = arg;
     char serbuf[4096];
     char msgbuf[4096];
 
@@ -482,7 +481,6 @@ sigpipe_handler(int signum)
 int main(int argc, char **argv)
 {
     struct uipcps *uipcps = &guipcps;
-    pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
     int ret;
@@ -585,20 +583,11 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Create and start the unix server thread. */
-    ret = pthread_create(&unix_th, NULL, unix_server, uipcps);
-    if (ret) {
-        perror("pthread_create(unix)");
-        exit(EXIT_FAILURE);
-    }
+    /* Start the unix server. */
+    unix_server(uipcps);
 
     /* The following code should be never reached, since the unix
      * socket server should execute until a SIGINT signal comes. */
-    ret = pthread_join(unix_th, NULL);
-    if (ret < 0) {
-        perror("pthread_join(unix)");
-        exit(EXIT_FAILURE);
-    }
 
     return 0;
 }
