@@ -638,7 +638,7 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
         if (pci->seqnum - dtp->rcv_lwe <= max_sdu_gap) {
             list_del(&qrb->node);
             list_add_tail(&qrb->node, qrbs);
-            dtp->rcv_lwe = pci->seqnum;
+            dtp->rcv_lwe = pci->seqnum + 1;
             PD("%s: [%lu] popped out from seqq\n", __func__,
                     (long unsigned)pci->seqnum);
         }
