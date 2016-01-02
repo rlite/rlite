@@ -388,6 +388,10 @@ __rina_name_fill(struct rina_name *name, const char *apn,
                  const char *api, const char *aen, const char *aei,
                  int maysleep)
 {
+    if (!name) {
+        return -1;
+    }
+
     name->apn = (apn && strlen(apn)) ? COMMON_STRDUP(apn, maysleep) : NULL;
     name->api = (api && strlen(api)) ? COMMON_STRDUP(api, maysleep) : NULL;
     name->aen = (aen && strlen(aen)) ? COMMON_STRDUP(aen, maysleep) : NULL;
