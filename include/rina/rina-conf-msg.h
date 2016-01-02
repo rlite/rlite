@@ -22,7 +22,7 @@ enum {
     RINA_CONF_MSG_MAX,
 };
 
-/* Numtables for rina-config <==> ipcm messages exchange. */
+/* Numtables for rina-config <==> uipcp-server messages exchange. */
 
 extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX];
 

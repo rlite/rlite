@@ -1,3 +1,3 @@
 if [ "$batch" != "0" ]; then
-    kill -SIGINT $(pgrep ipcm)
+    kill -SIGINT $(pgrep uipcp-server)
 fi

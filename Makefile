@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror -g -O2
 CFLAGS += -I$(PWD)/include
 LDFLAGS = -lpthread
-EXES=user/ipcm user/rina-config user/rinaperf
+EXES=user/uipcp-server user/rina-config user/rinaperf
 HEADERS=$(shell find include/rina)
 
 KER=`uname -r`
@@ -12,11 +12,11 @@ all: $(EXES) ker
 ker:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
-user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o user/rina-conf-numtables.o user/helpers.o user/evloop.o user/application.o user/uipcp.o
+user/uipcp-server: user/uipcp-server.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o user/rina-conf-numtables.o user/helpers.o user/evloop.o user/application.o user/uipcp.o
 
-user/ipcm.o:  $(HEADERS) user/pending_queue.h user/helpers.h user/evloop.h user/application.h user/ipcm.h
+user/uipcp-server.o:  $(HEADERS) user/pending_queue.h user/helpers.h user/evloop.h user/application.h user/uipcp-server.h
 
-user/uipcp.o: $(HEADERS) user/ipcm.h
+user/uipcp.o: $(HEADERS) user/uipcp-server.h
 
 user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
@@ -40,7 +40,7 @@ count:
 	find . -type f -and \( -name "*.c" -or -name "*.h" \) | grep -v vmpi | xargs wc -l
 
 test:
-	(./unprepare.sh || true; ./prepare.sh && user/ipcm -t)
+	(./unprepare.sh || true; ./prepare.sh && user/uipcp-server -t)
 
 clean:
 	-rm user/*.o

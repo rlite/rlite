@@ -3,8 +3,8 @@ if [ -z "$batch" ]; then
 fi
 
 if [ "$batch" != "0" ]; then
-    user/ipcm &
-    while [ ! -e "/tmp/rina-ipcm" ] ; do
+    user/uipcp-server &
+    while [ ! -e "/var/rina/uipcp-server" ] ; do
         true
     done
 fi

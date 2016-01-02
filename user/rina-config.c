@@ -52,7 +52,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-ipcm_connect(int verbose)
+uipcps_connect(int verbose)
 {
     struct sockaddr_un server_address;
     int ret;
@@ -84,7 +84,7 @@ ipcm_connect(int verbose)
     return sfd;
 }
 
-static int ipcm_disconnect(int sfd)
+static int uipcps_disconnect(int sfd)
 {
         return close(sfd);
 }
@@ -126,7 +126,7 @@ request_response(struct rina_msg_base *req, int verbose)
     int fd;
     int ret;
 
-    fd = ipcm_connect(verbose);
+    fd = uipcps_connect(verbose);
     if (fd < 0) {
         return fd;
     }
@@ -141,7 +141,7 @@ request_response(struct rina_msg_base *req, int verbose)
         return ret;
     }
 
-    return ipcm_disconnect(fd);
+    return uipcps_disconnect(fd);
 }
 
 static int

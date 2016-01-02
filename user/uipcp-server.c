@@ -20,7 +20,7 @@
 #include "helpers.h"
 #include "evloop.h"
 #include "application.h"
-#include "ipcm.h"
+#include "uipcp-server.h"
 
 
 struct registered_ipcp {
@@ -36,7 +36,7 @@ struct registered_ipcp {
  * how to do it differently). The rest of the program should access it
  * through pointers.
  */
-static struct ipcm gipcm;
+static struct uipcps guipcps;
 
 static int
 rina_conf_response(int sfd, struct rina_msg_base *req,
@@ -49,7 +49,7 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
 }
 
 uint8_t
-rina_ipcp_register(struct ipcm *ipcm, int reg,
+rina_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *dif_name,
                    unsigned int ipcp_id,
                    const struct rina_name *ipcp_name)
@@ -58,7 +58,7 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
     uint8_t result;
 
     /* Grab the corresponding userspace IPCP. */
-    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
         PE("%s: No such uipcp [%u]\n", __func__, ipcp_id);
         return -1;
@@ -82,12 +82,12 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
                 rina_name_copy(&ripcp->dif_name, dif_name);
                 ripcp->ipcp_id = ipcp_id;
                 rina_name_copy(&ripcp->ipcp_name, ipcp_name);
-                list_add_tail(&ripcp->node, &ipcm->ipcps_registrations);
+                list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
             }
         } else {
             /* Remove a registration element from the persistent
              * registration list. */
-            list_for_each_entry(ripcp, &ipcm->ipcps_registrations, node) {
+            list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
                 if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
                         rina_name_cmp(&ripcp->ipcp_name,
                             ipcp_name) == 0) {
@@ -103,20 +103,20 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
 }
 
 static int
-rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
                        const struct rina_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_register *req = (struct rina_cmsg_ipcp_register *)b_req;
     struct rina_msg_base_resp resp;
 
-    resp.result = rina_ipcp_register(ipcm, req->reg, &req->dif_name,
+    resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
     return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static int
-rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
                       const struct rina_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
@@ -127,7 +127,7 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     resp.result = 1; /* Report failure by default. */
 
     /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_lookup(ipcm, req->ipcp_id);
+    uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
         PE("%s: Could not find userspace IPC process %u\n",
             __func__, req->ipcp_id);
@@ -147,7 +147,7 @@ out:
 }
 
 static int
-rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
                        const struct rina_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
@@ -157,7 +157,7 @@ rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
 
     resp.result = 1; /* Report failure by default. */
 
-    uipcp = uipcp_lookup(ipcm, req->ipcp_id);
+    uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
         PE("%s: Could not find uipcp for IPC process %u\n",
             __func__, req->ipcp_id);
@@ -176,7 +176,7 @@ out:
 }
 
 static int
-rina_conf_uipcp_update(struct ipcm *ipcm, int sfd,
+rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
                        const struct rina_msg_base *b_req)
 {
     struct rina_cmsg_uipcp_update *req = (struct rina_cmsg_uipcp_update *)b_req;
@@ -186,20 +186,20 @@ rina_conf_uipcp_update(struct ipcm *ipcm, int sfd,
     resp.result = 1; /* Report failure by default. */
 
     if (req->msg_type == RINA_CONF_UIPCP_CREATE) {
-        resp.result = uipcp_add(ipcm, req->ipcp_id);
+        resp.result = uipcp_add(uipcps, req->ipcp_id);
 
     } else if (req->msg_type == RINA_CONF_UIPCP_DESTROY) {
-        uipcp = uipcp_lookup(ipcm, req->ipcp_id);
+        uipcp = uipcp_lookup(uipcps, req->ipcp_id);
         if (!uipcp) {
             PE("%s: Could not find uipcp for IPC process %u\n",
                 __func__, req->ipcp_id);
             goto out;
         }
 
-        resp.result = uipcp_del(ipcm, req->ipcp_id);
+        resp.result = uipcp_del(uipcps, req->ipcp_id);
     }
 
-    uipcps_fetch(ipcm);
+    uipcps_fetch(uipcps);
 
     resp.result = 0;
 
@@ -207,7 +207,7 @@ out:
     return rina_conf_response(sfd, RMB(req), &resp);
 }
 
-typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
+typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
                                    const struct rina_msg_base * b_req);
 
 /* The table containing all application request handlers. */
@@ -225,7 +225,7 @@ static rina_req_handler_t rina_config_handlers[] = {
 static void *
 unix_server(void *arg)
 {
-    struct ipcm *ipcm = arg;
+    struct uipcps *uipcps = arg;
     char serbuf[4096];
     char msgbuf[4096];
 
@@ -238,7 +238,7 @@ unix_server(void *arg)
         int n;
 
         /* Accept a new client. */
-        cfd = accept(ipcm->lfd, (struct sockaddr *)&client_address,
+        cfd = accept(uipcps->lfd, (struct sockaddr *)&client_address,
                      &client_address_len);
 
         /* Read the request message in serialized form. */
@@ -267,7 +267,7 @@ unix_server(void *arg)
             rina_msg_write(cfd, (struct rina_msg_base *)&resp);
         } else {
             /* Valid message type: handle the request. */
-            ret = rina_config_handlers[req->msg_type](ipcm, cfd, req);
+            ret = rina_config_handlers[req->msg_type](uipcps, cfd, req);
             if (ret) {
                 PE("%s: Error while handling message type [%d]\n",
                         __func__, req->msg_type);
@@ -282,9 +282,9 @@ unix_server(void *arg)
 }
 
 /* Dump the ipcps_registrations list to a file, so that
- * subsequent ipcm invocations can redo the registrations. */
+ * subsequent uipcps invocations can redo the registrations. */
 static void
-persistent_ipcp_reg_dump(struct ipcm *ipcm)
+persistent_ipcp_reg_dump(struct uipcps *uipcps)
 {
     FILE *fpreg = fopen(RINA_PERSISTENT_REG_FILE, "w");
 
@@ -295,7 +295,7 @@ persistent_ipcp_reg_dump(struct ipcm *ipcm)
         char *dif_s, *ipcp_s;
         struct registered_ipcp *ripcp;
 
-        list_for_each_entry(ripcp, &ipcm->ipcps_registrations, node) {
+        list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
             dif_s = rina_name_to_string(&ripcp->dif_name);
             ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
             if (dif_s && ipcp_s) {
@@ -313,12 +313,12 @@ persistent_ipcp_reg_dump(struct ipcm *ipcm)
 static void
 sigint_handler(int signum)
 {
-    struct ipcm *ipcm = &gipcm;
+    struct uipcps *uipcps = &guipcps;
 
-    persistent_ipcp_reg_dump(ipcm);
+    persistent_ipcp_reg_dump(uipcps);
 
     /* TODO Here we should free all the dynamically allocated memory
-     * referenced by ipcm. */
+     * referenced by uipcps. */
 
     unlink(RINA_IPCM_UNIX_NAME);
     exit(EXIT_SUCCESS);
@@ -332,15 +332,15 @@ sigpipe_handler(int signum)
 
 int main(int argc, char **argv)
 {
-    struct ipcm *ipcm = &gipcm;
+    struct uipcps *uipcps = &guipcps;
     pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
     int ret;
 
     /* Open a Unix domain socket to listen to. */
-    ipcm->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (ipcm->lfd < 0) {
+    uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (uipcps->lfd < 0) {
         perror("socket(AF_UNIX)");
         exit(EXIT_FAILURE);
     }
@@ -355,20 +355,20 @@ int main(int argc, char **argv)
          * This unlink() will clean up in this situation. */
         PI("info: cleaned up existing unix domain socket\n");
     }
-    ret = bind(ipcm->lfd, (struct sockaddr *)&server_address,
+    ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
                 sizeof(server_address));
     if (ret) {
         perror("bind(AF_UNIX, path)");
         exit(EXIT_FAILURE);
     }
-    ret = listen(ipcm->lfd, 50);
+    ret = listen(uipcps->lfd, 50);
     if (ret) {
         perror("listen(AF_UNIX)");
         exit(EXIT_FAILURE);
     }
 
-    list_init(&ipcm->uipcps);
-    list_init(&ipcm->ipcps_registrations);
+    list_init(&uipcps->uipcps);
+    list_init(&uipcps->ipcps_registrations);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -404,14 +404,14 @@ int main(int argc, char **argv)
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
-    ret = uipcps_update(ipcm);
+    ret = uipcps_update(uipcps);
     if (ret) {
         PE("Failed to load userspace ipcps\n");
         exit(EXIT_FAILURE);
     }
 
     /* Create and start the unix server thread. */
-    ret = pthread_create(&unix_th, NULL, unix_server, ipcm);
+    ret = pthread_create(&unix_th, NULL, unix_server, uipcps);
     if (ret) {
         perror("pthread_create(unix)");
         exit(EXIT_FAILURE);

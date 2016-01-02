@@ -7,7 +7,7 @@
 
 
 /* IPC Manager data model. */
-struct ipcm {
+struct uipcps {
     /* Unix domain socket file descriptor used to accept request from
      * applications. */
     int lfd;
@@ -18,24 +18,24 @@ struct ipcm {
     /* Each element of this list corresponds to the registration of
      * and IPCP within a DIF. This is useful to implement the persistent
      * IPCP registration feature, where the "persistence" is to be intended
-     * across subsequent ipcm restarts. */
+     * across subsequent uipcps restarts. */
     struct list_head ipcps_registrations;
 };
 
-#define RINA_PERSISTENT_REG_FILE   "/var/rina/ipcm-pers-reg"
+#define RINA_PERSISTENT_REG_FILE   "/var/rina/uipcps-pers-reg"
 
 int
-ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,
+ipcp_pduft_set(struct uipcps *uipcps, uint16_t ipcp_id,
                uint64_t dest_addr, uint32_t local_port);
 
 uint8_t
-rina_ipcp_register(struct ipcm *ipcm, int reg,
+rina_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *dif_name, unsigned int ipcp_id,
                    const struct rina_name *ipcp_name);
 
 struct uipcp {
     struct application appl;
-    struct ipcm *ipcm;
+    struct uipcps *uipcps;
     unsigned int ipcp_id;
     int mgmtfd;
     pthread_t server_th;
@@ -56,11 +56,11 @@ enum {
 };
 
 void *uipcp_server(void *arg);
-int uipcps_update(struct ipcm *ipcm);
-int uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id);
-int uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id);
-struct uipcp *uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id);
-int uipcps_fetch(struct ipcm *ipcm);
+int uipcps_update(struct uipcps *uipcps);
+int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
+int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
+struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
+int uipcps_fetch(struct uipcps *uipcps);
 int uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
                   uint64_t remote_addr);
 int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);

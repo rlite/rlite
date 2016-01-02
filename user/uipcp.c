@@ -5,7 +5,7 @@
 #include <string.h>
 #include <rina/rina-utils.h>
 #include <rina/rina-conf-msg.h>
-#include "ipcm.h"
+#include "uipcp-server.h"
 
 
 #define MGMTBUF_SIZE_MAX 2048
@@ -617,11 +617,11 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 }
 
 struct uipcp *
-uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id)
+uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct uipcp *cur;
 
-    list_for_each_entry(cur, &ipcm->uipcps, node) {
+    list_for_each_entry(cur, &uipcps->uipcps, node) {
         if (cur->ipcp_id == ipcp_id) {
             return cur;
         }
@@ -631,7 +631,7 @@ uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id)
 }
 
 int
-uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
+uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct uipcp *uipcp;
     int ret;
@@ -644,11 +644,11 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
     memset(uipcp, 0, sizeof(*uipcp));
 
     uipcp->ipcp_id = ipcp_id;
-    uipcp->ipcm = ipcm;
+    uipcp->uipcps = uipcps;
     list_init(&uipcp->dft);
     list_init(&uipcp->enrolled_neighbors);
 
-    list_add_tail(&uipcp->node, &ipcm->uipcps);
+    list_add_tail(&uipcp->node, &uipcps->uipcps);
 
     ret = rina_application_init(&uipcp->appl);
     if (ret) {
@@ -707,13 +707,13 @@ err1:
 }
 
 int
-uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
+uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct enrolled_neighbor *neigh;
     struct uipcp *uipcp;
     int ret;
 
-    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
         /* The specified IPCP is a Shim IPCP. */
         return 0;
@@ -746,12 +746,12 @@ uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
 }
 
 int
-uipcps_fetch(struct ipcm *ipcm)
+uipcps_fetch(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
     int ret;
 
-    list_for_each_entry(uipcp, &ipcm->uipcps, node) {
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         ret = ipcps_fetch(&uipcp->appl.loop);
         if (ret) {
             return ret;
@@ -762,7 +762,7 @@ uipcps_fetch(struct ipcm *ipcm)
 }
 
 int
-uipcps_update(struct ipcm *ipcm)
+uipcps_update(struct uipcps *uipcps)
 {
     struct rina_evloop loop;
     struct ipcp *ipcp;
@@ -778,7 +778,7 @@ uipcps_update(struct ipcm *ipcm)
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(ipcp, &loop.ipcps, node) {
         if (ipcp->dif_type == DIF_TYPE_NORMAL) {
-            ret = uipcp_add(ipcm, ipcp->ipcp_id);
+            ret = uipcp_add(uipcps, ipcp->ipcp_id);
             if (ret) {
                 return ret;
             }
@@ -790,7 +790,7 @@ uipcps_update(struct ipcm *ipcm)
 
     /* Perform a fetch operation on the evloops of
      * all the userspace IPCPs. */
-    uipcps_fetch(ipcm);
+    uipcps_fetch(uipcps);
 
     if (1) {
         /* Read the persistent IPCP registration file into
@@ -820,7 +820,7 @@ uipcps_update(struct ipcm *ipcm)
                 if (s1 && s2 && s3 && rina_name_from_string(s1, &dif_name) == 0
                         && rina_name_from_string(s3, &ipcp_name) == 0) {
                     ipcp_id = atoi(s2);
-                    reg_result = rina_ipcp_register(ipcm, 1, &dif_name,
+                    reg_result = rina_ipcp_register(uipcps, 1, &dif_name,
                                                     ipcp_id, &ipcp_name);
                     PI("%s: Automatic re-registration for %s --> %s\n",
                         __func__, s3, (reg_result == 0) ? "DONE" : "FAILED");

@@ -39,7 +39,7 @@ enum {
     RINA_KERN_MSG_MAX,
 };
 
-/* Numtables for kernel <==> ipcm messages exchange. */
+/* Numtables for kernel <==> uipcp-server messages exchange. */
 
 extern struct rina_msg_layout rina_kernel_numtables[RINA_KERN_MSG_MAX+1];
 
