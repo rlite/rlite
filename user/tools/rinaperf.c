@@ -144,6 +144,7 @@ echo_client(struct rinaperf *rp)
             } else {
                 printf("Partial write %d/%d\n", ret, size);
             }
+            break;
         }
 
         ret = poll(&pfd, 1, 3000);
@@ -255,6 +256,7 @@ perf_client(struct rinaperf *rp)
             } else {
                 printf("Partial write %d/%d\n", ret, size);
             }
+            break;
         }
 
         if (interval && --cdown == 0) {
