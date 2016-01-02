@@ -147,10 +147,10 @@ int rl_evloop_flow_alloc(struct rlite_evloop *loop,
                         uint16_t upper_ipcp_id,
                         unsigned int *port_id, unsigned int wait_ms);
 
-int rl_appl_fa_resp(struct rlite_evloop *loop,
-                             uint32_t kevent_id, uint16_t ipcp_id,
-                             uint16_t upper_ipcp_id, uint32_t port_id,
-                             uint8_t response);
+int rl_evloop_fa_resp(struct rlite_evloop *loop,
+                      uint32_t kevent_id, uint16_t ipcp_id,
+                      uint16_t upper_ipcp_id, uint32_t port_id,
+                      uint8_t response);
 
 int
 rlite_flows_print(struct rlite_evloop *loop);

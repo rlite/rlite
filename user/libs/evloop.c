@@ -964,9 +964,9 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
 }
 
 int
-rl_appl_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
-                         uint16_t ipcp_id, uint16_t upper_ipcp_id,
-                         uint32_t port_id, uint8_t response)
+rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
+                  uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                  uint32_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp *req;
     struct rlite_msg_base *resp;

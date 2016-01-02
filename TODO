@@ -24,5 +24,3 @@
   getting ERR in the logs
 
 - add copy constructor to CDAPMessage class
-
-- evloop.h, appl.h --> hide main structs

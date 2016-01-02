@@ -548,9 +548,9 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    ret = rl_appl_fa_resp(&gw->loop, req->kevent_id,
-                          req->ipcp_id, 0xffff,
-                          req->port_id, RLITE_SUCC);
+    ret = rl_evloop_fa_resp(&gw->loop, req->kevent_id,
+                            req->ipcp_id, 0xffff,
+                            req->port_id, RLITE_SUCC);
     if (ret != RLITE_SUCC) {
         PE("rl_appl_fa_resp() failed\n");
         close(cfd);

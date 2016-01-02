@@ -652,8 +652,8 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         result = RLITE_ERR;
     }
 
-    ret = rl_appl_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
-                                   uipcp->ipcp_id, req->port_id, result);
+    ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
+                            uipcp->ipcp_id, req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
         UPE(uipcp, "rl_appl_fa_resp() failed\n");
