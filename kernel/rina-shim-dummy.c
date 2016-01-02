@@ -63,20 +63,20 @@ rina_shim_dummy_create(void)
 }
 
 static void
-rina_shim_dummy_destroy(void *data)
+rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_dummy *priv = data;
+    struct rina_shim_dummy *priv = ipcp->priv;
 
     kfree(priv);
 
-    printk("%s: IPC [%p] destroyed\n", __func__, data);
+    printk("%s: IPC [%p] destroyed\n", __func__, priv);
 }
 
 static int
-rina_shim_dummy_application_register(void *data, struct rina_name *application_name)
+rina_shim_dummy_application_register(struct ipcp_entry *ipcp, struct rina_name *application_name)
 {
     struct registered_application *app;
-    struct rina_shim_dummy *priv = data;
+    struct rina_shim_dummy *priv = ipcp->priv;
     char *name_s;
 
     mutex_lock(&priv->lock);
@@ -109,10 +109,10 @@ rina_shim_dummy_application_register(void *data, struct rina_name *application_n
 }
 
 static int
-rina_shim_dummy_application_unregister(void *data, struct rina_name *application_name)
+rina_shim_dummy_application_unregister(struct ipcp_entry *ipcp, struct rina_name *application_name)
 {
     struct registered_application *app;
-    struct rina_shim_dummy *priv = data;
+    struct rina_shim_dummy *priv = ipcp->priv;
     int found = 0;
     char *name_s;
 
@@ -145,7 +145,7 @@ rina_shim_dummy_application_unregister(void *data, struct rina_name *application
 }
 
 static int
-rina_shim_dummy_assign_to_dif(void *data, struct rina_name *dif_name)
+rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp, struct rina_name *dif_name)
 {
     return 0;
 }

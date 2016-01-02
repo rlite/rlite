@@ -43,16 +43,6 @@ struct upqueue_entry {
     struct list_head node;
 };
 
-struct ipcp_entry {
-    uint16_t            id;    /* Key */
-    struct rina_name    name;
-    struct rina_name    dif_name;
-    uint8_t             dif_type;
-    struct ipcp_ops     ops;
-    void                *priv;
-    struct hlist_node   node;
-};
-
 #define IPCP_ID_BITMAP_SIZE 1024
 #define IPCP_HASHTABLE_BITS  7
 
@@ -218,7 +208,7 @@ ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
     entry = kmalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
         if (factory->ops.destroy) {
-            factory->ops.destroy(ipcp_priv);
+            factory->ops.destroy(entry);
         }
         mutex_unlock(&rina_dm.lock);
         return -ENOMEM;
@@ -238,7 +228,7 @@ ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
     } else {
         if (factory->ops.destroy) {
-            factory->ops.destroy(ipcp_priv);
+            factory->ops.destroy(entry);
         }
         kfree(entry);
     }
@@ -267,7 +257,7 @@ ipcp_del(unsigned int ipcp_id)
         rina_name_free(&entry->name);
         rina_name_free(&entry->dif_name);
         if (entry->ops.destroy) {
-            entry->ops.destroy(entry->priv);
+            entry->ops.destroy(entry);
         }
         /* Invalid the IPCP fetch pointer, if necessary. */
         if (entry == rina_dm.ipcp_fetch_last) {
@@ -497,12 +487,12 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         ret = 0;
         if (reg) {
             if (entry->ops.application_register) {
-                ret = entry->ops.application_register(entry->priv,
+                ret = entry->ops.application_register(entry,
                                             &req->application_name);
             }
         } else {
             if (entry->ops.application_unregister) {
-                ret = entry->ops.application_unregister(entry->priv,
+                ret = entry->ops.application_unregister(entry,
                                             &req->application_name);
             }
         }
