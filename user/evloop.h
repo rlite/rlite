@@ -44,7 +44,7 @@ struct rina_evloop {
     int rfd;
 
     /* A FIFO queue that stores pending RINA events. */
-    struct pending_queue pqueue;
+    struct list_head pqueue;
 
     /* What event-id to use for the next request issued to the kernel. */
     uint32_t event_id_counter;

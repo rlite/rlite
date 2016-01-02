@@ -353,14 +353,13 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     msg->event_id = loop->event_id_counter;
 
     if (has_response) {
-        entry->next = NULL;
         entry->msg = msg;
         entry->msg_len = msg_len;
         entry->resp = NULL;
         entry->wait_for_completion = wait_for_completion;
         entry->op_complete = 0;
         pthread_cond_init(&entry->op_complete_cond, NULL);
-        pending_queue_enqueue(&loop->pqueue, entry);
+        list_add_tail(&entry->node, &loop->pqueue);
     }
 
     /* Serialize the message. */
@@ -449,7 +448,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
     memcpy(loop->handlers, handlers, sizeof(loop->handlers));
     pthread_mutex_init(&loop->lock, NULL);
-    pending_queue_init(&loop->pqueue);
+    list_init(&loop->pqueue);
     loop->event_id_counter = 1;
     list_init(&loop->ipcps);
     loop->rfd = -1;
