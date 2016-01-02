@@ -516,11 +516,6 @@ rl_evloop_stop(struct rlite_evloop *loop)
     uint64_t x = 1;
     int n;
 
-    if (!(loop->flags & RLITE_EVLOOP_SPAWN)) {
-        /* Nothing to do here. */
-        return 0;
-    }
-
     n = write(loop->eventfd, &x, sizeof(x));
     if (n != sizeof(x)) {
         perror("write(eventfd)");
@@ -706,16 +701,13 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
     loop->handlers[RLITE_KER_IPCP_UPDATE] = evloop_ipcp_update;
 
-
-    if (loop->flags & RLITE_EVLOOP_SPAWN) {
-        /* Create and start the event-loop thread. */
-        ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
-        if (ret) {
-            perror("pthread_create(event-loop)");
-            return ret;
-        }
-        loop->running = 1;
+    /* Create and start the event-loop thread. */
+    ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
+    if (ret) {
+        perror("pthread_create(event-loop)");
+        return ret;
     }
+    loop->running = 1;
 
     return ret;
 }
@@ -741,11 +733,6 @@ rl_evloop_run(struct rlite_evloop *loop)
 int
 rl_evloop_join(struct rlite_evloop *loop)
 {
-    if (!(loop->flags & RLITE_EVLOOP_SPAWN)) {
-        PE("Cannot join evloop, RLITE_EVLOOP_SPAWN flag not set\n");
-        return -1;
-    }
-
     if (loop->running) {
         int ret = pthread_join(loop->evloop_th, NULL);
 
@@ -795,11 +782,7 @@ rl_evloop_fini(struct rlite_evloop *loop)
         pthread_mutex_unlock(&loop->timer_lock);
     }
 
-    pending_queue_fini(&loop->ctrl.pqueue);
-
-    if ((loop->flags & RLITE_EVLOOP_SPAWN)) {
-        rl_evloop_join(loop);
-    }
+    rl_evloop_join(loop);
 
     if (loop->eventfd >= 0) {
         close(loop->eventfd);

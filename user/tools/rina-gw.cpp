@@ -394,7 +394,7 @@ Gateway::Gateway()
 
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
-    if (rl_evloop_init(&loop, NULL, NULL, RLITE_EVLOOP_SPAWN)) {
+    if (rl_evloop_init(&loop, NULL, NULL, 0)) {
         throw std::exception();
     }
 }

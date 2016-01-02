@@ -574,6 +574,7 @@ int
 rl_ctrl_fini(struct rlite_ctrl *ctrl)
 {
     pthread_mutex_lock(&ctrl->lock);
+    pending_queue_fini(&ctrl->pqueue);
     rlite_ipcps_purge(&ctrl->ipcps);
     pthread_mutex_unlock(&ctrl->lock);
 

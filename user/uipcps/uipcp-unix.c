@@ -406,8 +406,7 @@ uipcps_update(struct uipcps *uipcps)
     struct rlite_ipcp *rlite_ipcp;
     int ret = 0;
 
-    ret = rl_evloop_init(&uipcps->loop, "/dev/rlite", NULL,
-                            RLITE_EVLOOP_SPAWN);
+    ret = rl_evloop_init(&uipcps->loop, "/dev/rlite", NULL, 0);
     if (ret) {
         return ret;
     }

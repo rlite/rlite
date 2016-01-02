@@ -311,7 +311,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
-    ret = rl_evloop_init(&uipcp->loop, NULL, NULL, RLITE_EVLOOP_SPAWN);
+    ret = rl_evloop_init(&uipcp->loop, NULL, NULL, 0);
     if (ret) {
         goto err0;
     }

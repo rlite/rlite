@@ -93,12 +93,10 @@ rl_evloop_stop(struct rlite_evloop *loop);
 int
 rl_evloop_join(struct rlite_evloop *loop);
 
-#define RLITE_EVLOOP_SPAWN 0x0001
-
 int
 rl_evloop_init(struct rlite_evloop *loop, const char *dev,
-                  rlite_resp_handler_t *handlers,
-                  unsigned int flags);
+               rlite_resp_handler_t *handlers,
+               unsigned int flags);
 
 int
 rl_evloop_run(struct rlite_evloop *loop);
