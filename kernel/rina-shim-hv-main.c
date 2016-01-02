@@ -138,13 +138,13 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
         return;
     }
 
-    rb = rina_buf_alloc(len, GFP_ATOMIC);
+    rb = rina_buf_alloc(len, 0, GFP_ATOMIC);
     if (!rb) {
         printk("%s: Out of memory\n", __func__);
         return;
     }
 
-    memcpy(rb->ptr, buf, len);
+    memcpy(RINA_BUF_DATA(rb), buf, len);
 
     rina_sdu_rx(priv->ipcp, rb, channel - 1);
 }
@@ -243,8 +243,8 @@ rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
         return -ENXIO;
     }
 
-    iov.iov_base = rb->ptr;
-    iov.iov_len = rb->size;
+    iov.iov_base = RINA_BUF_DATA(rb);
+    iov.iov_len = rb->len;
 
     ret = vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
                            &iov, 1);

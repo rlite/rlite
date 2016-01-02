@@ -193,7 +193,7 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
         return 0;
     }
 
-    return rb->size;
+    return rb->len;
 }
 
 static int

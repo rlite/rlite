@@ -22,7 +22,7 @@
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-utils.h>
 #include "rina-ipcp.h"
-#include "rina-pci.h"
+#include "rina-bufs.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -1142,34 +1142,21 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
     }
 
     if (flow->upper.ipcp) {
-        struct rina_pci *pci = (struct rina_pci *)rb->ptr;
-        struct rina_buf *mgmt;
-
-        if (unlikely(rb->size < sizeof(*pci))) {
+        if (unlikely(rb->len < sizeof(struct rina_pci))) {
             PI("%s: Dropping SDU shorter [%u] than PCI\n",
-                    __func__, (unsigned int)rb->size);
+                    __func__, (unsigned int)rb->len);
             rina_buf_free(rb);
             ret = -EINVAL;
             goto out;
         }
 
-        if (likely(pci->type != PDU_TYPE_MGMT)) {
+        if (likely(RINA_BUF_PCI(rb)->type != PDU_TYPE_MGMT)) {
             /* TODO Process this in kernel, not putting it in a queue. */
             rina_buf_free(rb);
             goto out;
         }
 
-        /* TODO add rina_buf a sk_buf like pointers, instead of reallocating
-         * and copying. */
-        mgmt = rina_buf_alloc(rb->size - sizeof(*pci), GFP_ATOMIC);
-        if (!mgmt) {
-            rina_buf_free(rb);
-            ret = -ENOMEM;
-            goto out;
-        }
-        memcpy(mgmt->ptr, rb->ptr + sizeof(*pci), rb->size - sizeof(*pci));
-        rina_buf_free(rb);
-        rb = mgmt;
+        rina_buf_pci_pop(rb);
     }
 
     spin_lock(&flow->rxq_lock);
@@ -1473,8 +1460,6 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     struct rina_io *rio = (struct rina_io *)f->private_data;
     struct ipcp_entry *ipcp;
     struct rina_buf *rb;
-    size_t rblen = ulen;
-    uint8_t *rbptr;
     ssize_t ret;
 
     if (unlikely(!rio->flow)) {
@@ -1483,31 +1468,23 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
     ipcp = rio->flow->ipcp;
 
-    if (unlikely(rio->flow->upper.ipcp)) {
-        /* Reserve space for PCI. */
-        rblen += sizeof(struct rina_pci);
-    }
-
-    rb = rina_buf_alloc(rblen, GFP_KERNEL);
+    rb = rina_buf_alloc(ulen, 3, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }
 
-    rbptr = rb->ptr;
-    if (unlikely(rio->flow->upper.ipcp)) {
-        /* Fill the PCI for a management PDU. */
-        struct rina_pci *pci = (struct rina_pci *)rbptr;
-
-        memset(pci, 0, sizeof(*pci));
-        pci->type = PDU_TYPE_MGMT;
-        rbptr += sizeof(struct rina_pci);
-    }
-
     /* Copy in the userspace SDU. */
-    if (copy_from_user(rbptr, ubuf, ulen)) {
+    if (copy_from_user(RINA_BUF_DATA(rb), ubuf, ulen)) {
         printk("%s: copy_from_user()\n", __func__);
         rina_buf_free(rb);
         return -EFAULT;
+    }
+
+    if (unlikely(rio->flow->upper.ipcp)) {
+        /* Fill the PCI for a management PDU. */
+        rina_buf_pci_push(rb);
+        memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
+        RINA_BUF_PCI(rb)->type = PDU_TYPE_MGMT;
     }
 
     ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
@@ -1557,12 +1534,12 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         list_del(&rb->node);
         spin_unlock(&flow->rxq_lock);
 
-        copylen = rb->size;
+        copylen = rb->len;
         if (copylen > len) {
             copylen = len;
         }
         ret = copylen;
-        if (unlikely(copy_to_user(ubuf, rb->ptr, copylen))) {
+        if (unlikely(copy_to_user(ubuf, RINA_BUF_DATA(rb), copylen))) {
             ret = -EFAULT;
         }
 
