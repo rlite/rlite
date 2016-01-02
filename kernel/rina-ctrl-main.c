@@ -318,7 +318,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_msg_ipcp_destroy *req =
                         (struct rina_msg_ipcp_destroy *)bmsg;
-    struct rina_msg_ipcp_destroy_resp *resp;
+    struct rina_msg_base_resp *resp;
     int ret;
 
     /* Create the response message. */
@@ -408,7 +408,7 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_msg_assign_to_dif *req =
                     (struct rina_msg_assign_to_dif *)bmsg;
-    struct rina_msg_assign_to_dif_resp *resp;
+    struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->dif_name);
     struct ipcp_entry *entry;
     struct hlist_head *head;

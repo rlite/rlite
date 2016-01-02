@@ -140,7 +140,7 @@ static struct rina_msg_layout rina_msg_numtables[] = {
         .names = 0,
     },
     [RINA_CTRL_DESTROY_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_destroy_resp),
+        .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
     [RINA_CTRL_FETCH_IPCP] = {
@@ -158,7 +158,7 @@ static struct rina_msg_layout rina_msg_numtables[] = {
         .names = 1,
     },
     [RINA_CTRL_ASSIGN_TO_DIF_RESP] = {
-        .copylen = sizeof(struct rina_msg_assign_to_dif_resp),
+        .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
     [RINA_CTRL_MSG_MAX] = {

@@ -42,8 +42,8 @@ ipcp_destroy_resp(struct ipcm *ipcm,
                   const struct rina_msg_base *b_resp,
                   const struct rina_msg_base *b_req)
 {
-    struct rina_msg_ipcp_destroy_resp *resp =
-            (struct rina_msg_ipcp_destroy_resp *)b_resp;
+    struct rina_msg_base_resp *resp =
+            (struct rina_msg_base_resp *)b_resp;
     struct rina_msg_ipcp_destroy *req =
             (struct rina_msg_ipcp_destroy *)b_req;
 
@@ -106,8 +106,8 @@ assign_to_dif_resp(struct ipcm *ipcm,
                    const struct rina_msg_base *b_resp,
                    const struct rina_msg_base *b_req)
 {
-    struct rina_msg_assign_to_dif_resp *resp =
-            (struct rina_msg_assign_to_dif_resp *)b_resp;
+    struct rina_msg_base_resp *resp =
+            (struct rina_msg_base_resp *)b_resp;
     struct rina_msg_assign_to_dif *req =
             (struct rina_msg_assign_to_dif *)b_req;
     char *name_s = NULL;

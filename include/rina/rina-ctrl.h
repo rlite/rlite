@@ -49,6 +49,15 @@ struct rina_msg_base {
     uint32_t event_id;
 } __attribute__((packed));
 
+/* A simple response message layout that can be shared by many
+ * different types. */
+struct rina_msg_base_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t result;
+} __attribute__((packed));
+
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_msg_ipcp_create {
     rina_msg_t msg_type;
@@ -75,15 +84,6 @@ struct rina_msg_ipcp_destroy {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
-/* IPCM <-- kernel message to inform the IPCM about the destruction
- * of an IPC process. */
-struct rina_msg_ipcp_destroy_resp {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-
-    uint8_t result;
-} __attribute__((packed));
-
 /* IPCM <-- kernel message to fetch IPC process information. */
 struct rina_msg_fetch_ipcp_resp {
     rina_msg_t msg_type;
@@ -104,11 +104,12 @@ struct rina_msg_assign_to_dif {
     struct rina_name dif_name;
 } __attribute__((packed));
 
-struct rina_msg_assign_to_dif_resp {
+struct rina_msg_register_application {
     rina_msg_t msg_type;
     uint32_t event_id;
 
-    uint8_t result;
+    uint32_t ipcp_id;
+    struct rina_name application_name;
 } __attribute__((packed));
 
 #endif  /* __RINA_CTRL_H__ */
