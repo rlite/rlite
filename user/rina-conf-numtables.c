@@ -15,8 +15,8 @@ struct rina_msg_layout rina_conf_numtables[] = {
     },
     [RINA_CONF_IPCP_DFT_SET] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_dft_set) -
-                   2 * sizeof(struct rina_name),
-        .names = 2,
+                   1 * sizeof(struct rina_name),
+        .names = 1,
     },
     [RINA_CONF_UIPCP_CREATE] = {
         .copylen = sizeof(struct rina_cmsg_uipcp_update),

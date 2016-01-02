@@ -530,6 +530,8 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     const char *appl_apn;
     const char *appl_api;
     unsigned long remote_addr;
+    struct rina_name ipcp_name;
+    struct ipcp *ipcp;
 
     assert(argc >= 5);
     ipcp_apn = argv[0];
@@ -543,9 +545,17 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
         return -1;
     }
 
+    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rina_name_free(&ipcp_name);
+    if (!ipcp) {
+        PE("%s: Could not find IPC process\n", __func__);
+        return -1;
+    }
+
     req.msg_type = RINA_CONF_IPCP_DFT_SET;
     req.event_id = 0;
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    req.ipcp_id = ipcp->ipcp_id;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 

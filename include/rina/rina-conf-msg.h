@@ -56,8 +56,8 @@ struct rina_cmsg_ipcp_dft_set {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    uint16_t ipcp_id;
     uint64_t remote_addr;
-    struct rina_name ipcp_name;
     struct rina_name appl_name;
 } __attribute__((packed));
 
