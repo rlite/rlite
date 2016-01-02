@@ -144,8 +144,6 @@ client_connect(int sfd)
 
     m->print();
 
-    PD("%s: Connection completed\n", __func__);
-
     return 0;
 }
 

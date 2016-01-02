@@ -359,8 +359,9 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
                 __func__, m->invoke_id);
         }
 
-        if (m->op_code == gpb::M_CONNECT_R) {
+        if (m->op_code == gpb::M_CONNECT_R && m->result == 0) {
             connected = 1;
+            PD("%s: Connection completed\n", __func__);
         }
     }
 
@@ -418,8 +419,9 @@ CDAPConn::msg_recv()
             m = NULL;
         }
 
-        if (m->op_code == gpb::M_CONNECT_R) {
+        if (m->op_code == gpb::M_CONNECT_R && m->result == 0) {
             connected = 1;
+            PD("%s: Connection completed\n", __func__);
         }
 
     } else {

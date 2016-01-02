@@ -7,6 +7,7 @@
 #include "rinalite/rinalite-common.h"
 #include "CDAP.pb.h"
 
+
 struct CDAPAuthValue {
     std::string name;
     std::string password;
