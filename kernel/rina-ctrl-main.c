@@ -258,6 +258,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
         entry->dif_type = req->dif_type;
+        entry->addr = 0;
         entry->priv = NULL;
         entry->owner = NULL;
         mutex_init(&entry->lock);
@@ -725,6 +726,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
             resp->end = 0;
             resp->ipcp_id = entry->id;
             resp->dif_type = entry->dif_type;
+            resp->ipcp_addr = entry->addr;
             rina_name_copy(&resp->ipcp_name, &entry->name);
             rina_name_copy(&resp->dif_name, &entry->dif_name);
             rina_dm.ipcp_fetch_last = entry;

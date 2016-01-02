@@ -41,6 +41,7 @@ struct ipcp_entry {
     struct rina_name    name;
     struct rina_name    dif_name;
     uint8_t             dif_type;
+    uint64_t            addr;
     struct ipcp_ops     ops;
     void                *priv;
     struct list_head    registered_applications;

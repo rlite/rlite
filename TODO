@@ -8,3 +8,4 @@
 - limitare la lunghezza delle code nel kernel
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 - fondi flow_allocate() + open_port()
+- enrollment scambia gli indirizzi

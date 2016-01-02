@@ -40,8 +40,6 @@
 struct rina_normal {
     struct ipcp_entry *ipcp;
 
-    uint32_t address;
-
     /* Implementation of the PDU forwarding table. */
     struct flow_entry *default_gateway;
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
@@ -58,7 +56,6 @@ rina_normal_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-    priv->address = 0U;
     priv->default_gateway = NULL;
     hash_init(priv->pdu_ft);
 
@@ -216,14 +213,16 @@ rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     int ret = -EINVAL;
 
     if (strcmp(param_name, "address") == 0) {
-        unsigned int address;
+        uint64_t address;
 
-        ret = kstrtouint(param_value, 10, &address);
+        ret = kstrtou64(param_value, 10, &address);
         if (ret == 0) {
-            PI("IPCP %u address set to %u\n", ipcp->id, address);
-            priv->address = address;
+            PI("IPCP %u address set to %llu\n", ipcp->id, address);
+            ipcp->addr = address;
         }
     }
+
+    (void)priv;
 
     return ret;
 }

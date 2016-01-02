@@ -387,6 +387,11 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
 
+    if (result == 0 && strcmp(param_name, "address") == 0) {
+        /* Fetch after a succesfull address setting operation. */
+        ipcps_fetch(&ipcm->loop);
+    }
+
     return result;
 }
 

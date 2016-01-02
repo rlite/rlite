@@ -74,6 +74,7 @@ struct rina_kmsg_fetch_ipcp_resp {
     uint8_t end;
     uint16_t ipcp_id;
     uint8_t dif_type;
+    uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
     struct rina_name ipcp_name;
     struct rina_name dif_name;
 } __attribute__((packed));
