@@ -251,12 +251,16 @@ rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
     struct iovec iov;
     struct rina_shim_hv *priv = (struct rina_shim_hv *)ipcp->priv;
     struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;
+    ssize_t ret;
 
     iov.iov_base = rb->ptr;
     iov.iov_len = rb->size;
 
-    return vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
+    ret = vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
                            &iov, 1);
+    rina_buf_free(rb);
+
+    return ret;
 }
 
 static int __init
