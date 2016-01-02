@@ -1202,22 +1202,57 @@ rina_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
+struct rina_io {
+    struct flow_entry *flow;
+};
+
 static int
 rina_io_open(struct inode *inode, struct file *f)
 {
-    return -ENXIO;
+    struct rina_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
+
+    if (!rio) {
+        printk("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+    f->private_data = rio;
+
+    return 0;
 }
 
 static int
 rina_io_release(struct inode *inode, struct file *f)
 {
-    return -ENXIO;
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+
+    kfree(rio);
+
+    return 0;
 }
 
 static ssize_t
 rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
-    return -ENXIO;
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct ipcp_entry *ipcp;
+    struct rina_buf rb;
+    uint8_t *kbuf;
+
+    if (unlikely(!rio->flow)) {
+        printk("%s: Error: Flow not assigned\n", __func__);
+        return -ENXIO;
+    }
+    ipcp = rio->flow->ipcp;
+
+    kbuf = kmalloc(len, GFP_KERNEL);
+    if (unlikely(!kbuf)) {
+        printk("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+    rb.ptr = kbuf;
+    rb.size = len;
+
+    return ipcp->ops.sdu_write(ipcp, &rb);
 }
 
 static ssize_t

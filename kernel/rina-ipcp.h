@@ -5,6 +5,11 @@
 #include <linux/mutex.h>
 
 
+struct rina_buf {
+    uint8_t *ptr;
+    size_t size;
+};
+
 struct ipcp_entry;
 struct flow_entry;
 
@@ -19,7 +24,7 @@ struct ipcp_ops {
                              struct flow_entry *flow);
     int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                               uint8_t response);
-    int (*sdu_write)(struct ipcp_entry *ipcp, void *sdu, unsigned int sdu_len);
+    int (*sdu_write)(struct ipcp_entry *ipcp, struct rina_buf *rb);
 };
 
 struct ipcp_entry {
