@@ -35,7 +35,6 @@
 
 
 struct rina_shim_dummy {
-    struct work_struct decouple;
     struct ipcp_entry *ipcp;
 };
 
@@ -88,26 +87,52 @@ rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp,
     return 0;
 }
 
+struct flow_allocate_req_work {
+    struct work_struct w;
+    struct ipcp_entry *ipcp;
+    struct rina_name local_application;
+    struct rina_name remote_application;
+    uint16_t remote_port;
+};
+
 static void
 flow_allocate_req_work(struct work_struct *w)
 {
-    struct rina_shim_dummy *priv = container_of(w,
-                        struct rina_shim_dummy, decouple);
+    struct flow_allocate_req_work *faw = container_of(w,
+                        struct flow_allocate_req_work, w);
+    int ret;
 
-    //TODO invoke
-    (void)priv;
+    ret = rina_flow_allocate_req_arrived(faw->ipcp, faw->remote_port,
+                                         &faw->local_application,
+                                         &faw->remote_application);
+    if (ret) {
+        printk("%s: failed to report flow allocation request\n",
+                __func__);
+    }
+
+    kfree(faw);
 }
 
 static int
 rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
-    struct rina_shim_dummy *priv = (struct rina_shim_dummy *)ipcp->priv;
+    struct flow_allocate_req_work *faw;
 
-    INIT_WORK(&priv->decouple, flow_allocate_req_work);
-    schedule_work(&priv->decouple);
+    faw = kmalloc(sizeof(*faw), GFP_KERNEL);
+    if (!faw) {
+        printk("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
 
-    return -1; //TODO return 0
+    rina_name_copy(&faw->remote_application, &flow->local_application);
+    rina_name_copy(&faw->local_application, &flow->remote_application);
+    faw->remote_port = flow->local_port;
+    faw->ipcp = ipcp;
+    INIT_WORK(&faw->w, flow_allocate_req_work);
+    schedule_work(&faw->w);
+
+    return 0;
 }
 
 static int

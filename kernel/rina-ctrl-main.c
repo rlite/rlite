@@ -846,15 +846,15 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
         return ret;
     }
 
-    printk("%s: Flow allocation requested to IPC process %u\n",
-                    __func__, req->ipcp_id);
-
     req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ;
     req->event_id = 0;
     req->ipcp_id = ipcp->id;
     req->qos = 0;
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
+
+    printk("%s: Flow allocation requested to IPC process %u\n",
+                    __func__, req->ipcp_id);
 
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(rina_dm.ctrl, (struct rina_msg_base *)req);

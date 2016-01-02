@@ -290,7 +290,7 @@ evloop_function(void *arg)
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
                 !rina_kernel_handlers[resp->msg_type]) {
-            printf("%s: Invalid message type [%d] received",__func__,
+            printf("%s: Invalid message type [%d] received\n", __func__,
                     resp->msg_type);
             continue;
         }
@@ -1139,6 +1139,7 @@ int main()
     }
 
     /* Run the script thread. */
+    ipcps_fetch(&ipcm);
     if (0) test(&ipcm);
 
     ret = pthread_join(evloop_th, NULL);
