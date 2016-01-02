@@ -15,7 +15,13 @@ clean:
 	cd build && make clean
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel clean
 
-install: userspace_install
+install: userspace_install kernelspace_install
 
 userspace_install:
 	cd build && make install
+
+# Install kernelspace parts using a script, instead of placing the command
+# directly in the target, since 'sudo' seems to interact badly with
+# 'make modules_install'
+kernelspace_install:
+	./kernelspace-install
