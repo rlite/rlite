@@ -28,12 +28,12 @@ int rina_application_fini(struct application *application);
 
 int application_register(struct application *application,
                          int reg, const struct rina_name *dif_name,
-                         int fallback,
+                         int fallback, const struct rina_name *ipcp_name,
                          const struct rina_name *application_name);
 
 int flow_allocate(struct application *application,
-                  struct rina_name *dif_name,
-                  int dif_fallback,
+                  struct rina_name *dif_name, int dif_fallback,
+                  struct rina_name *ipcp_name,
                   const struct rina_name *local_application,
                   const struct rina_name *remote_application,
                   unsigned int *port_id, unsigned int wait_ms);
@@ -51,8 +51,8 @@ int open_port_ipcp(uint32_t port_id, uint16_t ipcp_id);
 int open_ipcp_mgmt(uint16_t ipcp_id);
 
 int flow_allocate_open(struct application *application,
-                       struct rina_name *dif_name,
-                       int dif_fallback,
+                       struct rina_name *dif_name, int dif_fallback,
+                       struct rina_name *ipcp_name,
                        const struct rina_name *local_application,
                        const struct rina_name *remote_application,
                        unsigned int wait_ms);

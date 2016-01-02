@@ -407,7 +407,7 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
 
     /* Perform the registration. */
     result = application_register(&uipcp->appl, reg, dif_name,
-                                  0, ipcp_name);
+                                  0, NULL, ipcp_name);
 
     if (result == 0) {
         struct registered_ipcp *ripcp;

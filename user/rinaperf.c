@@ -386,13 +386,13 @@ main(int argc, char **argv)
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
-        ret = application_register(&rp.application, 1, &rp.dif_name, 1,
-                                   &server_ctrl_name);
+        ret = application_register(&rp.application, 1, &rp.dif_name,
+                                   1, NULL, &server_ctrl_name);
         if (ret) {
             return ret;
         }
-        ret = application_register(&rp.application, 1, &rp.dif_name, 1,
-                                   &rp.server_appl_name);
+        ret = application_register(&rp.application, 1, &rp.dif_name,
+                                   1, NULL, &rp.server_appl_name);
         if (ret) {
             return ret;
         }
@@ -401,8 +401,8 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1,
-                &rp.client_appl_name, &rp.server_appl_name, 1500);
+        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1, NULL,
+                        &rp.client_appl_name, &rp.server_appl_name, 1500);
         if (rp.dfd < 0) {
             return rp.dfd;
         }

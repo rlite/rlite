@@ -196,11 +196,15 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
 int
 application_register(struct application *application, int reg,
                      const struct rina_name *dif_name, int fallback,
+                     const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
 {
     unsigned int ipcp_id;
 
-    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, fallback);
+    ipcp_id = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (ipcp_id == ~0U) {
+        ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, fallback);
+    }
     if (ipcp_id == ~0U) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
         return -1;
@@ -213,8 +217,8 @@ application_register(struct application *application, int reg,
 
 int
 flow_allocate(struct application *application,
-              struct rina_name *dif_name,
-              int dif_fallback,
+              struct rina_name *dif_name, int dif_fallback,
+              struct rina_name *ipcp_name,
               const struct rina_name *local_application,
               const struct rina_name *remote_application,
               unsigned int *port_id, unsigned int wait_ms)
@@ -223,9 +227,11 @@ flow_allocate(struct application *application,
     struct rina_kmsg_fa_resp_arrived *kresp;
     int result;
 
-    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name,
-                                 dif_fallback);
-
+    ipcp_id = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (ipcp_id == ~0U) {
+        ipcp_id = select_ipcp_by_dif(&application->loop, dif_name,
+                                     dif_fallback);
+    }
     if (ipcp_id == ~0U) {
         PE("%s: No suitable IPCP found\n", __func__);
         return -1;
@@ -311,8 +317,8 @@ int open_ipcp_mgmt(uint16_t ipcp_id)
 /* flow_allocate() + open_port_appl() */
 int
 flow_allocate_open(struct application *application,
-                   struct rina_name *dif_name,
-                   int dif_fallback,
+                   struct rina_name *dif_name, int dif_fallback,
+                   struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
                    const struct rina_name *remote_application,
                    unsigned int wait_ms)
@@ -320,7 +326,7 @@ flow_allocate_open(struct application *application,
     unsigned int port_id;
     int ret;
 
-    ret = flow_allocate(application, dif_name, dif_fallback,
+    ret = flow_allocate(application, dif_name, dif_fallback, ipcp_name,
                         local_application, remote_application,
                         &port_id, wait_ms);
     if (ret) {
