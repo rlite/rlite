@@ -493,8 +493,11 @@ int main(int argc, char **argv)
         enable_testing = 1;
     }
 
-    rina_evloop_init(&ipcm.loop, "/dev/rina-ipcm-ctrl",
+    ret = rina_evloop_init(&ipcm.loop, "/dev/rina-ipcm-ctrl",
                      rina_kernel_handlers);
+    if (ret) {
+        return ret;
+    }
 
     /* Open a Unix domain socket to listen to. */
     ipcm.lfd = socket(AF_UNIX, SOCK_STREAM, 0);
