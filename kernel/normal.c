@@ -498,7 +498,7 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
 static int
 rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                            const struct rlite_mgmt_hdr *mhdr,
-                           struct rlite_buf *rb)
+                           struct rlite_buf *rb, bool mayblock)
 {
     struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     struct rina_pci *pci;
@@ -556,7 +556,7 @@ rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_len = rb->len;
     pci->seqnum = 0; /* Not valid. */
 
-    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, true);
+    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, mayblock);
 }
 
 static int

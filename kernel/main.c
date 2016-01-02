@@ -2507,7 +2507,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 
     if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
         if (rio->mode == RLITE_IO_MODE_IPCP_MGMT) {
-            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
+            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb, blocking);
         } else {
             PE("Unknown mode, this should not happen\n");
             ret = -EINVAL;
