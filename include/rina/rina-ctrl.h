@@ -30,13 +30,17 @@ struct rina_name {
  * the corresponding responses. */
 enum {
     RINA_CTRL_CREATE_IPCP = 1,
-    RINA_CTRL_CREATE_IPCP_RESP,
-    RINA_CTRL_DESTROY_IPCP,
-    RINA_CTRL_DESTROY_IPCP_RESP,
-    RINA_CTRL_FETCH_IPCP,
-    RINA_CTRL_FETCH_IPCP_RESP,
-    RINA_CTRL_ASSIGN_TO_DIF,
-    RINA_CTRL_ASSIGN_TO_DIF_RESP,
+    RINA_CTRL_CREATE_IPCP_RESP, /* 2 */
+    RINA_CTRL_DESTROY_IPCP,     /* 3 */
+    RINA_CTRL_DESTROY_IPCP_RESP, /* 4 */
+    RINA_CTRL_FETCH_IPCP, /* 5 */
+    RINA_CTRL_FETCH_IPCP_RESP, /* 6 */
+    RINA_CTRL_ASSIGN_TO_DIF, /* 7 */
+    RINA_CTRL_ASSIGN_TO_DIF_RESP, /* 8 */
+    RINA_CTRL_APPLICATION_REGISTER, /* 9 */
+    RINA_CTRL_APPLICATION_REGISTER_RESP, /* 10 */
+    RINA_CTRL_APPLICATION_UNREGISTER, /* 11 */
+    RINA_CTRL_APPLICATION_UNREGISTER_RESP, /* 12 */
 
     RINA_CTRL_MSG_MAX,
 };
@@ -104,7 +108,7 @@ struct rina_msg_assign_to_dif {
     struct rina_name dif_name;
 } __attribute__((packed));
 
-struct rina_msg_register_application {
+struct rina_msg_application_register {
     rina_msg_t msg_type;
     uint32_t event_id;
 

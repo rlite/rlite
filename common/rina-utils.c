@@ -161,6 +161,15 @@ static struct rina_msg_layout rina_msg_numtables[] = {
         .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
+    [RINA_CTRL_APPLICATION_REGISTER] = {
+        .copylen = sizeof(struct rina_msg_application_register) -
+                    sizeof(struct rina_name),
+        .names = 1,
+    },
+    [RINA_CTRL_APPLICATION_REGISTER_RESP] = {
+        .copylen = sizeof(struct rina_msg_base_resp),
+        .names = 0,
+    },
     [RINA_CTRL_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

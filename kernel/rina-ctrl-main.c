@@ -178,6 +178,22 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
     return 0;
 }
 
+static struct ipcp_entry *
+ipcp_table_find(unsigned int ipcp_id)
+{
+    struct ipcp_entry *entry;
+    struct hlist_head *head;
+
+    head = &rina_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->id == ipcp_id) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static int
 ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
 {
@@ -236,7 +252,6 @@ static uint8_t
 ipcp_del(unsigned int ipcp_id)
 {
     struct ipcp_entry *entry;
-    struct hlist_head *head;
     uint8_t result = 1; /* No IPC process found. */
 
     if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
@@ -246,23 +261,20 @@ ipcp_del(unsigned int ipcp_id)
     mutex_lock(&rina_dm.lock);
     /* Lookup and remove the IPC process entry in the hash table corresponding
      * to the given ipcp_id. */
-    head = &rina_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
-    hlist_for_each_entry(entry, head, node) {
-        if (entry->id == ipcp_id) {
-            hash_del(&entry->node);
-            rina_name_free(&entry->name);
-            rina_name_free(&entry->dif_name);
-            if (entry->ops.destroy) {
-                entry->ops.destroy(entry->priv);
-            }
-            /* Invalid the IPCP fetch pointer, if necessary. */
-            if (entry == rina_dm.ipcp_fetch_last) {
-                rina_dm.ipcp_fetch_last = NULL;
-            }
-            kfree(entry);
-            result = 0;
-            break;
+    entry = ipcp_table_find(ipcp_id);
+    if (entry) {
+        hash_del(&entry->node);
+        rina_name_free(&entry->name);
+        rina_name_free(&entry->dif_name);
+        if (entry->ops.destroy) {
+            entry->ops.destroy(entry->priv);
         }
+        /* Invalid the IPCP fetch pointer, if necessary. */
+        if (entry == rina_dm.ipcp_fetch_last) {
+            rina_dm.ipcp_fetch_last = NULL;
+        }
+        kfree(entry);
+        result = 0;
     }
     bitmap_clear(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
     mutex_unlock(&rina_dm.lock);
@@ -301,7 +313,9 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     printk("%s: IPC process %s created\n", __func__, name_s);
-    kfree(name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
 
     return 0;
 
@@ -411,7 +425,6 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->dif_name);
     struct ipcp_entry *entry;
-    struct hlist_head *head;
     int ret;
 
     /* Create the response message. */
@@ -425,14 +438,11 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
-    head = &rina_dm.ipcp_table[hash_min(req->ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
-    hlist_for_each_entry(entry, head, node) {
-        if (entry->id == req->ipcp_id) {
-            rina_name_free(&entry->dif_name);
-            rina_name_copy(&entry->dif_name, &req->dif_name);
-            resp->result = 0;  /* Report success. */
-            break;
-        }
+    entry = ipcp_table_find(req->ipcp_id);
+    if (entry) {
+        rina_name_free(&entry->dif_name);
+        rina_name_copy(&entry->dif_name, &req->dif_name);
+        resp->result = 0;  /* Report success. */
     }
     mutex_unlock(&rina_dm.lock);
 
@@ -449,7 +459,64 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         printk("%s: Assigning IPC process %u to DIF %s\n", __func__,
             req->ipcp_id, name_s);
     }
-    kfree(name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+
+err3:
+    rina_msg_free((struct rina_msg_base *)resp);
+
+    return ret;
+}
+
+static int
+rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_msg_application_register *req =
+                    (struct rina_msg_application_register *)bmsg;
+    struct rina_msg_base_resp *resp;
+    char *name_s = rina_name_to_string(&req->application_name);
+    struct ipcp_entry *entry;
+    int ret;
+
+    /* Create the response message. */
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
+        return -ENOMEM;
+    }
+
+    resp->result = 1;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    /* Find the IPC process entry corresponding to req->ipcp_id. */
+    entry = ipcp_table_find(req->ipcp_id);
+    if (entry) {
+        if (entry->ops.application_register) {
+            entry->ops.application_register(entry->priv,
+                                            &req->application_name);
+        }
+        resp->result = 0;  /* Report success. */
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    resp->msg_type = RINA_CTRL_APPLICATION_REGISTER_RESP;
+    resp->event_id = req->event_id;
+
+    /* Enqueue the response into the upqueue. */
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
+    if (ret) {
+        goto err3;
+    }
+
+    if (resp->result == 0) {
+        printk("%s: Registering application process %s to IPC process %u\n",
+                __func__, name_s, req->ipcp_id);
+    }
+    if (name_s) {
+        kfree(name_s);
+    }
 
     return 0;
 
@@ -469,6 +536,7 @@ static rina_msg_handler_t rina_handlers[] = {
     [RINA_CTRL_DESTROY_IPCP] = rina_ipcp_destroy,
     [RINA_CTRL_FETCH_IPCP] = rina_ipcp_fetch,
     [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
+    [RINA_CTRL_APPLICATION_REGISTER] = rina_application_register,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
