@@ -301,6 +301,13 @@ open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
     return open_port_common(port_id, RINA_IOCTL_CMD_IPCP_BIND, ipcp_id);
 }
 
+int open_ipcp_mgmt(uint16_t ipcp_id)
+{
+    /* The port_id argument is not valid in this call, it will not
+     * be considered by the kernel. */
+    return open_port_common(~0U, RINA_IOCTL_CMD_IPCP_MGMT, ipcp_id);
+}
+
 /* flow_allocate() + open_port_appl() */
 int
 flow_allocate_open(struct application *application,

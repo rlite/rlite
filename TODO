@@ -22,3 +22,5 @@
 - flow_allocator_ ==> fa_
 
 - FLOW_ALLOCATOR_ ==> FA_
+
+- RINA_IOCTL_CMD_ ==> RINA_IOCTL_MODE_

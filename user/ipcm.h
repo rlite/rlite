@@ -39,6 +39,7 @@ struct uipcp {
     struct application appl;
     struct ipcm *ipcm;
     unsigned int ipcp_id;
+    int mgmtfd;
     pthread_t server_th;
 
     /* Implementation of the Directory Forwarding Table (DFT). */

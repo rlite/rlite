@@ -113,6 +113,11 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     struct rina_msg_base *resp;
     int result;
 
+    result = uipcp_del(ipcm, ipcp_id);
+    if (result) {
+        return result;
+    }
+
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
@@ -132,10 +137,6 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
-
-    if (result == 0) {
-        result = uipcp_del(ipcm, ipcp_id);
-    }
 
     uipcps_fetch(ipcm);
 

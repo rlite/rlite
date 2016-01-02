@@ -1598,26 +1598,6 @@ rina_io_open(struct inode *inode, struct file *f)
     return 0;
 }
 
-static int
-rina_io_release(struct inode *inode, struct file *f)
-{
-    struct rina_io *rio = (struct rina_io *)f->private_data;
-
-    if (rio->flow) {
-        mutex_lock(&rina_dm.lock);
-        rio->flow->refcnt--;
-        if (rio->flow->upper.ipcp) {
-            rio->flow->upper.ipcp->refcnt--;
-        }
-        flow_del_entry(rio->flow, 0);
-        mutex_unlock(&rina_dm.lock);
-    }
-
-    kfree(rio);
-
-    return 0;
-}
-
 static ssize_t
 rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 {
@@ -1799,23 +1779,10 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
     return ret;
 }
 
-static long
-rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+/* To be called under global lock. */
+static int
+rina_io_release_internal(struct rina_io *rio)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
-    void __user *argp = (void __user *)arg;
-    struct rina_ioctl_info info;
-    long ret = -EINVAL;
-
-    /* We have only one command. This should be used and checked. */
-    (void) cmd;
-
-    if (copy_from_user(&info, argp, sizeof(info))) {
-        return -EFAULT;
-    }
-
-    mutex_lock(&rina_dm.lock);
-
     switch (rio->mode) {
         case RINA_IOCTL_CMD_APPL_BIND:
         case RINA_IOCTL_CMD_IPCP_BIND:
@@ -1825,6 +1792,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
             if (rio->flow->upper.ipcp) {
                 rio->flow->upper.ipcp->refcnt--;
             }
+            flow_del_entry(rio->flow, 0);
             rio->flow = NULL;
             rio->txrx = NULL;
             break;
@@ -1843,6 +1811,28 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
             break;
     }
 
+    return 0;
+}
+
+static long
+rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    void __user *argp = (void __user *)arg;
+    struct rina_ioctl_info info;
+    long ret = -EINVAL;
+
+    /* We have only one command. This should be used and checked. */
+    (void) cmd;
+
+    if (copy_from_user(&info, argp, sizeof(info))) {
+        return -EFAULT;
+    }
+
+    mutex_lock(&rina_dm.lock);
+
+    rina_io_release_internal(rio);
+
     switch (info.cmd) {
         case RINA_IOCTL_CMD_APPL_BIND:
         case RINA_IOCTL_CMD_IPCP_BIND:
@@ -1859,6 +1849,20 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     mutex_unlock(&rina_dm.lock);
 
     return ret;
+}
+
+static int
+rina_io_release(struct inode *inode, struct file *f)
+{
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+
+    mutex_lock(&rina_dm.lock);
+    rina_io_release_internal(rio);
+    mutex_unlock(&rina_dm.lock);
+
+    kfree(rio);
+
+    return 0;
 }
 
 static const struct file_operations rina_ipcm_ctrl_fops = {

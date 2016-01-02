@@ -6,6 +6,38 @@
 #include <rina/rina-utils.h>
 #include "ipcm.h"
 
+
+static int
+mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
+           void *buf, size_t buflen)
+{
+    return 0;
+}
+
+/*static */int
+mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+                         void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    mhdr.type = RINA_MGMT_HDR_TYPE_LOCAL_PORT;
+    mhdr.u.local_port = local_port;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+/*static */int
+mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
+                       void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    mhdr.type = RINA_MGMT_HDR_TYPE_DST_ADDR;
+    mhdr.u.dst_addr = dst_addr;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
 /*static */int
 uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                                 const struct rina_name *local_application,
@@ -368,8 +400,7 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
 
     ret = rina_application_init(&uipcp->appl);
     if (ret) {
-        list_del(&uipcp->node);
-        return ret;
+        goto err1;
     }
 
     /* Set the evloop handlers for flow allocation request/response
@@ -378,31 +409,47 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
                                   RINA_KERN_FLOW_ALLOCATE_REQ,
                                   uipcp_flow_allocate_req);
     if (ret) {
-        return ret;
+        goto err2;
     }
 
     ret = rina_evloop_set_handler(&uipcp->appl.loop,
                                   RINA_KERN_FLOW_ALLOCATE_RESP,
                                   uipcp_flow_allocate_resp);
     if (ret) {
-        return ret;
+        goto err2;
     }
 
+    /* Tell the kernel what is the event loop to be associated to
+     * the ipcp_id specified, so that reflected messages for that
+     * IPCP are redirected to this uipcp. */
     ret = uipcp_evloop_set(uipcp, ipcp_id);
     if (ret) {
-        list_del(&uipcp->node);
-        rina_application_fini(&uipcp->appl);
+        goto err2;
+    }
+
+    uipcp->mgmtfd = open_ipcp_mgmt(ipcp_id);
+    if (uipcp->mgmtfd < 0) {
+        ret = uipcp->mgmtfd;
+        goto err2;
     }
 
     ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
     if (ret) {
-        list_del(&uipcp->node);
-        rina_application_fini(&uipcp->appl);
+        goto err3;
     }
 
     PD("userspace IPCP %u created\n", ipcp_id);
 
     return 0;
+
+err3:
+    close(uipcp->mgmtfd);
+err2:
+    rina_application_fini(&uipcp->appl);
+err1:
+    list_del(&uipcp->node);
+
+    return ret;
 }
 
 int
@@ -416,6 +463,8 @@ uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
         /* The specified IPCP is a Shim IPCP. */
         return 0;
     }
+
+    close(uipcp->mgmtfd);
 
     evloop_stop(&uipcp->appl.loop);
 
