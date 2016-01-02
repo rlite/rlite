@@ -47,6 +47,7 @@ struct shim_inet4_flow {
     struct socket *sock;
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk);
+    void (*sk_write_space)(struct sock *sk);
 };
 
 static void *
@@ -131,6 +132,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
             if (ret && ret != -EAGAIN) {
                 PE("recvmsg(%d): %d\n", lenhdr, ret);
             }
+            rina_buf_free(rb);
             break;
         }
 
@@ -159,6 +161,14 @@ inet4_data_ready(struct sock *sk)
     schedule_work(&priv->rxw);
 }
 
+static void
+inet4_write_space(struct sock *sk)
+{
+    struct shim_inet4_flow *priv = sk->sk_user_data;
+
+    rina_write_restart_flow(priv->flow);
+}
+
 static int
 rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
@@ -182,7 +192,9 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready = sock->sk->sk_data_ready;
+    priv->sk_write_space = sock->sk->sk_write_space;
     sock->sk->sk_data_ready = inet4_data_ready;
+    sock->sk->sk_write_space = inet4_write_space;
     sock->sk->sk_user_data = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
@@ -220,6 +232,7 @@ rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 
     write_lock_bh(&sock->sk->sk_callback_lock);
     sock->sk->sk_data_ready = priv->sk_data_ready;
+    sock->sk->sk_write_space = priv->sk_write_space;
     sock->sk->sk_user_data = NULL;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
@@ -264,17 +277,22 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                          totlen);
 #endif
 
+    if (ret == -EAGAIN) {
+        /* Backpressure: We will be called again. */
+        return -EAGAIN;
+    }
+
     if (unlikely(ret != totlen)) {
         if (ret < 0) {
-            PE("sock_sendmsg(): failed [%d]\n", ret);
+            PE("kernel_sendmsg(): failed [%d]\n", ret);
 
         } else {
-            PI("sock_sendmsg(): partial write %d/%d\n",
+            PI("kernel_sendmsg(): partial write %d/%d\n",
                ret, (int)rb->len);
         }
 
     } else {
-        NPD("sock_sendmsg(%d + 2)\n", (int)rb->len);
+        NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
     }
 
     rina_buf_free(rb);
