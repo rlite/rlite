@@ -37,8 +37,8 @@ struct RinaName {
              const std::string& aei_);
     RinaName(const struct rina_name *name);
     operator std::string() const;
-    bool operator==(const RinaName& other);
-    bool operator!=(const RinaName& other);
+    bool operator==(const RinaName& other) const;
+    bool operator!=(const RinaName& other) const;
     int rina_name_fill(struct rina_name *name);
 };
 

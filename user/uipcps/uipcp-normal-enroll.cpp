@@ -9,11 +9,8 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
 {
     rib = rib_;
     ipcp_name = RinaName(name);
-    flow_fd = -1;
-    port_id = 0; /* Not valid. */
-    conn = NULL;
-    enrollment_state = NONE;
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
+    mgmt_port_id = ~0U;
     enroll_fsm_handlers[NONE] = &Neighbor::none;
     enroll_fsm_handlers[I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
     enroll_fsm_handlers[S_WAIT_START] = &Neighbor::s_wait_start;
@@ -28,31 +25,36 @@ Neighbor::Neighbor(const Neighbor& other)
 {
     rib = other.rib;
     ipcp_name = other.ipcp_name;
-    flow_fd = other.flow_fd;
-    port_id = other.port_id;
-    enrollment_state = enrollment_state;
-    conn = NULL;
+    flows = other.flows;
+    mgmt_port_id = other.mgmt_port_id;
     memcpy(enroll_fsm_handlers, other.enroll_fsm_handlers,
            sizeof(enroll_fsm_handlers));
 }
 
 Neighbor::~Neighbor()
 {
-    if (conn) {
-        delete conn;
-    }
-    if (flow_fd != -1) {
-        int ret = close(flow_fd);
+    for (map<unsigned int, NeighFlow>::iterator fit = flows.begin();
+                                        fit != flows.end(); fit++) {
+        NeighFlow& flow = fit->second;
 
-        if (ret) {
-            UPE(rib->uipcp, "Error deallocating N-1 flow fd %d\n",
-               flow_fd);
-        } else {
-            UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n", flow_fd);
+        if (flow.conn) {
+            delete flow.conn;
         }
 
-        uipcps_lower_flow_removed(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
-                                  lower_ipcp_id);
+        if (flow.flow_fd != -1) {
+            int ret = close(flow.flow_fd);
+
+            if (ret) {
+                UPE(rib->uipcp, "Error deallocating N-1 flow fd %d\n",
+                    flow.flow_fd);
+            } else {
+                UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n",
+                    flow.flow_fd);
+            }
+
+            uipcps_lower_flow_removed(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
+                                      flow.lower_ipcp_id);
+        }
     }
 }
 
@@ -91,8 +93,19 @@ Neighbor::enrollment_state_repr(state_t s) const
     return NULL;
 }
 
+NeighFlow *
+Neighbor::cur_conn()
+{
+    map<unsigned int, NeighFlow>::iterator mit;
+
+    mit = flows.find(mgmt_port_id);
+    assert(mit != flows.end());
+
+    return &mit->second;
+}
+
 int
-Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
+Neighbor::send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,
                           const UipcpObject *obj) const
 {
     char objbuf[4096];
@@ -112,7 +125,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
     }
 
     try {
-        ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
+        ret = nf->conn->msg_ser(m, invoke_id, &serbuf, &serlen);
     } catch (std::bad_alloc) {
         ret = -1;
     }
@@ -125,7 +138,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
         return -1;
     }
 
-    ret = mgmt_write_to_local_port(rib->uipcp, port_id, serbuf, serlen);
+    ret = mgmt_write_to_local_port(rib->uipcp, nf->port_id, serbuf, serlen);
 
     if (serbuf) {
         delete [] serbuf;
@@ -135,58 +148,59 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
 }
 
 void
-Neighbor::abort()
+Neighbor::abort(NeighFlow *nf)
 {
     CDAPMessage m;
     int ret;
 
     UPE(rib->uipcp, "Aborting enrollment\n");
 
-    if (enrollment_state == NONE) {
+    if (nf->enrollment_state == NONE) {
         return;
     }
 
-    enrollment_state = NONE;
+    nf->enrollment_state = NONE;
 
     m.m_release(gpb::F_NO_FLAGS);
 
-    ret = send_to_port_id(&m, 0, NULL);
+    ret = send_to_port_id(nf, &m, 0, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
 
-    if (conn) {
-        conn->reset();
+    if (nf->conn) {
+        nf->conn->reset();
     }
 }
 
 static void
 enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
 {
-    Neighbor *neigh = static_cast<Neighbor *>(arg);
-    ScopeLock(neigh->rib->lock);
+    NeighFlow *nf = static_cast<NeighFlow *>(arg);
+    ScopeLock(nf->neigh->rib->lock);
 
     (void)loop;
-    UPI(neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
-        static_cast<string>(neigh->ipcp_name).c_str());
-    neigh->abort();
+    UPI(nf->neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
+        static_cast<string>(nf->neigh->ipcp_name).c_str());
+
+    nf->neigh->abort(nf);
 }
 
 void
-Neighbor::enroll_tmr_start()
+Neighbor::enroll_tmr_start(NeighFlow *nf)
 {
-    enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop, 1000,
-                                           enroll_timeout_cb, this);
+    nf->enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop, 1000,
+                                               enroll_timeout_cb, nf);
 }
 
 void
-Neighbor::enroll_tmr_stop()
+Neighbor::enroll_tmr_stop(NeighFlow *nf)
 {
-    rl_evloop_schedule_canc(&rib->uipcp->loop, enroll_timeout_id);
+    rl_evloop_schedule_canc(&rib->uipcp->loop, nf->enroll_timeout_id);
 }
 
 int
-Neighbor::none(const CDAPMessage *rm)
+Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
 {
     CDAPMessage m;
     int ret;
@@ -208,7 +222,7 @@ Neighbor::none(const CDAPMessage *rm)
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
-        conn = new CDAPConn(flow_fd, 1);
+        nf->conn = new CDAPConn(nf->flow_fd, 1);
 
         ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
                           &dst_name);
@@ -216,7 +230,7 @@ Neighbor::none(const CDAPMessage *rm)
 
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT creation failed\n");
-            abort();
+            abort(nf);
             return -1;
         }
 
@@ -232,7 +246,7 @@ Neighbor::none(const CDAPMessage *rm)
         ret = m.m_connect_r(rm, 0, string());
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
-            abort();
+            abort(nf);
             return -1;
         }
 
@@ -241,21 +255,21 @@ Neighbor::none(const CDAPMessage *rm)
         next_state = S_WAIT_START;
     }
 
-    ret = send_to_port_id(&m, invoke_id, NULL);
+    ret = send_to_port_id(nf, &m, invoke_id, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
-    enroll_tmr_start();
-    enrollment_state = next_state;
+    enroll_tmr_start(nf);
+    nf->enrollment_state = next_state;
 
     return 0;
 }
 
 int
-Neighbor::i_wait_connect_r(const CDAPMessage *rm)
+Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START */
@@ -269,7 +283,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
     if (rm->result) {
         UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -281,22 +295,22 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
     enr_info.address = ipcp->ipcp_addr;
     enr_info.lower_difs = rib->lower_difs;
 
-    ret = send_to_port_id(&m, 0, &enr_info);
+    ret = send_to_port_id(nf, &m, 0, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
-    enroll_tmr_stop();
-    enroll_tmr_start();
-    enrollment_state = I_WAIT_START_R;
+    enroll_tmr_stop(nf);
+    enroll_tmr_start(nf);
+    nf->enrollment_state = I_WAIT_START_R;
 
     return 0;
 }
 
 int
-Neighbor::s_wait_start(const CDAPMessage *rm)
+Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (3) S <-- I: M_START
      * (4) S --> I: M_START_R
@@ -310,14 +324,14 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_START) {
         UPE(rib->uipcp, "M_START expected\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(rib->uipcp, "M_START does not contain a nested message\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -342,10 +356,10 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());
 
-    ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
+    ret = send_to_port_id(nf, &m, rm->invoke_id, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -367,7 +381,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     cand.lower_difs = rib->lower_difs;
     ncl.candidates.push_back(cand);
 
-    remote_sync_obj(true, obj_class::neighbors, obj_name::neighbors,
+    remote_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors,
                     &ncl);
 
     /* Stop the enrollment. */
@@ -377,22 +391,22 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
              0, 0, string());
 
-    ret = send_to_port_id(&m, 0, &enr_info);
+    ret = send_to_port_id(nf, &m, 0, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
-    enroll_tmr_stop();
-    enroll_tmr_start();
-    enrollment_state = S_WAIT_STOP_R;
+    enroll_tmr_stop(nf);
+    enroll_tmr_start(nf);
+    nf->enrollment_state = S_WAIT_STOP_R;
 
     return 0;
 }
 
 int
-Neighbor::i_wait_start_r(const CDAPMessage *rm)
+Neighbor::i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (4) I <-- S: M_START_R */
     const char *objbuf;
@@ -400,21 +414,21 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_START_R) {
         UPE(rib->uipcp, "M_START_R expected\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
     if (rm->result) {
         UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
-        abort();
+        abort(nf);
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(rib->uipcp, "M_START_R does not contain a nested message\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -425,15 +439,15 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
         rib->set_address(enr_info.address);
     }
 
-    enroll_tmr_stop();
-    enroll_tmr_start();
-    enrollment_state = I_WAIT_STOP;
+    enroll_tmr_stop(nf);
+    enroll_tmr_start(nf);
+    nf->enrollment_state = I_WAIT_STOP;
 
     return 0;
 }
 
 int
-Neighbor::i_wait_stop(const CDAPMessage *rm)
+Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (6) I <-- S: M_STOP
      * (7) I --> S: M_STOP_R */
@@ -450,14 +464,14 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_STOP) {
         UPE(rib->uipcp, "M_STOP expected\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -476,36 +490,36 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     m.m_stop_r(gpb::F_NO_FLAGS, 0, string());
 
-    ret = send_to_port_id(&m, rm->invoke_id, NULL);
+    ret = send_to_port_id(nf, &m, rm->invoke_id, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
     if (enr_info.start_early) {
         UPI(rib->uipcp, "Initiator is allowed to start early\n");
-        enroll_tmr_stop();
-        enrollment_state = ENROLLED;
+        enroll_tmr_stop(nf);
+        nf->enrollment_state = ENROLLED;
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
          * the new neighbor. */
-        rib->add_lower_flow(enr_info.address, *this);
+        rib->commit_lower_flow(enr_info.address, *this);
 
-        remote_sync_rib();
+        remote_sync_rib(nf);
 
     } else {
         UPI(rib->uipcp, "Initiator is not allowed to start early\n");
-        enroll_tmr_stop();
-        enroll_tmr_start();
-        enrollment_state = I_WAIT_START;
+        enroll_tmr_stop(nf);
+        enroll_tmr_start(nf);
+        nf->enrollment_state = I_WAIT_START;
     }
 
     return 0;
 }
 
 int
-Neighbor::s_wait_stop_r(const CDAPMessage *rm)
+Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (7) S <-- I: M_STOP_R */
     /* (8) S --> I: M_START(status) */
@@ -515,14 +529,14 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_STOP_R) {
         UPE(rib->uipcp, "M_START_R expected\n");
-        abort();
+        abort(nf);
         return 0;
     }
 
     if (rm->result) {
         UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
-        abort();
+        abort(nf);
         return 0;
     }
 
@@ -531,28 +545,28 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
               0, 0, string());
 
-    ret = send_to_port_id(&m, 0, NULL);
+    ret = send_to_port_id(nf, &m, 0, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id failed\n");
-        abort();
+        abort(nf);
         return ret;
     }
 
-    enroll_tmr_stop();
-    enrollment_state = ENROLLED;
+    enroll_tmr_stop(nf);
+    nf->enrollment_state = ENROLLED;
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
     ipcp = rib->ipcp_info();
-    rib->add_lower_flow(ipcp->ipcp_addr, *this);
+    rib->commit_lower_flow(ipcp->ipcp_addr, *this);
 
-    remote_sync_rib();
+    remote_sync_rib(nf);
 
     return 0;
 }
 
 int
-Neighbor::i_wait_start(const CDAPMessage *rm)
+Neighbor::i_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* Not yet implemented. */
     assert(false);
@@ -560,7 +574,7 @@ Neighbor::i_wait_start(const CDAPMessage *rm)
 }
 
 int
-Neighbor::enrolled(const CDAPMessage *rm)
+Neighbor::enrolled(NeighFlow *nf, const CDAPMessage *rm)
 {
     if (rm->op_code == gpb::M_START && rm->obj_class == obj_class::status
                 && rm->obj_name == obj_name::status) {
@@ -576,49 +590,54 @@ Neighbor::enrolled(const CDAPMessage *rm)
 }
 
 int
-Neighbor::enroll_fsm_run(const CDAPMessage *rm)
+Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
 {
-    state_t old_state = enrollment_state;
+    state_t old_state = nf->enrollment_state;
     int ret;
 
-    assert(enrollment_state >= NONE &&
-           enrollment_state < ENROLLMENT_STATE_LAST);
-    assert(enroll_fsm_handlers[enrollment_state]);
+    assert(nf->enrollment_state >= NONE &&
+           nf->enrollment_state < ENROLLMENT_STATE_LAST);
+    assert(enroll_fsm_handlers[nf->enrollment_state]);
 
-    if (!rm && enrollment_state != NONE) {
+    if (!rm && nf->enrollment_state != NONE) {
         UPI(rib->uipcp, "Enrollment already in progress, current state "
-            "is %s\n", enrollment_state_repr(enrollment_state));
+            "is %s\n", enrollment_state_repr(nf->enrollment_state));
         return 0;
     }
 
-    ret = (this->*(enroll_fsm_handlers[enrollment_state]))(rm);
+    ret = (this->*(enroll_fsm_handlers[nf->enrollment_state]))(nf, rm);
 
-    if (old_state != enrollment_state) {
+    if (old_state != nf->enrollment_state) {
         UPI(rib->uipcp, "switching state %s --> %s\n",
             enrollment_state_repr(old_state),
-            enrollment_state_repr(enrollment_state));
+            enrollment_state_repr(nf->enrollment_state));
     }
 
     return ret;
 }
 
-int Neighbor::remote_sync_obj(bool create, const string& obj_class,
+int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
+                              const string& obj_class,
                               const string& obj_name,
                               const UipcpObject *obj_value) const
 {
     CDAPMessage m;
     int ret;
 
+    if (!nf) {
+        nf = const_cast<Neighbor*>(this)->cur_conn();
+    }
+
     if (create) {
         m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
-                0, 0, "");
+                   0, 0, "");
 
     } else {
         m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
-                0, 0, "");
+                   0, 0, "");
     }
 
-    ret = send_to_port_id(&m, 0, obj_value);
+    ret = send_to_port_id(nf, &m, 0, obj_value);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
@@ -626,7 +645,7 @@ int Neighbor::remote_sync_obj(bool create, const string& obj_class,
     return ret;
 }
 
-int Neighbor::remote_sync_rib() const
+int Neighbor::remote_sync_rib(NeighFlow *nf) const
 {
     int ret = 0;
 
@@ -641,7 +660,7 @@ int Neighbor::remote_sync_rib() const
             lfl.flows.push_back(mit->second);
         }
 
-        ret |= remote_sync_obj(true, obj_class::lfdb, obj_name::lfdb,
+        ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
                                &lfl);
     }
 
@@ -653,7 +672,7 @@ int Neighbor::remote_sync_rib() const
             dft_slice.entries.push_back(e->second);
         }
 
-        ret |= remote_sync_obj(true, obj_class::dft, obj_name::dft,
+        ret |= remote_sync_obj(nf, true, obj_class::dft, obj_name::dft,
                                &dft_slice);
     }
 
@@ -679,8 +698,8 @@ int Neighbor::remote_sync_rib() const
         cand.lower_difs = rib->lower_difs;
         ncl.candidates.push_back(cand);
 
-        ret |= remote_sync_obj(true, obj_class::neighbors, obj_name::neighbors,
-                               &ncl);
+        ret |= remote_sync_obj(nf, true, obj_class::neighbors,
+                               obj_name::neighbors, &ncl);
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
@@ -780,7 +799,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(uipcp, "M_START does not contain a nested message\n");
-        abort();
+        neigh->abort(neigh->cur_conn());
         return 0;
     }
 
@@ -827,23 +846,26 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
     return 0;
 }
 
-map<string, Neighbor>::iterator
-uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
+int
+uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id, Neighbor **np,
+                                   NeighFlow **nfp)
 {
-    for (map<string, Neighbor>::iterator neigh = neighbors.begin();
-                        neigh != neighbors.end(); neigh++) {
-        if (neigh->second.port_id == port_id) {
-            return neigh;
+    *np = NULL;
+    *nfp = NULL;
+
+    for (map<string, Neighbor>::iterator nit = neighbors.begin();
+                        nit != neighbors.end(); nit++) {
+        Neighbor& neigh = nit->second;
+
+        if (neigh.flows.count(port_id)) {
+            *np = &neigh;
+            *nfp = &neigh.flows[port_id];
+
+            return 0;
         }
     }
 
-    return neighbors.end();
-}
-
-map<string, Neighbor>::iterator
-uipcp_rib::lookup_neigh_by_name(const RinaName& name)
-{
-    return neighbors.find(name);
+    return -1;
 }
 
 int
@@ -858,8 +880,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
     int ret;
 
     if (has_mgmt_flow()) {
-        UPI(rib->uipcp, "Management flow already allocated\n");
-        return 0;
+        UPI(rib->uipcp, "Trying to allocate additional N-1 flow\n");
     }
 
     info = rib->ipcp_info();
@@ -882,8 +903,8 @@ Neighbor::alloc_flow(const char *supp_dif_name)
 
     /* Allocate a flow for the enrollment. */
     ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif_name, NULL,
-                             &info->ipcp_name, &neigh_name, NULL,
-                             info->ipcp_id, &port_id_, 2000);
+                              &info->ipcp_name, &neigh_name, NULL,
+                              info->ipcp_id, &port_id_, 2000);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
@@ -896,15 +917,18 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         return -1;
     }
 
-    port_id = port_id_;
-    flow_fd = flow_fd_;
-    lower_ipcp_id = lower_ipcp_id_;
+    /* Set mgmt_port_id if required. */
+    if (!has_mgmt_flow()) {
+        mgmt_port_id = port_id_;
+    }
 
-    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
-        port_id);
+    flows[port_id_] = NeighFlow(this, port_id_, flow_fd_, lower_ipcp_id_);
+
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
+                    flows[port_id_].flow_fd, flows[port_id_].port_id);
 
     uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
-                            lower_ipcp_id);
+                            lower_ipcp_id_);
 
     return 0;
 }
@@ -930,7 +954,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
     assert(neigh->has_mgmt_flow());
 
     /* Start the enrollment procedure as initiator. */
-    neigh->enroll_fsm_run(NULL);
+    neigh->enroll_fsm_run(neigh->cur_conn(), NULL);
 
     return 0;
 }
@@ -948,8 +972,19 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
         return -1;
     }
 
-    neigh->port_id = neigh_port_id;
-    neigh->lower_ipcp_id = lower_ipcp_id;
+    if (neigh->flows.count(neigh_port_id)) {
+        UPE(rib->uipcp, "Port id '%u' already exists\n",
+            neigh_port_id);
+        return -1;
+    }
+
+    /* Set mgmt_port_id if required. */
+    if (!neigh->has_mgmt_flow()) {
+        neigh->mgmt_port_id = neigh_port_id;
+    }
+
+    neigh->flows[neigh_port_id] = NeighFlow(neigh, neigh_port_id, 0,
+                                            lower_ipcp_id);
 
     return 0;
 }
@@ -957,7 +992,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
 int
 rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
-                      int neigh_fd)
+                      unsigned int neigh_port_id, int neigh_fd)
 {
     Neighbor *neigh = rib->get_neighbor(neigh_name);
 
@@ -965,10 +1000,17 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
         UPE(rib->uipcp, "Failed to get neighbor\n");
     }
 
-    neigh->flow_fd = neigh_fd;
+    if (!neigh->flows.count(neigh_port_id)) {
+        UPE(rib->uipcp, "Port id '%u' does not exist\n",
+            neigh_port_id);
+        return -1;
+    }
 
-    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", neigh->flow_fd,
-        neigh->port_id);
+    neigh->flows[neigh_port_id].flow_fd = neigh_fd;
+
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
+                    neigh->flows[neigh_port_id].flow_fd,
+                    neigh->flows[neigh_port_id].port_id);
 
     return 0;
 }

@@ -111,8 +111,9 @@ static int
 rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
-    map<string, Neighbor>::iterator neigh;
     CDAPMessage *m = NULL;
+    Neighbor *neigh;
+    NeighFlow *flow;
     int ret;
 
     try {
@@ -166,26 +167,26 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
         ScopeLock(rib->lock);
 
         /* Lookup neighbor by port id. */
-        neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
-        if (neigh == rib->neighbors.end()) {
+        ret = rib->lookup_neigh_by_port_id(mhdr->local_port, &neigh, &flow);
+        if (ret) {
             UPE(rib->uipcp, "Received message from unknown port id %d\n",
-                    mhdr->local_port);
+                mhdr->local_port);
             return -1;
         }
 
-        if (!neigh->second.conn) {
-            neigh->second.conn = new CDAPConn(neigh->second.flow_fd, 1);
+        if (!flow->conn) {
+            flow->conn = new CDAPConn(flow->flow_fd, 1);
         }
 
         /* Deserialize the received CDAP message. */
-        m = neigh->second.conn->msg_deser(serbuf, serlen);
+        m = flow->conn->msg_deser(serbuf, serlen);
         if (!m) {
             UPE(rib->uipcp, "msg_deser() failed\n");
             return -1;
         }
 
         /* Feed the enrollment state machine. */
-        ret = neigh->second.enroll_fsm_run(m);
+        ret = neigh->enroll_fsm_run(flow, m);
 
     } catch (std::bad_alloc) {
         UPE(rib->uipcp, "Out of memory\n");
@@ -573,12 +574,14 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        if (neigh->second.enrollment_state != Neighbor::ENROLLED) {
+        if (const_cast<Neighbor &>(neigh->second).
+                        cur_conn()->enrollment_state != ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }
 
-        neigh->second.remote_sync_obj(create, obj_class, obj_name, obj_value);
+        neigh->second.remote_sync_obj(NULL, create, obj_class,
+                                      obj_name, obj_value);
     }
 
     return 0;
@@ -669,7 +672,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, flow_fd);
+    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, req->port_id, flow_fd);
     if (ret) {
         goto err;
     }

@@ -6,7 +6,7 @@ using namespace std;
 
 
 int
-uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
+uipcp_rib::commit_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 {
     LowerFlow lf;
     uint64_t remote_addr = lookup_neighbor_address(neigh.ipcp_name);
@@ -29,19 +29,10 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 
     LowerFlowList lfl;
 
-    /* Send our lower flow database to the neighbor. */
-    for (map<string, LowerFlow>::iterator mit = lfdb.begin();
-                                        mit != lfdb.end(); mit++) {
-        lfl.flows.push_back(mit->second);
-    }
-    ret = neigh.remote_sync_obj(true, obj_class::lfdb,
-                                obj_name::lfdb, &lfl);
-
     /* Send the new lower flow to the other neighbors. */
-    lfl.flows.clear();
     lfl.flows.push_back(lf);
-    ret |= remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
-                                     obj_name::lfdb, &lfl);
+    ret = remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
+                                    obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
     spe.run(ipcp_info()->ipcp_addr, lfdb);
@@ -264,7 +255,8 @@ uipcp_rib::pduft_sync()
             continue;
         }
 
-        next_hop_to_port_id[r->second] = neigh->second.port_id;
+        /* Just take one for now. */
+        next_hop_to_port_id[r->second] = neigh->second.cur_conn()->port_id;
     }
 
     /* Generate PDUFT entries. */

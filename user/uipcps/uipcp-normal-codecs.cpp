@@ -64,13 +64,13 @@ RinaName::operator std::string() const
     return apn + '/' + api + '/' + aen + '/' + aei;
 }
 
-bool RinaName::operator==(const RinaName& other)
+bool RinaName::operator==(const RinaName& other) const
 {
     return api == other.api && apn == other.apn &&
             aen == other.aen && aei == other.aei;
 }
 
-bool RinaName::operator!=(const RinaName& other)
+bool RinaName::operator!=(const RinaName& other) const
 {
     return !(*this == other);
 }

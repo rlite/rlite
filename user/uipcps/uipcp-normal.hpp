@@ -44,65 +44,87 @@ namespace obj_name {
 
 #define RL_AGE_INCR_INTERVAL    2
 
-struct Neighbor {
-    RinaName ipcp_name;
-    int flow_fd;
+enum state_t {
+    NONE = 0,
+    I_WAIT_CONNECT_R,
+    S_WAIT_START,
+    I_WAIT_START_R,
+    S_WAIT_STOP_R,
+    I_WAIT_STOP,
+    I_WAIT_START,
+    ENROLLED,
+    ENROLLMENT_STATE_LAST,
+};
+
+struct Neighbor;
+
+/* Holds the information about an N-1 flow towards a neighbor IPCP. */
+struct NeighFlow {
+    Neighbor *neigh;
     unsigned int port_id;
+    int flow_fd;
     unsigned int lower_ipcp_id;
     CDAPConn *conn;
-    struct uipcp_rib *rib;
+
     int enroll_timeout_id;
+    enum state_t enrollment_state;
 
-    enum state_t {
-        NONE = 0,
-        I_WAIT_CONNECT_R,
-        S_WAIT_START,
-        I_WAIT_START_R,
-        S_WAIT_STOP_R,
-        I_WAIT_STOP,
-        I_WAIT_START,
-        ENROLLED,
-        ENROLLMENT_STATE_LAST,
-    } enrollment_state;
+    NeighFlow() : neigh(NULL), conn(NULL) { }
+    NeighFlow(Neighbor *n, unsigned int pid, int ffd,
+              unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
+                                  lower_ipcp_id(lid), conn(NULL),
+                                  enrollment_state(NONE) { }
+};
 
-    typedef int (Neighbor::*enroll_fsm_handler_t)(const CDAPMessage *rm);
+/* Holds the information about a neighbor IPCP. */
+struct Neighbor {
+    struct uipcp_rib *rib;
+    RinaName ipcp_name;
+
+    std::map<unsigned int, NeighFlow> flows;
+    unsigned int mgmt_port_id;
+
+    typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
+                                                  const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[ENROLLMENT_STATE_LAST];
 
     /* Required to use the map. */
-    Neighbor() : flow_fd(-1), conn(NULL), rib(NULL) { }
+    Neighbor() : rib(NULL) { }
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name);
     Neighbor(const Neighbor& other);
-    bool operator==(const Neighbor& other) const { return port_id == other.port_id; }
+    bool operator==(const Neighbor& other) const { return ipcp_name == other.ipcp_name; }
     bool operator!=(const Neighbor& other) const { return !(*this == other); }
     ~Neighbor();
 
+    NeighFlow *cur_conn();
     const char *enrollment_state_repr(state_t s) const;
-    bool has_mgmt_flow() const { return flow_fd != -1; }
+    bool has_mgmt_flow() const { return flows.size() > 0; }
     int alloc_flow(const char *supp_dif_name);
 
-    int send_to_port_id(CDAPMessage *m, int invoke_id,
+    int send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;
-    int enroll_fsm_run(const CDAPMessage *rm);
+    int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
-    int none(const CDAPMessage *rm);
-    int i_wait_connect_r(const CDAPMessage *rm);
-    int s_wait_start(const CDAPMessage *rm);
-    int i_wait_start_r(const CDAPMessage *rm);
-    int i_wait_stop(const CDAPMessage *rm);
-    int s_wait_stop_r(const CDAPMessage *rm);
-    int i_wait_start(const CDAPMessage *rm);
-    int enrolled(const CDAPMessage *rm);
+    int none(NeighFlow *nf, const CDAPMessage *rm);
+    int i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm);
+    int s_wait_start(NeighFlow *nf, const CDAPMessage *rm);
+    int i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm);
+    int i_wait_stop(NeighFlow *nf, const CDAPMessage *rm);
+    int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
+    int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
+    int enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
-    void abort();
-    void enroll_tmr_start();
-    void enroll_tmr_stop();
+    void abort(NeighFlow *nf);
+    void enroll_tmr_start(NeighFlow *nf);
+    void enroll_tmr_stop(NeighFlow *nf);
 
-    int remote_sync_obj(bool create, const std::string& obj_class,
+    int remote_sync_obj(NeighFlow *nf, bool create,
+                        const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
 
-    int remote_sync_rib() const;
+    int remote_sync_rib(NeighFlow *nf) const;
 };
 
 /* Shortest Path algorithm. */
@@ -199,11 +221,9 @@ struct uipcp_rib {
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
-    std::map<std::string, Neighbor>::iterator
-                lookup_neigh_by_port_id(unsigned int port_id);
-    std::map<std::string, Neighbor>::iterator
-                lookup_neigh_by_name(const RinaName& name);
-    int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
+    int lookup_neigh_by_port_id(unsigned int port_id, Neighbor **np,
+                                NeighFlow **nfp);
+    int commit_lower_flow(uint64_t local_addr, const Neighbor& neigh);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
@@ -253,7 +273,7 @@ int rib_neigh_set_port_id(struct uipcp_rib *rib,
 
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
-                          int neigh_fd);
+                          unsigned int neigh_port_id, int neigh_fd);
 
 void age_incr_cb(struct rlite_evloop *loop, void *arg);
 
