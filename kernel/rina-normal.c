@@ -925,7 +925,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     } else {
         /* Out of order. */
-        PD("%s: Out of order packet, RLWE would jump %lu --> %lu\n",
+        RPD(5, "%s: Out of order packet, RLWE would jump %lu --> %lu\n",
                 __func__, (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
     }
