@@ -24,4 +24,4 @@ userspace_install:
 # directly in the target, since 'sudo' seems to interact badly with
 # 'make modules_install'
 kernelspace_install:
-	./kernelspace-install
+	./install-kernelspace
