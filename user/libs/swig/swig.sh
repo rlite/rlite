@@ -2,7 +2,7 @@
 
 set -x
 
-swig -I../../include/ -python rlite.i
+swig -I../../../include/ -python rlite.i
 gcc -fPIC -I ../../include/ -I /usr/include/python2.7/ -c rlite_wrap.c
 gcc -fPIC -I ../../include/ -c utils.c
 gcc -fPIC -I ../../include/ -c ctrl.c
