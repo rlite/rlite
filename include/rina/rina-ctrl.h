@@ -39,19 +39,36 @@ enum {
 enum {
     RINA_CTRL_CREATE_IPCP = 1,
     RINA_CTRL_ASSIGN_TO_DIF,
+
+    RINA_CTRL_CREATE_IPCP_RESP,
+
     RINA_CTRL_MSG_MAX,
 };
 
 typedef uint16_t rina_msg_t;
 
+/* IPCM --> kernel message to create a new IPC process. */
 struct rina_ctrl_create_ipcp {
     rina_msg_t msg_type;
+    uint32_t event_id;
+
     struct rina_name name;
     uint8_t dif_type;
 };
 
+/* IPCM <-- kernel message to inform the IPCM about the ID of a new
+ * IPC process. */
+struct rina_ctrl_create_ipcp_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+};
+
 struct rina_ctrl_assign_to_dif {
     rina_msg_t msg_type;
+    uint32_t event_id;
+
     uint32_t ipcp_id;
     struct dif_information dif_info;
 };
