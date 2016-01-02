@@ -54,10 +54,27 @@ fetch_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
 {
     const struct rina_ctrl_fetch_ipcp_resp *resp =
         (const struct rina_ctrl_fetch_ipcp_resp *)b_resp;
+    char *ipcp_name_s = NULL;
+    char *dif_name_s = NULL;
 
-    printf("%s: Fetch IPCP response\n", __func__);
-    (void)resp;
+    if (resp->end) {
+        return 0;
+    }
+
+    ipcp_name_s = rina_name_to_string(&resp->ipcp_name);
+    dif_name_s = rina_name_to_string(&resp->dif_name);
+
+    printf("%s: Fetch IPCP response id=%u, type=%u, name='%s', dif_name='%s'\n",
+            __func__, resp->ipcp_id, resp->dif_type, ipcp_name_s, dif_name_s);
     (void)b_req;
+
+    if (ipcp_name_s) {
+        free(ipcp_name_s);
+    }
+
+    if (dif_name_s) {
+        free(dif_name_s);
+    }
 
     return 0;
 }

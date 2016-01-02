@@ -9,6 +9,7 @@
 #define COMMON_ALLOC(_sz)   kmalloc(_sz, GFP_KERNEL)
 #define COMMON_FREE(_p)   kfree(_p)
 #define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s)   kstrdup(_s, GFP_KERNEL)
 
 #else
 
@@ -19,6 +20,7 @@
 #define COMMON_ALLOC(_sz)   malloc(_sz)
 #define COMMON_FREE(_p)   free(_p)
 #define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s)   strdup(_s)
 
 #endif
 
@@ -261,4 +263,90 @@ rina_msg_free(struct rina_ctrl_base_msg *msg)
     for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
         rina_name_free(name);
     }
+}
+
+void
+rina_name_move(struct rina_name *dst, struct rina_name *src)
+{
+    if (!dst || !src) {
+        return;
+    }
+
+    dst->apn = src->apn;
+    src->apn = NULL;
+
+    dst->api = src->api;
+    src->api = NULL;
+
+    dst->aen = src->aen;
+    src->aen = NULL;
+
+    dst->aei = src->aei;
+    src->aei = NULL;
+}
+
+int
+rina_name_copy(struct rina_name *dst, const struct rina_name *src)
+{
+    if (!dst || !src) {
+        return 0;
+    }
+
+    dst->apn = src->apn ? COMMON_STRDUP(src->apn) : NULL;
+    dst->api = src->api ? COMMON_STRDUP(src->api) : NULL;
+    dst->aen = src->aen ? COMMON_STRDUP(src->aen) : NULL;
+    dst->aei = src->aei ? COMMON_STRDUP(src->aei) : NULL;
+
+    return 0;
+}
+
+char *
+rina_name_to_string(const struct rina_name *name)
+{
+    char *str = NULL;
+    char *cur;
+    unsigned int apn_len;
+    unsigned int api_len;
+    unsigned int aen_len;
+    unsigned int aei_len;
+
+    if (!name) {
+        return NULL;
+    }
+
+    apn_len = name->apn ? strlen(name->apn) : 0;
+    api_len = name->api ? strlen(name->api) : 0;
+    aen_len = name->aen ? strlen(name->aen) : 0;
+    aei_len = name->aei ? strlen(name->aei) : 0;
+
+    str = cur = COMMON_ALLOC(apn_len + 1 + api_len + 1 +
+                             aen_len + 1 + aei_len + 1);
+    if (!str) {
+        return NULL;
+    }
+
+    memcpy(cur, name->apn, apn_len);
+    cur += apn_len;
+
+    *cur = '/';
+    cur++;
+
+    memcpy(cur, name->api, api_len);
+    cur += api_len;
+
+    *cur = '/';
+    cur++;
+
+    memcpy(cur, name->aen, aen_len);
+    cur += aen_len;
+
+    *cur = '/';
+    cur++;
+
+    memcpy(cur, name->aei, aei_len);
+    cur += aei_len;
+
+    *cur = '\0';
+
+    return str;
 }

@@ -94,7 +94,7 @@ struct rina_ctrl_fetch_ipcp_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
 
-    uint8_t more;
+    uint8_t end;
     uint16_t ipcp_id;
     uint8_t dif_type;
     struct rina_name ipcp_name;
