@@ -355,8 +355,6 @@ unix_server(void *arg)
 
         /* Close the connection. */
 	close(cfd);
-
-        fflush(stdout);
     }
 
     return NULL;
@@ -406,7 +404,6 @@ uipcps_update(struct uipcps *uipcps)
     rlite_ipcps_fetch(&loop);
 
     rlite_ipcps_print(&loop);
-    fflush(stdout);
 
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(rlite_ipcp, &loop.ipcps, node) {

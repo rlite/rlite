@@ -143,15 +143,19 @@ struct rina_flow_spec {
 #define PI_ON  /* Enable info print. */
 
 #ifdef __KERNEL__
-#define PRINTFUN printk
-#else
-#define PRINTFUN printf
-#endif
+#define DOPRINT(FMT, ...) printk(FMT, ##__VA_ARGS__)
+#else  /* ! __KERNEL__ */
+#define DOPRINT(FMT, ...)               \
+    do {                                \
+        printf(FMT, ##__VA_ARGS__);     \
+        fflush(stdout);                 \
+    } while (0)
+#endif /* ! __KERNEL__ */
 
 #define PRINTFUN1(FMT, ...)                 \
-                PRINTFUN(FMT, ##__VA_ARGS__)
+                DOPRINT(FMT, ##__VA_ARGS__)
 #define PRINTFUN2(LEV, FMT, ...)            \
-                PRINTFUN("[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
+                DOPRINT("[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
 #ifdef PD_ON
 #define PD(FMT, ...) PRINTFUN2("DBG", FMT, ##__VA_ARGS__)

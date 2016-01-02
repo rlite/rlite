@@ -260,12 +260,12 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         PE("Error: read() failed [%d]\n", n);
-        goto out;
+        return;
 
     } else if (n < sizeof(*mhdr)) {
         PE("Error: read() does not contain mgmt header, %d<%d\n",
                 n, (int)sizeof(*mhdr));
-        goto out;
+        return;
     }
 
     /* Grab the management header. */
@@ -275,8 +275,6 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     /* Hand off the message to the RIB. */
     rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
                   n - sizeof(*mhdr));
-out:
-    fflush(stdout);
 }
 
 static int
@@ -391,8 +389,6 @@ uipcp_server(void *arg)
 
 out:
         rlite_pending_flow_req_free(pfr);
-
-        fflush(stdout);
     }
 
     return NULL;
@@ -584,7 +580,6 @@ uipcps_fetch(struct uipcps *uipcps)
             /* This is just for debugging purposes. */
             first = 0;
             rlite_ipcps_print(&uipcp->appl.loop);
-            fflush(stdout);
         }
     }
 

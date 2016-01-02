@@ -342,8 +342,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
     if (!has_response && wait_for_completion) {
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
-        PE("has_response == 0 --> wait_for_completion "
-                "== 0\n");
+        PE("has_response == 0 --> wait_for_completion == 0\n");
         rina_msg_free(rina_kernel_numtables, msg);
         *result = EINVAL;
         return NULL;
