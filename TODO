@@ -28,3 +28,10 @@
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
 
 - addr size non consistente (PCI/resto dello stack)
+
+- aggiungere supporto per QoS cubes
+
+- poichè la registrazione non ha un messaggio di risposta, attualmente
+  non è possibile per l'userspace IPCP il rifiuto della registrazione,
+  con conseguenti malfunzionamenti, visto che in kernelspace non è
+  disponibile la DFT completa
