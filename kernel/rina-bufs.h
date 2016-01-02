@@ -39,10 +39,10 @@ struct rina_pci_ctrl {
     struct rina_pci base;
     uint64_t last_ctrl_seq_num_rcvd;
     uint64_t ack_nack_seq_num;
-    uint64_t new_rt_wind_edge;
-    uint64_t new_lf_wind_edge;
-    uint64_t my_lf_wind_edge;
-    uint64_t my_rt_wind_edge;
+    uint64_t new_rwe;
+    uint64_t new_lwe;
+    uint64_t my_lwe;
+    uint64_t my_rwe;
 } __attribute__((packed));
 
 struct rina_buf {
@@ -55,6 +55,8 @@ struct rina_buf {
 };
 
 struct rina_buf *rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
+
+struct rina_buf * rina_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
 
 void rina_buf_free(struct rina_buf *rb);
 

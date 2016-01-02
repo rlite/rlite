@@ -32,6 +32,13 @@ rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 }
 EXPORT_SYMBOL_GPL(rina_buf_alloc);
 
+struct rina_buf *
+rina_buf_alloc_ctrl(size_t num_pci, gfp_t gfp)
+{
+    return rina_buf_alloc(sizeof(struct rina_pci_ctrl), num_pci, gfp);
+}
+EXPORT_SYMBOL_GPL(rina_buf_alloc_ctrl);
+
 void
 rina_buf_free(struct rina_buf *rb)
 {

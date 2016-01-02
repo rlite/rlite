@@ -342,20 +342,37 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
 }
 
 static void
-sdu_rx_sv_update(struct dtp *dtp, const struct rina_flow_config *cfg,
+sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                  uint64_t seqnum)
 {
-    if (cfg->dtcp.flow_control) {
+    const struct dtcp_config *cfg = &flow->cfg.dtcp;
+
+    if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         /* We should not unconditionally increment the receiver RWE,
          * but instead use some logic related to buffer management
          * (e.g. see the amount of receiver buffer available). */
-        dtp->rcv_rwe++;
+        flow->dtp.rcv_rwe++;
 
-        if (!cfg->dtcp.rtx_control) {
+        if (!cfg->rtx_control) {
             /* POL: ReceivingFlowControl */
-            if (cfg->dtcp.fc.fc_type == RINA_FC_T_WIN) {
-                /* TODO Send a flow control only control PDU. */
+            if (cfg->fc.fc_type == RINA_FC_T_WIN) {
+                /* Send a flow control only control PDU. */
+                struct rina_buf *rb = rina_buf_alloc_ctrl(2, GFP_ATOMIC);
+                struct rina_pci_ctrl *pcic;
+
+                if (rb) {
+                    pcic = (struct rina_pci_ctrl *)RINA_BUF_DATA(rb);
+                    pcic->base.dst_addr = flow->remote_addr;
+                    pcic->base.src_addr = ipcp->addr;
+                    pcic->base.conn_id.qos_id = 0;
+                    pcic->base.conn_id.dst_cep = flow->remote_port;
+                    pcic->base.conn_id.src_cep = flow->local_port;
+                    pcic->base.pdu_type = PDU_TYPE_FC;
+                    pcic->base.pdu_flags = 0;
+                    pcic->base.seqnum = 0;
+                    rina_buf_free(rb); //TODO
+                }
             }
         }
     }
@@ -393,7 +410,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             dtp->rcv_lwe = pci->seqnum + 1;
             dtp->max_seq_num_rcvd = pci->seqnum;
 
-            sdu_rx_sv_update(dtp, &flow->cfg, pci->seqnum);
+            sdu_rx_sv_update(ipcp, flow, pci->seqnum);
 
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
         } else {
