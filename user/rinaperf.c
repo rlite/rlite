@@ -97,22 +97,6 @@ echo_client(struct rinaperf *rp)
         size = sizeof(buf);
     }
 
-    ret = flow_allocate(&rp->application, &rp->dif_name, &rp->client_appl_name,
-                        &rp->server_appl_name, &rp->data_port_id);
-    if (ret) {
-        return ret;
-    }
-
-    rp->dfd = open_port(rp->data_port_id);
-    if (rp->dfd < 0) {
-        return rp->dfd;
-    }
-
-    ret = client_test_config(rp);
-    if (ret) {
-        return ret;
-    }
-
     memset(buf, 'x', size);
 
     gettimeofday(&t_start, NULL);
@@ -174,6 +158,68 @@ echo_server(struct rinaperf *rp)
 }
 
 static int
+perf_client(struct rinaperf *rp)
+{
+    struct timeval t_start, t_end;
+    unsigned long us;
+    int ret;
+    char buf[4096];
+    int size = rp->test_config.size;
+    unsigned int i = 0;
+
+    if (size > sizeof(buf)) {
+        size = sizeof(buf);
+    }
+
+    memset(buf, 'x', size);
+
+    gettimeofday(&t_start, NULL);
+
+    for (i = 0; i < rp->test_config.cnt; i++) {
+        ret = write(rp->dfd, buf, size);
+        if (ret != size) {
+            if (ret < 0) {
+                perror("write(buf)");
+            } else {
+                printf("Partial write %d/%d\n", ret, size);
+            }
+        }
+    }
+
+    gettimeofday(&t_end, NULL);
+    us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
+            (t_end.tv_usec - t_start.tv_usec);
+
+    if (us) {
+        printf("Throughput: %.3f Kpps, %.3f Mbps\n",
+                ((float)rp->test_config.cnt) * 1000.0 / us,
+                ((float)size) * rp->test_config.cnt / us);
+    }
+
+    close(rp->dfd);
+
+    return 0;
+}
+
+static int
+perf_server(struct rinaperf *rp)
+{
+    int n;
+    unsigned int i;
+    char buf[4096];
+
+    for (i = 0; i < rp->test_config.cnt; i++) {
+        n = read(rp->dfd, buf, sizeof(buf));
+        if (n < 0) {
+            perror("read(flow)");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
 server(struct rinaperf *rp, perf_function_t perf_function)
 {
     struct pending_flow_req *pfr = NULL;
@@ -223,6 +269,9 @@ static struct perf_function_desc client_descs[] = {
     {
         .name = "echo",
         .function = echo_client,
+    },
+    {   .name = "perf",
+        .function = perf_client,
     }
 };
 
@@ -230,6 +279,9 @@ static struct perf_function_desc server_descs[] = {
     {
         .name = "echo",
         .function = echo_server,
+    },
+    {   .name = "perf",
+        .function = perf_server,
     }
 };
 
@@ -298,7 +350,7 @@ main(int argc, char **argv)
     }
 
     if (perf_function == NULL) {
-        printf("    Unknown test type %s\n", type);
+        printf("    Unknown test type '%s'\n", type);
         return -1;
     }
     rp.test_config.ty = i;
@@ -339,7 +391,23 @@ main(int argc, char **argv)
         server(&rp, perf_function);
 
     } else {
-        /* We're the client: run the perf function. */
+        /* We're the client: allocate a flow and run the perf function. */
+        ret = flow_allocate(&rp.application, &rp.dif_name, &rp.client_appl_name,
+                &rp.server_appl_name, &rp.data_port_id);
+        if (ret) {
+            return ret;
+        }
+
+        rp.dfd = open_port(rp.data_port_id);
+        if (rp.dfd < 0) {
+            return rp.dfd;
+        }
+
+        ret = client_test_config(&rp);
+        if (ret) {
+            return ret;
+        }
+
         perf_function(&rp);
     }
 
