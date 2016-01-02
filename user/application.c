@@ -17,16 +17,53 @@
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
 
+static int
+read_response(int sfd)
+{
+    struct rina_msg_base_resp *resp;
+    char msgbuf[4096];
+    char serbuf[4096];
+    int ret;
+    int n;
+
+    n = read(sfd, serbuf, sizeof(serbuf));
+    if (n < 0) {
+        printf("%s: read() error [%d]\n", __func__, n);
+        return -1;
+    }
+
+    ret = deserialize_rina_msg(rina_application_numtables, serbuf,
+                               n, msgbuf, sizeof(msgbuf));
+    if (ret) {
+        printf("%s: error while deserializing response [%d]\n",
+                __func__, ret);
+        return -1;
+    }
+
+    resp = (struct rina_msg_base_resp *)msgbuf;
+    ret = (resp->result) == 0 ? 0 : -1;
+
+    printf("IPCM response [type=%u] --> %d\n", resp->msg_type, ret);
+
+    return ret;
+}
+
 static int application_register(int sfd)
 {
     struct rina_amsg_register msg;
+    int ret;
 
     msg.msg_type = RINA_APPL_REGISTER;
     msg.event_id = 0;
     rina_name_fill(&msg.application_name, "echo", "1", NULL, NULL);
     rina_name_fill(&msg.dif_name, "test-shim-dummy.DIF", NULL, NULL, NULL);
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&msg);
+    ret = rina_msg_write(sfd, (struct rina_msg_base *)&msg);
+    if (ret) {
+        return ret;
+    }
+
+    return read_response(sfd);
 }
 
 static int application_unregister(int sfd)
@@ -63,7 +100,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* Open a Unix domain socket to listen to. */
+    /* Open a Unix domain socket towards the IPCM. */
     sfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sfd < 0) {
         perror("socket(AF_UNIX)");
@@ -79,8 +116,6 @@ int main()
         perror("bind(AF_UNIX, path)");
         exit(EXIT_FAILURE);
     }
-
-    printf("Connected\n");
 
     application_register(sfd);
     application_unregister(sfd);
