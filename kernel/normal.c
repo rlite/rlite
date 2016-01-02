@@ -20,7 +20,6 @@
 
 #include <linux/types.h>
 #include <rinalite/rinalite-utils.h>
-#include <rinalite/rina-ipcp-types.h>
 #include "rinalite-kernel.h"
 
 #include <linux/module.h>
@@ -1054,7 +1053,7 @@ rina_normal_init(void)
 
     memset(&factory, 0, sizeof(factory));
     factory.owner = THIS_MODULE;
-    factory.dif_type = DIF_TYPE_NORMAL;
+    factory.dif_type = "normal";
     factory.create = rina_normal_create;
     factory.ops.destroy = rina_normal_destroy;
     factory.ops.flow_allocate_req = NULL; /* Reflect to userspace. */
@@ -1075,7 +1074,7 @@ rina_normal_init(void)
 static void __exit
 rina_normal_fini(void)
 {
-    rina_ipcp_factory_unregister(DIF_TYPE_NORMAL);
+    rina_ipcp_factory_unregister("normal");
 }
 
 module_init(rina_normal_init);

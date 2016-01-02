@@ -126,8 +126,7 @@ for i in vms:
             'sudo chmod -R a+rw /var/rinalite\n'\
             '\n'\
             'rinalite-uipcps &> uipcp.log &\n'\
-            'rina-config ipcp-create normal n.IPCP %(id)s\n'\
-            'rina-config ipcp-config n.IPCP %(id)s dif n.DIF\n'\
+            'rina-config ipcp-create n.IPCP %(id)s normal n.DIF\n'\
             'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
                    'id': vm['id']}
@@ -135,9 +134,8 @@ for i in vms:
     for port in vm['ports']:
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
-                'rina-config ipcp-create shim-eth e.IPCP %(idx)s\n'\
+                'rina-config ipcp-create e.IPCP %(idx)s shim-eth e.%(idx)s.DIF\n'\
                 'rina-config ipcp-config e.IPCP %(idx)s netdev $PORT\n'\
-                'rina-config ipcp-config e.IPCP %(idx)s dif e.%(idx)s.DIF\n'\
                 'rina-config ipcp-register e.%(idx)s.DIF n.IPCP %(id)s\n'\
                     % {'mac': port['mac'], 'idx': port['idx'],
                        'id': vm['id']}

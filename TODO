@@ -1,5 +1,3 @@
-- dif_type had better be a string
-
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 

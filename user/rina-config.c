@@ -156,18 +156,11 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id)
     return request_response((struct rina_msg_base *)&req, 0);
 }
 
-static const char *dif_types[] = {
-    [DIF_TYPE_NORMAL] = "normal",
-    [DIF_TYPE_SHIM_LOOPBACK] = "shim-loopback",
-    [DIF_TYPE_SHIM_HV] = "shim-hv",
-    [DIF_TYPE_SHIM_ETH] = "shim-eth",
-};
-
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
 rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
-                 const struct rina_name *name, uint8_t dif_type,
-                 int *result)
+                 const struct rina_name *name, const char *dif_type,
+                 const char *dif_name, int *result)
 {
     struct rina_kmsg_ipcp_create *msg;
     struct rina_kmsg_ipcp_create_resp *resp;
@@ -182,7 +175,8 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_CREATE;
     rina_name_copy(&msg->name, name);
-    msg->dif_type = dif_type;
+    msg->dif_type = strdup(dif_type);
+    msg->dif_name = strdup(dif_name);
 
     PD("Requesting IPC process creation...\n");
 
@@ -192,7 +186,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
 
     rinalite_ipcps_fetch(&rc->loop);
 
-    if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
+    if (strcmp(dif_type, "normal") == 0 && *result == 0 && resp) {
         uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id);
     } else {
         uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
@@ -208,34 +202,20 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
-    uint8_t dif_type;
+    const char *dif_type;
+    const char *dif_name;
     int result;
     int i;
 
-    assert(argc >= 3);
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
+    assert(argc >= 4);
+    ipcp_apn = argv[0];
+    ipcp_api = argv[1];
+    dif_type = argv[2];
+    dif_name = argv[3];
 
-    dif_type = DIF_TYPE_MAX;
-    for (i = 0; i < DIF_TYPE_MAX; i++) {
-        assert(dif_types[i]);
-        if (strcmp(argv[0], dif_types[i]) == 0) {
-            dif_type = i;
-            break;
-        }
-    }
-    if (dif_type == DIF_TYPE_MAX) {
-        /* No such dif type. Print the available types
-         * and exit. */
-        PE("No such dif type. Available DIF types:\n");
-        for (i = 0; i < DIF_TYPE_MAX; i++) {
-            PE("    %s\n", dif_types[i]);
-        }
-        return -1;
-    }
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, &result);
+    kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
         rina_msg_free(rina_kernel_numtables, RINALITE_RMB(kresp));
     }
@@ -246,7 +226,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 /* Destroy an IPC process. */
 static int
 rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
-                  unsigned dif_type)
+                  const char *dif_type)
 {
     struct rina_kmsg_ipcp_destroy *msg;
     struct rina_msg_base *resp;
@@ -259,7 +239,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
         return ENOMEM;
     }
 
-    if (dif_type == DIF_TYPE_NORMAL) {
+    if (strcmp(dif_type, "normal") == 0) {
         uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id);
     }
 
@@ -516,35 +496,32 @@ test(struct rinaconf *rc)
 
     /* Create an IPC process of type shim-loopback. */
     rina_name_fill(&name, "test-shim-loopback.IPCP", "1", NULL, NULL);
-    icresp = rina_ipcp_create(rc, 0, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
+    icresp = rina_ipcp_create(rc, 0, &name, "shim-loopback",
+                              "test-shim-loopback.DIF", &result);
     assert(!icresp);
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-loopback.IPCP", "2", NULL, NULL);
-    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
+    icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",
+                              "test-shim-loopback.DIF", &result);
     assert(icresp);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RINALITE_RMB(icresp));
     }
-    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
+    icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",
+                              "test-shim-loopback.DIF", &result);
     assert(!icresp);
     rina_name_free(&name);
-
-    /* Assign to DIF. */
-    ret = rina_ipcp_config(rc, 0, "dif", "test-shim-loopback.DIF");
-    assert(!ret);
-    ret = rina_ipcp_config(rc, 0, "dif", "test-shim-loopback.DIF");
-    assert(!ret);
 
     /* Fetch IPC processes table. */
     rinalite_ipcps_fetch(&rc->loop);
 
     /* Destroy the IPCPs. */
-    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_LOOPBACK);
+    ret = rina_ipcp_destroy(rc, 0, "shim-loopback");
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 1, DIF_TYPE_SHIM_LOOPBACK);
+    ret = rina_ipcp_destroy(rc, 1, "shim-loopback");
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_LOOPBACK);
+    ret = rina_ipcp_destroy(rc, 0, "shim-loopback");
     assert(ret);
 
     return 0;
@@ -560,8 +537,8 @@ struct cmd_descriptor {
 static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "ipcp-create",
-        .usage = "DIF_TYPE IPCP_APN IPCP_API",
-        .num_args = 3,
+        .usage = "IPCP_APN IPCP_API DIF_TYPE DIF_NAME",
+        .num_args = 4,
         .func = ipcp_create,
     },
     {

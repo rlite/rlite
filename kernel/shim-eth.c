@@ -20,7 +20,6 @@
 
 #include <linux/types.h>
 #include <rinalite/rinalite-utils.h>
-#include <rinalite/rina-ipcp-types.h>
 #include "rinalite-kernel.h"
 
 #include <linux/module.h>
@@ -945,7 +944,7 @@ rina_shim_eth_init(void)
 
     memset(&factory, 0, sizeof(factory));
     factory.owner = THIS_MODULE;
-    factory.dif_type = DIF_TYPE_SHIM_ETH;
+    factory.dif_type = "shim-eth";
     factory.create = rina_shim_eth_create;
     factory.ops.destroy = rina_shim_eth_destroy;
     factory.ops.flow_allocate_req = rina_shim_eth_fa_req;
@@ -963,7 +962,7 @@ rina_shim_eth_init(void)
 static void __exit
 rina_shim_eth_fini(void)
 {
-    rina_ipcp_factory_unregister(DIF_TYPE_SHIM_ETH);
+    rina_ipcp_factory_unregister("shim-eth");
 }
 
 module_init(rina_shim_eth_init);

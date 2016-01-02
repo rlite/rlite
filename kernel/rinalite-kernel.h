@@ -65,7 +65,7 @@ struct txrx {
 
 struct dif {
     char *              name;
-    uint8_t             ty;
+    char *              ty;
     unsigned int        max_pdu_life;
     unsigned int        max_pdu_size;
 
@@ -77,7 +77,6 @@ struct ipcp_entry {
     uint16_t            id;    /* Key */
     struct rina_name    name;
     struct dif          *dif;
-    uint8_t             dif_type;
     uint64_t            addr;
     struct ipcp_ops     ops;
     void                *priv;
@@ -97,7 +96,7 @@ struct ipcp_entry {
 struct ipcp_factory {
     /* The module providing this factory. */
     struct module *owner;
-    uint8_t dif_type;
+    const char *dif_type;
     void *(*create)(struct ipcp_entry *ipcp);
     struct ipcp_ops ops;
 
@@ -180,7 +179,7 @@ struct pduft_entry {
 };
 
 int rina_ipcp_factory_register(struct ipcp_factory *factory);
-int rina_ipcp_factory_unregister(uint8_t dif_type);
+int rina_ipcp_factory_unregister(const char *dif_type);
 
 int rina_fa_req_arrived(struct ipcp_entry *ipcp,
                         uint32_t remote_port, uint64_t remote_addr,

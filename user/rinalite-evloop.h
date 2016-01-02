@@ -16,7 +16,7 @@ struct rinalite_ipcp {
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
     uint64_t ipcp_addr;
-    unsigned int dif_type;
+    char *dif_type;
     struct rina_name dif_name;
 
     struct list_head node;

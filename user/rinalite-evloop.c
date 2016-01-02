@@ -35,13 +35,13 @@ ipcp_fetch_resp(struct rinalite_evloop *loop,
         return 0;
     }
 
-    NPD("%s: Fetch IPCP response id=%u, type=%u\n",
+    NPD("%s: Fetch IPCP response id=%u, type=%s\n",
        __func__, resp->ipcp_id, resp->dif_type);
 
     rinalite_ipcp = malloc(sizeof(*rinalite_ipcp));
     if (rinalite_ipcp) {
         rinalite_ipcp->ipcp_id = resp->ipcp_id;
-        rinalite_ipcp->dif_type = resp->dif_type;
+        rinalite_ipcp->dif_type = strdup(resp->dif_type);
         rinalite_ipcp->ipcp_addr = resp->ipcp_addr;
         rina_name_copy(&rinalite_ipcp->ipcp_name, &resp->ipcp_name);
         rina_name_copy(&rinalite_ipcp->dif_name, &resp->dif_name);
@@ -89,7 +89,7 @@ rinalite_ipcps_print(struct rinalite_evloop *loop)
 
             ipcp_name_s = rina_name_to_string(&rinalite_ipcp->ipcp_name);
             dif_name_s = rina_name_to_string(&rinalite_ipcp->dif_name);
-            PI("    id = %d, name = '%s', dif_type ='%d', dif_name = '%s',"
+            PI("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                     " address = %llu\n",
                         rinalite_ipcp->ipcp_id, ipcp_name_s, rinalite_ipcp->dif_type,
                         dif_name_s,
@@ -609,7 +609,7 @@ rinalite_select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name
          * giving priority to normal DIFs. */
         list_for_each_entry(cur, &loop->ipcps, node) {
             if (rina_name_valid(&cur->dif_name) &&
-                    (cur->dif_type == DIF_TYPE_NORMAL ||
+                    (strcmp(cur->dif_type, "normal") == 0 ||
                         !rinalite_ipcp)) {
                 rinalite_ipcp = cur;
             }

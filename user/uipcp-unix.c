@@ -368,7 +368,7 @@ uipcps_update(struct uipcps *uipcps)
 
     /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(rinalite_ipcp, &loop.ipcps, node) {
-        if (rinalite_ipcp->dif_type == DIF_TYPE_NORMAL) {
+        if (strcmp(rinalite_ipcp->dif_type, "normal") == 0) {
             ret = uipcp_add(uipcps, rinalite_ipcp->ipcp_id);
             if (ret) {
                 return ret;

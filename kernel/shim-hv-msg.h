@@ -11,7 +11,6 @@
 #include <stdint.h>
 #endif
 
-#include <rinalite/rina-ipcp-types.h>
 #include <rinalite/rinalite-common.h>
 #include <rinalite/rinalite-utils.h>
 

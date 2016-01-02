@@ -15,12 +15,10 @@ if [ -n "$1" ]; then
     IF=$1
 fi
 
-$RINACONF ipcp-create shim-eth e.IPCP 1
+$RINACONF ipcp-create e.IPCP 1 shim-eth e.DIF
 $RINACONF ipcp-config e.IPCP 1 netdev $IF
-$RINACONF ipcp-config e.IPCP 1 dif e.DIF
 
-$RINACONF ipcp-create normal n.IPCP ${ID}
-$RINACONF ipcp-config n.IPCP ${ID} dif n.DIF
+$RINACONF ipcp-create n.IPCP ${ID} normal n.DIF
 $RINACONF ipcp-config n.IPCP ${ID} address $ID
 $RINACONF ipcp-register e.DIF n.IPCP ${ID}
 

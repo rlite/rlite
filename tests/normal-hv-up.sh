@@ -24,11 +24,9 @@ else
     ADDR=22
 fi
 
-$RINACONF ipcp-create shim-hv $SHIPCP 1
-$RINACONF ipcp-config $SHIPCP 1 dif d.DIF
+$RINACONF ipcp-create $SHIPCP 1 shim-hv d.DIF
 $RINACONF ipcp-config $SHIPCP 1 vmpi-id ${vmpi_id}
-$RINACONF ipcp-create normal $NORMIPCP 1
-$RINACONF ipcp-config $NORMIPCP 1 dif n.DIF
+$RINACONF ipcp-create $NORMIPCP 1 normal n.DIF
 $RINACONF ipcp-config $NORMIPCP 1 address $ADDR
 $RINACONF ipcp-register d.DIF $NORMIPCP 1
 if [ "$1" == "h" ]; then

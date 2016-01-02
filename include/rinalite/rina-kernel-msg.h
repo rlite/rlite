@@ -11,7 +11,6 @@
 #include <stdint.h>
 #endif
 
-#include <rinalite/rina-ipcp-types.h>
 #include <rinalite/rinalite-common.h>
 #include <rinalite/rinalite-utils.h>
 
@@ -58,8 +57,9 @@ struct rina_kmsg_ipcp_create {
     rina_msg_t msg_type;
     uint32_t event_id;
 
-    uint8_t dif_type;
     struct rina_name name;
+    char *dif_type;
+    char *dif_name;
 } __attribute__((packed));
 
 /* application <-- kernel message to inform the application about the
@@ -86,10 +86,10 @@ struct rina_kmsg_fetch_ipcp_resp {
 
     uint8_t end;
     uint16_t ipcp_id;
-    uint8_t dif_type;
     uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
     struct rina_name ipcp_name;
     struct rina_name dif_name;
+    char *dif_type;
 } __attribute__((packed));
 
 struct rina_kmsg_application_register {

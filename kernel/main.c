@@ -120,12 +120,16 @@ static struct rina_dm rina_dm;
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
 static struct ipcp_factory *
-ipcp_factories_find(uint8_t dif_type)
+ipcp_factories_find(const char *dif_type)
 {
     struct ipcp_factory *factory;
 
+    if (!dif_type) {
+        return NULL;
+    }
+
     list_for_each_entry(factory, &rina_dm.ipcp_factories, node) {
-        if (factory->dif_type == dif_type) {
+        if (strcmp(factory->dif_type, dif_type) == 0) {
             return factory;
         }
     }
@@ -139,7 +143,8 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
     struct ipcp_factory *f;
     int ret = 0;
 
-    if (!factory || !factory->create || !factory->owner) {
+    if (!factory || !factory->create || !factory->owner
+            || !factory->dif_type) {
         return -EINVAL;
     }
 
@@ -174,7 +179,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 
     list_add_tail(&f->node, &rina_dm.ipcp_factories);
 
-    printk("%s: IPC processes factory %u registered\n",
+    printk("%s: IPC processes factory '%s' registered\n",
             __func__, factory->dif_type);
 out:
     mutex_unlock(&rina_dm.general_lock);
@@ -184,7 +189,7 @@ out:
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_register);
 
 int
-rina_ipcp_factory_unregister(uint8_t dif_type)
+rina_ipcp_factory_unregister(const char *dif_type)
 {
     struct ipcp_factory *factory;
 
@@ -192,6 +197,7 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 
     factory = ipcp_factories_find(dif_type);
     if (!factory) {
+        mutex_unlock(&rina_dm.general_lock);
         return -EINVAL;
     }
 
@@ -201,7 +207,7 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 
     kfree(factory);
 
-    printk("%s: IPC processes factory %u unregistered\n",
+    printk("%s: IPC processes factory '%s' unregistered\n",
             __func__, dif_type);
 
     return 0;
@@ -252,7 +258,7 @@ ipcp_remove_work(struct work_struct *w)
 }
 
 static struct dif *
-dif_get(const char *dif_name, uint8_t dif_type, int *err)
+dif_get(const char *dif_name, const char *dif_type, int *err)
 {
     struct dif *cur;
 
@@ -263,7 +269,7 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
     list_for_each_entry(cur, &rina_dm.difs, node) {
         if (strcmp(cur->name, dif_name) == 0) {
             /* A DIF called 'dif_name' already exists. */
-            if (cur->ty == dif_type) {
+            if (strcmp(cur->ty, dif_type) == 0) {
                 cur->refcnt++;
             } else {
                 /* DIF type mismatch: report error. */
@@ -289,13 +295,21 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
         goto out;
     }
 
-    cur->ty = dif_type;
+    cur->ty = kstrdup(dif_type, GFP_ATOMIC);
+    if (!cur->ty) {
+        kfree(cur->name);
+        kfree(cur);
+        cur = NULL;
+        *err = -ENOMEM;
+        goto out;
+    }
+
     cur->max_pdu_size = 8000;  /* Currently unused. */
     cur->max_pdu_life = MPL_MSECS_DEFAULT;
     cur->refcnt = 1;
     list_add_tail(&cur->node, &rina_dm.difs);
 
-    PD("%s: DIF %s [type %u] created\n", __func__, cur->name, cur->ty);
+    PD("%s: DIF %s [type '%s'] created\n", __func__, cur->name, cur->ty);
 
 out:
     spin_unlock_bh(&rina_dm.difs_lock);
@@ -316,7 +330,7 @@ dif_put(struct dif *dif)
         goto out;
     }
 
-    PD("%s: DIF %s [type %u] destroyed\n", __func__, dif->name, dif->ty);
+    PD("%s: DIF %s [type '%s' destroyed\n", __func__, dif->name, dif->ty);
 
     list_del(&dif->node);
     kfree(dif->name);
@@ -355,6 +369,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
     struct ipcp_entry *entry;
     struct ipcp_entry *cur;
     int bucket;
+    struct dif *dif;
     int ret = 0;
 
     *pentry = NULL;
@@ -367,14 +382,21 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
     PLOCK();
 
     /* Check if an IPC process with that name already exists.
-     * We could also skip this check here, since it's a check
-     * already performed by userspace. */
+     * This check is also performed by userspace. */
     hash_for_each(rina_dm.ipcp_table, bucket, cur, node) {
         if (rina_name_cmp(&cur->name, &req->name) == 0) {
             PUNLOCK();
             kfree(entry);
             return -EINVAL;
         }
+    }
+
+    /* Create or take a reference to the specified DIF. */
+    dif = dif_get(req->dif_name, req->dif_type, &ret);
+    if (!dif) {
+        PUNLOCK();
+        kfree(entry);
+        return ret;
     }
 
     /* Try to alloc an IPC process id from the bitmap. */
@@ -384,8 +406,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         bitmap_set(rina_dm.ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
-        entry->dif_type = req->dif_type;
-        entry->dif = NULL;
+        entry->dif = dif;
         entry->addr = 0;
         entry->priv = NULL;
         entry->owner = NULL;
@@ -400,6 +421,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         *pentry = entry;
     } else {
         ret = -ENOSPC;
+        dif_put(dif);
         kfree(entry);
     }
 
@@ -436,7 +458,7 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
      * constructor invocation (factory->create()), in order to
      * avoid race conditions. */
     if (!try_module_get(factory->owner)) {
-        printk("%s: IPC process module [%u] unexpectedly "
+        printk("%s: IPC process module [%s] unexpectedly "
                 "disappeared\n", __func__, factory->dif_type);
         ret = -ENXIO;
         goto out;
@@ -1126,11 +1148,11 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 
             resp.end = 0;
             resp.ipcp_id = entry->id;
-            resp.dif_type = entry->dif_type;
             resp.ipcp_addr = entry->addr;
             rina_name_copy(&resp.ipcp_name, &entry->name);
             if (entry->dif) {
                 dif_name = entry->dif->name;
+                resp.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
             }
             rina_name_fill(&resp.dif_name, dif_name, NULL, NULL, NULL);
             rina_dm.ipcp_fetch_last = entry;
@@ -1174,12 +1196,7 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     if (entry) {
         mutex_lock(&entry->lock);
-        if (strcmp(req->name, "dif") == 0) {
-            dif_put(entry->dif);
-            entry->dif = dif_get(req->value, entry->dif_type, &ret);
-        } else {
-            ret = entry->ops.config(entry, req->name, req->value);
-        }
+        ret = entry->ops.config(entry, req->name, req->value);
         mutex_unlock(&entry->lock);
     }
 
