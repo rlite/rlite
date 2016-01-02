@@ -88,7 +88,7 @@ snd_inact_tmr_cb(long unsigned arg)
     dtp->set_drf = true;
 
     /* InitialSeqNumPolicy */
-    dtp->next_seq_num_to_send = 0;
+    //dtp->next_seq_num_to_send = 0;
 
     /* Discard the retransmission queue. */
 
