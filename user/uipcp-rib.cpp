@@ -49,8 +49,8 @@ struct Neighbor {
     struct uipcp_rib *rib;
 
     /* Information about the neighbor. */
-    list< string > lower_difs;
-    uint64_t address;
+    list< string > lower_difs; // XXX deprecated
+    uint64_t address; // XXX deprecated
 
     enum state_t {
         NONE = 0,
@@ -121,6 +121,8 @@ struct uipcp_rib {
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int ipcp_register(int reg, string lower_dif);
     int application_register(int reg, const RinaName& appl_name);
+    uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
+    int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
@@ -329,6 +331,44 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
     PD("Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
             uipcp->ipcp_id);
+
+    return 0;
+}
+
+uint64_t
+uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
+{
+    map< string, NeighborCandidate >::const_iterator
+            mit = cand_neighbors.find(static_cast<string>(neigh_name));
+
+    if (mit != cand_neighbors.end()) {
+        return mit->second.address;
+    }
+
+    return 0;
+}
+
+int
+uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
+{
+    LowerFlow lf;
+    RinaName neigh_name = RinaName(&neigh.ipcp_name);
+    uint64_t remote_addr = lookup_neighbor_address(neigh_name);
+
+    if (remote_addr == 0) {
+        PE("Cannot find address for neighbor %s\n",
+            static_cast<string>(neigh_name).c_str());
+        return -1;
+    }
+
+    lf.local_addr = local_addr;
+    lf.remote_addr = remote_addr;
+    lf.cost = 1;
+    lf.seqnum = 1;
+    lf.state = true;
+    lf.age = 0;
+
+    lfdb[static_cast<string>(lf)] = lf;
 
     return 0;
 }
@@ -910,6 +950,8 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     EnrollmentInfo enr_info(objbuf, objlen);
 
+    /* TODO update our address according to enr_info.address. */
+
     /* If operational state indicates that we (the initiator) are already
      * DIF member, we can send our dynamic information to the slave. */
 
@@ -925,12 +967,16 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     }
 
     if (enr_info.start_early) {
-        enrollment_state = ENROLLED;
         PI("Initiator is allowed to start early\n");
+        enrollment_state = ENROLLED;
+
+        /* Add a new LowerFlow entry to the RIB, corresponding to
+         * the new neighbor. */
+        rib->add_lower_flow(enr_info.address, *this);
 
     } else {
-        enrollment_state = I_WAIT_START;
         PI("Initiator is not allowed to start early\n");
+        enrollment_state = I_WAIT_START;
     }
 
     return 0;
@@ -941,6 +987,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 {
     /* (7) S <-- I: M_STOP_R */
     /* (8) S --> I: M_START(status) */
+    struct rinalite_ipcp *ipcp;
     CDAPMessage m;
     int ret;
 
@@ -963,6 +1010,11 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     }
 
     enrollment_state = ENROLLED;
+
+    /* Add a new LowerFlow entry to the RIB, corresponding to
+     * the new neighbor. */
+    ipcp = rib->ipcp_info();
+    rib->add_lower_flow(ipcp->ipcp_addr, *this);
 
     return 0;
 }

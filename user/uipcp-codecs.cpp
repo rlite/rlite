@@ -1,6 +1,7 @@
 #include <iostream>
 #include <list>
 #include <string>
+#include <sstream>
 
 #include "rinalite/rinalite-common.h"
 
@@ -324,6 +325,15 @@ LowerFlow::serialize(char *buf, unsigned int size) const
     LowerFlow2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
+}
+
+LowerFlow::operator std::string() const
+{
+    stringstream ss;
+
+    ss << local_addr << "-" << remote_addr;
+
+    return ss.str();
 }
 
 LowerFlowList::LowerFlowList(const char *buf, unsigned int size)

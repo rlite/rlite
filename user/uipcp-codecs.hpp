@@ -88,6 +88,8 @@ struct LowerFlow : public UipcpObject {
     LowerFlow() { }
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
+
+    operator std::string() const;
 };
 
 struct LowerFlowList : public UipcpObject {
