@@ -967,21 +967,21 @@ rlite_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow
 
 static int
 rlite_shim_eth_flow_get_stats(struct flow_entry *flow,
-                              struct rl_kmsg_flow_stats_resp *resp)
+                              struct rl_flow_stats *stats)
 {
     struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
     struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp;
 
     spin_lock_bh(&priv->tx_lock);
-    resp->stats.tx_pkt = flow_priv->stats.tx_pkt;
-    resp->stats.tx_byte = flow_priv->stats.tx_byte;
-    resp->stats.tx_err = flow_priv->stats.tx_err;
+    stats->tx_pkt = flow_priv->stats.tx_pkt;
+    stats->tx_byte = flow_priv->stats.tx_byte;
+    stats->tx_err = flow_priv->stats.tx_err;
     spin_unlock_bh(&priv->tx_lock);
 
     spin_lock_bh(&priv->arpt_lock);
-    resp->stats.rx_pkt = flow_priv->stats.rx_pkt;
-    resp->stats.rx_byte = flow_priv->stats.rx_byte;
-    resp->stats.rx_err = flow_priv->stats.rx_err;
+    stats->rx_pkt = flow_priv->stats.rx_pkt;
+    stats->rx_byte = flow_priv->stats.rx_byte;
+    stats->rx_err = flow_priv->stats.rx_err;
     spin_unlock_bh(&priv->arpt_lock);
 
     return 0;

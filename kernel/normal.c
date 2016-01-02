@@ -478,6 +478,7 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             int ret = rlite_rtxq_push(dtp, rb);
 
             if (unlikely(ret)) {
+                dtp->stats.tx_err++;
                 spin_unlock_bh(&dtp->lock);
                 rlite_buf_free(rb);
 
@@ -485,6 +486,9 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             }
         }
     }
+
+    dtp->stats.tx_pkt++;
+    dtp->stats.tx_byte += rb->len;
 
     spin_unlock_bh(&dtp->lock);
 
@@ -997,6 +1001,9 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
+        dtp->stats.rx_pkt++;
+        dtp->stats.rx_byte += rb->len;
+
         spin_unlock_bh(&dtp->lock);
 
         ret = rlite_buf_pci_pop(rb);
@@ -1016,6 +1023,7 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
         RPD(5, "Dropping duplicate PDU [seq=%lu]\n",
                 (long unsigned)seqnum);
         rlite_buf_free(rb);
+        dtp->stats.rx_err++;
 
         if (flow->cfg.dtcp.flow_control &&
                 dtp->rcv_lwe >= dtp->last_snd_data_ack) {
@@ -1098,6 +1106,9 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
             crb = sdu_rx_sv_update(ipcp, flow);
         }
 
+        dtp->stats.rx_pkt++;
+        dtp->stats.rx_byte += rb->len;
+
         spin_unlock_bh(&dtp->lock);
 
         ret = rlite_buf_pci_pop(rb);
@@ -1127,11 +1138,16 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
                 (long unsigned)seqnum);
         rlite_buf_free(rb);
 
+        dtp->stats.rx_err++;
+
     } else {
         /* What is not dropped nor delivered goes in the
          * sequencing queue.
          */
         seqq_push(dtp, rb);
+
+        dtp->stats.rx_pkt++;
+        dtp->stats.rx_byte += rb->len;
     }
 
     crb = sdu_rx_sv_update(ipcp, flow);
@@ -1171,6 +1187,19 @@ rlite_normal_sdu_rx_consumed(struct flow_entry *flow,
     return 0;
 }
 
+static int
+rlite_normal_flow_get_stats(struct flow_entry *flow,
+                            struct rl_flow_stats *stats)
+{
+    struct dtp *dtp = &flow->dtp;
+
+    spin_lock_bh(&dtp->lock);
+    *stats = dtp->stats;
+    spin_unlock_bh(&dtp->lock);
+
+    return 0;
+}
+
 #define SHIM_DIF_TYPE   "normal"
 
 static struct ipcp_factory normal_factory = {
@@ -1189,6 +1218,7 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_del = rlite_normal_pduft_del,
     .ops.mgmt_sdu_write = rlite_normal_mgmt_sdu_write,
     .ops.sdu_rx = rlite_normal_sdu_rx,
+    .ops.flow_get_stats = rlite_normal_flow_get_stats,
 };
 
 static int __init

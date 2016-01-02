@@ -1712,7 +1712,7 @@ rlite_flow_get_stats(struct rlite_ctrl *rc,
     resp.event_id = req->event_id;
 
     if (flow->txrx.ipcp->ops.flow_get_stats) {
-        ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp);
+        ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp.stats);
     }
     flow_put(flow);
 
