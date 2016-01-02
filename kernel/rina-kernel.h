@@ -122,6 +122,7 @@ struct dtp {
     struct list_head seqq;
     struct list_head rtxq;
     struct timer_list rtx_tmr;
+    long unsigned rtx_tmr_next;
 };
 
 struct flow_entry {
