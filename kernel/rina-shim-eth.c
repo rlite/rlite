@@ -240,19 +240,57 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return -EINVAL;
 }
 
+static void
+shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
+{
+    PD("ARPLEN %d EXP %d\n", len, (int)(sizeof(*arp) + 2*(arp->ar_pln + arp->ar_hln)));
+    if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
+        /* Send an ARP reply if necessary. */
+    } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
+        /* Update the ARP table. */
+    } else {
+        PI("%s: Unknown RINA ARP operation %04X\n", __func__,
+                ntohs(arp->ar_op));
+    }
+}
+
 static rx_handler_result_t
 shim_eth_rx_handler(struct sk_buff **skbp)
 {
     struct sk_buff *skb = (*skbp);
     struct rina_shim_eth *priv = (struct rina_shim_eth *)
                 rcu_dereference(skb->dev->rx_handler_data);
+    unsigned int ethertype = ntohs(skb->protocol);
 
-    PD("%s: intercept skb %u\n", __func__, skb->len);
+    (void)priv;
+
+    PD("%s: intercept skb %u, protocol %u\n", __func__, skb->len, ntohs(skb->protocol));
+
+    if (ethertype == ETH_P_ARP) {
+        /* This is an ARP frame. */
+        struct arphdr *arp = (struct arphdr *)skb->data;
+
+        if (ntohs(arp->ar_pro) == ETH_P_RINA) {
+            /* This ARP operation belongs to RINA stack. */
+            PD("SHIM ETH ARP\n");
+            shim_eth_arp_rx(priv, arp, skb->len);
+
+        } else {
+            /* This ARP operation belongs to regular stack. */
+            return RX_HANDLER_PASS;
+        }
+
+    } else if (ethertype == ETH_P_RINA) {
+        /* This is a RINA shim-eth PDU. */
+        PD("SHIM ETH PDU\n");
+
+    } else {
+        /* This frame doesn't belong to RINA stack. */
+        return RX_HANDLER_PASS;
+    }
 
     /* Steal the skb from the kernel stack. */
     dev_consume_skb_any(skb);
-
-    (void)priv;
 
     return RX_HANDLER_CONSUMED;
 }
