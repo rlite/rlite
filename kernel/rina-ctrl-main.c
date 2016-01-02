@@ -57,6 +57,28 @@ struct rina_ctrl {
     wait_queue_head_t upqueue_wqh;
 };
 
+static int
+rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg,
+                    size_t rmsg_len)
+{
+    struct upqueue_entry *entry;
+
+    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    if (!entry) {
+        return -ENOMEM;
+    }
+
+    entry->msg = rmsg;
+    entry->msg_len = rmsg_len;
+    mutex_lock(&rc->upqueue_lock);
+    list_add_tail(&entry->node, &rc->upqueue);
+    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
+                               POLLRDBAND);
+    mutex_unlock(&rc->upqueue_lock);
+
+    return 0;
+}
+
 static void
 ipcp_id_release(unsigned int ipcp_id)
 {
@@ -92,7 +114,6 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
                     (const struct rina_ctrl_create_ipcp *)buf;
     struct rina_ctrl_create_ipcp kmsg;
     struct rina_ctrl_create_ipcp_resp *rmsg;
-    struct upqueue_entry *entry;
     int ret;
     char *name_s;
     unsigned int ipcp_id;
@@ -129,18 +150,11 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     rmsg->ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
-    if (!entry) {
-        ret = -ENOMEM;
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)rmsg,
+                              sizeof(*rmsg));
+    if (ret) {
         goto err3;
     }
-    entry->msg = rmsg;
-    entry->msg_len = sizeof(*rmsg);
-    mutex_lock(&rc->upqueue_lock);
-    list_add_tail(&entry->node, &rc->upqueue);
-    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
-                               POLLRDBAND);
-    mutex_unlock(&rc->upqueue_lock);
 
     name_s = rina_name_to_string(&kmsg.name);
     printk("IPC process %s created\n", name_s);
@@ -165,7 +179,6 @@ rina_ipcp_destroy(struct rina_ctrl *rc, const char __user *buf, size_t len)
                     (const struct rina_ctrl_destroy_ipcp *)buf;
     struct rina_ctrl_destroy_ipcp kmsg;
     struct rina_ctrl_destroy_ipcp_resp *rmsg;
-    struct upqueue_entry *entry;
     int ret;
 
     if (len != sizeof(*umsg)) {
@@ -185,24 +198,14 @@ rina_ipcp_destroy(struct rina_ctrl *rc, const char __user *buf, size_t len)
     rmsg->event_id = kmsg.event_id;
     rmsg->result = 0;
 
-    /* Alloc an entry for the response. */
-    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
-    if (!entry) {
-        ret = -ENOMEM;
-        goto err1;
-    }
-    entry->msg = rmsg;
-    entry->msg_len = sizeof(*rmsg);
-
     /* Release the IPC process ID. */
     ipcp_id_release(kmsg.ipcp_id);
 
-    /* Enqueue the response into the upqueue. */
-    mutex_lock(&rc->upqueue_lock);
-    list_add_tail(&entry->node, &rc->upqueue);
-    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
-                               POLLRDBAND);
-    mutex_unlock(&rc->upqueue_lock);
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)rmsg,
+                              sizeof(*rmsg));
+    if (ret) {
+        goto err1;
+    }
 
     printk("IPC process %u destroyed\n", kmsg.ipcp_id);
 
@@ -272,6 +275,7 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 
         mutex_lock(&rc->upqueue_lock);
         if (list_empty(&rc->upqueue)) {
+            /* No pending messages? Let's sleep. */
             mutex_unlock(&rc->upqueue_lock);
 
             if (signal_pending(current)) {
@@ -285,16 +289,20 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 
         entry = list_first_entry(&rc->upqueue, struct upqueue_entry, node);
         if (len < entry->msg_len) {
-            /* Not enough space. Don't pop the entry from the upqueue. */
+            /* Not enough space? Don't pop the entry from the upqueue. */
             ret = -ENOBUFS;
         } else {
-            list_del(&entry->node);
             if (unlikely(copy_to_user(buf, entry->msg, entry->msg_len))) {
                 ret = -EFAULT;
             } else {
                 ret = entry->msg_len;
                 *ppos += ret;
             }
+
+            /* Unlink and free the upqueue entry and the associated message. */
+            list_del(&entry->node);
+            kfree(entry->msg);
+            kfree(entry);
         }
 
         mutex_unlock(&rc->upqueue_lock);
