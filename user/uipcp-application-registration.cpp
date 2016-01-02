@@ -107,7 +107,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
     remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     if (req->reg) {
-        /* Registration require a response, while unregistrations don't. */
+        /* Registration requires a response, while unregistrations doesn't. */
         return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
                                         RLITE_SUCC, req);
     }

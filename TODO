@@ -39,3 +39,5 @@
   che possono essere fatte da tutte le applicazioni
 
 - implementare list_for_each_entry_safe()
+
+- uniformare l'uso di RLITE_SUCC e RLITE_ERR

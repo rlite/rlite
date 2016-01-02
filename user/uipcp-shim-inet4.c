@@ -43,7 +43,7 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
     FILE *fin;
     char *linebuf = NULL;
     size_t sz;
-    size_t n;
+    ssize_t n;
     int found = 0;
 
     if (addr2sock) {
@@ -240,7 +240,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     bp = malloc(sizeof(*bp));
     if (!bp) {
         PE("Out of memory\n");
-        return -1;
+        goto err0;
     }
 
     bp->appl_name_s = rina_name_to_string(&req->appl_name);
@@ -273,7 +273,9 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
 
     list_add_tail(&bp->node, &shim->bindpoints);
 
-    return 0;
+    /* Registration requires a response, while unregistrations doesn't. */
+    return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+                                    RLITE_SUCC, req);
 
 err3:
     close(bp->fd);
@@ -281,8 +283,9 @@ err2:
     free(bp->appl_name_s);
 err1:
     free(bp);
-
-    return -1;
+err0:
+    return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+                                    RLITE_ERR, req);
 }
 
 static int
