@@ -165,6 +165,26 @@ static int ipcp_destroy(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int assign_to_dif(int argc, char **argv)
+{
+    struct rina_amsg_register req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    const char *dif_name;
+
+    assert(argc >= 3);
+    dif_name = argv[0];
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
+
+    req.msg_type = RINA_APPL_ASSIGN_TO_DIF;
+    req.event_id = 0;
+    rina_name_fill(&req.application_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 static int application_register_common(const struct rina_name *app_name,
                                        const char *dif_name, int reg)
 {
@@ -193,15 +213,15 @@ application_register(int argc, char **argv)
 {
     struct rina_name application_name;
     const char *dif_name;
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *apn;
+    const char *api;
 
     assert(argc >= 3);
     dif_name = argv[0];
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
+    apn = argv[1];
+    api = argv[2];
 
-    rina_name_fill(&application_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&application_name, apn, api, NULL, NULL);
 
     return application_register_common(&application_name, dif_name, 1);
 }
@@ -211,15 +231,15 @@ application_unregister(int argc, char **argv)
 {
     struct rina_name application_name;
     const char *dif_name;
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *apn;
+    const char *api;
 
     assert(argc >= 3);
     dif_name = argv[0];
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
+    apn = argv[1];
+    api = argv[2];
 
-    rina_name_fill(&application_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&application_name, apn, api, NULL, NULL);
 
     return application_register_common(&application_name, dif_name, 0);
 }
@@ -234,13 +254,13 @@ struct cmd_descriptor {
 static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "application-register",
-        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .usage = "DIF_NAME APN API",
         .num_args = 3,
         .func = application_register,
     },
     {
         .name = "application-unregister",
-        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .usage = "DIF_NAME APN API",
         .num_args = 3,
         .func = application_unregister,
     },
@@ -255,6 +275,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_APN IPCP_API",
         .num_args = 2,
         .func = ipcp_destroy,
+    },
+    {
+        .name = "assign-to-dif",
+        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .num_args = 3,
+        .func = assign_to_dif,
     },
 };
 

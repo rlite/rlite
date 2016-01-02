@@ -690,6 +690,47 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
 }
 
 static int
+rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
+                        const struct rina_msg_base *b_req)
+{
+    struct ipcp *ipcp = NULL;
+    struct ipcp *cur;
+    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+    struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
+    uint8_t result = 1;
+
+    if (rina_name_valid(&req->application_name)) {
+        /* The request specifies an IPCP: lookup that. */
+        list_for_each_entry(cur, &ipcm->ipcps, node) {
+            if (rina_name_valid(&cur->ipcp_name)
+                    && rina_name_cmp(&cur->ipcp_name,
+                            &req->application_name) == 0) {
+                ipcp = cur;
+                break;
+            }
+        }
+    }
+
+    if (!ipcp) {
+        printf("%s: Could not find a suitable IPC process\n", __func__);
+    } else {
+        /* Forward the request to the kernel. */
+        kresp = assign_to_dif(ipcm, ipcp->ipcp_id, &req->dif_name);
+        if (kresp) {
+            result = kresp->result;
+            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+        }
+    }
+
+    resp.msg_type = RINA_APPL_ASSIGN_TO_DIF_RESP;
+    resp.event_id = req->event_id;
+    resp.result = result;
+
+    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+}
+
+static int
 rina_appl_register(struct ipcm *ipcm, int sfd,
                    const struct rina_msg_base *b_req)
 {
@@ -786,6 +827,7 @@ typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
 static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_IPCP_CREATE] = rina_appl_ipcp_create,
     [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
+    [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
     [RINA_APPL_REGISTER] = rina_appl_register,
     [RINA_APPL_UNREGISTER] = rina_appl_unregister,
     [RINA_APPL_MSG_MAX] = NULL,
