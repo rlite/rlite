@@ -1013,6 +1013,11 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 
             app = ipcp_application_lookup(ipcp_entry, remote_application);
             if (app) {
+                /* If the remote application is registered within this very
+                 * IPCP, the allocating flow can managed entirely inside this
+                 * IPCP. Then bypass all the userspace flow allocation request
+                 * and directly invoke rina_fa_req_arrived, with reversed
+                 * arguments. */
                 ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                           ipcp_entry->addr, remote_application,
                                           local_application, 0);
@@ -1145,6 +1150,11 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             /* No userspace IPCP to use, this should not happen. */
         } else {
             if (flow_entry->remote_addr == ipcp->addr) {
+                /* This flow is managed entirely in this IPCP - basically
+                 * the flow is established between the IPCP and itself.
+                 * Bypass all the userspace flow allocation response
+                 * and directly invoke rina_fa_resp_arrived, with reversed
+                 * arguments. */
                 ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
                                            flow_entry->local_port,
                                            ipcp->addr,

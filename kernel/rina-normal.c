@@ -128,6 +128,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         return 0;
     }
     if (lower_flow) {
+        /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
         lower_ipcp = lower_flow->txrx.ipcp;
         BUG_ON(!lower_ipcp);
     }
@@ -152,6 +153,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             ret -= sizeof(struct rina_pci);
         }
     } else {
+        /* This SDU gets loopbacked to this IPCP, since this is a
+         * self flow (flow->remote_addr == ipcp->addr). */
         int len = rb->len - sizeof(struct rina_pci);
 
         ret = ipcp->ops.sdu_rx(ipcp, rb);
