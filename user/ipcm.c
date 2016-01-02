@@ -157,7 +157,7 @@ application_register_resp(struct ipcm *ipcm,
     struct rina_msg_application_register *req =
             (struct rina_msg_application_register *)b_req;
     char *name_s = NULL;
-    int reg = resp->msg_type == RINA_CTRL_APPLICATION_REGISTER_RESP ? 1 : 0;
+    int reg = resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
 
     name_s = rina_name_to_string(&req->application_name);
 
@@ -183,13 +183,13 @@ typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
 
 /* The table containing all response handlers. */
 static rina_resp_handler_t rina_handlers[] = {
-    [RINA_CTRL_CREATE_IPCP_RESP] = ipcp_create_resp,
-    [RINA_CTRL_DESTROY_IPCP_RESP] = ipcp_destroy_resp,
-    [RINA_CTRL_FETCH_IPCP_RESP] = fetch_ipcp_resp,
-    [RINA_CTRL_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
-    [RINA_CTRL_APPLICATION_REGISTER_RESP] = application_register_resp,
-    [RINA_CTRL_APPLICATION_UNREGISTER_RESP] = application_register_resp,
-    [RINA_CTRL_MSG_MAX] = NULL,
+    [RINA_KERN_CREATE_IPCP_RESP] = ipcp_create_resp,
+    [RINA_KERN_DESTROY_IPCP_RESP] = ipcp_destroy_resp,
+    [RINA_KERN_FETCH_IPCP_RESP] = fetch_ipcp_resp,
+    [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
+    [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
+    [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
+    [RINA_KERN_MSG_MAX] = NULL,
 };
 
 /* The event loop function. */
@@ -229,7 +229,7 @@ evloop_function(void *arg)
         resp = (struct rina_msg_base *)serbuf;
 
         /* Do we have an handler for this response message? */
-        if (resp->msg_type > RINA_CTRL_MSG_MAX ||
+        if (resp->msg_type > RINA_KERN_MSG_MAX ||
                 !rina_handlers[resp->msg_type]) {
             printf("%s: Invalid message type [%d] received",__func__,
                     resp->msg_type);
@@ -359,7 +359,7 @@ ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_CTRL_CREATE_IPCP;
+    msg->msg_type = RINA_KERN_CREATE_IPCP;
     rina_name_copy(&msg->name, name);
     msg->dif_type = dif_type;
 
@@ -382,7 +382,7 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_CTRL_DESTROY_IPCP;
+    msg->msg_type = RINA_KERN_DESTROY_IPCP;
     msg->ipcp_id = ipcp_id;
 
     printf("Requesting IPC process destruction...\n");
@@ -404,7 +404,7 @@ fetch_ipcp(struct ipcm *ipcm)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_CTRL_FETCH_IPCP;
+    msg->msg_type = RINA_KERN_FETCH_IPCP;
 
     printf("Requesting IPC processes fetch...\n");
 
@@ -445,7 +445,7 @@ assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_CTRL_ASSIGN_TO_DIF;
+    req->msg_type = RINA_KERN_ASSIGN_TO_DIF;
     req->ipcp_id = ipcp_id;
     rina_name_copy(&req->dif_name, dif_name);
 
@@ -467,8 +467,8 @@ application_register(struct ipcm *ipcm, int reg, unsigned int ipcp_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = reg ? RINA_CTRL_APPLICATION_REGISTER
-                        : RINA_CTRL_APPLICATION_UNREGISTER;
+    req->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER
+                        : RINA_KERN_APPLICATION_UNREGISTER;
     req->ipcp_id = ipcp_id;
     rina_name_copy(&req->application_name, application_name);
 

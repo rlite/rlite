@@ -299,7 +299,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         ret = -ENOMEM;
         goto err2;
     }
-    resp->msg_type = RINA_CTRL_CREATE_IPCP_RESP;
+    resp->msg_type = RINA_KERN_CREATE_IPCP_RESP;
     resp->event_id = req->event_id;
     resp->ipcp_id = ipcp_id;
 
@@ -337,7 +337,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (!resp) {
         return -ENOMEM;
     }
-    resp->msg_type = RINA_CTRL_DESTROY_IPCP_RESP;
+    resp->msg_type = RINA_KERN_DESTROY_IPCP_RESP;
     resp->event_id = req->event_id;
 
     /* Release the IPC process ID. */
@@ -375,7 +375,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     if (!resp) {
         return -ENOMEM;
     }
-    resp->msg_type = RINA_CTRL_FETCH_IPCP_RESP;
+    resp->msg_type = RINA_KERN_FETCH_IPCP_RESP;
     resp->event_id = req->event_id;
     mutex_lock(&rina_dm.lock);
     stop_next = (rina_dm.ipcp_fetch_last == NULL);
@@ -443,7 +443,7 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
     mutex_unlock(&rina_dm.lock);
 
-    resp->msg_type = RINA_CTRL_ASSIGN_TO_DIF_RESP;
+    resp->msg_type = RINA_KERN_ASSIGN_TO_DIF_RESP;
     resp->event_id = req->event_id;
 
     /* Enqueue the response into the upqueue. */
@@ -548,7 +548,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->application_name);
     struct ipcp_entry *entry;
-    int reg = req->msg_type == RINA_CTRL_APPLICATION_REGISTER ? 1 : 0;
+    int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
     int ret;
 
     /* Create the response message. */
@@ -581,8 +581,8 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
     mutex_unlock(&rina_dm.lock);
 
-    resp->msg_type = reg ? RINA_CTRL_APPLICATION_REGISTER_RESP
-                         : RINA_CTRL_APPLICATION_UNREGISTER_RESP;
+    resp->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER_RESP
+                         : RINA_KERN_APPLICATION_UNREGISTER_RESP;
     resp->event_id = req->event_id;
 
     /* Enqueue the response into the upqueue. */
@@ -613,13 +613,13 @@ typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
-    [RINA_CTRL_CREATE_IPCP] = rina_ipcp_create,
-    [RINA_CTRL_DESTROY_IPCP] = rina_ipcp_destroy,
-    [RINA_CTRL_FETCH_IPCP] = rina_ipcp_fetch,
-    [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
-    [RINA_CTRL_APPLICATION_REGISTER] = rina_application_register,
-    [RINA_CTRL_APPLICATION_UNREGISTER] = rina_application_register,
-    [RINA_CTRL_MSG_MAX] = NULL,
+    [RINA_KERN_CREATE_IPCP] = rina_ipcp_create,
+    [RINA_KERN_DESTROY_IPCP] = rina_ipcp_destroy,
+    [RINA_KERN_FETCH_IPCP] = rina_ipcp_fetch,
+    [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
+    [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
+    [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
+    [RINA_KERN_MSG_MAX] = NULL,
 };
 
 static ssize_t
@@ -656,7 +656,7 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
     bmsg = (struct rina_msg_base *)rc->msgbuf;
 
     /* Demultiplex the message to the right message handler. */
-    if (bmsg->msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[bmsg->msg_type]) {
+    if (bmsg->msg_type > RINA_KERN_MSG_MAX || !rina_handlers[bmsg->msg_type]) {
         kfree(kbuf);
         return -EINVAL;
     }
@@ -795,10 +795,10 @@ static const struct file_operations rina_ctrl_fops = {
     .llseek         = noop_llseek,
 };
 
-#define RINA_CTRL_MINOR     247
+#define RINA_KERN_MINOR     247
 
 static struct miscdevice rina_ctrl_misc = {
-    .minor = RINA_CTRL_MINOR,
+    .minor = RINA_KERN_MINOR,
     .name = "rina-ctrl",
     .fops = &rina_ctrl_fops,
 };
@@ -832,5 +832,5 @@ rina_ctrl_fini(void)
 module_init(rina_ctrl_init);
 module_exit(rina_ctrl_fini);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS_MISCDEV(RINA_CTRL_MINOR);
+MODULE_ALIAS_MISCDEV(RINA_KERN_MINOR);
 MODULE_ALIAS("devname: rina-ctrl");

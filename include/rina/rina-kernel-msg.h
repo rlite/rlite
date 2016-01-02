@@ -1,5 +1,5 @@
-#ifndef __RINA_CTRL_H__
-#define __RINA_CTRL_H__
+#ifndef __RINA_KERN_H__
+#define __RINA_KERN_H__
 
 /*
  * When compiling from userspace include <stdint.h>,
@@ -19,25 +19,25 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RINA_CTRL_CREATE_IPCP = 1,
-    RINA_CTRL_CREATE_IPCP_RESP, /* 2 */
-    RINA_CTRL_DESTROY_IPCP,     /* 3 */
-    RINA_CTRL_DESTROY_IPCP_RESP, /* 4 */
-    RINA_CTRL_FETCH_IPCP, /* 5 */
-    RINA_CTRL_FETCH_IPCP_RESP, /* 6 */
-    RINA_CTRL_ASSIGN_TO_DIF, /* 7 */
-    RINA_CTRL_ASSIGN_TO_DIF_RESP, /* 8 */
-    RINA_CTRL_APPLICATION_REGISTER, /* 9 */
-    RINA_CTRL_APPLICATION_REGISTER_RESP, /* 10 */
-    RINA_CTRL_APPLICATION_UNREGISTER, /* 11 */
-    RINA_CTRL_APPLICATION_UNREGISTER_RESP, /* 12 */
+    RINA_KERN_CREATE_IPCP = 1,
+    RINA_KERN_CREATE_IPCP_RESP, /* 2 */
+    RINA_KERN_DESTROY_IPCP,     /* 3 */
+    RINA_KERN_DESTROY_IPCP_RESP, /* 4 */
+    RINA_KERN_FETCH_IPCP, /* 5 */
+    RINA_KERN_FETCH_IPCP_RESP, /* 6 */
+    RINA_KERN_ASSIGN_TO_DIF, /* 7 */
+    RINA_KERN_ASSIGN_TO_DIF_RESP, /* 8 */
+    RINA_KERN_APPLICATION_REGISTER, /* 9 */
+    RINA_KERN_APPLICATION_REGISTER_RESP, /* 10 */
+    RINA_KERN_APPLICATION_UNREGISTER, /* 11 */
+    RINA_KERN_APPLICATION_UNREGISTER_RESP, /* 12 */
 
-    RINA_CTRL_MSG_MAX,
+    RINA_KERN_MSG_MAX,
 };
 
 /* Numtables for kernel <==> ipcm messages exchange. */
 
-extern struct rina_msg_layout rina_kernel_numtables[RINA_CTRL_MSG_MAX+1];
+extern struct rina_msg_layout rina_kernel_numtables[RINA_KERN_MSG_MAX+1];
 
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_msg_ipcp_create {
@@ -93,4 +93,4 @@ struct rina_msg_application_register {
     struct rina_name application_name;
 } __attribute__((packed));
 
-#endif  /* __RINA_CTRL_H__ */
+#endif  /* __RINA_KERN_H__ */
