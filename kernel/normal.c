@@ -632,7 +632,7 @@ rlite_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     if (strcmp(param_name, "address") == 0) {
         rl_addr_t address;
 
-        ret = kstrtou64(param_value, 10, &address);
+        ret = kstrtou32(param_value, 10, &address);
         if (ret == 0) {
             PI("IPCP %u address set to %lu\n", ipcp->id,
                (long unsigned)address);
