@@ -14,6 +14,7 @@ struct ipcp_ops {
     int (*application_register)(struct ipcp_entry *ipcp, struct rina_name *app_name);
     int (*application_unregister)(struct ipcp_entry *ipcp, struct rina_name *app_name);
     int (*flow_allocate_req)(struct ipcp_entry *ipcp, struct flow_entry *flow);
+    int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow);
     int (*sdu_write)(struct ipcp_entry *ipcp, void *sdu, unsigned int sdu_len);
 };
 
@@ -48,6 +49,7 @@ struct flow_entry {
     uint8_t             state;
     struct rina_name    local_application;
     struct rina_name    remote_application;
+    struct ipcp_entry   *ipcp;
 
     struct mutex        lock;
     struct hlist_node   node;

@@ -73,6 +73,10 @@ flow_allocate_resp_arrived(struct rina_evloop *loop,
 }
 
 static int
+flow_allocate_resp(struct application *application, uint16_t ipcp_id,
+                   uint32_t port_id, uint8_t response);
+
+static int
 flow_allocate_req_arrived(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
@@ -87,8 +91,9 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     pfr = malloc(sizeof(*pfr));
     if (!pfr) {
         printf("%s: Out of memory\n", __func__);
-        /* TODO negative flow alloc request. */
-        return 0;
+        /* Negative flow allocation response. */
+        return flow_allocate_resp(application,req->ipcp_id,
+                                    req->port_id, 1);
     }
     pfr->ipcp_id = req->ipcp_id;
     pfr->port_id = req->port_id;
@@ -178,8 +183,8 @@ flow_allocate_req(struct application *application, int wait_for_completion,
 }
 
 static int
-flow_allocate_resp(struct application *application,
-                       struct pending_flow_req *pfr, uint8_t response)
+flow_allocate_resp(struct application *application, uint16_t ipcp_id,
+                   uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_flow_allocate_resp *req;
     struct rina_msg_base *resp;
@@ -193,8 +198,8 @@ flow_allocate_resp(struct application *application,
     memset(req, 0, sizeof(*req));
 
     req->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP;
-    req->ipcp_id = pfr->ipcp_id;
-    req->port_id = pfr->port_id;
+    req->ipcp_id = ipcp_id;
+    req->port_id = port_id;
     req->response = response;
 
     printf("Responding to flow allocation request...\n");
@@ -314,7 +319,8 @@ server_function(void *arg)
                 __func__, pfr->ipcp_id, pfr->port_id);
 
         /* Always accept incoming connection, for now. */
-        result = flow_allocate_resp(application, pfr, 1);
+        result = flow_allocate_resp(application, pfr->ipcp_id,
+                                    pfr->port_id, 0);
         free(pfr);
         (void) result;
     }

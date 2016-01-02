@@ -130,6 +130,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         !factory->ops.application_register ||
         !factory->ops.application_unregister ||
         !factory->ops.flow_allocate_req ||
+        !factory->ops.flow_allocate_resp ||
         !factory->ops.sdu_write) {
         return -EINVAL;
     }
@@ -656,7 +657,8 @@ flow_table_find(unsigned int port_id)
 }
 
 static int
-flow_add(struct rina_name *local_application,
+flow_add(struct ipcp_entry *ipcp,
+         struct rina_name *local_application,
          struct rina_name *remote_application,
          struct flow_entry **pentry, int locked)
 {
@@ -682,6 +684,7 @@ flow_add(struct rina_name *local_application,
         rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
+        entry->ipcp = ipcp;
         mutex_init(&entry->lock);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
     } else {
@@ -769,8 +772,8 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(&req->local_application, &req->remote_application,
-                   &flow_entry, 0);
+    ret = flow_add(ipcp_entry, &req->local_application,
+                   &req->remote_application, &flow_entry, 0);
     if (ret) {
         goto negative;
     }
@@ -825,9 +828,13 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto out;
     }
     flow_entry->state = FLOW_STATE_ALLOCATED;
-    ret = 0;
 
-    /* Notify the involved IPC process about the response. TODO */
+    /* Notify the involved IPC process about the response. */
+    ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
+                                             flow_entry);
+    if (ret) {
+        flow_del(flow_entry->local_port, 0);
+    }
 
 out:
     mutex_unlock(&rina_dm.lock);
@@ -862,7 +869,8 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(local_application, remote_application, &flow_entry, 0);
+    ret = flow_add(ipcp, local_application, remote_application,
+                   &flow_entry, 0);
     if (ret) {
         mutex_unlock(&rina_dm.lock);
         return ret;
