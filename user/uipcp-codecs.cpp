@@ -761,3 +761,64 @@ RtxCtrlConfig::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2DtcpConfig(DtcpConfig& cfg,
+               const gpb::dtcpConfig_t &gm)
+{
+    cfg.flow_ctrl = gm.flowcontrol();
+    cfg.rtx_ctrl = gm.rtxcontrol();
+    gpb2FlowCtrlConfig(cfg.flow_ctrl_cfg, gm.flowcontrolconfig());
+    gpb2RtxCtrlConfig(cfg.rtx_ctrl_cfg, gm.rtxcontrolconfig());
+    gpb2PolicyDescr(cfg.lost_ctrl_pdu, gm.lostcontrolpdupolicy());
+    gpb2PolicyDescr(cfg.rtt_estimator, gm.rttestimatorpolicy());
+}
+
+static int
+DtcpConfig2gpb(const DtcpConfig& cfg,
+               gpb::dtcpConfig_t &gm)
+{
+    gpb::policyDescriptor_t *p;
+    gpb::dtcpFlowControlConfig_t *f;
+    gpb::dtcpRtxControlConfig_t *r;
+
+    gm.set_flowcontrol(cfg.flow_ctrl);
+    gm.set_rtxcontrol(cfg.rtx_ctrl);
+
+    f = new gpb::dtcpFlowControlConfig_t;
+    FlowCtrlConfig2gpb(cfg.flow_ctrl_cfg, *f);
+    gm.set_allocated_flowcontrolconfig(f);
+
+    r = new gpb::dtcpRtxControlConfig_t;
+    RtxCtrlConfig2gpb(cfg.rtx_ctrl_cfg, *r);
+    gm.set_allocated_rtxcontrolconfig(r);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.lost_ctrl_pdu, *p);
+    gm.set_allocated_lostcontrolpdupolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rtt_estimator, *p);
+    gm.set_allocated_rttestimatorpolicy(p);
+
+    return 0;
+}
+
+DtcpConfig::DtcpConfig(const char *buf, unsigned int size)
+{
+    gpb::dtcpConfig_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2DtcpConfig(*this, gm);
+}
+
+int
+DtcpConfig::serialize(char *buf, unsigned int size) const
+{
+    gpb::dtcpConfig_t gm;
+
+    DtcpConfig2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+

@@ -200,4 +200,17 @@ struct RtxCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct DtcpConfig {
+    bool flow_ctrl;
+    FlowCtrlConfig flow_ctrl_cfg;
+    bool rtx_ctrl;
+    RtxCtrlConfig rtx_ctrl_cfg;
+    PolicyDescr lost_ctrl_pdu;
+    PolicyDescr rtt_estimator;
+
+    DtcpConfig() { }
+    DtcpConfig(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
