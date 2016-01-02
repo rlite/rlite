@@ -24,6 +24,11 @@
 
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
 
-- kernel: usare i valori di timeout indicati nel flow_config
-
-- impedire la flow allocation se un IPCP non è ancora stato assegnato ad un DIF
+- problema: in rina_sdu_rx_flow() non c'è un controllo sulla dimensione
+  massima della coda di ricezione per userspace. D'altronde in quel punto
+  non si possono buttare pacchetti, altrimenti la ritrasmissione implementata
+  dal normal ipcp non funzionerebbe. Bisogna, come minimo, che il normale
+  controlli in normal_sdu_rx() se l'upper è userspace, ed in tal caso butti
+  il pacchetto se la coda è troppo lunga, prima di aggiornare lo stato del
+  DTP (e quindi gestire flow control, ristrasmissione, variabili di stato,
+  etc.)
