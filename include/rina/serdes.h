@@ -8,12 +8,13 @@ unsigned int string_prlen(const char *s);
 unsigned rina_name_serlen(const struct rina_name *name);
 void serialize_string(void **pptr, const char *s);
 void serialize_rina_name(void **pptr, const struct rina_name *name);
-unsigned int serialize_rina_msg(void *serbuf, unsigned int serbuf_len,
+unsigned int serialize_rina_msg(void *serbuf,
                    const struct rina_ctrl_base_msg *msg);
 int deserialize_string(const void **pptr, char **s);
 int deserialize_rina_name(const void **pptr, struct rina_name *name);
 int deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len);
+unsigned int rina_msg_serlen(const struct rina_ctrl_base_msg *msg);
 
 /* Serialize a numeric variable _v of type _t. */
 #define serialize_obj(_p, _t, _v)       \

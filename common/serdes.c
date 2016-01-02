@@ -154,10 +154,24 @@ static struct rina_msg_layout rina_msg_numtables[] = {
     },
 };
 
+unsigned int
+rina_msg_serlen(const struct rina_ctrl_base_msg *msg)
+{
+    unsigned int ret = rina_msg_numtables[msg->msg_type].copylen;
+    struct rina_name *name;
+    int i;
+
+    name = (struct rina_name *)(((void *)msg) + ret);
+    for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
+        ret += rina_name_serlen(name);
+    }
+
+    return ret;
+}
+
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rina_msg(void *serbuf, unsigned int serbuf_len,
-                   const struct rina_ctrl_base_msg *msg)
+serialize_rina_msg(void *serbuf, const struct rina_ctrl_base_msg *msg)
 {
     void *serptr = serbuf;
     unsigned int serlen;

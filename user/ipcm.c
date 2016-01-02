@@ -163,7 +163,7 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
 {
     struct pending_entry *entry;
     char serbuf[4096];
-    size_t serlen;
+    unsigned int serlen;
     int ret;
 
     /* Store the request in the pending queue before issuing the request
@@ -181,7 +181,14 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
     pending_queue_enqueue(&ipcm->pqueue, entry);
 
     /* Serialize the message. */
-    serlen = serialize_rina_msg(serbuf, sizeof(serbuf), msg);
+    serlen = rina_msg_serlen(msg);
+    if (serlen > sizeof(serbuf)) {
+        printf("%s: Serialized message would be too long [%u]\n",
+                    __func__, serlen);
+        free(entry);
+        return ENOBUFS;
+    }
+    serlen = serialize_rina_msg(serbuf, msg);
 
     /* Issue the request to the kernel. */
     ret = write(ipcm->rfd, serbuf, serlen);
@@ -189,7 +196,7 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
         if (ret < 0) {
             perror("write(rfd)");
         } else {
-            printf("%s: Error: partial write [%u/%lu]\n", __func__,
+            printf("%s: Error: partial write [%d/%u]\n", __func__,
                     ret, serlen);
         }
     }

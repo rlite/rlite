@@ -53,7 +53,6 @@ static struct rina_dm rina_dm;
 
 struct rina_ctrl {
     char msgbuf[1024];
-    char serbuf[1024];
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -73,15 +72,14 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg)
         return -ENOMEM;
     }
 
-    /* Serialize the response into rc->serbuf and then copy it into a
-     * sized buffer to be put into the upqueue. */
-    serlen = serialize_rina_msg(rc->serbuf, sizeof(rc->serbuf), rmsg);
+    /* Serialize the response into serbuf and then put it into the upqueue. */
+    serlen = rina_msg_serlen(rmsg);
     serbuf = kmalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         return -ENOMEM;
     }
-    memcpy(serbuf, rc->serbuf, serlen);
+    serlen = serialize_rina_msg(serbuf, rmsg);
 
     entry->sermsg = serbuf;
     entry->serlen = serlen;
