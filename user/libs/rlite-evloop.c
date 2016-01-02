@@ -107,6 +107,24 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
     return 0;
 }
 
+static int
+ipcp_update(struct rlite_evloop *loop,
+            const struct rlite_msg_base_resp *b_resp,
+            const struct rlite_msg_base *b_req)
+{
+    const struct rl_kmsg_ipcp_update *upd =
+        (const struct rl_kmsg_ipcp_update *)b_resp;
+
+    (void)b_req;
+
+    PD("UPDATE IPCP update_type=%d, id=%u, addr=%lu, depth=%u, dif_name=%s "
+       "dif_type=%s\n",
+        upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
+        upd->dif_name, upd->dif_type);
+
+    return 0;
+}
+
 uint32_t
 rlite_evloop_get_id(struct rlite_evloop *loop)
 {
@@ -680,6 +698,11 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     if (!loop->handlers[RLITE_KER_IPCP_FETCH_RESP]) {
         NPD("setting default fetch handler\n");
         loop->handlers[RLITE_KER_IPCP_FETCH_RESP] = ipcp_fetch_resp;
+    }
+
+    if (!loop->handlers[RLITE_KER_IPCP_UPDATE]) {
+        NPD("setting default update handler\n");
+        loop->handlers[RLITE_KER_IPCP_UPDATE] = ipcp_update;
     }
 
     /* Create and start the event-loop thread. */

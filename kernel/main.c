@@ -2259,6 +2259,58 @@ rlite_ctrl_poll(struct file *f, poll_table *wait)
 }
 
 static int
+initial_ipcp_update(struct rlite_ctrl *rc)
+{
+    struct ipcp_entry *entry;
+    int bucket;
+    int ret = 0;
+
+    PLOCK();
+
+    hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
+        struct rl_kmsg_ipcp_update upd;
+        const char *dif_name = NULL;
+
+        memset(&upd, 0, sizeof(upd));
+
+        upd.msg_type = RLITE_KER_IPCP_UPDATE;
+        upd.update_type = RLITE_UPDATE_ADD;
+        upd.ipcp_id = entry->id;
+        upd.ipcp_addr = entry->addr;
+        upd.depth = entry->depth;
+        if (rina_name_copy(&upd.ipcp_name, &entry->name)) {
+            ret = -ENOMEM;
+        }
+        if (entry->dif) {
+            dif_name = entry->dif->name;
+            upd.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
+            if (!upd.dif_type) {
+                ret = -ENOMEM;
+            }
+        }
+        if (dif_name) {
+            upd.dif_name = kstrdup(dif_name, GFP_ATOMIC);
+            if (!upd.dif_name) {
+                ret = -ENOMEM;
+            }
+        }
+
+        rlite_upqueue_append(rc, (const struct rlite_msg_base *)&upd);
+
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                       (struct rlite_msg_base *)&upd);
+    }
+
+    PUNLOCK();
+
+    if (ret) {
+        PE("Out of memory\n");
+    }
+
+    return ret;
+}
+
+static int
 rlite_ctrl_open(struct inode *inode, struct file *f)
 {
     struct rlite_ctrl *rc;
@@ -2280,6 +2332,10 @@ rlite_ctrl_open(struct inode *inode, struct file *f)
     mutex_lock(&rlite_dm.general_lock);
     list_add_tail(&rc->node, &rlite_dm.ctrl_devs);
     mutex_unlock(&rlite_dm.general_lock);
+
+    /* Enqueue RLITE_KER_IPCP_UPDATE messages for all the
+     * IPCPs in the system. */
+    initial_ipcp_update(rc);
 
     return 0;
 }

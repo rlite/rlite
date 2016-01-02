@@ -24,6 +24,12 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
         .names = 1,
         .strings = 2,
     },
+    [RLITE_KER_IPCP_UPDATE] = {
+        .copylen = sizeof(struct rl_kmsg_ipcp_update) -
+                    1 * sizeof(struct rina_name) - 2 * sizeof(char *),
+        .names = 1,
+        .strings = 2,
+    },
     [RLITE_KER_APPL_REGISTER] = {
         .copylen = sizeof(struct rl_kmsg_appl_register) -
                     1 * sizeof(struct rina_name),

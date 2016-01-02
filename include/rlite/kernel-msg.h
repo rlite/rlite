@@ -37,6 +37,7 @@ enum {
     RLITE_KER_UIPCP_FA_RESP_ARRIVED, /* 17 */
     RLITE_KER_FLOW_DEALLOCATED, /* 18 */
     RLITE_KER_FLOW_DEALLOC, /* 19 */
+    RLITE_KER_IPCP_UPDATE,
 
     RLITE_KER_MSG_MAX,
 };
@@ -84,6 +85,24 @@ struct rl_kmsg_fetch_ipcp_resp {
     uint32_t event_id;
 
     uint8_t end;
+    uint16_t ipcp_id;
+    uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
+    uint16_t  depth;
+    struct rina_name ipcp_name;
+    char *dif_name;
+    char *dif_type;
+} __attribute__((packed));
+
+#define RLITE_UPDATE_ADD    0x01
+#define RLITE_UPDATE_UPD    0x02
+#define RLITE_UPDATE_DEL    0x03
+
+/* application <-- kernel message to report updated IPCP information. */
+struct rl_kmsg_ipcp_update {
+    rlite_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t update_type;
     uint16_t ipcp_id;
     uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
     uint16_t  depth;
