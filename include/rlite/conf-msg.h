@@ -23,7 +23,7 @@ enum {
     RLITE_CFG_MSG_MAX,
 };
 
-/* Numtables for rina-config <==> uipcp-server messages exchange. */
+/* Numtables for rlite-config <==> uipcp-server messages exchange. */
 
 extern struct rlite_msg_layout rlite_conf_numtables[RLITE_CFG_MSG_MAX + 1];
 

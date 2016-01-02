@@ -8,7 +8,7 @@ if [ -n "$1" ]; then
     ID=$1
 fi
 
-rina-config ipcp-destroy n.IPCP ${ID}
-rina-config ipcp-destroy e.IPCP 1
+rlite-config ipcp-destroy n.IPCP ${ID}
+rlite-config ipcp-destroy e.IPCP 1
 
 source tests/epilogue.sh

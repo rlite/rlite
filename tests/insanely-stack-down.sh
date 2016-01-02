@@ -7,10 +7,10 @@ source tests/env.sh
 # auto-unregistration
 
 for i in $(seq 30 -1 1); do
-    rina-config ipcp-destroy n.1.IPCP $i
-    rina-config ipcp-destroy n.2.IPCP $i
+    rlite-config ipcp-destroy n.1.IPCP $i
+    rlite-config ipcp-destroy n.2.IPCP $i
 done
 
-rina-config ipcp-destroy d.IPCP 1
+rlite-config ipcp-destroy d.IPCP 1
 
 source tests/epilogue.sh

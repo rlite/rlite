@@ -8,6 +8,6 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-rina-config ipcp-destroy ${1}.IPCP 1
+rlite-config ipcp-destroy ${1}.IPCP 1
 
 source tests/epilogue.sh

@@ -172,8 +172,8 @@ for i in vms:
             'rlite-uipcps &> uipcp.log &\n'\
             '\n'\
             'for i in $(seq 1 %(levels)s); do\n'\
-            '   rina-config ipcp-create n.${i}.IPCP %(id)s normal n.${i}.DIF\n'\
-            '   rina-config ipcp-config n.${i}.IPCP %(id)s address %(id)d\n'\
+            '   rlite-config ipcp-create n.${i}.IPCP %(id)s normal n.${i}.DIF\n'\
+            '   rlite-config ipcp-config n.${i}.IPCP %(id)s address %(id)d\n'\
             'done\n'\
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
                    'id': vm['id'], 'levels': args.levels,
@@ -185,19 +185,19 @@ for i in vms:
                      'shimtype': args.type}
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
-                'rina-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
+                'rlite-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
         if args.type == 'eth':
-                outs += 'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n' % vars_dict
+                outs += 'rlite-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n' % vars_dict
         elif args.type == 'inet4':
                 outs += 'sudo ip addr add 10.71.%(brid)s.%(id)s/24 dev $PORT\n' % vars_dict
                 entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.DIF///' % vars_dict
                 outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
                 inet4_dir.append(entry)
-        outs += 'rina-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
+        outs += 'rlite-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
                 '\n' % vars_dict
 
     outs += 'for i in $(seq 2 %(levels)s); do\n'\
-            '   rina-config ipcp-register n.$(($i-1)).DIF n.$i.IPCP %(id)s\n'\
+            '   rlite-config ipcp-register n.$(($i-1)).DIF n.$i.IPCP %(id)s\n'\
             'done\n'\
             'true\n'\
             'ENDSSH\n'\
@@ -254,7 +254,7 @@ for br_name in bridges:
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
-            'rina-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
+            'rlite-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
                                     'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
             'sleep 1\n'\
             'true\n'\
@@ -285,7 +285,7 @@ for level in range(2, args.levels + 1):
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
-            'rina-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
+            'rlite-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
                             'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
             'sleep 1\n'\
             'true\n'\
