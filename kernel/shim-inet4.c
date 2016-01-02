@@ -140,7 +140,8 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
             } else {
                 priv->cur_rx_hdr = false;
                 priv->cur_rx_rb = rlite_buf_alloc(priv->cur_rx_rblen,
-                                                 RLITE_DEFAULT_LAYERS, GFP_ATOMIC);
+                                                  priv->flow->txrx.ipcp->depth,
+                                                  GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     PE("Out of memory\n");
                     break;

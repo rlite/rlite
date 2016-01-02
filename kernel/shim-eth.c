@@ -639,8 +639,8 @@ out:
 static void
 shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rlite_buf *rb = rlite_buf_alloc(skb->len, RLITE_DEFAULT_LAYERS,
-                                         GFP_ATOMIC);
+    struct rlite_buf *rb = rlite_buf_alloc(skb->len, priv->ipcp->depth,
+                                           GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
     struct flow_entry *flow = NULL;
