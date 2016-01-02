@@ -453,6 +453,50 @@ flow_lookup(unsigned int port_id)
 }
 EXPORT_SYMBOL_GPL(flow_lookup);
 
+static void
+tx_completion_func(unsigned long arg)
+{
+    struct flow_entry *flow = (struct flow_entry *)arg;
+    struct ipcp_entry *ipcp = flow->txrx.ipcp;
+    bool drained = false;
+
+    for (;;) {
+        struct rina_buf *rb;
+        int ret;
+
+        spin_lock(&flow->rmtq_lock);
+        if (flow->rmtq_len == 0) {
+            drained = true;
+            spin_unlock(&flow->rmtq_lock);
+            break;
+        }
+
+        rb = list_first_entry(&flow->rmtq, struct rina_buf, node);
+        list_del(&rb->node);
+        flow->rmtq_len--;
+        spin_unlock(&flow->rmtq_lock);
+
+        PD("%s: Sending [%lu] from rmtq\n", __func__,
+                (long unsigned)RINA_BUF_PCI(rb)->seqnum);
+
+        ret = ipcp->ops.sdu_write(ipcp, flow, rb, false);
+        if (unlikely(ret == -EAGAIN)) {
+            PD("%s: Pushing [%lu] back to rmtq\n", __func__,
+                    (long unsigned)RINA_BUF_PCI(rb)->seqnum);
+            spin_lock(&flow->rmtq_lock);
+            list_add(&rb->node, &flow->rmtq);
+            flow->rmtq_len++;
+            spin_unlock(&flow->rmtq_lock);
+            break;
+        }
+    }
+
+    if (drained) {
+        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
+                                   POLLWRBAND | POLLWRNORM);
+    }
+}
+
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
@@ -489,6 +533,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->refcnt = 0;
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+        INIT_LIST_HEAD(&entry->rmtq);
+        entry->rmtq_len = 0;
+        spin_lock_init(&entry->rmtq_lock);
+        tasklet_init(&entry->tx_completion, tx_completion_func,
+                     (unsigned long)entry);
         dtp_init(&entry->dtp);
         if (flowcfg) {
             memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
@@ -564,7 +613,13 @@ flow_del_entry(struct flow_entry *entry, int locked)
     PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
     ipcp_del_entry(entry->txrx.ipcp, 0);
 
+    list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+    }
+
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
+        list_del(&rb->node);
         rina_buf_free(rb);
     }
     hash_del(&entry->node);
@@ -1389,8 +1444,18 @@ rina_write_restart(uint32_t local_port)
 
     flow = flow_table_find(local_port);
     if (flow) {
-        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
-            POLLWRBAND | POLLWRNORM);
+        spin_lock(&flow->rmtq_lock);
+        if (flow->rmtq_len > 0) {
+            /* Schedule a tasklet to complete the tx work.
+             * If appropriate, the tasklet will wake up
+             * waiting process contexts. */
+            tasklet_schedule(&flow->tx_completion);
+        } else {
+            /* Wake up waiting process contexts directly. */
+            wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
+                POLLWRBAND | POLLWRNORM);
+        }
+        spin_unlock(&flow->rmtq_lock);
     }
 
     mutex_unlock(&rina_dm.lock);

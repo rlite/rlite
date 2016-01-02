@@ -7,6 +7,7 @@
 #include <linux/wait.h>
 #include <linux/hrtimer.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 
 #include "rina-bufs.h"
 
@@ -131,6 +132,11 @@ struct flow_entry {
     struct txrx         txrx;
     struct dtp          dtp;
     struct rina_flow_config cfg;
+
+    struct list_head    rmtq;
+    unsigned int        rmtq_len;
+    spinlock_t          rmtq_lock;
+    struct tasklet_struct   tx_completion;
 
     unsigned int        refcnt;
     struct hlist_node   node;

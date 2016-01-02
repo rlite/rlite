@@ -173,7 +173,9 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
         lower_ipcp = lower_flow->txrx.ipcp;
         BUG_ON(!lower_ipcp);
 
-        add_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+        if (maysleep) {
+            add_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+        }
 
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
@@ -183,18 +185,28 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
                                             rb, maysleep);
 
             if (unlikely(ret == -EAGAIN)) {
-                /* Cannot restart system call from here... */
+                if (!maysleep) {
+                    /* Enqueue in the RMT queue. */
+                    spin_lock(&lower_flow->rmtq_lock);
+                    list_add_tail(&rb->node, &lower_flow->rmtq);
+                    lower_flow->rmtq_len++;
+                    spin_unlock(&lower_flow->rmtq_lock);
+                } else {
+                    /* Cannot restart system call from here... */
 
-                /* No room to write, let's sleep. */
-                schedule();
-                continue;
+                    /* No room to write, let's sleep. */
+                    schedule();
+                    continue;
+                }
             }
 
             break;
         }
 
         current->state = TASK_RUNNING;
-        remove_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+        if (maysleep) {
+            remove_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+        }
 
         return ret;
     }
