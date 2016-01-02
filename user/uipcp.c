@@ -71,6 +71,56 @@ uipcp_flow_allocate_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     return result;
 }
 
+struct dft_entry {
+    struct rina_name appl_name;
+    uint64_t remote_addr;
+
+    struct list_head node;
+};
+
+static struct dft_entry *
+dft_lookup(struct uipcp *uipcp, const struct rina_name *appl_name)
+{
+    struct dft_entry *entry;
+
+    list_for_each_entry(entry, &uipcp->dft, node) {
+        if (rina_name_cmp(&entry->appl_name, appl_name) == 0) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
+int
+uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
+              uint64_t remote_addr)
+{
+    struct dft_entry *entry;
+    char *appl_s;
+
+    entry = dft_lookup(uipcp, appl_name);
+    if (!entry) {
+        entry = malloc(sizeof(*entry));
+        if (!entry) {
+            return -1;
+        }
+        memset(entry, 0, sizeof(*entry));
+        rina_name_copy(&entry->appl_name, appl_name);
+        list_add_tail(&entry->node, &uipcp->dft);
+    }
+    entry->remote_addr = remote_addr;
+
+    appl_s = rina_name_to_string(appl_name);
+    PD("%s: '%s' --> %llu\n", __func__, appl_s,
+            (long long unsigned)remote_addr);
+    if (appl_s) {
+        free(appl_s);
+    }
+
+    return 0;
+}
+
 static int
 uipcp_flow_allocate_req(struct rina_evloop *loop,
                         const struct rina_msg_base_resp *b_resp,
@@ -257,6 +307,7 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
 
     uipcp->ipcp_id = ipcp_id;
     uipcp->ipcm = ipcm;
+    list_init(&uipcp->dft);
 
     list_add_tail(&uipcp->node, &ipcm->uipcps);
 

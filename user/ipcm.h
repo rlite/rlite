@@ -39,6 +39,8 @@ struct uipcp {
     struct ipcm *ipcm;
     unsigned int ipcp_id;
     pthread_t server_th;
+
+    /* Implementation of the Directory Forwarding Table (DFT). */
     struct list_head dft;
 
     struct list_head node;
@@ -54,5 +56,7 @@ int uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id);
 int uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id);
 struct uipcp *uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id);
 int uipcps_fetch(struct ipcm *ipcm);
+int uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
+                  uint64_t remote_addr);
 
 #endif /* __RINA_UIPCP_H__ */

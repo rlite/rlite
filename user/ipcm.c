@@ -532,43 +532,14 @@ out:
 }
 
 static int
-rina_ipcp_dft_set(struct ipcm *ipcm, unsigned int ipcp_id,
-                  const struct rina_name *appl_name, uint64_t remote_addr)
-{
-    struct rina_kmsg_ipcp_dft_set *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_DFT_SET;
-    req->ipcp_id = ipcp_id;
-    rina_name_copy(&req->appl_name, appl_name);
-    req->remote_addr = remote_addr;
-
-    PD("Requesting IPCP DFT set...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    return result;
-}
-
-static int
 rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
     struct rina_amsg_ipcp_dft_set *req = (struct rina_amsg_ipcp_dft_set *)b_req;
     struct rina_msg_base_resp resp;
     unsigned int ipcp_id;
+    struct uipcp *uipcp;
+    int ret;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -578,8 +549,18 @@ rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    resp.result = rina_ipcp_dft_set(ipcm, ipcp_id, &req->appl_name,
-                                    req->remote_addr);
+    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    if (!uipcp) {
+        PE("%s: Could not find uipcp for IPC process %u\n", __func__, ipcp_id);
+        goto out;
+    }
+
+    ret = uipcp_dft_set(uipcp, &req->appl_name, req->remote_addr);
+    if (ret) {
+        goto out;
+    }
+
+    resp.result = 0;
 
 out:
     return rina_conf_response(sfd, RMB(req), &resp);
