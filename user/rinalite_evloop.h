@@ -8,8 +8,7 @@
 #include <rina/rina-conf-msg.h>
 #include <rina/rina-utils.h>
 
-#include "pending_queue.h"
-#include "list.h"
+#include "rinalite_list.h"
 
 
 struct rinalite_ipcp {

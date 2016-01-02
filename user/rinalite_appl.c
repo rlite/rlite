@@ -15,7 +15,7 @@
 #include "rina/rina-conf-msg.h"
 #include "rina/rina-utils.h"
 
-#include "list.h"
+#include "rinalite_list.h"
 #include "rinalite_evloop.h"
 #include "rinalite_appl.h"
 

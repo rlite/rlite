@@ -3,7 +3,7 @@
 
 #include <rina/rina-common.h>
 #include <stdint.h>
-#include "list.h"
+#include "rinalite_list.h"
 #include "rinalite_evloop.h"
 
 

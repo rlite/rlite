@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <rina/rina-common.h>
-#include "list.h"
+#include "rinalite_list.h"
 
 struct pending_entry {
     struct rina_msg_base *msg;
