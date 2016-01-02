@@ -36,6 +36,7 @@
 #include <linux/sched.h>
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
+#include <linux/spinlock.h>
 
 
 struct rina_ctrl;
@@ -91,10 +92,15 @@ struct rina_dm {
 
     struct list_head ipcp_factories;
 
+    spinlock_t flows_lock;
+
     struct mutex lock;
 };
 
 static struct rina_dm rina_dm;
+
+#define FLOCK() spin_lock(&rina_dm.flows_lock)
+#define FUNLOCK() spin_unlock(&rina_dm.flows_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(uint8_t dif_type)
@@ -421,32 +427,37 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
-/* Code improvement: we may merge ipcp_table_find() and flow_table_find()
+/* Code improvement: we may merge ipcp_table_find() and flow_get()
  * into a template (a macro). */
 static struct flow_entry *
-flow_table_find(unsigned int port_id)
+flow_get(unsigned int port_id)
 {
     struct flow_entry *entry;
     struct hlist_head *head;
 
+    FLOCK();
+
     head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->local_port == port_id) {
+            FUNLOCK();
             return entry;
         }
     }
 
+    FUNLOCK();
+
     return NULL;
 }
 
-/* Exported (and locked) version of flow_table_find(). */
+/* Exported (and locked) version of flow_get(). */
 struct flow_entry *
 flow_lookup(unsigned int port_id)
 {
     struct flow_entry *flow;
 
     mutex_lock(&rina_dm.lock);
-    flow = flow_table_find(port_id);
+    flow = flow_get(port_id);
     mutex_unlock(&rina_dm.lock);
 
     return flow;
@@ -562,8 +573,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 }
 
 int
-flow_del_entry(struct flow_entry *entry, int locked)
+flow_put(struct flow_entry *entry, int locked)
 {
+    struct ipcp_entry *ipcp = NULL;
     struct dtp *dtp = &entry->dtp;
     struct rina_buf *rb;
     struct rina_buf *tmp;
@@ -571,6 +583,8 @@ flow_del_entry(struct flow_entry *entry, int locked)
 
     if (locked)
         mutex_lock(&rina_dm.lock);
+
+    FLOCK();
 
     if (entry->refcnt) {
         entry->refcnt--;
@@ -600,7 +614,7 @@ flow_del_entry(struct flow_entry *entry, int locked)
             schedule_delayed_work(&dtp->remove, 2 * HZ);
             /* Reference counter is zero here, but since the delayed
              * worker is going to use the flow, we reset the reference
-             * counter to 1. The delayed worker will invoke flow_del_entry()
+             * counter to 1. The delayed worker will invoke flow_put()
              * after having performed is work.
              */
             entry->refcnt++;
@@ -608,10 +622,9 @@ flow_del_entry(struct flow_entry *entry, int locked)
         }
     }
 
-    dtp_fini(&entry->dtp);
+    ipcp = entry->txrx.ipcp;
 
-    PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
-    ipcp_del_entry(entry->txrx.ipcp, 0);
+    dtp_fini(&entry->dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
         list_del(&rb->node);
@@ -630,6 +643,13 @@ flow_del_entry(struct flow_entry *entry, int locked)
     printk("%s: flow entry %u removed\n", __func__, entry->local_port);
     kfree(entry);
 out:
+    FUNLOCK();
+
+    if (ipcp) {
+        PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
+        ipcp_del_entry(entry->txrx.ipcp, 0);
+    }
+
     if (locked)
         mutex_unlock(&rina_dm.lock);
 
@@ -687,7 +707,7 @@ flow_rc_unbind(struct rina_ctrl *rc)
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
                  * remove the flow. */
-                flow_del_entry(flow, 0);
+                flow_put(flow, 0);
             } else {
                 /* If no rina_io device binds to this allocated flow,
                  * the associated memory will never be released.
@@ -924,7 +944,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
-    flow = flow_table_find(req->local_port);
+    flow = flow_get(req->local_port);
     if (ipcp && flow && ipcp->ops.pduft_set) {
         ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
     }
@@ -1101,7 +1121,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 out:
     if (ret) {
         if (flow_entry) {
-            flow_del_entry(flow_entry, 0);
+            flow_put(flow_entry, 0);
         }
 
         return ret;
@@ -1226,7 +1246,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
     }
 
     if (ret || response) {
-        flow_del_entry(flow_entry, 0);
+        flow_put(flow_entry, 0);
     }
 out:
 
@@ -1245,7 +1265,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     /* Lookup the flow corresponding to the port-id specified
      * by the request. */
-    flow_entry = flow_table_find(req->port_id);
+    flow_entry = flow_get(req->port_id);
     if (!flow_entry) {
         printk("%s: no pending flow corresponding to port-id %u\n",
                 __func__, req->port_id);
@@ -1309,7 +1329,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);
     if (ret) {
-        flow_del_entry(flow_entry, 0);
+        flow_put(flow_entry, 0);
     }
     rina_name_free(&req.remote_appl);
 out:
@@ -1336,7 +1356,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
         mutex_lock(&rina_dm.lock);
     }
 
-    flow_entry = flow_table_find(local_port);
+    flow_entry = flow_get(local_port);
     if (!flow_entry) {
         goto out;
     }
@@ -1359,7 +1379,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     if (response) {
         /* Negative response --> delete the flow. */
-        flow_del_entry(flow_entry, 0);
+        flow_put(flow_entry, 0);
     }
 
 out:
@@ -1380,7 +1400,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 
     mutex_lock(&rina_dm.lock);  /* Here we should use ipcp mutex! */
 
-    flow = flow_table_find(local_port);
+    flow = flow_get(local_port);
     if (!flow) {
         rina_buf_free(rb);
         ret = -ENXIO;
@@ -1442,7 +1462,7 @@ rina_write_restart(uint32_t local_port)
 
     mutex_lock(&rina_dm.lock);
 
-    flow = flow_table_find(local_port);
+    flow = flow_get(local_port);
     if (flow) {
         spin_lock(&flow->rmtq_lock);
         if (flow->rmtq_len > 0) {
@@ -1857,7 +1877,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
     struct flow_entry *flow = NULL;
     long ret = 0;
 
-    flow = flow_table_find(info->port_id);
+    flow = flow_get(info->port_id);
     if (!flow) {
         printk("%s: Error: No such flow\n", __func__);
         return -ENXIO;
@@ -1928,7 +1948,7 @@ rina_io_release_internal(struct rina_io *rio)
                 PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
                 ipcp_del_entry(rio->flow->upper.ipcp, 0);
             }
-            flow_del_entry(rio->flow, 0);
+            flow_put(rio->flow, 0);
             rio->flow = NULL;
             rio->txrx = NULL;
             break;
@@ -2046,6 +2066,7 @@ rina_ctrl_init(void)
     bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rina_dm.ipcp_table);
     mutex_init(&rina_dm.lock);
+    spin_lock_init(&rina_dm.flows_lock);
     rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
 
