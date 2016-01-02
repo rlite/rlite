@@ -120,14 +120,10 @@ inet4_rx_worker(struct work_struct *w)
 
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
                              sizeof(lenhdr), msghdr.msg_flags);
-        if (unlikely(ret != sizeof(lenhdr))) {
-            if (ret >= 0) {
-                PE("Partial read %d/%d\n", ret, 2);
-
-            } else if (ret != -EAGAIN) {
-                PE("recvmsg(): %d\n", ret);
+        if (ret != sizeof(lenhdr)) {
+            if (unlikely(ret && ret != -EAGAIN)) {
+                PE("recvmsg(2): %d\n", ret);
             }
-
             break;
         }
 
@@ -135,7 +131,7 @@ inet4_rx_worker(struct work_struct *w)
         PD("lenhdr %d, ret = %d\n", lenhdr, ret);
 
         if (!lenhdr) {
-            PI("Warning: zero lenght packet\n");
+            PE("Warning: zero lenght packet\n");
             continue;
         }
 
@@ -154,11 +150,8 @@ inet4_rx_worker(struct work_struct *w)
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
                              lenhdr, msghdr.msg_flags);
         if (unlikely(ret != lenhdr)) {
-            if (ret >= 0) {
-                PE("Partial read %d/%d\n", ret, lenhdr);
-
-            } else if (ret != -EAGAIN) {
-                PE("recvmsg(): %d\n", ret);
+            if (ret && ret != -EAGAIN) {
+                PE("recvmsg(%d): %d\n", lenhdr, ret);
             }
             break;
         }
@@ -280,6 +273,9 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
             PI("sock_sendmsg(): partial write %d/%d\n",
                ret, (int)rb->len);
         }
+
+    } else {
+        PD("sock_sendmsg(%d + 2)\n", (int)rb->len);
     }
 
     rina_buf_free(rb);
