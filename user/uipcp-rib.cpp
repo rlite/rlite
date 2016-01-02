@@ -191,6 +191,7 @@ struct uipcp_rib {
     int dft_handler(const CDAPMessage *rm);
     int neighbors_handler(const CDAPMessage *rm);
     int lfdb_handler(const CDAPMessage *rm);
+    int flows_handler(const CDAPMessage *rm);
 };
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
@@ -199,6 +200,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
     handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
+    handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
 }
 
 struct rinalite_ipcp *
@@ -703,7 +705,8 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
 
         if (pos != string::npos) {
             container_obj_name = rm->obj_name.substr(0, pos);
-            PD("Trying agaoin with container '%s'\n", container_obj_name.c_str());
+            PD("Falling back to container object '%s'\n",
+               container_obj_name.c_str());
             hi = handlers.find(container_obj_name);
         }
     }
@@ -907,6 +910,39 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
         spe.run(ipcp_info()->ipcp_addr, lfdb);
         pduft_sync();
     }
+
+    return 0;
+}
+
+int
+uipcp_rib::flows_handler(const CDAPMessage *rm)
+{
+    const char *objbuf;
+    size_t objlen;
+    bool add = true;
+
+    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+        PE("M_CREATE or M_DELETE expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_DELETE) {
+        add = false;
+        PI("M_DELETE not supported yet\n");
+        return 0;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("M_START does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    FlowRequest freq(objbuf, objlen);
+
+    (void)freq;
+    (void)add;
 
     return 0;
 }
