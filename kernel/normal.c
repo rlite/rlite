@@ -429,6 +429,7 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (unlikely(rlite_buf_pci_push(rb))) {
+        dtp->stats.tx_err++;
         spin_unlock_bh(&dtp->lock);
         rlite_buf_free(rb);
 
@@ -445,6 +446,9 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_flags = dtp->set_drf ? 1 : 0;
     pci->pdu_len = rb->len;
     pci->seqnum = dtp->next_seq_num_to_send++;
+
+    dtp->stats.tx_pkt++;
+    dtp->stats.tx_byte += rb->len;
 
     dtp->set_drf = false;
     if (!dtcp_present) {
@@ -478,6 +482,8 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             int ret = rlite_rtxq_push(dtp, rb);
 
             if (unlikely(ret)) {
+                dtp->stats.tx_pkt--;
+                dtp->stats.tx_byte -= rb->len;
                 dtp->stats.tx_err++;
                 spin_unlock_bh(&dtp->lock);
                 rlite_buf_free(rb);
@@ -486,9 +492,6 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             }
         }
     }
-
-    dtp->stats.tx_pkt++;
-    dtp->stats.tx_byte += rb->len;
 
     spin_unlock_bh(&dtp->lock);
 
