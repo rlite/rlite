@@ -27,6 +27,7 @@ test_cdap_server(int port)
     int one = 1;
     int ld;
     int n, k;
+    long obj_inst_cnt = 15;
 
     if (pipe(pipefds) < 0) {
         perror("pipe()");
@@ -94,6 +95,12 @@ test_cdap_server(int port)
                 conn.m_release_r_send(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
+            case gpb::M_CREATE:
+                conn.m_create_r_send(m, gpb::F_NO_FLAGS, m->obj_class,
+                                     m->obj_name, obj_inst_cnt++,
+                                     0, string());
+                break;
+
             default:
                 PE("Unmanaged op_code %d\n", m->op_code);
                 break;
@@ -136,6 +143,28 @@ client_connect(CDAPConn *conn)
 
     if (conn->m_connect_send(&invoke_id, gpb::AUTH_NONE,
                             &av, &local_appl, &remote_appl)) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
+    return 0;
+}
+
+static int
+client_create_some(CDAPConn *conn)
+{
+    struct CDAPMessage *m;
+    int invoke_id;
+
+    if (conn->m_create_send(&invoke_id, gpb::F_NO_FLAGS,
+                            "class_A", "x", 0, 0, string())) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -196,6 +225,8 @@ test_cdap_client(int port)
     CDAPConn conn(sk);
 
     client_connect(&conn);
+
+    client_create_some(&conn);
 
     client_disconnect(&conn);
 

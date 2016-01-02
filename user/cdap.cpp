@@ -84,6 +84,7 @@ CDAPConn::put_invoke_id_remote(int invoke_id)
 CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
 {
     abs_syntax = CDAP_ABS_SYNTAX;
+    auth_mech = gpb::AUTH_NONE;
     memset(&src_appl, 0, sizeof(src_appl));
     memset(&dst_appl, 0, sizeof(dst_appl));
     flags = gpb::F_NO_FLAGS;
@@ -383,7 +384,9 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
             break;
     }
 
-    PD("%s: Connection state %d --> %d\n", __func__, old_state, state);
+    if (old_state != state) {
+        PD("%s: Connection state %d --> %d\n", __func__, old_state, state);
+    }
 
     return 0;
 }
@@ -520,6 +523,7 @@ CDAPConn::m_connect_r_send(const struct CDAPMessage *req, int result,
     m.auth_value = req->auth_value;
     ret = rina_name_copy(&m.src_appl, &req->dst_appl);
     ret |= rina_name_copy(&m.dst_appl, &req->src_appl);
+
     m.result = result;
     m.result_reason = result_reason;
 
@@ -549,6 +553,44 @@ CDAPConn::m_release_r_send(const struct CDAPMessage *req,
     struct CDAPMessage m(gpb::M_RELEASE_R);
 
     m.flags = flags;
+
+    m.result = result;
+    m.result_reason = result_reason;
+
+    return msg_send(&m, req->invoke_id);
+}
+
+int
+CDAPConn::m_create_send(int *invoke_id, gpb::flagValues_t flags,
+                        const std::string& obj_class,
+                        const std::string& obj_name, long obj_inst,
+                        int scope, const std::string& filter)
+{
+    struct CDAPMessage m(gpb::M_CREATE);
+
+    m.flags = flags;
+    m.obj_class = obj_class;
+    m.obj_name = obj_name;
+    m.obj_inst = obj_inst;
+    m.scope = scope;
+    m.filter = filter;
+
+    return msg_send(&m, 0);
+}
+
+int
+CDAPConn::m_create_r_send(const struct CDAPMessage *req,
+                          gpb::flagValues_t flags, const std::string& obj_class,
+                          const std::string& obj_name, long obj_inst,
+                          int result, const std::string& result_reason)
+{
+    struct CDAPMessage m(gpb::M_CREATE_R);
+
+    m.flags = flags;
+    m.obj_class = obj_class;
+    m.obj_name = obj_name;
+    m.obj_inst = obj_inst;
+
     m.result = result;
     m.result_reason = result_reason;
 
