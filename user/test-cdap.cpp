@@ -239,9 +239,9 @@ CDAPMessage::operator gpb::CDAPMessage() const
 }
 
 int
-cdap_msg_send(const struct CDAPMessage& m, int fd)
+cdap_msg_send(const struct CDAPMessage *m, int fd)
 {
-    gpb::CDAPMessage gm = static_cast<gpb::CDAPMessage>(m);
+    gpb::CDAPMessage gm = static_cast<gpb::CDAPMessage>(*m);
     size_t serlen = gm.ByteSize();
     char *serbuf = (char *)malloc(serlen);
     int n;
@@ -263,6 +263,30 @@ cdap_msg_send(const struct CDAPMessage& m, int fd)
     }
 
     return 0;
+}
+
+struct CDAPMessage *
+cdap_msg_recv(int fd)
+{
+    struct CDAPMessage *m;
+    gpb::CDAPMessage gm;
+    char serbuf[4096];
+    int n;
+
+    n = read(fd, serbuf, sizeof(serbuf));
+    if (n < 0) {
+        perror("read(cdap_msg)");
+        return NULL;
+    }
+
+    gm.ParseFromArray(serbuf, n);
+
+    m = new CDAPMessage(gm);
+    if (!m) {
+        PE("%s: Out of memory\n", __func__);
+    }
+
+    return m;
 }
 
 int main()
