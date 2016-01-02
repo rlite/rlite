@@ -39,7 +39,7 @@ struct shim_inet4 {
 #define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
 
 static int
-parse_directory(struct shim_inet4 *shim, int appl2sock, int cmp_shim_name,
+parse_directory(struct shim_inet4 *shim, int appl2sock,
                 struct sockaddr_in *addr, struct rina_name *appl_name)
 {
     char *appl_name_s = NULL;
@@ -119,7 +119,7 @@ parse_directory(struct shim_inet4 *shim, int appl2sock, int cmp_shim_name,
 
         if (appl2sock) {
             if (strcmp(nm, appl_name_s) == 0 &&
-                    (!cmp_shim_name || strcmp(shnm, shim->dif_name) == 0)) {
+                        strcmp(shnm, shim->dif_name) == 0) {
                 memcpy(addr, &cur_addr, sizeof(cur_addr));
                 found = 1;
             }
@@ -156,9 +156,9 @@ parse_directory(struct shim_inet4 *shim, int appl2sock, int cmp_shim_name,
 static int
 appl_name_to_sock_addr(struct shim_inet4 *shim,
                        const struct rina_name *appl_name,
-                       struct sockaddr_in *addr, int cmp_shim_name)
+                       struct sockaddr_in *addr)
 {
-    return parse_directory(shim, 1, cmp_shim_name, addr,
+    return parse_directory(shim, 1, addr,
                            (struct rina_name *)appl_name);
 }
 
@@ -166,7 +166,7 @@ static int
 sock_addr_to_appl_name(struct shim_inet4 *shim, const struct sockaddr_in *addr,
                        struct rina_name *appl_name)
 {
-    return parse_directory(shim, 0, 0, (struct sockaddr_in *)addr,
+    return parse_directory(shim, 0, (struct sockaddr_in *)addr,
                            appl_name);
 }
 
@@ -271,7 +271,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr, 1);
+    ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address from appl_name '%s'\n",
            bp->appl_name_s);
@@ -338,15 +338,8 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
 
     ep->port_id = req->local_port;
 
-    /* This first lookup is currently useless, since we don't bind(). */
-    ret = appl_name_to_sock_addr(shim, &req->local_appl, &ep->addr, 0);
-    if (ret) {
-        UPE(uipcp, "Failed to get inet4 address for local appl\n");
-        goto err1;
-    }
-
     /* This lookup is needed for the connect(). */
-    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr, 1);
+    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address for remote appl\n");
         goto err1;
