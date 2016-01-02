@@ -71,7 +71,7 @@ struct Neighbor {
 
     const char *enrollment_state_repr(state_t s) const;
 
-    int send_to_port_id(CDAPMessage *m, const UipcpObject *obj);
+    int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
     int fsm_run(const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
@@ -187,7 +187,8 @@ Neighbor::enrollment_state_repr(state_t s) const
 }
 
 int
-Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
+Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
+                          const UipcpObject *obj)
 {
     char *serbuf;
     size_t serlen;
@@ -206,7 +207,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
         m->set_obj_value(objbuf, objlen);
     }
 
-    ret = conn->msg_ser(m, 0, &serbuf, &serlen);
+    ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
     if (ret) {
         PE("%s: message serialization failed\n", __func__);
         delete serbuf;
@@ -232,7 +233,7 @@ Neighbor::abort()
 
     m.m_release(gpb::F_NO_FLAGS);
 
-    ret = send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         return;
@@ -251,6 +252,7 @@ Neighbor::none(const CDAPMessage *rm)
     CDAPMessage m;
     int ret;
     state_t next_state;
+    int invoke_id = 0;
 
     if (rm == NULL) {
         /* (1) I --> S: M_CONNECT */
@@ -288,17 +290,19 @@ Neighbor::none(const CDAPMessage *rm)
         /* We are the enrollment slave, let's send an
          * M_CONNECT_R message. */
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
-        m.m_connect_r(rm, 0, string());
+        ret = m.m_connect_r(rm, 0, string());
         if (ret) {
             PE("%s: M_CONNECT_R creation failed\n", __func__);
             abort();
             return -1;
         }
 
+        invoke_id = rm->invoke_id;
+
         next_state = S_WAIT_START;
     }
 
-    ret = send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, invoke_id, NULL);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         abort();
@@ -326,7 +330,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 
     enr_info.lower_difs = rib->lower_difs;
 
-    ret = send_to_port_id(&m, &enr_info);
+    ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         abort();
@@ -377,7 +381,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
 
-    ret = send_to_port_id(&m, &enr_info);
+    ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         abort();
@@ -396,7 +400,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
              0, 0, string());
 
-    ret = send_to_port_id(&m, &enr_info);
+    ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         abort();
@@ -472,7 +476,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     m.m_stop_r(rm, gpb::F_NO_FLAGS, 0, string());
 
-    ret = send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
         abort();
@@ -510,7 +514,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
               0, 0, string());
 
-    ret = send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
         PE("%s: send_to_port_id failed\n", __func__);
         abort();
@@ -751,6 +755,15 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
         PE("%s: Received message from unknown port id %d\n", __func__,
             mhdr->local_port);
         return -1;
+    }
+
+    if (!neigh->conn) {
+        neigh->conn = new CDAPConn(neigh->flow_fd, 1);
+        if (!neigh->conn) {
+            PE("%s: Out of memory\n", __func__);
+            neigh->abort();
+            return -1;
+        }
     }
 
     /* Deserialize the received CDAP message. */

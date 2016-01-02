@@ -764,7 +764,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
         /* CDAP response message (M_*_R). */
         m->invoke_id = invoke_id;
         if (put_invoke_id_remote(m->invoke_id)) {
-           PE("%s: Invoke id %s does not match any pending request\n",
+           PE("%s: Invoke id %d does not match any pending request\n",
                 __func__, m->invoke_id);
         }
     }
