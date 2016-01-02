@@ -139,6 +139,18 @@ request_response(struct rina_msg_base *req)
     return ipcm_disconnect(fd);
 }
 
+static int
+uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id)
+{
+    struct rina_cmsg_uipcp_update req;
+
+    req.msg_type = update_type;
+    req.event_id = 0;
+    req.ipcp_id = ipcp_id;
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 static const char *dif_types[] = {
     [DIF_TYPE_NORMAL] = "normal",
     [DIF_TYPE_SHIM_DUMMY] = "shim-dummy",
@@ -174,13 +186,11 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
 
     ipcps_fetch(&rc->loop);
 
-    /* TODO notify the uipcps manager
     if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
-        *result = uipcp_add(ipcm, resp->ipcp_id);
+        uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id);
+    } else {
+        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
     }
-
-    uipcps_fetch(ipcm);
-    */
 
     return resp;
 }
@@ -235,13 +245,6 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
     struct rina_msg_base *resp;
     int result;
 
-    /* TODO notify uipcp manager
-    result = uipcp_del(rc, ipcp_id);
-    if (result) {
-        return result;
-    }
-    */
-
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
@@ -262,9 +265,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
 
     ipcps_fetch(&rc->loop);
 
-    /* TODO see above
-    uipcps_fetch(ipcm);
-    */
+    uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id);
 
     return result;
 }
@@ -324,9 +325,8 @@ rina_assign_to_dif(struct rinaconf *rc, uint16_t ipcp_id,
     PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&rc->loop);
-    /* TODO notify uipcps
-    uipcps_fetch(ipcm);
-    */
+
+    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
 
     return result;
 }
@@ -393,9 +393,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
         ipcps_fetch(&rc->loop);
-        /* TODO notify uipcps
-        uipcps_fetch(ipcm);
-        */
+        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
     }
 
     return result;
