@@ -188,7 +188,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
      * the invoking IPCP module. */
     list_add_tail(&factory->node, &rina_dm.ipcp_factories);
 
-    printk("IPC processes factory '%s' registered\n",
+    PI("IPC processes factory '%s' registered\n",
             factory->dif_type);
 out:
     mutex_unlock(&rina_dm.general_lock);
@@ -216,7 +216,7 @@ rina_ipcp_factory_unregister(const char *dif_type)
 
     mutex_unlock(&rina_dm.general_lock);
 
-    printk("IPC processes factory '%s' unregistered\n",
+    PI("IPC processes factory '%s' unregistered\n",
             dif_type);
 
     return 0;
@@ -474,7 +474,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, unsigned int *ipcp_id)
      * constructor invocation (factory->create()), in order to
      * avoid race conditions. */
     if (!try_module_get(factory->owner)) {
-        printk("IPC process module [%s] unexpectedly "
+        PE("IPC process module [%s] unexpectedly "
                 "disappeared\n", factory->dif_type);
         ret = -ENXIO;
         goto out;
@@ -995,7 +995,7 @@ flow_put(struct flow_entry *entry)
         hash_del(&entry->node_cep);
         bitmap_clear(rina_dm.cep_id_bitmap, entry->local_cep, 1);
     }
-    printk("flow entry %u removed\n", entry->local_port);
+    PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 out:
     FUNLOCK();
@@ -1044,7 +1044,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
          * this IPCP, detach it. */
         if (ipcp->uipcp == rc) {
             ipcp->uipcp = NULL;
-            printk("IPC process %u detached by uipcp %p\n",
+            PI("IPC process %u detached by uipcp %p\n",
                    ipcp->id, rc);
         }
     }
@@ -1055,7 +1055,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
      * process context here). */
     list_for_each_entry_safe(app, tmp, &remove_apps, node) {
         s = rina_name_to_string(&app->name);
-        printk("Application %s will be automatically "
+        PD("Application %s will be automatically "
                 "unregistered\n",  s);
         kfree(s);
 
@@ -1226,7 +1226,7 @@ rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         goto err;
     }
 
-    printk("IPC process %s created\n", name_s);
+    PI("IPC process %s created\n", name_s);
     if (name_s) {
         kfree(name_s);
     }
@@ -1250,7 +1250,7 @@ rina_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     ret = ipcp_del(req->ipcp_id);
 
     if (ret == 0) {
-        printk("IPC process %u destroyed\n", req->ipcp_id);
+        PI("IPC process %u destroyed\n", req->ipcp_id);
     }
 
     return ret;
@@ -1359,7 +1359,7 @@ rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     ipcp_put(entry);
 
     if (ret == 0) {
-        printk("Configured IPC process %u: %s <= %s\n",
+        PI("Configured IPC process %u: %s <= %s\n",
                 req->ipcp_id, req->name, req->value);
     }
 
@@ -1392,7 +1392,7 @@ rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     ipcp_put(ipcp);
 
     if (ret == 0) {
-        printk("Set IPC process %u PDUFT entry: %llu --> %u\n",
+        PD("Set IPC process %u PDUFT entry: %llu --> %u\n",
                 req->ipcp_id, (unsigned long long)req->dest_addr,
                 req->local_port);
     }
@@ -1419,7 +1419,7 @@ rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     ipcp_put(ipcp);
 
     if (ret == 0) {
-        printk("Flushed PDUFT for IPC process %u\n", req->ipcp_id);
+        PD("Flushed PDUFT for IPC process %u\n", req->ipcp_id);
     }
 
     return ret;
@@ -1445,7 +1445,7 @@ rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     ipcp_put(entry);
 
     if (ret == 0) {
-        printk("IPC process %u attached to uipcp %p\n",
+        PI("IPC process %u attached to uipcp %p\n",
                 req->ipcp_id, rc);
     }
 
@@ -1709,7 +1709,7 @@ out:
         }
 
     } else {
-        printk("Flow allocation requested to IPC process %u, "
+        PD("Flow allocation requested to IPC process %u, "
                "port-id %u\n", req->ipcp_id, flow_entry->local_port);
     }
 
@@ -2245,7 +2245,7 @@ rina_io_open(struct inode *inode, struct file *f)
     struct rina_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
 
     if (!rio) {
-        printk("Out of memory\n");
+        PE("Out of memory\n");
         return -ENOMEM;
     }
     f->private_data = rio;
@@ -2264,7 +2264,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     ssize_t ret;
 
     if (unlikely(!rio->txrx)) {
-        printk("Error: Not bound to a flow nor IPCP\n");
+        PE("Error: Not bound to a flow nor IPCP\n");
         return -ENXIO;
     }
     ipcp = rio->txrx->ipcp;
@@ -2428,7 +2428,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 
     flow = flow_get(info->port_id);
     if (!flow) {
-        printk("Error: No such flow\n");
+        PE("Error: No such flow\n");
         return -ENXIO;
     }
 
@@ -2606,14 +2606,14 @@ rlite_ctrl_init(void)
 
     ret = misc_register(&rlite_ctrl_misc);
     if (ret) {
-        printk("Failed to register rlite misc device\n");
+        PE("Failed to register rlite misc device\n");
         return ret;
     }
 
     ret = misc_register(&rina_io_misc);
     if (ret) {
         misc_deregister(&rlite_ctrl_misc);
-        printk("Failed to register rlite-io misc device\n");
+        PE("Failed to register rlite-io misc device\n");
         return ret;
     }
 

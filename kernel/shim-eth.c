@@ -102,7 +102,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.data = (unsigned long)priv;
     priv->arp_tmr_shutdown = false;
 
-    printk("New IPC created [%p]\n", priv);
+    PD("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -141,7 +141,7 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("IPC [%p] destroyed\n", priv);
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 static int

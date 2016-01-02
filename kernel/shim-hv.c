@@ -56,14 +56,14 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
                              msg);
     serbuf = kmalloc(serlen, GFP_ATOMIC);
     if (!serbuf) {
-        printk("Out of memory\n");
+        PE("Out of memory\n");
         return -ENOMEM;
     }
 
     ret = serialize_rina_msg(rina_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
                              serbuf, msg);
     if (ret != serlen) {
-        printk("Error while serializing\n");
+        PE("Error while serializing\n");
         return -EINVAL;
     }
 
@@ -97,7 +97,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         ret = rina_fa_req_arrived(priv->ipcp, 0, req.local_port, 0, 0,
                     &req.remote_appl, &req.local_appl, NULL);
         if (ret) {
-            printk("failed to report flow allocation request\n");
+            PE("failed to report flow allocation request\n");
         }
     } else if (ty == RLITE_SHIM_HV_FA_RESP) {
         struct rina_hmsg_fa_resp resp;
@@ -114,17 +114,17 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         ret = rina_fa_resp_arrived(priv->ipcp, resp.remote_port,
                                    resp.local_port, 0, 0, resp.response, NULL);
         if (ret) {
-            printk("failed to report flow allocation response\n");
+            PE("failed to report flow allocation response\n");
         }
     } else {
-        printk("unknown ctrl msg type %u\n", ty);
+        PE("unknown ctrl msg type %u\n", ty);
     }
 
     return;
 
 des_fail:
     if (ret) {
-        printk("failed to deserialize msg type %u\n", ty);
+        PE("failed to deserialize msg type %u\n", ty);
     }
 }
 
@@ -143,7 +143,7 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
 
     rb = rlite_buf_alloc(len, priv->ipcp->depth, GFP_ATOMIC);
     if (!rb) {
-        printk("Out of memory\n");
+        PE("Out of memory\n");
         return;
     }
 
@@ -165,7 +165,7 @@ rina_shim_hv_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
     priv->vmpi_id = ~0U;
 
-    printk("New IPC created [%p]\n", priv);
+    PD("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -177,7 +177,7 @@ rina_shim_hv_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("IPC [%p] destroyed\n", priv);
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 static int
@@ -258,19 +258,19 @@ rina_shim_hv_config(struct ipcp_entry *ipcp,
 
         ret = kstrtouint(param_value, 10, &priv->vmpi_id);
         if (ret == 0) {
-            printk("vmpi id set to %u\n", priv->vmpi_id);
+            PI("vmpi id set to %u\n", priv->vmpi_id);
         }
 
         ret = vmpi_provider_find_instance(provider, priv->vmpi_id, &priv->vmpi_ops);
         if (ret) {
-            printk("vmpi_provider_find(%u, %u) failed\n", provider, priv->vmpi_id);
+            PE("vmpi_provider_find(%u, %u) failed\n", provider, priv->vmpi_id);
             return ret;
         }
 
         ret = priv->vmpi_ops.register_read_callback(&priv->vmpi_ops,
                 shim_hv_read_callback, priv);
         if (ret) {
-            printk("register_read_callback() failed\n");
+            PE("register_read_callback() failed\n");
             return ret;
         }
     }

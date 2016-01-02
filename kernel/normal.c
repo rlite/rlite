@@ -61,7 +61,7 @@ rina_normal_create(struct ipcp_entry *ipcp)
     hash_init(priv->pdu_ft);
     spin_lock_init(&priv->pduft_lock);
 
-    printk("New IPC created [%p]\n", priv);
+    PD("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -73,7 +73,7 @@ rina_normal_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("IPC [%p] destroyed\n", priv);
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 static void

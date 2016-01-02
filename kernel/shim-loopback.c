@@ -104,7 +104,7 @@ rina_shim_loopback_create(struct ipcp_entry *ipcp)
     spin_lock_init(&priv->lock);
     priv->rdt = priv->rdh = 0;
 
-    printk("New IPC created [%p]\n", priv);
+    PD("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -123,7 +123,7 @@ rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("IPC [%p] destroyed\n", priv);
+    PD("IPC [%p] destroyed\n", priv);
 }
 
 struct flow_allocate_req_work {
@@ -145,7 +145,7 @@ flow_allocate_req_work(struct work_struct *w)
                               &faw->local_appl,
                               &faw->remote_appl, NULL);
     if (ret) {
-        printk("failed to report flow allocation request\n");
+        PE("failed to report flow allocation request\n");
     }
 
     kfree(faw);
@@ -159,7 +159,7 @@ rina_shim_loopback_fa_req(struct ipcp_entry *ipcp,
 
     faw = kzalloc(sizeof(*faw), GFP_KERNEL);
     if (!faw) {
-        printk("Out of memory\n");
+        PE("Out of memory\n");
         return -ENOMEM;
     }
 
@@ -191,7 +191,7 @@ flow_allocate_resp_work(struct work_struct *w)
     ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
                                0, 0, farw->response, NULL);
     if (ret) {
-        printk("failed to report flow allocation response\n");
+        PE("failed to report flow allocation response\n");
     }
 
     kfree(farw);
@@ -206,7 +206,7 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
     farw = kzalloc(sizeof(*farw), GFP_KERNEL);
     if (!farw) {
-        printk("Out of memory\n");
+        PE("Out of memory\n");
         return -ENOMEM;
     }
 
