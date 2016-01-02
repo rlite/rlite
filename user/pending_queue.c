@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <rina/rina-ctrl.h>
+#include <rina/rina-common.h>
 #include "pending_queue.h"
 
 

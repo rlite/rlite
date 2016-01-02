@@ -2,7 +2,7 @@
 #define __LIST_H__
 
 #include <stdint.h>
-#include <rina/rina-ctrl.h>
+#include <rina/rina-common.h>
 
 struct pending_entry {
     struct pending_entry *next;

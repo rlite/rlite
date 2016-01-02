@@ -16,11 +16,11 @@ user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-n
 
 user/ipcm.o:  $(HEADERS) user/pending_queue.h
 
-user/pending_queue.o: user/pending_queue.h
+user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
 user/application: user/application.o
 
-user/rina-utils.o: include/rina/rina-utils.h include/rina/rina-ctrl.h
+user/rina-utils.o: $(HEADERS)
 
 clean:
 	-rm user/*.o

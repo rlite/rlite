@@ -19,7 +19,7 @@
  */
 
 #include <linux/types.h>
-#include <rina/rina-ctrl.h>
+#include <rina/rina-kernel-msg.h>
 #include <rina/rina-utils.h>
 #include "rina-ipcp.h"
 
