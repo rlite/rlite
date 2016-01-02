@@ -974,11 +974,11 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
 
 /* To be called under global lock. */
 static int
-rina_fa_internal(uint16_t ipcp_id, struct upper_ref upper,
-                            uint32_t event_id,
-                            const struct rina_name *local_application,
-                            const struct rina_name *remote_application,
-                            const struct rina_kmsg_fa_req *req)
+rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
+                     uint32_t event_id,
+                     const struct rina_name *local_application,
+                     const struct rina_name *remote_application,
+                     const struct rina_kmsg_fa_req *req)
 {
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
@@ -1084,9 +1084,9 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_lock(&rina_dm.lock);
 
-    ret = rina_fa_internal(req->ipcp_id, upper,
-                                      req->event_id, &req->local_application,
-                                      &req->remote_application, req);
+    ret = rina_fa_req_internal(req->ipcp_id, upper, req->event_id,
+                               &req->local_application,
+                               &req->remote_application, req);
     mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {

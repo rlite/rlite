@@ -46,7 +46,7 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
     return ret;
 }
 
-/*static */int
+static int
 mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                          void *buf, size_t buflen)
 {
@@ -58,7 +58,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
-/*static */int
+static int
 mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
                        void *buf, size_t buflen)
 {
@@ -127,59 +127,16 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     PD("%s: Received enrollment management SDU from IPCP addr %lu\n",
             __func__, (long unsigned)remote_addr);
 
-    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
     ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
                    mhdr->local_port);
 
     return 0;
 }
 
-static void
-mgmt_fd_ready(struct rina_evloop *loop, int fd)
-{
-    struct application *appl = container_of(loop, struct application, loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    char mgmtbuf[MGMTBUF_SIZE_MAX];
-    struct rina_mgmt_hdr *mhdr;
-    uint8_t cmd;
-    int n;
-
-    assert(fd == uipcp->mgmtfd);
-
-    /* Read a buffer that contains a management header followed by
-     * a management SDU. */
-    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
-    if (n < 0) {
-        PE("%s: Error: read() failed [%d]\n", __func__, n);
-        return;
-    } else if (n < sizeof(*mhdr)) {
-        PE("%s: Error: read() does not contain mgmt header, %d<%d\n",
-                __func__, n, (int)sizeof(*mhdr));
-        return;
-    }
-
-    /* Grab the management header. */
-    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
-
-    /* Grab the management command (this and the following will be replaced
-     * by CDAP). */
-    cmd = *((uint8_t *)(mhdr + 1));
-
-    switch (cmd) {
-        case IPCP_MGMT_ENROLL:
-            uipcp_mgmt_sdu_enroll(uipcp, mhdr, ((uint8_t *)(mhdr + 1)) + 1,
-                                 n - sizeof(*mhdr) - 1);
-            break;
-        default:
-            PI("%s: Unknown cmd %u received\n", __func__, cmd);
-            break;
-    }
-}
-
-/*static */int
+static int
 uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
-                                const struct rina_name *local_application,
-                                const struct rina_name *remote_application)
+                     const struct rina_name *local_application,
+                     const struct rina_name *remote_application)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req;
     struct rina_msg_base *resp;
@@ -207,6 +164,84 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     PD("%s: result: %d\n", __func__, result);
 
     return result;
+}
+
+static int
+uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
+                      uint8_t *buf, size_t buflen)
+{
+    int ret;
+    struct rina_name local_application, remote_application;
+    const void *ptr = buf;
+
+    PD("%s: Received fa req management SDU from IPCP addr %lu\n",
+            __func__, (long unsigned)mhdr->remote_addr);
+
+    ret = deserialize_rina_name(&ptr, &remote_application);
+    if (ret) {
+        PE("%s: deserialization error\n", __func__);
+    }
+
+    ret = deserialize_rina_name(&ptr, &local_application);
+    if (ret) {
+        PE("%s: deserialization error\n", __func__);
+    }
+
+    uipcp_fa_req_arrived(uipcp, 2 /* TODO remote_port */, &local_application,
+                         &remote_application);
+
+    return 0;
+}
+
+static void
+mgmt_fd_ready(struct rina_evloop *loop, int fd)
+{
+    struct application *appl = container_of(loop, struct application, loop);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    struct rina_mgmt_hdr *mhdr;
+    uint8_t *buf;
+    size_t buflen;
+    uint8_t cmd;
+    int n;
+
+    assert(fd == uipcp->mgmtfd);
+
+    /* Read a buffer that contains a management header followed by
+     * a management SDU. */
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        PE("%s: Error: read() failed [%d]\n", __func__, n);
+        return;
+    } else if (n < sizeof(*mhdr)) {
+        PE("%s: Error: read() does not contain mgmt header, %d<%d\n",
+                __func__, n, (int)sizeof(*mhdr));
+        return;
+    }
+
+    /* Grab the management header. */
+    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
+    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
+
+    /* Grab the management command (this and the following will be replaced
+     * by CDAP). */
+    cmd = *((uint8_t *)(mhdr + 1));
+    buf = ((uint8_t *)(mhdr + 1)) + 1;
+    buflen = n - sizeof(*mhdr) - 1;
+
+    switch (cmd) {
+        case IPCP_MGMT_ENROLL:
+            uipcp_mgmt_sdu_enroll(uipcp, mhdr, buf, buflen);
+            break;
+
+        case IPCP_MGMT_FA_REQ:
+            uipcp_mgmt_sdu_fa_req(uipcp, mhdr, buf, buflen);
+            break;
+
+        default:
+            PI("%s: Unknown cmd %u received\n", __func__, cmd);
+            break;
+    }
 }
 
 /*static */int
@@ -293,28 +328,52 @@ uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
 
 static int
 uipcp_fa_req(struct rina_evloop *loop,
-                        const struct rina_msg_base_resp *b_resp,
-                        const struct rina_msg_base *b_req)
+             const struct rina_msg_base_resp *b_resp,
+             const struct rina_msg_base *b_req)
 {
     struct application *application = container_of(loop, struct application,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
-    struct rina_kmsg_fa_req *req =
-                (struct rina_kmsg_fa_req *)b_resp;
+    struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
+    struct dft_entry *dft_entry;
+    uint8_t *mgmtsdu;
+    void *cur;
+    size_t len;
 
     PD("%s: Got reflected message\n", __func__);
 
     assert(b_req == NULL);
-    (void)uipcp;
-    (void)req;
+
+    dft_entry = dft_lookup(uipcp, &req->remote_application);
+    if (!dft_entry) {
+        /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
+        PI("%s: No DFT matching entry\n", __func__);
+        return 0;
+    }
+
+    len = 1 + rina_name_serlen(&req->local_application)
+            + rina_name_serlen(&req->remote_application);
+    mgmtsdu = malloc(len);
+    if (!mgmtsdu) {
+        PE("%s: Out of memory\n", __func__);
+        return 0;
+    }
+
+    mgmtsdu[0] = IPCP_MGMT_FA_REQ;
+    cur = mgmtsdu + 1;
+    serialize_rina_name(&cur, &req->local_application);
+    serialize_rina_name(&cur, &req->remote_application);
+
+    mgmt_write_to_dst_addr(uipcp, dft_entry->remote_addr,
+                           mgmtsdu, sizeof(mgmtsdu));
 
     return 0;
 }
 
 static int
 uipcp_fa_resp(struct rina_evloop *loop,
-                         const struct rina_msg_base_resp *b_resp,
-                         const struct rina_msg_base *b_req)
+              const struct rina_msg_base_resp *b_resp,
+              const struct rina_msg_base *b_req)
 {
     struct application *application = container_of(loop, struct application,
                                                    loop);

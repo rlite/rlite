@@ -50,6 +50,8 @@ struct uipcp {
 
 enum {
     IPCP_MGMT_ENROLL = 5,
+    IPCP_MGMT_FA_REQ = 6,
+    IPCP_MGMT_FA_RESP = 7,
 };
 
 void *uipcp_server(void *arg);
