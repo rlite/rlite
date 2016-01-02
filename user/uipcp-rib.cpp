@@ -45,7 +45,7 @@ namespace obj_name {
     static string address = "/daf/mgmt/naming" + obj_class::address;
     static string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
     static string whatevercast = "/daf/mgmt/naming/whatevercast";
-    static string flows = "/dif/ra/fa/flows" + obj_class::flows;
+    static string flows = "/dif/ra/fa/" + obj_class::flows;
 };
 
 struct Neighbor {
@@ -169,7 +169,8 @@ struct uipcp_rib {
     map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
 
-    int send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj);
+    int send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
+                         const string& obj_class, const string& obj_name);
 
     /* Synchronize neighbors. */
     int remote_sync_neigh(const Neighbor& neigh, bool create,
@@ -582,7 +583,8 @@ flowcfg2policies(struct rina_flow_config *cfg,
 }
 
 int
-uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj)
+uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj,
+                            const string& obj_class, const string& obj_name)
 {
     struct rinalite_ipcp *ipcp;
     CDAPMessage m;
@@ -598,7 +600,7 @@ uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj)
 
     ipcp = ipcp_info();
 
-    m.m_create(gpb::F_NO_FLAGS, obj_class::flows, obj_class::flow,
+    m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
                0, 0, string());
 
     objlen = obj.serialize(objbuf, sizeof(objbuf));
@@ -651,6 +653,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     struct rinalite_ipcp *ipcp;
     FlowRequest freq;
     ConnId conn_id;
+    stringstream obj_name;
 
     if (!remote_addr) {
         /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
@@ -681,7 +684,11 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     freq.create_flow_retries = 0;
     freq.hop_cnt = 0;
 
-    return send_to_dst_addr(freq.dst_addr, freq);
+    obj_name << obj_name::flows << "/" << freq.src_addr
+                << "-" << req->local_port;
+
+    return send_to_dst_addr(freq.dst_addr, freq, obj_class::flow,
+                            obj_name.str());
 }
 
 int
