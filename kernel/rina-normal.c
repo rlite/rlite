@@ -427,7 +427,7 @@ static struct rina_buf *
 sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
-    struct rina_buf *crb = NULL;
+    uint8_t pdu_type = 0;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
@@ -442,17 +442,29 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
             flow->dtp.rcv_rwe = flow->dtp.rcv_lwe +
                             flow->cfg.dtcp.fc.cfg.w.initial_credit;
         }
-
-        if (!cfg->rtx_control) {
-            /* POL: ReceivingFlowControl */
-            if (cfg->fc.fc_type == RINA_FC_T_WIN) {
-                /* Send a flow control only control PDU. */
-                crb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_FC, 0);
-            }
-        }
     }
 
-    return crb;
+    /* I know, the following code can obviously be simplified, but this
+     * way policies are more visible. */
+    if (cfg->rtx_control) {
+        /* POL: RcvrAck */
+        /* Do this here or using the A timeout ? */
+        pdu_type = PDU_TYPE_ACK;
+        if (cfg->flow_control) {
+            pdu_type |= PDU_TYPE_FC;
+        }
+
+    } else if (cfg->flow_control) {
+        /* POL: ReceivingFlowControl */
+        /* Send a flow control only control PDU. */
+        pdu_type = PDU_TYPE_FC;
+    }
+
+    if (pdu_type) {
+        return ctrl_pdu_alloc(ipcp, flow, pdu_type, 0);
+    }
+
+    return NULL;
 }
 
 /* Takes the ownership of the rb. */
@@ -738,14 +750,12 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
 
     if (deliver) {
+        struct list_head qrbs;
+        struct rina_buf *qrb;
+
         /* Update rcv_lwe only if this PDU is going to be
          * delivered. */
         dtp->rcv_lwe = seqnum + 1;
-    }
-
-    if (deliver) {
-        struct list_head qrbs;
-        struct rina_buf *qrb;
 
         seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
 
