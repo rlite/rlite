@@ -12,8 +12,9 @@
 #include <signal.h>
 #include <assert.h>
 
-#include "rlite/conf-msg.h"
 #include "../helpers.h"
+#include "rlite/list.h"
+#include "rlite/conf-msg.h"
 #include "rlite/rlite.h"
 #include "rlite/conf.h"
 
@@ -341,10 +342,13 @@ ipcps_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 static int
 flows_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 {
-/* XXX
-    rlite_flows_fetch(ctrl);
-    rlite_flows_print(ctrl);
-*/
+    struct list_head flows;
+
+    list_init(&flows);
+    rlconf_flows_fetch(ctrl, &flows);
+    rlconf_flows_print(&flows);
+    rlconf_flows_purge(&flows);
+
     return 0;
 }
 

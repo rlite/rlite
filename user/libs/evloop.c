@@ -38,65 +38,6 @@ struct rlite_tmr_event {
     struct list_head node;
 };
 
-static void
-rlite_flows_purge(struct list_head *flows)
-{
-    struct rlite_flow *rlite_flow, *tmp;
-
-    /* Purge the flows list. */
-    list_for_each_entry_safe(rlite_flow, tmp, flows, node) {
-        list_del(&rlite_flow->node);
-        free(rlite_flow);
-    }
-}
-
-static int
-flow_fetch_resp(struct rlite_evloop *loop,
-                const struct rlite_msg_base *b_resp,
-                const struct rlite_msg_base *b_req)
-{
-    const struct rl_kmsg_flow_fetch_resp *resp =
-        (const struct rl_kmsg_flow_fetch_resp *)b_resp;
-    struct rlite_flow *rlite_flow;
-
-    (void)b_req;
-
-    if (resp->end) {
-        struct list_head *tmp;
-
-        /* This response is just to say there are no
-         * more IPCPs. */
-        pthread_mutex_lock(&loop->lock);
-
-        tmp = loop->flows;
-        loop->flows = loop->flows_next;
-        loop->flows_next = tmp;
-        rlite_flows_purge(loop->flows_next);
-
-        pthread_mutex_unlock(&loop->lock);
-
-        return 0;
-    }
-
-    rlite_flow = malloc(sizeof(*rlite_flow));
-    if (!rlite_flow) {
-        PE("Out of memory\n");
-        return 0;
-    }
-
-    rlite_flow->ipcp_id = resp->ipcp_id;
-    rlite_flow->local_port = resp->local_port;
-    rlite_flow->remote_port = resp->remote_port;
-    rlite_flow->local_addr = resp->local_addr;
-    rlite_flow->remote_addr = resp->remote_addr;
-
-    pthread_mutex_lock(&loop->lock);
-    list_add_tail(&rlite_flow->node, loop->flows_next);
-    pthread_mutex_unlock(&loop->lock);
-
-    return 0;
-}
-
 static int
 flow_allocate_resp_arrived(struct rlite_evloop *loop,
                            const struct rlite_msg_base *b_resp,
@@ -188,76 +129,6 @@ barrier_resp(struct rlite_evloop *loop,
              const struct rlite_msg_base *b_req)
 {
     /* Nothing to do, this is just a synchronization point. */
-    return 0;
-}
-
-/* Fetch information about a single IPC process. */
-static struct rl_kmsg_flow_fetch_resp *
-flow_fetch(struct rlite_evloop *loop, int *result)
-{
-    struct rlite_msg_base *msg;
-
-    /* Allocate and create a request message. */
-    msg = malloc(sizeof(*msg));
-    if (!msg) {
-        PE("Out of memory\n");
-        return NULL;
-    }
-
-    memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RLITE_KER_FLOW_FETCH;
-    msg->event_id = rl_ctrl_get_id(&loop->ctrl);
-
-    NPD("Requesting IPC processes fetch...\n");
-
-    return (struct rl_kmsg_flow_fetch_resp *)
-           rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
-}
-
-/* Fetch information about all flows. */
-int
-rlite_flows_fetch(struct rlite_evloop *loop)
-{
-    struct rl_kmsg_flow_fetch_resp *resp;
-    int end = 0;
-
-    /* Reload the IPCPs list. */
-    while (!end) {
-        int result;
-
-        resp = flow_fetch(loop, &result);
-        if (!resp) {
-            end = 1;
-        } else {
-            end = resp->end;
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(resp));
-            free(resp);
-        }
-    }
-
-    return 0;
-}
-
-int
-rlite_flows_print(struct rlite_evloop *loop)
-{
-    struct rlite_flow *rlite_flow;
-
-    pthread_mutex_lock(&loop->lock);
-
-    PI_S("Flows table:\n");
-    list_for_each_entry(rlite_flow, loop->flows, node) {
-            PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
-                    "local_addr = %llu, remote_addr = %llu\n",
-                        rlite_flow->ipcp_id, rlite_flow->local_port,
-                        rlite_flow->remote_port,
-                        (long long unsigned int)rlite_flow->local_addr,
-                        (long long unsigned int)rlite_flow->remote_addr);
-    }
-
-    pthread_mutex_unlock(&loop->lock);
-
     return 0;
 }
 
@@ -656,10 +527,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
         memset(loop->handlers, 0, sizeof(loop->handlers));
     }
     pthread_mutex_init(&loop->lock, NULL);
-    loop->flows= &loop->flows_lists[0];
-    loop->flows_next = &loop->flows_lists[1];
-    list_init(loop->flows);
-    list_init(loop->flows_next);
     list_init(&loop->fdcbs);
     list_init(&loop->timer_events);
     pthread_mutex_init(&loop->timer_lock, NULL);
@@ -682,10 +549,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
     }
 
     /* If not redefined, setup default handlers. */
-    if (!loop->handlers[RLITE_KER_FLOW_FETCH_RESP]) {
-        loop->handlers[RLITE_KER_FLOW_FETCH_RESP] = flow_fetch_resp;
-    }
-
     if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
         loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
     }
@@ -752,11 +615,6 @@ rl_evloop_fini(struct rlite_evloop *loop)
 {
     /* Stop if nobody has already stopped. */
     rl_evloop_stop(loop);
-
-    pthread_mutex_lock(&loop->lock);
-    rlite_flows_purge(loop->flows);
-    rlite_flows_purge(loop->flows_next);
-    pthread_mutex_unlock(&loop->lock);
 
     {
         /* Clean up the fdcbs list. */

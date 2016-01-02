@@ -16,17 +16,6 @@
 extern "C" {
 #endif
 
-struct rlite_flow {
-    /* Flow attributes. */
-    unsigned int ipcp_id;
-    unsigned int local_port;
-    unsigned int remote_port;
-    uint64_t local_addr;
-    uint64_t remote_addr;
-
-    struct list_head node;
-};
-
 struct rlite_evloop;
 
 /* The signature of a response handler. */
@@ -70,12 +59,6 @@ struct rlite_evloop {
     pthread_mutex_t timer_lock;
     int timer_events_cnt;
     int timer_next_id;
-
-    /* Used to store the list of flow entries fetched from kernel.
-     * User can only access the 'flows'. The other ones are private. */
-    struct list_head *flows;
-    struct list_head *flows_next;
-    struct list_head flows_lists[2];
 
     rlite_resp_handler_t usr_ipcp_update;
 };
@@ -152,13 +135,6 @@ int rl_evloop_fa_resp(struct rlite_evloop *loop,
 
 int rl_evloop_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
                           const char *param_name, const char *param_value);
-
-int
-rlite_flows_print(struct rlite_evloop *loop);
-
-/* Fetch information about all IPC processes. */
-int
-rlite_flows_fetch(struct rlite_evloop *loop);
 
 #ifdef __cplusplus
 }
