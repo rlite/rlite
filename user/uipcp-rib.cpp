@@ -45,12 +45,18 @@ struct Neighbor {
     CDAPConn *conn;
     struct uipcp_rib *rib;
 
+    /* Information about the neighbor. */
+    list< string > lower_difs;
+    uint64_t address;
+
     enum {
         NONE = 0,
         I_CONNECT_SENT,
         S_CONNECT_R_SENT,
         I_START_SENT,
         S_START_R_SENT,
+        S_STOP_SENT,
+        I_STOP_R_SENT,
         ENROLLMENT_STATE_LAST,
     } enrollment_state;
 
@@ -69,6 +75,8 @@ struct Neighbor {
     int none(const CDAPMessage *rm);
     int i_connect_sent(const CDAPMessage *rm);
     int s_connect_r_sent(const CDAPMessage *rm);
+    int i_start_sent(const CDAPMessage *rm);
+    int s_stop_sent(const CDAPMessage *rm);
 };
 
 typedef int (*rib_handler_t)(struct uipcp_rib *);
@@ -91,6 +99,7 @@ struct uipcp_rib {
     uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
+    uint64_t address_allocate() const;
 };
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
@@ -104,6 +113,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     enrollment_state = NONE;
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     enroll_fsm_handlers[NONE] = &Neighbor::none;
+    address = 0;
 }
 
 Neighbor::Neighbor(const Neighbor& other)
@@ -116,6 +126,7 @@ Neighbor::Neighbor(const Neighbor& other)
     conn = NULL;
     memcpy(enroll_fsm_handlers, other.enroll_fsm_handlers,
            sizeof(enroll_fsm_handlers));
+    address = other.address;
 }
 
 Neighbor::~Neighbor()
@@ -162,6 +173,8 @@ Neighbor::none(const CDAPMessage *rm)
     int ret;
 
     if (rm == NULL) {
+        /* (1) I --> S: M_CONNECT */
+
         CDAPAuthValue av;
         struct uipcp *uipcp = rib->uipcp;
         struct rinalite_ipcp *ipcp;
@@ -187,6 +200,9 @@ Neighbor::none(const CDAPMessage *rm)
         enrollment_state = I_CONNECT_SENT;
 
     } else {
+        /* (1) S <-- I: M_CONNECT
+         * (2) S --> I: M_CONNECT_R */
+
         /* We are the enrollment slave, let's send an
          * M_CONNECT_R message. */
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
@@ -205,6 +221,8 @@ Neighbor::none(const CDAPMessage *rm)
 int
 Neighbor::i_connect_sent(const CDAPMessage *rm)
 {
+    /* (2) I <-- S: M_CONNECT_R
+     * (3) I --> S: M_START */
     EnrollmentInfo enr_info;
     CDAPMessage m;
 
@@ -223,8 +241,14 @@ Neighbor::i_connect_sent(const CDAPMessage *rm)
 int
 Neighbor::s_connect_r_sent(const CDAPMessage *rm)
 {
+    /* (3) S <-- I: M_START
+     * (4) S --> I: M_START_R
+     * (5) S --> I: M_CREATE
+     * (6) S --> I: M_STOP */
     const char *objbuf;
     size_t objlen;
+    bool has_address;
+    int ret;
 
     if (rm->op_code != gpb::M_START) {
         PE("%s: M_START expected\n", __func__);
@@ -240,13 +264,72 @@ Neighbor::s_connect_r_sent(const CDAPMessage *rm)
     EnrollmentInfo enr_info(objbuf, objlen);
     CDAPMessage m;
 
-    (void)enr_info;
+    lower_difs = enr_info.lower_difs;
+
+    has_address = (enr_info.address != 0);
+
+    if (has_address) {
+        /* Assign an address to the initiator. */
+        enr_info.address = address = rib->address_allocate();
+    }
 
     m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
 
     enrollment_state = S_START_R_SENT;
 
-    return send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, &enr_info);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return 0;
+    }
+
+    if (has_address) {
+        /* Send DIF static information. */
+    }
+
+    /* Send DIF dynamic information. */
+
+    enr_info.start_early = true;
+
+    m = CDAPMessage();
+    m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
+             0, 0, string());
+
+    enrollment_state = S_STOP_SENT;
+
+    return send_to_port_id(&m, &enr_info);
+}
+
+int
+Neighbor::i_start_sent(const CDAPMessage *rm)
+{
+    /* (4) I <-- S: M_START_R */
+    const char *objbuf;
+    size_t objlen;
+
+    if (rm->op_code != gpb::M_START_R) {
+        PE("%s: M_START_R expected\n", __func__);
+        return 0;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("%s: M_START does not contain a nested message\n");
+        return 0;
+    }
+
+    EnrollmentInfo enr_info(objbuf, objlen);
+
+    if (enr_info.address) {
+        address = enr_info.address;
+    }
+
+    return 0;
+}
+
+int
+Neighbor::s_stop_sent(const CDAPMessage *rm)
+{
 }
 
 int
@@ -282,6 +365,12 @@ uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
     }
 
     return neighbors.end();
+}
+
+uint64_t
+uipcp_rib::address_allocate() const
+{
+    return 0; // TODO
 }
 
 static int
