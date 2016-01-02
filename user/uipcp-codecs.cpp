@@ -690,3 +690,74 @@ FlowCtrlConfig::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2RtxCtrlConfig(RtxCtrlConfig& cfg,
+                  const gpb::dtcpRtxControlConfig_t &gm)
+{
+    cfg.max_time_to_retry = gm.maxtimetoretry();
+    cfg.data_rxmsn_max = gm.datarxmsnmax();
+    cfg.initial_tr = gm.initialrtxtime();
+    gpb2PolicyDescr(cfg.rtx_timer_expiry, gm.rtxtimerexpirypolicy());
+    gpb2PolicyDescr(cfg.sender_ack, gm.senderackpolicy());
+    gpb2PolicyDescr(cfg.receiving_ack_list, gm.recvingacklistpolicy());
+    gpb2PolicyDescr(cfg.rcvr_ack, gm.rcvrackpolicy());
+    gpb2PolicyDescr(cfg.sending_ack, gm.sendingackpolicy());
+    gpb2PolicyDescr(cfg.rcvr_ctrl_ack, gm.rcvrcontrolackpolicy());
+}
+
+static int
+RtxCtrlConfig2gpb(const RtxCtrlConfig& cfg,
+                  gpb::dtcpRtxControlConfig_t &gm)
+{
+    gpb::policyDescriptor_t *p;
+
+    gm.set_maxtimetoretry(cfg.max_time_to_retry);
+    gm.set_datarxmsnmax(cfg.data_rxmsn_max);
+    gm.set_initialrtxtime(cfg.initial_tr);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rtx_timer_expiry, *p);
+    gm.set_allocated_rtxtimerexpirypolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.sender_ack, *p);
+    gm.set_allocated_senderackpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.receiving_ack_list, *p);
+    gm.set_allocated_recvingacklistpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rcvr_ack, *p);
+    gm.set_allocated_rcvrackpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.sending_ack, *p);
+    gm.set_allocated_sendingackpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rcvr_ctrl_ack, *p);
+    gm.set_allocated_rcvrcontrolackpolicy(p);
+
+    return 0;
+}
+
+RtxCtrlConfig::RtxCtrlConfig(const char *buf, unsigned int size)
+{
+    gpb::dtcpRtxControlConfig_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2RtxCtrlConfig(*this, gm);
+}
+
+int
+RtxCtrlConfig::serialize(char *buf, unsigned int size) const
+{
+    gpb::dtcpRtxControlConfig_t gm;
+
+    RtxCtrlConfig2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+

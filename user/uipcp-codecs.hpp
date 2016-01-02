@@ -183,4 +183,21 @@ struct FlowCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct RtxCtrlConfig {
+    uint32_t max_time_to_retry; /* R div initial_tr */
+    uint16_t data_rxmsn_max;
+    uint32_t initial_tr;
+
+    PolicyDescr rtx_timer_expiry;
+    PolicyDescr sender_ack;
+    PolicyDescr receiving_ack_list;
+    PolicyDescr rcvr_ack;
+    PolicyDescr sending_ack;
+    PolicyDescr rcvr_ctrl_ack;
+
+    RtxCtrlConfig() { }
+    RtxCtrlConfig(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
