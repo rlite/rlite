@@ -99,7 +99,9 @@ for i in vms:
             '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
             '-vga std '                                                 \
             '-pidfile rina-%(id)s.pid '                                 \
-            '-display none ' % {'fwdp': fwdp, 'id': vmid, 'mac': mac}
+            '-display none '                                            \
+            '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '\
+             % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000}
 
     for port in vm['ports']:
         tap = port['tap']
