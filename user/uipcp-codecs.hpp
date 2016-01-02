@@ -38,4 +38,11 @@ struct DFTEntry : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct DFTSlice : public UipcpObject {
+    std::list<DFTEntry> entries;
+
+    DFTSlice(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

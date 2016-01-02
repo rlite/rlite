@@ -84,23 +84,28 @@ EnrollmentInfo::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2DFTEntry(DFTEntry &entry, const gpb::directoryForwardingTableEntry_t &gm)
+{
+    gpb2RinaName(entry.appl_name, gm.applicationname());
+    entry.address = gm.ipcprocesssynonym();
+    entry.timestamp = gm.timestamp();
+}
+
 DFTEntry::DFTEntry(const char *buf, unsigned int size)
 {
     gpb::directoryForwardingTableEntry_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    gpb2RinaName(appl_name, gm.applicationname());
-    address = gm.ipcprocesssynonym();
-    timestamp = gm.timestamp();
+    gpb2DFTEntry(*this, gm);
 }
 
-int
-DFTEntry::serialize(char *buf, unsigned int size) const
+static int
+DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
 {
-    gpb::directoryForwardingTableEntry_t gm;
     gpb::applicationProcessNamingInfo_t *gan =
-        RinaName2gpb(appl_name);
+        RinaName2gpb(entry.appl_name);
 
     if (!gan) {
         PE("Out of memory\n");
@@ -108,8 +113,53 @@ DFTEntry::serialize(char *buf, unsigned int size) const
     }
 
     gm.set_allocated_applicationname(gan);
-    gm.set_ipcprocesssynonym(address);
-    gm.set_timestamp(timestamp);
+    gm.set_ipcprocesssynonym(entry.address);
+    gm.set_timestamp(entry.timestamp);
+
+    return 0;
+}
+
+int
+DFTEntry::serialize(char *buf, unsigned int size) const
+{
+    gpb::directoryForwardingTableEntry_t gm;
+    int ret = DFTEntry2gpb(*this, gm);
+
+    if (ret) {
+        return ret;
+    }
+
+    return ser_common(gm, buf, size);
+}
+
+DFTSlice::DFTSlice(const char *buf, unsigned int size)
+{
+    gpb::directoryForwardingTableEntrySet_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    for (int i = 0; i < gm.directoryforwardingtableentry_size(); i++) {
+        entries.push_back(DFTEntry());
+        gpb2DFTEntry(entries.back(), gm.directoryforwardingtableentry(i));
+    }
+}
+
+int
+DFTSlice::serialize(char *buf, unsigned int size) const
+{
+    gpb::directoryForwardingTableEntrySet_t gm;
+
+    for (list<DFTEntry>::const_iterator e = entries.begin();
+                    e != entries.end(); e++) {
+        gpb::directoryForwardingTableEntry_t *gentry;
+        int ret;
+
+        gentry = gm.add_directoryforwardingtableentry();
+        ret = DFTEntry2gpb(*e, *gentry);
+        if (ret) {
+            return ret;
+        }
+    }
 
     return ser_common(gm, buf, size);
 }
