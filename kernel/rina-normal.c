@@ -820,8 +820,6 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         mod_timer(&dtp->rcv_inact_tmr, jiffies + jiffies_to_msecs(668));
     }
 
-    rina_buf_pci_pop(rb);
-
     if (pci->pdu_flags & 1) {
         /* DRF is set: either first PDU or new run. */
 
@@ -834,6 +832,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         spin_unlock_irq(&dtp->lock);
 
+        rina_buf_pci_pop(rb);
         ret = rina_sdu_rx_flow(ipcp, flow, rb);
 
         goto snd_crb;
@@ -927,9 +926,11 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         spin_unlock_irq(&dtp->lock);
 
+        rina_buf_pci_pop(rb);
         ret = rina_sdu_rx_flow(ipcp, flow, rb);
 
         list_for_each_entry(qrb, &qrbs, node) {
+            rina_buf_pci_pop(qrb);
             ret |= rina_sdu_rx_flow(ipcp, flow, qrb);
         }
 
