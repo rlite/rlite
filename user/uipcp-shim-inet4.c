@@ -11,7 +11,7 @@
 #include "uipcp-container.h"
 
 
-struct inet4_endpoint {
+struct inet4_bindpoint {
     int fd;
     struct sockaddr_in addr;
     char *appl_name_s;
@@ -19,8 +19,17 @@ struct inet4_endpoint {
     struct list_head node;
 };
 
+struct inet4_endpoint {
+    int fd;
+    struct sockaddr_in addr;
+    unsigned int port_id;
+
+    struct list_head node;
+};
+
 struct shim_inet4 {
     struct list_head endpoints;
+    struct list_head bindpoints;
 };
 
 #define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
@@ -140,27 +149,27 @@ sock_addr_to_appl_name(const struct sockaddr_in *addr,
 
 /* ep->addr must be filled in before calling this function */
 static int
-open_bound_socket(struct inet4_endpoint *ep)
+open_bound_socket(int fd, struct sockaddr_in *addr)
 {
     int enable = 1;
 
-    ep->fd = socket(PF_INET, SOCK_STREAM, 0);
+    fd = socket(PF_INET, SOCK_STREAM, 0);
 
-    if (ep->fd < 0) {
+    if (fd < 0) {
         PE("socket() failed [%d]\n", errno);
         return -1;
     }
 
-    if (setsockopt(ep->fd, SOL_SOCKET, SO_REUSEADDR, &enable,
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable,
                    sizeof(enable))) {
         PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
-        close(ep->fd);
+        close(fd);
         return -1;
     }
 
-    if (bind(ep->fd, (struct sockaddr *)&ep->addr, sizeof(ep->addr))) {
+    if (bind(fd, (struct sockaddr *)addr, sizeof(*addr))) {
         PE("bind() failed [%d]\n", errno);
-        close(ep->fd);
+        close(fd);
         return -1;
     }
 
@@ -175,7 +184,7 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
 {
     char *appl_name_s = rina_name_to_string(&req->appl_name);
     struct shim_inet4 *shim = SHIM(uipcp);
-    struct inet4_endpoint *ep;
+    struct inet4_bindpoint *bp;
     int ret = -1;
 
     if (!appl_name_s) {
@@ -183,13 +192,13 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
         return -1;
     }
 
-    list_for_each_entry(ep, &shim->endpoints, node) {
-        if (strcmp(appl_name_s, ep->appl_name_s) == 0) {
-            rlite_evloop_fdcb_del(&uipcp->appl.loop, ep->fd);
-            list_del(&ep->node);
-            close(ep->fd);
-            free(ep->appl_name_s);
-            free(ep);
+    list_for_each_entry(bp, &shim->bindpoints, node) {
+        if (strcmp(appl_name_s, bp->appl_name_s) == 0) {
+            rlite_evloop_fdcb_del(&uipcp->appl.loop, bp->fd);
+            list_del(&bp->node);
+            close(bp->fd);
+            free(bp->appl_name_s);
+            free(bp);
             ret = 0;
 
             break;
@@ -218,7 +227,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
-    struct inet4_endpoint *ep;
+    struct inet4_bindpoint *bp;
     int ret;
 
     if (!req->reg) {
@@ -228,50 +237,50 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
 
     /* Process the registration. */
 
-    ep = malloc(sizeof(*ep));
-    if (!ep) {
+    bp = malloc(sizeof(*bp));
+    if (!bp) {
         PE("Out of memory\n");
         return -1;
     }
 
-    ep->appl_name_s = rina_name_to_string(&req->appl_name);
-    if (!ep->appl_name_s) {
+    bp->appl_name_s = rina_name_to_string(&req->appl_name);
+    if (!bp->appl_name_s) {
         PE("Out of memory\n");
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(&req->appl_name, &ep->addr);
+    ret = appl_name_to_sock_addr(&req->appl_name, &bp->addr);
     if (ret) {
         PE("Failed to get inet4 address from appl_name '%s'\n",
-           ep->appl_name_s);
+           bp->appl_name_s);
         goto err2;
     }
 
     /* Open a listening socket, bind() and listen(). */
-    ret = open_bound_socket(ep);
+    ret = open_bound_socket(bp->fd, &bp->addr);
     if (ret) {
         goto err2;
     }
 
-    if (listen(ep->fd, 5)) {
+    if (listen(bp->fd, 5)) {
         PE("listen() failed [%d]\n", errno);
         goto err3;
     }
 
     /* The accept_conn() callback will be invoked on new incoming
      * connections. */
-    rlite_evloop_fdcb_add(&uipcp->appl.loop, ep->fd, accept_conn);
+    rlite_evloop_fdcb_add(&uipcp->appl.loop, bp->fd, accept_conn);
 
-    list_add_tail(&ep->node, &shim->endpoints);
+    list_add_tail(&bp->node, &shim->bindpoints);
 
     return 0;
 
 err3:
-    close(ep->fd);
+    close(bp->fd);
 err2:
-    free(ep->appl_name_s);
+    free(bp->appl_name_s);
 err1:
-    free(ep);
+    free(bp);
 
     return -1;
 }
@@ -300,29 +309,24 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
         return -1;
     }
 
-    ep->appl_name_s = rina_name_to_string(&req->local_application);
-    if (!ep->appl_name_s) {
-        PE("Out of memory\n");
-        goto err1;
-    }
+    ep->port_id = req->local_port;
 
     ret = appl_name_to_sock_addr(&req->local_application, &ep->addr);
     if (ret) {
-        PE("Failed to get inet4 address for local application '%s'\n",
-            ep->appl_name_s);
-        goto err2;
+        PE("Failed to get inet4 address for local application\n");
+        goto err1;
     }
 
     ret = appl_name_to_sock_addr(&req->remote_application, &remote_addr);
     if (ret) {
         PE("Failed to get inet4 address for remote application\n");
-        goto err2;
+        goto err1;
     }
 
     /* Open a client-side socket, bind() and connect(). */
-    ret = open_bound_socket(ep);
+    ret = open_bound_socket(ep->fd, &ep->addr);
     if (ret) {
-        goto err2;
+        goto err1;
     }
 
     /* Don't select() on ep->fd for incoming packets, that will be received in
@@ -331,17 +335,15 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     if (connect(ep->fd, (const struct sockaddr *)&remote_addr,
                 sizeof(remote_addr))) {
         PE("Failed to connect to remote addr\n");
-        goto err3;
+        goto err2;
     }
 
     list_add_tail(&ep->node, &shim->endpoints);
 
     return 0;
 
-err3:
-    close(ep->fd);
 err2:
-    free(ep->appl_name_s);
+    close(ep->fd);
 err1:
     free(ep);
 
@@ -351,9 +353,9 @@ err1:
 static int
 lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
 {
-    struct inet4_endpoint *ep;
+    struct inet4_bindpoint *ep;
 
-    list_for_each_entry(ep, &shim->endpoints, node) {
+    list_for_each_entry(ep, &shim->bindpoints, node) {
         if (lfd == ep->fd) {
             return rina_name_from_string(ep->appl_name_s, name);
         }
@@ -403,12 +405,6 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     /* Lookup the remote IP address and port. */
     if (sock_addr_to_appl_name(&ep->addr, &remote_appl)) {
         PE("Failed to get appl_name from remote address\n");
-        goto err1;
-    }
-
-    ep->appl_name_s = rina_name_to_string(&remote_appl);
-    if (ep->appl_name_s) {
-        PE("Out of memory\n");
         goto err1;
     }
 
@@ -492,6 +488,7 @@ shim_inet4_init(struct uipcp *uipcp)
     uipcp->priv = shim;
 
     list_init(&shim->endpoints);
+    list_init(&shim->bindpoints);
 
     return 0;
 }
@@ -501,13 +498,26 @@ shim_inet4_fini(struct uipcp *uipcp)
 {
     struct shim_inet4 *shim = SHIM(uipcp);
     struct list_head *elem;
-    struct inet4_endpoint *ep;
 
-    while ((elem = list_pop_front(&shim->endpoints))) {
-        ep = container_of(elem, struct inet4_endpoint, node);
-        close(ep->fd);
-        free(ep->appl_name_s);
-        free(ep);
+    {
+        struct inet4_bindpoint *bp;
+
+        while ((elem = list_pop_front(&shim->bindpoints))) {
+            bp = container_of(elem, struct inet4_bindpoint, node);
+            close(bp->fd);
+            free(bp->appl_name_s);
+            free(bp);
+        }
+    }
+
+    {
+        struct inet4_endpoint *ep;
+
+        while ((elem = list_pop_front(&shim->endpoints))) {
+            ep = container_of(elem, struct inet4_endpoint, node);
+            close(ep->fd);
+            free(ep);
+        }
     }
 
     return 0;
