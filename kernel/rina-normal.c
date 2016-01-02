@@ -227,6 +227,19 @@ rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     return ret;
 }
 
+static int
+rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
+                      struct flow_entry *flow)
+{
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+
+    PD("%s: %llu --> %u\n", __func__, (unsigned long long)dest_addr,
+        flow->local_port);
+    (void)priv;
+
+    return 0;
+}
+
 static int __init
 rina_normal_init(void)
 {
@@ -245,6 +258,7 @@ rina_normal_init(void)
     factory.ops.flow_allocate_resp = rina_normal_flow_allocate_resp;
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
+    factory.ops.pduft_set = rina_normal_pduft_set;
 
     ret = rina_ipcp_factory_register(&factory);
 

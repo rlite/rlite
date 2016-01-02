@@ -34,6 +34,8 @@ struct ipcp_ops {
                      struct rina_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
+    int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
+                     struct flow_entry *flow);
 };
 
 struct ipcp_entry {

@@ -31,7 +31,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_RESP, /* 10 */
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 11 */
     RINA_KERN_IPCP_CONFIG, /* 12 */
-    RINA_KERN_IPCP_BIND_FLOW, /* 13 */
+    RINA_KERN_IPCP_PDUFT_SET, /* 13 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -146,6 +146,20 @@ struct rina_kmsg_ipcp_config {
     uint16_t ipcp_id;
     char *name;
     char *value;
+} __attribute__((packed));
+
+/* IPCM --> kernel to set an IPCP PDUFT entry. */
+struct rina_kmsg_ipcp_pduft_set {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    /* The IPCP whose PDUFT is to be modified. */
+    uint16_t ipcp_id;
+    /* The address of a remote IPCP. */
+    uint64_t dest_addr;
+    /* The local port through which the remote IPCP
+     * can be reached. */
+    uint16_t local_port;
 } __attribute__((packed));
 
 
