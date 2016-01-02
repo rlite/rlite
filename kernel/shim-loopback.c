@@ -104,7 +104,7 @@ rina_shim_loopback_create(struct ipcp_entry *ipcp)
     spin_lock_init(&priv->lock);
     priv->rdt = priv->rdh = 0;
 
-    printk("%s: New IPC created [%p]\n", __func__, priv);
+    printk("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -121,7 +121,7 @@ rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("%s: IPC [%p] destroyed\n", __func__, priv);
+    printk("IPC [%p] destroyed\n", priv);
 }
 
 struct flow_allocate_req_work {
@@ -143,8 +143,7 @@ flow_allocate_req_work(struct work_struct *w)
                               &faw->local_application,
                               &faw->remote_application, NULL);
     if (ret) {
-        printk("%s: failed to report flow allocation request\n",
-                __func__);
+        printk("failed to report flow allocation request\n");
     }
 
     kfree(faw);
@@ -158,7 +157,7 @@ rina_shim_loopback_fa_req(struct ipcp_entry *ipcp,
 
     faw = kzalloc(sizeof(*faw), GFP_KERNEL);
     if (!faw) {
-        printk("%s: Out of memory\n", __func__);
+        printk("Out of memory\n");
         return -ENOMEM;
     }
 
@@ -190,8 +189,7 @@ flow_allocate_resp_work(struct work_struct *w)
     ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port,
                                farw->remote_port, 0, farw->response);
     if (ret) {
-        printk("%s: failed to report flow allocation response\n",
-                __func__);
+        printk("failed to report flow allocation response\n");
     }
 
     kfree(farw);
@@ -206,7 +204,7 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
     farw = kzalloc(sizeof(*farw), GFP_KERNEL);
     if (!farw) {
-        printk("%s: Out of memory\n", __func__);
+        printk("Out of memory\n");
         return -ENOMEM;
     }
 
@@ -291,7 +289,7 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
         }
 
         if (ret == 0) {
-            PD("%s: queued set to %u\n", __func__, priv->queued);
+            PD("queued set to %u\n", priv->queued);
         }
 
     } else if (strcmp(param_name, "drop_fract") == 0) {
@@ -305,7 +303,7 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
         }
 
         if (ret == 0) {
-            PD("%s: drop_fract set to %u\n", __func__, priv->drop_fract);
+            PD("drop_fract set to %u\n", priv->drop_fract);
         }
     }
 

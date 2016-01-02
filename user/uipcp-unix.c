@@ -72,7 +72,7 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
         if (!found) {
             ripcp = malloc(sizeof(*ripcp));
             if (!ripcp) {
-                PE("%s: ripcp allocation failed\n", __func__);
+                PE("ripcp allocation failed\n");
             } else {
                 memset(ripcp, 0, sizeof(*ripcp));
                 rina_name_copy(&ripcp->dif_name, dif_name);
@@ -111,7 +111,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
     /* Grab the corresponding userspace IPCP. */
     uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
-        PE("%s: No such uipcp [%u]\n", __func__, ipcp_id);
+        PE("No such uipcp [%u]\n", ipcp_id);
         return -1;
     }
 
@@ -159,8 +159,8 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     /* Find the userspace part of the enrolling IPCP. */
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
-        PE("%s: Could not find userspace IPC process %u\n",
-            __func__, req->ipcp_id);
+        PE("Could not find userspace IPC process %u\n",
+            req->ipcp_id);
         goto out;
     }
 
@@ -193,8 +193,8 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
 
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
-        PE("%s: Could not find uipcp for IPC process %u\n",
-            __func__, req->ipcp_id);
+        PE("Could not find uipcp for IPC process %u\n",
+            req->ipcp_id);
         goto out;
     }
 
@@ -229,8 +229,8 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
 
         uipcp = uipcp_lookup(uipcps, req->ipcp_id);
         if (!uipcp) {
-            PE("%s: Could not find uipcp for IPC process %u\n",
-                __func__, req->ipcp_id);
+            PE("Could not find uipcp for IPC process %u\n",
+                req->ipcp_id);
             goto out;
         }
 
@@ -282,14 +282,14 @@ unix_server(void *arg)
         /* Read the request message in serialized form. */
         n = read(cfd, serbuf, sizeof(serbuf));
         if (n < 0) {
-            PE("%s: read() error [%d]\n", __func__, n);
+            PE("read() error [%d]\n", n);
         }
 
         /* Deserialize into a formatted message. */
         ret = deserialize_rina_msg(rina_conf_numtables, serbuf, n,
                                         msgbuf, sizeof(msgbuf));
         if (ret) {
-            PE("%s: deserialization error [%d]\n", __func__, ret);
+            PE("deserialization error [%d]\n", ret);
         }
 
         /* Lookup the message type. */
@@ -297,7 +297,7 @@ unix_server(void *arg)
         if (rina_config_handlers[req->msg_type] == NULL) {
             struct rina_msg_base_resp resp;
 
-            PE("%s: Invalid message received [type=%d]\n", __func__,
+            PE("Invalid message received [type=%d]\n",
                     req->msg_type);
             resp.msg_type = RINA_CONF_BASE_RESP;
             resp.event_id = req->event_id;
@@ -307,8 +307,8 @@ unix_server(void *arg)
             /* Valid message type: handle the request. */
             ret = rina_config_handlers[req->msg_type](uipcps, cfd, req);
             if (ret) {
-                PE("%s: Error while handling message type [%d]\n",
-                        __func__, req->msg_type);
+                PE("Error while handling message type [%d]\n",
+                        req->msg_type);
             }
         }
 
@@ -329,8 +329,8 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
     FILE *fpreg = fopen(RINA_PERSISTENT_REG_FILE, "w");
 
     if (!fpreg) {
-        PE("%s: Cannot open persistent register file (%s)\n",
-                __func__, RINA_PERSISTENT_REG_FILE);
+        PE("Cannot open persistent register file (%s)\n",
+                RINA_PERSISTENT_REG_FILE);
     } else {
         char *dif_s, *ipcp_s;
         struct registered_ipcp *ripcp;
@@ -341,7 +341,7 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
             if (dif_s && ipcp_s) {
                 fprintf(fpreg, "%s %u %s\n", dif_s, ripcp->ipcp_id, ipcp_s);
             } else {
-                PE("%s: Error in rina_name_to_string()\n", __func__);
+                PE("Error in rina_name_to_string()\n");
             }
             if (dif_s) free(dif_s);
             if (ipcp_s) free(ipcp_s);
@@ -414,8 +414,8 @@ uipcps_update(struct uipcps *uipcps)
                     ipcp_id = atoi(s2);
                     reg_result = rina_ipcp_register(uipcps, 1, &dif_name,
                                                     ipcp_id, &ipcp_name);
-                    PI("%s: Automatic re-registration for %s --> %s\n",
-                        __func__, s3, (reg_result == 0) ? "DONE" : "FAILED");
+                    PI("Automatic re-registration for %s --> %s\n",
+                        s3, (reg_result == 0) ? "DONE" : "FAILED");
                 }
             }
 

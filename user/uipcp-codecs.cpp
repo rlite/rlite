@@ -43,7 +43,7 @@ EnrollmentInfo::serialize(char *buf, unsigned int size) const
     }
 
     if (gm.ByteSize() > size) {
-        PE("%s: User buffer too small [%u/%u]\n", __func__,
+        PE("User buffer too small [%u/%u]\n",
                 gm.ByteSize(), size);
         return -1;
     }

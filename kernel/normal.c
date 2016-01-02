@@ -61,7 +61,7 @@ rina_normal_create(struct ipcp_entry *ipcp)
     hash_init(priv->pdu_ft);
     spin_lock_init(&priv->pduft_lock);
 
-    printk("%s: New IPC created [%p]\n", __func__, priv);
+    printk("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -73,7 +73,7 @@ rina_normal_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("%s: IPC [%p] destroyed\n", __func__, priv);
+    printk("IPC [%p] destroyed\n", priv);
 }
 
 static void
@@ -82,7 +82,7 @@ snd_inact_tmr_cb(long unsigned arg)
     struct flow_entry *flow = (struct flow_entry *)arg;
     struct dtp *dtp = &flow->dtp;
 
-    PD("%s\n", __func__);
+    PD("\n");
 
     spin_lock_bh(&dtp->lock);
     dtp->set_drf = true;
@@ -105,7 +105,7 @@ snd_inact_tmr_cb(long unsigned arg)
 static void
 rcv_inact_tmr_cb(long unsigned arg)
 {
-    PD("%s\n", __func__);
+    PD("\n");
 }
 
 static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
@@ -120,7 +120,7 @@ rtx_tmr_cb(long unsigned arg)
     struct list_head rrbq;
     struct list_head *cur;
 
-    PD("%s\n", __func__);
+    PD("\n");
 
     INIT_LIST_HEAD(&rrbq);
 
@@ -147,14 +147,14 @@ rtx_tmr_cb(long unsigned arg)
 
                 crb = rina_buf_clone(rb, GFP_ATOMIC);
                 if (unlikely(!crb)) {
-                    PD("%s: Out of memory\n", __func__);
+                    PD("Out of memory\n");
                 } else {
                     list_add_tail(&crb->node, &rrbq);
                 }
 
             } else {
                 if (rb != dtp->rtx_tmr_next) {
-                    PD("%s: Forward rtx timer by %u\n", __func__,
+                    PD("Forward rtx timer by %u\n",
                             jiffies_to_msecs(rb->rtx_jiffies - jiffies));
                     dtp->rtx_tmr_next = rb;
                     mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
@@ -176,7 +176,7 @@ rtx_tmr_cb(long unsigned arg)
     list_for_each_entry(crb, &rrbq, node) {
         struct rina_pci *pci = RINA_BUF_PCI(crb);
 
-        PD("%s: sending [%lu] from rtxq\n", __func__,
+        PD("sending [%lu] from rtxq\n",
                 (long unsigned)pci->seqnum);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
@@ -207,19 +207,19 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (!mpl) {
-        PI("%s: fixing MPL to %u ms\n", __func__, MPL_MSECS_DEFAULT);
+        PI("fixing MPL to %u ms\n", MPL_MSECS_DEFAULT);
         mpl = msecs_to_jiffies(MPL_MSECS_DEFAULT);
     }
 
     if (flow->cfg.dtcp.rtx_control && ! flow->cfg.dtcp.rtx.initial_tr) {
-        PI("%s: fixing initial_tr parameter to %u ms\n",
-                __func__, RTX_MSECS_DEFAULT);
+        PI("fixing initial_tr parameter to %u ms\n",
+                RTX_MSECS_DEFAULT);
         flow->cfg.dtcp.rtx.initial_tr = RTX_MSECS_DEFAULT;
     }
 
     if (flow->cfg.dtcp.rtx_control && ! flow->cfg.dtcp.rtx.data_rxms_max) {
-        PI("%s: fixing data_rxms_max parameter to %u\n",
-                __func__, DATA_RXMS_MAX_DEFAULT);
+        PI("fixing data_rxms_max parameter to %u\n",
+                DATA_RXMS_MAX_DEFAULT);
         flow->cfg.dtcp.rtx.data_rxms_max = DATA_RXMS_MAX_DEFAULT;
     }
 
@@ -293,7 +293,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
     lower_flow = pduft_lookup((struct rina_normal *)ipcp->priv,
                               remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
-        RPD(5, "%s: No route to IPCP %lu, dropping packet\n", __func__,
+        RPD(5, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
         rina_buf_free(rb);
         return 0;
@@ -327,7 +327,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
                         list_add_tail(&rb->node, &lower_flow->rmtq);
                         lower_flow->rmtq_len++;
                     } else {
-                        RPD(5, "%s: rmtq overrun: dropping PDU\n", __func__);
+                        RPD(5, "rmtq overrun: dropping PDU\n");
                         rina_buf_free(rb);
                     }
                     spin_unlock_bh(&lower_flow->rmtq_lock);
@@ -414,7 +414,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                  * that dtp->cwq_len < dtp->max_cwq_len. */
                 list_add_tail(&rb->node, &dtp->cwq);
                 dtp->cwq_len++;
-                PD("%s: push [%lu] into cwq\n", __func__,
+                PD("push [%lu] into cwq\n",
                         (long unsigned)pci->seqnum);
                 rb = NULL; /* Ownership passed. */
             } else {
@@ -422,7 +422,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 /* POL: TxControl. */
                 dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
                 dtp->last_seq_num_sent = pci->seqnum;
-                PD("%s: sending [%lu] through sender window\n", __func__,
+                PD("sending [%lu] through sender window\n",
                         (long unsigned)pci->seqnum);
             }
         }
@@ -432,7 +432,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 
             if (unlikely(!crb)) {
                 spin_unlock_bh(&dtp->lock);
-                PE("%s: Out of memory\n", __func__);
+                PE("Out of memory\n");
                 rina_buf_free(rb);
                 return -ENOMEM;
             }
@@ -445,12 +445,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             list_add_tail(&crb->node, &dtp->rtxq);
             dtp->rtxq_len++;
             if (!timer_pending(&dtp->rtx_tmr)) {
-                PD("%s: Forward rtx timer by %u\n", __func__,
+                PD("Forward rtx timer by %u\n",
                         jiffies_to_msecs(crb->rtx_jiffies - jiffies));
                 dtp->rtx_tmr_next = crb;
                 mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
             }
-            PD("%s: cloning [%lu] into rtxq\n", __func__,
+            PD("cloning [%lu] into rtxq\n",
                     (long unsigned)RINA_BUF_PCI(crb)->seqnum);
         }
     }
@@ -478,7 +478,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!lower_flow)) {
-            RPD(5, "%s: No route to IPCP %lu, dropping packet\n", __func__,
+            RPD(5, "No route to IPCP %lu, dropping packet\n",
                     (long unsigned)mhdr->remote_addr);
             rina_buf_free(rb);
 
@@ -488,8 +488,8 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
         lower_flow = flow_get(mhdr->local_port);
         if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
-            RPD(5, "%s: Invalid mgmt header local port %u, "
-                    "dropping packet\n", __func__,
+            RPD(5, "Invalid mgmt header local port %u, "
+                    "dropping packet\n",
                     mhdr->local_port);
             rina_buf_free(rb);
 
@@ -636,7 +636,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         if (cfg->fc.fc_type == RINA_FC_T_WIN) {
-            PD("%s: rcv_rwe [%lu] --> [%lu]\n", __func__,
+            PD("rcv_rwe [%lu] --> [%lu]\n",
                     (long unsigned)flow->dtp.rcv_rwe,
                     (long unsigned)(flow->dtp.rcv_lwe +
                         flow->cfg.dtcp.fc.cfg.w.initial_credit));
@@ -683,8 +683,8 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
     struct list_head *pos = &dtp->seqq;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
-        RPD(5, "%s: seqq overrun: dropping PDU [%lu]\n",
-                __func__, (long unsigned)seqnum);
+        RPD(5, "seqq overrun: dropping PDU [%lu]\n",
+                (long unsigned)seqnum);
         rina_buf_free(rb);
         return;
     }
@@ -699,8 +699,8 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
             /* This is a duplicate amongst the gaps, we can
              * drop it. */
             rina_buf_free(rb);
-            RPD(5, "%s: Duplicate amongs the gaps [%lu] dropped\n",
-                __func__, (long unsigned)seqnum);
+            RPD(5, "Duplicate amongs the gaps [%lu] dropped\n",
+                (long unsigned)seqnum);
 
             return;
         }
@@ -709,7 +709,7 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
     /* Insert the rb right before 'pos'. */
     list_add_tail(&rb->node, pos);
     dtp->seqq_len++;
-    RPD(5, "%s: [%lu] inserted\n", __func__, (long unsigned)seqnum);
+    RPD(5, "[%lu] inserted\n", (long unsigned)seqnum);
 }
 
 static void
@@ -726,7 +726,7 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
             dtp->seqq_len--;
             list_add_tail(&qrb->node, qrbs);
             dtp->rcv_lwe = pci->seqnum + 1;
-            RPD(5, "%s: [%lu] popped out from seqq\n", __func__,
+            RPD(5, "[%lu] popped out from seqq\n",
                     (long unsigned)pci->seqnum);
         }
     }
@@ -743,7 +743,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (unlikely((pcic->base.pdu_type & PDU_T_CTRL_MASK)
                 != PDU_T_CTRL_MASK)) {
-        PE("%s: Unknown PDU type %X\n", __func__, pcic->base.pdu_type);
+        PE("Unknown PDU type %X\n", pcic->base.pdu_type);
         rina_buf_free(rb);
         return 0;
     }
@@ -755,13 +755,13 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
         /* Gap in the control SDU space. */
         /* POL: Lost control PDU. */
-        RPD(5, "%s: Lost control PDUs: [%lu] --> [%lu]\n", __func__,
+        RPD(5, "Lost control PDUs: [%lu] --> [%lu]\n",
             (long unsigned)dtp->last_ctrl_seq_num_rcvd,
             (long unsigned)pcic->base.seqnum);
     } else if (unlikely(dtp->last_ctrl_seq_num_rcvd &&
                     pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
         /* Duplicated control PDU: just drop it. */
-        RPD(5, "%s: Duplicated control PDU [%lu], last [%lu]\n", __func__,
+        RPD(5, "Duplicated control PDU [%lu], last [%lu]\n",
             (long unsigned)pcic->base.seqnum,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 
@@ -776,12 +776,12 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         if (unlikely(pcic->new_rwe < dtp->snd_rwe)) {
             /* This should not happen, the other end is
              * broken. */
-            PD("%s: Broken peer, new_rwe would go backward [%lu] "
-                    "--> [%lu]\n", __func__, (long unsigned)dtp->snd_rwe,
+            PD("Broken peer, new_rwe would go backward [%lu] "
+                    "--> [%lu]\n", (long unsigned)dtp->snd_rwe,
                     (long unsigned)pcic->new_rwe);
 
         } else {
-            PD("%s: snd_rwe [%lu] --> [%lu]\n", __func__,
+            PD("snd_rwe [%lu] --> [%lu]\n",
                     (long unsigned)dtp->snd_rwe,
                     (long unsigned)pcic->new_rwe);
 
@@ -811,7 +811,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rina_pci *pci = RINA_BUF_PCI(cur);
 
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
-                        PD("%s: Remove [%lu] from rtxq\n", __func__,
+                        PD("Remove [%lu] from rtxq\n",
                                 (long unsigned)pci->seqnum);
                         list_del(&cur->node);
                         dtp->rtxq_len--;
@@ -829,7 +829,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                          * stop here. Let's update the rtx timer
                          * expiration time, if necessary. */
                         if (likely(!dtp->rtx_tmr_next)) {
-                            PD("%s: Forward rtx timer by %u\n", __func__,
+                            PD("Forward rtx timer by %u\n",
                                     jiffies_to_msecs(cur->rtx_jiffies - jiffies));
                             dtp->rtx_tmr_next = cur;
                             mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
@@ -848,8 +848,8 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
             case PDU_T_NACK:
             case PDU_T_SACK:
             case PDU_T_SNACK:
-                PD("%s: Missing support for PDU type [%X]\n",
-                        __func__, pcic->base.pdu_type);
+                PD("Missing support for PDU type [%X]\n",
+                        pcic->base.pdu_type);
                 break;
         }
     }
@@ -863,7 +863,7 @@ out:
     list_for_each_entry(qrb, &qrbs, node) {
         struct rina_pci *pci = RINA_BUF_PCI(qrb);
 
-        PD("%s: sending [%lu] from cwq\n", __func__,
+        PD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
         rmt_tx(ipcp, pci->dst_addr, qrb, false);
     }
@@ -898,8 +898,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     flow = flow_get(pci->conn_id.dst_cep);
     if (!flow) {
-        RPD(5, "%s: No flow for port-id %u: dropping PDU\n",
-                __func__, pci->conn_id.dst_cep);
+        RPD(5, "No flow for port-id %u: dropping PDU\n",
+                pci->conn_id.dst_cep);
         rina_buf_free(rb);
         return 0;
     }
@@ -943,7 +943,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     if (unlikely(seqnum < dtp->rcv_lwe)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
-        RPD(5, "%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
+        RPD(5, "Dropping duplicate PDU [seq=%lu]\n",
                 (long unsigned)seqnum);
         rina_buf_free(rb);
 
@@ -969,8 +969,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         /* This may go in a gap or be a duplicate
          * amongst the gaps. */
 
-        PD("%s: Possible gap fill, RLWE would jump %lu --> %lu\n",
-                __func__, (long unsigned)dtp->rcv_lwe,
+        PD("Possible gap fill, RLWE would jump %lu --> %lu\n",
+                (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
 
     } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
@@ -978,8 +978,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     } else {
         /* Out of order. */
-        RPD(5, "%s: Out of order packet, RLWE would jump %lu --> %lu\n",
-                __func__, (long unsigned)dtp->rcv_lwe,
+        RPD(5, "Out of order packet, RLWE would jump %lu --> %lu\n",
+                (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
     }
 
@@ -1015,8 +1015,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     if (unlikely(deliver && !flow->upper.ipcp &&
                  flow->txrx.rx_qlen >= USR_Q_TH)) {
-        RPD(5, "%s: early dropping [%lu] to avoid userspace rx queue "
-                "overrun\n", __func__, (long unsigned)seqnum);
+        RPD(5, "early dropping [%lu] to avoid userspace rx queue "
+                "overrun\n", (long unsigned)seqnum);
         deliver = false;
         drop = true;
     }
@@ -1051,8 +1051,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     }
 
     if (drop) {
-        RPD(5, "%s: dropping PDU [%lu] to meet QoS requirements\n",
-                __func__, (long unsigned)seqnum);
+        RPD(5, "dropping PDU [%lu] to meet QoS requirements\n",
+                (long unsigned)seqnum);
         rina_buf_free(rb);
 
     } else {

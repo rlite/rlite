@@ -54,7 +54,7 @@ client_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("write(buf)");
         } else {
-            PE("%s: partial write %d/%lu\n", __func__, ret,
+            PE("partial write %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -74,7 +74,7 @@ server_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("read(buf");
         } else {
-            PE("%s: partial write %d/%lu\n", __func__, ret,
+            PE("partial write %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -131,7 +131,7 @@ echo_client(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (ret == 0) {
             /* Timeout */
-            printf("%s: timeout occurred\n", __func__);
+            printf("%s: timeout occurred\n");
             break;
         }
 
@@ -177,8 +177,8 @@ echo_server(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            PI("%s: timeout occurred\n", __func__);
-            PI("%s: received %u PDUs out of %u\n", __func__,
+            PI("timeout occurred\n");
+            PI("received %u PDUs out of %u\n",
                     i, rp->test_config.cnt);
             break;
         }
@@ -313,8 +313,8 @@ perf_server(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            PI("%s: timeout occurred\n", __func__);
-            PI("%s: received %u PDUs out of %u\n", __func__,
+            PI("timeout occurred\n");
+            PI("received %u PDUs out of %u\n",
                     i, rp->test_config.cnt);
             break;
         }

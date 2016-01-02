@@ -36,13 +36,13 @@ flow_allocate_resp_arrived(struct rinalite_evloop *loop,
     remote_s = rina_name_to_string(&req->remote_application);
 
     if (resp->result) {
-        PE("%s: Failed to allocate a flow between local application "
-               "'%s' and remote application '%s'\n", __func__,
+        PE("Failed to allocate a flow between local application "
+               "'%s' and remote application '%s'\n",
                 local_s, remote_s);
     } else {
-        PI("%s: Allocated flow between local application "
+        PI("Allocated flow between local application "
                "'%s' and remote application '%s' [port-id = %u]\n",
-                __func__, local_s, remote_s, resp->port_id);
+                local_s, remote_s, resp->port_id);
     }
 
     if (local_s) {
@@ -70,7 +70,7 @@ flow_allocate_req_arrived(struct rinalite_evloop *loop,
     assert(b_req == NULL);
     pfr = malloc(sizeof(*pfr));
     if (!pfr) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         /* Negative flow allocation response. */
         return rinalite_flow_allocate_resp(application,req->ipcp_id, 0xffff,
                                     req->port_id, 1);
@@ -84,7 +84,7 @@ flow_allocate_req_arrived(struct rinalite_evloop *loop,
     pthread_cond_signal(&application->flow_req_arrived_cond);
     pthread_mutex_unlock(&application->lock);
 
-    PI("%s: port-id %u\n", __func__, req->port_id);
+    PI("port-id %u\n", req->port_id);
 
     return 0;
 }
@@ -115,7 +115,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -130,7 +130,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
     resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -160,7 +160,7 @@ flow_allocate_req(struct rinalite_appl *application,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 
@@ -193,7 +193,7 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
     memset(req, 0, sizeof(*req));
@@ -209,7 +209,7 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
     resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -227,7 +227,7 @@ rinalite_appl_register(struct rinalite_appl *application, int reg,
         rinalite_ipcp = rinalite_select_ipcp_by_dif(&application->loop, dif_name, fallback);
     }
     if (!rinalite_ipcp) {
-        PE("%s: Could not find a suitable IPC process\n", __func__);
+        PE("Could not find a suitable IPC process\n");
         return -1;
     }
 
@@ -256,7 +256,7 @@ rinalite_flow_allocate(struct rinalite_appl *application,
                                   dif_fallback);
     }
     if (!rinalite_ipcp) {
-        PE("%s: No suitable IPCP found\n", __func__);
+        PE("No suitable IPCP found\n");
         return -1;
     }
 
@@ -264,12 +264,12 @@ rinalite_flow_allocate(struct rinalite_appl *application,
                               rinalite_ipcp->ipcp_id, upper_ipcp_id, local_application,
                               remote_application, flowcfg, &result);
     if (!kresp) {
-        PE("%s: Flow allocation request failed\n", __func__);
+        PE("Flow allocation request failed\n");
         return -1;
     }
 
-    PI("%s: Flow allocation response: ret = %u, port-id = %u\n",
-                __func__, kresp->result, kresp->port_id);
+    PI("Flow allocation response: ret = %u, port-id = %u\n",
+                kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
     rina_msg_free(rina_kernel_numtables, RINALITE_RMB(kresp));
@@ -364,7 +364,7 @@ rinalite_flow_req_wait_open(struct rinalite_appl *application)
 
     pfr = rinalite_flow_req_wait(application);
     printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-            __func__, pfr->ipcp_id, pfr->port_id);
+            pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
     result = rinalite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,

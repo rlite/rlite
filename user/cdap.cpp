@@ -66,14 +66,14 @@ bool CDAPValidationTable::check(int field, const char *flname,
     char expected = tab[(MAX_CDAP_OPCODE + 1) * field + op];
 
     if (expected == MUST_EXIST && !observed) {
-        PE("%s: Invalid message: %s must contain field %s\n",
-            __func__, opcode_names_table[op], flname);
+        PE("Invalid message: %s must contain field %s\n",
+            opcode_names_table[op], flname);
         return false;
     }
 
     if (expected == MUST_NOT_EXIST && observed) {
-        PE("%s: Invalid message: %s must not contain field %s\n",
-            __func__, opcode_names_table[op], flname);
+        PE("Invalid message: %s must not contain field %s\n",
+            opcode_names_table[op], flname);
         return false;
     }
 
@@ -256,7 +256,7 @@ CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 
     pending.erase(invoke_id);
 
-    PD("%s: put %d\n", __func__, invoke_id);
+    PD("put %d\n", invoke_id);
 
     return 0;
 }
@@ -273,7 +273,7 @@ CDAPConn::get_invoke_id()
     ret = invoke_id_next++;
     pending_invoke_ids.insert(ret);
 
-    PD("%s: got %d\n", __func__, ret);
+    PD("got %d\n", ret);
 
     return ret;
 }
@@ -293,7 +293,7 @@ CDAPConn::get_invoke_id_remote(int invoke_id)
 
     pending_invoke_ids_remote.insert(invoke_id);
 
-    PD("%s: got %d\n", __func__, invoke_id);
+    PD("got %d\n", invoke_id);
 
     return 0;
 }
@@ -380,7 +380,7 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
     } else if (objvalue.has_byteval()) {
         obj_value.u.buf.ptr = new char[objvalue.byteval().size()];
         if (!obj_value.u.buf.ptr) {
-            PE("%s: BYTES object allocation failed\n", __func__);
+            PE("BYTES object allocation failed\n");
             obj_value.ty = NONE;
         } else {
             memcpy(obj_value.u.buf.ptr, objvalue.byteval().data(),
@@ -428,7 +428,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gpb::authValue_t *authvalue = new gpb::authValue_t();
 
     if (!objvalue || !authvalue) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         if (objvalue) delete objvalue;
         if (authvalue) delete authvalue;
 
@@ -557,8 +557,8 @@ CDAPMessage::valid(bool check_invoke_id) const
                           version != 0);
 
     if ((obj_class != string()) != (obj_name != string())) {
-        PE("%s: Invalid message: if obj_class is specified, also obj_name "
-                "must be, and the other way around\n", __func__);
+        PE("Invalid message: if obj_class is specified, also obj_name "
+                "must be, and the other way around\n");
         return false;
     }
 
@@ -677,7 +677,7 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
     int old_state = state;
 
     if (m->op_code > MAX_CDAP_OPCODE) {
-        PE("%s: Invalid opcode %d\n", __func__, m->op_code);
+        PE("Invalid opcode %d\n", m->op_code);
         return -1;
     }
 
@@ -688,8 +688,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                 int ret;
 
                 if (state != NONE) {
-                    PE("%s: Cannot %s M_CONNECT message: Invalid state %d\n",
-                            __func__, action, state);
+                    PE("Cannot %s M_CONNECT message: Invalid state %d\n",
+                            action, state);
                     return -1;
                 }
 
@@ -714,8 +714,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_CONNECT_R:
             if (state != AWAITCON) {
-                PE("%s: Cannot %s M_CONNECT_R message: Invalid state %d\n",
-                                    __func__, action, state);
+                PE("Cannot %s M_CONNECT_R message: Invalid state %d\n",
+                                    action, state);
                 return -1;
             }
             state = CONNECTED;
@@ -723,8 +723,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_RELEASE:
             if (state != CONNECTED) {
-                PE("%s: Cannot %s M_RELEASE message: Invalid state %d\n",
-                                    __func__, action, state);
+                PE("Cannot %s M_RELEASE message: Invalid state %d\n",
+                                    action, state);
                 return -1;
             }
             rina_name_free(&local_appl);
@@ -734,8 +734,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
         case gpb::M_RELEASE_R:
             if (state != AWAITCLOSE) {
-                PE("%s: Cannot %s M_RELEASE message: Invalid state %d\n",
-                                    __func__, action, state);
+                PE("Cannot %s M_RELEASE message: Invalid state %d\n",
+                                    action, state);
                 return -1;
             }
             state = NONE;
@@ -744,14 +744,14 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
         default:
             /* All the operational messages. */
             if (state != CONNECTED) {
-                PE("%s: Cannot %s %s message: Invalid state %d\n",
-                    __func__, action, opcode_names_table[m->op_code], state);
+                PE("Cannot %s %s message: Invalid state %d\n",
+                    action, opcode_names_table[m->op_code], state);
                 return -1;
             }
     }
 
     if (old_state != state) {
-        PD("%s: Connection state %s --> %s\n", __func__,
+        PD("Connection state %s --> %s\n",
                 conn_state_repr(old_state),
                 conn_state_repr(state));
     }
@@ -787,8 +787,8 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
         /* CDAP response message (M_*_R). */
         m->invoke_id = invoke_id;
         if (put_invoke_id_remote(m->invoke_id)) {
-           PE("%s: Invoke id %d does not match any pending request\n",
-                __func__, m->invoke_id);
+           PE("Invoke id %d does not match any pending request\n",
+                m->invoke_id);
         }
     }
 
@@ -798,7 +798,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
     *buf = new char[*len];
 
     if (!(*buf)) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -824,7 +824,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
         if (n < 0) {
             perror("write(cdap_msg)");
         } else {
-            PE("%s: Partial write %d/%d\n", __func__, n, serlen);
+            PE("Partial write %d/%d\n", n, serlen);
         }
         return -1;
     }
@@ -844,7 +844,7 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
 
     m = new CDAPMessage(gm);
     if (!m) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
     }
 
     if (!m->valid(true)) {
@@ -861,8 +861,7 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
     if (m->is_response()) {
         /* CDAP request message (M_*). */
         if (put_invoke_id(m->invoke_id)) {
-            PE("%s: Invoke id %d does not match any pending request\n",
-                __func__);
+            PE("Invoke id %d does not match any pending request\n");
             delete m;
             m = NULL;
         }
@@ -870,7 +869,7 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
     } else {
         /* CDAP response message (M_*_R). */
         if (get_invoke_id_remote(m->invoke_id)) {
-            PE("%s: Invoke id %d already used remotely\n");
+            PE("Invoke id %d already used remotely\n");
             delete m;
             m = NULL;
         }
@@ -910,7 +909,7 @@ CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
     ret |= rina_name_copy(&dst_appl, remote_appl);
 
     if (ret) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ret;
     }
 
@@ -934,7 +933,7 @@ CDAPMessage::m_connect_r(const struct CDAPMessage *req, int result_,
     result_reason = result_reason_;
 
     if (ret) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ret;
     }
 

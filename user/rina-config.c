@@ -32,7 +32,7 @@ ipcp_create_resp(struct rinalite_evloop *loop,
     struct rina_kmsg_ipcp_create *req =
             (struct rina_kmsg_ipcp_create *)b_req;
 
-    PI("%s: Assigned id %d\n", __func__, resp->ipcp_id);
+    PI("Assigned id %d\n", resp->ipcp_id);
     (void)req;
 
     return 0;
@@ -100,15 +100,15 @@ read_response(int sfd)
 
     n = read(sfd, serbuf, sizeof(serbuf));
     if (n < 0) {
-        PE("%s: read() error [%d]\n", __func__, n);
+        PE("read() error [%d]\n", n);
         return -1;
     }
 
     ret = deserialize_rina_msg(rina_conf_numtables, serbuf,
                                n, msgbuf, sizeof(msgbuf));
     if (ret) {
-        PE("%s: error while deserializing response [%d]\n",
-                __func__, ret);
+        PE("error while deserializing response [%d]\n",
+                ret);
         return -1;
     }
 
@@ -168,7 +168,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 
@@ -235,7 +235,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -252,7 +252,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
     resp = rinalite_issue_request(&rc->loop, RINALITE_RMB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     rinalite_ipcps_fetch(&rc->loop);
 
@@ -279,7 +279,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     /* Does the request specifies an existing IPC process ? */
     rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     if (!rinalite_ipcp) {
-        PE("%s: No such IPCP process\n", __func__);
+        PE("No such IPCP process\n");
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
         ret = rina_ipcp_destroy(rc, rinalite_ipcp->ipcp_id, rinalite_ipcp->dif_type);
@@ -299,7 +299,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -314,7 +314,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     resp = rinalite_issue_request(&rc->loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
@@ -347,7 +347,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     /* The request specifies an IPCP: lookup that. */
     rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     if (!rinalite_ipcp) {
-        PE("%s: Could not find a suitable IPC process\n", __func__);
+        PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
         ret = rina_ipcp_config(rc, rinalite_ipcp->ipcp_id, param_name, param_value);
@@ -375,7 +375,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     /* Lookup the id of the registering IPCP. */
     rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
     if (!rinalite_ipcp) {
-        PE("%s: Could not find the IPC process to register\n", __func__);
+        PE("Could not find the IPC process to register\n");
         return -1;
     }
 
@@ -423,7 +423,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
     if (!rinalite_ipcp) {
-        PE("%s: Could not find enrolling IPC process\n", __func__);
+        PE("Could not find enrolling IPC process\n");
         return -1;
     }
 
@@ -457,7 +457,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     errno = 0;
     remote_addr = strtoul(argv[4], NULL, 10);
     if (errno) {
-        PE("%s: Invalid address %s\n", __func__, argv[4]);
+        PE("Invalid address %s\n", argv[4]);
         return -1;
     }
 
@@ -465,7 +465,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     rinalite_ipcp = rinalite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     rina_name_free(&ipcp_name);
     if (!rinalite_ipcp) {
-        PE("%s: Could not find IPC process\n", __func__);
+        PE("Could not find IPC process\n");
         return -1;
     }
 

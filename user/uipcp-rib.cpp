@@ -200,7 +200,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
 
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
-            PE("%s: serialization failed\n", __func__);
+            PE("serialization failed\n");
             return objlen;
         }
 
@@ -209,7 +209,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
 
     ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
     if (ret) {
-        PE("%s: message serialization failed\n", __func__);
+        PE("message serialization failed\n");
         delete serbuf;
         return -1;
     }
@@ -223,7 +223,7 @@ Neighbor::abort()
     CDAPMessage m;
     int ret;
 
-    PE("%s: Aborting enrollment\n", __func__);
+    PE("Aborting enrollment\n");
 
     if (enrollment_state == NONE) {
         return;
@@ -235,7 +235,7 @@ Neighbor::abort()
 
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         return;
     }
 
@@ -268,7 +268,7 @@ Neighbor::none(const CDAPMessage *rm)
          * M_CONNECT message. */
         conn = new CDAPConn(flow_fd, 1);
         if (!conn) {
-            PE("%s: Out of memory\n", __func__);
+            PE("Out of memory\n");
             abort();
             return -1;
         }
@@ -276,7 +276,7 @@ Neighbor::none(const CDAPMessage *rm)
         ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
                           &ipcp_name);
         if (ret) {
-            PE("%s: M_CONNECT creation failed\n", __func__);
+            PE("M_CONNECT creation failed\n");
             abort();
             return -1;
         }
@@ -292,7 +292,7 @@ Neighbor::none(const CDAPMessage *rm)
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
         ret = m.m_connect_r(rm, 0, string());
         if (ret) {
-            PE("%s: M_CONNECT_R creation failed\n", __func__);
+            PE("M_CONNECT_R creation failed\n");
             abort();
             return -1;
         }
@@ -304,7 +304,7 @@ Neighbor::none(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, invoke_id, NULL);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -332,7 +332,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -355,14 +355,14 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     int ret;
 
     if (rm->op_code != gpb::M_START) {
-        PE("%s: M_START expected\n", __func__);
+        PE("M_START expected\n");
         abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("%s: M_START does not contain a nested message\n");
+        PE("M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -383,7 +383,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -402,7 +402,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, &enr_info);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         abort();
         return 0;
     }
@@ -420,14 +420,14 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
     size_t objlen;
 
     if (rm->op_code != gpb::M_START_R) {
-        PE("%s: M_START_R expected\n", __func__);
+        PE("M_START_R expected\n");
         abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("%s: M_START_R does not contain a nested message\n");
+        PE("M_START_R does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -455,14 +455,14 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     int ret;
 
     if (rm->op_code != gpb::M_STOP) {
-        PE("%s: M_STOP expected\n", __func__);
+        PE("M_STOP expected\n");
         abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        PE("%s: M_STOP does not contain a nested message\n");
+        PE("M_STOP does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -478,18 +478,18 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
-        PE("%s: send_to_port_id() failed\n", __func__);
+        PE("send_to_port_id() failed\n");
         abort();
         return 0;
     }
 
     if (enr_info.start_early) {
         enrollment_state = ENROLLED;
-        PI("%s: Initiator is allowed to start early\n", __func__);
+        PI("Initiator is allowed to start early\n");
 
     } else {
         enrollment_state = I_WAIT_START;
-        PI("%s: Initiator is not allowed to start early\n", __func__);
+        PI("Initiator is not allowed to start early\n");
     }
 
     return 0;
@@ -504,7 +504,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     int ret;
 
     if (rm->op_code != gpb::M_STOP_R) {
-        PE("%s: M_START_R expected\n", __func__);
+        PE("M_START_R expected\n");
         abort();
         return 0;
     }
@@ -516,7 +516,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
-        PE("%s: send_to_port_id failed\n", __func__);
+        PE("send_to_port_id failed\n");
         abort();
         return ret;
     }
@@ -541,7 +541,7 @@ Neighbor::enrolled(const CDAPMessage *rm)
                 && rm->obj_name == obj_name::status) {
         /* This is OK, but we didn't need it, as
          * we started early. */
-        PI("%s: Ignoring M_START(status)\n", __func__);
+        PI("Ignoring M_START(status)\n");
         return 0;
     }
 
@@ -563,7 +563,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     }
 
     if (old_state != enrollment_state) {
-        PI("%s: switching state %s --> %s\n", __func__,
+        PI("switching state %s --> %s\n",
              enrollment_state_repr(old_state),
              enrollment_state_repr(enrollment_state));
     }
@@ -630,7 +630,7 @@ rib_destroy(struct uipcp_rib *rib)
                         neigh != rib->neighbors.end(); neigh++) {
         ret = close(neigh->flow_fd);
         if (ret) {
-            PE("%s: Error deallocating N-1 flow fd %d\n", __func__,
+            PE("Error deallocating N-1 flow fd %d\n",
                neigh->flow_fd);
         }
     }
@@ -752,7 +752,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     /* Lookup neighbor by port id. */
     neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
     if (neigh == rib->neighbors.end()) {
-        PE("%s: Received message from unknown port id %d\n", __func__,
+        PE("Received message from unknown port id %d\n",
             mhdr->local_port);
         return -1;
     }
@@ -760,7 +760,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     if (!neigh->conn) {
         neigh->conn = new CDAPConn(neigh->flow_fd, 1);
         if (!neigh->conn) {
-            PE("%s: Out of memory\n", __func__);
+            PE("Out of memory\n");
             neigh->abort();
             return -1;
         }
@@ -769,7 +769,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     /* Deserialize the received CDAP message. */
     m = neigh->conn->msg_deser(serbuf, serlen);
     if (!m) {
-        PE("%s: msg_deser() failed\n", __func__);
+        PE("msg_deser() failed\n");
         return -1;
     }
 
@@ -795,7 +795,7 @@ rib_application_register(struct uipcp_rib *rib, int reg,
     assert(!ret);
 
     if (!name_s) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return -1;
     }
 
@@ -806,8 +806,8 @@ rib_application_register(struct uipcp_rib *rib, int reg,
 
     if (reg) {
         if (mit != rib->dft.end()) {
-            PE("%s: Application %s already registered on uipcp with address "
-                    "[%llu], my address being [%llu]\n", __func__, name_str.c_str(),
+            PE("Application %s already registered on uipcp with address "
+                    "[%llu], my address being [%llu]\n", name_str.c_str(),
                     (long long unsigned)mit->second, (long long unsigned)local_addr);
             return -1;
         }
@@ -817,7 +817,7 @@ rib_application_register(struct uipcp_rib *rib, int reg,
 
     } else {
         if (mit == rib->dft.end()) {
-            PE("%s: Application %s was not registered here\n", __func__,
+            PE("Application %s was not registered here\n",
                 name_str.c_str());
             return -1;
         }
@@ -829,7 +829,7 @@ rib_application_register(struct uipcp_rib *rib, int reg,
 
     rib_remote_sync(rib, create, obj_class::dft, obj_name::dft, 10329);
 
-    PD("%s: Application %s %sregistered %s uipcp %d\n", __func__,
+    PD("Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
             uipcp->ipcp_id);
 
@@ -844,7 +844,7 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
     string name;
 
     if (!rina_name_valid(lower_dif)) {
-        PE("%s: lower_dif name is not valid\n", __func__);
+        PE("lower_dif name is not valid\n");
         return -1;
     }
 
@@ -857,7 +857,7 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
 
     if (reg) {
         if (lit != rib->lower_difs.end()) {
-            PE("%s: DIF %s already registered\n", __func__, name.c_str());
+            PE("DIF %s already registered\n", name.c_str());
             return -1;
         }
 
@@ -865,7 +865,7 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
 
     } else {
         if (lit == rib->lower_difs.end()) {
-            PE("%s: DIF %s not registered\n", __func__, name.c_str());
+            PE("DIF %s not registered\n", name.c_str());
             return -1;
         }
         rib->lower_difs.erase(lit);

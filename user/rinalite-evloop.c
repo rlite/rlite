@@ -35,8 +35,8 @@ ipcp_fetch_resp(struct rinalite_evloop *loop,
         return 0;
     }
 
-    NPD("%s: Fetch IPCP response id=%u, type=%s\n",
-       __func__, resp->ipcp_id, resp->dif_type);
+    NPD("Fetch IPCP response id=%u, type=%s\n",
+       resp->ipcp_id, resp->dif_type);
 
     rinalite_ipcp = malloc(sizeof(*rinalite_ipcp));
     if (rinalite_ipcp) {
@@ -47,7 +47,7 @@ ipcp_fetch_resp(struct rinalite_evloop *loop,
         rina_name_copy(&rinalite_ipcp->dif_name, &resp->dif_name);
         list_add_tail(&rinalite_ipcp->node, &loop->ipcps);
     } else {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
     }
 
     (void)b_req;
@@ -64,7 +64,7 @@ ipcp_fetch(struct rinalite_evloop *loop, int *result)
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 
@@ -82,14 +82,14 @@ rinalite_ipcps_print(struct rinalite_evloop *loop)
 {
     struct rinalite_ipcp *rinalite_ipcp;
 
-    PI("IPC Processes table:\n");
+    PI_S("IPC Processes table:\n");
     list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
             char *ipcp_name_s = NULL;
             char *dif_name_s = NULL;
 
             ipcp_name_s = rina_name_to_string(&rinalite_ipcp->ipcp_name);
             dif_name_s = rina_name_to_string(&rinalite_ipcp->dif_name);
-            PI("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
+            PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                     " address = %llu\n",
                         rinalite_ipcp->ipcp_id, ipcp_name_s, rinalite_ipcp->dif_type,
                         dif_name_s,
@@ -223,7 +223,7 @@ evloop_function(void *arg)
         /* Here we can malloc the maximum kernel message size. */
         resp = RINALITE_RMBR(malloc(max_resp_size));
         if (!resp) {
-            PE("%s: Out of memory\n", __func__);
+            PE("Out of memory\n");
             goto next_one;
         }
 
@@ -231,14 +231,14 @@ evloop_function(void *arg)
         ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret,
                                    (void *)resp, max_resp_size);
         if (ret) {
-            PE("%s: Problems during deserialization [%d]\n",
-                    __func__, ret);
+            PE("Problems during deserialization [%d]\n",
+                    ret);
         }
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
                 !loop->handlers[resp->msg_type]) {
-            PE("%s: Invalid message type [%d] received\n", __func__,
+            PE("Invalid message type [%d] received\n",
                     resp->msg_type);
             goto next_one;
         }
@@ -249,7 +249,7 @@ evloop_function(void *arg)
             pthread_mutex_unlock(&loop->lock);
             ret = loop->handlers[resp->msg_type](loop, resp, NULL);
             if (ret) {
-                PE("%s: Error while handling message type [%d]\n", __func__,
+                PE("Error while handling message type [%d]\n",
                                         resp->msg_type);
             }
             goto next_one;
@@ -260,14 +260,14 @@ evloop_function(void *arg)
         req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
         pthread_mutex_unlock(&loop->lock);
         if (!req_entry) {
-            PE("%s: No pending request matching event-id [%u]\n", __func__,
+            PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
             goto next_one;
         }
 
         if (req_entry->msg->msg_type + 1 != resp->msg_type) {
-            PE("%s: Response message mismatch: expected %u, got %u\n",
-                    __func__, req_entry->msg->msg_type + 1,
+            PE("Response message mismatch: expected %u, got %u\n",
+                    req_entry->msg->msg_type + 1,
                     resp->msg_type);
             goto notify_requestor;
         }
@@ -277,7 +277,7 @@ evloop_function(void *arg)
         /* Invoke the right response handler, without holding the loop lock. */
         ret = loop->handlers[resp->msg_type](loop, resp, req_entry->msg);
         if (ret) {
-            PE("%s: Error while handling message type [%d]\n", __func__,
+            PE("Error while handling message type [%d]\n",
                     resp->msg_type);
         }
 
@@ -342,8 +342,8 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
     if (!has_response && wait_for_completion) {
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
-        PE("%s: has_response == 0 --> wait_for_completion "
-                "== 0\n", __func__);
+        PE("has_response == 0 --> wait_for_completion "
+                "== 0\n");
         rina_msg_free(rina_kernel_numtables, msg);
         *result = EINVAL;
         return NULL;
@@ -357,7 +357,7 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
         entry = malloc(sizeof(*entry));
         if (!entry) {
             rina_msg_free(rina_kernel_numtables, msg);
-            PE("%s: Out of memory\n", __func__);
+            PE("Out of memory\n");
             *result = ENOMEM;
             return NULL;
         }
@@ -384,8 +384,8 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
     /* Serialize the message. */
     serlen = rina_msg_serlen(rina_kernel_numtables, msg);
     if (serlen > sizeof(serbuf)) {
-        PE("%s: Serialized message would be too long [%u]\n",
-                    __func__, serlen);
+        PE("Serialized message would be too long [%u]\n",
+                    serlen);
         free(entry);
         pthread_mutex_unlock(&loop->lock);
         rina_msg_free(rina_kernel_numtables, msg);
@@ -407,7 +407,7 @@ rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
             *result = ret;
         } else {
             /* This should never happen if kernel code is correct. */
-            PE("%s: Error: partial write [%d/%u]\n", __func__,
+            PE("Error: partial write [%d/%u]\n",
                     ret, serlen);
             *result = EINVAL;
         }
@@ -498,7 +498,7 @@ rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
 
     /* If not redefined, setup default fetch handler. */
     if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
-        NPD("%s: setting default fetch handler\n", __func__);
+        NPD("setting default fetch handler\n");
         loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 
@@ -556,7 +556,7 @@ rinalite_evloop_fdcb_add(struct rinalite_evloop *loop, int fd, rinalite_evloop_f
     struct rinalite_evloop_fdcb *fdcb;
 
     if (!cb || fd < 0) {
-        PE("%s: Invalid arguments fd [%d], cb[%p]\n", __func__, fd, cb);
+        PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
         return -1;
     }
 

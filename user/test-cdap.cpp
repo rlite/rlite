@@ -80,7 +80,7 @@ test_cdap_server(int port)
         m = conn.msg_recv();
 
         if (!m) {
-            PE("%s: msg_recv()\n");
+            PE("msg_recv()\n");
             continue;
         }
 
@@ -147,7 +147,7 @@ test_cdap_server(int port)
         }
 
         if (k != n) {
-            PE("%s: Partial write %d/%d\n", __func__, m, n);
+            PE("Partial write %d/%d\n", m, n);
         }
     }
 
@@ -173,12 +173,12 @@ client_connect(CDAPConn *conn)
     if (req.m_connect(gpb::AUTH_NONE,
                       &av, &local_appl, &remote_appl) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -197,12 +197,12 @@ client_create_some(CDAPConn *conn)
     if (req.m_create(gpb::F_NO_FLAGS,
                      "class_A", "x", 0, 0, string()) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -222,13 +222,13 @@ client_write_some(CDAPConn *conn)
     req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
     req.set_obj_value(18);
     if(conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     req.m_write(gpb::F_NO_FLAGS, "class_B", "y", 0, 0, string());
     req.set_obj_value("ciccio");
     if (conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     req.m_write(gpb::F_NO_FLAGS, "class_C", "z", 0, 0, string());
@@ -237,13 +237,13 @@ client_write_some(CDAPConn *conn)
     }
     req.set_obj_value(buf, sizeof(buf));
     if (conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     for (int i = 0; i < 3; i++) {
         m = conn->msg_recv();
         if (!m) {
-            PE("%s: Error receiving CDAP response\n", __func__);
+            PE("Error receiving CDAP response\n");
             return -1;
         }
 
@@ -263,12 +263,12 @@ client_read_some(CDAPConn *conn)
     if (req.m_read(gpb::F_NO_FLAGS,
                     "class_A", "x", 0, 0, string()) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -287,12 +287,12 @@ client_startstop_some(CDAPConn *conn)
     if (req.m_start(gpb::F_NO_FLAGS,
                     "class_A", "x", 0, 0, string()) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -301,12 +301,12 @@ client_startstop_some(CDAPConn *conn)
     if (req.m_stop(gpb::F_NO_FLAGS,
                    "class_A", "x", 0, 0, string()) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -325,12 +325,12 @@ client_delete_some(CDAPConn *conn)
     if (req.m_delete(gpb::F_NO_FLAGS,
                      "class_A", "x", 0, 0, string()) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 
@@ -348,12 +348,12 @@ client_disconnect(CDAPConn *conn)
 
     if (req.m_release(gpb::F_NO_FLAGS) ||
             conn->msg_send(&req, 0)) {
-        PE("%s: Failed to send CDAP message\n", __func__);
+        PE("Failed to send CDAP message\n");
     }
 
     m = conn->msg_recv();
     if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
+        PE("Error receiving CDAP response\n");
         return -1;
     }
 

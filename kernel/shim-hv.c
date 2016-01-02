@@ -55,13 +55,13 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     serlen = rina_msg_serlen(rina_shim_hv_numtables, msg);
     serbuf = kmalloc(serlen, GFP_ATOMIC);
     if (!serbuf) {
-        printk("%s: Out of memory\n", __func__);
+        printk("Out of memory\n");
         return -ENOMEM;
     }
 
     ret = serialize_rina_msg(rina_shim_hv_numtables, serbuf, msg);
     if (ret != serlen) {
-        printk("%s: Error while serializing\n", __func__);
+        printk("Error while serializing\n");
         return -EINVAL;
     }
 
@@ -94,8 +94,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         ret = rina_fa_req_arrived(priv->ipcp, req.local_port, 0,
                     &req.remote_application, &req.local_application, NULL);
         if (ret) {
-            printk("%s: failed to report flow allocation request\n",
-                    __func__);
+            printk("failed to report flow allocation request\n");
         }
     } else if (ty == RINA_SHIM_HV_FA_RESP) {
         struct rina_hmsg_fa_resp resp;
@@ -109,18 +108,17 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         ret = rina_fa_resp_arrived(priv->ipcp, resp.remote_port,
                                    resp.local_port, 0, resp.response);
         if (ret) {
-            printk("%s: failed to report flow allocation response\n",
-                    __func__);
+            printk("failed to report flow allocation response\n");
         }
     } else {
-        printk("%s: unknown ctrl msg type %u\n", __func__, ty);
+        printk("unknown ctrl msg type %u\n", ty);
     }
 
     return;
 
 des_fail:
     if (ret) {
-        printk("%s: failed to deserialize msg type %u\n", __func__, ty);
+        printk("failed to deserialize msg type %u\n", ty);
     }
 }
 
@@ -139,7 +137,7 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
 
     rb = rina_buf_alloc(len, 0, GFP_ATOMIC);
     if (!rb) {
-        printk("%s: Out of memory\n", __func__);
+        printk("Out of memory\n");
         return;
     }
 
@@ -161,7 +159,7 @@ rina_shim_hv_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
     priv->vmpi_id = ~0U;
 
-    printk("%s: New IPC created [%p]\n", __func__, priv);
+    printk("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -173,7 +171,7 @@ rina_shim_hv_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("%s: IPC [%p] destroyed\n", __func__, priv);
+    printk("IPC [%p] destroyed\n", priv);
 }
 
 static int

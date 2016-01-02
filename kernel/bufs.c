@@ -13,14 +13,14 @@ rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 
     rb = kmalloc(sizeof(*rb), gfp);
     if (unlikely(!rb)) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 
     kbuf = kmalloc(sizeof(*rb->raw) + real_size, gfp);
     if (unlikely(!kbuf)) {
         kfree(rb);
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 
@@ -48,7 +48,7 @@ rina_buf_clone(struct rina_buf *rb, gfp_t gfp)
 
     crb = kmalloc(sizeof(*crb), gfp);
     if (unlikely(!crb)) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return NULL;
     }
 

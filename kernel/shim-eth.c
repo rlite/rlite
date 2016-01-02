@@ -102,7 +102,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.data = (unsigned long)priv;
     priv->arp_tmr_shutdown = false;
 
-    printk("%s: New IPC created [%p]\n", __func__, priv);
+    printk("New IPC created [%p]\n", priv);
 
     return priv;
 }
@@ -141,7 +141,7 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
 
     kfree(priv);
 
-    printk("%s: IPC [%p] destroyed\n", __func__, priv);
+    printk("IPC [%p] destroyed\n", priv);
 }
 
 static int
@@ -160,7 +160,7 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
 
         priv->upper_name_s = rina_name_to_string(appl);
         if (!priv->upper_name_s) {
-            PE("%s: Out of memory\n", __func__);
+            PE("Out of memory\n");
             return -ENOMEM;
         }
 
@@ -171,7 +171,7 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
             return ret;
         }
 
-        PD("%s: Application %s registered\n", __func__, priv->upper_name_s);
+        PD("Application %s registered\n", priv->upper_name_s);
 
         return 0;
     }
@@ -182,7 +182,7 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
     }
 
     if (rina_name_cmp(appl, &priv->upper_name) == 0) {
-        PD("%s: Application %s unregistered\n", __func__, priv->upper_name_s);
+        PD("Application %s unregistered\n", priv->upper_name_s);
         rina_name_free(&priv->upper_name);
         kfree(priv->upper_name_s);
         priv->upper_name_s = NULL;
@@ -308,7 +308,7 @@ arp_resolver_cb(unsigned long arg)
 
             BUG_ON(!entry->spa);
             BUG_ON(!entry->tpa);
-            PD("%s: Trying again to resolve %s\n", __func__, entry->tpa);
+            PD("Trying again to resolve %s\n", entry->tpa);
             skb = arp_create(priv, ARPOP_REQUEST, entry->spa,
                              strlen(entry->spa), entry->tpa,
                              strlen(entry->tpa), NULL, GFP_ATOMIC);
@@ -441,7 +441,7 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     return 0;
 
 nomem:
-    PE("%s: Out of memory\n", __func__);
+    PE("Out of memory\n");
 
     if (spa) kfree(spa);
     if (tpa) kfree(tpa);
@@ -468,7 +468,7 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     remote_app_s = rina_name_to_string(&flow->remote_application);
     if (!remote_app_s) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return -ENOMEM;
     }
 
@@ -487,7 +487,7 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
          * in order delivery, but the reordering problem complicates
          * testing. This is bsically a tradeoff, so I went for this
          * solution since it could not have any drawbacks. */
-        PD("%s: Popping %u PDUs from rx_tmpq\n", __func__,
+        PD("Popping %u PDUs from rx_tmpq\n",
                 entry->rx_tmpq_len);
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
             list_del(&rb->node);
@@ -528,7 +528,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
     struct sk_buff *skb = NULL;
 
     if (len < sizeof(*arp) + 2*(arp->ar_pln + arp->ar_hln)) {
-        PI("%s: Dropping truncated ARP message\n", __func__);
+        PI("Dropping truncated ARP message\n");
         return;
     }
 
@@ -579,14 +579,14 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
                 memcpy(entry->tha, sha, sizeof(entry->tha));
                 list_add_tail(&entry->node, &priv->arp_table);
 
-                PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
-                        __func__, entry->tpa, entry->tha[0], entry->tha[1],
+                PD("ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
+                        entry->tpa, entry->tha[0], entry->tha[1],
                         entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
             }
         }
 
         if (!entry) {
-            PI("%s: ARP table entry allocation failed\n", __func__);
+            PI("ARP table entry allocation failed\n");
         }
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
@@ -596,14 +596,14 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
         if (!entry) {
             /* Gratuitous ARP reply. Don't accept it (for now). */
-            PI("%s: Dropped gratuitous ARP reply\n", __func__);
+            PI("Dropped gratuitous ARP reply\n");
             goto out;
         }
 
         if (arp->ar_hln != sizeof(entry->tha)) {
             /* Only support 48-bits hardware address (for now). */
-            PI("%s: Dropped ARP reply with SHA/THA len of %d\n",
-               __func__, arp->ar_hln);
+            PI("Dropped ARP reply with SHA/THA len of %d\n",
+               arp->ar_hln);
             goto out;
         }
 
@@ -611,12 +611,12 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         entry->complete = true;
         flow = entry->flow;
 
-        PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
-           __func__, entry->tpa, entry->tha[0], entry->tha[1],
+        PD("ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
+           entry->tpa, entry->tha[0], entry->tha[1],
            entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
 
     } else {
-        PI("%s: Unknown RINA ARP operation %04X\n", __func__,
+        PI("Unknown RINA ARP operation %04X\n",
                 ntohs(arp->ar_op));
     }
 
@@ -650,7 +650,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
             skb->len);
 
     if (unlikely(!rb)) {
-        PD("%s: Out of memory\n", __func__);
+        PD("Out of memory\n");
         return;
     }
 
@@ -682,8 +682,8 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
      * allocation initiator. */
 
     if (!match) {
-        RPD(5, "%s: PDU from unknown source MAC "
-                "%02X:%02X:%02X:%02X:%02X:%02X\n", __func__,
+        RPD(5, "PDU from unknown source MAC "
+                "%02X:%02X:%02X:%02X:%02X:%02X\n",
                 hh->h_source[0], hh->h_source[1], hh->h_source[2],
                 hh->h_source[3], hh->h_source[4], hh->h_source[5]);
         goto drop;
@@ -702,14 +702,14 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
         /* The first PDU is interpreted as a flow allocation request. */
 
         if (!priv->upper_name_s) {
-            PD("%s: Flow allocation request arrived but no application"
-               "registered\n", __func__);
+            PD("Flow allocation request arrived but no application"
+               "registered\n");
             goto drop;
         }
 
         ret = __rina_name_from_string(entry->tpa, &remote_app, GFP_ATOMIC);
         if (ret) {
-            PD("%s: Out of memory\n", __func__);
+            PD("Out of memory\n");
             goto drop;
         }
 
@@ -718,7 +718,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
         rina_name_free(&remote_app);
 
         if (ret) {
-            PD("%s: Out of memory\n", __func__);
+            PD("Out of memory\n");
             goto drop;
         }
 
@@ -727,7 +727,7 @@ enq:
         if (entry->rx_tmpq_len > 64) {
             goto drop;
         }
-        RPD(5, "%s: Push PDU into rx_tmpq\n", __func__);
+        RPD(5, "Push PDU into rx_tmpq\n");
         list_add_tail(&rb->node, &entry->rx_tmpq);
         entry->rx_tmpq_len++;
     }
@@ -748,7 +748,7 @@ shim_eth_rx_handler(struct sk_buff **skbp)
                 rcu_dereference(skb->dev->rx_handler_data);
     unsigned int ethertype = ntohs(skb->protocol);
 
-    NPD("%s: intercept skb %u, protocol %u\n", __func__, skb->len,
+    NPD("intercept skb %u, protocol %u\n", skb->len,
         ntohs(skb->protocol));
 
     if (ethertype == ETH_P_ARP) {
@@ -832,7 +832,7 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
                     GFP_KERNEL);
     if (!skb) {
-        PD("%s: Out of memory\n", __func__);
+        PD("Out of memory\n");
         return -ENOMEM;
     }
 
@@ -860,7 +860,7 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
-        RPD(5, "%s: dev_queue_xmit() error %d\n", __func__, ret);
+        RPD(5, "dev_queue_xmit() error %d\n", ret);
     }
 
     return 0;
@@ -895,7 +895,7 @@ rina_shim_eth_config(struct ipcp_entry *ipcp,
 
                 wmb();
 
-                PD("%s: netdev set to %p\n", __func__, priv->netdev);
+                PD("netdev set to %p\n", priv->netdev);
             } else {
                 dev_put(priv->netdev);
                 priv->netdev = NULL;
@@ -919,7 +919,7 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
             struct rina_buf *rb, *tmp;
 
             /* Unbind the flow from this ARP table entry. */
-            PD("%s: Unbinding from flow %p\n", __func__, entry->flow);
+            PD("Unbinding from flow %p\n", entry->flow);
             flow->priv = NULL;
             entry->flow = NULL;
             entry->fa_req_arrived = false;

@@ -21,13 +21,13 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
     int ret = 0;
 
     if (buflen > MGMTBUF_SIZE_MAX) {
-        PE("%s: Dropping oversized mgmt message %d/%d\n", __func__,
+        PE("Dropping oversized mgmt message %d/%d\n",
             (int)buflen, MGMTBUF_SIZE_MAX);
     }
 
     mgmtbuf = malloc(sizeof(*mhdr) + buflen);
     if (!mgmtbuf) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -37,10 +37,10 @@ mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
 
     n = write(uipcp->mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
-        PE("%s: write(): %d\n", __func__, n);
+        PE("write(): %d\n", n);
         ret = n;
     } else if (n != buflen) {
-        PE("%s: partial write %d/%d\n", __func__, n, (int)buflen);
+        PE("partial write %d/%d\n", n, (int)buflen);
         ret = -1;
     }
 
@@ -106,7 +106,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -121,7 +121,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -134,8 +134,8 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 
     remote_addr = le64toh(*((uint64_t *)(buf)));
 
-    PD("%s: [uipcp %u] Received enrollment management SDU from IPCP addr %lu\n",
-            __func__, uipcp->ipcp_id, (long unsigned)remote_addr);
+    PD("[uipcp %u] Received enrollment management SDU from IPCP addr %lu\n",
+            uipcp->ipcp_id, (long unsigned)remote_addr);
 
     uipcp_pduft_set(uipcp, uipcp->ipcp_id, remote_addr,
                    mhdr->local_port);
@@ -157,7 +157,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -176,7 +176,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -191,8 +191,8 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     struct rina_flow_config flowcfg;
     int ret;
 
-    PD("%s: [uipcp %u] Received fa req management SDU from IPCP addr %lu\n",
-            __func__, uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
+    PD("[uipcp %u] Received fa req management SDU from IPCP addr %lu\n",
+            uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
 
     remote_port = le32toh(*((uint32_t *)ptr));
     ptr += sizeof(uint32_t);
@@ -202,12 +202,12 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 
     ret = deserialize_rina_name(&ptr, &remote_application);
     if (ret) {
-        PE("%s: deserialization error\n", __func__);
+        PE("deserialization error\n");
     }
 
     ret = deserialize_rina_name(&ptr, &local_application);
     if (ret) {
-        PE("%s: deserialization error\n", __func__);
+        PE("deserialization error\n");
     }
 
     uipcp_fa_req_arrived(uipcp, remote_port, mhdr->remote_addr,
@@ -229,7 +229,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -247,7 +247,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -260,8 +260,8 @@ uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     uint32_t remote_port, local_port;
     uint8_t response;
 
-    PD("%s: [uipcp %u] Received fa resp management SDU from IPCP addr %lu\n",
-            __func__, uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
+    PD("[uipcp %u] Received fa resp management SDU from IPCP addr %lu\n",
+            uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
 
     remote_port = le32toh(*((uint32_t *)ptr));
     ptr += sizeof(uint32_t);
@@ -294,12 +294,12 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
      * a management SDU. */
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
-        PE("%s: Error: read() failed [%d]\n", __func__, n);
+        PE("Error: read() failed [%d]\n", n);
         goto out;
 
     } else if (n < sizeof(*mhdr)) {
-        PE("%s: Error: read() does not contain mgmt header, %d<%d\n",
-                __func__, n, (int)sizeof(*mhdr));
+        PE("Error: read() does not contain mgmt header, %d<%d\n",
+                n, (int)sizeof(*mhdr));
         goto out;
     }
 
@@ -331,7 +331,7 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
             break;
 
         default:
-            PI("%s: Unknown cmd %u received\n", __func__, cmd);
+            PI("Unknown cmd %u received\n", cmd);
             break;
     }
 
@@ -380,7 +380,7 @@ uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
     entry->remote_addr = remote_addr;
 
     appl_s = rina_name_to_string(appl_name);
-    PD("%s: [uipcp %u] '%s' --> %llu\n", __func__, uipcp->ipcp_id,
+    PD("[uipcp %u] '%s' --> %llu\n", uipcp->ipcp_id,
         appl_s, (long long unsigned)remote_addr);
     if (appl_s) {
         free(appl_s);
@@ -403,14 +403,14 @@ uipcp_fa_req(struct rinalite_evloop *loop,
     void *cur;
     size_t len;
 
-    PD("%s: [uipcp %u] Got reflected message\n", __func__, uipcp->ipcp_id);
+    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
     dft_entry = dft_lookup(uipcp, &req->remote_application);
     if (!dft_entry) {
         /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
-        PI("%s: No DFT matching entry\n", __func__);
+        PI("No DFT matching entry\n");
         return 0;
     }
 
@@ -420,7 +420,7 @@ uipcp_fa_req(struct rinalite_evloop *loop,
             rina_name_serlen(&req->remote_application);
     mgmtsdu = malloc(len);
     if (!mgmtsdu) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return 0;
     }
 
@@ -455,7 +455,7 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
     void *cur;
     size_t len;
 
-    PD("%s: [uipcp %u] Got reflected message\n", __func__, uipcp->ipcp_id);
+    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
     (void)uipcp;
@@ -466,7 +466,7 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
 
     mgmtsdu = malloc(len);
     if (!mgmtsdu) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return 0;
     }
 
@@ -516,8 +516,8 @@ uipcp_server(void *arg)
 
         pfr = rinalite_flow_req_wait(&uipcp->appl);
         port_id = pfr->port_id;
-        PD("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-                __func__, pfr->ipcp_id, pfr->port_id);
+        PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+                pfr->ipcp_id, pfr->port_id);
 
         result = rinalite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
                                     uipcp->ipcp_id, pfr->port_id, 0);
@@ -537,7 +537,7 @@ uipcp_server(void *arg)
         ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
                                 flow_fd, port_id);
         if (ret) {
-            PE("%s: rib_neighbor_flow() failed\n", __func__);
+            PE("rib_neighbor_flow() failed\n");
         }
 
         /* XXX This usleep() is a temporary hack to make sure that the
@@ -563,7 +563,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
 
@@ -576,7 +576,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
+    PD("result: %d\n", result);
 
     return result;
 }
@@ -603,7 +603,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     uipcp = malloc(sizeof(*uipcp));
     if (!uipcp) {
-        PE("%s: Out of memory\n", __func__);
+        PE("Out of memory\n");
         return ENOMEM;
     }
     memset(uipcp, 0, sizeof(*uipcp));

@@ -34,16 +34,16 @@ remove_flow_work(struct work_struct *work)
 
     spin_lock_bh(&dtp->lock);
 
-    PD("%s: Delayed flow removal, dropping %u PDUs from cwq\n",
-            __func__, dtp->cwq_len);
+    PD("Delayed flow removal, dropping %u PDUs from cwq\n",
+            dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del(&rb->node);
         rina_buf_free(rb);
         dtp->cwq_len--;
     }
 
-    PD("%s: Delayed flow removal, dropping %u PDUs from rtxq\n",
-            __func__, dtp->rtxq_len);
+    PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
+            dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del(&rb->node);
         rina_buf_free(rb);
