@@ -216,6 +216,7 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
 
     entry = kzalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
+        PE("%s: Out of memory\n", __func__);
         return -ENOMEM;
     }
 
@@ -224,6 +225,7 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
+        PE("%s: Out of memory\n", __func__);
         return -ENOMEM;
     }
     serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, rmsg);
@@ -1306,38 +1308,6 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     return ret;
 }
 
-static int
-rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
-                     struct rina_ctrl *rc)
-{
-    char *name_s = rina_name_to_string(appl_name);
-    struct ipcp_entry *entry;
-    int ret = -EINVAL;  /* Report failure by default. */
-
-    /* Find the IPC process entry corresponding to req->ipcp_id. */
-    entry = ipcp_get(ipcp_id);
-    if (entry) {
-        ret = 0;
-        if (reg) {
-            ret = ipcp_application_add(entry, appl_name, rc);
-        } else {
-            ret = ipcp_application_del(entry, appl_name);
-        }
-    }
-
-    ipcp_put(entry);
-
-    if (ret == 0) {
-        printk("%s: Application process %s %sregistered to IPC process %u\n",
-                __func__, name_s, (reg ? "" : "un"), ipcp_id);
-    }
-    if (name_s) {
-        kfree(name_s);
-    }
-
-    return ret;
-}
-
 /* Connect the upper IPCP which is using this flow
  * so that rina_sdu_rx() can deliver SDU to the IPCP. */
 static int
@@ -1444,9 +1414,40 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_application_register *req =
                     (struct rina_kmsg_application_register *)bmsg;
+    struct rina_name *appl_name = &req->application_name;
+    char *name_s = rina_name_to_string(appl_name);
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
 
-    return  rina_register_internal(req->reg, req->ipcp_id, &req->application_name,
-                                   rc);
+    /* Find the IPC process entry corresponding to req->ipcp_id. */
+    ipcp = ipcp_get(req->ipcp_id);
+    if (ipcp) {
+        ret = 0;
+        if (req->reg) {
+            ret = ipcp_application_add(ipcp, appl_name, rc);
+        } else {
+            ret = ipcp_application_del(ipcp, appl_name);
+        }
+    }
+
+    if (!ret && ipcp->uipcp) {
+        /* Reflect to userspace this (un)registration, so that userspace
+         * IPC process can take appropriate actions. */
+        req->event_id = 0;
+        rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)req);
+    }
+
+    ipcp_put(ipcp);
+
+    if (ret == 0) {
+        printk("%s: Application process %s %sregistered to IPC process %u\n",
+                __func__, name_s, (req->reg ? "" : "un"), req->ipcp_id);
+    }
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return ret;
 }
 
 static int
