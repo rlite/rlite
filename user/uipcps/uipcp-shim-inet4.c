@@ -294,7 +294,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     list_add_tail(&bp->node, &shim->bindpoints);
 
     /* Registration requires a response, while unregistrations doesn't. */
-    return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+    return uipcp_appl_register_resp(uipcp, uipcp->id,
                                     RLITE_SUCC, req);
 
 err3:
@@ -304,7 +304,7 @@ err2:
 err1:
     free(bp);
 err0:
-    return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+    return uipcp_appl_register_resp(uipcp, uipcp->id,
                                     RLITE_ERR, req);
 }
 
@@ -321,7 +321,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     struct inet4_endpoint *ep;
     int ret;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     assert(b_req == NULL);
 
@@ -490,7 +490,7 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
     struct inet4_endpoint *ep;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     assert(b_req == NULL);
 
@@ -545,9 +545,9 @@ shim_inet4_init(struct uipcp *uipcp)
     struct shim_inet4 *shim;
 
     rl_ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl,
-                                           uipcp->ipcp_id);
+                                           uipcp->id);
     if (!rl_ipcp) {
-        PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);
+        PE("Cannot find kernelspace IPCP %u\n", uipcp->id);
         return -1;
     }
 

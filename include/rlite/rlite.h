@@ -17,9 +17,9 @@ extern "C" {
 
 struct rl_ipcp {
     /* IPCP attributes. */
-    rl_ipcp_id_t ipcp_id;
-    struct rina_name ipcp_name;
-    rl_addr_t ipcp_addr;
+    rl_ipcp_id_t id;
+    struct rina_name name;
+    rl_addr_t addr;
     unsigned int depth;
     char *dif_type;
     char *dif_name;

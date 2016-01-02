@@ -30,8 +30,8 @@ const char *ctrl_dev_name = "/dev/rlite";
 const char *io_dev_name = "/dev/rlite-io";
 
 struct registered_ipcp {
-    rl_ipcp_id_t ipcp_id;
-    struct rina_name ipcp_name;
+    rl_ipcp_id_t id;
+    struct rina_name name;
     char *dif_name;
 
     struct list_head node;
@@ -65,7 +65,7 @@ track_ipcp_registration(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id,
      * registration list. */
     list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
         if (strcmp(ripcp->dif_name, req->dif_name) == 0 &&
-                rina_name_cmp(&ripcp->ipcp_name, &req->ipcp_name) == 0) {
+                rina_name_cmp(&ripcp->name, &req->ipcp_name) == 0) {
             return;
         }
     }
@@ -78,8 +78,8 @@ track_ipcp_registration(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id,
 
     memset(ripcp, 0, sizeof(*ripcp));
     ripcp->dif_name = strdup(req->dif_name);
-    ripcp->ipcp_id = ipcp_id;
-    rina_name_copy(&ripcp->ipcp_name, &req->ipcp_name);
+    ripcp->id = ipcp_id;
+    rina_name_copy(&ripcp->name, &req->ipcp_name);
     list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
 }
 
@@ -94,10 +94,10 @@ track_ipcp_unregistration(struct uipcps *uipcps,
      * match the corresponding tuple fields. Otherwise match the
      * by IPCP id. */
     list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-        if (ripcp->ipcp_id == ipcp_id) {
+        if (ripcp->id == ipcp_id) {
             list_del(&ripcp->node);
             free(ripcp->dif_name);
-            rina_name_free(&ripcp->ipcp_name);
+            rina_name_free(&ripcp->name);
             free(ripcp);
             break;
         }
@@ -124,14 +124,14 @@ ipcp_register(struct uipcps *uipcps,
             /* Track the (un)registration in the persistent registration
              * list. */
             if (req->reg) {
-                track_ipcp_registration(uipcps, uipcp->ipcp_id, req);
+                track_ipcp_registration(uipcps, uipcp->id, req);
             } else {
-                track_ipcp_unregistration(uipcps, uipcp->ipcp_id);
+                track_ipcp_unregistration(uipcps, uipcp->id);
             }
         }
     }
 
-    uipcp_put(uipcps, uipcp->ipcp_id);
+    uipcp_put(uipcps, uipcp->id);
 
     return result;
 }
@@ -160,7 +160,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
         ret = uipcp->ops.enroll(uipcp, req, 1);
     }
 
-    uipcp_put(uipcps, uipcp->ipcp_id);
+    uipcp_put(uipcps, uipcp->id);
 
     return ret;
 }
@@ -196,7 +196,7 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.dft_set(uipcp, req);
     }
 
-    uipcp_put(uipcps, uipcp->ipcp_id);
+    uipcp_put(uipcps, uipcp->id);
 
 out:
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
@@ -227,7 +227,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         }
     }
 
-    uipcp_put(uipcps, uipcp->ipcp_id);
+    uipcp_put(uipcps, uipcp->id);
 
 out:
     resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
@@ -504,7 +504,7 @@ uipcps_update(struct uipcps *uipcps)
     pthread_mutex_lock(&uipcps->loop.lock);
     list_for_each_entry(rl_ipcp, &uipcps->loop.ctrl.ipcps, node) {
         if (type_has_uipcp(rl_ipcp->dif_type)) {
-            ret = uipcp_add(uipcps, rl_ipcp->ipcp_id,
+            ret = uipcp_add(uipcps, rl_ipcp->id,
                             rl_ipcp->dif_type);
             if (ret) {
                 pthread_mutex_unlock(&uipcps->loop.lock);
@@ -539,7 +539,7 @@ dump_persistence_file(struct uipcps *uipcps)
     list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
         char *ipcp_s;
 
-        ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
+        ipcp_s = rina_name_to_string(&ripcp->name);
         if (ipcp_s) {
             fprintf(fpreg, "REG %s %s\n", ripcp->dif_name, ipcp_s);
         } else {
@@ -561,7 +561,7 @@ dump_persistence_file(struct uipcps *uipcps)
 
         if (uipcp->ops.get_enrollment_targets(uipcp, &neighs)) {
             PE("get_enrolled_neighs() failed for uipcp [%u]\n",
-               uipcp->ipcp_id);
+               uipcp->id);
             continue;
         }
 

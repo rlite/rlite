@@ -82,7 +82,7 @@ struct uipcp_ops {
 };
 
 struct ipcp_node {
-    rl_ipcp_id_t ipcp_id;
+    rl_ipcp_id_t id;
     unsigned int marked;
     unsigned int depth;
     unsigned int refcnt;
@@ -103,7 +103,7 @@ struct flow_edge {
 struct uipcp {
     struct rlite_evloop loop;
     struct uipcps *uipcps;
-    rl_ipcp_id_t ipcp_id;
+    rl_ipcp_id_t id;
 
     struct uipcp_ops ops;
     void *priv;
@@ -155,7 +155,7 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
 
 #define UPRINT(_u, LEV, FMT, ...)    \
-    DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->ipcp_id, __func__, ##__VA_ARGS__)
+    DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->id, __func__, ##__VA_ARGS__)
 
 #define UPD(_u, FMT, ...)   UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 #define UPI(_u, FMT, ...)   UPRINT(_u, "INF", FMT, ##__VA_ARGS__)

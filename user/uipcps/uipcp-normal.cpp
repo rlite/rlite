@@ -240,7 +240,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
     kevent_id_cnt = 1;
 
-    mgmtfd = rl_open_mgmt_port(uipcp->ipcp_id);
+    mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
         ret = mgmtfd;
         throw std::exception();
@@ -290,7 +290,7 @@ uipcp_rib::ipcp_info() const
 {
     struct rl_ipcp *ipcp;
 
-    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
+    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->id);
     assert(ipcp);
 
     return ipcp;
@@ -349,7 +349,7 @@ uipcp_rib::dump() const
             ss << "}" << endl;
     }
 
-    ss << "Address: " << ipcp->ipcp_addr << endl << endl;
+    ss << "Address: " << ipcp->addr << endl << endl;
 
     ss << "LowerDIFs: {";
     for (list<string>::const_iterator lit = lower_difs.begin();
@@ -429,7 +429,7 @@ uipcp_rib::set_address(rl_addr_t address)
     stringstream addr_ss;
 
     addr_ss << address;
-    return rl_evloop_ipcp_config(&uipcp->loop, uipcp->ipcp_id,
+    return rl_evloop_ipcp_config(&uipcp->loop, uipcp->id,
                                  "address", addr_ss.str().c_str());
 }
 
@@ -495,7 +495,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
 
     m->invoke_id = invoke_id_mgr.get_invoke_id();
 
-    if (dst_addr == ipcp->ipcp_addr) {
+    if (dst_addr == ipcp->addr) {
         /* This is a message to be delivered to myself. */
         ret = cdap_dispatch(m, NULL);
         delete m;
@@ -503,7 +503,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
         return ret;
     }
 
-    adata.src_addr = ipcp->ipcp_addr;
+    adata.src_addr = ipcp->addr;
     adata.dst_addr = dst_addr;
     adata.cdap = m; /* Ownership passing */
 
@@ -633,7 +633,7 @@ normal_fa_req(struct rlite_evloop *loop,
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     assert(b_req == NULL);
 
@@ -673,7 +673,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
     }
 
     ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
-                            uipcp->ipcp_id, req->port_id, result);
+                            uipcp->id, req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
         UPE(uipcp, "rl_appl_fa_resp() failed\n");
@@ -690,7 +690,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->ipcp_id, req->ipcp_id);
+    uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 
     return 0;
 
@@ -710,7 +710,7 @@ normal_fa_resp(struct rlite_evloop *loop,
                 (struct rl_kmsg_fa_resp *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     assert(b_req == NULL);
 

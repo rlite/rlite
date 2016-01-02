@@ -129,7 +129,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     req->msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
     req->event_id = 1;
     req->kevent_id = kevent_id;
-    req->ipcp_id = uipcp->ipcp_id;
+    req->ipcp_id = uipcp->id;
     req->remote_port = remote_port;
     req->remote_cep = remote_cep;
     req->remote_addr = remote_addr;
@@ -171,7 +171,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
     req->event_id = 1;
-    req->ipcp_id = uipcp->ipcp_id;
+    req->ipcp_id = uipcp->id;
     req->local_port = local_port;
     req->remote_port = remote_port;
     req->remote_cep = remote_cep;
@@ -210,7 +210,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_FLOW_DEALLOC;
     req->event_id = 1;
-    req->ipcp_id = uipcp->ipcp_id;
+    req->ipcp_id = uipcp->id;
     req->port_id = local_port;
 
     UPD(uipcp, "Issuing FLOW_DEALLOC message...\n");
@@ -286,9 +286,9 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
     }
 
     pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup(uipcps, rl_ipcp->ipcp_id);
+    uipcp = uipcp_lookup(uipcps, rl_ipcp->id);
     if (!uipcp) {
-        PE("No uipcp for [%u]\n", rl_ipcp->ipcp_id);
+        PE("No uipcp for [%u]\n", rl_ipcp->id);
     }
     uipcp->refcnt++;
     pthread_mutex_unlock(&uipcps->lock);
@@ -303,7 +303,7 @@ uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
     struct uipcp *cur;
 
     list_for_each_entry(cur, &uipcps->uipcps, node) {
-        if (cur->ipcp_id == ipcp_id) {
+        if (cur->id == ipcp_id) {
             return cur;
         }
     }
@@ -330,7 +330,7 @@ uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
     }
     memset(uipcp, 0, sizeof(*uipcp));
 
-    uipcp->ipcp_id = ipcp_id;
+    uipcp->id = ipcp_id;
     uipcp->uipcps = uipcps;
     uipcp->ops = *ops;
     uipcp->priv = NULL;
@@ -525,7 +525,7 @@ uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
             continue;
         }
 
-        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->ipcp_id, "depth",
+        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "depth",
                                     strbuf);
         if (ret) {
             PE("'ipcp-config depth %u' failed\n", depth);
@@ -550,16 +550,16 @@ uipcps_compute_depths(struct uipcps *uipcps)
     max_depth = visit(uipcps);
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        PD_S("NODE %u, depth = %u\n", ipn->ipcp_id,
+        PD_S("NODE %u, depth = %u\n", ipn->id,
              ipn->depth);
         PD_S("    uppers = [");
         list_for_each_entry(e, &ipn->uppers, node) {
-            PD_S("%u, ", e->ipcp->ipcp_id);
+            PD_S("%u, ", e->ipcp->id);
         }
         PD_S("]\n");
         PD_S("    lowers = [");
         list_for_each_entry(e, &ipn->lowers, node) {
-            PD_S("%u, ", e->ipcp->ipcp_id);
+            PD_S("%u, ", e->ipcp->id);
         }
         PD_S("]\n");
     }
@@ -575,7 +575,7 @@ uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
     struct ipcp_node *ipn;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        if (ipn->ipcp_id == ipcp_id) {
+        if (ipn->id == ipcp_id) {
             return ipn;
         }
     }
@@ -586,7 +586,7 @@ uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         return NULL;
     }
 
-    ipn->ipcp_id = ipcp_id;
+    ipn->id = ipcp_id;
     ipn->refcnt = 0;
     list_init(&ipn->lowers);
     list_init(&ipn->uppers);
@@ -658,7 +658,7 @@ flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
         }
     }
 
-    PE("Cannot find neigh %u for ipcp %u\n", neigh->ipcp_id, ipcp->ipcp_id);
+    PE("Cannot find neigh %u for ipcp %u\n", neigh->id, ipcp->id);
 
     return -1;
 }

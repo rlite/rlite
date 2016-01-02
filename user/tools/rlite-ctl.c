@@ -178,9 +178,9 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rl_conf_ipcp_destroy(ctrl, rl_ipcp->ipcp_id);
+    ret = rl_conf_ipcp_destroy(ctrl, rl_ipcp->id);
     if (!ret) {
-        PI("IPCP %u destroyed\n", rl_ipcp->ipcp_id);
+        PI("IPCP %u destroyed\n", rl_ipcp->id);
     }
 
     return ret;
@@ -211,9 +211,9 @@ ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
         PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
-        ret = rl_conf_ipcp_config(ctrl, rl_ipcp->ipcp_id, param_name, param_value);
+        ret = rl_conf_ipcp_config(ctrl, rl_ipcp->id, param_name, param_value);
         if (!ret) {
-            PI("IPCP %u configured correctly: %s <== %s\n", rl_ipcp->ipcp_id,
+            PI("IPCP %u configured correctly: %s <== %s\n", rl_ipcp->id,
                param_name, param_value);
         }
     }

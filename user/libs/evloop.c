@@ -855,7 +855,7 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
         return NULL;
     }
 
-    rl_register_req_fill(req, event_id, rl_ipcp->ipcp_id, reg,
+    rl_register_req_fill(req, event_id, rl_ipcp->id, reg,
                          appl_name);
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
@@ -924,7 +924,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
         PE("Out of memory\n");
         return -1;
     }
-    rl_fa_req_fill(req, event_id, rl_ipcp->ipcp_id, dif_name, ipcp_name,
+    rl_fa_req_fill(req, event_id, rl_ipcp->id, dif_name, ipcp_name,
                    local_appl, remote_appl, flowspec, upper_ipcp_id);
 
     PD("Requesting flow allocation...\n");

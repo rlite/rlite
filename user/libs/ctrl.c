@@ -33,7 +33,7 @@ rl_ipcps_purge(struct list_head *ipcps)
         if (rl_ipcp->dif_type) {
             free(rl_ipcp->dif_type);
         }
-        rina_name_free(&rl_ipcp->ipcp_name);
+        rina_name_free(&rl_ipcp->name);
         free(rl_ipcp->dif_name);
         list_del(&rl_ipcp->node);
         free(rl_ipcp);
@@ -55,7 +55,7 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
     pthread_mutex_lock(&ctrl->lock);
 
     list_for_each_entry(cur, &ctrl->ipcps, node) {
-        if (cur->ipcp_id == upd->ipcp_id) {
+        if (cur->id == upd->ipcp_id) {
             rl_ipcp = cur;
             break;
         }
@@ -88,7 +88,7 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
         if (rl_ipcp->dif_type) {
             free(rl_ipcp->dif_type);
         }
-        rina_name_free(&rl_ipcp->ipcp_name);
+        rina_name_free(&rl_ipcp->name);
         free(rl_ipcp->dif_name);
         list_del(&rl_ipcp->node);
         free(rl_ipcp);
@@ -103,11 +103,11 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
             goto out;
         }
 
-        rl_ipcp->ipcp_id = upd->ipcp_id;
+        rl_ipcp->id = upd->ipcp_id;
         rl_ipcp->dif_type = strdup(upd->dif_type);
-        rl_ipcp->ipcp_addr = upd->ipcp_addr;
+        rl_ipcp->addr = upd->ipcp_addr;
         rl_ipcp->depth = upd->depth;
-        rina_name_copy(&rl_ipcp->ipcp_name, &upd->ipcp_name);
+        rina_name_copy(&rl_ipcp->name, &upd->ipcp_name);
         rl_ipcp->dif_name = strdup(upd->dif_name);
 
         list_add_tail(&rl_ipcp->node, &ctrl->ipcps);
@@ -144,12 +144,12 @@ rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl)
     list_for_each_entry(rl_ipcp, &ctrl->ipcps, node) {
             char *ipcp_name_s = NULL;
 
-            ipcp_name_s = rina_name_to_string(&rl_ipcp->ipcp_name);
+            ipcp_name_s = rina_name_to_string(&rl_ipcp->name);
             PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                     " address = %llu, depth = %u\n",
-                        rl_ipcp->ipcp_id, ipcp_name_s, rl_ipcp->dif_type,
+                        rl_ipcp->id, ipcp_name_s, rl_ipcp->dif_type,
                         rl_ipcp->dif_name,
-                        (long long unsigned int)rl_ipcp->ipcp_addr,
+                        (long long unsigned int)rl_ipcp->addr,
                         rl_ipcp->depth);
 
             if (ipcp_name_s) {
@@ -280,8 +280,8 @@ rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
 
     if (rina_name_valid(name)) {
         list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-            if (rina_name_valid(&ipcp->ipcp_name)
-                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
+            if (rina_name_valid(&ipcp->name)
+                    && rina_name_cmp(&ipcp->name, name) == 0) {
                 pthread_mutex_unlock(&ctrl->lock);
                 return ipcp;
             }
@@ -302,8 +302,8 @@ rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
     pthread_mutex_lock(&ctrl->lock);
 
     list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-        if (ipcp->ipcp_id == id) {
-            *addr = ipcp->ipcp_addr;
+        if (ipcp->id == id) {
+            *addr = ipcp->addr;
             pthread_mutex_unlock(&ctrl->lock);
             return 0;
         }
@@ -322,7 +322,7 @@ rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
     pthread_mutex_lock(&ctrl->lock);
 
     list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-        if (rina_name_valid(&ipcp->ipcp_name) && ipcp->ipcp_id == id) {
+        if (rina_name_valid(&ipcp->name) && ipcp->id == id) {
             pthread_mutex_unlock(&ctrl->lock);
             return ipcp;
         }
@@ -627,7 +627,7 @@ rl_ctrl_fa_req_common(struct rlite_ctrl *ctrl, const char *dif_name,
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_fa_req_fill(&req, event_id, rl_ipcp->ipcp_id,
+    ret = rl_fa_req_fill(&req, event_id, rl_ipcp->id,
                          dif_name, ipcp_name, local_appl, remote_appl,
                          flowspec, 0xffff);
     if (ret) {
@@ -692,7 +692,7 @@ rl_ctrl_reg_req_common(struct rlite_ctrl *ctrl, int reg,
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_register_req_fill(&req, event_id, rl_ipcp->ipcp_id,
+    ret = rl_register_req_fill(&req, event_id, rl_ipcp->id,
                                reg, appl_name);
     if (ret) {
         PE("Failed to fill (un)register request\n");

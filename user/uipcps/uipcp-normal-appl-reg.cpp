@@ -46,7 +46,7 @@ uipcp_rib::dft_set(const RinaName& appl_name, rl_addr_t remote_addr)
 
     dft[key] = entry;
 
-    UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->ipcp_id,
+    UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->id,
        key.c_str(), (long long unsigned)entry.address);
 
     return 0;
@@ -65,7 +65,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     DFTEntry dft_entry;
 
     ret = rl_ctrl_lookup_ipcp_addr_by_id(&uipcp->loop.ctrl,
-                                         uipcp->ipcp_id, &local_addr);
+                                         uipcp->id, &local_addr);
     assert(!ret);
 
     dft_entry.address = local_addr;
@@ -82,7 +82,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
                     "[%llu], my address being [%llu]\n", name_str.c_str(),
                     (long long unsigned)mit->second.address,
                     (long long unsigned)local_addr);
-            return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+            return uipcp_appl_register_resp(uipcp, uipcp->id,
                                             RLITE_ERR, req);
         }
 
@@ -105,13 +105,13 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 
     UPD(uipcp, "Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
-            uipcp->ipcp_id);
+            uipcp->id);
 
     remote_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
-        return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+        return uipcp_appl_register_resp(uipcp, uipcp->id,
                                         RLITE_SUCC, req);
     }
 

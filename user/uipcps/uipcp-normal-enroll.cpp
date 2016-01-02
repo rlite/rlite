@@ -53,7 +53,7 @@ NeighFlow::~NeighFlow()
     }
 
     uipcps_lower_flow_removed(neigh->rib->uipcp->uipcps,
-                              neigh->rib->uipcp->ipcp_id,
+                              neigh->rib->uipcp->id,
                               lower_ipcp_id);
 
     pthread_cond_destroy(&enrollment_stopped);
@@ -358,7 +358,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
          * M_CONNECT message. */
         nf->conn = new CDAPConn(nf->flow_fd, 1);
 
-        ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
+        ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->name,
                           &dst_name);
         rina_name_free(&dst_name);
 
@@ -426,7 +426,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 
     ipcp = rib->ipcp_info();
 
-    enr_info.address = ipcp->ipcp_addr;
+    enr_info.address = ipcp->addr;
     enr_info.lower_difs = rib->lower_difs;
 
     ret = nf->send_to_port_id(&m, 0, &enr_info);
@@ -518,10 +518,10 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     ipcp = rib->ipcp_info();
     cand = NeighborCandidate();
-    cand_name = RinaName(&ipcp->ipcp_name);
+    cand_name = RinaName(&ipcp->name);
     cand.apn = cand_name.apn;
     cand.api = cand_name.api;
-    cand.address = ipcp->ipcp_addr;
+    cand.address = ipcp->addr;
     cand.lower_difs = rib->lower_difs;
     ncl.candidates.push_back(cand);
 
@@ -724,7 +724,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
     ipcp = rib->ipcp_info();
-    rib->commit_lower_flow(ipcp->ipcp_addr, *this);
+    rib->commit_lower_flow(ipcp->addr, *this);
 
     remote_sync_rib(nf);
 
@@ -873,10 +873,10 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
 
         /* A neighbor representing myself. */
         ipcp = rib->ipcp_info();
-        cand_name = RinaName(&ipcp->ipcp_name);
+        cand_name = RinaName(&ipcp->name);
         cand.apn = cand_name.apn;
         cand.api = cand_name.api;
-        cand.address = ipcp->ipcp_addr;
+        cand.address = ipcp->addr;
         cand.lower_difs = rib->lower_difs;
         ncl.candidates.push_back(cand);
 
@@ -986,7 +986,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
     ipcp = ipcp_info();
 
     NeighborCandidateList ncl(objbuf, objlen);
-    RinaName my_name = RinaName(&ipcp->ipcp_name);
+    RinaName my_name = RinaName(&ipcp->name);
 
     for (list<NeighborCandidate>::iterator neigh = ncl.candidates.begin();
                                 neigh != ncl.candidates.end(); neigh++) {
@@ -1105,7 +1105,7 @@ Neighbor::alloc_flow(const char *supp_dif)
         ipcp = rl_ctrl_select_ipcp_by_dif(&rib->uipcp->loop.ctrl,
                                           supp_dif);
         if (ipcp) {
-            lower_ipcp_id_ = ipcp->ipcp_id;
+            lower_ipcp_id_ = ipcp->id;
         } else {
             UPI(rib->uipcp, "Failed to get lower ipcp id\n");
             return -1;
@@ -1116,8 +1116,8 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     /* Allocate a flow for the enrollment. */
     ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif, NULL,
-                               &info->ipcp_name, &neigh_name, NULL,
-                               info->ipcp_id, &port_id_, 2000);
+                               &info->name, &neigh_name, NULL,
+                               info->id, &port_id_, 2000);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
@@ -1141,7 +1141,7 @@ Neighbor::alloc_flow(const char *supp_dif)
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
-    uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
+    uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,
                             lower_ipcp_id_);
 
     return 0;
@@ -1294,7 +1294,7 @@ normal_get_enrollment_targets(struct uipcp *uipcp, struct list_head *neighs)
         assert(neigh->has_mgmt_flow());
 
         if (neigh->ipcp_name.rina_name_fill(&ni->neigh_name) ||
-                rina_name_copy(&ni->ipcp_name, &rl_ipcp->ipcp_name) ||
+                rina_name_copy(&ni->ipcp_name, &rl_ipcp->name) ||
                 (ni->dif_name = strdup(rl_ipcp->dif_name)) == NULL ||
                 (ni->supp_dif = strdup(neigh->mgmt_conn()->
                                        supp_dif.c_str())) == NULL) {
