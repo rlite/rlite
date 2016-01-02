@@ -352,11 +352,12 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         PE("%s: Error: read() failed [%d]\n", __func__, n);
-        return;
+        goto out;
+
     } else if (n < sizeof(*mhdr)) {
         PE("%s: Error: read() does not contain mgmt header, %d<%d\n",
                 __func__, n, (int)sizeof(*mhdr));
-        return;
+        goto out;
     }
 
     /* Grab the management header. */
@@ -386,6 +387,9 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
             PI("%s: Unknown cmd %u received\n", __func__, cmd);
             break;
     }
+
+out:
+    fflush(stdout);
 }
 
 struct dft_entry {
@@ -583,6 +587,8 @@ uipcp_server(void *arg)
          * enrollment management sdu. */
         usleep(100000);
         uipcp_enroll_send_mgmtsdu(uipcp, port_id);
+
+        fflush(stdout);
     }
 
     return NULL;
@@ -762,6 +768,7 @@ uipcps_fetch(struct uipcps *uipcps)
             /* This is just for debugging purposes. */
             first = 0;
             ipcps_print(&uipcp->appl.loop);
+            fflush(stdout);
         }
     }
 
