@@ -676,7 +676,7 @@ int Neighbor::remote_sync_rib() const
         cand.lower_difs = rib->lower_difs;
         ncl.candidates.push_back(cand);
 
-        ret |= remote_sync_obj(true, obj_class::lfdb, obj_name::lfdb,
+        ret |= remote_sync_obj(true, obj_class::neighbors, obj_name::neighbors,
                                &ncl);
     }
 
