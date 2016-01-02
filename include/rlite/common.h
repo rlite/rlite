@@ -34,6 +34,7 @@ struct rina_name {
 
 typedef uint32_t rl_addr_t;
 typedef uint32_t rl_port_t;
+typedef uint64_t rl_seq_t;
 typedef uint16_t rl_ipcp_id_t;
 typedef uint16_t rl_msg_t;
 
@@ -103,8 +104,8 @@ struct rate_based_config {
 } __attribute__((packed));
 
 struct window_based_config {
-    uint64_t max_cwq_len; /* closed window queue */
-    uint64_t initial_credit;
+    rl_seq_t max_cwq_len; /* closed window queue */
+    rl_seq_t initial_credit;
 } __attribute__((packed));
 
 #define RLITE_FC_T_NONE      0
@@ -137,7 +138,7 @@ struct rlite_flow_config {
     uint8_t partial_delivery;
     uint8_t incomplete_delivery;
     uint8_t in_order_delivery;
-    uint64_t max_sdu_gap;
+    rl_seq_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
     int32_t fd;  /* Currently used but shim-inet4. */

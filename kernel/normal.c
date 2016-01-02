@@ -716,7 +716,7 @@ rlite_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 
 static struct rlite_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                uint8_t pdu_type, uint64_t ack_nack_seq_num)
+                uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
 {
     struct rlite_buf *rb = rlite_buf_alloc_ctrl(ipcp->depth, GFP_ATOMIC);
     struct rina_pci_ctrl *pcic;
@@ -751,7 +751,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
     uint8_t pdu_type = 0;
-    uint64_t ack_nack_seq_num = 0;
+    rl_seq_t ack_nack_seq_num = 0;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
@@ -799,7 +799,7 @@ static void
 seqq_push(struct dtp *dtp, struct rlite_buf *rb)
 {
     struct rlite_buf *cur;
-    uint64_t seqnum = RLITE_BUF_PCI(rb)->seqnum;
+    rl_seq_t seqnum = RLITE_BUF_PCI(rb)->seqnum;
     struct list_head *pos = &dtp->seqq;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
@@ -833,7 +833,7 @@ seqq_push(struct dtp *dtp, struct rlite_buf *rb)
 }
 
 static void
-seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
+seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct list_head *qrbs)
 {
     struct rlite_buf *qrb, *tmp;
 
@@ -1005,10 +1005,10 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 {
     struct rina_pci *pci = RLITE_BUF_PCI(rb);
     struct flow_entry *flow;
-    uint64_t seqnum = pci->seqnum;
+    rl_seq_t seqnum = pci->seqnum;
     struct rlite_buf *crb = NULL;
     unsigned int a = 0;
-    uint64_t gap;
+    rl_seq_t gap;
     struct dtp *dtp;
     bool deliver;
     bool drop;

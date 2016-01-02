@@ -36,18 +36,18 @@ struct rina_pci {
     uint8_t pdu_type;
     uint8_t pdu_flags;
     uint16_t pdu_len;
-    uint64_t seqnum;
+    rl_seq_t seqnum;
 } __attribute__((packed));
 
 /* PCI header to be used for control PDUs. */
 struct rina_pci_ctrl {
     struct rina_pci base;
-    uint64_t last_ctrl_seq_num_rcvd;
-    uint64_t ack_nack_seq_num;
-    uint64_t new_rwe;
-    uint64_t new_lwe;
-    uint64_t my_lwe;
-    uint64_t my_rwe;
+    rl_seq_t last_ctrl_seq_num_rcvd;
+    rl_seq_t ack_nack_seq_num;
+    rl_seq_t new_rwe;
+    rl_seq_t new_lwe;
+    rl_seq_t my_lwe;
+    rl_seq_t my_rwe;
 } __attribute__((packed));
 
 struct rlite_rawbuf {

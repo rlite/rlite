@@ -147,8 +147,8 @@ struct PolicyDescr : public UipcpObject {
 };
 
 struct WindowBasedFlowCtrlConfig : public UipcpObject {
-    uint64_t max_cwq_len; /* closed window queue */
-    uint64_t initial_credit;
+    rl_seq_t max_cwq_len; /* closed window queue */
+    rl_seq_t initial_credit;
     PolicyDescr rcvr_flow_ctrl;
     PolicyDescr tx_ctrl;
 
@@ -222,7 +222,7 @@ struct DtcpConfig : public UipcpObject {
 struct ConnPolicies : public UipcpObject {
     bool dtcp_present;
     DtcpConfig dtcp_cfg;
-    uint64_t seq_num_rollover_th;
+    rl_seq_t seq_num_rollover_th;
     uint32_t initial_a_timer;
     PolicyDescr rcvr_timer_inact;
     PolicyDescr sender_timer_inact;
