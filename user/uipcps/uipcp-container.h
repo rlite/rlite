@@ -26,6 +26,8 @@ struct uipcps {
     struct list_head ipcps_registrations;
 
     struct list_head ipcp_nodes;
+
+    struct rlite_evloop loop;
 };
 
 #define RLITE_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"

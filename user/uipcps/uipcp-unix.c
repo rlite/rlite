@@ -378,35 +378,43 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
 }
 
 static int
+uipcps_ipcp_update(struct rlite_evloop *loop,
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
+{
+    PD("CALLED\n");
+    return 0;
+}
+
+static int
 uipcps_update(struct uipcps *uipcps)
 {
-    struct rlite_evloop loop;
     struct rlite_ipcp *rlite_ipcp;
     int ret = 0;
 
-    ret = rlite_evloop_init(&loop, "/dev/rlite", NULL);
+    ret = rlite_evloop_init(&uipcps->loop, "/dev/rlite", NULL);
     if (ret) {
         return ret;
     }
 
-    rlite_ipcps_print(&loop);
+    rlite_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
+                             uipcps_ipcp_update);
+
+    rlite_ipcps_print(&uipcps->loop);
 
     /* Create an userspace IPCP for each existing IPCP. */
-    pthread_mutex_lock(&loop.lock);
-    list_for_each_entry(rlite_ipcp, &loop.ipcps2, node) {
+    pthread_mutex_lock(&uipcps->loop.lock);
+    list_for_each_entry(rlite_ipcp, &uipcps->loop.ipcps2, node) {
         if (type_has_uipcp(rlite_ipcp->dif_type)) {
             ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id,
                             rlite_ipcp->dif_type);
             if (ret) {
-                pthread_mutex_unlock(&loop.lock);
+                pthread_mutex_unlock(&uipcps->loop.lock);
                 return ret;
             }
         }
     }
-    pthread_mutex_unlock(&loop.lock);
-
-    rlite_evloop_stop(&loop);
-    rlite_evloop_fini(&loop);
+    pthread_mutex_unlock(&uipcps->loop.lock);
 
     uipcps_print(uipcps);
 
@@ -565,7 +573,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Fetch kernel state and create userspace IPCPs as needed. This
+    /* Init main evloop and create userspace IPCPs as needed. This
      * must be done before launching the unix server in order to
      * avoid race conditions between main thread fetching and unix
      * server thread serving a client. That is, a client could see

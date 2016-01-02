@@ -35,8 +35,8 @@ struct rlite_evloop;
 
 /* The signature of a response handler. */
 typedef int (*rlite_resp_handler_t)(struct rlite_evloop *loop,
-                                   const struct rlite_msg_base_resp *b_resp,
-                                   const struct rlite_msg_base *b_req);
+                                    const struct rlite_msg_base_resp *b_resp,
+                                    const struct rlite_msg_base *b_req);
 
 /* The signature of file descriptor callback. */
 typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
@@ -83,6 +83,7 @@ struct rlite_evloop {
     struct list_head ipcps_lists[2];
 
     struct list_head ipcps2;
+    rlite_resp_handler_t usr_ipcp_update;
 };
 
 /* Issue a request message to the kernel. Takes the ownership of

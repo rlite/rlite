@@ -188,6 +188,10 @@ ipcp_update(struct rlite_evloop *loop,
 out:
     pthread_mutex_unlock(&loop->lock);
 
+    if (loop->usr_ipcp_update) {
+        loop->usr_ipcp_update(loop, b_resp, b_req);
+    }
+
     return 0;
 }
 
@@ -778,6 +782,7 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->rfd = -1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
+    loop->usr_ipcp_update = NULL;
 
     /* Open the RLITE control device. */
     loop->rfd = open(dev, O_RDWR);
@@ -808,10 +813,8 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         loop->handlers[RLITE_KER_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 
-    if (!loop->handlers[RLITE_KER_IPCP_UPDATE]) {
-        NPD("setting default update handler\n");
-        loop->handlers[RLITE_KER_IPCP_UPDATE] = ipcp_update;
-    }
+    loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
+    loop->handlers[RLITE_KER_IPCP_UPDATE] = ipcp_update;
 
     if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
         NPD("setting default barrier handler\n");
@@ -906,7 +909,11 @@ rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
         return -1;
     }
 
-    loop->handlers[index] = handler;
+    if (index == RLITE_KER_IPCP_UPDATE) {
+        loop->usr_ipcp_update = handler;
+    } else {
+        loop->handlers[index] = handler;
+    }
 
     return 0;
 }
