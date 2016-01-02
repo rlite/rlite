@@ -69,6 +69,8 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
     CDAPMessage m;
     int ret;
 
+    nf->keepalive_tmrid = 0;
+
     UPI(nf->neigh->rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(nf->neigh->ipcp_name).c_str());
 
