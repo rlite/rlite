@@ -18,24 +18,8 @@
 
 #include "list.h"
 #include "evloop.h"
+#include "application.h"
 
-
-struct pending_flow_req {
-    uint16_t ipcp_id;
-    uint32_t port_id;
-    struct list_head node;
-};
-
-/* IPC Manager data model. */
-struct application {
-    struct rina_evloop loop;
-
-    pthread_cond_t flow_req_arrived_cond;
-    struct list_head pending_flow_reqs;
-    pthread_mutex_t lock;
-
-    pthread_t server_th;
-};
 
 static int
 flow_allocate_resp_arrived(struct rina_evloop *loop,
@@ -72,10 +56,6 @@ flow_allocate_resp_arrived(struct rina_evloop *loop,
 
     return 0;
 }
-
-static int
-flow_allocate_resp(struct application *application, uint16_t ipcp_id,
-                   uint32_t port_id, uint8_t response);
 
 static int
 flow_allocate_req_arrived(struct rina_evloop *loop,
@@ -183,7 +163,7 @@ flow_allocate_req(struct application *application, int wait_for_completion,
                          sizeof(*req), 1, wait_for_completion, result);
 }
 
-static int
+int
 flow_allocate_resp(struct application *application, uint16_t ipcp_id,
                    uint32_t port_id, uint8_t response)
 {
@@ -213,7 +193,7 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
     return result;
 }
 
-static int
+int
 application_register(struct application *application, int reg,
                      struct rina_name *dif_name,
                      struct rina_name *application_name)
@@ -231,11 +211,12 @@ application_register(struct application *application, int reg,
                                      application_name);
 }
 
-static int flow_allocate(struct application *application,
-                         struct rina_name *dif_name,
-                         struct rina_name *local_application,
-                         struct rina_name *remote_application,
-                         unsigned int *port_id)
+int
+flow_allocate(struct application *application,
+              struct rina_name *dif_name,
+              struct rina_name *local_application,
+              struct rina_name *remote_application,
+              unsigned int *port_id)
 {
     unsigned int ipcp_id;
     struct rina_kmsg_flow_allocate_resp_arrived *kresp;
@@ -264,7 +245,7 @@ static int flow_allocate(struct application *application,
     return result;
 }
 
-static struct pending_flow_req *
+struct pending_flow_req *
 flow_request_wait(struct application *application)
 {
     struct list_head *elem = NULL;
@@ -286,7 +267,7 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-static int
+int
 open_port(unsigned port_id)
 {
     int fd;
@@ -307,112 +288,17 @@ open_port(unsigned port_id)
     return fd;
 }
 
-static void
-client(int argc, char **argv, struct application *application)
+int
+rina_application_init(struct application *application)
 {
-    struct rina_name dif_name;
-    struct rina_name this_application;
-    struct rina_name remote_application;
-    unsigned int port_id;
-    int ret;
-    int fd;
-    char buf[10];
-
-    (void) argc;
-    (void) argv;
-
-    ipcps_fetch(&application->loop);
-
-    rina_name_fill(&dif_name, "d.DIF", "", "", "");
-    rina_name_fill(&this_application, "client", "1", NULL, NULL);
-    rina_name_fill(&remote_application, "server", "1", NULL, NULL);
-
-    ret = application_register(application, 1, &dif_name, &remote_application);
-    if (ret) {
-        return;
-    }
-
-    ret = flow_allocate(application, &dif_name, &this_application,
-                        &remote_application, &port_id);
-    if (ret) {
-        return;
-    }
-
-    fd = open_port(port_id);
-    if (fd < 0) {
-        return;
-    }
-
-    printf("%s: Open fd %d\n", __func__, fd);
-
-    memset(buf, 'x', sizeof(buf));
-
-    ret = write(fd, buf, sizeof(buf));
-    if (ret) {
-        perror("write(buf)");
-    }
-
-    close(fd);
-}
-
-static void *
-server_function(void *arg)
-{
-    struct application *application = arg;
-    struct pending_flow_req *pfr = NULL;
-
-    for (;;) {
-        unsigned int port_id;
-        int result;
-        int fd;
-        char buf[4096];
-        int n;
-
-        pfr = flow_request_wait(application);
-        port_id = pfr->port_id;
-        printf("%s: flow request arrived: [ipcp_id = %u, port_id = %u]\n",
-                __func__, pfr->ipcp_id, pfr->port_id);
-
-        /* Always accept incoming connection, for now. */
-        result = flow_allocate_resp(application, pfr->ipcp_id,
-                                    pfr->port_id, 0);
-        free(pfr);
-
-        if (result) {
-            continue;
-        }
-
-        fd = open_port(port_id);
-        if (fd < 0) {
-            continue;
-        }
-
-        printf("%s: Open fd %d\n", __func__, fd);
-
-        n = read(fd, buf, sizeof(buf));
-        if (n < 0) {
-            perror("read(flow)");
-        } else {
-            printf("%s: read %d bytes\n", __func__, n);
-        }
-
-        close(fd);
-    }
-
-    return NULL;
-}
-
-int main(int argc, char **argv)
-{
-    struct application application;
     struct sigaction sa;
     int ret;
 
-    rina_evloop_init(&application.loop, "/dev/rina-app-ctrl",
+    rina_evloop_init(&application->loop, "/dev/rina-app-ctrl",
                      rina_kernel_handlers);
-    pthread_mutex_init(&application.lock, NULL);
-    pthread_cond_init(&application.flow_req_arrived_cond, NULL);
-    list_init(&application.pending_flow_reqs);
+    pthread_mutex_init(&application->lock, NULL);
+    pthread_cond_init(&application->flow_req_arrived_cond, NULL);
+    list_init(&application->pending_flow_reqs);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -422,32 +308,21 @@ int main(int argc, char **argv)
     ret = sigaction(SIGINT, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
-        exit(EXIT_FAILURE);
+        return ret;
     }
     ret = sigaction(SIGTERM, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGTERM)");
-        exit(EXIT_FAILURE);
+        return ret;
     }
 
-    /* Create and start the server thread. */
-    ret = pthread_create(&application.server_th, NULL, server_function,
-                         &application);
-    if (ret) {
-        perror("pthread_create(server)");
-        exit(EXIT_FAILURE);
-    }
+    return 0;
+}
 
-    /* Execute the client part. */
-    client(argc, argv, &application);
-
-    ret = pthread_join(application.server_th, NULL);
-    if (ret < 0) {
-        perror("pthread_join(server)");
-        exit(EXIT_FAILURE);
-    }
-
-    rina_evloop_fini(&application.loop);
+int
+rina_application_fini(struct application *application)
+{
+    rina_evloop_fini(&application->loop);
 
     return 0;
 }
