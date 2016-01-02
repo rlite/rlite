@@ -21,6 +21,7 @@
 
 /* PCI header to be used for transfer PDUs. */
 struct rina_pci {
+    /* We miss the version field. */
     uint32_t dst_addr;
     uint32_t src_addr;
     struct {
@@ -30,6 +31,7 @@ struct rina_pci {
     } conn_id;
     uint8_t pdu_type;
     uint8_t pdu_flags;
+    uint16_t pdu_len;
     uint64_t seqnum;
 } __attribute__((packed));
 
