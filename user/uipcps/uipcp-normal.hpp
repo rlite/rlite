@@ -102,6 +102,8 @@ struct Neighbor {
      * or were we the target? */
     bool initiator;
 
+    int enroll_attempts;
+
     std::map<unsigned int, NeighFlow *> flows;
     unsigned int mgmt_port_id;
 

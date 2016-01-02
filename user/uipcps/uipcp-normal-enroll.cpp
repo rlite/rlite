@@ -7,9 +7,10 @@
 using namespace std;
 
 
-#define NEIGH_KEEPALIVE_INTVAL  5000
-#define NEIGH_KEEPALIVE_THRESH  3
-#define NEIGH_ENROLL_TO         1500
+#define NEIGH_KEEPALIVE_INTVAL      5000
+#define NEIGH_KEEPALIVE_THRESH      3
+#define NEIGH_ENROLL_TO             1500
+#define NEIGH_ENROLL_MAX_ATTEMPTS   3
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
@@ -136,7 +137,18 @@ NeighFlow::abort_enrollment()
         conn->reset();
     }
 
-    pthread_cond_signal(&enrollment_stopped);
+    if (neigh->initiator &&
+                ++neigh->enroll_attempts < NEIGH_ENROLL_MAX_ATTEMPTS) {
+        /* Retry the enrollment. */
+        PI("Enrollment aborted, trying again [attempt #%d]\n",
+           neigh->enroll_attempts + 1);
+        neigh->enroll_fsm_run(this, NULL);
+
+    } else {
+        /* Give up. */
+        neigh->enroll_attempts = 0;
+        pthread_cond_signal(&enrollment_stopped);
+    }
 }
 
 static void
@@ -253,6 +265,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
 {
     rib = rib_;
     initiator = initiator_;
+    enroll_attempts = 0;
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = ~0U;
