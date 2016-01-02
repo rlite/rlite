@@ -1,4 +1,5 @@
 KER=`uname -r`
+FINDCMD=-type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | grep -v "\.mod\.c" | xargs wc -l
 
 all: usr ker
 
@@ -8,8 +9,14 @@ usr:
 ker:
 	make -C /lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
+usr_count:
+	find common user include $(FINDCMD)
+
+ker_count:
+	find common kernel $(FINDCMD)
+
 count:
-	find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | grep -v "\.mod\.c" | xargs wc -l
+	find common kernel user include $(FINDCMD)
 
 clean: usr_clean ker_clean
 
