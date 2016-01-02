@@ -88,7 +88,6 @@ enum {
 };
 
 struct upper_ref {
-    unsigned int        userspace;
     struct rina_ctrl    *rc;
     struct ipcp_entry   *ipcp;
 };

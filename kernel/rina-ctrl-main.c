@@ -582,8 +582,7 @@ flow_del_by_upper(struct upper_ref upper)
     int bucket;
 
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
-        if ((upper.userspace && flow->upper.rc == upper.rc) ||
-            (!upper.userspace && flow->upper.ipcp == upper.ipcp)) {
+        if (flow->upper.rc == upper.rc) {
             flow_del_entry(flow, 0);
         }
     }
@@ -1061,7 +1060,6 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
                     (struct rina_kmsg_fa_req *)bmsg;
     int ret;
     struct upper_ref upper = {
-            .userspace = 1,
             .rc = rc,
         };
 
@@ -1202,7 +1200,6 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     /* Allocate a port id and the associated flow entry. */
     upper.rc = app->rc;
     upper.ipcp = NULL;
-    upper.userspace = 1;
     ret = flow_add(ipcp, upper, 0, local_application,
                    remote_application, flowcfg, &flow_entry, 0);
     if (ret) {
@@ -1543,7 +1540,6 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
     struct upper_ref upper = {
-        .userspace = 1,
         .rc = rc,
     };
 
