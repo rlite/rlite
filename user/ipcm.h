@@ -39,6 +39,7 @@ struct uipcp {
     struct ipcm *ipcm;
     unsigned int ipcp_id;
     pthread_t server_th;
+    struct list_head dft;
 
     struct list_head node;
 };

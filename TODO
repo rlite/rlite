@@ -18,3 +18,7 @@
 
 - rina_upqueue_append(): deallocare rmsg oppure passargli un buffer allocato
   staticamente sulla pila
+
+- flow_allocator_ ==> fa_
+
+- FLOW_ALLOCATOR_ ==> FA_

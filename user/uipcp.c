@@ -72,6 +72,46 @@ uipcp_flow_allocate_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 }
 
 static int
+uipcp_flow_allocate_req(struct rina_evloop *loop,
+                        const struct rina_msg_base_resp *b_resp,
+                        const struct rina_msg_base *b_req)
+{
+    struct application *application = container_of(loop, struct application,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_flow_allocate_req *req =
+                (struct rina_kmsg_flow_allocate_req *)b_resp;
+
+    PD("%s: Got reflected message\n", __func__);
+
+    assert(b_req == NULL);
+    (void)uipcp;
+    (void)req;
+
+    return 0;
+}
+
+static int
+uipcp_flow_allocate_resp(struct rina_evloop *loop,
+                         const struct rina_msg_base_resp *b_resp,
+                         const struct rina_msg_base *b_req)
+{
+    struct application *application = container_of(loop, struct application,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_flow_allocate_resp *resp =
+                (struct rina_kmsg_flow_allocate_resp *)b_resp;
+
+    PD("%s: Got reflected message\n", __func__);
+
+    assert(b_req == NULL);
+    (void)uipcp;
+    (void)resp;
+
+    return 0;
+}
+
+static int
 uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
 {
     uint64_t remote_addr, local_addr;
@@ -223,6 +263,22 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
     ret = rina_application_init(&uipcp->appl);
     if (ret) {
         list_del(&uipcp->node);
+        return ret;
+    }
+
+    /* Set the evloop handlers for flow allocation request/response
+     * reflected messages. */
+    ret = rina_evloop_set_handler(&uipcp->appl.loop,
+                                  RINA_KERN_FLOW_ALLOCATE_REQ,
+                                  uipcp_flow_allocate_req);
+    if (ret) {
+        return ret;
+    }
+
+    ret = rina_evloop_set_handler(&uipcp->appl.loop,
+                                  RINA_KERN_FLOW_ALLOCATE_RESP,
+                                  uipcp_flow_allocate_resp);
+    if (ret) {
         return ret;
     }
 
