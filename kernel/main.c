@@ -55,6 +55,8 @@ struct rina_ctrl {
     struct list_head upqueue;
     spinlock_t upqueue_lock;
     wait_queue_head_t upqueue_wqh;
+
+    struct list_head ipcps_fetch_q;
 };
 
 struct upqueue_entry {
@@ -100,9 +102,6 @@ struct rina_dm {
 
     /* Hash table to store information about each flow. */
     DECLARE_HASHTABLE(flow_table, PORT_ID_HASHTABLE_BITS);
-
-    /* Pointer used to implement the IPC processes fetch operations. */
-    struct ipcp_entry *ipcp_fetch_last;
 
     struct list_head ipcp_factories;
 
@@ -1085,11 +1084,6 @@ ipcp_put(struct ipcp_entry *entry)
     hash_del(&entry->node);
     bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
 
-    /* Invalid the IPCP fetch pointer, if necessary. */
-    if (entry == rina_dm.ipcp_fetch_last) {
-        rina_dm.ipcp_fetch_last = NULL;
-    }
-
     PUNLOCK();
 
     /* Inoke the destructor method, if the constructor
@@ -1198,53 +1192,69 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
+struct ipcps_fetch_q_entry {
+    struct rina_kmsg_fetch_ipcp_resp resp;
+    struct list_head node;
+};
+
 static int
 rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 {
-    struct rina_kmsg_fetch_ipcp_resp resp;
+    struct ipcps_fetch_q_entry *fqe;
     struct ipcp_entry *entry;
-    bool stop_next;
-    bool no_next = true;
     int bucket;
-    int ret;
+    int ret = -ENOMEM;
 
-    memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
-    resp.event_id = req->event_id;
     PLOCK();
-    stop_next = (rina_dm.ipcp_fetch_last == NULL);
-    hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
-        if (stop_next) {
+
+    if (list_empty(&rc->ipcps_fetch_q)) {
+        hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
             const char *dif_name = NULL;
 
-            resp.end = 0;
-            resp.ipcp_id = entry->id;
-            resp.ipcp_addr = entry->addr;
-            rina_name_copy(&resp.ipcp_name, &entry->name);
+            fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
+            if (!fqe) {
+                PE("Out of memory\n");
+                break;
+            }
+
+            memset(fqe, 0, sizeof(*fqe));
+            list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
+
+            fqe->resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
+            fqe->resp.end = 0;
+            fqe->resp.ipcp_id = entry->id;
+            fqe->resp.ipcp_addr = entry->addr;
+            rina_name_copy(&fqe->resp.ipcp_name, &entry->name);
             if (entry->dif) {
                 dif_name = entry->dif->name;
-                resp.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
+                fqe->resp.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
             }
-            rina_name_fill(&resp.dif_name, dif_name, NULL, NULL, NULL);
-            rina_dm.ipcp_fetch_last = entry;
-            no_next = false;
-            break;
-        } else if (entry == rina_dm.ipcp_fetch_last) {
-            stop_next = true;
+            rina_name_fill(&fqe->resp.dif_name, dif_name, NULL, NULL, NULL);
+        }
+
+        fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
+        if (!fqe) {
+            PE("Out of memory\n");
+        } else {
+            memset(fqe, 0, sizeof(*fqe));
+            list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
+            fqe->resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
+            fqe->resp.end = 1;
         }
     }
-    if (no_next) {
-            resp.end = 1;
-            memset(&resp.ipcp_name, 0, sizeof(resp.ipcp_name));
-            memset(&resp.dif_name, 0, sizeof(resp.dif_name));
-            rina_dm.ipcp_fetch_last = NULL;
+
+    if (!list_empty(&rc->ipcps_fetch_q)) {
+        fqe = list_first_entry(&rc->ipcps_fetch_q, struct ipcps_fetch_q_entry,
+                               node);
+        list_del(&fqe->node);
+        fqe->resp.event_id = req->event_id;
+        ret = rina_upqueue_append(rc, (struct rina_msg_base *)&fqe->resp);
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                      (struct rina_msg_base *)&fqe->resp);
+        kfree(fqe);
     }
+
     PUNLOCK();
-
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
-
-    rina_name_free(&resp.ipcp_name);
-    rina_name_free(&resp.dif_name);
 
     return ret;
 }
@@ -2148,6 +2158,8 @@ rina_ctrl_open_common(struct inode *inode, struct file *f)
     spin_lock_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
+    INIT_LIST_HEAD(&rc->ipcps_fetch_q);
+
     return rc;
 }
 
@@ -2547,7 +2559,6 @@ rina_ctrl_init(void)
     spin_lock_init(&rina_dm.flows_lock);
     spin_lock_init(&rina_dm.ipcps_lock);
     spin_lock_init(&rina_dm.difs_lock);
-    rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
     INIT_LIST_HEAD(&rina_dm.difs);
 
