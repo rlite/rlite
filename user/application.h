@@ -68,4 +68,6 @@ int flow_allocate_open(struct application *application,
 
 int flow_request_wait_open(struct application *application);
 
+void flow_config_default(struct rina_flow_config *cfg);
+
 #endif  /* __RINA_APPLICATION_H__ */

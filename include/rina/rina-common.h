@@ -72,6 +72,52 @@ struct rina_mgmt_hdr {
     uint64_t remote_addr;
 } __attribute__((packed));
 
+
+/* Flow specifications and QoS cubes related definitions. */
+
+struct rate_based_config {
+    uint64_t sending_rate;
+    uint64_t time_period; /* us */
+} __attribute__((packed));
+
+struct window_based_config {
+    uint64_t max_cwq_len; /* closed window queue */
+    uint64_t initial_credit;
+} __attribute__((packed));
+
+#define RINA_FC_TYPE_WINDOW_BASED   1
+#define RINA_FC_TYPE_RATE_BASED     2
+
+struct fc_config {
+    uint8_t fc_type;
+    union {
+        struct rate_based_config r;
+        struct window_based_config w;
+    } cfg;
+} __attribute__((packed));
+
+struct rtx_config {
+    uint32_t max_time_to_retry; /* R */
+    uint16_t data_rxms_max;
+    uint32_t initial_rtx_max;
+} __attribute__((packed));
+
+struct dtcp_config {
+    uint8_t flow_control;
+    struct fc_config fc;
+    uint8_t rtx_control;
+    struct rtx_config rtx;
+} __attribute__((packed));
+
+struct rina_flow_config {
+    uint8_t partial_delivery;
+    uint8_t incomplete_delivery;
+    uint8_t in_order_delivery;
+    int32_t max_sdu_gap;
+    uint8_t dtcp_present;
+    struct dtcp_config dtcp;
+} __attribute__((packed));
+
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */

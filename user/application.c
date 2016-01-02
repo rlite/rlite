@@ -135,6 +135,17 @@ application_register_req(struct application *application,
     return result;
 }
 
+void
+flow_config_default(struct rina_flow_config *cfg)
+{
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->partial_delivery = 0;
+    cfg->incomplete_delivery = 0;
+    cfg->in_order_delivery = 0;
+    cfg->max_sdu_gap = -1;
+    cfg->dtcp_present = 0;
+}
+
 static struct rina_kmsg_fa_resp_arrived *
 flow_allocate_req(struct application *application,
                   unsigned int wait_for_completion,
@@ -153,7 +164,7 @@ flow_allocate_req(struct application *application,
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_FA_REQ;
     req->ipcp_id = ipcp_id;
-    req->qos = 0;  /* Not currently used. */
+    flow_config_default(&req->flowcfg);
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 

@@ -190,6 +190,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
     req->remote_addr = remote_addr;
+    flow_config_default(&req->flowcfg);
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 

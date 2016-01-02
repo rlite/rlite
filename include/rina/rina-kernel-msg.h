@@ -105,7 +105,7 @@ struct rina_kmsg_fa_req {
     uint32_t event_id;
 
     uint16_t ipcp_id;
-    uint16_t qos;
+    struct rina_flow_config flowcfg;
     uint32_t local_port; /* Filled by kernel before reflection to userspace. */
     struct rina_name local_application;
     struct rina_name remote_application;
@@ -187,6 +187,7 @@ struct rina_kmsg_uipcp_fa_req_arrived {
     uint16_t ipcp_id;
     uint32_t remote_port;
     uint64_t remote_addr;
+    struct rina_flow_config flowcfg;
     /* Requested application. */
     struct rina_name local_application;
     /* Requesting application. */
