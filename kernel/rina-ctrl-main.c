@@ -272,7 +272,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
     return ret;
 }
 
-static int ipcp_del(unsigned int ipcp_id);
+static int ipcp_del_entry(struct ipcp_entry *entry, int locked);
 
 static int
 ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
@@ -305,9 +305,45 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
     *ipcp_id = entry->id;
 
 out:
-    mutex_unlock(&rina_dm.lock);
     if (ret) {
-        ipcp_del(entry->id);
+        ipcp_del_entry(entry, 0);
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+ipcp_del_entry(struct ipcp_entry *entry, int locked)
+{
+    int ret = 0;
+
+    if (locked) {
+        mutex_lock(&rina_dm.lock);
+    }
+
+    if (entry->refcnt) {
+        ret = -EBUSY;
+        goto out;
+    }
+
+    if (entry->priv) {
+        BUG_ON(entry->ops.destroy == NULL);
+        entry->ops.destroy(entry);
+    }
+
+    hash_del(&entry->node);
+    rina_name_free(&entry->name);
+    rina_name_free(&entry->dif_name);
+    /* Invalid the IPCP fetch pointer, if necessary. */
+    if (entry == rina_dm.ipcp_fetch_last) {
+        rina_dm.ipcp_fetch_last = NULL;
+    }
+    bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
+    kfree(entry);
+out:
+    if (locked) {
+        mutex_unlock(&rina_dm.lock);
     }
 
     return ret;
@@ -332,23 +368,8 @@ ipcp_del(unsigned int ipcp_id)
         ret = -ENXIO;
         goto out;
     }
-    if (entry->refcnt) {
-        ret = -EBUSY;
-        goto out;
-    }
-    if (entry->priv) {
-        BUG_ON(entry->ops.destroy == NULL);
-        entry->ops.destroy(entry);
-    }
-    hash_del(&entry->node);
-    rina_name_free(&entry->name);
-    rina_name_free(&entry->dif_name);
-    /* Invalid the IPCP fetch pointer, if necessary. */
-    if (entry == rina_dm.ipcp_fetch_last) {
-        rina_dm.ipcp_fetch_last = NULL;
-    }
-    kfree(entry);
-    bitmap_clear(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
+
+    ret = ipcp_del_entry(entry, 0);
 out:
     mutex_unlock(&rina_dm.lock);
 
@@ -726,25 +747,12 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
 }
 
 static int
-flow_del(unsigned int port_id, int locked)
+flow_del_entry(struct flow_entry *entry, int locked)
 {
-    struct flow_entry *entry;
     int ret = 0;
-
-    if (port_id >= PORT_ID_BITMAP_SIZE) {
-        return ret;
-    }
 
     if (locked)
         mutex_lock(&rina_dm.lock);
-    /* Lookup and remove the flow entry in the hash table corresponding
-     * to the given port_id. */
-    entry = flow_table_find(port_id);
-    if (!entry) {
-        /* No such flow. */
-        ret = -ENXIO;
-        goto out;
-    }
 
     if (entry->refcnt) {
         /* Flow is being used by someone. */
@@ -756,8 +764,8 @@ flow_del(unsigned int port_id, int locked)
     hash_del(&entry->node);
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
+    bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
     kfree(entry);
-    bitmap_clear(rina_dm.port_id_bitmap, port_id, 1);
 out:
     if (locked)
         mutex_unlock(&rina_dm.lock);
@@ -776,9 +784,7 @@ flow_del_by_rc(struct rina_ctrl *rc)
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->rc == rc) {
             printk("%s: Removing flow %u\n", __func__, flow->local_port);
-            /* Optimization possible: flow_del() does a lookup, which is
-             * useless here, since we already have the entry. */
-            flow_del(flow->local_port, 0);
+            flow_del_entry(flow, 0);
         }
     }
     mutex_unlock(&rina_dm.lock);
@@ -849,7 +855,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
 negative:
     if (flow_entry) {
-        flow_del(flow_entry->local_port, 0);
+        flow_del_entry(flow_entry, 0);
     }
 
     mutex_unlock(&rina_dm.lock);
@@ -891,7 +897,7 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
                                                    flow_entry,
                                                    req->response);
     if (ret || req->response) {
-        flow_del(flow_entry->local_port, 0);
+        flow_del_entry(flow_entry, 0);
     }
 
 out:
@@ -947,7 +953,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)req);
     if (ret) {
-        flow_del(flow_entry->local_port, 0);
+        flow_del_entry(flow_entry, 0);
         rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
     }
 
@@ -988,7 +994,7 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
                                                  local_port, response);
     if (response) {
         /* Negative response --> delete the flow. */
-        flow_del(local_port, 0);
+        flow_del_entry(flow_entry, 0);
     }
 
 out:
