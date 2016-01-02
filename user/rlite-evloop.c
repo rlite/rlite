@@ -89,6 +89,7 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
     rlite_ipcp->ipcp_id = resp->ipcp_id;
     rlite_ipcp->dif_type = strdup(resp->dif_type);
     rlite_ipcp->ipcp_addr = resp->ipcp_addr;
+    rlite_ipcp->depth = resp->depth;
     rina_name_copy(&rlite_ipcp->ipcp_name, &resp->ipcp_name);
     rina_name_copy(&rlite_ipcp->dif_name, &resp->dif_name);
 
@@ -136,10 +137,11 @@ rlite_ipcps_print(struct rlite_evloop *loop)
             ipcp_name_s = rina_name_to_string(&rlite_ipcp->ipcp_name);
             dif_name_s = rina_name_to_string(&rlite_ipcp->dif_name);
             PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                    " address = %llu\n",
+                    " address = %llu, depth = %u\n",
                         rlite_ipcp->ipcp_id, ipcp_name_s, rlite_ipcp->dif_type,
                         dif_name_s,
-                        (long long unsigned int)rlite_ipcp->ipcp_addr);
+                        (long long unsigned int)rlite_ipcp->ipcp_addr,
+                        rlite_ipcp->depth);
 
             if (ipcp_name_s) {
                     free(ipcp_name_s);

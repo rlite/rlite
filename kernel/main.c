@@ -1288,6 +1288,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
             fqe->resp.end = 0;
             fqe->resp.ipcp_id = entry->id;
             fqe->resp.ipcp_addr = entry->addr;
+            fqe->resp.depth = entry->depth;
             rina_name_copy(&fqe->resp.ipcp_name, &entry->name);
             if (entry->dif) {
                 dif_name = entry->dif->name;
@@ -1344,7 +1345,7 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
             uint8_t depth;
 
             ret = kstrtou8(req->value, 10, &depth);
-            if (ret) {
+            if (ret == 0) {
                 entry->depth = depth;
             }
 
