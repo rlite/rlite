@@ -659,8 +659,8 @@ int main(int argc, char **argv)
     int enable_testing = 0;
     int ret;
 
-    ret = rlite_evloop_init(&rc.loop, "/dev/rlite",
-                     rlite_kernel_handlers);
+    ret = rlite_evloop_init(&rc.loop, "/dev/rlite", rlite_kernel_handlers,
+                            RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
     }

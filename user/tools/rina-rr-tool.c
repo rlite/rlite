@@ -253,7 +253,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application library. */
-    ret = rlite_appl_init(&rr.application);
+    ret = rlite_appl_init(&rr.application, RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
     }

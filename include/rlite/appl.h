@@ -40,7 +40,7 @@ struct rlite_appl {
     pthread_mutex_t lock;
 };
 
-int rlite_appl_init(struct rlite_appl *appl);
+int rlite_appl_init(struct rlite_appl *appl, unsigned int flags);
 
 int rlite_appl_fini(struct rlite_appl *appl);
 

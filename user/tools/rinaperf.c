@@ -607,7 +607,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application library. */
-    ret = rlite_appl_init(&rp.application);
+    ret = rlite_appl_init(&rp.application, RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
     }

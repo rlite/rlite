@@ -475,7 +475,7 @@ rlite_flow_req_wait_open(struct rlite_appl *appl)
 }
 
 int
-rlite_appl_init(struct rlite_appl *appl)
+rlite_appl_init(struct rlite_appl *appl, unsigned int flags)
 {
     int ret;
 
@@ -484,7 +484,7 @@ rlite_appl_init(struct rlite_appl *appl)
     list_init(&appl->pending_flow_reqs);
 
     ret = rlite_evloop_init(&appl->loop, "/dev/rlite",
-                            rlite_kernel_handlers);
+                            rlite_kernel_handlers, flags);
     if (ret) {
         return ret;
     }

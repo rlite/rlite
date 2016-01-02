@@ -752,7 +752,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
 }
 
 static int
-rlite_evloop_sync(struct rlite_evloop *loop)
+rlite_evloop_barrier(struct rlite_evloop *loop)
 {
     struct rlite_msg_base *msg;
     int result;
@@ -783,13 +783,16 @@ rlite_evloop_sync(struct rlite_evloop *loop)
 
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
-                 rlite_resp_handler_t *handlers)
+                 rlite_resp_handler_t *handlers,
+                 unsigned int flags)
 {
     int ret;
 
     if (!dev) {
         dev = "/dev/rlite";
     }
+
+    loop->flags = flags;
 
     if (handlers) {
         memcpy(loop->handlers, handlers, sizeof(loop->handlers));
@@ -857,8 +860,9 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         perror("pthread_create(event-loop)");
         return ret;
     }
+    loop->running = 1;
 
-    ret = rlite_evloop_sync(loop);
+    ret = rlite_evloop_barrier(loop);
 
     return ret;
 }

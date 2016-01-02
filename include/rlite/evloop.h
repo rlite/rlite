@@ -55,6 +55,12 @@ struct rlite_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
 
+    /* Flags used in rlite_evloop_init(). */
+    unsigned int flags;
+
+    /* Is the evloop running already?. */
+    int running;
+
     /* Table containing the kernel handlers. */
     rlite_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
 
@@ -106,9 +112,12 @@ rlite_evloop_stop(struct rlite_evloop *loop);
 int
 rlite_evloop_join(struct rlite_evloop *loop);
 
+#define RLITE_EVLOOP_SPAWN 0x0001
+
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
-                  rlite_resp_handler_t *handlers);
+                  rlite_resp_handler_t *handlers,
+                  unsigned int flags);
 
 int
 rlite_evloop_fini(struct rlite_evloop *loop);

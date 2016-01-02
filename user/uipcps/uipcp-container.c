@@ -311,7 +311,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
-    ret = rlite_appl_init(&uipcp->appl);
+    ret = rlite_appl_init(&uipcp->appl, RLITE_EVLOOP_SPAWN);
     if (ret) {
         goto err0;
     }
@@ -467,16 +467,10 @@ visit(struct uipcps *uipcps)
 static int
 uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
 {
-    struct rlite_evloop loop;
     struct ipcp_node *ipn;
     unsigned int depth;
     char strbuf[10];
     int ret;
-
-    ret = rlite_evloop_init(&loop, "/dev/rlite", NULL);
-    if (ret) {
-        return ret;
-    }
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         /* Shims have down_depth set to 0, so we use the up_depth
@@ -489,15 +483,12 @@ uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
             continue;
         }
 
-        ret = rlite_ipcp_config(&loop, ipn->ipcp_id, "depth",
+        ret = rlite_ipcp_config(&uipcps->loop, ipn->ipcp_id, "depth",
                                 strbuf);
         if (ret) {
             PE("'ipcp-config depth %u' failed\n", depth);
         }
     }
-
-    rlite_evloop_stop(&loop);
-    rlite_evloop_fini(&loop);
 
     return 0;
 }
