@@ -6,7 +6,7 @@ usr:
 	cd build && make
 
 ker:
-	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
+	make -C /lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
 count:
 	find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | xargs wc -l
@@ -17,7 +17,7 @@ usr_clean:
 	cd build && make clean
 
 ker_clean:
-	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel clean
+	make -C /lib/modules/$(KER)/build M=$(PWD)/kernel clean
 
 install: usr_install ker_install
 
