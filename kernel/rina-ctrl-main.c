@@ -1589,6 +1589,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     struct ipcp_entry *ipcp;
     struct rina_buf *rb;
     struct rina_mgmt_hdr mhdr;
+    size_t orig_len = ulen;
     ssize_t ret;
 
     if (unlikely(!rio->txrx)) {
@@ -1621,19 +1622,14 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
 
     if (unlikely(rio->mode != RINA_IO_MODE_APPL_BIND)) {
         if (rio->mode == RINA_IO_MODE_IPCP_BIND) {
-            /* Fill the PCI for a management PDU. */
+            /* Fill the PCI for a management PDU.
+             * XXX is this path used anymore ? */
             rina_buf_pci_push(rb);
             memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
             RINA_BUF_PCI(rb)->pdu_type = PDU_TYPE_MGMT;
             ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
-            if (ret > sizeof(struct rina_pci)) {
-                ret -= sizeof(struct rina_pci);
-            }
         } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
-            if (ret >= 0) {
-                ret += sizeof(mhdr);
-            }
         } else {
             PE("%s: Unknown mode, this should not happen\n", __func__);
             ret = -EINVAL;
@@ -1643,7 +1639,11 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
     }
 
-    return ret;
+    if (unlikely(ret < 0)) {
+        return ret;
+    }
+
+    return orig_len;
 }
 
 static ssize_t

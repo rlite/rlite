@@ -152,7 +152,6 @@ rmt_tx(struct rina_normal *priv, struct ipcp_entry *ipcp,
 {
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
-    int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
     if (unlikely(!lower_flow && flow->remote_addr != ipcp->addr)) {
@@ -161,25 +160,19 @@ rmt_tx(struct rina_normal *priv, struct ipcp_entry *ipcp,
         rina_buf_free(rb);
         return 0;
     }
+
     if (lower_flow) {
         /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
         lower_ipcp = lower_flow->txrx.ipcp;
         BUG_ON(!lower_ipcp);
-    }
 
-    if (lower_flow) {
         /* Push down to the underlying IPCP. */
-        ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
-    } else {
-        /* This SDU gets loopbacked to this IPCP, since this is a
-         * self flow (flow->remote_addr == ipcp->addr). */
-        size_t len = rb->len;
-
-        ret = ipcp->ops.sdu_rx(ipcp, rb);
-        ret = (ret == 0) ? len : ret;
+        return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
     }
 
-    return ret;
+    /* This SDU gets loopbacked to this IPCP, since this is a
+     * self flow (flow->remote_addr == ipcp->addr). */
+    return ipcp->ops.sdu_rx(ipcp, rb);
 }
 
 static int
@@ -221,14 +214,13 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 dtp->cwq_len++;
             } else {
                 /* POL: FlowControlOverrun */
-                int len = rb->len;
 
                 /* TODO Set blocking write (backpressure) ? */
                 PD("%s: Dropping overrun PDU [%lu]", __func__,
                         (long unsigned)pci->seqnum);
                 rina_buf_free(rb);
 
-                return len;
+                return 0;
             }
         } else {
             /* PDU in the sender window. */
@@ -243,9 +235,6 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     }
 
     ret = rmt_tx(priv, ipcp, flow, rb);
-    if (likely(ret >= sizeof(struct rina_pci))) {
-        ret -= sizeof(struct rina_pci);
-    }
 
     /* 3 * (MPL + R + A) */
     hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
@@ -264,7 +253,6 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
-    int ret = rb->len;
 
     if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->remote_addr);
@@ -273,7 +261,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                     (long unsigned)mhdr->remote_addr);
             rina_buf_free(rb);
 
-            return ret;
+            return 0;
         }
         dst_addr = mhdr->remote_addr;
     } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
@@ -284,12 +272,12 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                     mhdr->local_port);
             rina_buf_free(rb);
 
-            return ret;
+            return 0;
         }
     } else {
         rina_buf_free(rb);
 
-        return ret;
+        return 0;
     }
     lower_ipcp = lower_flow->txrx.ipcp;
     BUG_ON(!lower_ipcp);
@@ -306,12 +294,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_flags = 0; /* Not valid. */
     pci->seqnum = 0; /* Not valid. */
 
-    ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
-    if (ret >= sizeof(*pci)) {
-        ret -= sizeof(*pci);
-    }
-
-    return ret;
+    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
 }
 
 static int

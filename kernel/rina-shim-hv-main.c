@@ -226,10 +226,14 @@ rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
     iov.iov_len = rb->len;
 
     ret = vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
-                           &iov, 1);
+                          &iov, 1);
     rina_buf_free(rb);
 
-    return ret;
+    if (unlikely(ret != iov.iov_len)) {
+        return ret < 0 ? ret : -ENOBUFS;
+    }
+
+    return 0;
 }
 
 static int
