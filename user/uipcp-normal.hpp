@@ -44,6 +44,7 @@ struct Neighbor {
     RinaName ipcp_name;
     int flow_fd;
     unsigned int port_id;
+    unsigned int lower_ipcp_id;
     CDAPConn *conn;
     struct uipcp_rib *rib;
     int enroll_timeout_id;
@@ -242,7 +243,8 @@ int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
 
 int rib_neigh_set_port_id(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
-                          unsigned int neigh_port_id);
+                          unsigned int neigh_port_id,
+                          unsigned int lower_ipcp_id);
 
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,

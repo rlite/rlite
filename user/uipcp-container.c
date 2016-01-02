@@ -377,3 +377,20 @@ uipcps_fetch(struct uipcps *uipcps)
     return 0;
 }
 
+int
+uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
+                        unsigned int lower)
+{
+    PD("Adding flow %d -> %d\n", upper, lower);
+
+    return 0;
+}
+
+int
+uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
+                          unsigned int lower)
+{
+    PD("Removing flow %d -> %d\n", upper, lower);
+
+    return 0;
+}

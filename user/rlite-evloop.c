@@ -801,8 +801,9 @@ rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 }
 
 struct rlite_ipcp *
-rlite_select_ipcp_by_dif(struct rlite_evloop *loop, const struct rina_name *dif_name,
-                   int fallback)
+rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
+                         const struct rina_name *dif_name,
+                         int fallback)
 {
     struct rlite_ipcp *cur;
 

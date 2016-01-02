@@ -50,6 +50,9 @@ Neighbor::~Neighbor()
         } else {
             UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n", flow_fd);
         }
+
+        uipcps_lower_flow_removed(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
+                                  lower_ipcp_id);
     }
 }
 
@@ -846,9 +849,10 @@ uipcp_rib::lookup_neigh_by_name(const RinaName& name)
 int
 Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 {
-    struct rlite_ipcp *info;
-    unsigned int port_id_;
     struct rina_name neigh_name;
+    struct rlite_ipcp *info;
+    unsigned int lower_ipcp_id_;
+    unsigned int port_id_;
     int flow_fd_;
     int ret;
 
@@ -860,10 +864,20 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     info = rib->ipcp_info();
     ipcp_name.rina_name_fill(&neigh_name);
 
+    {
+        struct rlite_ipcp *ipcp;
+
+        ipcp = rlite_select_ipcp_by_dif(&rib->uipcp->appl.loop,
+                                        supp_dif_name, 0);
+        if (ipcp) {
+            lower_ipcp_id_ = ipcp->ipcp_id;
+        }
+    }
+
     /* Allocate a flow for the enrollment. */
     ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, 0, NULL,
-                         &info->ipcp_name, &neigh_name, NULL,
-                         &port_id_, 2000, info->ipcp_id);
+                              &info->ipcp_name, &neigh_name, NULL,
+                              &port_id_, 2000, info->ipcp_id);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
@@ -878,9 +892,13 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 
     port_id = port_id_;
     flow_fd = flow_fd_;
+    lower_ipcp_id = lower_ipcp_id_;
 
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
         port_id);
+
+    uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
+                            lower_ipcp_id);
 
     return 0;
 }
@@ -914,7 +932,8 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 int
 rib_neigh_set_port_id(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
-                      unsigned int neigh_port_id)
+                      unsigned int neigh_port_id,
+                      unsigned int lower_ipcp_id)
 {
     Neighbor *neigh = rib->get_neighbor(neigh_name);
 
@@ -924,6 +943,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
     }
 
     neigh->port_id = neigh_port_id;
+    neigh->lower_ipcp_id = lower_ipcp_id;
 
     return 0;
 }

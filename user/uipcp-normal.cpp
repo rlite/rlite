@@ -635,7 +635,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
     ret = rib_neigh_set_port_id(rib, &req->remote_appl,
-                                req->port_id);
+                                req->port_id, req->ipcp_id);
     if (ret) {
         UPE(uipcp, "rib_neigh_set_port_id() failed\n");
         result = 1;
@@ -658,6 +658,8 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
     if (ret) {
         goto err;
     }
+
+    uipcps_lower_flow_added(uipcp->uipcps, uipcp->ipcp_id, req->ipcp_id);
 
     return 0;
 

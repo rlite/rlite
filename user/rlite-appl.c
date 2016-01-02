@@ -320,7 +320,7 @@ rlite_flow_allocate(struct rlite_appl *application,
     rlite_ipcp = rlite_lookup_ipcp_by_name(&application->loop, ipcp_name);
     if (!rlite_ipcp) {
         rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name,
-                                  dif_fallback);
+                                              dif_fallback);
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
