@@ -800,7 +800,6 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
         return -1;
     }
 
-    /* TODO delete rm */
     return (this->*(hi->second))(rm);
 }
 
@@ -1936,6 +1935,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 {
     map<string, Neighbor>::iterator neigh;
     CDAPMessage *m;
+    int ret;
 
     try {
         m = msg_deser_stateless(serbuf, serlen);
@@ -2002,8 +2002,11 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     }
 
     /* Feed the enrollment state machine. */
-    return neigh->second.enroll_fsm_run(m);
-    // TODO delete m
+    ret = neigh->second.enroll_fsm_run(m);
+
+    delete m;
+
+    return ret;
 }
 
 extern "C" int

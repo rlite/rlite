@@ -10,7 +10,7 @@
 #include "uipcp-container.h"
 
 
-#define MGMTBUF_SIZE_MAX 2048
+#define MGMTBUF_SIZE_MAX 4096
 
 static int
 mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
