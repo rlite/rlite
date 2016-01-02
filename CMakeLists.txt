@@ -44,7 +44,7 @@ protobuf_generate_cpp(UIPCP_GPB_SRC UIPCP_GPB_HDR ${UIPCP_GPB_PROTOFILES})
 add_library(rlite SHARED user/rlite-utils.c user/rina-kernel-numtables.c user/rina-conf-numtables.c user/rlite-evloop.c user/pending_queue.c user/rlite-appl.c)
 add_library(rlite-cdap SHARED user/cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 add_library(rlite-conf SHARED user/rlite-conf.c)
-add_library(uipcp-rib STATIC user/uipcp-rib.cpp user/uipcp-codecs.cpp user/uipcp-rib.hpp user/uipcp-enrollment.cpp user/uipcp-flow-allocation.cpp user/uipcp-application-registration.cpp user/uipcp-lower-flows.cpp ${UIPCP_GPB_SRC} ${UIPCP_GPB_HDR})
+add_library(uipcp-rib STATIC user/uipcp-rib.cpp user/uipcp-codecs.cpp user/uipcp-rib.hpp user/uipcp-enrollment.cpp user/uipcp-flow-allocation.cpp user/uipcp-application-registration.cpp user/uipcp-lower-flows.cpp user/uipcp-qos.cpp ${UIPCP_GPB_SRC} ${UIPCP_GPB_HDR})
 
 target_link_libraries(rlite ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(rlite-cdap rlite ${PROTOBUF_LIBRARY})
