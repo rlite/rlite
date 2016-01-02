@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-utils.h>
-#include "rina-ipcp.h"
+#include "rina-kernel.h"
 #include "rina-bufs.h"
 
 #include <linux/module.h>

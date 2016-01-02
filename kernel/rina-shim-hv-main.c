@@ -23,7 +23,7 @@
 #include <rina/rina-utils.h>
 #include <rina/rina-ipcp-types.h>
 #include <vmpi-provider.h>
-#include "rina-ipcp.h"
+#include "rina-kernel.h"
 #include "rina-shim-hv-msg.h"
 
 #include <linux/module.h>

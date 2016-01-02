@@ -20,17 +20,7 @@
 
 #include <linux/types.h>
 #include <rina/rina-utils.h>
-#include "rina-ipcp.h"
-
-#include <linux/aio.h>
-#include <linux/mutex.h>
-#include <linux/slab.h>
-#include <linux/list.h>
-#include <linux/wait.h>
-#include <linux/sched.h>
-#include <linux/workqueue.h>
-#include <linux/hashtable.h>
-#include <linux/ktime.h>
+#include "rina-kernel.h"
 
 
 void

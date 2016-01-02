@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <rina/rina-utils.h>
 #include <rina/rina-ipcp-types.h>
-#include "rina-ipcp.h"
+#include "rina-kernel.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
