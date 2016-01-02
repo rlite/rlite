@@ -792,20 +792,12 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 }
 
 struct CDAPMessage *
-CDAPConn::msg_recv()
+CDAPConn::msg_deser(char *serbuf, size_t serlen)
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;
-    char serbuf[4096];
-    int n;
 
-    n = read(fd, serbuf, sizeof(serbuf));
-    if (n < 0) {
-        perror("read(cdap_msg)");
-        return NULL;
-    }
-
-    gm.ParseFromArray(serbuf, n);
+    gm.ParseFromArray(serbuf, serlen);
 
     m = new CDAPMessage(gm);
     if (!m) {
@@ -842,6 +834,21 @@ CDAPConn::msg_recv()
     }
 
     return m;
+}
+
+struct CDAPMessage *
+CDAPConn::msg_recv()
+{
+    char serbuf[4096];
+    int n;
+
+    n = read(fd, serbuf, sizeof(serbuf));
+    if (n < 0) {
+        perror("read(cdap_msg)");
+        return NULL;
+    }
+
+    return msg_deser(serbuf, n);
 }
 
 int
