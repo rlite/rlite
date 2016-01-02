@@ -180,6 +180,8 @@ struct Gateway {
 
     Gateway();
     ~Gateway();
+
+    int join();
 };
 
 static void *
@@ -422,6 +424,12 @@ Gateway::~Gateway()
     for (unsigned int i=0; i<workers.size(); i++) {
         delete workers[i];
     }
+}
+
+int
+Gateway::join()
+{
+    return rlite_evloop_join(&appl.loop);
 }
 
 Gateway gw;
@@ -711,6 +719,8 @@ int main()
 
     print_conf();
     setup();
+
+    gw.join();
 
     PI("Main thread exits\n");
 

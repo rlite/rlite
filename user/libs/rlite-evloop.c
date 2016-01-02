@@ -696,10 +696,24 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
 }
 
 int
+rlite_evloop_join(struct rlite_evloop *loop)
+{
+    if (loop->evloop_th) {
+        int ret = pthread_join(loop->evloop_th, NULL);
+
+        if (ret < 0) {
+            perror("pthread_join(event-loop)");
+            return ret;
+        }
+        loop->evloop_th = 0;
+    }
+
+    return 0;
+}
+
+int
 rlite_evloop_fini(struct rlite_evloop *loop)
 {
-    int ret;
-
     /* Stop if nobody has already stopped. */
     rlite_evloop_stop(loop);
 
@@ -734,13 +748,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
         pthread_mutex_unlock(&loop->timer_lock);
     }
 
-    if (loop->evloop_th) {
-        ret = pthread_join(loop->evloop_th, NULL);
-        if (ret < 0) {
-            perror("pthread_join(event-loop)");
-            return ret;
-        }
-    }
+    rlite_evloop_join(loop);
 
     /* Clean up all the data structures. To be completed. */
     if (loop->eventfd >= 0) {

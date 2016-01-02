@@ -101,6 +101,9 @@ int
 rlite_evloop_stop(struct rlite_evloop *loop);
 
 int
+rlite_evloop_join(struct rlite_evloop *loop);
+
+int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
                   rina_resp_handler_t *handlers);
 
