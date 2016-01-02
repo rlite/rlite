@@ -154,5 +154,6 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
+void dtp_dump(struct dtp *dtp);
 
 #endif  /* __RINA_IPCP_H__ */

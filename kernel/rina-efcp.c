@@ -38,3 +38,15 @@ dtp_fini(struct dtp *dtp)
     hrtimer_cancel(&dtp->rcv_inact_tmr);
 }
 EXPORT_SYMBOL(dtp_fini);
+
+void
+dtp_dump(struct dtp *dtp)
+{
+    printk("DTP: set_drf=%u,snd_lwe=%lu,next_seq_num_to_send=%lu,"
+            "last_seq_num_sent=%lu,rcv_lwe=%lu\n",
+            dtp->set_drf, (long unsigned)dtp->snd_lwe,
+            (long unsigned)dtp->next_seq_num_to_send,
+            (long unsigned)dtp->last_seq_num_sent,
+            (long unsigned)dtp->rcv_lwe);
+}
+EXPORT_SYMBOL_GPL(dtp_dump);
