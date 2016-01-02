@@ -86,9 +86,6 @@ int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 int rib_ipcp_register(struct uipcp_rib *rib, int reg,
                       const struct rina_name *lower_dif);
 
-uint64_t rib_dft_lookup(struct uipcp_rib *rib,
-                        const struct rina_name *appl_name);
-
 int rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
                 uint64_t remote_addr);
 

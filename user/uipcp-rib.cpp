@@ -2038,12 +2038,6 @@ rib_dump(struct uipcp_rib *rib)
     return rib->dump();
 }
 
-extern "C" uint64_t
-rib_dft_lookup(struct uipcp_rib *rib, const struct rina_name *appl_name)
-{
-    return rib->dft_lookup(RinaName(appl_name));
-}
-
 extern "C" int
 rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
             uint64_t remote_addr)
