@@ -130,9 +130,8 @@ struct dtp {
     uint64_t next_snd_ctl_seq;
     uint64_t last_ctrl_seq_num_rcvd;
     struct timer_list snd_inact_tmr;
-    unsigned long snd_inact_tmr_int;
     struct timer_list rcv_inact_tmr;
-    unsigned long rcv_inact_tmr_int;
+    unsigned long mpl_r_a;  /* MPL + R + A */
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
