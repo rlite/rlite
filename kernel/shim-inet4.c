@@ -97,11 +97,10 @@ peek_head_len(struct sock *sk)
 }
 #endif
 
+/* This must be called in process context. */
 static void
-inet4_rx_worker(struct work_struct *w)
+inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
 {
-    struct shim_inet4_flow *priv =
-            container_of(w, struct shim_inet4_flow, rxw);
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
     struct msghdr msghdr;
@@ -162,10 +161,22 @@ inet4_rx_worker(struct work_struct *w)
 }
 
 static void
+inet4_rx_worker(struct work_struct *w)
+{
+    struct shim_inet4_flow *priv =
+            container_of(w, struct shim_inet4_flow, rxw);
+
+    inet4_drain_socket_rxq(priv);
+}
+
+static void
 inet4_data_ready(struct sock *sk)
 {
     struct shim_inet4_flow *priv = sk->sk_user_data;
 
+    /* We cannot receive skbs in softirq context, so we use a work
+     * queue item to execute the work in process context.
+     */
     schedule_work(&priv->rxw);
 }
 
@@ -202,6 +213,15 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     INIT_WORK(&priv->rxw, inet4_rx_worker);
     priv->flow = flow;
     flow->priv = priv;
+
+    /* It often happens then the remote endpoint sent some data before
+     * this flow_init() function is called, and therefore before we
+     * have the chance to intercept that data with the sk_data_ready()
+     * callback. This data is however stored in the socket receive
+     * queue, so we can just drain the queue here. This situation
+     * usually happens on the "server" side of an TCP/UDP endpoint.
+     */
+    inet4_drain_socket_rxq(priv);
 
     return 0;
 }
