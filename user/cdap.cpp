@@ -377,16 +377,17 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
         obj_value.ty = BOOL;
 
     } else if (objvalue.has_byteval()) {
-        obj_value.u.buf.ptr = new char[objvalue.byteval().size()];
-        if (!obj_value.u.buf.ptr) {
-            PE("BYTES object allocation failed\n");
-            obj_value.ty = NONE;
-        } else {
+        try {
+            obj_value.u.buf.ptr = new char[objvalue.byteval().size()];
             memcpy(obj_value.u.buf.ptr, objvalue.byteval().data(),
-                   objvalue.byteval().size());
+                    objvalue.byteval().size());
             obj_value.u.buf.len = objvalue.byteval().size();
             obj_value.u.buf.owned = true;
             obj_value.ty = BYTES;
+
+        } catch (std::bad_alloc) {
+            PE("BYTES object allocation failed\n");
+            obj_value.ty = NONE;
         }
 
     } else {
@@ -425,14 +426,6 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gpb::CDAPMessage gm;
     gpb::objVal_t *objvalue = new gpb::objVal_t();
     gpb::authValue_t *authvalue = new gpb::authValue_t();
-
-    if (!objvalue || !authvalue) {
-        PE("Out of memory\n");
-        if (objvalue) delete objvalue;
-        if (authvalue) delete authvalue;
-
-        return gpb::CDAPMessage();
-    }
 
     gm.set_abssyntax(abs_syntax);
     gm.set_opcode(op_code);
@@ -802,11 +795,6 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
     *len = gm.ByteSize();
     *buf = new char[*len];
 
-    if (!(*buf)) {
-        PE("Out of memory\n");
-        return ENOMEM;
-    }
-
     gm.SerializeToArray(*buf, *len);
 
     return 0;
@@ -848,9 +836,6 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
     gm.ParseFromArray(serbuf, serlen);
 
     m = new CDAPMessage(gm);
-    if (!m) {
-        PE("Out of memory\n");
-    }
 
     if (!m->valid(true)) {
         delete m;

@@ -287,7 +287,12 @@ Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
         m->set_obj_value(objbuf, objlen);
     }
 
-    ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
+    try {
+        ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
+    } catch (std::bad_alloc) {
+        ret = -1;
+    }
+
     if (ret) {
         PE("message serialization failed\n");
         delete serbuf;
