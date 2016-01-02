@@ -60,7 +60,7 @@ RinaName2gpb(const RinaName &name)
     gan->set_applicationprocessname(name.apn);
     gan->set_applicationprocessinstance(name.api);
     gan->set_applicationentityname(name.aen);
-    gan->set_applicationprocessinstance(name.aei);
+    gan->set_applicationentityinstance(name.aei);
 
     return gan;
 }
