@@ -7,13 +7,16 @@
 #include <linux/slab.h>
 
 #define COMMON_ALLOC(_sz)   kmalloc(_sz, GFP_KERNEL)
+#define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
 
 #else
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define COMMON_ALLOC(_sz)   malloc(_sz)
+#define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
 
 #endif
 
@@ -136,6 +139,15 @@ static struct rina_msg_layout rina_msg_numtables[] = {
         .copylen = sizeof(struct rina_ctrl_destroy_ipcp_resp),
         .names = 0,
     },
+    [RINA_CTRL_FETCH_IPCP] = {
+        .copylen = sizeof(struct rina_ctrl_base_msg),
+        .names = 0,
+    },
+    [RINA_CTRL_FETCH_IPCP_RESP] = {
+        .copylen = sizeof(struct rina_ctrl_fetch_ipcp_resp) -
+                    2 * sizeof(struct rina_name),
+        .names = 2,
+    },
     [RINA_CTRL_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
@@ -172,7 +184,7 @@ deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
 {
     struct rina_ctrl_base_msg *bmsg = (struct rina_ctrl_base_msg *)serbuf;
     struct rina_name *name;
-    size_t copylen;
+    unsigned int copylen;
     const void *desptr;
     int ret;
     int i;
@@ -181,11 +193,13 @@ deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
     memcpy(msgbuf, serbuf, copylen);
     desptr = serbuf + copylen;
     name = (struct rina_name *)(msgbuf + copylen);
+    //COMMON_PRINT(">>>> %u %u %p\n", serbuf_len, copylen, desptr);
     for (i = 0; i < rina_msg_numtables[bmsg->msg_type].names; i++, name++) {
         ret = deserialize_rina_name(&desptr, name);
         if (ret) {
             return ret;
         }
+        //COMMON_PRINT("   desptr %p\n", desptr);
     }
     if ((desptr - serbuf) != serbuf_len) {
         return -1;

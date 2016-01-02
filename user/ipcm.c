@@ -48,6 +48,20 @@ destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
     return 0;
 }
 
+static int
+fetch_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
+                 const struct rina_ctrl_base_msg *b_req)
+{
+    const struct rina_ctrl_fetch_ipcp_resp *resp =
+        (const struct rina_ctrl_fetch_ipcp_resp *)b_resp;
+
+    printf("%s: Fetch IPCP response\n", __func__);
+    (void)resp;
+    (void)b_req;
+
+    return 0;
+}
+
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
                                    const struct rina_ctrl_base_msg *b_req);
@@ -56,6 +70,7 @@ typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
 static rina_resp_handler_t rina_handlers[] = {
     [RINA_CTRL_CREATE_IPCP_RESP] = create_ipcp_resp,
     [RINA_CTRL_DESTROY_IPCP_RESP] = destroy_ipcp_resp,
+    [RINA_CTRL_FETCH_IPCP_RESP] = fetch_ipcp_resp,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
@@ -243,6 +258,34 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
     return ret;
 }
 
+/* Fetch information about IPC processes. */
+static int
+fetch_ipcps(struct ipcm *ipcm)
+{
+    struct rina_ctrl_base_msg *msg;
+    int ret;
+
+    /* Allocate and create a request message. */
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        return ENOMEM;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_CTRL_FETCH_IPCP;
+    msg->event_id = ipcm->event_id_counter++;
+
+    printf("Requesting IPC processes fetch...\n");
+
+    ret = issue_request(ipcm, msg, sizeof(*msg));
+    if (ret < 0) {
+        free(msg);
+        return ret;
+    }
+
+    return ret;
+}
+
 static int
 test(struct ipcm *ipcm)
 {
@@ -256,9 +299,11 @@ test(struct ipcm *ipcm)
     rina_name_fill(&ipcp_name, "prova.IPCP", "2", NULL, NULL);
     ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
 
+    ret = fetch_ipcps(ipcm);
+
     /* Destroy the IPCP. */
-    destroy_ipcp(ipcm, 0);
-    destroy_ipcp(ipcm, 1);
+    ret = destroy_ipcp(ipcm, 0);
+    ret = destroy_ipcp(ipcm, 1);
 
     return ret;
 }

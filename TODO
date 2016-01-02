@@ -1,0 +1,2 @@
+- rina_msg_free(): uses numtables to take care of rina_names
+- function to compute serialized length

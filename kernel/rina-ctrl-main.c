@@ -37,8 +37,8 @@
 
 
 struct upqueue_entry {
-    void *msg;
-    size_t msg_len;
+    void *sermsg;
+    size_t serlen;
     struct list_head node;
 };
 
@@ -53,6 +53,7 @@ static struct rina_dm rina_dm;
 
 struct rina_ctrl {
     char msgbuf[1024];
+    char serbuf[1024];
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -61,18 +62,29 @@ struct rina_ctrl {
 };
 
 static int
-rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg,
-                    size_t rmsg_len)
+rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg)
 {
     struct upqueue_entry *entry;
+    unsigned int serlen;
+    void *serbuf;
 
     entry = kmalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
         return -ENOMEM;
     }
 
-    entry->msg = rmsg;
-    entry->msg_len = rmsg_len;
+    /* Serialize the response into rc->serbuf and then copy it into a
+     * sized buffer to be put into the upqueue. */
+    serlen = serialize_rina_msg(rc->serbuf, sizeof(rc->serbuf), rmsg);
+    serbuf = kmalloc(serlen, GFP_KERNEL);
+    if (!serbuf) {
+        kfree(entry);
+        return -ENOMEM;
+    }
+    memcpy(serbuf, rc->serbuf, serlen);
+
+    entry->sermsg = serbuf;
+    entry->serlen = serlen;
     mutex_lock(&rc->upqueue_lock);
     list_add_tail(&entry->node, &rc->upqueue);
     wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
@@ -135,8 +147,7 @@ rina_ipcp_create(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
     resp->ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp,
-                              sizeof(*resp));
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
     if (ret) {
         goto err3;
     }
@@ -175,13 +186,44 @@ rina_ipcp_destroy(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
     /* Release the IPC process ID. */
     ipcp_id_release(req->ipcp_id);
 
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp,
-                              sizeof(*resp));
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
     if (ret) {
         goto err1;
     }
 
     printk("IPC process %u destroyed\n", req->ipcp_id);
+
+    return 0;
+
+err1:
+    kfree(resp);
+
+    return ret;
+}
+
+static int
+rina_ipcp_fetch(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *req)
+{
+    struct rina_ctrl_fetch_ipcp_resp *resp;
+    int ret;
+
+    /* Create the response message. */
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
+        return -ENOMEM;
+    }
+    resp->msg_type = RINA_CTRL_FETCH_IPCP_RESP;
+    resp->event_id = req->event_id;
+    resp->more = 0;
+    resp->ipcp_id = 0;
+    resp->dif_type = DIF_TYPE_SHIM_DUMMY;
+    memset(&resp->ipcp_name, 0, sizeof(resp->ipcp_name));
+    memset(&resp->dif_name, 0, sizeof(resp->dif_name));
+
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    if (ret) {
+        goto err1;
+    }
 
     return 0;
 
@@ -205,6 +247,7 @@ typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
 static rina_msg_handler_t rina_handlers[] = {
     [RINA_CTRL_CREATE_IPCP] = rina_ipcp_create,
     [RINA_CTRL_DESTROY_IPCP] = rina_ipcp_destroy,
+    [RINA_CTRL_FETCH_IPCP] = rina_ipcp_fetch,
     [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
@@ -287,20 +330,20 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         }
 
         entry = list_first_entry(&rc->upqueue, struct upqueue_entry, node);
-        if (len < entry->msg_len) {
+        if (len < entry->serlen) {
             /* Not enough space? Don't pop the entry from the upqueue. */
             ret = -ENOBUFS;
         } else {
-            if (unlikely(copy_to_user(buf, entry->msg, entry->msg_len))) {
+            if (unlikely(copy_to_user(buf, entry->sermsg, entry->serlen))) {
                 ret = -EFAULT;
             } else {
-                ret = entry->msg_len;
+                ret = entry->serlen;
                 *ppos += ret;
             }
 
             /* Unlink and free the upqueue entry and the associated message. */
             list_del(&entry->node);
-            kfree(entry->msg);
+            kfree(entry->sermsg);
             kfree(entry);
         }
 

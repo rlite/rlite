@@ -23,7 +23,7 @@ struct rina_name {
     char *api;
     char *aen;
     char *aei;
-};
+} __attribute__((packed));
 
 /* DIF types */
 enum {
@@ -38,6 +38,8 @@ enum {
     RINA_CTRL_CREATE_IPCP_RESP,
     RINA_CTRL_DESTROY_IPCP,
     RINA_CTRL_DESTROY_IPCP_RESP,
+    RINA_CTRL_FETCH_IPCP,
+    RINA_CTRL_FETCH_IPCP_RESP,
     RINA_CTRL_ASSIGN_TO_DIF,
     RINA_CTRL_ASSIGN_TO_DIF_RESP,
 
@@ -50,7 +52,7 @@ typedef uint16_t rina_msg_t;
 struct rina_ctrl_base_msg {
     rina_msg_t msg_type;
     uint32_t event_id;
-};
+} __attribute__((packed));
 
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_ctrl_create_ipcp {
@@ -59,7 +61,7 @@ struct rina_ctrl_create_ipcp {
 
     uint8_t dif_type;
     struct rina_name name;
-};
+} __attribute__((packed));
 
 /* IPCM <-- kernel message to inform the IPCM about the ID of a new
  * IPC process. */
@@ -68,7 +70,7 @@ struct rina_ctrl_create_ipcp_resp {
     uint32_t event_id;
 
     uint16_t ipcp_id;
-};
+} __attribute__((packed));
 
 /* IPCM --> kernel message to destroy an IPC process. */
 struct rina_ctrl_destroy_ipcp {
@@ -76,7 +78,7 @@ struct rina_ctrl_destroy_ipcp {
     uint32_t event_id;
 
     uint16_t ipcp_id;
-};
+} __attribute__((packed));
 
 /* IPCM <-- kernel message to inform the IPCM about the destruction
  * of an IPC process. */
@@ -85,7 +87,19 @@ struct rina_ctrl_destroy_ipcp_resp {
     uint32_t event_id;
 
     uint8_t result;
-};
+} __attribute__((packed));
+
+/* IPCM <-- kernel message to fetch IPC process information. */
+struct rina_ctrl_fetch_ipcp_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t more;
+    uint16_t ipcp_id;
+    uint8_t dif_type;
+    struct rina_name ipcp_name;
+    struct rina_name dif_name;
+} __attribute__((packed));
 
 struct rina_ctrl_assign_to_dif {
     rina_msg_t msg_type;
@@ -93,6 +107,6 @@ struct rina_ctrl_assign_to_dif {
 
     uint32_t ipcp_id;
     struct rina_name dif_name;
-};
+} __attribute__((packed));
 
 #endif  /* __RINA_CTRL_H__ */
