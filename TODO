@@ -27,3 +27,8 @@
 - limitare le dimensioni della seqq
 
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
+
+- rendere uipcp-server compatibile con la redirezione dell'output o implementare
+  il logging
+
+- rina-config: aggiungere il comando ipcps-fetch
