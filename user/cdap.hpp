@@ -18,11 +18,25 @@ struct CDAPAuthValue {
                          other == std::string(); }
 };
 
-class CDAPConn {
+class InvokeIdMgr {
     std::set<int> pending_invoke_ids;
     int invoke_id_next;
     int max_pending_ops;
     std::set<int> pending_invoke_ids_remote;
+
+    int __put_invoke_id(std::set<int> &pending, int invoke_id);
+
+public:
+    InvokeIdMgr();
+    int get_invoke_id();
+    int put_invoke_id(int invoke_id);
+    int get_invoke_id_remote(int invoke_id);
+    int put_invoke_id_remote(int invoke_id);
+
+};
+
+class CDAPConn {
+    InvokeIdMgr invoke_id_mgr;
 
     enum {
         NONE = 1,
@@ -32,12 +46,6 @@ class CDAPConn {
     } state;
 
     const char *conn_state_repr(int st);
-
-    int __put_invoke_id(std::set<int> &pending, int invoke_id);
-    int get_invoke_id();
-    int put_invoke_id(int invoke_id);
-    int get_invoke_id_remote(int invoke_id);
-    int put_invoke_id_remote(int invoke_id);
 
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 

@@ -210,9 +210,6 @@ static struct CDAPValidationTable vt;
 
 CDAPConn::CDAPConn(int arg_fd, long arg_version)
 {
-    invoke_id_next = 1;
-    max_pending_ops = 5;
-
     fd = arg_fd;
     version = arg_version;
     memset(&local_appl, 0, sizeof(local_appl));
@@ -247,8 +244,14 @@ CDAPConn::conn_state_repr(int st)
     return NULL;
 }
 
+InvokeIdMgr::InvokeIdMgr()
+{
+    invoke_id_next = 1;
+    max_pending_ops = 5;
+}
+
 int
-CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
+InvokeIdMgr::__put_invoke_id(set<int>& pending, int invoke_id)
 {
     if (!pending.count(invoke_id)) {
         return -1;
@@ -262,7 +265,7 @@ CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 }
 
 int
-CDAPConn::get_invoke_id()
+InvokeIdMgr::get_invoke_id()
 {
     int ret;
 
@@ -279,13 +282,13 @@ CDAPConn::get_invoke_id()
 }
 
 int
-CDAPConn::put_invoke_id(int invoke_id)
+InvokeIdMgr::put_invoke_id(int invoke_id)
 {
     return __put_invoke_id(pending_invoke_ids, invoke_id);
 }
 
 int
-CDAPConn::get_invoke_id_remote(int invoke_id)
+InvokeIdMgr::get_invoke_id_remote(int invoke_id)
 {
     if (pending_invoke_ids_remote.count(invoke_id)) {
         return -1;
@@ -299,7 +302,7 @@ CDAPConn::get_invoke_id_remote(int invoke_id)
 }
 
 int
-CDAPConn::put_invoke_id_remote(int invoke_id)
+InvokeIdMgr::put_invoke_id_remote(int invoke_id)
 {
     return __put_invoke_id(pending_invoke_ids_remote, invoke_id);
 }
@@ -792,12 +795,12 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
 
     if (m->is_request()) {
         /* CDAP request message (M_*). */
-        m->invoke_id = get_invoke_id();
+        m->invoke_id = invoke_id_mgr.get_invoke_id();
 
     } else {
         /* CDAP response message (M_*_R). */
         m->invoke_id = invoke_id;
-        if (put_invoke_id_remote(m->invoke_id)) {
+        if (invoke_id_mgr.put_invoke_id_remote(m->invoke_id)) {
            PE("Invoke id %d does not match any pending request\n",
                 m->invoke_id);
         }
@@ -868,7 +871,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
 
     if (m->is_response()) {
         /* CDAP request message (M_*). */
-        if (put_invoke_id(m->invoke_id)) {
+        if (invoke_id_mgr.put_invoke_id(m->invoke_id)) {
             PE("Invoke id %d does not match any pending request\n",
                m->invoke_id);
             delete m;
@@ -877,7 +880,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
 
     } else {
         /* CDAP response message (M_*_R). */
-        if (get_invoke_id_remote(m->invoke_id)) {
+        if (invoke_id_mgr.get_invoke_id_remote(m->invoke_id)) {
             PE("Invoke id %d already used remotely\n",
                m->invoke_id);
             delete m;
