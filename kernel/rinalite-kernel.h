@@ -1,5 +1,5 @@
-#ifndef __RINA_IPCP_H__
-#define __RINA_IPCP_H__
+#ifndef __RINALITE_KERNEL_H__
+#define __RINALITE_KERNEL_H__
 
 #include <rinalite/rinalite-utils.h>
 #include <linux/mutex.h>
@@ -226,4 +226,4 @@ void dtp_dump(struct dtp *dtp);
 
 #define MPL_MSECS_DEFAULT   1000
 
-#endif  /* __RINA_IPCP_H__ */
+#endif  /* __RINALITE_KERNEL_H__ */

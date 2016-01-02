@@ -23,7 +23,7 @@
 #include <rinalite/rinalite-utils.h>
 #include <rinalite/rina-ipcp-types.h>
 #include <vmpi-provider.h>
-#include "rina-kernel.h"
+#include "rinalite-kernel.h"
 #include "rina-shim-hv-msg.h"
 
 #include <linux/module.h>

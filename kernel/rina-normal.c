@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <rinalite/rinalite-utils.h>
 #include <rinalite/rina-ipcp-types.h>
-#include "rina-kernel.h"
+#include "rinalite-kernel.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>

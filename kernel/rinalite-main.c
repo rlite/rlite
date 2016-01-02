@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <rinalite/rina-kernel-msg.h>
 #include <rinalite/rinalite-utils.h>
-#include "rina-kernel.h"
+#include "rinalite-kernel.h"
 #include "rina-bufs.h"
 
 #include <linux/module.h>

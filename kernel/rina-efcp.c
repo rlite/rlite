@@ -22,7 +22,7 @@
 #include <linux/list.h>
 #include <linux/timer.h>
 #include <rinalite/rinalite-utils.h>
-#include "rina-kernel.h"
+#include "rinalite-kernel.h"
 
 
 static void
