@@ -37,3 +37,5 @@
 
 - remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
+
+- make sel-flows work when ipcp->addr != 0

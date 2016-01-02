@@ -541,6 +541,13 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     cfd = mit->second;
     gw->pending_fa_reqs.erase(mit);
 
+    if (resp->result) {
+        /* Negative response. */
+        PD("Negative flow allocation response received\n");
+        close(cfd);
+        return 0;
+    }
+
     rfd = rlite_open_appl_port(resp->port_id);
     if (rfd < 0) {
         PE("Failed to open application port\n");

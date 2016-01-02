@@ -1676,6 +1676,13 @@ rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         goto out;
     }
 
+    if (req->upper_ipcp_id != 0xffff) {
+        ret = upper_ipcp_flow_bind(rc, req->upper_ipcp_id, flow_entry);
+        if (ret) {
+            goto out;
+        }
+    }
+
     if (ipcp_entry->ops.flow_allocate_req) {
         /* This IPCP handles the flow allocation in kernel-space. This is
          * currently true for shim IPCPs. */
@@ -1695,10 +1702,6 @@ rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             ret = rina_upqueue_append(ipcp_entry->uipcp,
                     (const struct rlite_msg_base *)req);
         }
-    }
-
-    if (!ret && req->upper_ipcp_id != 0xffff) {
-        ret = upper_ipcp_flow_bind(rc, req->upper_ipcp_id, flow_entry);
     }
 
 out:
