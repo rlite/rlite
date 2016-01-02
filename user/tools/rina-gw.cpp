@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -129,6 +130,17 @@ RinaName::operator=(const RinaName& other)
     return *this;
 }
 
+struct Worker {
+    pthread_t th;
+    pthread_mutex_t lock;
+
+    /* Holds the active mappings between rlite file descriptors and
+     * socket file descriptors. */
+    map<int, int> active_mappings;
+};
+
+#define NUM_WORKERS     1
+
 struct Gateway {
     struct rlite_appl appl;
     struct rina_name appl_name;
@@ -148,7 +160,7 @@ struct Gateway {
      * fa_req_event_id --> tcp_client_fd */
     map<unsigned int, int> pending_fa_reqs;
 
-    map<int, int> active_mappings;
+    Worker workers[NUM_WORKERS];
 
     Gateway();
     ~Gateway();
@@ -269,6 +281,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     struct rina_kmsg_fa_resp_arrived *resp =
             (struct rina_kmsg_fa_resp_arrived *)b_resp;
     map<unsigned int, int>::iterator mit;
+    Worker *w = &gw->workers[0];
     int cfd;
     int rfd;
 
@@ -288,8 +301,10 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    gw->active_mappings[cfd] = rfd;
-    gw->active_mappings[rfd] = cfd;
+    pthread_mutex_lock(&w->lock);
+    w->active_mappings[cfd] = rfd;
+    w->active_mappings[rfd] = cfd;
+    pthread_mutex_unlock(&w->lock);
 
     PI("New mapping created %d <--> %d\n", cfd, rfd);
 
@@ -439,9 +454,30 @@ print_conf()
     }
 }
 
+static void *
+worker_function(void *opaque)
+{
+    Gateway *gw = (Gateway *)opaque;
+
+    (void) gw;
+
+    return NULL;
+}
+
+static int
+start_workers()
+{
+    for (int i=0; i<NUM_WORKERS; i++) {
+        pthread_create(&gw.workers[i].th, NULL, worker_function, &gw);
+        pthread_mutex_init(&gw.workers[i].lock, NULL);
+    }
+
+    return 0;
+}
+
 int main()
 {
-    const char *confname = "rina-gw.conf";
+    const char *confname = "/etc/rlite/rina-gw.conf";
     int ret;
 
     ret = parse_conf(confname);
@@ -450,7 +486,10 @@ int main()
     }
 
     print_conf();
+    start_workers();
     setup();
+
+    PI("Main thread exits\n");
 
     return 0;
 }
