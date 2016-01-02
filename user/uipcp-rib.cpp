@@ -146,6 +146,7 @@ struct uipcp_rib {
     struct rinalite_ipcp *ipcp_info() const;
     char *dump() const;
 
+    int set_address(uint64_t address);
     int add_neighbor(const struct rina_name *neigh_name, int neigh_flow_fd,
                      unsigned int neigh_port_id, bool start_enrollment);
     uint64_t dft_lookup(const RinaName& appl_name) const;
@@ -256,6 +257,16 @@ uipcp_rib::dump() const
     }
 
     return strdup(ss.str().c_str());
+}
+
+int
+uipcp_rib::set_address(uint64_t address)
+{
+    stringstream addr_ss;
+
+    addr_ss << address;
+    return rinalite_ipcp_config(&uipcp->appl.loop, uipcp->ipcp_id,
+                                "address", addr_ss.str().c_str());
 }
 
 int
@@ -1211,11 +1222,7 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     /* The slave may have specified an address for us. */
     if (enr_info.address) {
-        stringstream addr_ss;
-
-        addr_ss << enr_info.address;
-        rinalite_ipcp_config(&rib->uipcp->appl.loop, rib->uipcp->ipcp_id,
-                             "address", addr_ss.str().c_str());
+        rib->set_address(enr_info.address);
     }
 
     enrollment_state = I_WAIT_STOP;
@@ -1254,7 +1261,11 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     EnrollmentInfo enr_info(objbuf, objlen);
 
-    /* TODO update our address according to enr_info.address. */
+    /* Update our address according to what received from the
+     * neighbor. */
+    if (enr_info.address) {
+        rib->set_address(enr_info.address);
+    }
 
     /* If operational state indicates that we (the initiator) are already
      * DIF member, we can send our dynamic information to the slave. */
