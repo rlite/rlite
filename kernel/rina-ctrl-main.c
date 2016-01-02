@@ -32,6 +32,7 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/bitmap.h>
 
 
 struct upqueue_entry {
@@ -40,7 +41,17 @@ struct upqueue_entry {
     struct list_head node;
 };
 
+#define IPCP_ID_BITMAP_SIZE 1024
+
+struct rina_dm {
+    DECLARE_BITMAP(ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
+    struct mutex ipcp_id_bitmap_lock;
+};
+
+static struct rina_dm rina_dm;
+
 struct rina_ctrl {
+    /* Upqueue-related data structures. */
     struct list_head upqueue;
     struct mutex upqueue_lock;
     wait_queue_head_t upqueue_wqh;
@@ -56,6 +67,7 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     struct upqueue_entry *entry;
     int ret;
     char *name_s;
+    unsigned int ipcp_id;
 
     if (len != sizeof(*umsg)) {
         return -EINVAL;
@@ -65,6 +77,17 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
      * (kernelspace-invalid) pointers to userspace strings. */
     if (unlikely(copy_from_user(&kmsg, umsg, len))) {
         return -EFAULT;
+    }
+
+    mutex_lock(&rina_dm.ipcp_id_bitmap_lock);
+    ipcp_id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
+                IPCP_ID_BITMAP_SIZE, 0, 1, 0);
+    if (ipcp_id < IPCP_ID_BITMAP_SIZE) {
+        bitmap_set(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
+    }
+    mutex_unlock(&rina_dm.ipcp_id_bitmap_lock);
+    if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
+        return -ENOSPC;
     }
 
     /* Copy in the userspace strings. */
@@ -80,7 +103,7 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     }
     rmsg->msg_type = RINA_CTRL_CREATE_IPCP_RESP;
     rmsg->event_id = kmsg.event_id;
-    rmsg->ipcp_id = 18232;
+    rmsg->ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
     entry = kmalloc(sizeof(*entry), GFP_KERNEL);
@@ -242,6 +265,9 @@ static int __init
 rina_ctrl_init(void)
 {
     int ret;
+
+    bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
+    mutex_init(&rina_dm.ipcp_id_bitmap_lock);
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {
