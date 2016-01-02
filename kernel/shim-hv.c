@@ -21,8 +21,8 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include "rlite/utils.h"
-#include <vmpi-provider.h>
 #include "rlite-kernel.h"
+#include <vmpi.h>
 #include "shim-hv-msg.h"
 
 #include <linux/module.h>
@@ -47,50 +47,48 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
                       struct rlite_msg_base *msg)
 {
     struct rlite_shim_hv *priv = (struct rlite_shim_hv *)ipcp->priv;
-    struct iovec iov;
+    struct rlite_buf *rb;
     unsigned int serlen;
     int ret;
-    uint8_t *serbuf;
 
     serlen = rlite_msg_serlen(rlite_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
                              msg);
-    serbuf = kmalloc(serlen, GFP_ATOMIC);
-    if (!serbuf) {
+    rb = rlite_buf_alloc(serlen, 1, GFP_ATOMIC);
+    if (!rb) {
         PE("Out of memory\n");
         return -ENOMEM;
     }
 
     ret = serialize_rlite_msg(rlite_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
-                             serbuf, msg);
+                              RLITE_BUF_DATA(rb), msg);
     if (ret != serlen) {
         PE("Error while serializing\n");
         return -EINVAL;
     }
+    rb->len = serlen;
 
-    iov.iov_base = serbuf;
-    iov.iov_len = serlen;
-    ret = priv->vmpi_ops.write(&priv->vmpi_ops, 0, &iov, 1);
-
-    kfree(serbuf);
+    ret = priv->vmpi_ops.write(&priv->vmpi_ops, 0, rb);
 
     return !(ret == serlen);
 }
 
 static void
 shim_hv_handle_ctrl_message(struct rlite_shim_hv *priv,
-                            const char *serbuf, int serlen)
+                            struct rlite_buf *rb)
 {
-    int ret;
+    int ret = 0;
 
-    rlite_msg_t ty = *((const rlite_msg_t *)serbuf);
+    rlite_msg_t ty = *((const rlite_msg_t *)RLITE_BUF_DATA(rb));
 
     if (ty == RLITE_SHIM_HV_FA_REQ) {
         struct rlite_hmsg_fa_req req;
 
         ret = deserialize_rlite_msg(rlite_shim_hv_numtables,
-                                   RLITE_SHIM_HV_MSG_MAX, serbuf, serlen,
+                                   RLITE_SHIM_HV_MSG_MAX,
+                                   RLITE_BUF_DATA(rb), rb->len,
                                    &req, sizeof(req));
         if (ret) {
+            PE("failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
@@ -99,57 +97,58 @@ shim_hv_handle_ctrl_message(struct rlite_shim_hv *priv,
         if (ret) {
             PE("failed to report flow allocation request\n");
         }
+
     } else if (ty == RLITE_SHIM_HV_FA_RESP) {
         struct rlite_hmsg_fa_resp resp;
 
         ret = deserialize_rlite_msg(rlite_shim_hv_numtables,
-                                   RLITE_SHIM_HV_MSG_MAX, serbuf, serlen,
+                                   RLITE_SHIM_HV_MSG_MAX,
+                                   RLITE_BUF_DATA(rb), rb->len,
                                    &resp, sizeof(resp));
         if (ret) {
+            PE("failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
         /* XXX shouldn't we swap resp.remote_port and resp.local_port
          * arguments? */
         ret = rlite_fa_resp_arrived(priv->ipcp, resp.remote_port,
-                                   resp.local_port, 0, 0, resp.response, NULL);
+                                    resp.local_port, 0, 0, resp.response,
+                                    NULL);
         if (ret) {
             PE("failed to report flow allocation response\n");
         }
+
     } else {
         PE("unknown ctrl msg type %u\n", ty);
     }
 
-    return;
-
 des_fail:
-    if (ret) {
-        PE("failed to deserialize msg type %u\n", ty);
-    }
+    rlite_buf_free(rb);
 }
 
 static void
-shim_hv_read_callback(void *opaque, unsigned int channel,
-                      const char *buf, int len)
+shim_hv_read_cb(void *opaque, unsigned int channel,
+                struct rlite_buf *rb)
 {
     struct rlite_shim_hv *priv = (struct rlite_shim_hv *)opaque;
-    struct rlite_buf *rb;
 
     if (unlikely(channel == 0)) {
         /* Control message. */
-        shim_hv_handle_ctrl_message(priv, buf, len);
+        shim_hv_handle_ctrl_message(priv, rb);
         return;
     }
 
-    rb = rlite_buf_alloc(len, priv->ipcp->depth, GFP_ATOMIC);
-    if (!rb) {
-        PE("Out of memory\n");
-        return;
-    }
-
-    memcpy(RLITE_BUF_DATA(rb), buf, len);
-
+    /* TODO priv->ipcp->depth */
     rlite_sdu_rx(priv->ipcp, rb, channel - 1);
+}
+
+static void
+shim_hv_write_restart_cb(void *opaque)
+{
+    struct rlite_shim_hv *priv = (struct rlite_shim_hv *)opaque;
+
+    rlite_write_restart_flows(priv->ipcp);
 }
 
 static void *
@@ -182,7 +181,7 @@ rlite_shim_hv_destroy(struct ipcp_entry *ipcp)
 
 static int
 rlite_shim_hv_fa_req(struct ipcp_entry *ipcp,
-                               struct flow_entry *flow)
+                     struct flow_entry *flow)
 {
     struct rlite_hmsg_fa_req req;
 
@@ -199,8 +198,8 @@ rlite_shim_hv_fa_req(struct ipcp_entry *ipcp,
 
 static int
 rlite_shim_hv_fa_resp(struct ipcp_entry *ipcp,
-                                   struct flow_entry *flow,
-                                   uint8_t response)
+                      struct flow_entry *flow,
+                      uint8_t response)
 {
     struct rlite_hmsg_fa_resp resp;
 
@@ -220,29 +219,18 @@ rlite_shim_hv_sdu_write(struct ipcp_entry *ipcp,
                        struct flow_entry *flow,
                        struct rlite_buf *rb, bool maysleep)
 {
-    struct iovec iov;
     struct rlite_shim_hv *priv = (struct rlite_shim_hv *)ipcp->priv;
     struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;
+    int len = rb->len;
     ssize_t ret;
 
     if (unlikely(!vmpi_ops->write)) {
         return -ENXIO;
     }
 
-    if (unlikely(rb->len > PAGE_SIZE-8)) {
-        RPD(5, "Exceeding maximum VMPI payload (%lu)\n",
-            PAGE_SIZE-8);
-        return -EINVAL;
-    }
+    ret = vmpi_ops->write(vmpi_ops, flow->remote_port + 1, rb);
 
-    iov.iov_base = RLITE_BUF_DATA(rb);
-    iov.iov_len = rb->len;
-
-    ret = vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
-                          &iov, 1);
-    rlite_buf_free(rb);
-
-    if (unlikely(ret != iov.iov_len)) {
+    if (unlikely(ret != len)) {
         return ret < 0 ? ret : -ENOBUFS;
     }
 
@@ -265,14 +253,17 @@ rlite_shim_hv_config(struct ipcp_entry *ipcp,
             PI("vmpi id set to %u\n", priv->vmpi_id);
         }
 
-        ret = vmpi_provider_find_instance(provider, priv->vmpi_id, &priv->vmpi_ops);
+        ret = vmpi_provider_find_instance(provider, priv->vmpi_id,
+                                          &priv->vmpi_ops);
         if (ret) {
             PE("vmpi_provider_find(%u, %u) failed\n", provider, priv->vmpi_id);
             return ret;
         }
 
-        ret = priv->vmpi_ops.register_read_callback(&priv->vmpi_ops,
-                shim_hv_read_callback, priv);
+        ret = priv->vmpi_ops.register_cbs(&priv->vmpi_ops,
+                                          shim_hv_read_cb,
+                                          shim_hv_write_restart_cb,
+                                          priv);
         if (ret) {
             PE("register_read_callback() failed\n");
             return ret;

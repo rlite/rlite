@@ -58,6 +58,20 @@ EXTRA_CFLAGS += -I\$(PWD)/kernel/vmpi
 
 obj-y += vmpi/
 EOS
+
+cd kernel/vmpi
+git clean -fdx .
+tar -zxvf vmpi-*.tar.gz
+rm vmpi/vmpi-bufs.c vmpi/vmpi-bufs.h
+mv vmpi/* .
+rm -rf vmpi
+# Delete the vmpi-bufs module line
+sed -i '/vmpi-bufs/d' Makefile
+# Insert a line to set include directives
+sed -i '1 i \
+EXTRA_CFLAGS := -I$(PWD)/include' Makefile
+cd ../..
+
 fi
 
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh

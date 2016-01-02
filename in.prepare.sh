@@ -2,6 +2,12 @@
 
 set -x
 
+sudo insmod kernel/rlite.ko
+sudo insmod kernel/rlite-shim-loopback.ko
+sudo insmod kernel/rlite-shim-eth.ko
+sudo insmod kernel/rlite-normal.ko
+sudo insmod kernel/rlite-shim-inet4.ko
+
 if [ HAVE_VMPI == "y" ]; then
     # prepare VMPI-KVM
     pushd .
@@ -11,14 +17,10 @@ if [ HAVE_VMPI == "y" ]; then
     popd
 fi
 
-sudo insmod kernel/rlite.ko
-sudo insmod kernel/rlite-shim-loopback.ko
 if [ HAVE_VMPI == "y" ]; then
     sudo insmod kernel/rlite-shim-hv.ko
 fi
-sudo insmod kernel/rlite-shim-eth.ko
-sudo insmod kernel/rlite-normal.ko
-sudo insmod kernel/rlite-shim-inet4.ko
+
 sudo chmod a+rwx /dev/rlite
 sudo chmod a+rwx /dev/rlite-io
 
