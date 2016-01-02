@@ -60,12 +60,13 @@ test_cdap_server(int port)
 
     while (1) {
         CDAPMessage rm;
+        int pn;
 
-        /* read a datagram from the socket (put result in bufin) */
+        /* Read the payload from the socket (put result in bufin). */
         n = recvfrom(ld, bufin, sizeof(bufin), 0,
                 (struct sockaddr *)&remote, &addrlen);
 
-        /* print out the address of the sender */
+        /* Print out the address of the sender. */
         PD("Got a datagram from %s port %d, len %d\n",
                 inet_ntoa(remote.sin_addr), ntohs(remote.sin_port), n);
 
@@ -74,9 +75,20 @@ test_cdap_server(int port)
             continue;
         }
 
-        write(pipefds[1], bufin, n);
+        /* Push the payload in the first end of a pipe. */
+        pn = write(pipefds[1], bufin, n);
+        if (pn != n) {
+            if (pn < 0) {
+                perror("write(pipefds[1]");
+            } else {
+                PE("Partial write(pipefds[1]) %d/%d\n", pn, n);
+            }
+            continue;
+        }
 
-        conn.fd = pipefds[0]; /* This is just a trick. */
+        /* This is a trick to make conn.msg_recv() receive
+         * the payload from the pipe. */
+        conn.fd = pipefds[0];
         m = conn.msg_recv();
 
         if (!m) {
@@ -86,7 +98,9 @@ test_cdap_server(int port)
 
         m->dump();
 
-        conn.fd = pipefds[1];  /* This is just a trick. */
+        /* This is a trick to make conn.msg_send() write the response
+         * CDAP message into the pipe. */
+        conn.fd = pipefds[1];
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
@@ -134,12 +148,14 @@ test_cdap_server(int port)
 
         conn.msg_send(&rm, m->invoke_id);
 
+        /* Read the response from the pipe into bufin. */
         n = read(pipefds[0], bufin, sizeof(bufin));
         if (n < 0) {
             perror("read()");
             break;
         }
 
+        /* Send the response to the socket. */
         k = sendto(ld, bufin, n, 0, (struct sockaddr *)&remote, addrlen);
         if (k < 0) {
             perror("sendto()");
