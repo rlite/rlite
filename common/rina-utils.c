@@ -407,7 +407,7 @@ rina_name_fill(struct rina_name *name, const char *apn,
 COMMON_EXPORT(rina_name_fill);
 
 int
-rina_name_valid(struct rina_name *name)
+rina_name_valid(const struct rina_name *name)
 {
     if (!name || !name->apn || strlen(name->apn) == 0) {
         return 0;

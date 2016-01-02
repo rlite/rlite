@@ -743,6 +743,23 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
     return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
 
+static unsigned int
+lookup_ipcp_by_name(struct ipcm *ipcm, const struct rina_name *name)
+{
+    struct ipcp *ipcp;
+
+    if (rina_name_valid(name)) {
+        list_for_each_entry(ipcp, &ipcm->ipcps, node) {
+            if (rina_name_valid(&ipcp->ipcp_name)
+                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
+                return ipcp->ipcp_id;
+            }
+        }
+    }
+
+    return ~0U;
+}
+
 static int
 rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
@@ -750,30 +767,20 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
     struct rina_amsg_ipcp_destroy *req = (struct rina_amsg_ipcp_destroy *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
-    struct ipcp *ipcp;
-    unsigned int ipcp_id = ~0;
+    unsigned int ipcp_id;
     uint8_t result = 1;
 
     /* Does the request specifies an existing IPC process ? */
-    if (rina_name_valid(&req->ipcp_name)) {
-        list_for_each_entry(ipcp, &ipcm->ipcps, node) {
-            if (rina_name_valid(&ipcp->ipcp_name)
-                    && rina_name_cmp(&ipcp->ipcp_name, &req->ipcp_name) == 0) {
-                ipcp_id = ipcp->ipcp_id;
-                break;
-            }
-        }
-    }
-
-    if (ipcp_id != ~0) {
+    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    if (ipcp_id == ~0U) {
+        printf("%s: No such IPCP process\n", __func__);
+    } else {
         /* Valid IPCP id. Forward the request to the kernel. */
         kresp = ipcp_destroy(ipcm, 1, ipcp_id);
         if (kresp) {
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
             result = kresp->result;
         }
-    } else {
-        printf("%s: No such IPCP process\n", __func__);
     }
 
     resp.msg_type = RINA_APPL_IPCP_DESTROY_RESP;
@@ -787,30 +794,19 @@ static int
 rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
                         const struct rina_msg_base *b_req)
 {
-    struct ipcp *ipcp = NULL;
-    struct ipcp *cur;
+    unsigned int ipcp_id;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
     uint8_t result = 1;
 
-    if (rina_name_valid(&req->application_name)) {
-        /* The request specifies an IPCP: lookup that. */
-        list_for_each_entry(cur, &ipcm->ipcps, node) {
-            if (rina_name_valid(&cur->ipcp_name)
-                    && rina_name_cmp(&cur->ipcp_name,
-                            &req->application_name) == 0) {
-                ipcp = cur;
-                break;
-            }
-        }
-    }
-
-    if (!ipcp) {
+    /* The request specifies an IPCP: lookup that. */
+    ipcp_id = lookup_ipcp_by_name(ipcm, &req->application_name);
+    if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = assign_to_dif(ipcm, 1, ipcp->ipcp_id, &req->dif_name);
+        kresp = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name);
         if (kresp) {
             result = kresp->result;
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
@@ -824,27 +820,23 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
 
-static int
-rina_appl_register(struct ipcm *ipcm, int sfd,
-                   const struct rina_msg_base *b_req)
+static unsigned int
+select_ipcp_by_dif(struct ipcm *ipcm, const struct rina_name *dif_name,
+                   int fallback)
 {
-    struct ipcp *ipcp = NULL;
     struct ipcp *cur;
-    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
-    struct rina_msg_base_resp resp;
-    struct rina_msg_base_resp *kresp;
-    uint8_t result = 1;
 
-    if (rina_name_valid(&req->dif_name)) {
+    if (rina_name_valid(dif_name)) {
         /* The request specifies a DIF: lookup that. */
         list_for_each_entry(cur, &ipcm->ipcps, node) {
             if (rina_name_valid(&cur->dif_name)
-                    && rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
-                ipcp = cur;
-                break;
+                    && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
+                return cur->ipcp_id;
             }
         }
-    } else {
+    } else if (fallback) {
+        struct ipcp *ipcp = NULL;
+
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
         list_for_each_entry(cur, &ipcm->ipcps, node) {
@@ -854,13 +846,29 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
                 ipcp = cur;
             }
         }
+
+        return ipcp ? ipcp->ipcp_id : ~0U;
     }
 
-    if (!ipcp) {
+    return ~0U;
+}
+
+static int
+rina_appl_register(struct ipcm *ipcm, int sfd,
+                   const struct rina_msg_base *b_req)
+{
+    unsigned int ipcp_id;
+    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+    struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
+    uint8_t result = 1;
+
+    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 1);
+    if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = application_register(ipcm, 1, 1, ipcp->ipcp_id, &req->application_name);
+        kresp = application_register(ipcm, 1, 1, ipcp_id, &req->application_name);
         if (kresp) {
             result = kresp->result;
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
@@ -878,29 +886,19 @@ static int
 rina_appl_unregister(struct ipcm *ipcm, int sfd,
                      const struct rina_msg_base *b_req)
 {
-    struct ipcp *ipcp = NULL;
-    struct ipcp *cur;
+    unsigned int ipcp_id;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
     uint8_t result = 1;
 
-    if (rina_name_valid(&req->dif_name)) {
-        /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &ipcm->ipcps, node) {
-            if (rina_name_valid(&cur->dif_name)
-                    && rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
-                ipcp = cur;
-                break;
-            }
-        }
-    }
-
-    if (!ipcp) {
+    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 0);
+    if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = application_register(ipcm, 1, 0, ipcp->ipcp_id, &req->application_name);
+        kresp = application_register(ipcm, 1, 0, ipcp_id,
+                &req->application_name);
         if (kresp) {
             result = kresp->result;
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
@@ -918,8 +916,7 @@ static int
 rina_appl_flow_allocate_req(struct ipcm *ipcm, int sfd,
                             const struct rina_msg_base *b_req)
 {
-    struct ipcp *ipcp = NULL;
-    struct ipcp *cur;
+    unsigned int ipcp_id;
     struct rina_amsg_flow_allocate_req *req =
                         (struct rina_amsg_flow_allocate_req *)b_req;
     struct rina_amsg_flow_allocate_resp resp;
@@ -927,22 +924,12 @@ rina_appl_flow_allocate_req(struct ipcm *ipcm, int sfd,
     uint8_t result = 1;
     uint16_t port_id = 0;  /* Not valid. */
 
-    if (rina_name_valid(&req->dif_name)) {
-        /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &ipcm->ipcps, node) {
-            if (rina_name_valid(&cur->dif_name)
-                    && rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
-                ipcp = cur;
-                break;
-            }
-        }
-    }
-
-    if (!ipcp) {
+    ipcp_id = select_ipcp_by_dif(ipcm, &req->dif_name, 0);
+    if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = flow_allocate_req(ipcm, 1, ipcp->ipcp_id,
+        kresp = flow_allocate_req(ipcm, 1, ipcp_id,
                                   &req->local_application,
                                   &req->remote_application);
         if (kresp) {
