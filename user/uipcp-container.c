@@ -170,42 +170,6 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     return result;
 }
 
-static int
-uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
-                      uint8_t *buf, size_t buflen)
-{
-    struct rina_name local_application, remote_application;
-    const void *ptr = buf;
-    uint32_t remote_port;
-    struct rina_flow_config flowcfg;
-    int ret;
-
-    PD("[uipcp %u] Received fa req management SDU from IPCP addr %lu\n",
-            uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
-
-    remote_port = le32toh(*((uint32_t *)ptr));
-    ptr += sizeof(uint32_t);
-
-    memcpy(&flowcfg, ptr, sizeof(flowcfg)); /* unsafe... */
-    ptr += sizeof(flowcfg);
-
-    ret = deserialize_rina_name(&ptr, &remote_application);
-    if (ret) {
-        PE("deserialization error\n");
-    }
-
-    ret = deserialize_rina_name(&ptr, &local_application);
-    if (ret) {
-        PE("deserialization error\n");
-    }
-
-    uipcp_fa_req_arrived(uipcp, remote_port, mhdr->remote_addr,
-                         &local_application, &remote_application,
-                         &flowcfg);
-
-    return 0;
-}
-
 int
 uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                       uint32_t remote_port, uint64_t remote_addr,
@@ -241,30 +205,6 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     return result;
 }
 
-static int
-uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
-                       uint8_t *buf, size_t buflen)
-{
-    const void *ptr = buf;
-    uint32_t remote_port, local_port;
-    uint8_t response;
-
-    PD("[uipcp %u] Received fa resp management SDU from IPCP addr %lu\n",
-            uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
-
-    remote_port = le32toh(*((uint32_t *)ptr));
-    ptr += sizeof(uint32_t);
-    local_port = le32toh(*((uint32_t *)ptr));
-    ptr += sizeof(uint32_t);
-    response = *((uint8_t *)ptr);
-    ptr += sizeof(uint8_t);
-
-    uipcp_fa_resp_arrived(uipcp, local_port, remote_port,
-                          mhdr->remote_addr, response);
-
-    return 0;
-}
-
 static void
 mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
 {
@@ -272,9 +212,6 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rina_mgmt_hdr *mhdr;
-    uint8_t *buf;
-    size_t buflen;
-    uint8_t cmd;
     int n;
 
     assert(fd == uipcp->mgmtfd);
@@ -298,31 +235,6 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
 
     rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
                   n - sizeof(*mhdr));
-    goto out;
-
-    /* Grab the management command (XXX this and the following has been
-     * replaced by CDAP). */
-    cmd = *((uint8_t *)(mhdr + 1));
-    buf = ((uint8_t *)(mhdr + 1)) + 1;
-    buflen = n - sizeof(*mhdr) - 1;
-
-    switch (cmd) {
-        case IPCP_MGMT_ENROLL:
-            break;
-
-        case IPCP_MGMT_FA_REQ:
-            uipcp_mgmt_sdu_fa_req(uipcp, mhdr, buf, buflen);
-            break;
-
-        case IPCP_MGMT_FA_RESP:
-            uipcp_mgmt_sdu_fa_resp(uipcp, mhdr, buf, buflen);
-            break;
-
-        default:
-            PI("Unknown cmd %u received\n", cmd);
-            break;
-    }
-
 out:
     fflush(stdout);
 }
@@ -336,49 +248,12 @@ uipcp_fa_req(struct rinalite_evloop *loop,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
-    uint64_t remote_addr;
-    uint8_t *mgmtsdu;
-    void *cur;
-    size_t len;
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
     return rib_fa_req(uipcp->rib, req);
-
-    // TODO remove the following
-    remote_addr = rib_dft_lookup(uipcp->rib, &req->remote_application);
-    if (!remote_addr) {
-        PI("No DFT matching entry\n");
-        return 0;
-    }
-
-    len = 1 + sizeof(req->local_port) +
-            sizeof(req->flowcfg) +
-            rina_name_serlen(&req->local_application) +
-            rina_name_serlen(&req->remote_application);
-    mgmtsdu = malloc(len);
-    if (!mgmtsdu) {
-        PE("Out of memory\n");
-        return 0;
-    }
-
-    mgmtsdu[0] = IPCP_MGMT_FA_REQ;
-    cur = mgmtsdu + 1;
-    *((uint32_t *)cur) = htole32(req->local_port);
-    cur += sizeof(req->local_port);
-    memcpy(cur, &req->flowcfg, sizeof(req->flowcfg)); /* unsafe */
-    cur += sizeof(req->flowcfg);
-    serialize_rina_name(&cur, &req->local_application);
-    serialize_rina_name(&cur, &req->remote_application);
-
-    mgmt_write_to_dst_addr(uipcp, remote_addr,
-                           mgmtsdu, len);
-
-    free(mgmtsdu);
-
-    return 0;
 }
 
 static int
@@ -391,39 +266,12 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
-    uint8_t *mgmtsdu;
-    void *cur;
-    size_t len;
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
     return rib_fa_resp(uipcp->rib, resp);
-
-    len = 1 + sizeof(resp->port_id) + sizeof(resp->remote_port)
-            + sizeof(resp->response);
-
-    mgmtsdu = malloc(len);
-    if (!mgmtsdu) {
-        PE("Out of memory\n");
-        return 0;
-    }
-
-    mgmtsdu[0] = IPCP_MGMT_FA_RESP;
-    cur = mgmtsdu + 1;
-    *((uint32_t *)cur) = htole32(resp->port_id);
-    cur += sizeof(resp->port_id);
-    *((uint32_t *)cur) = htole32(resp->remote_port);
-    cur += sizeof(resp->remote_port);
-    *((uint8_t *)cur) = resp->response;
-    cur += sizeof(resp->response);
-
-    mgmt_write_to_dst_addr(uipcp, resp->remote_addr,
-                           mgmtsdu, len);
-    free(mgmtsdu);
-
-    return 0;
 }
 
 static int
