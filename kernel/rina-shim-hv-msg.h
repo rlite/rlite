@@ -11,9 +11,9 @@
 #include <stdint.h>
 #endif
 
-#include <rina/rina-ipcp-types.h>
-#include <rina/rinalite-common.h>
-#include <rina/rinalite-utils.h>
+#include <rinalite/rina-ipcp-types.h>
+#include <rinalite/rinalite-common.h>
+#include <rinalite/rinalite-utils.h>
 
 
 enum {

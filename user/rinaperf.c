@@ -9,7 +9,7 @@
 #include <endian.h>
 #include <signal.h>
 #include <poll.h>
-#include "rina/rinalite-utils.h"
+#include "rinalite/rinalite-utils.h"
 
 #include "rinalite_appl.h"
 

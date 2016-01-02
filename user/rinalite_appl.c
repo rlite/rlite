@@ -11,9 +11,9 @@
 #include <sys/un.h>
 #include <sys/ioctl.h>
 #include <assert.h>
-#include "rina/rina-kernel-msg.h"
-#include "rina/rina-conf-msg.h"
-#include "rina/rinalite-utils.h"
+#include "rinalite/rina-kernel-msg.h"
+#include "rinalite/rina-conf-msg.h"
+#include "rinalite/rinalite-utils.h"
 
 #include "rinalite_list.h"
 #include "rinalite_evloop.h"

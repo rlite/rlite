@@ -1,7 +1,7 @@
 #ifndef __RINA_UIPCP_H__
 #define __RINA_UIPCP_H__
 
-#include <rina/rina-conf-msg.h>
+#include <rinalite/rina-conf-msg.h>
 #include "rinalite_list.h"
 #include "rinalite_appl.h"
 

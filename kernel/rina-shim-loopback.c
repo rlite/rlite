@@ -19,8 +19,8 @@
  */
 
 #include <linux/types.h>
-#include <rina/rinalite-utils.h>
-#include <rina/rina-ipcp-types.h>
+#include <rinalite/rinalite-utils.h>
+#include <rinalite/rina-ipcp-types.h>
 #include "rina-kernel.h"
 
 #include <linux/module.h>

@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-#include <rina/rina-ipcp-types.h>
-#include <rina/rinalite-common.h>
-#include <rina/rinalite-utils.h>
+#include <rinalite/rina-ipcp-types.h>
+#include <rinalite/rinalite-common.h>
+#include <rinalite/rinalite-utils.h>
 
 
 /* Message types. They **must** be listed alternating requests with

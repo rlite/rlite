@@ -1,7 +1,7 @@
 #ifndef __RINALITE_APPL_H__
 #define __RINALITE_APPL_H__
 
-#include <rina/rinalite-common.h>
+#include <rinalite/rinalite-common.h>
 #include <stdint.h>
 #include "rinalite_list.h"
 #include "rinalite_evloop.h"

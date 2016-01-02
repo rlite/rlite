@@ -20,8 +20,8 @@
 
 #include <linux/types.h>
 #include <linux/string.h>
-#include <rina/rinalite-utils.h>
-#include <rina/rina-ipcp-types.h>
+#include <rinalite/rinalite-utils.h>
+#include <rinalite/rina-ipcp-types.h>
 #include <vmpi-provider.h>
 #include "rina-kernel.h"
 #include "rina-shim-hv-msg.h"

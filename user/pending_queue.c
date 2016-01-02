@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "rina/rinalite-common.h"
+#include "rinalite/rinalite-common.h"
 #include "pending_queue.h"
 #include "rinalite_list.h"
 

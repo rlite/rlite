@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <pthread.h>
-#include <rina/rina-kernel-msg.h>
-#include <rina/rina-conf-msg.h>
-#include <rina/rinalite-utils.h>
+#include <rinalite/rina-kernel-msg.h>
+#include <rinalite/rina-conf-msg.h>
+#include <rinalite/rinalite-utils.h>
 
 #include "rinalite_list.h"
 

@@ -1,7 +1,7 @@
 #ifndef __RINA_IPCP_H__
 #define __RINA_IPCP_H__
 
-#include <rina/rinalite-utils.h>
+#include <rinalite/rinalite-utils.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>

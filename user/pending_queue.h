@@ -2,7 +2,7 @@
 #define __LIST_H__
 
 #include <stdint.h>
-#include <rina/rinalite-common.h>
+#include <rinalite/rinalite-common.h>
 #include "rinalite_list.h"
 
 struct pending_entry {

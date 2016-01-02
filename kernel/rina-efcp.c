@@ -21,7 +21,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/timer.h>
-#include <rina/rinalite-utils.h>
+#include <rinalite/rinalite-utils.h>
 #include "rina-kernel.h"
 
 
