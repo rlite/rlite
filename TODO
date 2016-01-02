@@ -12,5 +12,3 @@
 - limitare la lunghezza delle code nel kernel
 
 - vmpi_provider_find_instance non dovrebbe essere bloccante
-
-- spostare il codice uipcp in un file separato
