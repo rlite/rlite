@@ -68,6 +68,7 @@ struct registered_application {
     struct rina_ctrl *rc;
     struct ipcp_entry *ipcp;
     unsigned int refcnt;
+    struct work_struct remove;
     struct list_head node;
 };
 
@@ -409,6 +410,28 @@ ipcp_application_get(struct ipcp_entry *ipcp,
 }
 
 static void
+app_remove_work(struct work_struct *w)
+{
+    struct registered_application *app = container_of(w,
+                            struct registered_application, remove);
+    struct ipcp_entry *ipcp = app->ipcp;
+
+    if (ipcp->ops.application_register) {
+        mutex_lock(&ipcp->lock);
+        ipcp->ops.application_register(ipcp, &app->name, 0);
+        mutex_unlock(&ipcp->lock);
+    }
+
+    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
+    ipcp_put(ipcp);
+
+    /* From here on registered application cannot be referenced anymore, and so
+     * that we don't need locks. */
+    rina_name_free(&app->name);
+    kfree(app);
+}
+
+static void
 ipcp_application_put(struct registered_application *app)
 {
     struct ipcp_entry *ipcp = app->ipcp;
@@ -429,18 +452,9 @@ ipcp_application_put(struct registered_application *app)
 
     RAUNLOCK(ipcp);
 
-    /* XXX here we should hold ipcp->lock. */
-    if (ipcp->ops.application_register) {
-        ipcp->ops.application_register(ipcp, &app->name, 0);
-    }
-
-    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_put(ipcp);
-
-    /* From here on registered application cannot be referenced anymore, and so
-     * that we don't need locks. */
-    rina_name_free(&app->name);
-    kfree(app);
+    /* Perform cleanup operation in process context, because we need
+     * to take the per-ipcp mutex. */
+    schedule_work(&app->remove);
 }
 
 static int
@@ -461,6 +475,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     newapp->rc = rc;
     newapp->refcnt = 1;
     newapp->ipcp = ipcp;
+    INIT_WORK(&newapp->remove, app_remove_work);
 
     RALOCK(ipcp);
 
