@@ -92,9 +92,13 @@ struct rina_dm {
 
     struct list_head ipcp_factories;
 
+    /* Lock for flows table. */
     spinlock_t flows_lock;
+
+    /* Lock for IPCPs table. */
     spinlock_t ipcps_lock;
 
+    /* Lock for ipcp_factories list. */
     struct mutex lock;
 };
 
@@ -123,31 +127,38 @@ int
 rina_ipcp_factory_register(struct ipcp_factory *factory)
 {
     struct ipcp_factory *f;
+    int ret = 0;
 
     if (!factory || !factory->create || !factory->owner) {
         return -EINVAL;
     }
 
+    mutex_lock(&rina_dm.lock);
+
     if (ipcp_factories_find(factory->dif_type)) {
-        return -EBUSY;
+        ret = -EBUSY;
+        goto out;
     }
 
     /* Check if IPCP ops are ok. */
     if (!factory->ops.destroy ||
         !factory->ops.sdu_write ||
         !factory->ops.config) {
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
     if (factory->ops.pduft_set && ! factory->ops.pduft_del) {
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
     /* Build a copy and insert it into the IPC process factories
      * list. */
     f = kzalloc(sizeof(*f), GFP_KERNEL);
     if (!f) {
-        return -ENOMEM;
+        ret = -ENOMEM;
+        goto out;
     }
     memcpy(f, factory, sizeof(*f));
 
@@ -155,21 +166,29 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 
     printk("%s: IPC processes factory %u registered\n",
             __func__, factory->dif_type);
+out:
+    mutex_unlock(&rina_dm.lock);
 
-    return 0;
+    return ret;
 }
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_register);
 
 int
 rina_ipcp_factory_unregister(uint8_t dif_type)
 {
-    struct ipcp_factory *factory = ipcp_factories_find(dif_type);
+    struct ipcp_factory *factory;
 
+    mutex_lock(&rina_dm.lock);
+
+    factory = ipcp_factories_find(dif_type);
     if (!factory) {
         return -EINVAL;
     }
 
     list_del(&factory->node);
+
+    mutex_unlock(&rina_dm.lock);
+
     kfree(factory);
 
     printk("%s: IPC processes factory %u unregistered\n",
@@ -218,10 +237,8 @@ ipcp_remove_work(struct work_struct *w)
 {
     struct ipcp_entry *ipcp = container_of(w, struct ipcp_entry, remove);
 
-    mutex_lock(&rina_dm.lock);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     ipcp_put(ipcp);
-    mutex_unlock(&rina_dm.lock);
 }
 
 static struct ipcp_entry *
@@ -262,14 +279,14 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         return -ENOMEM;
     }
 
-    mutex_lock(&rina_dm.lock);
+    PLOCK();
 
     /* Check if an IPC process with that name already exists.
      * We could also skip this check here, since it's a check
      * already performed by userspace. */
     hash_for_each(rina_dm.ipcp_table, bucket, cur, node) {
         if (rina_name_cmp(&cur->name, &req->name) == 0) {
-            mutex_unlock(&rina_dm.lock);
+            PUNLOCK();
             kfree(entry);
             return -EINVAL;
         }
@@ -299,7 +316,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         kfree(entry);
     }
 
-    mutex_unlock(&rina_dm.lock);
+    PUNLOCK();
 
     return ret;
 }
@@ -525,9 +542,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         return -ENOMEM;
     }
 
-    if (locked)
-        mutex_lock(&rina_dm.lock);
-
     FLOCK();
 
     /* Try to alloc a port id from the bitmap. */
@@ -556,23 +570,25 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         if (flowcfg) {
             memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
         }
+        FUNLOCK();
+
+        PLOCK();
         ipcp->refcnt++;
         PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
+        PUNLOCK();
         if (ipcp->ops.flow_init) {
             /* Let the IPCP do some
              * specific initialization. */
             ipcp->ops.flow_init(ipcp, entry);
         }
     } else {
+        FUNLOCK();
+
         kfree(entry);
         *pentry = NULL;
         ret = -ENOSPC;
     }
 
-    FUNLOCK();
-
-    if (locked)
-        mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -818,7 +834,6 @@ ipcp_del(unsigned int ipcp_id)
         return -ENXIO;
     }
 
-    mutex_lock(&rina_dm.lock);
     /* Lookup and remove the IPC process entry in the hash table corresponding
      * to the given ipcp_id. */
     entry = ipcp_get(ipcp_id);
@@ -830,7 +845,6 @@ ipcp_del(unsigned int ipcp_id)
     ret = ipcp_put(entry);
 out:
     ret = ipcp_put(entry); /* To match the ipcp_get(). */
-    mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -903,7 +917,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     memset(&resp, 0, sizeof(resp));
     resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
     resp.event_id = req->event_id;
-    mutex_lock(&rina_dm.lock);
+    PLOCK();
     stop_next = (rina_dm.ipcp_fetch_last == NULL);
     hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
         if (stop_next) {
@@ -926,7 +940,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
             memset(&resp.dif_name, 0, sizeof(resp.dif_name));
             rina_dm.ipcp_fetch_last = NULL;
     }
-    mutex_unlock(&rina_dm.lock);
+    PUNLOCK();
 
     ret = rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
 
@@ -948,7 +962,6 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         return -EINVAL;
     }
 
-    mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
     entry = ipcp_get(req->ipcp_id);
@@ -962,7 +975,6 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         }
     }
     ipcp_put(entry);
-    mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {
         printk("%s: Configured IPC process %u: %s <= %s\n", __func__,
@@ -982,10 +994,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     int ret = -EINVAL;  /* Report failure by default. */
 
     flow = flow_get(req->local_port);
-
-    mutex_lock(&rina_dm.lock);
     ipcp = ipcp_get(req->ipcp_id);
-    mutex_unlock(&rina_dm.lock);
 
     if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set) {
         /* We allow this operation only if the requesting IPCP (req->ipcp_id)
@@ -1016,7 +1025,6 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct ipcp_entry *entry;
     int ret = -EINVAL;  /* Report failure by default. */
 
-    mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
     entry = ipcp_get(req->ipcp_id);
@@ -1025,7 +1033,6 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         ret = 0;
     }
     ipcp_put(entry);
-    mutex_unlock(&rina_dm.lock);
 
     if (ret == 0) {
         printk("%s: IPC process %u attached to uipcp %p\n", __func__,
@@ -1044,7 +1051,6 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
-    mutex_lock(&rina_dm.lock);
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
@@ -1053,7 +1059,6 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     }
 
     ipcp_put(ipcp);
-    mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -1067,7 +1072,6 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
-    mutex_lock(&rina_dm.lock);
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
@@ -1075,8 +1079,6 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
                                    req->response, 0);
     }
     ipcp_put(ipcp);
-    mutex_unlock(&rina_dm.lock);
-
 
     return ret;
 }
@@ -1193,14 +1195,9 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_application_register *req =
                     (struct rina_kmsg_application_register *)bmsg;
-    int ret;
 
-    mutex_lock(&rina_dm.lock);
-    ret = rina_register_internal(req->reg, req->ipcp_id, &req->application_name,
-                                 rc);
-    mutex_unlock(&rina_dm.lock);
-
-    return ret;
+    return  rina_register_internal(req->reg, req->ipcp_id, &req->application_name,
+                                   rc);
 }
 
 static int
@@ -1229,13 +1226,9 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
             .rc = rc,
         };
 
-    mutex_lock(&rina_dm.lock);
-
     ret = rina_fa_req_internal(req->ipcp_id, upper, req->event_id,
                                &req->local_application,
                                &req->remote_application, req);
-    mutex_unlock(&rina_dm.lock);
-
     if (ret == 0) {
         return 0;
     }
@@ -1325,9 +1318,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         return ret;
     }
 
-    mutex_lock(&rina_dm.lock);
     ret = rina_fa_resp_internal(flow_entry, req->response, req);
-    mutex_unlock(&rina_dm.lock);
 
     flow_entry = flow_put(flow_entry);
     /* Here reference counter is (likely) 1. Reset it to 0, so that
@@ -1352,10 +1343,6 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     struct rina_kmsg_fa_req_arrived req;
     struct upper_ref upper;
     int ret = -EINVAL;
-
-    if (locked) {
-        mutex_lock(&rina_dm.lock);
-    }
 
     /* See whether the local application is registered to this
      * IPC process. */
@@ -1393,9 +1380,6 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     }
     rina_name_free(&req.remote_appl);
 out:
-    if (locked) {
-        mutex_unlock(&rina_dm.lock);
-    }
 
     return ret;
 }
@@ -1415,10 +1399,6 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     flow_entry = flow_get(local_port);
     if (!flow_entry) {
         return ret;
-    }
-
-    if (locked) {
-        mutex_lock(&rina_dm.lock);
     }
 
     if (flow_entry->state != FLOW_STATE_PENDING) {
@@ -1446,10 +1426,6 @@ out:
     flow_entry = flow_put(flow_entry);
     /* Same operation as above. */
     flow_orphan(flow_entry);
-
-    if (locked) {
-        mutex_unlock(&rina_dm.lock);
-    }
 
     return ret;
 }
@@ -1747,13 +1723,11 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
 
-    mutex_lock(&rina_dm.lock);
     /* This is a ctrl device opened by an application.
      * We must invalidate (e.g. unregister) all the
      * application names registered with this device. */
     application_del_by_rc(rc);
     flow_rc_unbind(rc);
-    mutex_unlock(&rina_dm.lock);
 
     kfree(rc);
     f->private_data = NULL;
@@ -2067,8 +2041,6 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         return -EFAULT;
     }
 
-    mutex_lock(&rina_dm.lock);
-
     rina_io_release_internal(rio);
 
     switch (info.mode) {
@@ -2090,8 +2062,6 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         rio->mode = info.mode;
     }
 
-    mutex_unlock(&rina_dm.lock);
-
     return ret;
 }
 
@@ -2100,9 +2070,7 @@ rina_io_release(struct inode *inode, struct file *f)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
 
-    mutex_lock(&rina_dm.lock);
     rina_io_release_internal(rio);
-    mutex_unlock(&rina_dm.lock);
 
     kfree(rio);
 
