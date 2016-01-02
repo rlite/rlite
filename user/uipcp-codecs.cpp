@@ -15,6 +15,7 @@
 #include "NeighborArrayMessage.pb.h"
 #include "FlowStateMessage.pb.h"
 #include "FlowStateGroupMessage.pb.h"
+#include "CommonMessages.pb.h"
 
 using namespace std;
 
@@ -364,6 +365,27 @@ LowerFlowList::serialize(char *buf, unsigned int size) const
             return ret;
         }
     }
+
+    return ser_common(gm, buf, size);
+}
+
+Property::Property(const char *buf, unsigned int size)
+{
+    gpb::property_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    name = gm.name();
+    value = gm.value();
+}
+
+int
+Property::serialize(char *buf, unsigned int size) const
+{
+    gpb::property_t gm;
+
+    gm.set_name(name);
+    gm.set_value(value);
 
     return ser_common(gm, buf, size);
 }

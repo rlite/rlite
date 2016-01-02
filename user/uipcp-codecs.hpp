@@ -100,4 +100,13 @@ struct LowerFlowList : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct Property : public UipcpObject {
+    std::string name;
+    std::string value;
+
+    Property() { }
+    Property(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
