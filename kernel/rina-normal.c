@@ -162,7 +162,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
-    int ret;
+    int ret = rb->len;
 
     if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->remote_addr);
@@ -171,7 +171,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                     (long unsigned)mhdr->remote_addr);
             rina_buf_free(rb);
 
-            return 0;
+            return ret;
         }
         dst_addr = mhdr->remote_addr;
     } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
@@ -182,12 +182,12 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                     mhdr->local_port);
             rina_buf_free(rb);
 
-            return 0;
+            return ret;
         }
     } else {
         rina_buf_free(rb);
 
-        return -EINVAL;
+        return ret;
     }
     lower_ipcp = lower_flow->txrx.ipcp;
     BUG_ON(!lower_ipcp);
