@@ -117,15 +117,15 @@ for i in vms:
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'sudo hostname %(name)s\n'\
             '\n'\
-            'sudo modprobe rina-ctrl\n'\
-            'sudo modprobe rina-shim-eth\n'\
-            'sudo modprobe rina-normal\n'\
-            'sudo chmod a+rwx /dev/rina-ctrl\n'\
+            'sudo modprobe rinalite\n'\
+            'sudo modprobe rinalite-shim-eth\n'\
+            'sudo modprobe rinalite-normal\n'\
+            'sudo chmod a+rwx /dev/rinalite\n'\
             'sudo chmod a+rwx /dev/rina-io\n'\
             'sudo mkdir -p /var/rinalite\n'\
             'sudo chmod -R a+rw /var/rinalite\n'\
             '\n'\
-            'uipcps &> uipcp.log &\n'\
+            'rinalite-uipcps &> uipcp.log &\n'\
             'rina-config ipcp-create normal n.IPCP %(id)s\n'\
             'rina-config ipcp-config n.IPCP %(id)s dif n.DIF\n'\
             'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\
