@@ -158,6 +158,7 @@ for i in vms:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'set -x\n'\
             'sudo hostname %(name)s\n'\
             '\n'\
             'sudo modprobe rlite\n'\
@@ -252,6 +253,7 @@ for br_name in bridges:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'set -x\n'\
             'rina-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
                                     'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
             'sleep 1\n'\
@@ -282,6 +284,7 @@ for level in range(2, args.levels + 1):
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'set -x\n'\
             'rina-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
                             'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
             'sleep 1\n'\
