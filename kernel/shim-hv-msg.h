@@ -31,9 +31,9 @@ struct rlite_hmsg_fa_req {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint32_t local_port;
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
+    uint32_t src_port;
+    struct rina_name src_appl;
+    struct rina_name dst_appl;
 } __attribute__((packed));
 
 /* Message to respond to a flow allocation request. */
@@ -41,8 +41,8 @@ struct rlite_hmsg_fa_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint32_t local_port;
-    uint32_t remote_port;
+    uint32_t src_port;
+    uint32_t dst_port;
     uint8_t response;
 } __attribute__((packed));
 

@@ -84,16 +84,16 @@ shim_hv_handle_ctrl_message(struct rlite_shim_hv *priv,
         struct rlite_hmsg_fa_req req;
 
         ret = deserialize_rlite_msg(rlite_shim_hv_numtables,
-                                   RLITE_SHIM_HV_MSG_MAX,
-                                   RLITE_BUF_DATA(rb), rb->len,
-                                   &req, sizeof(req));
+                                    RLITE_SHIM_HV_MSG_MAX,
+                                    RLITE_BUF_DATA(rb), rb->len,
+                                    &req, sizeof(req));
         if (ret) {
             PE("failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
-        ret = rlite_fa_req_arrived(priv->ipcp, 0, req.local_port, 0, 0,
-                    &req.remote_appl, &req.local_appl, NULL);
+        ret = rlite_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0,
+                    &req.dst_appl, &req.src_appl, NULL);
         if (ret) {
             PE("failed to report flow allocation request\n");
         }
@@ -110,10 +110,8 @@ shim_hv_handle_ctrl_message(struct rlite_shim_hv *priv,
             goto des_fail;
         }
 
-        /* XXX shouldn't we swap resp.remote_port and resp.local_port
-         * arguments? */
-        ret = rlite_fa_resp_arrived(priv->ipcp, resp.remote_port,
-                                    resp.local_port, 0, 0, resp.response,
+        ret = rlite_fa_resp_arrived(priv->ipcp, resp.src_port,
+                                    resp.dst_port, 0, 0, resp.response,
                                     NULL);
         if (ret) {
             PE("failed to report flow allocation response\n");
@@ -189,9 +187,9 @@ rlite_shim_hv_fa_req(struct ipcp_entry *ipcp,
 
     req.msg_type = RLITE_SHIM_HV_FA_REQ;
     req.event_id = 0;
-    rina_name_copy(&req.local_appl, &flow->local_appl);
-    rina_name_copy(&req.remote_appl, &flow->remote_appl);
-    req.local_port = flow->local_port;
+    rina_name_copy(&req.src_appl, &flow->local_appl);
+    rina_name_copy(&req.dst_appl, &flow->remote_appl);
+    req.src_port = flow->local_port;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&req));
 }
@@ -207,8 +205,8 @@ rlite_shim_hv_fa_resp(struct ipcp_entry *ipcp,
 
     resp.msg_type = RLITE_SHIM_HV_FA_RESP;
     resp.event_id = 0;
-    resp.local_port = flow->local_port;
-    resp.remote_port = flow->remote_port;
+    resp.dst_port = flow->local_port;
+    resp.src_port = flow->remote_port;
     resp.response = response;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&resp));
