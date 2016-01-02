@@ -386,7 +386,9 @@ err2:
 err1:
     rl_evloop_fini(&uipcp->loop);
 err0:
+    pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
+    pthread_mutex_unlock(&uipcps->lock);
     free(uipcp);
 
     return ret;
