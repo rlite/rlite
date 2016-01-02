@@ -273,71 +273,101 @@ CDAPMessage::print() const
 {
     char *name;
 
-    PD("CDAP Message {\n");
-    PD("    abs_syntax: %d\n", abs_syntax);
-    PD("    op_code: %d\n", op_code);
-    PD("    invoke_id: %d\n", invoke_id);
-    PD("    flags: %04x\n", flags);
-    PD("    obj_class: %s\n", obj_class.c_str());
-    PD("    obj_name: %s\n", obj_name.c_str());
-    PD("    obj_inst: %ld\n", obj_inst);
+    PD("CDAP Message { ");
+    PD("abs_syntax: %d, ", abs_syntax);
+    PD("op_code: %d, ", op_code);
+    PD("invoke_id: %d, ", invoke_id);
+
+    if (flags != gpb::F_NO_FLAGS) {
+        PD("flags: %04x, ", flags);
+    }
+
+    if (obj_class != string()) {
+        PD("obj_class: %s, ", obj_class.c_str());
+    }
+
+    if (obj_name != string()) {
+        PD("obj_name: %s, ", obj_name.c_str());
+    }
+
+    if (obj_inst) {
+        PD("obj_inst: %ld, ", obj_inst);
+    }
 
     /* Print object value. */
     switch (obj_value.ty) {
         case I32:
-            PD("    obj_value: %d\n", obj_value.u.i32);
+            PD("obj_value: %d, ", obj_value.u.i32);
             break;
 
         case I64:
-            PD("    obj_value: %lld\n", (long long)obj_value.u.i64);
+            PD("obj_value: %lld, ", (long long)obj_value.u.i64);
             break;
 
         case STRING:
-            PD("    obj_value: %s\n", obj_value.str.c_str());
+            PD("obj_value: %s, ", obj_value.str.c_str());
             break;
 
         case FLOAT:
-            PD("    obj_value: %f\n", obj_value.u.fp_single);
+            PD("obj_value: %f,", obj_value.u.fp_single);
             break;
 
         case DOUBLE:
-            PD("    obj_value: %f\n", obj_value.u.fp_double);
+            PD("obj_value: %f, ", obj_value.u.fp_double);
             break;
 
         case BOOL:
-            PD("    obj_value: %s\n", (obj_value.u.boolean ? "true" : "false"));
+            PD("obj_value: %s, ", (obj_value.u.boolean ? "true" : "false"));
             break;
 
         case BYTES:
-            PD("    obj_value: %s\n", obj_value.str.c_str());
+            PD("obj_value: %s, ", obj_value.str.c_str());
             break;
     }
 
 
-    PD("    result: %d\n", result);
-    PD("    scope: %d\n", scope);
-    PD("    filter: %s\n", filter.c_str());
+    if (result) {
+        PD("result: %d, ", result);
+    }
 
-    PD("    auth_mech: %d\n", auth_mech);
+    if (scope) {
+        PD("scope: %d, ", scope);
+    }
 
-    PD("    auth_value: name='%s' pwd='%s' other='%s'\n",
+    if (filter != string()) {
+        PD("filter: %s, ", filter.c_str());
+    }
+
+    if (auth_mech != gpb::AUTH_NONE) {
+        PD("auth_mech: %d, ", auth_mech);
+        PD("auth_value: name='%s' pwd='%s' other='%s', ",
                 auth_value.name.c_str(), auth_value.password.c_str(),
                 auth_value.other.c_str());
-
-    name = rina_name_to_string(&dst_appl);
-    PD("    dst_appl: %s\n", name);
-    if (name) {
-        free(name);
     }
 
-    name = rina_name_to_string(&src_appl);
-    PD("    src_appl: %s\n", name);
-    if (name) {
-        free(name);
+    if (rina_name_valid(&dst_appl)) {
+        name = rina_name_to_string(&dst_appl);
+        PD("dst_appl: %s, ", name);
+        if (name) {
+            free(name);
+        }
     }
 
-    PD("    result_reason: %s\n", result_reason.c_str());
-    PD("    version: %ld\n", version);
+    if (rina_name_valid(&src_appl)) {
+        name = rina_name_to_string(&src_appl);
+        PD("src_appl: %s, ", name);
+        if (name) {
+            free(name);
+        }
+    }
+
+    if (result_reason != string()) {
+        PD("result_reason: %s, ", result_reason.c_str());
+    }
+
+    PD("version: %ld, ", version);
+
+    PD("}\n");
 }
 
 int
