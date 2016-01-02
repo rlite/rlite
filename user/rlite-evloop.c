@@ -211,20 +211,18 @@ evloop_function(void *arg)
             }
         }
 
-        pthread_mutex_lock(&loop->lock);
-
         /* Read the next message posted by the kernel. */
         ret = read(loop->rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
             perror("read(rfd)");
-            goto next_one;
+            continue;
         }
 
         /* Here we can malloc the maximum kernel message size. */
         resp = RINALITE_RMBR(malloc(max_resp_size));
         if (!resp) {
             PE("Out of memory\n");
-            goto next_one;
+            continue;
         }
 
         /* Deserialize the message from serbuf into resp. */
@@ -240,29 +238,30 @@ evloop_function(void *arg)
                 !loop->handlers[resp->msg_type]) {
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
-            goto next_one;
+            continue;
         }
 
         if (resp->event_id == 0) {
             /* That's a request originating from the kernel, it's
              * not a response. */
-            pthread_mutex_unlock(&loop->lock);
             ret = loop->handlers[resp->msg_type](loop, resp, NULL);
             if (ret) {
                 PE("Error while handling message type [%d]\n",
                                         resp->msg_type);
             }
-            goto next_one;
+            continue;
         }
 
+        pthread_mutex_lock(&loop->lock);
         /* Try to match the event_id in the response to the event_id of
          * a previous request. */
         req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
         pthread_mutex_unlock(&loop->lock);
+
         if (!req_entry) {
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
-            goto next_one;
+            continue;
         }
 
         if (req_entry->msg->msg_type + 1 != resp->msg_type) {
@@ -282,10 +281,10 @@ evloop_function(void *arg)
         }
 
 notify_requestor:
+        pthread_mutex_lock(&loop->lock);
         if (req_entry->wait_for_completion) {
             /* Signal the rlite_issue_request() caller that the operation is
              * complete, reporting the response in the 'resp' pointer field. */
-            pthread_mutex_lock(&loop->lock);
             req_entry->op_complete = 1;
             req_entry->resp = RINALITE_RMB(resp);
             pthread_cond_signal(&req_entry->op_complete_cond);
@@ -296,7 +295,6 @@ notify_requestor:
             free(req_entry);
             rina_msg_free(rina_kernel_numtables, RINALITE_RMB(resp));
         }
-next_one:
         pthread_mutex_unlock(&loop->lock);
     }
 
