@@ -31,6 +31,7 @@ namespace obj_class {
     static string status = "operational_status";
     static string address = "address";
     static string lfdb = "fsodb"; /* Lower Flow DB */
+    static string flows = "flows"; /* Supported flows */
 };
 
 namespace obj_name {
@@ -41,6 +42,7 @@ namespace obj_name {
     static string address = "/daf/mgmt/naming" + obj_class::address;
     static string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
     static string whatevercast = "/daf/mgmt/naming/whatevercast";
+    static string flows = "/dif/ra/fa/flows" + obj_class::flows;
 };
 
 struct Neighbor {
