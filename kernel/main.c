@@ -1,5 +1,5 @@
 /*
- * RLITE management functionalities
+ * Control and datapath functionalities for the rlite stack.
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
