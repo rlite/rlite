@@ -801,10 +801,10 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     struct rlite_shim_eth *priv = flow->txrx.ipcp->priv;
     bool notify;
 
-    spin_lock(&priv->tx_lock);
+    spin_lock_bh(&priv->tx_lock);
     notify = (priv->ntu == priv->ntp);
     priv->ntp++;
-    spin_unlock(&priv->tx_lock);
+    spin_unlock_bh(&priv->tx_lock);
 
     if (notify) {
         rlite_write_restart_flow(flow);
@@ -830,12 +830,12 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         return -EINVAL;
     }
 
-    spin_lock(&priv->tx_lock);
+    spin_lock_bh(&priv->tx_lock);
 
     if (unlikely(priv->ntu == priv->ntp)) {
         /* Double-check not necessary here, we are using locks,
          * not memory barriers. */
-        spin_unlock(&priv->tx_lock);
+        spin_unlock_bh(&priv->tx_lock);
 
         /* Backpressure: We will be called again. */
         return -EAGAIN;
@@ -847,7 +847,7 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     entry->stats.tx_pkt++;
     entry->stats.tx_byte += rb->len;
 
-    spin_unlock(&priv->tx_lock);
+    spin_unlock_bh(&priv->tx_lock);
 
     skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
                     GFP_KERNEL);
@@ -880,11 +880,11 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
         RPD(5, "dev_queue_xmit() error %d\n", ret);
 
-        spin_lock(&priv->tx_lock);
+        spin_lock_bh(&priv->tx_lock);
         entry->stats.tx_pkt--;
         entry->stats.tx_byte -= rb->len;
         entry->stats.tx_err++;
-        spin_unlock(&priv->tx_lock);
+        spin_unlock_bh(&priv->tx_lock);
     }
 
     rlite_buf_free(rb);
@@ -912,7 +912,7 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
                                              priv);
             rtnl_unlock();
             if (ret == 0) {
-                spin_lock(&priv->tx_lock);
+                spin_lock_bh(&priv->tx_lock);
 
                 priv->ntu = 0;
                 if (priv->netdev->tx_queue_len) {
@@ -921,7 +921,7 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
                     priv->ntp = -2;
                 }
 
-                spin_unlock(&priv->tx_lock);
+                spin_unlock_bh(&priv->tx_lock);
 
                 PD("netdev set to %p\n", priv->netdev);
 
@@ -970,7 +970,7 @@ rlite_shim_eth_flow_get_stats(struct flow_entry *flow,
                               struct rl_flow_stats *stats)
 {
     struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp;
+    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp->priv;
 
     spin_lock_bh(&priv->tx_lock);
     stats->tx_pkt = flow_priv->stats.tx_pkt;
