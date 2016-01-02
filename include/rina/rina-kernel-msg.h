@@ -132,6 +132,9 @@ struct rina_kmsg_flow_allocate_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    /* The ipcp_id field is currently unused, since port-id are currently
+     * global, while the architecture says they should be unique only per
+     * IPCP. */
     uint16_t ipcp_id;
     uint8_t result;
     uint32_t port_id;

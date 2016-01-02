@@ -793,11 +793,37 @@ flow_del(unsigned int port_id, int locked)
 }
 
 static int
+rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
+                                       uint32_t port_id, uint8_t result)
+{
+    struct rina_kmsg_flow_allocate_resp_arrived *resp;
+    int ret;
+
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
+        return -ENOMEM;
+    }
+
+    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED;
+    resp->event_id = event_id;
+    resp->port_id = port_id;
+    resp->result = result;
+
+    /* Enqueue the response into the upqueue. */
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
+    if (ret) {
+        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        return ret;
+    }
+
+    return 0;
+}
+
+static int
 rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_flow_allocate_req *req =
                     (struct rina_kmsg_flow_allocate_req *)bmsg;
-    struct rina_kmsg_flow_allocate_resp_arrived *resp;
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
     int ret;
@@ -815,6 +841,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (ret) {
         goto negative;
     }
+    flow_entry->state = FLOW_STATE_PENDING;
 
     ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
     if (ret) {
@@ -836,23 +863,42 @@ negative:
     mutex_unlock(&rina_dm.lock);
 
     /* Create a negative response message. */
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        return -ENOMEM;
+    return rina_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
+}
+
+static int
+rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_flow_allocate_resp *req =
+                    (struct rina_kmsg_flow_allocate_resp *)bmsg;
+    struct flow_entry *flow_entry = NULL;
+
+    mutex_lock(&rina_dm.lock);
+    /* Lookup the flow corresponding to the port-id specified
+     * by the request. */
+    flow_entry = flow_table_find(req->port_id);
+    if (!flow_entry) {
+        mutex_unlock(&rina_dm.lock);
+        printk("%s: no pending flow corresponding to port-id %u\n",
+                __func__, req->port_id);
+        return -EINVAL;
     }
 
-    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED;
-    resp->event_id = req->event_id;
-    resp->result = 1;  /* Report failure. */
-    resp->port_id = 0;  /* Not valid. */
-
-    /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
-    if (ret) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-        return ret;
+    /* Check that the flow is in pending state and make the
+     * transition to the allocated state. */
+    if (flow_entry->state != FLOW_STATE_PENDING) {
+        mutex_unlock(&rina_dm.lock);
+        printk("%s: flow %u is in invalid state %u\n",
+                __func__, flow_entry->local_port, flow_entry->state);
+        return -EINVAL;
     }
+    flow_entry->state = FLOW_STATE_ALLOCATED;
 
+    /* Notify the involved IPC process about the response. TODO */
+
+    mutex_unlock(&rina_dm.lock);
+
+    /* No response message to userspace . */
     return 0;
 }
 
@@ -888,6 +934,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
         mutex_unlock(&rina_dm.lock);
         return ret;
     }
+    flow_entry->state = FLOW_STATE_PENDING;
 
     req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
     req->event_id = 0;
@@ -926,6 +973,7 @@ static rina_msg_handler_t rina_flow_ctrl_handlers[] = {
     [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
+    [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
