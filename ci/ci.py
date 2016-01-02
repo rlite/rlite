@@ -38,6 +38,8 @@ common.gen_program_script(args.image, args.base_port, False)
 subprocess.check_call(['./program.sh'])
 
 
+tou = 10 # timeout unit, in seconds
+
 # Generate update script
 fout = open('ci-update.sh', 'w')
 
@@ -52,13 +54,13 @@ outs =  '#!/bin/bash\n'                                             \
 outs += '\n'                                                        \
         'cd ~/git/rlite\n'                                          \
         'git fetch %(remote)s\n'                                    \
-        'git clean -fdx\n'                                          \
-        'git reset HEAD\n'                                          \
-        'git checkout .\n'                                          \
-        'git checkout %(branch)s\n'                               \
         'git diff origin/%(branch)s > diff.patch\n'                 \
         'if [ -s diff.patch ]; then\n'                              \
         '    echo BRANCHCHANGED\n'                                  \
+        '    git clean -fdx\n'                                      \
+        '    git reset HEAD\n'                                      \
+        '    git checkout .\n'                                      \
+        '    git checkout %(branch)s\n'                             \
         '    git merge %(remote)s/%(branch)s\n'                     \
         '    ./configure && make && sudo make install\n'            \
         'else\n'                                                    \
@@ -78,15 +80,18 @@ fout.write(outs)
 fout.close()
 subprocess.call(['chmod', '+x', 'ci-update.sh'])
 
+
+# Run the program script
 branch_changed = False
 try:
     p = subprocess.run(['./ci-update.sh'], stdout = subprocess.PIPE,
-                       timeout = 200)
+                       timeout = 20 * tou)
     branch_changed = b'BRANCHCHANGED' in p.stdout
 except subprocess.TimeoutExpired:
     print("[ERROR] update script timed out")
 
 print("Branch changed %s" % branch_changed)
+
 
 # Terminate the program script
 try:
@@ -103,3 +108,41 @@ try:
 except:
     print("Cannot kill program script")
     raise
+
+
+topologies = ['gen.conf']
+
+# Prepare and run the tests
+for topofile in topologies:
+    try:
+        subprocess.run(['./gen.py', '--no-program-script', '-c',
+                        topofile], timeout = 20 * tou)
+    except subprocess.TimeoutExpired:
+        print("gen.py timed out")
+        continue
+
+    try:
+        subprocess.run(['./up.sh'], timeout = 30 * tou)
+    except subprocess.TimeoutExpired:
+        print("up.sh timed out")
+        continue
+
+    try:
+        subprocess.run(['./test-server.sh'], timeout = 1 * tou)
+    except subprocess.TimeoutExpired:
+        print("test-server.sh timed out")
+        continue
+
+    try:
+        p = subprocess.run(['./test-client.sh'], timeout = 1 * tou,
+                           stdout = subprocess.PIPE)
+        print(p.stdout)
+    except subprocess.TimeoutExpired:
+        print("test-client.sh timed out")
+        continue
+
+    try:
+        subprocess.run(['./down.sh'], timeout = 10 * tou)
+    except subprocess.TimeoutExpired:
+        print("down.sh timed out")
+        continue

@@ -28,6 +28,9 @@ argparser.add_argument('-c', '--conf',
                        default = 'gen.conf')
 argparser.add_argument('--no-program-script', dest='program_script',
                        action='store_false', help = "Don't generate program script")
+argparser.add_argument('-m', '--vm-memory',
+                       help = "Memory of each VM, in MiB",
+                       type = int, default = 256)
 
 args = argparser.parse_args()
 
@@ -35,6 +38,10 @@ args = argparser.parse_args()
 if args.levels < 1:
     args.levels = 1
     print("Warning: levels set to %d" % (args.levels))
+
+if args.vm_memory < 32:
+    args.vm_memory = 32
+    print("Warning: vm_memory set to %d" % (args.vm_memory))
 
 try:
     fin = open(args.conf, 'r')
@@ -133,7 +140,7 @@ for i in sorted(vms):
             '-snapshot '                                                \
             '--enable-kvm '                                             \
             '-smp 2 '                                                   \
-            '-m 512M '                                                  \
+            '-m %(memory)sM '                                                  \
             '-device e1000,mac=%(mac)s,netdev=mgmt '                    \
             '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
             '-vga std '                                                 \
@@ -141,7 +148,7 @@ for i in sorted(vms):
             '-display none '                                            \
             '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '\
              % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000,
-                'img': args.image}
+                'img': args.image, 'memory': args.vm_memory}
 
     for port in vm['ports']:
         tap = port['tap']
