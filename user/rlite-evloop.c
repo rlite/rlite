@@ -672,6 +672,19 @@ rlite_evloop_fini(struct rlite_evloop *loop)
     rlite_ipcps_purge(loop);
 
     {
+        /* Clean up the fdcbs list. */
+        struct rlite_evloop_fdcb *fdcb;
+        struct list_head *elem;
+
+        pthread_mutex_lock(&loop->lock);
+        while ((elem = list_pop_front(&loop->fdcbs))) {
+            fdcb = container_of(elem, struct rlite_evloop_fdcb, node);
+            free(fdcb);
+        }
+        pthread_mutex_unlock(&loop->lock);
+    }
+
+    {
         /* Clean up the timer_events list. */
         struct rlite_tmr_event *e;
         struct list_head *elem;
@@ -732,11 +745,14 @@ rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rlite_evloop_fdcb_t cb)
         return ENOMEM;
     }
 
+
     memset(fdcb, 0, sizeof(*fdcb));
     fdcb->fd = fd;
     fdcb->cb = cb;
 
+    pthread_mutex_lock(&loop->lock);
     list_add_tail(&fdcb->node, &loop->fdcbs);
+    pthread_mutex_unlock(&loop->lock);
 
     return 0;
 }
@@ -746,12 +762,18 @@ rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 {
     struct rlite_evloop_fdcb *fdcb;
 
+    pthread_mutex_lock(&loop->lock);
     list_for_each_entry(fdcb, &loop->fdcbs, node) {
         if (fdcb->fd == fd) {
             list_del(&fdcb->node);
+            pthread_mutex_unlock(&loop->lock);
+            free(fdcb);
+
             return 0;
         }
     }
+
+    pthread_mutex_unlock(&loop->lock);
 
     return -1;
 }
