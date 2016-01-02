@@ -544,11 +544,13 @@ app_remove_work(struct work_struct *w)
 static void
 ipcp_application_put(struct registered_appl *app)
 {
-    struct ipcp_entry *ipcp = app->ipcp;
+    struct ipcp_entry *ipcp;
 
     if (!app) {
         return;
     }
+
+    ipcp = app->ipcp;
 
     RALOCK(ipcp);
 
