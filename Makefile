@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -g
 CFLAGS += -I$(PWD)/include
 LDFLAGS += -lpthread
 EXES=user/ipcm user/application

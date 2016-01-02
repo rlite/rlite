@@ -12,9 +12,20 @@
 #include <signal.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
-#include "pending_queue.h"
 #include <rina/rina-utils.h>
 
+#include "pending_queue.h"
+#include "list.h"
+
+
+struct ipcp {
+        unsigned int ipcp_id;
+        struct rina_name ipcp_name;
+        unsigned int dif_type;
+        struct rina_name dif_name;
+
+        struct list_head node;
+};
 
 /* IPC Manager data model. */
 struct ipcm {
@@ -33,6 +44,8 @@ struct ipcm {
     pthread_mutex_t lock;
     int fetch_complete;
     pthread_cond_t fetch_complete_cond;
+
+    struct list_head ipcps;
 
     /* Unix domain socket file descriptor used to accept request from
      * applications. */
@@ -84,8 +97,7 @@ fetch_ipcp_resp(struct ipcm *ipcm,
 {
     const struct rina_kmsg_fetch_ipcp_resp *resp =
         (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
-    char *ipcp_name_s = NULL;
-    char *dif_name_s = NULL;
+    struct ipcp *ipcp;
 
     if (resp->end) {
         /* Signal fetch_ipcps() that the fetch has been completed. */
@@ -97,20 +109,21 @@ fetch_ipcp_resp(struct ipcm *ipcm,
         return 0;
     }
 
-    ipcp_name_s = rina_name_to_string(&resp->ipcp_name);
-    dif_name_s = rina_name_to_string(&resp->dif_name);
+    printf("%s: Fetch IPCP response id=%u, type=%u\n",
+            __func__, resp->ipcp_id, resp->dif_type);
 
-    printf("%s: Fetch IPCP response id=%u, type=%u, name='%s', dif_name='%s'\n",
-            __func__, resp->ipcp_id, resp->dif_type, ipcp_name_s, dif_name_s);
+    ipcp = malloc(sizeof(*ipcp));
+    if (ipcp) {
+        ipcp->ipcp_id = resp->ipcp_id;
+        ipcp->dif_type = resp->dif_type;
+        rina_name_copy(&ipcp->ipcp_name, &resp->ipcp_name);
+        rina_name_copy(&ipcp->dif_name, &resp->dif_name);
+        list_add_tail(&ipcm->ipcps, &ipcp->node);
+    } else {
+        printf("%s: Out of memory\n", __func__);
+    }
+
     (void)b_req;
-
-    if (ipcp_name_s) {
-        free(ipcp_name_s);
-    }
-
-    if (dif_name_s) {
-        free(dif_name_s);
-    }
 
     /* The fetch is not complete: Request information about the next
      * IPC process. */
@@ -182,7 +195,7 @@ typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
                                    const struct rina_msg_base *b_req);
 
 /* The table containing all response handlers. */
-static rina_resp_handler_t rina_handlers[] = {
+static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_CREATE_IPCP_RESP] = ipcp_create_resp,
     [RINA_KERN_DESTROY_IPCP_RESP] = ipcp_destroy_resp,
     [RINA_KERN_FETCH_IPCP_RESP] = fetch_ipcp_resp,
@@ -230,7 +243,7 @@ evloop_function(void *arg)
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
-                !rina_handlers[resp->msg_type]) {
+                !rina_kernel_handlers[resp->msg_type]) {
             printf("%s: Invalid message type [%d] received",__func__,
                     resp->msg_type);
             continue;
@@ -263,7 +276,7 @@ evloop_function(void *arg)
         printf("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler. */
-        ret = rina_handlers[resp->msg_type](ipcm, resp, req_entry->msg);
+        ret = rina_kernel_handlers[resp->msg_type](ipcm, resp, req_entry->msg);
         if (ret) {
             printf("%s: Error while handling message type [%d]", __func__,
                     resp->msg_type);
@@ -401,6 +414,35 @@ fetch_ipcp(struct ipcm *ipcm)
     return issue_request(ipcm, msg, sizeof(*msg));
 }
 
+static int
+ipcps_print(struct ipcm *ipcm)
+{
+    struct ipcp *ipcp;
+    struct list_head *cur;
+
+    printf("IPC Processes table:\n");
+    for (cur = ipcm->ipcps.succ; cur != &ipcm->ipcps; cur = cur->succ) {
+            char *ipcp_name_s = NULL;
+            char *dif_name_s = NULL;
+
+            ipcp = container_of(cur, struct ipcp, node);
+            ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
+            dif_name_s = rina_name_to_string(&ipcp->dif_name);
+            printf("    id = %d, name = '%s' dif_name = '%s'\n",
+                        ipcp->ipcp_id, ipcp_name_s, dif_name_s);
+
+            if (ipcp_name_s) {
+                    free(ipcp_name_s);
+            }
+
+            if (dif_name_s) {
+                    free(dif_name_s);
+            }
+    }
+
+    return 0;
+}
+
 /* Fetch information about all IPC processes. */
 static int
 fetch_ipcps(struct ipcm *ipcm)
@@ -419,6 +461,8 @@ fetch_ipcps(struct ipcm *ipcm)
     }
     ipcm->fetch_complete = 0;
     pthread_mutex_unlock(&ipcm->lock);
+
+    ipcps_print(ipcm);
 
     return 0;
 }
@@ -650,13 +694,14 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* Initialize the remaining field of the IPC Manager data model
+    /* Initialize the remaining fields of the IPC Manager data model
      * instance. */
     pthread_mutex_init(&ipcm.lock, NULL);
     pthread_cond_init(&ipcm.fetch_complete_cond, NULL);
     ipcm.fetch_complete = 0;
     pending_queue_init(&ipcm.pqueue);
     ipcm.event_id_counter = 1;
+    list_init(&ipcm.ipcps);
 
     /* Create and start the event-loop thread. */
     ret = pthread_create(&evloop_th, NULL, evloop_function, &ipcm);
