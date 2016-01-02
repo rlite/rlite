@@ -169,6 +169,7 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     ret = store_pending_request(ipcm, (struct rina_ctrl_base_msg *)msg,
                                 sizeof(*msg));
     if (ret < 0) {
+        free(msg);
         return ret;
     }
 

@@ -57,6 +57,34 @@ struct rina_ctrl {
     wait_queue_head_t upqueue_wqh;
 };
 
+static void
+ipcp_id_release(unsigned int ipcp_id)
+{
+    if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
+        return;
+    }
+
+    mutex_lock(&rina_dm.ipcp_id_bitmap_lock);
+    bitmap_clear(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
+    mutex_unlock(&rina_dm.ipcp_id_bitmap_lock);
+}
+
+static unsigned int
+ipcp_id_acquire(void)
+{
+    unsigned int ipcp_id;
+
+    mutex_lock(&rina_dm.ipcp_id_bitmap_lock);
+    ipcp_id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
+                IPCP_ID_BITMAP_SIZE, 0, 1, 0);
+    if (ipcp_id < IPCP_ID_BITMAP_SIZE) {
+        bitmap_set(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
+    }
+    mutex_unlock(&rina_dm.ipcp_id_bitmap_lock);
+
+    return ipcp_id;
+}
+
 static ssize_t
 rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
 {
@@ -79,13 +107,7 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
         return -EFAULT;
     }
 
-    mutex_lock(&rina_dm.ipcp_id_bitmap_lock);
-    ipcp_id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
-                IPCP_ID_BITMAP_SIZE, 0, 1, 0);
-    if (ipcp_id < IPCP_ID_BITMAP_SIZE) {
-        bitmap_set(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
-    }
-    mutex_unlock(&rina_dm.ipcp_id_bitmap_lock);
+    ipcp_id = ipcp_id_acquire();
     if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
         return -ENOSPC;
     }
@@ -93,13 +115,14 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     /* Copy in the userspace strings. */
     ret = copy_name_from_user(&kmsg.name, &umsg->name);
     if (ret) {
-        return ret;
+        goto err1;
     }
 
     /* Create the response message. */
     rmsg = kmalloc(sizeof(*rmsg), GFP_KERNEL);
     if (!rmsg) {
-        return -ENOMEM;
+        ret = -ENOMEM;
+        goto err2;
     }
     rmsg->msg_type = RINA_CTRL_CREATE_IPCP_RESP;
     rmsg->event_id = kmsg.event_id;
@@ -108,7 +131,8 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     /* Enqueue the response into the upqueue. */
     entry = kmalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
-        return -ENOMEM;
+        ret = -ENOMEM;
+        goto err3;
     }
     entry->msg = rmsg;
     entry->msg_len = sizeof(*rmsg);
@@ -121,6 +145,15 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     kfree(name_s);
 
     return len;
+
+err3:
+    kfree(rmsg);
+err2:
+    rina_name_free(&kmsg.name);
+err1:
+    ipcp_id_release(ipcp_id);
+
+    return ret;
 }
 
 static ssize_t

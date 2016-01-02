@@ -55,6 +55,34 @@ rina_name_to_string(const struct rina_name *name)
     return str;
 }
 
+void
+rina_name_free(struct rina_name *name)
+{
+    if (!name) {
+        return;
+    }
+
+    if (name->apn) {
+        kfree(name->apn);
+        name->apn_len = 0;
+    }
+
+    if (name->api) {
+        kfree(name->api);
+        name->api_len = 0;
+    }
+
+    if (name->aen) {
+        kfree(name->aen);
+        name->aen_len = 0;
+    }
+
+    if (name->aei) {
+        kfree(name->aei);
+        name->aei_len = 0;
+    }
+}
+
 static int
 copy_buf_from_user(char **dstp, uint16_t *dst_len_p, char __user *src, uint16_t src_len)
 {
