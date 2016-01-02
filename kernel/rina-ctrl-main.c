@@ -742,10 +742,9 @@ flow_del_by_rc(struct rina_ctrl *rc)
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->rc == rc) {
             printk("%s: Removing flow %u\n", __func__, flow->local_port);
-            hash_del(&flow->node);
-            rina_name_free(&flow->local_application);
-            rina_name_free(&flow->remote_application);
-            kfree(flow);
+            /* Optimization possible: flow_del() does a lookup, which is
+             * useless here, since we already have the entry. */
+            flow_del(flow->local_port, 0);
         }
     }
     mutex_unlock(&rina_dm.lock);
