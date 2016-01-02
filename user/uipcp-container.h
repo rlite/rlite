@@ -3,7 +3,7 @@
 
 #include <rina/rina-conf-msg.h>
 #include "list.h"
-#include "application.h"
+#include "rinalite_appl.h"
 
 
 /* User IPCP data model. */
@@ -29,7 +29,7 @@ ipcp_pduft_set(struct uipcps *uipcps, uint16_t ipcp_id,
                uint64_t dest_addr, uint32_t local_port);
 
 struct uipcp {
-    struct application appl;
+    struct rinalite_appl appl;
     struct uipcps *uipcps;
     unsigned int ipcp_id;
     int mgmtfd;

@@ -336,7 +336,7 @@ uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 static void
 mgmt_fd_ready(struct rina_evloop *loop, int fd)
 {
-    struct application *appl = container_of(loop, struct application, loop);
+    struct rinalite_appl *appl = container_of(loop, struct rinalite_appl, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rina_mgmt_hdr *mhdr;
@@ -447,7 +447,7 @@ uipcp_fa_req(struct rina_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
              const struct rina_msg_base *b_req)
 {
-    struct application *application = container_of(loop, struct application,
+    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
@@ -499,7 +499,7 @@ uipcp_fa_resp(struct rina_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
-    struct application *application = container_of(loop, struct application,
+    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =

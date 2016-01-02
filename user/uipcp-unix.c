@@ -19,7 +19,7 @@
 #include "list.h"
 #include "helpers.h"
 #include "evloop.h"
-#include "application.h"
+#include "rinalite_appl.h"
 #include "uipcp-container.h"
 
 

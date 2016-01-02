@@ -11,7 +11,7 @@
 #include <poll.h>
 #include "rina/rina-utils.h"
 
-#include "application.h"
+#include "rinalite_appl.h"
 
 
 #define SDU_SIZE_MAX    65535
@@ -23,7 +23,7 @@ struct rinaperf_test_config {
 };
 
 struct rinaperf {
-    struct application application;
+    struct rinalite_appl application;
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;

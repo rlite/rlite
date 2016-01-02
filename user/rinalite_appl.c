@@ -17,7 +17,7 @@
 
 #include "list.h"
 #include "evloop.h"
-#include "application.h"
+#include "rinalite_appl.h"
 
 
 static int
@@ -61,8 +61,8 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
-    struct application *application = container_of(loop,
-                                       struct application, loop);
+    struct rinalite_appl *application = container_of(loop,
+                                       struct rinalite_appl, loop);
     struct rina_kmsg_fa_req_arrived *req =
             (struct rina_kmsg_fa_req_arrived *)b_resp;
     struct pending_flow_req *pfr = NULL;
@@ -104,7 +104,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-application_register_req(struct application *application,
+application_register_req(struct rinalite_appl *application,
                          int reg, unsigned int ipcp_id,
                          const struct rina_name *application_name)
 {
@@ -148,7 +148,7 @@ flow_config_default(struct rina_flow_config *cfg)
 }
 
 static struct rina_kmsg_fa_resp_arrived *
-flow_allocate_req(struct application *application,
+flow_allocate_req(struct rinalite_appl *application,
                   unsigned int wait_for_completion, uint16_t ipcp_id,
                   uint16_t upper_ipcp_id,
                   const struct rina_name *local_application,
@@ -184,7 +184,7 @@ flow_allocate_req(struct application *application,
 }
 
 int
-flow_allocate_resp(struct application *application, uint16_t ipcp_id,
+flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
                    uint16_t upper_ipcp_id, uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
@@ -215,7 +215,7 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
 }
 
 int
-application_register(struct application *application, int reg,
+application_register(struct rinalite_appl *application, int reg,
                      const struct rina_name *dif_name, int fallback,
                      const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
@@ -237,7 +237,7 @@ application_register(struct application *application, int reg,
 }
 
 int
-flow_allocate(struct application *application,
+flow_allocate(struct rinalite_appl *application,
               struct rina_name *dif_name, int dif_fallback,
               struct rina_name *ipcp_name,
               const struct rina_name *local_application,
@@ -278,7 +278,7 @@ flow_allocate(struct application *application,
 }
 
 struct pending_flow_req *
-flow_request_wait(struct application *application)
+flow_request_wait(struct rinalite_appl *application)
 {
     struct list_head *elem = NULL;
 
@@ -333,7 +333,7 @@ int open_ipcp_mgmt(uint16_t ipcp_id)
 
 /* flow_allocate() + open_port_appl() */
 int
-flow_allocate_open(struct application *application,
+flow_allocate_open(struct rinalite_appl *application,
                    struct rina_name *dif_name, int dif_fallback,
                    struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
@@ -356,7 +356,7 @@ flow_allocate_open(struct application *application,
 
 /* flow_request_wait() + open_port_appl() */
 int
-flow_request_wait_open(struct application *application)
+flow_request_wait_open(struct rinalite_appl *application)
 {
     struct pending_flow_req *pfr;
     unsigned int port_id;
@@ -380,7 +380,7 @@ flow_request_wait_open(struct application *application)
 }
 
 int
-rina_application_init(struct application *application)
+rina_application_init(struct rinalite_appl *application)
 {
     int ret;
 
@@ -398,7 +398,7 @@ rina_application_init(struct application *application)
 }
 
 int
-rina_application_fini(struct application *application)
+rina_application_fini(struct rinalite_appl *application)
 {
     return rina_evloop_fini(&application->loop);
 }
