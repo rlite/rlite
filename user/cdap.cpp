@@ -516,6 +516,12 @@ CDAPMessage::valid(bool check_invoke_id) const
     ret = ret && vt.check(FLNUM(Version), "version", op_code,
                           version != 0);
 
+    if ((obj_class != string()) != (obj_name != string())) {
+        PE("%s: Invalid message: if obj_class is specified, also obj_name "
+                "must be, and the other way around\n", __func__);
+        return false;
+    }
+
     return ret;
 }
 
