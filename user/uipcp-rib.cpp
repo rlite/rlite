@@ -87,12 +87,11 @@ struct Neighbor {
     void abort();
 };
 
-typedef int (*rib_handler_t)(struct uipcp_rib *);
-
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
 
+    typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm);
     map< string, rib_handler_t > handlers;
 
     /* Lower DIFs. */
@@ -104,13 +103,45 @@ struct uipcp_rib {
     /* Directory Forwarding Table. */
     map< string, DFTEntry > dft;
 
-    uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
+    uipcp_rib(struct uipcp *_u);
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
     int remote_sync(bool create, const string& obj_class,
                     const string& obj_name, const UipcpObject *obj_value);
+
+    int cdap_dispatch(const CDAPMessage *rm);
+
+    /* RIB handlers. */
+    int dft_handler(const CDAPMessage *rm);
 };
+
+uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
+{
+    /* Insert the handlers for the RIB objects. */
+    handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
+}
+
+int
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
+{
+    /* Dispatch depending on the obj_name specified in the request. */
+    map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
+
+    if (hi == handlers.end()) {
+        PE("Unable to manage CDAP message\n");
+        rm->print();
+        return -1;
+    }
+
+    return (this->*(hi->second))(rm);
+}
+
+int
+uipcp_rib::dft_handler(const CDAPMessage *rm)
+{
+    return 0;
+}
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
                    int fd, unsigned int port_id_)
@@ -547,7 +578,9 @@ Neighbor::enrolled(const CDAPMessage *rm)
         return 0;
     }
 
-    return 0;
+    /* We are enrolled to this neighbor, so we can dispatch its
+     * CDAP message to the RIB. */
+    return rib->cdap_dispatch(rm);
 }
 
 int
@@ -589,18 +622,6 @@ uipcp_rib::address_allocate() const
     return 0; // TODO
 }
 
-static int
-dft_handler(struct uipcp_rib *)
-{
-    return 0;
-}
-
-static int
-whatevercast_handler(struct uipcp_rib *)
-{
-    return 0;
-}
-
 extern "C" struct uipcp_rib *
 rib_create(struct uipcp *uipcp)
 {
@@ -609,13 +630,6 @@ rib_create(struct uipcp *uipcp)
     if (!rib) {
         return NULL;
     }
-
-    /* Insert the handlers for the RIB objects. */
-
-    rib->handlers.insert(make_pair(obj_name::dft, dft_handler));
-
-    rib->handlers.insert(make_pair(obj_name::whatevercast,
-                                   whatevercast_handler));
 
     return rib;
 }
