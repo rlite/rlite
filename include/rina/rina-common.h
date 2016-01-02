@@ -160,6 +160,8 @@ struct rina_flow_config {
         PD(format, ##__VA_ARGS__);                      \
     } while (0)
 
+#define NPD(format, ...)
+
 #endif
 
 #endif  /* __RINA_COMMON_H__ */

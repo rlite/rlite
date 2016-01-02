@@ -632,7 +632,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
     struct flow_entry *flow = NULL;
     bool match = false;
 
-    PD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
+    NPD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
             hh->h_source[0], hh->h_source[1], hh->h_source[2],
             hh->h_source[3], hh->h_source[4], hh->h_source[5],
             skb->len);
@@ -732,7 +732,8 @@ shim_eth_rx_handler(struct sk_buff **skbp)
                 rcu_dereference(skb->dev->rx_handler_data);
     unsigned int ethertype = ntohs(skb->protocol);
 
-    PD("%s: intercept skb %u, protocol %u\n", __func__, skb->len, ntohs(skb->protocol));
+    NPD("%s: intercept skb %u, protocol %u\n", __func__, skb->len,
+        ntohs(skb->protocol));
 
     if (ethertype == ETH_P_ARP) {
         /* This is an ARP frame. */
@@ -740,7 +741,6 @@ shim_eth_rx_handler(struct sk_buff **skbp)
 
         if (ntohs(arp->ar_pro) == ETH_P_RINA) {
             /* This ARP operation belongs to RINA stack. */
-            PD("SHIM ETH ARP\n");
             shim_eth_arp_rx(priv, arp, skb->len);
 
         } else {
