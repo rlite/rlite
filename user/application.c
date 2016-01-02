@@ -12,33 +12,10 @@
 #include <signal.h>
 
 #include <rina/rina-application-msg.h>
+#include "helpers.h"
 
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
-
-static int rina_msg_send(int sfd, struct rina_msg_base *msg)
-{
-    unsigned int serlen;
-    char *serbuf;
-    int n;
-
-    serlen = rina_msg_serlen(rina_application_numtables, msg);
-    serbuf = malloc(serlen);
-    if (!serbuf) {
-        return -1;
-    }
-
-    serialize_rina_msg(rina_application_numtables, serbuf, msg);
-
-    n = write(sfd, serbuf, serlen);
-    if (n != serlen) {
-        printf("write failed [%d/%d]\n", n, serlen);
-    }
-
-    free(serbuf);
-
-    return (n == serlen) ? 0 : -1;
-}
 
 static int application_register(int sfd)
 {
@@ -49,7 +26,7 @@ static int application_register(int sfd)
     rina_name_fill(&msg.application_name, "echo", "1", NULL, NULL);
     rina_name_fill(&msg.dif_name, "test-shim-dummy.DIF", NULL, NULL, NULL);
 
-    return rina_msg_send(sfd, (struct rina_msg_base *)&msg);
+    return rina_msg_write(sfd, (struct rina_msg_base *)&msg);
 }
 
 static int application_unregister(int sfd)

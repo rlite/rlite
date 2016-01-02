@@ -16,6 +16,7 @@
 
 #include "pending_queue.h"
 #include "list.h"
+#include "helpers.h"
 
 
 struct ipcp {
@@ -278,7 +279,7 @@ evloop_function(void *arg)
         /* Invoke the right response handler. */
         ret = rina_kernel_handlers[resp->msg_type](ipcm, resp, req_entry->msg);
         if (ret) {
-            printf("%s: Error while handling message type [%d]", __func__,
+            printf("%s: Error while handling message type [%d]\n", __func__,
                     resp->msg_type);
         }
 
@@ -558,12 +559,13 @@ test(struct ipcm *ipcm)
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
 
 static int
-rina_appl_register(struct ipcm *ipcm, const struct rina_msg_base *b_req)
+rina_appl_register(struct ipcm *ipcm, int sfd,
+                   const struct rina_msg_base *b_req)
 {
     struct ipcp *ipcp = NULL;
     struct ipcp *cur;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
-    char *s;
+    struct rina_msg_base_resp resp;
 
     if (rina_name_valid(&req->dif_name)) {
         /* The request specifies a DIF: lookup that. */
@@ -588,17 +590,21 @@ rina_appl_register(struct ipcm *ipcm, const struct rina_msg_base *b_req)
 
     if (!ipcp) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
-        return -1;
+    } else {
+        char *s = rina_name_to_string(&ipcp->ipcp_name);
+
+        printf("%s: Ok, selected %s\n", __func__, s);
+        if (s) free(s);
     }
 
-    s = rina_name_to_string(&ipcp->ipcp_name);
-    printf("%s: Ok, selected %s\n", __func__, s);
-    if (s) free(s);
+    resp.msg_type = RINA_APPL_REGISTER_RESP;
+    resp.event_id = req->event_id;
+    resp.result = (ipcp != NULL) ? 0 : 1;
 
-    return 0;
+    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
 
-typedef int (*rina_req_handler_t)(struct ipcm *ipcm,
+typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
 /* The table containing all response handlers. */
@@ -622,28 +628,38 @@ server_function(void *arg)
         int ret;
         int n;
 
+        /* Accept a new client. */
         cfd = accept(ipcm->lfd, (struct sockaddr *)&client_address,
                      &client_address_len);
 
+        /* Read the request message in serialized form. */
         n = read(cfd, serbuf, sizeof(serbuf));
         if (n < 0) {
                 printf("%s: read() error [%d]\n", __func__, n);
         }
 
+        /* Deserialize into a formatted message. */
         ret = deserialize_rina_msg(rina_application_numtables, serbuf, n,
                                         msgbuf, sizeof(msgbuf));
         if (ret) {
                 printf("%s: deserialization error [%d]\n", __func__, ret);
         }
 
+        /* Lookup the message type. */
         req = (struct rina_msg_base *)msgbuf;
-
-        ret = rina_application_handlers[req->msg_type](ipcm, req);
-        if (ret) {
-            printf("%s: Error while handling message type [%d]", __func__,
+        if (rina_application_handlers[req->msg_type] == NULL) {
+            printf("%s: Invalid message received [type=%d]\n", __func__,
                     req->msg_type);
+        } else {
+            /* Handle the request. */
+            ret = rina_application_handlers[req->msg_type](ipcm, cfd, req);
+            if (ret) {
+                printf("%s: Error while handling message type [%d]\n",
+                        __func__, req->msg_type);
+            }
         }
 
+        /* Close the connection. */
 	close(cfd);
     }
 
@@ -655,6 +671,12 @@ sigint_handler(int signum)
 {
     unlink(UNIX_DOMAIN_SOCKNAME);
     exit(EXIT_SUCCESS);
+}
+
+static void
+sigpipe_handler(int signum)
+{
+    printf("SIGPIPE received\n");
 }
 
 int main()
@@ -723,6 +745,18 @@ int main()
     ret = sigaction(SIGTERM, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGTERM)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Handle the SIGPIPE signal, which is received when
+     * trying to read/write from/to a Unix domain socket
+     * that has been closed by the other end. */
+    sa.sa_handler = sigpipe_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    ret = sigaction(SIGPIPE, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGPIPE)");
         exit(EXIT_FAILURE);
     }
 

@@ -12,7 +12,9 @@
  * the corresponding responses. */
 enum {
     RINA_APPL_REGISTER = 1,
-    RINA_APPL_UNREGISTER, /* 2 */
+    RINA_APPL_REGISTER_RESP,   /* 2 */
+    RINA_APPL_UNREGISTER,      /* 3 */
+    RINA_APPL_UNREGISTER_RESP, /* 4 */
 
     RINA_APPL_MSG_MAX,
 };

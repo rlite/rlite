@@ -1,2 +1,3 @@
 - dif_type had better be a string
 - manage NULL strings (mainly struct rina_name) so that NULL <==> ""
+- implement pending_queue using list.h
