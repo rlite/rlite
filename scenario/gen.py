@@ -22,6 +22,9 @@ argparser.add_argument('-l', '--levels',
 argparser.add_argument('-t', '--type',
                        help = "",
                        choices = ['eth', 'inet4', 'null'], default = 'eth')
+argparser.add_argument('-c', '--conf',
+                       help = "Path to the topology configuration file", type = str,
+                       default = 'gen.conf')
 
 args = argparser.parse_args()
 
@@ -30,9 +33,11 @@ if args.levels < 1:
     args.levels = 1
     print("Warning: levels set to %d" % (args.levels))
 
-print("LEVELS %d" % args.levels)
-
-fin = open('gen.conf', 'r')
+try:
+    fin = open(args.conf, 'r')
+except:
+    print("Could not open topology configuration file %s" % args.conf)
+    quit(1)
 
 vms = dict()
 bridges = dict()
