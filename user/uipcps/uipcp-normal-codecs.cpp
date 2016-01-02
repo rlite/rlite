@@ -1051,16 +1051,22 @@ int
 AData::serialize(char *buf, unsigned int size) const
 {
     gpb::a_data_t gm;
+    char *serbuf = NULL;
+    size_t serlen;
+    int ret;
 
     gm.set_sourceaddress(src_addr);
     gm.set_destaddress(dst_addr);
     if (cdap) {
-        char *serbuf;
-        size_t serlen;
-
         msg_ser_stateless(cdap, &serbuf, &serlen);
         gm.set_cdapmessage(serbuf, serlen);
     }
 
-    return ser_common(gm, buf, size);
+    ret = ser_common(gm, buf, size);
+
+    if (serbuf) {
+        delete [] serbuf;
+    }
+
+    return ret;
 }

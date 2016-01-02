@@ -29,7 +29,5 @@
 
 - implementare list_for_each_entry_safe()
 
-- uniformare l'uso di RLITE_SUCC e RLITE_ERR
-
 - remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
