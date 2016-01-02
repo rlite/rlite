@@ -80,7 +80,7 @@ struct rl_kmsg_ipcp_create_resp {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
 
 /* application --> kernel message to destroy an IPC process. */
@@ -92,7 +92,7 @@ struct rl_kmsg_flow_fetch_resp {
     uint32_t event_id;
 
     uint8_t end;
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint32_t local_port;
     uint32_t remote_port;
     rl_addr_t local_addr;
@@ -109,7 +109,7 @@ struct rl_kmsg_ipcp_update {
     uint32_t event_id;
 
     uint8_t update_type;
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     rl_addr_t ipcp_addr;
     uint16_t  depth;
     struct rina_name ipcp_name;
@@ -122,7 +122,7 @@ struct rl_kmsg_appl_register {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint8_t reg;
     struct rina_name appl_name;
 } __attribute__((packed));
@@ -132,7 +132,7 @@ struct rl_kmsg_appl_register_resp {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint8_t reg;
     uint8_t response;
     struct rina_name appl_name;
@@ -143,8 +143,8 @@ struct rl_kmsg_fa_req {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
-    uint16_t upper_ipcp_id;
+    rl_ipcp_id_t ipcp_id;
+    rl_ipcp_id_t upper_ipcp_id;
     struct rlite_flow_spec flowspec;
     uint32_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
@@ -168,7 +168,7 @@ struct rl_kmsg_fa_req_arrived {
 
     uint32_t kevent_id;
     uint32_t port_id;
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     struct rina_name local_appl;
     struct rina_name remote_appl;
     char *dif_name;
@@ -183,10 +183,10 @@ struct rl_kmsg_fa_resp {
     /* The ipcp_id field is currently unused, since port-id are currently
      * global, while the architecture says they should be unique only per
      * IPCP. */
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     /* The ipcp_id_bind field tells to bind the kernel datapath for this
      * flow to the specified upper IPCP. */
-    uint16_t upper_ipcp_id;
+    rl_ipcp_id_t upper_ipcp_id;
     uint8_t response;
     uint32_t port_id;
     uint32_t cep_id;     /* Filled by kernel before reflecting to userspace. */
@@ -197,7 +197,7 @@ struct rl_kmsg_ipcp_config {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     char *name;
     char *value;
 } __attribute__((packed));
@@ -208,7 +208,7 @@ struct rl_kmsg_ipcp_pduft_set {
     uint32_t event_id;
 
     /* The IPCP whose PDUFT is to be modified. */
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     /* The address of a remote IPCP. */
     rl_addr_t dst_addr;
     /* The local port through which the remote IPCP
@@ -225,7 +225,7 @@ struct rl_kmsg_ipcp_uipcp_set {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
 
 #define rl_kmsg_ipcp_uipcp_wait rl_kmsg_ipcp_uipcp_set
@@ -237,7 +237,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     uint32_t event_id;
 
     uint32_t kevent_id;
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint32_t remote_port;
     uint32_t remote_cep;
     rl_addr_t remote_addr;
@@ -254,7 +254,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint32_t local_port;
     uint32_t remote_port;
     uint32_t remote_cep;
@@ -269,7 +269,7 @@ struct rl_kmsg_flow_deallocated {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint32_t local_port_id;
     uint32_t remote_port_id;
     rl_addr_t remote_addr;
@@ -281,7 +281,7 @@ struct rl_kmsg_flow_dealloc {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint16_t ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     uint32_t port_id;
 } __attribute__((packed));
 

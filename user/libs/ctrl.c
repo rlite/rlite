@@ -385,7 +385,7 @@ rl_open_appl_port(uint32_t port_id)
     return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
 }
 
-int rl_open_mgmt_port(uint16_t ipcp_id)
+int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
@@ -450,7 +450,7 @@ pending_queue_fini(struct list_head *list)
 }
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     unsigned int ipcp_id, int reg,
+                     rl_ipcp_id_t ipcp_id, int reg,
                      const struct rina_name *appl_name)
 {
     memset(req, 0, sizeof(*req));
@@ -465,13 +465,13 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-               uint32_t event_id, unsigned int ipcp_id,
+               uint32_t event_id, rl_ipcp_id_t ipcp_id,
                const char *dif_name,
                const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
                const struct rlite_flow_spec *flowspec,
-               uint16_t upper_ipcp_id)
+               rl_ipcp_id_t upper_ipcp_id)
 {
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_FA_REQ;
@@ -491,7 +491,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
 
 int
 rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
-                uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
                 uint32_t port_id, uint8_t response)
 {
     memset(resp, 0, sizeof(*resp));
@@ -508,7 +508,7 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
 }
 
 int
-rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, uint16_t ipcp_id,
+rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value)
 {
     memset(req, 0, sizeof(*req));

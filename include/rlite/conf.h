@@ -11,7 +11,7 @@ extern "C" {
 
 struct rlite_flow {
     /* Flow attributes. */
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     unsigned int local_port;
     unsigned int remote_port;
     rl_addr_t local_addr;
@@ -26,13 +26,13 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
                     const char *dif_name);
 
 int
-rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, unsigned int ipcp_id);
+rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id);
 
 int
-rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id);
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id);
 
 int
-rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+rl_conf_ipcp_config(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value);
 
 /* Fetch information about all flows in the system. */

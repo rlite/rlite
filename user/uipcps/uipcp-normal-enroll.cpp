@@ -1086,7 +1086,7 @@ Neighbor::alloc_flow(const char *supp_dif)
 {
     struct rina_name neigh_name;
     struct rl_ipcp *info;
-    unsigned int lower_ipcp_id_ = ~0U;
+    rl_ipcp_id_t lower_ipcp_id_ = -1;
     unsigned int port_id_;
     unsigned int event_id;
     int flow_fd_;
@@ -1213,7 +1213,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       const char *supp_dif,
                       unsigned int neigh_port_id,
-                      unsigned int lower_ipcp_id)
+                      rl_ipcp_id_t lower_ipcp_id)
 {
     Neighbor *neigh = rib->get_neighbor(neigh_name, false);
 

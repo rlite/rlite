@@ -41,24 +41,24 @@ rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
                     const struct rl_kmsg_ipcp_update *upd);
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     unsigned int ipcp_id, int reg,
+                     rl_ipcp_id_t ipcp_id, int reg,
                      const struct rina_name *appl_name);
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-               uint32_t event_id, unsigned int ipcp_id,
+               uint32_t event_id, rl_ipcp_id_t ipcp_id,
                const char *dif_name,
                const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
                const struct rlite_flow_spec *flowspec,
-               uint16_t upper_ipcp_id);
+               rl_ipcp_id_t upper_ipcp_id);
 
 int rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
-                    uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                    rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
                     uint32_t port_id, uint8_t response);
 
 int
-rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, uint16_t ipcp_id,
+rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value);
 
 #endif  /* __CTRL_UTILS_H__ */

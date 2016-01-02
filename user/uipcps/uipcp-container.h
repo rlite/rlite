@@ -82,7 +82,7 @@ struct uipcp_ops {
 };
 
 struct ipcp_node {
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     unsigned int marked;
     unsigned int depth;
     unsigned int refcnt;
@@ -103,7 +103,7 @@ struct flow_edge {
 struct uipcp {
     struct rlite_evloop loop;
     struct uipcps *uipcps;
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
 
     struct uipcp_ops ops;
     void *priv;
@@ -114,11 +114,11 @@ struct uipcp {
 
 void *uipcp_server(void *arg);
 
-int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
+int uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type);
 
-int uipcp_put(struct uipcps *uipcps, uint16_t ipcp_id);
+int uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
-struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
+struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
 struct uipcp *uipcp_get_by_name(struct uipcps *uipcps,
                                 const struct rina_name *ipcp_name);
@@ -131,14 +131,14 @@ int uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
 int uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
                               unsigned int lower);
 
-int uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
+int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                              uint8_t response,
                              const struct rl_kmsg_appl_register *req);
 
-int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
+int uipcp_pduft_set(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
                     rl_addr_t dst_addr, uint32_t local_port);
 
-int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
+int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                uint32_t remote_port, uint32_t remote_cep,

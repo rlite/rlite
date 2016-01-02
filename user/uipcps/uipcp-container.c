@@ -12,7 +12,7 @@
 
 
 int
-uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
+uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                          uint8_t response,
                          const struct rl_kmsg_appl_register *req)
 {
@@ -46,7 +46,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
 }
 
 int
-uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
+uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                 rl_addr_t dst_addr, uint32_t local_port)
 {
     struct rl_kmsg_ipcp_pduft_set *req;
@@ -78,7 +78,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 }
 
 int
-uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
+uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_pduft_flush *req;
     struct rlite_msg_base *resp;
@@ -224,7 +224,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, uint32_t local_port)
 }
 
 static int
-uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
+uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_set *req;
     struct rlite_msg_base *resp;
@@ -298,7 +298,7 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
 
 /* To be called under uipcps lock. */
 struct uipcp *
-uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
+uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *cur;
 
@@ -312,7 +312,7 @@ uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 }
 
 int
-uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
+uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
 {
     const struct uipcp_ops *ops = select_uipcp_ops(dif_type);
     struct uipcp *uipcp;
@@ -395,7 +395,7 @@ err0:
 }
 
 int
-uipcp_put(struct uipcps *uipcps, uint16_t ipcp_id)
+uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *uipcp;
     int destroy;
@@ -570,7 +570,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
 }
 
 static struct ipcp_node *
-uipcps_node_get(struct uipcps *uipcps, unsigned int ipcp_id)
+uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_node *ipn;
 

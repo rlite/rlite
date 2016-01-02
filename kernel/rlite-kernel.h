@@ -80,7 +80,7 @@ struct dif {
 };
 
 struct ipcp_entry {
-    uint16_t            id;    /* Key */
+    rl_ipcp_id_t           id;    /* Key */
     struct rina_name    name;
     struct dif          *dif;
     rl_addr_t           addr;

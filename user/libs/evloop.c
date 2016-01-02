@@ -804,7 +804,7 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
 
 int
 rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
-                  uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                  rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
                   uint32_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp *req;
@@ -901,7 +901,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
                    const struct rlite_flow_spec *flowspec,
-                   uint16_t upper_ipcp_id,
+                   rl_ipcp_id_t upper_ipcp_id,
                    unsigned int *port_id, unsigned int wait_ms)
 {
     struct rl_kmsg_fa_req *req;
@@ -958,7 +958,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
 }
 
 int
-rl_evloop_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
+rl_evloop_ipcp_config(struct rlite_evloop *loop, rl_ipcp_id_t ipcp_id,
                       const char *param_name, const char *param_value)
 {
     struct rl_kmsg_ipcp_config *req;

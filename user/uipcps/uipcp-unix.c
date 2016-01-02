@@ -30,7 +30,7 @@ const char *ctrl_dev_name = "/dev/rlite";
 const char *io_dev_name = "/dev/rlite-io";
 
 struct registered_ipcp {
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     struct rina_name ipcp_name;
     char *dif_name;
 
@@ -56,7 +56,7 @@ rlite_conf_response(int sfd, struct rlite_msg_base *req,
 }
 
 static void
-track_ipcp_registration(struct uipcps *uipcps, unsigned ipcp_id,
+track_ipcp_registration(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id,
                         const struct rl_cmsg_ipcp_register *req)
 {
     struct registered_ipcp *ripcp;
@@ -85,7 +85,7 @@ track_ipcp_registration(struct uipcps *uipcps, unsigned ipcp_id,
 
 static void
 track_ipcp_unregistration(struct uipcps *uipcps,
-                          unsigned int ipcp_id)
+                          rl_ipcp_id_t ipcp_id)
 {
     struct registered_ipcp *ripcp;
 

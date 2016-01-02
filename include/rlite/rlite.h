@@ -17,7 +17,7 @@ extern "C" {
 
 struct rl_ipcp {
     /* IPCP attributes. */
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     struct rina_name ipcp_name;
     rl_addr_t ipcp_addr;
     unsigned int depth;
@@ -77,7 +77,7 @@ int
 rl_open_appl_port(uint32_t port_id);
 
 int
-rl_open_mgmt_port(uint16_t ipcp_id);
+rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
 
 int
 rl_write_msg(int rfd, struct rlite_msg_base *msg);

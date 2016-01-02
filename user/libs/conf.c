@@ -53,7 +53,7 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
 
 /* Wait for an uIPCP to show up. */
 int
-rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
+rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_wait msg;
     int ret;
@@ -76,7 +76,7 @@ rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
 
 /* Destroy an IPC process. */
 int
-rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;
@@ -99,7 +99,7 @@ rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
 
 /* Configure an IPC process. */
 int
-rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+rl_conf_ipcp_config(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value)
 {
     struct rl_kmsg_ipcp_config msg;

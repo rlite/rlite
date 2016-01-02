@@ -66,7 +66,7 @@ struct NeighFlow {
     std::string supp_dif;
     unsigned int port_id;
     int flow_fd;
-    unsigned int lower_ipcp_id;
+    rl_ipcp_id_t lower_ipcp_id;
     CDAPConn *conn;
 
     int enroll_tmrid;
@@ -297,7 +297,7 @@ int rib_neigh_set_port_id(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           const char *supp_dif,
                           unsigned int neigh_port_id,
-                          unsigned int lower_ipcp_id);
+                          rl_ipcp_id_t lower_ipcp_id);
 
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,

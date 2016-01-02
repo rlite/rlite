@@ -362,7 +362,7 @@ out:
 }
 
 static struct ipcp_entry *
-__ipcp_get(unsigned int ipcp_id)
+__ipcp_get(rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_entry *entry;
     struct hlist_head *head;
@@ -461,7 +461,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
 }
 
 static int
-ipcp_add(struct rl_kmsg_ipcp_create *req, unsigned int *ipcp_id)
+ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
 {
     struct ipcp_factory *factory;
     struct ipcp_entry *entry = NULL;
@@ -1184,7 +1184,7 @@ __ipcp_put(struct ipcp_entry *entry)
 }
 
 static int
-ipcp_del(unsigned int ipcp_id)
+ipcp_del(rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_entry *entry;
     int ret = 0;
@@ -1242,7 +1242,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
 }
 
 static int
-ipcp_update_all(uint16_t ipcp_id, int update_type)
+ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
 {
     struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
     struct rl_kmsg_ipcp_update upd;
@@ -1280,7 +1280,7 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     struct rl_kmsg_ipcp_create *req = (struct rl_kmsg_ipcp_create *)bmsg;
     struct rl_kmsg_ipcp_create_resp resp;
     char *name_s = rina_name_to_string(&req->name);
-    unsigned int ipcp_id;
+    rl_ipcp_id_t ipcp_id;
     int ret;
 
     ret = ipcp_add(req, &ipcp_id);
@@ -1722,7 +1722,7 @@ rlite_flow_get_stats(struct rlite_ctrl *rc,
 /* Connect the upper IPCP which is using this flow
  * so that rlite_sdu_rx() can deliver SDU to the IPCP. */
 static int
-upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
+upper_ipcp_flow_bind(struct rlite_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
                      struct flow_entry *flow)
 {
     struct ipcp_entry *upper_ipcp;
