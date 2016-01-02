@@ -771,7 +771,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 
     /* Perform the registration. */
     ret = rl_evloop_register(&uipcp->loop, reg, lower_dif,
-                                      NULL, ipcp_name, 2000);
+                             NULL, ipcp_name, 2000);
 
     if (ret) {
         return ret;

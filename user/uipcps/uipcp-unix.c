@@ -463,7 +463,7 @@ uipcps_update(struct uipcps *uipcps)
                     if (s1 && s2 && s3
                             && rina_name_from_string(s3, &ipcp_name) == 0) {
                         ipcp_id = atoi(s2);
-                        reg_result = rlite_ipcp_register(uipcps, 1, s3,
+                        reg_result = rlite_ipcp_register(uipcps, 1, s1,
                                                          ipcp_id, &ipcp_name);
                         PI("Automatic re-registration for %s --> %s\n",
                                 s3, (reg_result == 0) ? "DONE" : "FAILED");
