@@ -290,7 +290,7 @@ main(int argc, char **argv)
     struct sigaction sa;
     struct rinaperf rp;
     const char *type = "echo";
-    const char *dif_name = "d.DIF";
+    const char *dif_name = NULL;
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
