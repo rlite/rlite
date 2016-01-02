@@ -85,7 +85,7 @@ outs =  '#!/bin/bash\n'             \
 
 brid = 1
 
-for b in bridges:
+for b in sorted(bridges):
     outs += 'sudo brctl addbr %(br)s\n'         \
             'sudo ip link set %(br)s up\n'      \
             '\n' % {'br': b}
@@ -110,7 +110,7 @@ for l in links:
 
 vmid = 1
 
-for i in vms:
+for i in sorted(vms):
     vm = vms[i]
 
     vm['id'] = vmid
@@ -151,7 +151,7 @@ for i in vms:
 
 inet4_dir = []
 
-for i in vms:
+for i in sorted(vms):
     vm = vms[i]
 
     outs += ''\
@@ -229,7 +229,7 @@ if args.type == 'inet4':
                 '   fi\n'\
                 'done\n\n'
 
-for br_name in bridges:
+for br_name in sorted(bridges):
     b = bridges[br_name]
 
     if len(b['vms']) == 1:
@@ -268,11 +268,11 @@ for br_name in bridges:
 
 
 # Select the pivot VM ad libitum
-for i in vms:
+for i in sorted(vms):
     pvm = vms[i]
 
 for level in range(2, args.levels + 1):
-    for vm_name in vms:
+    for vm_name in sorted(vms):
         if vm_name == pvm['name']:
             continue
 
@@ -326,13 +326,13 @@ outs =  '#!/bin/bash\n'             \
         '   rm $PIDFILE\n'                                      \
         '}\n\n'
 
-for i in vms:
+for i in sorted(vms):
     vm = vms[i]
     outs += 'kill_qemu rina-%(id)s.pid\n' % {'id': vm['id']}
 
 outs += '\n'
 
-for i in vms:
+for i in sorted(vms):
     vm = vms[i]
     for port in vm['ports']:
         tap = port['tap']
@@ -343,7 +343,7 @@ for i in vms:
                 'sudo ip tuntap del mode tap name %(tap)s\n\n'  \
                     % {'tap': tap, 'br': b}
 
-for b in bridges:
+for b in sorted(bridges):
     outs += 'sudo ip link set %(br)s down\n'        \
             'sudo brctl delbr %(br)s\n'             \
             '\n' % {'br': b}
@@ -415,7 +415,7 @@ outs =  '#!/bin/bash\n'                                             \
 
 # Run rinaperf in client mode on all but the pivot machine, at all layers,
 # towards the server running on the pivot machine
-for vm_name in vms:
+for vm_name in sorted(vms):
     if vm_name == pvm['name']:
         continue
 
