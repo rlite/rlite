@@ -2,6 +2,11 @@
 
 set -x
 
+which systemctl > /dev/null
+if [ $? == "0" ]; then
+    sudo systemctl stop rlite
+fi
+
 sudo rm -rf /var/rlite
 
 sudo rmmod rlite-shim-inet4.ko

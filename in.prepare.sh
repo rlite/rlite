@@ -24,3 +24,8 @@ sudo chmod a+rwx /dev/rlite-io
 
 sudo mkdir -p /var/rlite
 sudo chmod -R a+rwx /var/rlite
+
+which systemctl > /dev/null
+if [ $? == "0" ]; then
+    sudo systemctl start rlite
+fi
