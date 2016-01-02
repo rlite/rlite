@@ -64,6 +64,9 @@ struct rina_msg_layout rina_kernel_numtables[] = {
                     1 * sizeof(struct rina_name),
         .names = 1,
     },
+    [RINA_KERN_IPCP_ENROLL_RESP] = {
+        .copylen = sizeof(struct rina_msg_base_resp),
+    },
     [RINA_KERN_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

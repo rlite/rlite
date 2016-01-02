@@ -1066,6 +1066,10 @@ rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
     flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
                                         : FLOW_STATE_NULL;
 
+    PI("%s: Flow allocation response [%u] issued to IPC process %u, "
+            "port-id %u\n", __func__, response, flow_entry->ipcp->id,
+            flow_entry->local_port);
+
     /* Notify the involved IPC process about the response. */
     ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
                                                    flow_entry,
@@ -1140,15 +1144,15 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     flow_entry->remote_port = remote_port;
     flow_entry->state = FLOW_STATE_PENDING;
 
+    PI("%s: Flow allocation request arrived to IPC process %u, "
+        "port-id %u\n", __func__, ipcp->id, flow_entry->local_port);
+
     if (app->upper.userspace) {
         /* The flow allocation request is for a local application. */
         req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
         req->event_id = 0;
         req->ipcp_id = ipcp->id;
         req->port_id = flow_entry->local_port;
-
-        printk("%s: Flow allocation request arrived to IPC process %u, "
-                "port-id %u\n", __func__, req->ipcp_id, req->port_id);
 
         /* Enqueue the request into the upqueue. */
         ret = rina_upqueue_append(app->upper.rc, (struct rina_msg_base *)req);
@@ -1197,8 +1201,8 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
                                           : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
 
-    printk("%s: Flow allocation response arrived to IPC process %u, "
-                "port-id %u\n", __func__, ipcp->id, local_port);
+    PI("%s: Flow allocation response arrived to IPC process %u, "
+            "port-id %u\n", __func__, ipcp->id, local_port);
 
     if (flow_entry->upper.userspace) {
         /* This response is for a local userspace application. */
@@ -1208,11 +1212,32 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
     } else {
         /* This response is for a local IPCP. */
         struct ipcp_entry *upper_ipcp = flow_entry->upper.ipcp;
+        struct rina_msg_base_resp *resp;
 
         if (upper_ipcp->ops.flow_allocate_resp_arrived) {
             ret = upper_ipcp->ops.flow_allocate_resp_arrived(upper_ipcp,
                                                              flow_entry,
                                                              response);
+        }
+
+        /* Create an enrollment response message for the IPC manager. */
+        resp = kzalloc(sizeof(*resp), GFP_KERNEL);
+        if (!resp) {
+            PE("%s: Out of memory\n", __func__);
+            ret = -ENOMEM;
+        } else {
+            resp->msg_type = RINA_KERN_IPCP_ENROLL_RESP;
+            resp->event_id = flow_entry->event_id;
+            resp->result = response;
+
+            /* Enqueue the response into the upqueue. */
+            BUG_ON(!flow_entry->upper.rc);
+            ret = rina_upqueue_append(flow_entry->upper.rc,
+                                      (struct rina_msg_base *)resp);
+            if (ret) {
+                rina_msg_free(rina_kernel_numtables,
+                              (struct rina_msg_base *)resp);
+            }
         }
     }
 

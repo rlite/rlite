@@ -45,6 +45,20 @@ ipcp_create_resp(struct rina_evloop *loop,
     return 0;
 }
 
+static int
+ipcp_enroll_resp(struct rina_evloop *loop,
+                 const struct rina_msg_base_resp *b_resp,
+                 const struct rina_msg_base *b_req)
+{
+    struct rina_kmsg_ipcp_enroll *req =
+            (struct rina_kmsg_ipcp_enroll *)b_req;
+
+    PI("%s: IPCP enrollment result [%d]\n", __func__, b_resp->result);
+    (void)req;
+
+    return 0;
+}
+
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call issue_request(), in
@@ -55,6 +69,7 @@ ipcp_create_resp(struct rina_evloop *loop,
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
+    [RINA_KERN_IPCP_ENROLL_RESP] = ipcp_enroll_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -215,20 +230,20 @@ ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
     return result;
 }
 
-static int
+struct rina_msg_base_resp *
 ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
             const struct rina_name *neigh_ipcp_name,
             uint16_t supp_ipcp_id)
 {
     struct rina_kmsg_ipcp_enroll *req;
-    struct rina_msg_base *resp;
+    struct rina_msg_base_resp *resp;
     int result;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
         PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
+        return NULL;
     }
 
     memset(req, 0, sizeof(*req));
@@ -238,13 +253,12 @@ ipcp_enroll(struct ipcm *ipcm, uint16_t ipcp_id,
     req->supp_ipcp_id = supp_ipcp_id;
 
     PD("Requesting IPCP enrollment...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
+    resp = (struct rina_msg_base_resp *)
+           issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         1, 5000, &result);
     PD("%s: result: %d\n", __func__, result);
 
-    return result;
+    return resp;
 }
 
 static int
@@ -440,8 +454,9 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     unsigned int ipcp_id, supp_ipcp_id;
     struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
 
-    resp.result = 1;  /* Report failure by default. */
+    resp.result = 1; /* Report failure by default. */
 
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
     if (ipcp_id == ~0U) {
@@ -455,9 +470,12 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
     /* Forward the request to the kernel. */
-    resp.result = ipcp_enroll(ipcm, ipcp_id, &req->neigh_ipcp_name,
+    kresp = ipcp_enroll(ipcm, ipcp_id, &req->neigh_ipcp_name,
                               supp_ipcp_id);
-
+    if (kresp) {
+        resp.result = kresp->result;
+        rina_msg_free(rina_kernel_numtables, RMB(kresp));
+    }
 out:
     return rina_conf_response(sfd, RMB(req), &resp);
 }

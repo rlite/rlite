@@ -17,8 +17,7 @@
 
 
 /* Message types. They **must** be listed alternating requests with
- * the corresponding responses. Moreover, request messages **must**
- * be odd numbers and response messages **must** be even numbers. */
+ * the corresponding responses. */
 enum {
     RINA_KERN_IPCP_CREATE = 1,
     RINA_KERN_IPCP_CREATE_RESP, /* 2 */
@@ -35,6 +34,7 @@ enum {
     RINA_KERN_IPCP_CONFIG, /* 17 */
     RINA_KERN_IPCP_REGISTER, /* 18 */
     RINA_KERN_IPCP_ENROLL, /* 19 */
+    RINA_KERN_IPCP_ENROLL_RESP, /* 20 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -159,7 +159,7 @@ struct rina_kmsg_ipcp_register {
     uint16_t ipcp_id_where;
     /* Register or unregister ? */
     uint8_t reg;
-};
+} __attribute__((packed));
 
 struct rina_kmsg_ipcp_enroll {
     rina_msg_t msg_type;
@@ -171,6 +171,7 @@ struct rina_kmsg_ipcp_enroll {
     uint16_t supp_ipcp_id;
     /* Who to enroll to ? */
     struct rina_name neigh_ipcp_name;
-};
+} __attribute__((packed));
+
 
 #endif  /* __RINA_KERN_H__ */
