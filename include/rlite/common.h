@@ -132,6 +132,7 @@ struct rina_flow_config {
     uint64_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
+    int32_t fd;  /* Currently used but shim-inet4. */
 } __attribute__((packed));
 
 struct rina_flow_spec {

@@ -375,6 +375,7 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     socklen_t addrlen = sizeof(remote_addr);
     struct rina_name remote_appl, local_appl;
     struct inet4_endpoint *ep;
+    struct rina_flow_config cfg;
     int sfd;
 
     /* First of all let's call accept, so that we consume the event
@@ -410,8 +411,11 @@ accept_conn(struct rlite_evloop *loop, int lfd)
 
     list_add_tail(&ep->node, &shim->endpoints);
 
+    /* Push the file descriptor down to kernelspace. */
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.fd = ep->fd;
     uipcp_issue_fa_req_arrived(uipcp, 0, 0,
-                               &local_appl, &remote_appl, NULL);
+                               &local_appl, &remote_appl, &cfg);
     return;
 
 err1:
