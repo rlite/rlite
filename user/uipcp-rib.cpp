@@ -1021,16 +1021,42 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("M_CREATE does not contain a nested message\n");
-        abort();
         return 0;
     }
 
     FlowRequest freq(objbuf, objlen);
     struct rina_name local_appl, remote_appl;
     struct rina_flow_config flowcfg;
+    uint64_t dft_next_hop;
 
-    /* TODO check that freq.dst_app is hosted by this node, otherwise
-     * forward the freq. */
+    dft_next_hop = dft_lookup(freq.dst_app);
+    if (!dft_next_hop) {
+        /* We don't know how where this application is registered,
+         * reject the request. */
+        CDAPMessage m;
+
+        PI("Cannot find DFT entry for %s\n",
+           static_cast<string>(freq.dst_app).c_str());
+
+        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+                     -1, "Cannot find DFT entry");
+
+        return send_to_dst_addr(m, freq.src_addr, freq);
+    }
+
+    if (dft_next_hop != ipcp_info()->ipcp_addr) {
+        /* freq.dst_app is not registered with us, we have
+         * to forward the request. TODO */
+        CDAPMessage m;
+
+        PE("Flow request forwarding not supported\n");
+        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+                     -1, "Flow request forwarding not supported");
+
+        return send_to_dst_addr(m, freq.src_addr, freq);
+    }
+
+    /* freq.dst_app is registered with us, let's go ahead. */
 
     freq.dst_app.rina_name_fill(&local_appl);
     freq.src_app.rina_name_fill(&remote_appl);
@@ -1058,7 +1084,6 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm)
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("M_CREATE_R does not contain a nested message\n");
-        abort();
         return 0;
     }
 
