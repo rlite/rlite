@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 struct rlite_pending_flow_req {
+    uint32_t kevent_id;
     uint16_t ipcp_id;
     uint32_t port_id;
     struct rina_name remote_appl;
@@ -62,9 +63,10 @@ int rlite_flow_allocate(struct rlite_appl *application,
 
 struct rlite_pending_flow_req *rlite_flow_req_wait(struct rlite_appl *application);
 
-int rlite_flow_allocate_resp(struct rlite_appl *application, uint16_t ipcp_id,
-                       uint16_t upper_ipcp_id,uint32_t port_id,
-                       uint8_t response);
+int rlite_flow_allocate_resp(struct rlite_appl *application,
+                             uint32_t kevent_id, uint16_t ipcp_id,
+                             uint16_t upper_ipcp_id, uint32_t port_id,
+                             uint8_t response);
 
 int rlite_open_appl_port(uint32_t port_id);
 

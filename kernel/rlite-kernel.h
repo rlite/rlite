@@ -189,7 +189,7 @@ struct pduft_entry {
 int rina_ipcp_factory_register(struct ipcp_factory *factory);
 int rina_ipcp_factory_unregister(const char *dif_type);
 
-int rina_fa_req_arrived(struct ipcp_entry *ipcp,
+int rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                         uint32_t remote_port, uint64_t remote_addr,
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,

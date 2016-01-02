@@ -274,7 +274,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     freq.src_app.rina_name_fill(&remote_appl);
     policies2flowcfg(&flowcfg, freq.qos, freq.policies);
 
-    uipcp_issue_fa_req_arrived(uipcp, freq.src_port, freq.src_addr,
+    uipcp_issue_fa_req_arrived(uipcp, 0, freq.src_port, freq.src_addr,
                                &local_appl, &remote_appl, &flowcfg);
 
     rina_name_free(&local_appl);

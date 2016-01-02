@@ -138,6 +138,7 @@ struct rina_kmsg_fa_req_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    uint32_t kevent_id;
     uint32_t port_id;
     uint16_t ipcp_id;
     struct rina_name remote_appl;
@@ -148,6 +149,7 @@ struct rina_kmsg_fa_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    uint32_t kevent_id;
     /* The ipcp_id field is currently unused, since port-id are currently
      * global, while the architecture says they should be unique only per
      * IPCP. */
@@ -203,6 +205,7 @@ struct rina_kmsg_uipcp_fa_req_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
+    uint32_t kevent_id;
     uint16_t ipcp_id;
     uint32_t remote_port;
     uint64_t remote_addr;

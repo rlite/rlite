@@ -72,9 +72,12 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
     if (!pfr) {
         PE("Out of memory\n");
         /* Negative flow allocation response. */
-        return rlite_flow_allocate_resp(application,req->ipcp_id, 0xffff,
-                                    req->port_id, 1);
+        return rlite_flow_allocate_resp(application, req->kevent_id,
+                                        req->ipcp_id, 0xffff,
+                                        req->port_id, 1);
     }
+
+    pfr->kevent_id = req->kevent_id;
     pfr->ipcp_id = req->ipcp_id;
     pfr->port_id = req->port_id;
     rina_name_copy(&pfr->remote_appl, &req->remote_appl);
@@ -218,8 +221,9 @@ flow_allocate_req(struct rlite_appl *application,
 }
 
 int
-rlite_flow_allocate_resp(struct rlite_appl *application, uint16_t ipcp_id,
-                   uint16_t upper_ipcp_id, uint32_t port_id, uint8_t response)
+rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
+                         uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                         uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
     struct rina_msg_base *resp;
@@ -233,6 +237,7 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint16_t ipcp_id,
     memset(req, 0, sizeof(*req));
 
     req->msg_type = RINA_KERN_FA_RESP;
+    req->kevent_id = kevent_id;
     req->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
     req->upper_ipcp_id = upper_ipcp_id;
     req->port_id = port_id;
@@ -432,8 +437,9 @@ rlite_flow_req_wait_open(struct rlite_appl *application)
             pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
-    result = rlite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
-                                pfr->port_id, 0);
+    result = rlite_flow_allocate_resp(application, pfr->kevent_id,
+                                      pfr->ipcp_id, 0xffff,
+                                      pfr->port_id, 0);
     port_id = pfr->port_id;
     rlite_pending_flow_req_free(pfr);
 

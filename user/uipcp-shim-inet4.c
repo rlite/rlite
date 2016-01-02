@@ -23,6 +23,7 @@ struct inet4_endpoint {
     int fd;
     struct sockaddr_in addr;
     unsigned int port_id;
+    uint32_t kevent_id;
 
     struct list_head node;
 };
@@ -30,6 +31,7 @@ struct inet4_endpoint {
 struct shim_inet4 {
     struct list_head endpoints;
     struct list_head bindpoints;
+    uint32_t kevent_id_cnt;
 };
 
 #define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
@@ -60,7 +62,7 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
         return -1;
     }
 
-    while ((n = getline(&linebuf, &sz, fin)) > 0) {
+    while (!found && (n = getline(&linebuf, &sz, fin)) > 0) {
         /* I know, strtok_r, strsep, etc. etc. I just wanted to have
          * some fun ;) */
         char *nm = linebuf;
@@ -121,7 +123,7 @@ parse_directory(int addr2sock, struct sockaddr_in *addr,
             }
         }
 
-        printf("oho '%s' '%s'[%d] '%d'\n", nm, ip, ret, atoi(port));
+        NPD("dir '%s' '%s'[%d] '%d'\n", nm, ip, ret, atoi(port));
     }
 
     if (linebuf) {
@@ -418,17 +420,32 @@ accept_conn(struct rlite_evloop *loop, int lfd)
         goto err1;
     }
 
+    ep->kevent_id = shim->kevent_id_cnt++;
     list_add_tail(&ep->node, &shim->endpoints);
 
     /* Push the file descriptor down to kernelspace. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
-    uipcp_issue_fa_req_arrived(uipcp, 0, 0,
+    uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0,
                                &local_appl, &remote_appl, &cfg);
     return;
 
 err1:
     free(ep);
+}
+
+static struct inet4_endpoint *
+get_endpoint_by_kevent_id(struct shim_inet4 *shim, uint32_t kevent_id)
+{
+    struct inet4_endpoint *ep;
+
+    list_for_each_entry(ep, &shim->endpoints, node) {
+        if (kevent_id == ep->kevent_id) {
+            return ep;
+        }
+    }
+
+    return NULL;
 }
 
 static int
@@ -438,7 +455,8 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
 
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (port_id == ep->port_id) {
-            PD("Removing endpoint [port=%u,sfd=%d]\n", ep->port_id, ep->fd);
+            PD("Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
+               ep->port_id, ep->kevent_id, ep->fd);
             close(ep->fd);
             free(ep);
             return 0;
@@ -450,20 +468,28 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
 
 static int
 shim_inet4_fa_resp(struct rlite_evloop *loop,
-              const struct rina_msg_base_resp *b_resp,
-              const struct rina_msg_base *b_req)
+                   const struct rina_msg_base_resp *b_resp,
+                   const struct rina_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct shim_inet4 *shim = SHIM(uipcp);
-    struct rina_kmsg_fa_resp *resp =
-                (struct rina_kmsg_fa_resp *)b_resp;
-    int ret;
+    struct rina_kmsg_fa_resp *resp = (struct rina_kmsg_fa_resp *)b_resp;
+    struct inet4_endpoint *ep;
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
+
+    ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
+    if (!ep) {
+        PE("Cannot find endpoint corresponding to kevent-id '%d'\n",
+           resp->kevent_id);
+        return 0;
+    }
+
+    ep->port_id = resp->port_id;
 
     if (!resp->response) {
         /* If response is positive, there is nothing to do here. */
@@ -471,10 +497,10 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
     }
 
     /* Negative response, we have to close the TCP/UDP connection. */
-    ret = remove_endpoint_by_port_id(shim, resp->port_id);
-    if (ret) {
-        PE("Cannot find endpoint corresponding to port '%d'\n", resp->port_id);
-    }
+    PD("Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
+            ep->port_id, ep->kevent_id, ep->fd);
+    close(ep->fd);
+    free(ep);
 
     return 0;
 }
@@ -515,6 +541,7 @@ shim_inet4_init(struct uipcp *uipcp)
 
     list_init(&shim->endpoints);
     list_init(&shim->bindpoints);
+    shim->kevent_id_cnt = 1;
 
     return 0;
 }

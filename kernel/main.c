@@ -1423,7 +1423,7 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
+        ret = rina_fa_req_arrived(ipcp, req->kevent_id, req->remote_port, req->remote_addr,
                                   &req->local_appl,
                                   &req->remote_appl, &req->flowcfg);
     }
@@ -1515,7 +1515,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * IPCP. Then bypass all the userspace flow allocation request
              * and directly invoke rina_fa_req_arrived, with reversed
              * arguments. */
-            ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
+            ret = rina_fa_req_arrived(ipcp_entry, 0, flow_entry->local_port,
                                       ipcp_entry->addr, remote_appl,
                                       local_appl, NULL /* XXX */);
             ipcp_application_put(app);
@@ -1708,7 +1708,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
     if (flow_entry->state != FLOW_STATE_PENDING) {
-        printk("flow %u is in invalid state %u\n",
+        PE("flow %u is in invalid state %u\n",
                 flow_entry->local_port, flow_entry->state);
         goto out;
     }
@@ -1730,7 +1730,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
          * currently true for shim IPCPs. */
         ret = ipcp->ops.flow_allocate_resp(ipcp, flow_entry, response);
     } else {
-        if (flow_entry->remote_addr == ipcp->addr) {
+        if (flow_entry->remote_addr && flow_entry->remote_addr == ipcp->addr) {
             /* This flow is managed entirely in this IPCP - basically
              * the flow is established between the IPCP and itself.
              * Bypass all the userspace flow allocation response
@@ -1775,7 +1775,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
      * by the request. */
     flow_entry = flow_get(req->port_id);
     if (!flow_entry) {
-        printk("no pending flow corresponding to port-id %u\n",
+        PE("no pending flow corresponding to port-id %u\n",
                 req->port_id);
         return ret;
     }
@@ -1789,7 +1789,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
 /* This may be called from softirq context. */
 int
-rina_fa_req_arrived(struct ipcp_entry *ipcp,
+rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                     uint32_t remote_port, uint64_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
@@ -1826,6 +1826,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     memset(&req, 0, sizeof(req));
     req.msg_type = RINA_KERN_FA_REQ_ARRIVED;
     req.event_id = 0;
+    req.kevent_id = kevent_id;
     req.ipcp_id = ipcp->id;
     req.port_id = flow_entry->local_port;
     rina_name_copy(&req.remote_appl, remote_appl);

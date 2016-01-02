@@ -713,7 +713,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
             goto drop;
         }
 
-        ret = rina_fa_req_arrived(priv->ipcp, 0, 0, &priv->upper_name,
+        ret = rina_fa_req_arrived(priv->ipcp, 0, 0, 0, &priv->upper_name,
                 &remote_app, NULL);
         rina_name_free(&remote_app);
 

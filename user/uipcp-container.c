@@ -104,7 +104,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 }
 
 int
-uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
+uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                      uint32_t remote_port, uint64_t remote_addr,
                      const struct rina_name *local_appl,
                      const struct rina_name *remote_appl,
@@ -123,6 +123,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
 
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_UIPCP_FA_REQ_ARRIVED;
+    req->kevent_id = kevent_id;
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
     req->remote_addr = remote_addr;
@@ -147,8 +148,8 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
 
 int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
-                      uint32_t remote_port, uint64_t remote_addr,
-                      uint8_t response, const struct rina_flow_config *flowcfg)
+                            uint32_t remote_port, uint64_t remote_addr,
+                            uint8_t response, const struct rina_flow_config *flowcfg)
 {
     struct rina_kmsg_uipcp_fa_resp_arrived *req;
     struct rina_msg_base *resp;

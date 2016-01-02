@@ -657,8 +657,8 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         result = 1;
     }
 
-    ret = rlite_flow_allocate_resp(&uipcp->appl, req->ipcp_id,
-            uipcp->ipcp_id, req->port_id, result);
+    ret = rlite_flow_allocate_resp(&uipcp->appl, req->kevent_id, req->ipcp_id,
+                                   uipcp->ipcp_id, req->port_id, result);
 
     if (ret || result) {
         PE("rlite_flow_allocate_resp() failed\n");
