@@ -37,6 +37,16 @@
 #include <linux/hashtable.h>
 
 
+/* Data structure associated to the /dev/rina-ctrl file descriptor. */
+struct rina_ctrl {
+    char msgbuf[1024];
+
+    /* Upqueue-related data structures. */
+    struct list_head upqueue;
+    struct mutex upqueue_lock;
+    wait_queue_head_t upqueue_wqh;
+};
+
 struct upqueue_entry {
     void *sermsg;
     size_t serlen;
@@ -54,6 +64,8 @@ struct registered_application {
 #define PORT_ID_HASHTABLE_BITS  7
 
 struct rina_dm {
+    struct rina_ctrl *ctrl;
+
     /* Bitmap to manage IPC process ids. */
     DECLARE_BITMAP(ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
 
@@ -148,16 +160,6 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
     return 0;
 }
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
-
-/* Data structure associated to the /dev/rina-ctrl file descriptor. */
-struct rina_ctrl {
-    char msgbuf[1024];
-
-    /* Upqueue-related data structures. */
-    struct list_head upqueue;
-    struct mutex upqueue_lock;
-    wait_queue_head_t upqueue_wqh;
-};
 
 static int
 rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
@@ -486,6 +488,21 @@ err3:
     return ret;
 }
 
+static struct registered_application *
+ipcp_application_lookup(struct ipcp_entry *ipcp,
+                        struct rina_name *application_name)
+{
+    struct registered_application *app;
+
+    list_for_each_entry(app, &ipcp->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            return app;
+        }
+    }
+
+    return NULL;
+}
+
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *application_name)
@@ -495,11 +512,11 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
     mutex_lock(&ipcp->lock);
 
-    list_for_each_entry(app, &ipcp->registered_applications, node) {
-        if (rina_name_cmp(&app->name, application_name) == 0) {
+    app = ipcp_application_lookup(ipcp, application_name);
+    if (app) {
+            /* Application is already registered. */
             mutex_unlock(&ipcp->lock);
             return -EINVAL;
-        }
     }
 
     app = kmalloc(sizeof(*app), GFP_KERNEL);
@@ -527,25 +544,18 @@ ipcp_application_del(struct ipcp_entry *ipcp,
                      struct rina_name *application_name)
 {
     struct registered_application *app;
-    int found = 0;
     char *name_s;
 
     mutex_lock(&ipcp->lock);
 
-    list_for_each_entry(app, &ipcp->registered_applications, node) {
-        if (rina_name_cmp(&app->name, application_name) == 0) {
-            found = 1;
-            break;
-        }
-    }
-
-    if (found) {
+    app = ipcp_application_lookup(ipcp, application_name);
+    if (app) {
         list_del(&app->node);
     }
 
     mutex_unlock(&ipcp->lock);
 
-    if (!found) {
+    if (!app) {
         return -EINVAL;
     }
 
@@ -644,8 +654,9 @@ flow_table_find(unsigned int port_id)
 }
 
 static int
-flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry,
-         int locked)
+flow_add(struct rina_name *local_application,
+         struct rina_name *remote_application,
+         struct flow_entry **pentry, int locked)
 {
     struct flow_entry *entry;
     int ret = 0;
@@ -665,8 +676,8 @@ flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry,
     if (entry->local_port < PORT_ID_BITMAP_SIZE) {
         bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
         /* Build and insert a flow entry in the hash table. */
-        rina_name_move(&entry->local_application, &req->local_application);
-        rina_name_move(&entry->remote_application, &req->remote_application);
+        rina_name_copy(&entry->local_application, local_application);
+        rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
         mutex_init(&entry->lock);
@@ -730,7 +741,8 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(req, &flow_entry, 0);
+    ret = flow_add(&req->local_application, &req->remote_application,
+                   &flow_entry, 0);
     if (ret) {
         goto negative;
     }
@@ -774,6 +786,62 @@ negative:
 
     return 0;
 }
+
+int
+rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
+                               uint16_t remote_port,
+                               struct rina_name *local_application,
+                               struct rina_name *remote_application)
+{
+    struct flow_entry *flow_entry = NULL;
+    struct registered_application *app;
+    struct rina_kmsg_flow_allocate_req *req;
+    int ret;
+
+    req = kmalloc(sizeof(*req), GFP_KERNEL);
+    if (!req) {
+        return -ENOMEM;
+    }
+
+    mutex_lock(&rina_dm.lock);
+
+    /* See whether the local application is registered to this
+     * IPC process. */
+    app = ipcp_application_lookup(ipcp, local_application);
+    if (!app) {
+        mutex_unlock(&rina_dm.lock);
+        return -EINVAL;
+    }
+
+    /* Allocate a port id and the associated flow entry. */
+    ret = flow_add(local_application, remote_application, &flow_entry, 0);
+    if (ret) {
+        mutex_unlock(&rina_dm.lock);
+        return ret;
+    }
+
+    printk("%s: Flow allocation requested to IPC process %u\n",
+                    __func__, req->ipcp_id);
+
+    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ;
+    req->event_id = 0;
+    req->ipcp_id = ipcp->id;
+    req->qos = 0;
+    rina_name_copy(&req->local_application, local_application);
+    rina_name_copy(&req->remote_application, remote_application);
+
+    /* Enqueue the request into the upqueue. */
+    ret = rina_upqueue_append(rina_dm.ctrl, (struct rina_msg_base *)req);
+    if (ret) {
+        flow_del(flow_entry->local_port, 0);
+        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
+    }
+
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
 
 /* The signature of a message handler. */
 typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
@@ -940,6 +1008,12 @@ rina_ctrl_open(struct inode *inode, struct file *f)
     mutex_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
+    mutex_lock(&rina_dm.lock);
+    if (!rina_dm.ctrl) {
+        rina_dm.ctrl = rc;
+    }
+    mutex_unlock(&rina_dm.lock);
+
     return 0;
 }
 
@@ -950,6 +1024,12 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 
     kfree(rc);
     f->private_data = NULL;
+
+    mutex_lock(&rina_dm.lock);
+    if (rc == rina_dm.ctrl) {
+        rina_dm.ctrl = NULL;
+    }
+    mutex_unlock(&rina_dm.lock);
 
     return 0;
 }
@@ -977,6 +1057,7 @@ rina_ctrl_init(void)
 {
     int ret;
 
+    rina_dm.ctrl = NULL;
     bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rina_dm.ipcp_table);
     mutex_init(&rina_dm.lock);

@@ -31,10 +31,12 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/workqueue.h>
 
 
 struct rina_shim_dummy {
     int fake;
+    struct work_struct decouple;
 };
 
 static void *
@@ -85,11 +87,26 @@ rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp,
     return 0;
 }
 
+static void
+flow_allocate_req_work(struct work_struct *w)
+{
+    struct rina_shim_dummy *priv = container_of(w,
+                        struct rina_shim_dummy, decouple);
+
+    //TODO invoke
+    (void)priv;
+}
+
 static int
 rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
-    return -1;
+    struct rina_shim_dummy *priv = (struct rina_shim_dummy *)ipcp->priv;
+
+    INIT_WORK(&priv->decouple, flow_allocate_req_work);
+    schedule_work(&priv->decouple);
+
+    return -1; //TODO return 0
 }
 
 static int

@@ -56,4 +56,9 @@ struct flow_entry {
 int rina_ipcp_factory_register(struct ipcp_factory *factory);
 int rina_ipcp_factory_unregister(uint8_t dif_type);
 
+int rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
+                                   uint16_t remote_port,
+                                   struct rina_name *local_application,
+                                   struct rina_name *remote_application);
+
 #endif  /* __RINA_IPCP_H__ */
