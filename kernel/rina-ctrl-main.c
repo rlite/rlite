@@ -1010,6 +1010,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
             /* No userspace IPCP to use, this should not happen. */
         } else {
             /* Reflect the flow allocation request message to userspace. */
+            req->event_id = 0;
             req->local_port = flow_entry->local_port;
             ret = rina_upqueue_append(ipcp_entry->uipcp,
                                       (const struct rina_msg_base *)req);
@@ -1135,6 +1136,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             /* No userspace IPCP to use, this should not happen. */
         } else {
             /* Reflect the flow allocation response message to userspace. */
+            resp->event_id = 0;
             resp->remote_port = flow_entry->remote_port;
             resp->remote_addr = flow_entry->remote_addr;
             ret = rina_upqueue_append(ipcp->uipcp,
