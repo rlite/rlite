@@ -31,6 +31,8 @@ argparser.add_argument('--no-program-script', dest='program_script',
 argparser.add_argument('-m', '--vm-memory',
                        help = "Memory of each VM, in MiB",
                        type = int, default = 256)
+argparser.add_argument('--quiet', dest='quiet',
+                       action='store_true', help = "Don't use set -x in bash scripts")
 
 args = argparser.parse_args()
 
@@ -94,9 +96,10 @@ print(links)
 fout = open('up.sh', 'w')
 
 outs =  '#!/bin/bash\n'             \
-        '\n'                        \
-        'set -x\n'                  \
-        '\n';
+        '\n'
+if not args.quiet:
+    outs += 'set -x\n'                  \
+            '\n';
 
 brid = 1
 
@@ -169,12 +172,17 @@ inet4_dir = []
 for i in sorted(vms):
     vm = vms[i]
 
+    d = {'name': vm['name'], 'ssh': vm['ssh'],
+                   'id': vm['id'], 'levels': args.levels,
+                   'shimtype': args.type}
+
     outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
-            'set -x\n'\
-            'sudo hostname %(name)s\n'\
+            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+    if not args.quiet:
+        outs += 'set -x\n'
+    outs += 'sudo hostname %(name)s\n'\
             '\n'\
             '[ "%(shimtype)s" == "null" ] && cd /usr/bin/ && sudo ln -sf true rlite-ctl\n'\
             '\n'\
@@ -192,9 +200,7 @@ for i in sorted(vms):
             '   rlite-ctl ipcp-create n.${i}.IPCP %(id)s normal n.${i}.DIF\n'\
             '   rlite-ctl ipcp-config n.${i}.IPCP %(id)s address %(id)d\n'\
             'done\n'\
-            '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
-                   'id': vm['id'], 'levels': args.levels,
-                   'shimtype': args.type}
+            '\n' % d
 
     for port in vm['ports']:
         vars_dict = {'mac': port['mac'], 'idx': port['idx'],
@@ -264,23 +270,26 @@ for br_name in sorted(bridges):
 
         vm = vms[vm_name]
 
+        d = {'ssh': vm['ssh'], 'id': vm['id'],
+             'pvid': pvm['id'], 'brid': b['id']}
+
         # Enroll against the pivot
 
         outs += ''\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
-            'set -x\n'\
-            'rlite-ctl ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
+                'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+        if not args.quiet:
+            outs += 'set -x\n'
+        outs += 'rlite-ctl ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
                                     'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
-            'true\n'\
-            'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
-                          'pvid': pvm['id'], 'brid': b['id']}
+                'true\n'\
+                'ENDSSH\n'\
+                '   DONE=$?\n'\
+                '   if [ $DONE != "0" ]; then\n'\
+                '       sleep 1\n'\
+                '   fi\n'\
+                'done\n\n' % d
 
 
 # Select the pivot VM ad libitum
@@ -294,24 +303,27 @@ for level in range(2, args.levels + 1):
 
         vm = vms[vm_name]
 
+        d = {'ssh': vm['ssh'], 'id': vm['id'],
+             'pvid': pvm['id'], 'level': level,
+              'lm1': level - 1}
+
         # Enroll against the pivot
 
         outs += ''\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
-            'set -x\n'\
-            'rlite-ctl ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
+                'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+        if not args.quiet:
+            outs += 'set -x\n'
+        outs += 'rlite-ctl ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
                             'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
-            'true\n'\
-            'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
-                          'pvid': pvm['id'], 'level': level,
-                          'lm1': level - 1}
+                'true\n'\
+                'ENDSSH\n'\
+                '   DONE=$?\n'\
+                '   if [ $DONE != "0" ]; then\n'\
+                '       sleep 1\n'\
+                '   fi\n'\
+                'done\n\n' % d
 
 fout.write(outs)
 fout.close()
@@ -325,9 +337,10 @@ print(vms)
 fout = open('down.sh', 'w')
 
 outs =  '#!/bin/bash\n'             \
-        '\n'                        \
-        'set -x\n'                  \
-        '\n'                        \
+        '\n'
+if not args.quiet:
+    outs += 'set -x\n'
+outs += '\n'                        \
         'kill_qemu() {\n'           \
         '   PIDFILE=$1\n'           \
         '   PID=$(cat $PIDFILE)\n'  \
@@ -378,8 +391,9 @@ if args.program_script:
 fout = open('test-server.sh', 'w')
 
 outs =  '#!/bin/bash\n'                                             \
-        '\n'                                                        \
-        'set -x\n'
+        '\n'
+if not args.quiet:
+    outs += 'set -x\n'
 
 # Run rinaperf in server mode on the pivot machine, at all layers
 outs += ''\
@@ -407,8 +421,9 @@ subprocess.call(['chmod', '+x', 'test-server.sh'])
 fout = open('test-client.sh', 'w')
 
 outs =  '#!/bin/bash\n'                                             \
-        '\n'                                                        \
-        'set -x\n'
+        '\n'
+if not args.quiet:
+    outs += 'set -x\n'
 
 # Run rinaperf in client mode on all but the pivot machine, at all layers,
 # towards the server running on the pivot machine
@@ -423,7 +438,8 @@ for vm_name in sorted(vms):
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
-    outs += 'set -x\n'
+    if not args.quiet:
+        outs += 'set -x\n'
 
     for level in range(1, args.levels + 1):
         outs += 'rinaperf -c 10 -d n.%(level)s.DIF\n' % {'level': level}

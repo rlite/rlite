@@ -125,8 +125,8 @@ topologies = ['gen.conf']
 # Prepare and run the tests
 for topofile in topologies:
     try:
-        subprocess.run(['./gen.py', '--no-program-script', '-c',
-                        topofile], timeout = 20 * tou)
+        subprocess.run(['./gen.py', '--no-program-script', '--quiet',
+                        '-c', topofile], timeout = 20 * tou)
     except subprocess.TimeoutExpired:
         print("gen.py timed out")
         continue
