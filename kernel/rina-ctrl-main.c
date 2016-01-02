@@ -745,8 +745,7 @@ flow_put(struct flow_entry *entry)
 
         BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
         /* Here we are sure that 'entry->upper.ipcp' will not be destroyed
-         * before 'entry' is destroyed, and so we can operate outside
-         * the global lock. */
+         * before 'entry' is destroyed.. */
         ret = entry->upper.ipcp->ops.pduft_del(entry->upper.ipcp, pfte);
         if (ret == 0) {
             PD("%s: Removed IPC process %u PDUFT entry: %llu --> %u\n",
@@ -777,7 +776,6 @@ out:
 }
 EXPORT_SYMBOL_GPL(flow_put);
 
-/* Must be called under global lock. */
 static void
 application_del_by_rc(struct rina_ctrl *rc)
 {
@@ -836,7 +834,6 @@ application_del_by_rc(struct rina_ctrl *rc)
     }
 }
 
-/* Must be called under global lock. */
 static void
 flow_rc_unbind(struct rina_ctrl *rc)
 {
@@ -880,7 +877,6 @@ flow_orphan(struct flow_entry *flow)
     }
 }
 
-/* Must be called under global lock. */
 static int
 ipcp_put(struct ipcp_entry *entry)
 {
@@ -1113,8 +1109,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         /* We allow this operation only if the requesting IPCP (req->ipcp_id)
          * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
          * In this situation we are sure that 'ipcp' will not be deleted before
-         * 'flow' is deleted, so it we can work outside the global lock and
-         * rely on the internal pduft lock. */
+         * 'flow' is deleted, so we can rely on the internal pduft lock. */
         ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
         mutex_unlock(&ipcp->lock);
     }
@@ -1199,7 +1194,6 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     return ret;
 }
 
-/* To be called under global lock. */
 static int
 rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
                      struct rina_ctrl *rc)
@@ -1232,7 +1226,6 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
     return ret;
 }
 
-/* To be called under global lock. */
 static int
 rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
                      uint32_t event_id,
@@ -1354,7 +1347,6 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return rina_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
 }
 
-/* To be called under global lock. */
 static int
 rina_fa_resp_internal(struct flow_entry *flow_entry,
                       uint8_t response,
@@ -2040,7 +2032,6 @@ rina_io_poll(struct file *f, poll_table *wait)
     return mask;
 }
 
-/* To be called under global lock. */
 static long
 rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 {
@@ -2077,7 +2068,6 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
     return 0;
 }
 
-/* To be called under global lock. */
 static long
 rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 {
@@ -2104,7 +2094,6 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
     return 0;
 }
 
-/* To be called under global lock. */
 static int
 rina_io_release_internal(struct rina_io *rio)
 {
