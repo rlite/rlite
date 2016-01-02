@@ -21,6 +21,13 @@
 #include "rlite/evloop.h"
 
 
+struct rlite_evloop_fdcb {
+    int fd;
+    rlite_evloop_fdcb_t cb;
+
+    struct list_head node;
+};
+
 struct rlite_tmr_event {
     int id;
     struct timespec exp;

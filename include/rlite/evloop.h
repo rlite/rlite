@@ -44,13 +44,6 @@ typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
 /* The signature of timer callback. */
 typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop, void *arg);
 
-struct rlite_evloop_fdcb {
-    int fd;
-    rlite_evloop_fdcb_t cb;
-
-    struct list_head node;
-};
-
 struct rlite_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
