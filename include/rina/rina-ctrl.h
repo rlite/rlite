@@ -23,10 +23,6 @@ struct rina_name {
     char *api;
     char *aen;
     char *aei;
-    uint16_t apn_len;
-    uint16_t api_len;
-    uint16_t aen_len;
-    uint16_t aei_len;
 };
 
 /* DIF types */

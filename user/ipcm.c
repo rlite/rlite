@@ -136,13 +136,9 @@ rina_name_fill(struct rina_name *name, char *apn,
                char *api, char *aen, char *aei)
 {
     name->apn = apn;
-    name->apn_len = apn ? strlen(apn) : 0;
     name->api = api;
-    name->api_len = api ? strlen(api) : 0;
     name->aen = aen;
-    name->aen_len = aen ? strlen(aen) : 0;
     name->aei = aei;
-    name->aei_len = aei ? strlen(aei) : 0;
 }
 
 /* Issue a request message to the kernel. */
