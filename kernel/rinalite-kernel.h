@@ -10,7 +10,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 
-#include "rina-bufs.h"
+#include "rinalite-bufs.h"
 
 
 struct ipcp_entry;

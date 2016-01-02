@@ -22,7 +22,7 @@
 #include <rinalite/rina-kernel-msg.h>
 #include <rinalite/rinalite-utils.h>
 #include "rinalite-kernel.h"
-#include "rina-bufs.h"
+#include "rinalite-bufs.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>

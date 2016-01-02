@@ -1,6 +1,6 @@
 #include <linux/types.h>
 #include <linux/slab.h>
-#include "rina-bufs.h"
+#include "rinalite-bufs.h"
 #include <rinalite/rinalite-common.h>
 
 
