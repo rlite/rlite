@@ -24,9 +24,14 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .names = 2,
         .strings = 1,
     },
-    [RINA_KERN_APPLICATION_REGISTER] = {
-        .copylen = sizeof(struct rina_kmsg_application_register) -
-                    sizeof(struct rina_name),
+    [RINA_KERN_APPL_REGISTER] = {
+        .copylen = sizeof(struct rina_kmsg_appl_register) -
+                    1 * sizeof(struct rina_name),
+        .names = 1,
+    },
+    [RINA_KERN_APPL_REGISTER_RESP] = {
+        .copylen = sizeof(struct rina_kmsg_appl_register_resp) -
+                    1 * sizeof(struct rina_name),
         .names = 1,
     },
     [RINA_KERN_FA_REQ] = {

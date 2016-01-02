@@ -89,6 +89,34 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
     return 0;
 }
 
+static int
+appl_register_resp(struct rlite_evloop *loop,
+                   const struct rina_msg_base_resp *b_resp,
+                   const struct rina_msg_base *b_req)
+{
+    struct rina_kmsg_appl_register_resp *resp =
+            (struct rina_kmsg_appl_register_resp *)b_resp;
+    char *appl_name_s = NULL;
+
+    (void)b_req;
+
+    appl_name_s = rina_name_to_string(&resp->application_name);
+
+    if (resp->response) {
+        PE("Application '%s' %sregistration failed\n", appl_name_s,
+            (resp->reg ? "" : "un"));
+    } else {
+        PD("Application '%s' %sregistration successfully completed\n",
+           appl_name_s, (resp->reg ? "" : "un"));
+    }
+
+    if (appl_name_s) {
+        free(appl_name_s);
+    }
+
+    return 0;
+}
+
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call rlite_issue_request(), in
@@ -100,39 +128,37 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
     [RINA_KERN_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
+    [RINA_KERN_APPL_REGISTER_RESP] = appl_register_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
-static int
+struct rina_kmsg_appl_register_resp *
 rlite_appl_register_req(struct rlite_appl *application,
-                         int reg, unsigned int ipcp_id,
-                         const struct rina_name *application_name)
+                        unsigned int wait_for_completion,
+                        int reg, unsigned int ipcp_id,
+                        const struct rina_name *application_name)
 {
-    struct rina_kmsg_application_register *req;
-    struct rina_msg_base *resp;
+    struct rina_kmsg_appl_register *req;
     int result;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
         PE("Out of memory\n");
-        return ENOMEM;
+        return NULL;
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_APPLICATION_REGISTER;
+    req->msg_type = RINA_KERN_APPL_REGISTER;
     req->ipcp_id = ipcp_id;
     req->reg = reg;
     rina_name_copy(&req->application_name, application_name);
 
     PD("Requesting application %sregistration...\n", (reg ? "": "un"));
 
-    resp = rlite_issue_request(&application->loop, RINALITE_RMB(req),
-                         sizeof(*req), 0, 0, &result);
-    assert(!resp);
-    PD("result: %d\n", result);
-
-    return result;
+    return (struct rina_kmsg_appl_register_resp *)
+           rlite_issue_request(&application->loop, RINALITE_RMB(req),
+                               sizeof(*req), 1, wait_for_completion, &result);
 }
 
 void
@@ -222,11 +248,12 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint16_t ipcp_id,
     return result;
 }
 
-int
-rlite_appl_register(struct rlite_appl *application, int reg,
-                     const struct rina_name *dif_name, int fallback,
-                     const struct rina_name *ipcp_name,
-                     const struct rina_name *application_name)
+struct rina_kmsg_appl_register_resp *
+rlite_appl_register(struct rlite_appl *application,
+                    unsigned int wait_for_completion, int reg,
+                    const struct rina_name *dif_name, int fallback,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *application_name)
 {
     struct rlite_ipcp *rlite_ipcp;
 
@@ -236,12 +263,30 @@ rlite_appl_register(struct rlite_appl *application, int reg,
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
-        return -1;
+        return NULL;
     }
 
     /* Forward the request to the kernel. */
-    return rlite_appl_register_req(application, reg, rlite_ipcp->ipcp_id,
-                                     application_name);
+    return rlite_appl_register_req(application, wait_for_completion, reg,
+                                   rlite_ipcp->ipcp_id, application_name);
+}
+
+int
+rlite_appl_register_wait(struct rlite_appl *application, int reg,
+                         const struct rina_name *dif_name, int fallback,
+                         const struct rina_name *ipcp_name,
+                         const struct rina_name *application_name)
+{
+    struct rina_kmsg_appl_register_resp *resp;
+
+    resp = rlite_appl_register(application, ~0U, reg, dif_name, fallback,
+                               ipcp_name, application_name);
+
+    if (!resp || resp->response != RLITE_SUCC) {
+        return -1;
+    }
+
+    return 0;
 }
 
 int

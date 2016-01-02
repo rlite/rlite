@@ -500,12 +500,12 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 }
 
 extern "C" int
-rib_application_register(struct uipcp_rib *rib, int reg,
-                         const struct rina_name *appl_name)
+rib_appl_register(struct uipcp_rib *rib,
+                  const struct rina_kmsg_appl_register *req)
 {
     ScopeLock(rib->lock);
 
-    return rib->application_register(reg, RinaName(appl_name));
+    return rib->appl_register(req);
 }
 
 extern "C" int

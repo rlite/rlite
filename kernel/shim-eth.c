@@ -947,7 +947,7 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.flow_allocate_resp = rina_shim_eth_fa_resp,
     .ops.sdu_write = rina_shim_eth_sdu_write,
     .ops.config = rina_shim_eth_config,
-    .ops.application_register = rina_shim_eth_register,
+    .ops.appl_register = rina_shim_eth_register,
     .ops.flow_deallocated = rina_shim_eth_flow_deallocated,
 };
 

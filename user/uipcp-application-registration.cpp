@@ -50,8 +50,9 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 }
 
 int
-uipcp_rib::application_register(int reg, const RinaName& appl_name)
+uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
 {
+    RinaName appl_name(&req->application_name);
     map< string, DFTEntry >::iterator mit;
     uint64_t local_addr;
     string name_str;
@@ -72,13 +73,14 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 
     mit = dft.find(name_str);
 
-    if (reg) {
+    if (req->reg) {
         if (mit != dft.end()) {
             PE("Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", name_str.c_str(),
                     (long long unsigned)mit->second.address,
                     (long long unsigned)local_addr);
-            return -1;
+            return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+                                            RLITE_ERR, req);
         }
 
         /* Insert the object into the RIB. */
@@ -88,7 +90,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
         if (mit == dft.end()) {
             PE("Application %s was not registered here\n",
                 name_str.c_str());
-            return -1;
+            return 0;
         }
 
         /* Remove the object from the RIB. */
@@ -99,10 +101,16 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
     dft_slice.entries.push_back(dft_entry);
 
     PD("Application %s %sregistered %s uipcp %d\n",
-            name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
+            name_str.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->ipcp_id);
 
     remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+
+    if (req->reg) {
+        /* Registration require a response, while unregistrations don't. */
+        return uipcp_appl_register_resp(uipcp, uipcp->ipcp_id,
+                                        RLITE_SUCC, req);
+    }
 
     return 0;
 }

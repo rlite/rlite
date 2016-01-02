@@ -74,6 +74,40 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 }
 
 int
+uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
+                         uint8_t response,
+                         const struct rina_kmsg_appl_register *req)
+{
+    struct rina_kmsg_appl_register_resp *resp;
+    struct rina_msg_base *fkresp;
+    int result;
+
+    /* Allocate and create a request message. */
+    resp = malloc(sizeof(*resp));
+    if (!resp) {
+        PE("Out of memory\n");
+        return ENOMEM;
+    }
+
+    memset(resp, 0, sizeof(*resp));
+    resp->msg_type = RINA_KERN_APPL_REGISTER_RESP;
+    resp->event_id = req->event_id;  /* This is just 0 for now. */
+    resp->ipcp_id = ipcp_id;
+    resp->reg = 1;
+    resp->response = response;
+    rina_name_copy(&resp->application_name, &req->application_name);
+
+    PD("Issuing application register response ...\n");
+
+    fkresp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(resp),
+                               sizeof(*resp), 0, 0, &result);
+    assert(!fkresp);
+    PD("result: %d\n", result);
+
+    return result;
+}
+
+int
 uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
                 uint64_t dest_addr, uint32_t local_port)
 {
@@ -238,6 +272,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RINA_MGMT_HDR_T_IN);
 
+    /* Hand off the message to the RIB. */
     rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
                   n - sizeof(*mhdr));
 out:
@@ -280,17 +315,17 @@ uipcp_fa_resp(struct rlite_evloop *loop,
 }
 
 static int
-uipcp_application_register(struct rlite_evloop *loop,
+uipcp_appl_register(struct rlite_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
-    struct rina_kmsg_application_register *req =
-                (struct rina_kmsg_application_register *)b_resp;
+    struct rina_kmsg_appl_register *req =
+                (struct rina_kmsg_appl_register *)b_resp;
 
-    rib_application_register(uipcp->rib, req->reg, &req->application_name);
+    rib_appl_register(uipcp->rib, req);
 
     return 0;
 }
@@ -448,8 +483,8 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     }
 
     ret = rlite_evloop_set_handler(&uipcp->appl.loop,
-                                      RINA_KERN_APPLICATION_REGISTER,
-                                      uipcp_application_register);
+                                      RINA_KERN_APPL_REGISTER,
+                                      uipcp_appl_register);
     if (ret) {
         goto err2;
     }

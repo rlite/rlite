@@ -328,8 +328,8 @@ rlite_evloop_stop(struct rlite_evloop *loop)
  * @msg. */
 struct rina_msg_base *
 rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int has_response,
-              unsigned int wait_for_completion, int *result)
+                    size_t msg_len, int has_response,
+                    unsigned int wait_for_completion, int *result)
 {
     struct rina_msg_base *resp = NULL;
     struct pending_entry *entry = NULL;

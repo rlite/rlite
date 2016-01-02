@@ -33,6 +33,9 @@ struct rina_name {
 
 typedef uint16_t rina_msg_t;
 
+#define RLITE_SUCC  0
+#define RLITE_ERR   1
+
 /* All the possible messages begin like this. */
 struct rina_msg_base {
     rina_msg_t msg_type;

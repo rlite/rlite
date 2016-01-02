@@ -34,3 +34,6 @@
   con conseguenti malfunzionamenti, visto che in kernelspace non è
   disponibile la DFT completa
 
+- implementare un semplice livello di protezione, ad esempio distinguendo
+  quelle operazioni che possono essere effettuate solo da UIPCP, ed altre
+  che possono essere fatte da tutte le applicazioni

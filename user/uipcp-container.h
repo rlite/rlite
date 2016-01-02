@@ -47,17 +47,30 @@ enum {
 };
 
 void *uipcp_server(void *arg);
+
 int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
+
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
+
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
+
 int uipcps_fetch(struct uipcps *uipcps);
-int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
+
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
+
 int mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
                            void *buf, size_t buflen);
+
+int uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
+                             uint8_t response,
+                             const struct rina_kmsg_appl_register *req);
+
 int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
                     uint64_t dest_addr, uint32_t local_port);
+
+int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
+
 int uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                      uint64_t remote_addr,
                      const struct rina_name *local_application,
@@ -72,8 +85,8 @@ int uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 struct uipcp_rib *rib_create(struct uipcp *uipcp);
 void rib_destroy(struct uipcp_rib *rib);
 
-int rib_application_register(struct uipcp_rib *rib, int reg,
-                             const struct rina_name *appl_name);
+int rib_appl_register(struct uipcp_rib *rib,
+                      const struct rina_kmsg_appl_register *req);
 
 int rib_flow_deallocated(struct uipcp_rib *rib,
                          struct rina_kmsg_flow_deallocated *req);

@@ -120,7 +120,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
     rlite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform the registration. */
-    result = rlite_appl_register(&uipcp->appl, reg, dif_name,
+    result = rlite_appl_register_wait(&uipcp->appl, reg, dif_name,
                                   0, NULL, ipcp_name);
 
     if (result == 0) {

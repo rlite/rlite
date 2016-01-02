@@ -66,6 +66,7 @@ struct upqueue_entry {
 struct registered_application {
     struct rina_name name;
     struct rina_ctrl *rc;
+    uint32_t event_id;
     struct ipcp_entry *ipcp;
     unsigned int refcnt;
     struct work_struct remove;
@@ -515,9 +516,9 @@ app_remove_work(struct work_struct *w)
                             struct registered_application, remove);
     struct ipcp_entry *ipcp = app->ipcp;
 
-    if (ipcp->ops.application_register) {
+    if (ipcp->ops.appl_register) {
         mutex_lock(&ipcp->lock);
-        ipcp->ops.application_register(ipcp, &app->name, 0);
+        ipcp->ops.appl_register(ipcp, &app->name, 0);
         mutex_unlock(&ipcp->lock);
     }
 
@@ -551,7 +552,7 @@ ipcp_application_put(struct registered_application *app)
 
     RAUNLOCK(ipcp);
 
-    if (ipcp->ops.application_register) {
+    if (ipcp->ops.appl_register) {
         /* Perform cleanup operation in process context, because we need
          * to take the per-ipcp mutex. */
         schedule_work(&app->remove);
@@ -564,7 +565,8 @@ ipcp_application_put(struct registered_application *app)
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *application_name,
-                     struct rina_ctrl *rc)
+                     struct rina_ctrl *rc,
+                     uint32_t event_id)
 {
     struct registered_application *app, *newapp;
     int ret = 0;
@@ -577,6 +579,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
     rina_name_copy(&newapp->name, application_name);
     newapp->rc = rc;
+    newapp->event_id = event_id;
     newapp->refcnt = 1;
     newapp->ipcp = ipcp;
     INIT_WORK(&newapp->remove, app_remove_work);
@@ -603,9 +606,9 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     PUNLOCK();
     PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
 
-    if (ipcp->ops.application_register) {
+    if (ipcp->ops.appl_register) {
         mutex_lock(&ipcp->lock);
-        ret = ipcp->ops.application_register(ipcp, application_name, 1);
+        ret = ipcp->ops.appl_register(ipcp, application_name, 1);
         mutex_unlock(&ipcp->lock);
         if (ret) {
             ipcp_application_put(newapp);
@@ -1029,9 +1032,9 @@ application_del_by_rc(struct rina_ctrl *rc)
 
         /* Notify userspace IPCP if required. */
         if (app->ipcp->uipcp) {
-            struct rina_kmsg_application_register ntfy;
+            struct rina_kmsg_appl_register ntfy;
 
-            ntfy.msg_type = RINA_KERN_APPLICATION_REGISTER;
+            ntfy.msg_type = RINA_KERN_APPL_REGISTER;
             ntfy.event_id = 0;
             ntfy.ipcp_id = app->ipcp->id;
             ntfy.reg = false;
@@ -1540,10 +1543,10 @@ out:
 }
 
 static int
-rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_appl_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_application_register *req =
-                    (struct rina_kmsg_application_register *)bmsg;
+    struct rina_kmsg_appl_register *req =
+                    (struct rina_kmsg_appl_register *)bmsg;
     struct rina_name *appl_name = &req->application_name;
     char *name_s = rina_name_to_string(appl_name);
     struct ipcp_entry *ipcp;
@@ -1553,26 +1556,91 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = 0;
+
         if (req->reg) {
-            ret = ipcp_application_add(ipcp, appl_name, rc);
+            ret = ipcp_application_add(ipcp, appl_name, rc, req->event_id);
         } else {
             ret = ipcp_application_del(ipcp, appl_name);
         }
-    }
 
-    if (!ret && ipcp->uipcp) {
-        /* Reflect to userspace this (un)registration, so that userspace
-         * IPC process can take appropriate actions. */
-        req->event_id = 0;
-        rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)req);
+        if (ipcp->uipcp) {
+            /* Reflect to userspace this (un)registration, so that userspace
+             * IPCP can take appropriate actions. */
+            req->event_id = 0;
+            rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)req);
+        }
+
+        if (!ipcp->uipcp || !req->reg) {
+            /* Complete the (un)registration immediately notifying the requesting
+             * application. */
+            if (ret == 0) {
+                struct rina_kmsg_appl_register_resp resp;
+
+                resp.msg_type = RINA_KERN_APPL_REGISTER_RESP;
+                resp.event_id = req->event_id;
+                resp.ipcp_id = req->ipcp_id;
+                resp.reg = req->reg;
+                resp.response = 0;
+                rina_name_move(&resp.application_name, &req->application_name);
+
+                rina_upqueue_append(rc, (const struct rina_msg_base *)&resp);
+
+                PI("Application process %s %sregistered to IPC process %u\n",
+                        name_s, (req->reg ? "" : "un"), req->ipcp_id);
+            }
+        }
     }
 
     ipcp_put(ipcp);
 
-    if (ret == 0) {
-        printk("Application process %s %sregistered to IPC process %u\n",
-                name_s, (req->reg ? "" : "un"), req->ipcp_id);
+    if (name_s) {
+        kfree(name_s);
     }
+
+    return ret;
+}
+
+static int
+rina_appl_register_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_appl_register_resp *resp =
+                    (struct rina_kmsg_appl_register_resp *)bmsg;
+    struct rina_name *appl_name = &resp->application_name;
+    char *name_s = rina_name_to_string(appl_name);
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    ipcp = ipcp_get(resp->ipcp_id);
+
+    if (!ipcp || !ipcp->uipcp || !resp->reg) {
+        PE("Spurious/malicious application register response to "
+           "IPCP %u\n", resp->ipcp_id);
+    } else {
+        struct registered_application *app;
+
+        app = ipcp_application_get(ipcp, &resp->application_name);
+        if (!app) {
+            PE("Application register response does not match registration for "
+               "'%s'\n", name_s);
+        } else {
+            ret = 0;
+            resp->event_id = app->event_id;
+
+            if (resp->response != 0) {
+                /* Userspace IPCP denied the registration. */
+                ipcp_application_put(app);
+
+            } else {
+                PI("Application process %s %sregistered to IPC process %u\n",
+                        name_s, (resp->reg ? "" : "un"), resp->ipcp_id);
+            }
+            rina_upqueue_append(app->rc, (const struct rina_msg_base *)resp);
+        }
+        ipcp_application_put(app);
+    }
+
+    ipcp_put(ipcp);
+
     if (name_s) {
         kfree(name_s);
     }
@@ -1948,7 +2016,8 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
     [RINA_KERN_IPCP_PDUFT_FLUSH] = rina_ipcp_pduft_flush,
-    [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
+    [RINA_KERN_APPL_REGISTER] = rina_appl_register,
+    [RINA_KERN_APPL_REGISTER_RESP] = rina_appl_register_resp,
     [RINA_KERN_FA_REQ] = rina_fa_req,
     [RINA_KERN_FA_RESP] = rina_fa_resp,
     [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
