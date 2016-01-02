@@ -163,4 +163,14 @@ struct RateBasedFlowCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct FlowCtrlConfig {
+    uint8_t fc_type;
+    WindowBasedFlowCtrlConfig win;
+    RateBasedFlowCtrlConfig rate;
+
+    FlowCtrlConfig() { }
+    FlowCtrlConfig(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

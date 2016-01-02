@@ -603,3 +603,56 @@ RateBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2FlowCtrlConfig(FlowCtrlConfig& cfg,
+                   const gpb::dtcpFlowControlConfig_t &gm)
+{
+    if (gm.windowbased()) {
+        cfg.fc_type = RINA_FC_T_WIN;
+    } else if (gm.ratebased()) {
+        cfg.fc_type = RINA_FC_T_RATE;
+    }
+    gpb2WindowBasedFlowCtrlConfig(cfg.win, gm.windowbasedconfig());
+    gpb2RateBasedFlowCtrlConfig(cfg.rate, gm.ratebasedconfig());
+}
+
+static int
+FlowCtrlConfig2gpb(const FlowCtrlConfig& cfg,
+                   gpb::dtcpFlowControlConfig_t &gm)
+{
+    gpb::dtcpWindowBasedFlowControlConfig_t *w;
+    gpb::dtcpRateBasedFlowControlConfig_t *r;
+
+    gm.set_windowbased(cfg.fc_type == RINA_FC_T_WIN);
+    gm.set_ratebased(cfg.fc_type == RINA_FC_T_RATE);
+
+    w = new gpb::dtcpWindowBasedFlowControlConfig_t;
+    WindowBasedFlowCtrlConfig2gpb(cfg.win, *w);
+    gm.set_allocated_windowbasedconfig(w);
+
+    r = new gpb::dtcpRateBasedFlowControlConfig_t;
+    RateBasedFlowCtrlConfig2gpb(cfg.rate, *r);
+    gm.set_allocated_ratebasedconfig(r);
+
+    return 0;
+}
+
+FlowCtrlConfig::FlowCtrlConfig(const char *buf, unsigned int size)
+{
+    gpb::dtcpFlowControlConfig_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2FlowCtrlConfig(*this, gm);
+}
+
+int
+FlowCtrlConfig::serialize(char *buf, unsigned int size) const
+{
+    gpb::dtcpFlowControlConfig_t gm;
+
+    FlowCtrlConfig2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
