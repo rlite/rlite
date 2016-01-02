@@ -322,7 +322,7 @@ Worker::run()
             /* We've been requested to repoll the queue. */
             nrdy--;
             if (pollfds[0].revents & POLLIN) {
-                PD("w%d: Mappings changed, rebuliding poll array\n", idx);
+                PD("w%d: Mappings changed, rebuilding poll array\n", idx);
                 pthread_mutex_lock(&lock);
                 drain_syncfd();
                 pthread_mutex_unlock(&lock);
@@ -353,7 +353,7 @@ Worker::run()
             PD("w%d: fd %d ready, events %d\n", idx,
                pollfds[i].fd, pollfds[i].revents);
 
-            if (!pollfds[i].revents & POLLIN) {
+            if (!(pollfds[i].revents & POLLIN)) {
                 /* No read event, so forwarding cannot happen, let's
                  * skip it. */
                 continue;
@@ -388,6 +388,8 @@ Worker::run()
                 mit = fdmap.find(ofd);
                 assert(mit != fdmap.end());
                 fdmap.erase(mit);
+            } else {
+                PD("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
             }
         }
 

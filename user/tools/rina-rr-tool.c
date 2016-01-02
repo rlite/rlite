@@ -139,6 +139,8 @@ server(struct rina_rr *rr)
         }
 
         close(dfd);
+
+        PI("Response sent back\n");
     }
 
     return 0;
