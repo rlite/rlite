@@ -133,20 +133,28 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     return 0;
 }
 
-static struct flow_entry *
-pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
+static struct pduft_entry *
+pduft_lookup_internal(struct rina_normal *priv, uint64_t dest_addr)
 {
-    struct flow_entry *entry;
+    struct pduft_entry *entry;
     struct hlist_head *head;
 
     head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
-    hlist_for_each_entry(entry, head, ftnode) {
-        if (entry->pduft_dest_addr == dest_addr) {
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->address == dest_addr) {
             return entry;
         }
     }
 
     return NULL;
+}
+
+static struct flow_entry *
+pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
+{
+    struct pduft_entry *entry = pduft_lookup_internal(priv, dest_addr);
+
+    return entry ? entry->flow : NULL;
 }
 
 static int
@@ -398,15 +406,39 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
                       struct flow_entry *flow)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
-    struct flow_entry *prev;
+    struct pduft_entry *entry;
 
-    prev = pduft_lookup(priv, dest_addr);
-    if (prev) {
-        hash_del(&flow->ftnode);
+    entry = pduft_lookup_internal(priv, dest_addr);
+
+    if (!entry) {
+        entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+        if (!entry) {
+            return -ENOMEM;
+        }
+
+        hash_add(priv->pdu_ft, &entry->node, dest_addr);
+        list_add_tail(&entry->fnode, &flow->pduft_entries);
+    } else {
+        /* Move from the old list to the new one. */
+        list_del(&entry->fnode);
+        list_add_tail(&entry->fnode, &flow->pduft_entries);
     }
 
-    flow->pduft_dest_addr = dest_addr;
-    hash_add(priv->pdu_ft, &flow->ftnode, dest_addr);
+    entry->flow = flow;
+    entry->address = dest_addr;
+
+    return 0;
+}
+
+static int
+rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
+{
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+
+    (void)priv;
+    list_del(&entry->fnode);
+    hash_del(&entry->node);
+    kfree(entry);
 
     return 0;
 }
@@ -858,6 +890,7 @@ rina_normal_init(void)
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
+    factory.ops.pduft_del = rina_normal_pduft_del;
     factory.ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write;
     factory.ops.sdu_rx = rina_normal_sdu_rx;
 

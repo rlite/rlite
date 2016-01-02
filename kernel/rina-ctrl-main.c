@@ -136,6 +136,10 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         return -EINVAL;
     }
 
+    if (factory->ops.pduft_set && ! factory->ops.pduft_del) {
+        return -EINVAL;
+    }
+
     /* Build a copy and insert it into the IPC process factories
      * list. */
     f = kzalloc(sizeof(*f), GFP_KERNEL);
@@ -539,11 +543,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
-        entry->pduft_dest_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;
+        INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         INIT_LIST_HEAD(&entry->rmtq);
@@ -581,6 +585,7 @@ flow_put(struct flow_entry *entry)
 {
     struct rina_buf *rb;
     struct rina_buf *tmp;
+    struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
 
@@ -627,10 +632,6 @@ flow_put(struct flow_entry *entry)
 
     ret = NULL;
 
-    /* We could be in atomic context here, so let's defer the ipcp
-     * removal in a worker process context. */
-    schedule_work(&entry->txrx.ipcp->remove);
-
     dtp_fini(&entry->dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
@@ -642,8 +643,25 @@ flow_put(struct flow_entry *entry)
         list_del(&rb->node);
         rina_buf_free(rb);
     }
+
+    list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
+        int ret;
+        uint64_t dest_addr = pfte->address;
+
+        BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
+        ret = entry->upper.ipcp->ops.pduft_del(entry->upper.ipcp, pfte);
+        if (ret == 0) {
+            PD("%s: Removed IPC process %u PDUFT entry: %llu --> %u\n", __func__,
+                    entry->upper.ipcp->id, (unsigned long long)dest_addr,
+                    entry->local_port);
+        }
+    }
+
+    /* We could be in atomic context here, so let's defer the ipcp
+     * removal in a worker process context. */
+    schedule_work(&entry->txrx.ipcp->remove);
+
     hash_del(&entry->node);
-    hash_del(&entry->ftnode);
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
@@ -1960,17 +1978,25 @@ rina_io_release_internal(struct rina_io *rio)
     switch (rio->mode) {
         case RINA_IO_MODE_APPL_BIND:
         case RINA_IO_MODE_IPCP_BIND:
-            BUG_ON(!rio->flow);
-            /* A previous flow was bound to this file descriptor,
-             * so let's unbind from it. */
-            if (rio->flow->upper.ipcp) {
-                PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
-                ipcp_del_entry(rio->flow->upper.ipcp);
+            {
+                /* A previous flow was bound to this file descriptor,
+                 * so let's unbind from it. */
+                struct ipcp_entry *upper_ipcp;
+
+                BUG_ON(!rio->flow);
+                upper_ipcp = rio->flow->upper.ipcp;  /* save a pointer */
+
+                flow_put(rio->flow);
+
+                if (upper_ipcp) {
+                    PD("%s: REFCNT-- %u: %u\n", __func__, upper_ipcp->id,
+                            upper_ipcp->refcnt);
+                    ipcp_del_entry(upper_ipcp);
+                }
+                rio->flow = NULL;
+                rio->txrx = NULL;
+                break;
             }
-            flow_put(rio->flow);
-            rio->flow = NULL;
-            rio->txrx = NULL;
-            break;
 
         case RINA_IO_MODE_IPCP_MGMT:
             BUG_ON(!rio->txrx);

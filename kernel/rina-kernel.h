@@ -15,6 +15,7 @@
 struct ipcp_entry;
 struct flow_entry;
 struct rina_ctrl;
+struct pduft_entry;
 
 struct ipcp_ops {
     void (*destroy)(struct ipcp_entry *ipcp);
@@ -38,6 +39,7 @@ struct ipcp_ops {
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
                      struct flow_entry *flow);
+    int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
     int (*dft_set)(struct ipcp_entry *ipcp, const struct rina_name *appl_name,
                    uint64_t remote_addr);
     int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,
@@ -124,7 +126,6 @@ struct flow_entry {
     uint16_t            local_port;  /* flow table key */
     uint16_t            remote_port;
     uint64_t            remote_addr;
-    uint64_t            pduft_dest_addr;  /* pduft key */
     uint8_t             state;
     struct rina_name    local_application;
     struct rina_name    remote_application;
@@ -139,9 +140,17 @@ struct flow_entry {
     spinlock_t          rmtq_lock;
     struct tasklet_struct   tx_completion;
 
+    struct list_head    pduft_entries;
+
     unsigned int        refcnt;
     struct hlist_node   node;
-    struct hlist_node   ftnode;
+};
+
+struct pduft_entry {
+    uint64_t            address;    /* pdu_ft key */
+    struct flow_entry   *flow;
+    struct hlist_node   node;       /* for the pdu_ft hash table */
+    struct list_head    fnode;      /* for the flow->pduft_entries list */
 };
 
 int rina_ipcp_factory_register(struct ipcp_factory *factory);
