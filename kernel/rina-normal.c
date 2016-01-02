@@ -206,11 +206,29 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_normal_config(struct ipcp_entry *ipcp,
-                       const char *param_name,
-                       const char *param_value)
+rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
+                   const char *param_value)
 {
     return -EINVAL;
+}
+
+static int
+rina_normal_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
+                    uint32_t remote_port,
+                    const struct rina_name *remote_ipcp_name)
+{
+    /* Always respond positively to flow allocation requests. */
+    return 0;
+}
+
+static int
+rina_normal_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
+                                       struct flow_entry *flow,
+                                       uint8_t response)
+{
+    PI("%s, response %u\n", __func__, response);
+
+    return 0;
 }
 
 static int __init
@@ -231,6 +249,8 @@ rina_normal_init(void)
     factory.ops.flow_allocate_resp = rina_normal_flow_allocate_resp;
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
+    factory.ops.flow_allocate_req_arrived = rina_normal_flow_allocate_req_arrived;
+    factory.ops.flow_allocate_resp_arrived = rina_normal_flow_allocate_resp_arrived;
 
     ret = rina_ipcp_factory_register(&factory);
 

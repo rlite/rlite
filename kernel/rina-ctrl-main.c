@@ -422,6 +422,107 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
+/* Code improvement: we may merge ipcp_table_find() and flow_table_find()
+ * into a template (a macro). */
+static struct flow_entry *
+flow_table_find(unsigned int port_id)
+{
+    struct flow_entry *entry;
+    struct hlist_head *head;
+
+    head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->local_port == port_id) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
+         uint32_t event_id,
+         const struct rina_name *local_application,
+         const struct rina_name *remote_application,
+         struct flow_entry **pentry, int locked)
+{
+    struct flow_entry *entry;
+    int ret = 0;
+
+    *pentry = entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+    if (!entry) {
+        return -ENOMEM;
+    }
+
+    if (locked)
+        mutex_lock(&rina_dm.lock);
+
+    /* Try to alloc a port id from the bitmap. */
+    entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
+                                                PORT_ID_BITMAP_SIZE, 0, 1, 0);
+    if (entry->local_port < PORT_ID_BITMAP_SIZE) {
+        bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
+        /* Build and insert a flow entry in the hash table. */
+        rina_name_copy(&entry->local_application, local_application);
+        rina_name_copy(&entry->remote_application, remote_application);
+        entry->remote_port = 0;  /* Not valid. */
+        entry->state = FLOW_STATE_NULL;
+        entry->ipcp = ipcp;
+        entry->upper = upper;
+        entry->event_id = event_id;
+        mutex_init(&entry->lock);
+        entry->refcnt = 0;
+        spin_lock_init(&entry->rxq_lock);
+        INIT_LIST_HEAD(&entry->rxq);
+        init_waitqueue_head(&entry->rxq_wqh);
+        hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+        ipcp->refcnt++;
+    } else {
+        kfree(entry);
+        *pentry = NULL;
+        ret = -ENOSPC;
+    }
+
+    if (locked)
+        mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+flow_del_entry(struct flow_entry *entry, int locked)
+{
+    struct rina_buf *rb;
+    struct rina_buf *tmp;
+    int ret = 0;
+
+    if (locked)
+        mutex_lock(&rina_dm.lock);
+
+    if (entry->refcnt) {
+        /* Flow is being used by someone. */
+        ret = -EBUSY;
+        goto out;
+    }
+
+    entry->ipcp->refcnt--;
+    list_for_each_entry_safe(rb, tmp, &entry->rxq, node) {
+        rina_buf_free(rb);
+    }
+    hash_del(&entry->node);
+    rina_name_free(&entry->local_application);
+    rina_name_free(&entry->remote_application);
+    bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
+    printk("%s: flow entry %u removed\n", __func__, entry->local_port);
+    kfree(entry);
+out:
+    if (locked)
+        mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
 /* Must be called under global lock. */
 static void
 application_del_by_rc_or_ipcp(struct upper_ref upper)
@@ -450,6 +551,22 @@ application_del_by_rc_or_ipcp(struct upper_ref upper)
     }
 }
 
+/* Must be called under global lock. */
+static void
+flow_del_by_upper(struct upper_ref upper)
+{
+    struct flow_entry *flow;
+    struct hlist_node *tmp;
+    int bucket;
+
+    hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
+        if ((upper.userspace && flow->upper.rc == upper.rc) ||
+            (!upper.userspace && flow->upper.ipcp == upper.ipcp)) {
+            flow_del_entry(flow, 0);
+        }
+    }
+}
+
 static int
 ipcp_del_entry(struct ipcp_entry *entry, int locked)
 {
@@ -464,9 +581,11 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
     }
 
     /* Before actually removing @entry, we have to
-     * unregister the IPCP from all the IPC process
+     * unregister the IPCP from all the IPCPs
      * where it is registered. */
     application_del_by_rc_or_ipcp(upper);
+    /* And removing all the flows used by the IPCP. */
+    flow_del_by_upper(upper);
 
     if (entry->refcnt) {
         ret = -EBUSY;
@@ -782,107 +901,6 @@ out:
     return ret;
 }
 
-/* Code improvement: we may merge ipcp_table_find() and flow_table_find()
- * into a template (a macro). */
-static struct flow_entry *
-flow_table_find(unsigned int port_id)
-{
-    struct flow_entry *entry;
-    struct hlist_head *head;
-
-    head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
-    hlist_for_each_entry(entry, head, node) {
-        if (entry->local_port == port_id) {
-            return entry;
-        }
-    }
-
-    return NULL;
-}
-
-static int
-flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
-         uint32_t event_id,
-         const struct rina_name *local_application,
-         const struct rina_name *remote_application,
-         struct flow_entry **pentry, int locked)
-{
-    struct flow_entry *entry;
-    int ret = 0;
-
-    *pentry = entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-    if (!entry) {
-        return -ENOMEM;
-    }
-
-    if (locked)
-        mutex_lock(&rina_dm.lock);
-
-    /* Try to alloc a port id from the bitmap. */
-    entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
-                                                PORT_ID_BITMAP_SIZE, 0, 1, 0);
-    if (entry->local_port < PORT_ID_BITMAP_SIZE) {
-        bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
-        /* Build and insert a flow entry in the hash table. */
-        rina_name_copy(&entry->local_application, local_application);
-        rina_name_copy(&entry->remote_application, remote_application);
-        entry->remote_port = 0;  /* Not valid. */
-        entry->state = FLOW_STATE_NULL;
-        entry->ipcp = ipcp;
-        entry->upper = upper;
-        entry->event_id = event_id;
-        mutex_init(&entry->lock);
-        entry->refcnt = 0;
-        spin_lock_init(&entry->rxq_lock);
-        INIT_LIST_HEAD(&entry->rxq);
-        init_waitqueue_head(&entry->rxq_wqh);
-        hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
-        ipcp->refcnt++;
-    } else {
-        kfree(entry);
-        *pentry = NULL;
-        ret = -ENOSPC;
-    }
-
-    if (locked)
-        mutex_unlock(&rina_dm.lock);
-
-    return ret;
-}
-
-static int
-flow_del_entry(struct flow_entry *entry, int locked)
-{
-    struct rina_buf *rb;
-    struct rina_buf *tmp;
-    int ret = 0;
-
-    if (locked)
-        mutex_lock(&rina_dm.lock);
-
-    if (entry->refcnt) {
-        /* Flow is being used by someone. */
-        ret = -EBUSY;
-        goto out;
-    }
-
-    entry->ipcp->refcnt--;
-    list_for_each_entry_safe(rb, tmp, &entry->rxq, node) {
-        rina_buf_free(rb);
-    }
-    hash_del(&entry->node);
-    rina_name_free(&entry->local_application);
-    rina_name_free(&entry->remote_application);
-    bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
-    printk("%s: flow entry %u removed\n", __func__, entry->local_port);
-    kfree(entry);
-out:
-    if (locked)
-        mutex_unlock(&rina_dm.lock);
-
-    return ret;
-}
-
 /* To be called under global lock. */
 static int
 rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
@@ -978,21 +996,6 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
-/* Must be called under global lock. */
-static void
-flow_del_by_rc(struct rina_ctrl *rc)
-{
-    struct flow_entry *flow;
-    struct hlist_node *tmp;
-    int bucket;
-
-    hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
-        if (flow->upper.rc == rc) {
-            flow_del_entry(flow, 0);
-        }
-    }
-}
-
 static int
 rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
@@ -1046,6 +1049,35 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return rina_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
 }
 
+/* To be called under global lock. */
+static int
+rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
+                                 uint8_t response)
+{
+    int ret = -EINVAL;
+
+    /* Check that the flow is in pending state and make the
+     * transition to the allocated state. */
+    if (flow_entry->state != FLOW_STATE_PENDING) {
+        printk("%s: flow %u is in invalid state %u\n",
+                __func__, flow_entry->local_port, flow_entry->state);
+        goto out;
+    }
+    flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
+                                        : FLOW_STATE_NULL;
+
+    /* Notify the involved IPC process about the response. */
+    ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
+                                                   flow_entry,
+                                                   response);
+    if (ret || response) {
+        flow_del_entry(flow_entry, 0);
+    }
+out:
+
+    return ret;
+}
+
 static int
 rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
@@ -1055,6 +1087,7 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     int ret = -EINVAL;
 
     mutex_lock(&rina_dm.lock);
+
     /* Lookup the flow corresponding to the port-id specified
      * by the request. */
     flow_entry = flow_table_find(req->port_id);
@@ -1064,24 +1097,7 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto out;
     }
 
-    /* Check that the flow is in pending state and make the
-     * transition to the allocated state. */
-    if (flow_entry->state != FLOW_STATE_PENDING) {
-        printk("%s: flow %u is in invalid state %u\n",
-                __func__, flow_entry->local_port, flow_entry->state);
-        goto out;
-    }
-    flow_entry->state = (req->response == 0) ? FLOW_STATE_ALLOCATED
-                                             : FLOW_STATE_NULL;
-
-    /* Notify the involved IPC process about the response. */
-    ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
-                                                   flow_entry,
-                                                   req->response);
-    if (ret || req->response) {
-        flow_del_entry(flow_entry, 0);
-    }
-
+    ret = rina_flow_allocate_resp_internal(flow_entry, req->response);
 out:
     mutex_unlock(&rina_dm.lock);
 
@@ -1138,23 +1154,20 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
         ret = rina_upqueue_append(app->upper.rc, (struct rina_msg_base *)req);
         if (ret) {
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
+            flow_del_entry(flow_entry, 0);
         }
     } else {
         /* The flow allocation request is for a local IPCP. */
         struct ipcp_entry *upper_ipcp = app->upper.ipcp;
 
         if (upper_ipcp->ops.flow_allocate_req_arrived) {
-            /*XXX watch out for double-locking: this cb is going to
-             * call rina_flow_allocate_resp! */
             ret = upper_ipcp->ops.flow_allocate_req_arrived(upper_ipcp,
                                     remote_port, remote_application);
         }
-    }
 
-    if (ret) {
-        flow_del_entry(flow_entry, 0);
+        /* Report the flow allocation response. */
+        ret = rina_flow_allocate_resp_internal(flow_entry, ret);
     }
-
     mutex_unlock(&rina_dm.lock);
 
     return ret;
@@ -1187,9 +1200,22 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
     printk("%s: Flow allocation response arrived to IPC process %u, "
                 "port-id %u\n", __func__, ipcp->id, local_port);
 
-    ret = rina_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
-                                                 flow_entry->event_id,
-                                                 local_port, response);
+    if (flow_entry->upper.userspace) {
+        /* This response is for a local userspace application. */
+        ret = rina_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
+                                                     flow_entry->event_id,
+                                                     local_port, response);
+    } else {
+        /* This response is for a local IPCP. */
+        struct ipcp_entry *upper_ipcp = flow_entry->upper.ipcp;
+
+        if (upper_ipcp->ops.flow_allocate_resp_arrived) {
+            ret = upper_ipcp->ops.flow_allocate_resp_arrived(upper_ipcp,
+                                                             flow_entry,
+                                                             response);
+        }
+    }
+
     if (response) {
         /* Negative response --> delete the flow. */
         flow_del_entry(flow_entry, 0);
@@ -1467,7 +1493,7 @@ rina_ctrl_release(struct inode *inode, struct file *f)
          * We must invalidate (e.g. unregister) all the
          * application names registered with this device. */
         application_del_by_rc_or_ipcp(upper);
-        flow_del_by_rc(rc);
+        flow_del_by_upper(upper);
         mutex_unlock(&rina_dm.lock);
     }
 
