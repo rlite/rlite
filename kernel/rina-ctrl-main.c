@@ -527,6 +527,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     if (locked)
         mutex_lock(&rina_dm.lock);
 
+    FLOCK();
+
     /* Try to alloc a port id from the bitmap. */
     entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
                                                 PORT_ID_BITMAP_SIZE, 0, 1, 0);
@@ -565,6 +567,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         *pentry = NULL;
         ret = -ENOSPC;
     }
+
+    FUNLOCK();
 
     if (locked)
         mutex_unlock(&rina_dm.lock);
