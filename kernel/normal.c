@@ -357,6 +357,36 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
     return ipcp->ops.sdu_rx(ipcp, rb);
 }
 
+/* Called under DTP lock */
+static int
+rina_rtxq_push(struct dtp *dtp, struct rina_buf *rb)
+{
+    struct rina_buf *crb = rina_buf_clone(rb, GFP_ATOMIC);
+
+    if (unlikely(!crb)) {
+        PE("Out of memory\n");
+        return -ENOMEM;
+    }
+
+    /* Record the rtx expiration time. */
+    crb->rtx_jiffies = jiffies + dtp->rtx_tmr_int;
+
+    /* Add to the rtx queue and start the rtx timer if not already
+     * started. */
+    list_add_tail(&crb->node, &dtp->rtxq);
+    dtp->rtxq_len++;
+    if (!timer_pending(&dtp->rtx_tmr)) {
+        NPD("Forward rtx timer by %u\n",
+                jiffies_to_msecs(crb->rtx_jiffies - jiffies));
+        dtp->rtx_tmr_next = crb;
+        mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
+    }
+    NPD("cloning [%lu] into rtxq\n",
+            (long unsigned)RINA_BUF_PCI(crb)->seqnum);
+
+    return 0;
+}
+
 static int
 rina_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
@@ -427,31 +457,15 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             }
         }
 
-        if (flow->cfg.dtcp.rtx_control) {
-            struct rina_buf *crb = rina_buf_clone(rb, GFP_ATOMIC);
+        if (rb && flow->cfg.dtcp.rtx_control) {
+            int ret = rina_rtxq_push(dtp, rb);
 
-            if (unlikely(!crb)) {
+            if (unlikely(ret)) {
                 spin_unlock_bh(&dtp->lock);
-                PE("Out of memory\n");
                 rina_buf_free(rb);
-                return -ENOMEM;
-            }
 
-            /* Record the rtx expiration time. */
-            crb->rtx_jiffies = jiffies + dtp->rtx_tmr_int;
-
-            /* Add to the rtx queue and start the rtx timer if not already
-             * started. */
-            list_add_tail(&crb->node, &dtp->rtxq);
-            dtp->rtxq_len++;
-            if (!timer_pending(&dtp->rtx_tmr)) {
-                NPD("Forward rtx timer by %u\n",
-                        jiffies_to_msecs(crb->rtx_jiffies - jiffies));
-                dtp->rtx_tmr_next = crb;
-                mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
+                return ret;
             }
-            NPD("cloning [%lu] into rtxq\n",
-                    (long unsigned)RINA_BUF_PCI(crb)->seqnum);
         }
     }
 
@@ -819,6 +833,11 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 dtp->cwq_len--;
                 list_add_tail(&qrb->node, &qrbs);
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
+
+                if (flow->cfg.dtcp.rtx_control) {
+                    rina_rtxq_push(dtp, qrb);
+                }
+
             }
         }
     }
@@ -851,7 +870,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                          * expiration time, if necessary. */
                         if (likely(!dtp->rtx_tmr_next)) {
                             NPD("Forward rtx timer by %u\n",
-                                    jiffies_to_msecs(cur->rtx_jiffies - jiffies));
+                                jiffies_to_msecs(cur->rtx_jiffies - jiffies));
                             dtp->rtx_tmr_next = cur;
                             mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
                         }
