@@ -864,7 +864,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
-    struct rina_kmsg_flow_allocate_req *req;
+    struct rina_kmsg_flow_allocate_req_arrived *req;
     int ret;
 
     req = kmalloc(sizeof(*req), GFP_KERNEL);
@@ -889,12 +889,10 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
         return ret;
     }
 
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ;
+    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
     req->event_id = 0;
     req->ipcp_id = ipcp->id;
-    req->qos = 0;
-    rina_name_copy(&req->local_application, local_application);
-    rina_name_copy(&req->remote_application, remote_application);
+    req->port_id = flow_entry->local_port;
 
     printk("%s: Flow allocation requested to IPC process %u\n",
                     __func__, req->ipcp_id);

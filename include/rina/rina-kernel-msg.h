@@ -34,6 +34,7 @@ enum {
     RINA_KERN_APPLICATION_UNREGISTER_RESP, /* 12 */
     RINA_KERN_FLOW_ALLOCATE_REQ, /* 13 */
     RINA_KERN_FLOW_ALLOCATE_RESP, /* 14 */
+    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 15 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -112,6 +113,14 @@ struct rina_kmsg_flow_allocate_resp {
 
     uint8_t result;
     uint32_t port_id;
+} __attribute__((packed));
+
+struct rina_kmsg_flow_allocate_req_arrived {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint32_t port_id;
+    uint16_t ipcp_id;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

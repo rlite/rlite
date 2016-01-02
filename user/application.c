@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
+#include <assert.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
 #include <rina/rina-utils.h>
@@ -91,12 +92,12 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
-    struct rina_kmsg_flow_allocate_req *req =
-            (struct rina_kmsg_flow_allocate_req *)b_resp;
+    struct rina_kmsg_flow_allocate_req_arrived *req =
+            (struct rina_kmsg_flow_allocate_req_arrived *)b_resp;
 
-    (void) b_req;
+    assert(b_req == NULL);
 
-    printf("%s: event-id %u\n", __func__, req->event_id);
+    printf("%s: port-id %u\n", __func__, req->port_id);
 
     return 0;
 }
@@ -112,7 +113,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
-    [RINA_KERN_FLOW_ALLOCATE_REQ] = flow_allocate_req_arrived,
+    [RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED] = flow_allocate_req_arrived,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
