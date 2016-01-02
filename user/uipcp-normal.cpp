@@ -533,7 +533,7 @@ uipcp_rib::address_allocate() const
 }
 
 int
-uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
+uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
                                  bool create, const string& obj_class,
                                  const string& obj_name,
                                  const UipcpObject *obj_value) const
@@ -543,18 +543,18 @@ uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
         if (exclude && neigh->second == *exclude) {
             continue;
         }
-        neigh->second.remote_sync(create, obj_class, obj_name, obj_value);
+        neigh->second.remote_sync_obj(create, obj_class, obj_name, obj_value);
     }
 
     return 0;
 }
 
 int
-uipcp_rib::remote_sync_all(bool create, const string& obj_class,
+uipcp_rib::remote_sync_obj_all(bool create, const string& obj_class,
                            const string& obj_name,
                            const UipcpObject *obj_value) const
 {
-    return remote_sync_excluding(NULL, create, obj_class, obj_name, obj_value);
+    return remote_sync_obj_excluding(NULL, create, obj_class, obj_name, obj_value);
 }
 
 static int

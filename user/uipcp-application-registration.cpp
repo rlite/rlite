@@ -104,7 +104,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
             name_str.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->ipcp_id);
 
-    remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+    remote_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
@@ -169,7 +169,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        remote_sync_excluding(neigh, add, obj_class::dft,
+        remote_sync_obj_excluding(neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
     }

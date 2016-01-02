@@ -519,6 +519,8 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
          * the new neighbor. */
         rib->add_lower_flow(enr_info.address, *this);
 
+        remote_sync_rib();
+
     } else {
         PI("Initiator is not allowed to start early\n");
         enroll_tmr_stop();
@@ -570,6 +572,8 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
      * the new neighbor. */
     ipcp = rib->ipcp_info();
     rib->add_lower_flow(ipcp->ipcp_addr, *this);
+
+    remote_sync_rib();
 
     return 0;
 }
@@ -625,7 +629,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     return ret;
 }
 
-int Neighbor::remote_sync(bool create, const string& obj_class,
+int Neighbor::remote_sync_obj(bool create, const string& obj_class,
                           const string& obj_name,
                           const UipcpObject *obj_value) const
 {
@@ -650,6 +654,69 @@ int Neighbor::remote_sync(bool create, const string& obj_class,
     if (ret) {
         PE("send_to_port_id() failed\n");
     }
+
+    return ret;
+}
+
+int Neighbor::remote_sync_rib() const
+{
+    int ret = 0;
+
+    PD("Starting RIB sync with neighbor '%s'\n",
+       static_cast<string>(ipcp_name).c_str());
+
+    {
+        LowerFlowList lfl;
+
+        for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
+                mit != rib->lfdb.end(); mit++) {
+            lfl.flows.push_back(mit->second);
+        }
+
+        ret |= remote_sync_obj(true, obj_class::lfdb, obj_name::lfdb,
+                               &lfl);
+    }
+
+    {
+        DFTSlice dft_slice;
+
+        for (map< string, DFTEntry >::iterator e = rib->dft.begin();
+                e != rib->dft.end(); e++) {
+            dft_slice.entries.push_back(e->second);
+        }
+
+        ret |= remote_sync_obj(true, obj_class::dft, obj_name::dft,
+                               &dft_slice);
+    }
+
+    {
+        NeighborCandidateList ncl;
+        NeighborCandidate cand;
+        RinaName cand_name;
+        struct rlite_ipcp *ipcp;
+
+        /* My neighbors. */
+        for (map<string, NeighborCandidate>::iterator cit =
+                rib->cand_neighbors.begin();
+                cit != rib->cand_neighbors.end(); cit++) {
+            ncl.candidates.push_back(cit->second);
+        }
+
+        /* A neighbor representing myself. */
+        ipcp = rib->ipcp_info();
+        cand_name = RinaName(&ipcp->ipcp_name);
+        cand.apn = cand_name.apn;
+        cand.api = cand_name.api;
+        cand.address = ipcp->ipcp_addr;
+        cand.lower_difs = rib->lower_difs;
+        ncl.candidates.push_back(cand);
+
+        ret |= remote_sync_obj(true, obj_class::lfdb, obj_name::lfdb,
+                               &ncl);
+    }
+
+    PD("Finished RIB sync with neighbor '%s'\n",
+       static_cast<string>(ipcp_name).c_str());
 
     return ret;
 }

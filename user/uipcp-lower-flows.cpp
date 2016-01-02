@@ -34,13 +34,13 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
                                         mit != lfdb.end(); mit++) {
         lfl.flows.push_back(mit->second);
     }
-    ret = neigh.remote_sync(true, obj_class::lfdb,
-                            obj_name::lfdb, &lfl);
+    ret = neigh.remote_sync_obj(true, obj_class::lfdb,
+                               obj_name::lfdb, &lfl);
 
     /* Send the new lower flow to the other neighbors. */
     lfl.flows.clear();
     lfl.flows.push_back(lf);
-    ret |= remote_sync_excluding(&neigh, true, obj_class::lfdb,
+    ret |= remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
                                  obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
@@ -110,7 +110,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_excluding(neigh, add, obj_class::lfdb,
+        remote_sync_obj_excluding(neigh, add, obj_class::lfdb,
                               obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */

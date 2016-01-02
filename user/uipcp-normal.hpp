@@ -93,9 +93,11 @@ struct Neighbor {
     void enroll_tmr_start();
     void enroll_tmr_stop();
 
-    int remote_sync(bool create, const std::string& obj_class,
-                    const std::string& obj_name,
-                    const UipcpObject *obj_value) const;
+    int remote_sync_obj(bool create, const std::string& obj_class,
+                        const std::string& obj_name,
+                        const UipcpObject *obj_value) const;
+
+    int remote_sync_rib() const;
 };
 
 /* Shortest Path algorithm. */
@@ -205,11 +207,11 @@ struct uipcp_rib {
                          const UipcpObject& obj);
 
     /* Synchronize neighbors. */
-    int remote_sync_excluding(const Neighbor *exclude, bool create,
+    int remote_sync_obj_excluding(const Neighbor *exclude, bool create,
                               const std::string& obj_class,
                               const std::string& obj_name,
                               const UipcpObject *obj_value) const;
-    int remote_sync_all(bool create, const std::string& obj_class,
+    int remote_sync_obj_all(bool create, const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
 
