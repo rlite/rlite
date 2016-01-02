@@ -67,7 +67,28 @@ static int
 server_test_config(struct rinaperf *rp)
 {
     struct rinaperf_test_config cfg;
+    struct timeval to;
+    fd_set rfds;
     int ret;
+
+    FD_ZERO(&rfds);
+    FD_SET(rp->dfd, &rfds);
+    to.tv_sec = 3;
+    to.tv_usec = 0;
+
+    ret = select(rp->dfd + 1, &rfds, NULL, NULL, &to);
+    switch (ret) {
+        case -1:
+            perror("select()");
+            return ret;
+
+        case 0:
+            PI("timeout while waiting for server test configuration\n");
+            return -1;
+
+        default:
+            break;
+    }
 
     ret = read(rp->dfd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
