@@ -7,23 +7,16 @@ pkgver=0.3
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
-url=()
 license=('BSD')
-groups=()
 depends=('linux' 'glibc')
 makedepends=('git' 'linux-headers')
-provides=()
-conflicts=()
-replaces=()
-backup=()
-options=()
 install="rlite.install"
 source=("rlite.install" "rlite.conf" "rlite.service")
 noextract=()
 md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "f42f582e7be0c99ed67a3cbe9e56c3ba" "ecaab3e792c1c36048a069334337b380")
 
 _gitroot="$PWD/.."
-_gitname="rina"
+_gitname="rlite"
 
 build() {
     # Download the latest netmap code from the public repository
