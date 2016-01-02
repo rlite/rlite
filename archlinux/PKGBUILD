@@ -61,29 +61,32 @@ package() {
     KVER1=$(uname -r)
     KVER2=$(uname -r | sed 's/\.[0-9]\+-[0-9]\+//')
 
-    # Install the rina kernel modules into the extramodules-VERSION directory
-    mkdir -p "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
-    cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
-    #cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
+    # Install the rina kernel modules into the VERSION/extra directory
+    mkdir -p "$pkgdir/usr/lib/modules/${KVER1}/extra"
+    cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
+    #cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
 
     # Install the userspace programs and libraries
     mkdir -p "$pkgdir/usr/bin"
     mkdir -p "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/librlite.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/librlite-cdap.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/librlite-conf.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/rinaperf" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/rlite-uipcps" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/rina-config" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/user/libs/librlite.so" "$pkgdir/usr/lib"
+    cp "$srcdir/$_gitname/build/user/libs/librlite-cdap.so" "$pkgdir/usr/lib"
+    cp "$srcdir/$_gitname/build/user/libs/librlite-conf.so" "$pkgdir/usr/lib"
+    cp "$srcdir/$_gitname/build/user/uipcps/rlite-uipcps" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/user/tools/rinaperf" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/user/tools/rina-config" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/user/tools/rina-gw" "$pkgdir/usr/bin"
 
     # Install the rlite public headers
     mkdir -p "$pkgdir/usr/include/rlite"
     cp $srcdir/$_gitname/include/rlite/*.h "$pkgdir/usr/include/rlite"
+    cp $srcdir/$_gitname/include/rlite/cdap.hpp "$pkgdir/usr/include/rlite"
+    cp "$srcdir/$_gitname/build/user/libs/CDAP.pb.h" "$pkgdir/usr/include/rlite"
 
     # Install configuration files
     mkdir -p "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/uipcp-qoscubes.qos "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/shim-inet4-dir "$pkgdir/etc/rlite"
+    cp $srcdir/$_gitname/user/uipcps/uipcp-qoscubes.qos "$pkgdir/etc/rlite"
+    cp $srcdir/$_gitname/user/uipcps/shim-inet4-dir "$pkgdir/etc/rlite"
 
     # Install other system files
     mkdir -p "$pkgdir/etc/systemd/system"
