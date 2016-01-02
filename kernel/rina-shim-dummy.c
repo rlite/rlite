@@ -93,7 +93,7 @@ rina_shim_dummy_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-    priv->queued = 0;
+    priv->queued = 0;  /* No queue by default. */
     INIT_WORK(&priv->rcv, rcv_work);
     spin_lock_init(&priv->lock);
     priv->rdt = priv->rdh = 0;
@@ -254,7 +254,25 @@ rina_shim_dummy_config(struct ipcp_entry *ipcp,
                        const char *param_name,
                        const char *param_value)
 {
-    return -EINVAL;
+    struct rina_shim_dummy *priv = (struct rina_shim_dummy *)ipcp->priv;
+    int ret = -EINVAL;
+
+    if (strcmp(param_name, "queued") == 0) {
+        unsigned int queued;
+
+        ret = kstrtouint(param_value, 10, &queued);
+        if (ret == 0) {
+            spin_lock(&priv->lock);
+            priv->queued = queued ? 1 : 0;
+            spin_unlock(&priv->lock);
+        }
+
+        if (ret == 0) {
+            PD("%s: queued set to %u\n", __func__, priv->queued);
+        }
+    }
+
+    return ret;
 }
 
 static int __init
