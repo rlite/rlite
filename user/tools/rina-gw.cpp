@@ -125,6 +125,7 @@ struct Gateway {
 Gateway::Gateway()
 {
     rlite_appl_init(&appl);
+    rlite_ipcps_fetch(&appl.loop);
 }
 
 Gateway::~Gateway()
@@ -276,10 +277,18 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        // TODO dif argument is missing
-        int ret = rlite_appl_register_wait(&gw.appl, 1, NULL, 0, NULL,
-                                           &mit->first.name_r);
+        struct rina_name dif_name;
+        int ret;
 
+        ret = rina_name_from_string(mit->first.dif_name.c_str(), &dif_name);
+        if (ret) {
+            PE("rina_name_from_string() failed\n");
+            continue;
+        }
+
+        rlite_appl_register_wait(&gw.appl, 1, &dif_name, 0, NULL,
+                                           &mit->first.name_r);
+        rina_name_free(&dif_name);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());
