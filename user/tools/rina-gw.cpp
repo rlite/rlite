@@ -148,6 +148,8 @@ struct Gateway {
      * fa_req_event_id --> tcp_client_fd */
     map<unsigned int, int> pending_fa_reqs;
 
+    map<int, int> active_mappings;
+
     Gateway();
     ~Gateway();
 };
@@ -262,6 +264,35 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
                    const struct rina_msg_base_resp *b_resp,
                    const struct rina_msg_base *b_req)
 {
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
+    Gateway * gw = container_of(appl, struct Gateway, appl);
+    struct rina_kmsg_fa_resp_arrived *resp =
+            (struct rina_kmsg_fa_resp_arrived *)b_resp;
+    map<unsigned int, int>::iterator mit;
+    int cfd;
+    int rfd;
+
+    mit = gw->pending_fa_reqs.find(b_req->event_id);
+    if (mit == gw->pending_fa_reqs.end()) {
+        PE("Spurious flow allocation response [id=%u]\n", b_req->event_id);
+        return 0;
+    }
+
+    cfd = mit->second;
+    gw->pending_fa_reqs.erase(mit);
+
+    rfd = rlite_open_appl_port(resp->port_id);
+    if (rfd < 0) {
+        PE("Failed to open application port\n");
+        close(cfd);
+        return 0;
+    }
+
+    gw->active_mappings[cfd] = rfd;
+    gw->active_mappings[rfd] = cfd;
+
+    PI("New mapping created %d <--> %d\n", cfd, rfd);
+
     return 0;
 }
 
