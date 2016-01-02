@@ -528,7 +528,7 @@ flow_del_entry(struct flow_entry *entry, int locked)
     dtp_fini(&entry->dtp);
 
     entry->txrx.ipcp->refcnt--;
-    list_for_each_entry_safe(rb, tmp, &entry->txrx.queue, node) {
+    list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         rina_buf_free(rb);
     }
     hash_del(&entry->node);
@@ -1337,10 +1337,10 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         txrx = &flow->txrx;
     }
 
-    spin_lock(&txrx->lock);
-    list_add_tail(&rb->node, &txrx->queue);
-    spin_unlock(&txrx->lock);
-    wake_up_interruptible_poll(&txrx->wqh,
+    spin_lock(&txrx->rx_lock);
+    list_add_tail(&rb->node, &txrx->rx_q);
+    spin_unlock(&txrx->rx_lock);
+    wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
     mutex_unlock(&rina_dm.lock);
@@ -1650,16 +1650,16 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         return -ENXIO;
     }
 
-    add_wait_queue(&txrx->wqh, &wait);
+    add_wait_queue(&txrx->rx_wqh, &wait);
     while (len) {
         ssize_t copylen;
         struct rina_buf *rb;
 
         current->state = TASK_INTERRUPTIBLE;
 
-        spin_lock(&txrx->lock);
-        if (list_empty(&txrx->queue)) {
-            spin_unlock(&txrx->lock);
+        spin_lock(&txrx->rx_lock);
+        if (list_empty(&txrx->rx_q)) {
+            spin_unlock(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
                 break;
@@ -1670,9 +1670,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             continue;
         }
 
-        rb = list_first_entry(&txrx->queue, struct rina_buf, node);
+        rb = list_first_entry(&txrx->rx_q, struct rina_buf, node);
         list_del(&rb->node);
-        spin_unlock(&txrx->lock);
+        spin_unlock(&txrx->rx_lock);
 
         copylen = rb->len;
         if (copylen > len) {
@@ -1689,7 +1689,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&txrx->wqh, &wait);
+    remove_wait_queue(&txrx->rx_wqh, &wait);
 
     return ret;
 }
@@ -1704,13 +1704,13 @@ rina_io_poll(struct file *f, poll_table *wait)
         return mask;
     }
 
-    poll_wait(f, &rio->txrx->wqh, wait);
+    poll_wait(f, &rio->txrx->rx_wqh, wait);
 
-    spin_lock(&rio->txrx->lock);
-    if (!list_empty(&rio->txrx->queue)) {
+    spin_lock(&rio->txrx->rx_lock);
+    if (!list_empty(&rio->txrx->rx_q)) {
         mask |= POLLIN | POLLRDNORM;
     }
-    spin_unlock(&rio->txrx->lock);
+    spin_unlock(&rio->txrx->rx_lock);
 
     mask |= POLLOUT | POLLWRNORM;
 

@@ -45,9 +45,9 @@ struct ipcp_ops {
 
 struct txrx {
     /* Read operation support. */
-    struct list_head    queue;
-    wait_queue_head_t   wqh;
-    spinlock_t          lock;
+    struct list_head    rx_q;
+    wait_queue_head_t   rx_wqh;
+    spinlock_t          rx_lock;
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
@@ -157,9 +157,9 @@ struct flow_entry *flow_lookup(unsigned int port_id);
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 {
-    spin_lock_init(&txrx->lock);
-    INIT_LIST_HEAD(&txrx->queue);
-    init_waitqueue_head(&txrx->wqh);
+    spin_lock_init(&txrx->rx_lock);
+    INIT_LIST_HEAD(&txrx->rx_q);
+    init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
 }
 
