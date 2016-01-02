@@ -192,7 +192,8 @@ static rina_resp_handler_t rina_handlers[] = {
 };
 
 /* The event loop function. */
-void *evloop_function(void *arg)
+static void *
+evloop_function(void *arg)
 {
     struct ipcm *ipcm = (struct ipcm *)arg;
     struct pending_entry *req_entry;
@@ -523,6 +524,25 @@ test(struct ipcm *ipcm)
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
 
+static void *
+server_function(void *arg)
+{
+    struct ipcm *ipcm = arg;
+
+    for (;;) {
+        int cfd;
+        struct sockaddr_un client_address;
+        socklen_t client_address_len = sizeof(client_address);
+
+        cfd = accept(ipcm->lfd, (struct sockaddr *)&client_address,
+                     &client_address_len);
+	printf("Got connection\n");
+	close(cfd);
+    }
+
+    return NULL;
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -534,6 +554,7 @@ int main()
 {
     struct ipcm ipcm;
     pthread_t evloop_th;
+    pthread_t server_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
     int ret;
@@ -609,7 +630,14 @@ int main()
     /* Create and start the event-loop thread. */
     ret = pthread_create(&evloop_th, NULL, evloop_function, &ipcm);
     if (ret) {
-        perror("pthread_create()");
+        perror("pthread_create(event-loop)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Create and start the server thread. */
+    ret = pthread_create(&server_th, NULL, server_function, &ipcm);
+    if (ret) {
+        perror("pthread_create(server)");
         exit(EXIT_FAILURE);
     }
 
@@ -618,7 +646,13 @@ int main()
 
     ret = pthread_join(evloop_th, NULL);
     if (ret < 0) {
-        perror("pthread_join()");
+        perror("pthread_join(event-loop)");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = pthread_join(server_th, NULL);
+    if (ret < 0) {
+        perror("pthread_join(server)");
         exit(EXIT_FAILURE);
     }
 
