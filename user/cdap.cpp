@@ -35,6 +35,152 @@ static const char *opcode_names_table[] = {
 };
 
 #define MAX_CDAP_OPCODE gpb::M_STOP_R
+#define MAX_CDAP_FIELD  gpb::CDAPMessage::kVersionFieldNumber
+
+#define ENTRY_FILL(FL, OP, VA)   \
+        tab[((MAX_CDAP_OPCODE + 1) * gpb::CDAPMessage::k##FL##FieldNumber + gpb::OP)] = VA
+
+#define MUST_EXIST      1
+#define MUST_NOT_EXIST  2
+
+#define COMBO(FL, OP)   \
+        ((MAX_CDAP_OPCODE + 1) * gpb::CDAPMessage::k##FL##FieldNumber + OP)
+
+#define TAB_FILL(FL, VA)    \
+        for (unsigned _i = gpb::M_CONNECT; _i <= MAX_CDAP_OPCODE; _i++) tab[COMBO(FL, _i)] = VA
+
+struct CDAPValidationTable {
+    char tab[(MAX_CDAP_OPCODE + 1) * (1 + MAX_CDAP_FIELD)];
+
+    CDAPValidationTable();
+};
+
+CDAPValidationTable::CDAPValidationTable()
+{
+    /* abs_syntax */
+    TAB_FILL(AbsSyntax, MUST_NOT_EXIST);
+    ENTRY_FILL(AbsSyntax, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(AbsSyntax, M_CONNECT_R, MUST_EXIST);
+
+    /* auth_mech */
+    TAB_FILL(AuthMech, MUST_NOT_EXIST);
+    ENTRY_FILL(AuthMech, M_CONNECT, 0);
+    ENTRY_FILL(AuthMech, M_CONNECT_R, 0);
+
+    /* auth_value */
+    TAB_FILL(AuthValue, MUST_NOT_EXIST);
+    ENTRY_FILL(AuthValue, M_CONNECT, 0);
+    ENTRY_FILL(AuthValue, M_CONNECT_R, 0);
+
+    /* src_appl */
+    TAB_FILL(SrcApName, MUST_NOT_EXIST);
+    ENTRY_FILL(SrcApName, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(SrcApName, M_CONNECT_R, MUST_EXIST);
+
+    /* dst_appl */
+    TAB_FILL(DestApName, MUST_NOT_EXIST);
+    ENTRY_FILL(DestApName, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(DestApName, M_CONNECT_R, MUST_EXIST);
+
+    /* filter */
+    ENTRY_FILL(Filter, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_CONNECT_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_CREATE, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_CREATE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_DELETE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_READ_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_CANCELREAD, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_CANCELREAD_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_WRITE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_START_R, MUST_NOT_EXIST);
+    ENTRY_FILL(Filter, M_STOP_R, MUST_NOT_EXIST);
+
+    /* invoke_id */
+    ENTRY_FILL(InvokeID, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_CONNECT_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_RELEASE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_CREATE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_DELETE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_READ_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_CANCELREAD, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_CANCELREAD_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_WRITE_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_START_R, MUST_EXIST);
+    ENTRY_FILL(InvokeID, M_STOP_R, MUST_EXIST);
+
+    /* obj_class */
+    ENTRY_FILL(ObjClass, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjClass, M_CONNECT_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjClass, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjClass, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjClass, M_CANCELREAD, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjClass, M_CANCELREAD_R, MUST_NOT_EXIST);
+
+    /* obj_inst */
+    ENTRY_FILL(ObjInst, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjInst, M_CONNECT_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjInst, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjInst, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjInst, M_CANCELREAD, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjInst, M_CANCELREAD_R, MUST_NOT_EXIST);
+
+    /* obj_name */
+    ENTRY_FILL(ObjName, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjName, M_CONNECT_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjName, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjName, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjName, M_CANCELREAD, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjName, M_CANCELREAD_R, MUST_NOT_EXIST);
+
+    /* obj_value */
+    ENTRY_FILL(ObjValue, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_CONNECT_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_DELETE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_CANCELREAD, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_CANCELREAD_R, MUST_NOT_EXIST);
+
+    /* op_code */
+    TAB_FILL(OpCode, MUST_EXIST);
+
+    /* result */
+    ENTRY_FILL(Result, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_CREATE, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_DELETE, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_READ, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_WRITE, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_START, MUST_NOT_EXIST);
+    ENTRY_FILL(Result, M_STOP, MUST_NOT_EXIST);
+
+    /* result_reason */
+    ENTRY_FILL(ResultReason, M_CONNECT, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_RELEASE, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_CREATE, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_DELETE, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_READ, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_WRITE, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_START, MUST_NOT_EXIST);
+    ENTRY_FILL(ResultReason, M_STOP, MUST_NOT_EXIST);
+
+    /* scope */
+    TAB_FILL(Scope, MUST_NOT_EXIST);
+    ENTRY_FILL(Scope, M_CREATE, 0);
+    ENTRY_FILL(Scope, M_DELETE, 0);
+    ENTRY_FILL(Scope, M_READ, 0);
+    ENTRY_FILL(Scope, M_WRITE, 0);
+    ENTRY_FILL(Scope, M_START, 0);
+    ENTRY_FILL(Scope, M_STOP, 0);
+
+    /* version */
+    ENTRY_FILL(Version, M_CONNECT, MUST_EXIST);
+    ENTRY_FILL(Version, M_CONNECT_R, MUST_EXIST);
+}
+
+static struct CDAPValidationTable vt;
 
 CDAPConn::CDAPConn(int arg_fd)
 {
