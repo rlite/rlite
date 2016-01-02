@@ -1147,10 +1147,12 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
         return -1;
     }
 
-    ret = neigh->alloc_flow(req->supp_dif_name);
-    if (ret) {
-        pthread_mutex_unlock(&rib->lock);
-        return ret;
+    if (!neigh->has_mgmt_flow()) {
+        ret = neigh->alloc_flow(req->supp_dif_name);
+        if (ret) {
+            pthread_mutex_unlock(&rib->lock);
+            return ret;
+        }
     }
 
     assert(neigh->has_mgmt_flow());
@@ -1160,13 +1162,12 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
     if (nf->enrollment_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment already in progress, current state "
             "is %s\n", neigh->enrollment_state_repr(nf->enrollment_state));
-        pthread_mutex_unlock(&rib->lock);
-        return 0;
-    }
 
-    /* Start the enrollment procedure as initiator. This will move
-     * the internal state to  NEIGH_I_WAIT_CONNECT_R. */
-    neigh->enroll_fsm_run(nf, NULL);
+    } else {
+        /* Start the enrollment procedure as initiator. This will move
+         * the internal state to  NEIGH_I_WAIT_CONNECT_R. */
+        neigh->enroll_fsm_run(nf, NULL);
+    }
 
     /* Wait for the enrollment procedure to stop, either because of
      * successful completion (NEIGH_ENROLLED), or because of an abort
