@@ -83,7 +83,31 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
         nf->pending_keepalive_reqs++;
     }
 
-    nf->keepalive_tmr_start();
+    if (nf->pending_keepalive_reqs > NEIGH_KEEPALIVE_THRESH) {
+        /* We assume the neighbor is not alive on this flow.
+         * Remove the NeighFlow from the Neighbor and, if the
+         * NeighFlow is the current mgmt flow, elect
+         * another NeighFlow as mgmt flow, if possible. */
+        UPI(nf->neigh->rib->uipcp, "Neighbor %s is not alive on N-1 flow %u "
+            "and therefore will be pruned\n",
+            static_cast<string>(nf->neigh->ipcp_name).c_str(),
+            nf->port_id);
+
+        nf->neigh->flows.erase(nf->port_id);
+
+        if (nf->port_id == nf->neigh->mgmt_port_id && nf->neigh->flows.size())
+        {
+            nf->neigh->mgmt_port_id = nf->neigh->flows.begin()->second->port_id;
+            UPI(nf->neigh->rib->uipcp, "Mgmt flow switches to port id %u\n",
+                nf->neigh->mgmt_port_id);
+        }
+
+        delete nf;
+
+    } else {
+        /* Schedule the next keepalive request. */
+        nf->keepalive_tmr_start();
+    }
 }
 
 static void
@@ -972,6 +996,10 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
     }
 
     if (rm->op_code == gpb::M_READ_R) {
+        /* Reset the keepalive request counter, we know the neighbor
+         * is alive on this flow. */
+        nf->pending_keepalive_reqs = 0;
+
         UPD(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
             static_cast<string>(nf->neigh->ipcp_name).c_str());
         return 0;

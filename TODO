@@ -25,3 +25,5 @@
 
 - enrollment: manage re-enrollments (peer enrolls when we think we are are already
   enrolled
+
+- Neighbor::abort() --> NeighFlow::abort_enrollment()
