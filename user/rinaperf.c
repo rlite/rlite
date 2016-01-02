@@ -264,16 +264,46 @@ perf_client(struct rinaperf *rp)
     return 0;
 }
 
+static void
+rate_print(unsigned long long *limit, struct timespec *ts,
+           unsigned int bytes)
+{
+        struct timespec now;
+        unsigned long long elapsed_ns;
+        double kpps;
+        double mbps;
+
+        clock_gettime(CLOCK_MONOTONIC, &now);
+
+        elapsed_ns = ((now.tv_sec - ts->tv_sec) * 1000000000 +
+                        now.tv_nsec - ts->tv_nsec);
+        kpps = ((1000000) * (double)*limit) / elapsed_ns;
+        mbps = ((8 * 1000) * (double)bytes) / elapsed_ns;
+        printf("rate: %f Kpss, %f Mbps\n", kpps, mbps);
+        if (elapsed_ns < 1000000000U) {
+                *limit *= 2;
+        } else if (elapsed_ns > 3 * 1000000000U) {
+                *limit /= 2;
+        }
+        clock_gettime(CLOCK_MONOTONIC, ts);
+}
+
 static int
 perf_server(struct rinaperf *rp)
 {
-    int n;
-    unsigned int i;
+    unsigned long long rate_cnt = 0;
+    unsigned long long rate_cnt_limit = 10;
+    unsigned long long rate_bytes = 0;
+    struct timespec rate_ts;
     char buf[SDU_SIZE_MAX];
     struct pollfd pfd;
+    unsigned int i;
+    int n;
 
     pfd.fd = rp->dfd;
     pfd.events = POLLIN;
+
+    clock_gettime(CLOCK_MONOTONIC, &rate_ts);
 
     for (i = 0; i < rp->test_config.cnt; i++) {
         n = poll(&pfd, 1, 3000);
@@ -290,6 +320,16 @@ perf_server(struct rinaperf *rp)
         if (n < 0) {
             perror("read(flow)");
             return -1;
+        }
+
+        rate_bytes += n;
+        rate_cnt++;
+
+        if (rate_cnt == rate_cnt_limit) {
+            rate_print(&rate_cnt_limit, &rate_ts,
+                    rate_bytes);
+            rate_cnt = 0;
+            rate_bytes = 0;
         }
     }
 
