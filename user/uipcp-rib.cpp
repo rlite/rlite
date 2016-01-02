@@ -242,19 +242,9 @@ uipcp_rib::load_qos_cubes(const char *filename)
         string_strip(param);
 
         update_qos_cube(qos_cubes[cubename], param, value);
-
-        cout << cubename << "|" << param << "|" << value << endl;
     }
 
     fin.close();
-
-    {
-        map<string, struct rina_flow_config>::const_iterator i;
-
-        for (i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
-            PI("QoSCube '%s'\n", i->first.c_str());
-        }
-    }
 
     return 0;
 }
@@ -281,11 +271,58 @@ uipcp_rib::ipcp_info() const
     return ipcp;
 }
 
+static inline string
+u82boolstr(uint8_t v) {
+    return v != 0 ? string("true") : string("false");
+}
+
 char *
 uipcp_rib::dump() const
 {
     stringstream ss;
     struct rlite_ipcp *ipcp = ipcp_info();
+
+    ss << "QoS cubes" << endl;
+    for (map<string, struct rina_flow_config>::const_iterator
+                    i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
+            const struct rina_flow_config& c = i->second;
+
+            ss << i->first.c_str() << ": {" << endl;
+            ss << "   partial_delivery=" << u82boolstr(c.partial_delivery)
+                << endl << "   incomplete_delivery=" <<
+                u82boolstr(c.incomplete_delivery) << endl <<
+                "   in_order_delivery=" << u82boolstr(c.in_order_delivery)
+                << endl << "   max_sdu_gap=" <<
+                static_cast<unsigned long long>(c.max_sdu_gap) << endl
+                << "   dtcp_present=" << u82boolstr(c.dtcp_present) << endl
+                << "   dtcp.initial_a=" <<
+                static_cast<unsigned int>(c.dtcp.initial_a) << endl
+                << "   dtcp.flow_control=" << u82boolstr(c.dtcp.flow_control)
+                << endl << "   dtcp.rtx_control=" <<
+                u82boolstr(c.dtcp.rtx_control) << endl;
+
+            if (c.dtcp.fc.fc_type == RINA_FC_T_WIN) {
+                ss << "   dtcp.fc.max_cwq_len=" <<
+                    static_cast<unsigned int>(c.dtcp.fc.cfg.w.max_cwq_len)
+                    << endl << "   dtcp.fc.initial_credit=" <<
+                    static_cast<unsigned int>(c.dtcp.fc.cfg.w.initial_credit)
+                    << endl;
+            } else if (c.dtcp.fc.fc_type == RINA_FC_T_RATE) {
+                ss << "   dtcp.fc.sending_rate=" <<
+                    static_cast<unsigned int>(c.dtcp.fc.cfg.r.sending_rate)
+                    << endl << "   dtcp.fc.time_period=" <<
+                    static_cast<unsigned int>(c.dtcp.fc.cfg.r.time_period)
+                    << endl;
+            }
+
+            ss << "   dtcp.rtx.max_time_to_retry=" <<
+                static_cast<unsigned int>(c.dtcp.rtx.max_time_to_retry)
+                << endl << "   dtcp.rtx.data_rxms_max=" <<
+                static_cast<unsigned int>(c.dtcp.rtx.data_rxms_max) << endl <<
+                "   dtcp.rtx.initial_tr=" <<
+                static_cast<unsigned int>(c.dtcp.rtx.initial_tr) << endl;
+            ss << "}" << endl;
+    }
 
     ss << "Address: " << ipcp->ipcp_addr << endl << endl;
 
