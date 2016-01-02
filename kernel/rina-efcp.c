@@ -31,7 +31,6 @@ remove_flow_work(struct work_struct *work)
     struct dtp *dtp = container_of(work, struct dtp, remove.work);
     struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
     struct rina_buf *rb, *tmp;
-    int dropped;
 
     spin_lock_irq(&dtp->lock);
 
@@ -43,14 +42,13 @@ remove_flow_work(struct work_struct *work)
         dtp->cwq_len--;
     }
 
-    dropped = 0;
+    PD("%s: Delayed flow removal, dropping %u PDUs from rtxq\n",
+            __func__, dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del(&rb->node);
         rina_buf_free(rb);
-        dropped++;
+        dtp->rtxq_len--;
     }
-    PD("%s: Delayed flow removal, dropped %d PDUs from rtxq\n",
-            __func__, dropped);
 
     spin_unlock_irq(&dtp->lock);
 
@@ -68,6 +66,7 @@ dtp_init(struct dtp *dtp)
     dtp->cwq_len = dtp->max_cwq_len = 0;
     INIT_LIST_HEAD(&dtp->seqq);
     INIT_LIST_HEAD(&dtp->rtxq);
+    dtp->rtxq_len = dtp->max_rtxq_len = 0;
     init_timer(&dtp->rtx_tmr);
 }
 EXPORT_SYMBOL_GPL(dtp_init);

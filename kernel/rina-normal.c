@@ -193,6 +193,10 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }
 
+    if (flow->cfg.dtcp.rtx_control) {
+        dtp->max_rtxq_len = 64;  /* For now it's static. */
+    }
+
     return 0;
 }
 
@@ -308,9 +312,11 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         mod_timer(&dtp->snd_inact_tmr, jiffies + msecs_to_jiffies(1000));
     }
 
-    if (fc->fc_type == RINA_FC_T_WIN &&
-            dtp->next_seq_num_to_send > dtp->snd_rwe &&
-                dtp->cwq_len >= dtp->max_cwq_len) {
+    if (unlikely((fc->fc_type == RINA_FC_T_WIN &&
+                 dtp->next_seq_num_to_send > dtp->snd_rwe &&
+                    dtp->cwq_len >= dtp->max_cwq_len)) ||
+                        (flow->cfg.dtcp.rtx_control &&
+                            dtp->rtxq_len >= dtp->max_rtxq_len)) {
         /* POL: FlowControlOverrun */
         spin_unlock_irq(&dtp->lock);
 
@@ -375,6 +381,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             /* Add to the rtx queue and start the rtx timer if not already
              * started. */
             list_add_tail(&crb->node, &dtp->rtxq);
+            dtp->rtxq_len++;
             if (!timer_pending(&dtp->rtx_tmr)) {
                 PD("%s: Forward rtx timer by %u\n", __func__,
                         jiffies_to_msecs(crb->rtx_jiffies - jiffies));
@@ -732,6 +739,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         PD("%s: Remove [%lu] from rtxq\n", __func__,
                                 (long unsigned)pci->seqnum);
                         list_del(&cur->node);
+                        dtp->rtxq_len--;
                         rina_buf_free(cur);
                     } else {
                         /* The rtxq is sorted by seqnum, so we can safely

@@ -613,8 +613,8 @@ flow_put(struct flow_entry *entry)
         spin_lock_irq(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
             PD("%s: Flow removal postponed since cwq contains "
-                    "%u PDUs and rtxq is %sempty\n", __func__,
-                    dtp->cwq_len, list_empty(&dtp->rtxq) ? "" : "not ");
+                    "%u PDUs and rtxq contains %u PDUs\n", __func__,
+                    dtp->cwq_len, dtp->rtxq_len);
             postpone = true;
 
             /* No one can write or read from this flow anymore, so there

@@ -121,6 +121,8 @@ struct dtp {
     struct delayed_work remove;
     struct list_head seqq;
     struct list_head rtxq;
+    unsigned int rtxq_len;
+    unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
     long unsigned rtx_tmr_next;
 };
