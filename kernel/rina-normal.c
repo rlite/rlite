@@ -129,9 +129,12 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_lock_irq(&dtp->lock);
 
-    if (dtp->rtx_tmr_next) {
+    if (likely(dtp->rtx_tmr_next)) {
         /* I couldn't figure out how to implement this with the macros in
-         * list.h, so I went for a custom loop. */
+         * list.h, so I went for a custom loop.
+         * Here we scan the circular list starting from dtp->rtx_tmr_next,
+         * rather than starting from the list head, so that we process
+         * the PDU in ascending expiration time order. */
         for (cur = &dtp->rtx_tmr_next->node; 1; cur = cur->next) {
             if (cur == &dtp->rtxq) {
                 /* This is the head, it's not contained in an rina_buf: let's
@@ -759,6 +762,11 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         list_del(&cur->node);
                         dtp->rtxq_len--;
                         if (cur == dtp->rtx_tmr_next) {
+                            /* If we acked the PDU that would have expired
+                             * earliest, reset the pointer. It will be
+                             * set in the else branch (if this ack does not
+                             * cause the removal of all elements in the
+                             * rtxq). */
                             dtp->rtx_tmr_next = NULL;
                         }
                         rina_buf_free(cur);
