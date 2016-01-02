@@ -504,7 +504,7 @@ int main(int argc, char **argv)
          * However, if something goes wrong, the Unix domain socket
          * could still exist and so the following bind() would fail.
          * This unlink() will clean up in this situation. */
-        PI("info: cleaned up existing unix domain socket\n");
+        PI("Cleaned up existing unix domain socket\n");
     }
     ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
                 sizeof(server_address));

@@ -1537,9 +1537,13 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     entry = ipcp_get(req->ipcp_id);
     if (entry) {
         mutex_lock(&entry->lock);
-        entry->uipcp = rc;
+        if (entry->uipcp) {
+            ret = -EBUSY;
+        } else {
+            entry->uipcp = rc;
+            ret = 0;
+        }
         mutex_unlock(&entry->lock);
-        ret = 0;
     }
     ipcp_put(entry);
 
