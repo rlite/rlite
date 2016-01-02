@@ -6,6 +6,7 @@ enum {
     DIF_TYPE_NORMAL = 0,
     DIF_TYPE_SHIM_LOOPBACK,
     DIF_TYPE_SHIM_HV,
+    DIF_TYPE_SHIM_ETH,
     DIF_TYPE_MAX,
 };
 

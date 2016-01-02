@@ -160,6 +160,7 @@ static const char *dif_types[] = {
     [DIF_TYPE_NORMAL] = "normal",
     [DIF_TYPE_SHIM_LOOPBACK] = "shim-loopback",
     [DIF_TYPE_SHIM_HV] = "shim-hv",
+    [DIF_TYPE_SHIM_ETH] = "shim-eth",
 };
 
 /* Create an IPC process. */

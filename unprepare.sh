@@ -7,6 +7,7 @@ sudo rm -rf /var/rina
 sudo rmmod rina-normal.ko
 sudo rmmod rina-shim-loopback.ko
 sudo rmmod rina-shim-hv.ko
+sudo rmmod rina-shim-eth.ko
 sudo rmmod rina-ctrl
 
 # unprepare VMPI-KVM
