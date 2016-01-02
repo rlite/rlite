@@ -6,6 +6,38 @@
 #include <rina/rina-utils.h>
 #include "ipcm.h"
 
+/*static */int
+uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
+                                const struct rina_name *local_application,
+                                const struct rina_name *remote_application)
+{
+    struct rina_kmsg_uipcp_flow_allocate_req_arrived *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED;
+    req->ipcp_id = uipcp->ipcp_id;
+    req->remote_port = remote_port;
+    rina_name_copy(&req->local_application, local_application);
+    rina_name_copy(&req->remote_application, remote_application);
+
+    PD("Issuing UIPCP_FLOW_ALLOCATE_REQ_ARRIVED message...\n");
+
+    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
 
 static int
 uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
