@@ -340,7 +340,54 @@ CDAPMessage::CDAPMessage()
     version = 0;
 }
 
-CDAPMessage::~CDAPMessage()
+void
+CDAPMessage::copy(const CDAPMessage& o)
+{
+    abs_syntax = o.abs_syntax;
+    auth_mech = o.auth_mech;
+    auth_value = o.auth_value;
+    if (rina_name_copy(&src_appl, &o.src_appl)) {
+        throw std::bad_alloc();
+    }
+    if (rina_name_copy(&dst_appl, &o.dst_appl)) {
+        throw std::bad_alloc();
+    }
+    filter = o.filter;
+    flags = o.flags;
+    invoke_id = o.invoke_id;
+    obj_class = o.obj_class;
+    obj_inst = o.obj_inst;
+    obj_name = o.obj_name;
+    op_code = o.op_code;
+    result = o.result;
+    result_reason = o.result_reason;
+    scope = o.scope;
+    version = o.version;
+
+    switch (o.obj_value.ty) {
+        case BYTES:
+            obj_value.u.buf.owned = true;
+            obj_value.u.buf.len = o.obj_value.u.buf.len;
+            obj_value.u.buf.ptr = new char[obj_value.u.buf.len];
+            memcpy(obj_value.u.buf.ptr, o.obj_value.u.buf.ptr,
+                   obj_value.u.buf.len);
+            break;
+
+        case NONE:
+        case I32:
+        case I64:
+        case FLOAT:
+        case DOUBLE:
+        case BOOL:
+        case STRING:
+            obj_value = o.obj_value;
+            break;
+
+    }
+}
+
+void
+CDAPMessage::destroy()
 {
     rina_name_free(&src_appl);
     rina_name_free(&dst_appl);
@@ -348,6 +395,29 @@ CDAPMessage::~CDAPMessage()
                 && obj_value.u.buf.ptr) {
         delete [] obj_value.u.buf.ptr;
     }
+}
+
+CDAPMessage::CDAPMessage(const CDAPMessage& o)
+{
+    copy(o);
+}
+
+CDAPMessage::~CDAPMessage()
+{
+    destroy();
+}
+
+CDAPMessage&
+CDAPMessage::operator=(const CDAPMessage& o)
+{
+    if (&o == this) {
+        return *this;
+    }
+
+    destroy();
+    copy(o);
+
+    return *this;
 }
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)

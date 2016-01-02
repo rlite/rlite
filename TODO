@@ -23,4 +23,5 @@
 - [NOT VERIFIED] remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
 
-- add copy constructor to CDAPMessage class
+- enrollment: manage re-enrollments (peer enrolls when we think we are are already
+  enrolled

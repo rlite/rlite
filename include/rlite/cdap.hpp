@@ -112,6 +112,8 @@ struct CDAPMessage {
     void print() const;
 
     CDAPMessage();
+    CDAPMessage(const CDAPMessage& o);
+    CDAPMessage& operator=(const CDAPMessage& o);
     ~CDAPMessage();
 
     CDAPMessage(const gpb::CDAPMessage& gm);
@@ -313,6 +315,9 @@ private:
                   const std::string& obj_class,
                   const std::string& obj_name, long obj_inst,
                   int scope, const std::string& filter);
+
+    void copy(const CDAPMessage& o);
+    void destroy();
 
     /* Representation of the object value. */
     struct {
