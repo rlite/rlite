@@ -4,16 +4,16 @@ unrel.in_order_delivery = false
 unrel.max_sdu_gap = -1
 unrel.dtcp_present = false
 
-relfc.partial_delivery = false
-relfc.incomplete_delivery = false
-relfc.in_order_delivery = true
-relfc.max_sdu_gap = -1
-relfc.dtcp_present = true
-relfc.dtcp.intial_a = 10
-relfc.dtcp.flow_control = true
-relfc.dtcp.rtx_control = false
-relfc.dtcp.fc.max_cwq_len = 100
-relfc.dtcp.fc.initial_credit = 50
+unrelfc.partial_delivery = false
+unrelfc.incomplete_delivery = false
+unrelfc.in_order_delivery = false
+unrelfc.max_sdu_gap = -1
+unrelfc.dtcp_present = true
+unrelfc.dtcp.intial_a = 10
+unrelfc.dtcp.flow_control = true
+unrelfc.dtcp.rtx_control = false
+unrelfc.dtcp.fc.max_cwq_len = 100
+unrelfc.dtcp.fc.initial_credit = 60
 
 relrtx.partial_delivery = false
 relrtx.incomplete_delivery = false

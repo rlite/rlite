@@ -905,7 +905,8 @@ flow_put(struct flow_entry *entry)
         ipcp->ops.flow_deallocated(ipcp, entry);
     }
 
-    dtp_fini(&entry->dtp);
+    dtp_dump(dtp);
+    dtp_fini(dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
         list_del(&rb->node);
