@@ -34,23 +34,6 @@ enum {
     RINA_CTRL_MSG_MAX,
 };
 
-typedef uint16_t rina_msg_t;
-
-/* All the possible messages begin like this. */
-struct rina_msg_base {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-} __attribute__((packed));
-
-/* A simple response message layout that can be shared by many
- * different types. */
-struct rina_msg_base_resp {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-
-    uint8_t result;
-} __attribute__((packed));
-
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_msg_ipcp_create {
     rina_msg_t msg_type;

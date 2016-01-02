@@ -11,9 +11,11 @@
 #include <sys/un.h>
 #include <signal.h>
 #include <rina/rina-ctrl.h>
+#include <rina/rina-kernel-numtables.h>
+#include <rina/rina-application-msg.h>
+#include <rina/rina-application-numtables.h>
 #include "pending_queue.h"
 #include <rina/rina-utils.h>
-#include <rina/rina-kernel-numtables.h>
 
 
 /* IPC Manager data model. */
