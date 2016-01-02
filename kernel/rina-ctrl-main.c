@@ -1232,6 +1232,29 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
     return ret;
 }
 
+/* Connect the upper IPCP which is using this flow
+ * so that rina_sdu_rx() can deliver SDU to the IPCP. */
+static int
+upper_ipcp_flow_bind(uint16_t upper_ipcp_id, struct flow_entry *flow)
+{
+    struct ipcp_entry *upper_ipcp;
+
+    /* Lookup the IPCP user of 'flow'. */
+    upper_ipcp = ipcp_get(upper_ipcp_id);
+    if (!upper_ipcp) {
+        printk("%s: Error: No such upper ipcp %u\n", __func__,
+                upper_ipcp_id);
+
+        return -ENXIO;
+    }
+
+    flow->upper.ipcp = upper_ipcp;
+    PD("%s: REFCNT++ %u: %u\n", __func__, upper_ipcp->id,
+            upper_ipcp->refcnt);
+
+    return 0;
+}
+
 static int
 rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
                      uint32_t event_id,
@@ -1288,6 +1311,10 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
             ret = rina_upqueue_append(ipcp_entry->uipcp,
                     (const struct rina_msg_base *)req);
         }
+    }
+
+    if (!ret && req->upper_ipcp_id != 0xffff) {
+        ret = upper_ipcp_flow_bind(req->upper_ipcp_id, flow_entry);
     }
 
 out:
@@ -1406,6 +1433,10 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             ret = rina_upqueue_append(ipcp->uipcp,
                     (const struct rina_msg_base *)resp);
         }
+    }
+
+    if (!ret && !response && resp->upper_ipcp_id != 0xffff) {
+        ret = upper_ipcp_flow_bind(resp->upper_ipcp_id, flow_entry);
     }
 
     if (ret || response) {
@@ -1909,14 +1940,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
 
     if (unlikely(rio->mode != RINA_IO_MODE_APPL_BIND)) {
-        if (rio->mode == RINA_IO_MODE_IPCP_BIND) {
-            /* Fill the PCI for a management PDU.
-             * XXX is this path used anymore ? */
-            rina_buf_pci_push(rb);
-            memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
-            RINA_BUF_PCI(rb)->pdu_type = PDU_T_MGMT;
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, true);
-        } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
+        if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
         } else {
             PE("%s: Unknown mode, this should not happen\n", __func__);
@@ -2052,24 +2076,6 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
     rio->flow = flow;
     rio->txrx = &flow->txrx;
 
-    if (info->mode == RINA_IO_MODE_IPCP_BIND) {
-        /* Connect the upper IPCP which is using this flow
-         * so that rina_sdu_rx() can deliver SDU to the IPCP. */
-        struct ipcp_entry *ipcp;
-
-        /* Lookup the IPCP user of 'flow'. */
-        ipcp = ipcp_get(info->ipcp_id);
-        if (!ipcp) {
-            printk("%s: Error: No such ipcp\n", __func__);
-            flow_put(flow);
-
-            return -ENXIO;
-        }
-        rio->flow->upper.ipcp = ipcp;
-        PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id,
-                rio->flow->upper.ipcp->refcnt);
-    }
-
     return 0;
 }
 
@@ -2105,7 +2111,6 @@ rina_io_release_internal(struct rina_io *rio)
     BUG_ON(!rio);
     switch (rio->mode) {
         case RINA_IO_MODE_APPL_BIND:
-        case RINA_IO_MODE_IPCP_BIND:
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
             BUG_ON(!rio->flow);
@@ -2157,7 +2162,6 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
     switch (info.mode) {
         case RINA_IO_MODE_APPL_BIND:
-        case RINA_IO_MODE_IPCP_BIND:
             ret = rina_io_ioctl_bind(rio, &info);
             break;
 

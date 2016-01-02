@@ -72,7 +72,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     if (!pfr) {
         PE("%s: Out of memory\n", __func__);
         /* Negative flow allocation response. */
-        return flow_allocate_resp(application,req->ipcp_id,
+        return flow_allocate_resp(application,req->ipcp_id, 0xffff,
                                     req->port_id, 1);
     }
     pfr->ipcp_id = req->ipcp_id;
@@ -150,6 +150,7 @@ flow_config_default(struct rina_flow_config *cfg)
 static struct rina_kmsg_fa_resp_arrived *
 flow_allocate_req(struct application *application,
                   unsigned int wait_for_completion, uint16_t ipcp_id,
+                  uint16_t upper_ipcp_id,
                   const struct rina_name *local_application,
                   const struct rina_name *remote_application,
                   const struct rina_flow_config *flowcfg, int *result)
@@ -166,6 +167,7 @@ flow_allocate_req(struct application *application,
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_FA_REQ;
     req->ipcp_id = ipcp_id;
+    req->upper_ipcp_id = upper_ipcp_id;
     if (flowcfg) {
         memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
@@ -183,7 +185,7 @@ flow_allocate_req(struct application *application,
 
 int
 flow_allocate_resp(struct application *application, uint16_t ipcp_id,
-                   uint32_t port_id, uint8_t response)
+                   uint16_t upper_ipcp_id, uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
     struct rina_msg_base *resp;
@@ -197,7 +199,8 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
     memset(req, 0, sizeof(*req));
 
     req->msg_type = RINA_KERN_FA_RESP;
-    req->ipcp_id = ipcp_id;
+    req->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
+    req->upper_ipcp_id = upper_ipcp_id;
     req->port_id = port_id;
     req->response = response;
 
@@ -240,7 +243,8 @@ flow_allocate(struct application *application,
               const struct rina_name *local_application,
               const struct rina_name *remote_application,
               const struct rina_flow_config *flowcfg,
-              unsigned int *port_id, unsigned int wait_ms)
+              unsigned int *port_id, unsigned int wait_ms,
+              uint16_t upper_ipcp_id)
 {
     struct rina_kmsg_fa_resp_arrived *kresp;
     struct ipcp *ipcp;
@@ -257,7 +261,7 @@ flow_allocate(struct application *application,
     }
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              ipcp->ipcp_id, local_application,
+                              ipcp->ipcp_id, upper_ipcp_id, local_application,
                               remote_application, flowcfg, &result);
     if (!kresp) {
         PE("%s: Flow allocation request failed\n", __func__);
@@ -320,12 +324,6 @@ open_port_appl(uint32_t port_id)
     return open_port_common(port_id, RINA_IO_MODE_APPL_BIND, 0);
 }
 
-int
-open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
-{
-    return open_port_common(port_id, RINA_IO_MODE_IPCP_BIND, ipcp_id);
-}
-
 int open_ipcp_mgmt(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
@@ -348,7 +346,7 @@ flow_allocate_open(struct application *application,
 
     ret = flow_allocate(application, dif_name, dif_fallback, ipcp_name,
                         local_application, remote_application, flowcfg,
-                        &port_id, wait_ms);
+                        &port_id, wait_ms, 0xffff);
     if (ret) {
         return -1;
     }
@@ -369,8 +367,8 @@ flow_request_wait_open(struct application *application)
             __func__, pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
-    result = flow_allocate_resp(application, pfr->ipcp_id,
-            pfr->port_id, 0);
+    result = flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
+                                pfr->port_id, 0);
     port_id = pfr->port_id;
     pfr_free(pfr);
 
