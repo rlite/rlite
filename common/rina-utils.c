@@ -152,6 +152,7 @@ rina_msg_serlen(struct rina_msg_layout *numtables,
 
     return ret;
 }
+COMMON_EXPORT(rina_msg_serlen);
 
 /* Serialize msg into serbuf. */
 unsigned int
