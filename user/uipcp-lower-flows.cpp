@@ -174,7 +174,7 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     info[local_addr].dist = 0;
 
     for (;;) {
-        uint64_t min;
+        uint64_t min = UINT_MAX;
         unsigned int min_dist = UINT_MAX;
 
         /* Select the closest node from the ones in the frontier. */
@@ -189,6 +189,8 @@ SPEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
         if (min_dist == UINT_MAX) {
             break;
         }
+
+        assert(min != UINT_MAX);
 
         PD_S("Selecting node %lu\n", (long unsigned)min);
 

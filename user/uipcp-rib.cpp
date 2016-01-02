@@ -356,7 +356,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     map<string, Neighbor>::iterator neigh;
-    CDAPMessage *m;
+    CDAPMessage *m = NULL;
     int ret;
 
     try {
@@ -372,6 +372,8 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
             m->get_obj_value(objbuf, objlen);
             if (!objbuf) {
                 PE("CDAP message does not contain a nested message\n");
+
+                delete m;
                 return 0;
             }
 
@@ -379,13 +381,14 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 
             if (!adata.cdap) {
                 PE("A_DATA does not contain an encapsulated CDAP message\n");
+
+                delete m;
                 return 0;
             }
 
             rib->cdap_dispatch(adata.cdap, NULL);
 
             delete m;
-
             return 0;
         }
 
@@ -400,6 +403,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
          * deserialization can be avoided extending the CDAP
          * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
         delete m;
+        m = NULL;
 
         /* Lookup neighbor by port id. */
         neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);

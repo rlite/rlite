@@ -396,12 +396,12 @@ int
 uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct uipcp *uipcp;
-    int ret;
+    int ret = ENOMEM;
 
     uipcp = malloc(sizeof(*uipcp));
     if (!uipcp) {
         PE("Out of memory\n");
-        return ENOMEM;
+        return ret;
     }
     memset(uipcp, 0, sizeof(*uipcp));
 
