@@ -68,6 +68,8 @@ struct uipcp_ops {
 struct ipcp_node {
     unsigned int ipcp_id;
     unsigned int marked;
+    unsigned int up_depth;
+    unsigned int down_depth;
     unsigned int refcnt;
 
     struct list_head lowers;
@@ -78,9 +80,6 @@ struct ipcp_node {
 
 struct flow_edge {
     struct ipcp_node *ipcp;
-    unsigned int marked;
-    unsigned int up_depth;
-    unsigned int down_depth;
     unsigned int refcnt;
 
     struct list_head node;

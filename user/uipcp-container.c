@@ -378,13 +378,87 @@ uipcps_fetch(struct uipcps *uipcps)
 }
 
 static int
+relax(struct uipcps *uipcps, int up)
+{
+    struct ipcp_node *ipn;
+    struct flow_edge *e;
+
+    for (;;) {
+        struct ipcp_node *next = NULL;
+        struct list_head *prevs, *nexts;
+
+        list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+            int no_prev = 1;
+
+            if (ipn->marked) {
+                continue;
+            }
+
+            if (up) {
+                prevs = &ipn->lowers;
+                nexts = &ipn->uppers;
+            } else {
+                prevs = &ipn->uppers;
+                nexts = &ipn->lowers;
+            }
+
+            list_for_each_entry(e, prevs, node) {
+                if (!e->ipcp->marked) {
+                    no_prev = 0;
+                    break;
+                }
+            }
+
+            if (no_prev) {
+                next = ipn;
+                break;
+            }
+        }
+
+        if (!next) {
+            break;
+        }
+
+        next->marked = 1;
+
+        list_for_each_entry(e, nexts, node) {
+            if (up) {
+                if (e->ipcp->down_depth < ipn->down_depth + 1) {
+                    e->ipcp->down_depth = ipn->down_depth + 1;
+                }
+            } else {
+                if (e->ipcp->up_depth < ipn->up_depth + 1) {
+                    e->ipcp->up_depth = ipn->up_depth + 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+static int
 uipcps_compute_depths(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        PD_S("NODE %u\n", ipn->ipcp_id);
+        ipn->marked = 0;
+        ipn->up_depth = 0;
+    }
+
+    relax(uipcps, 0);
+
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        ipn->marked = 0;
+        ipn->down_depth = 0;
+    }
+    relax(uipcps, 1);
+
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        PD_S("NODE %u, up_depth = %u, down_depth = %u\n", ipn->ipcp_id,
+             ipn->up_depth, ipn->down_depth);
         PD_S("    uppers = [");
         list_for_each_entry(e, &ipn->uppers, node) {
             PD_S("%u, ", e->ipcp->ipcp_id);
