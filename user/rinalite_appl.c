@@ -65,7 +65,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
                                        struct rinalite_appl, loop);
     struct rina_kmsg_fa_req_arrived *req =
             (struct rina_kmsg_fa_req_arrived *)b_resp;
-    struct pending_flow_req *pfr = NULL;
+    struct rinalite_pending_flow_req *pfr = NULL;
 
     assert(b_req == NULL);
     pfr = malloc(sizeof(*pfr));
@@ -136,7 +136,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
 }
 
 void
-flow_config_default(struct rina_flow_config *cfg)
+rinalite_flow_cfg_default(struct rina_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->partial_delivery = 0;
@@ -171,7 +171,7 @@ flow_allocate_req(struct rinalite_appl *application,
     if (flowcfg) {
         memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
-        flow_config_default(&req->flowcfg);
+        rinalite_flow_cfg_default(&req->flowcfg);
     }
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
@@ -277,8 +277,8 @@ rinalite_flow_allocate(struct rinalite_appl *application,
     return result;
 }
 
-struct pending_flow_req *
-flow_request_wait(struct rinalite_appl *application)
+struct rinalite_pending_flow_req *
+rinalite_flow_req_wait(struct rinalite_appl *application)
 {
     struct list_head *elem = NULL;
 
@@ -289,7 +289,7 @@ flow_request_wait(struct rinalite_appl *application)
     }
     pthread_mutex_unlock(&application->lock);
 
-    return container_of(elem, struct pending_flow_req, node);
+    return container_of(elem, struct rinalite_pending_flow_req, node);
 }
 
 static int
@@ -319,21 +319,21 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 }
 
 int
-open_port_appl(uint32_t port_id)
+rinalite_open_appl_port(uint32_t port_id)
 {
     return open_port_common(port_id, RINA_IO_MODE_APPL_BIND, 0);
 }
 
-int open_ipcp_mgmt(uint16_t ipcp_id)
+int rinalite_open_mgmt_port(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
     return open_port_common(~0U, RINA_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
-/* rinalite_flow_allocate() + open_port_appl() */
+/* rinalite_flow_allocate() + rinalite_open_appl_port() */
 int
-flow_allocate_open(struct rinalite_appl *application,
+rinalite_flow_allocate_open(struct rinalite_appl *application,
                    struct rina_name *dif_name, int dif_fallback,
                    struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
@@ -351,18 +351,18 @@ flow_allocate_open(struct rinalite_appl *application,
         return -1;
     }
 
-    return open_port_appl(port_id);
+    return rinalite_open_appl_port(port_id);
 }
 
-/* flow_request_wait() + open_port_appl() */
+/* rinalite_flow_req_wait() + rinalite_open_appl_port() */
 int
-flow_request_wait_open(struct rinalite_appl *application)
+rinalite_flow_req_wait_open(struct rinalite_appl *application)
 {
-    struct pending_flow_req *pfr;
+    struct rinalite_pending_flow_req *pfr;
     unsigned int port_id;
     int result;
 
-    pfr = flow_request_wait(application);
+    pfr = rinalite_flow_req_wait(application);
     printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
             __func__, pfr->ipcp_id, pfr->port_id);
 
@@ -370,13 +370,13 @@ flow_request_wait_open(struct rinalite_appl *application)
     result = rinalite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
                                 pfr->port_id, 0);
     port_id = pfr->port_id;
-    pfr_free(pfr);
+    rinalite_pending_flow_req_free(pfr);
 
     if (result) {
         return -1;
     }
 
-    return open_port_appl(port_id);
+    return rinalite_open_appl_port(port_id);
 }
 
 int

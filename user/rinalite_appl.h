@@ -1,5 +1,5 @@
-#ifndef __RINA_APPLICATION_H__
-#define __RINA_APPLICATION_H__
+#ifndef __RINALITE_APPL_H__
+#define __RINALITE_APPL_H__
 
 #include <rina/rina-common.h>
 #include <stdint.h>
@@ -7,7 +7,7 @@
 #include "evloop.h"
 
 
-struct pending_flow_req {
+struct rinalite_pending_flow_req {
     uint16_t ipcp_id;
     uint32_t port_id;
     struct rina_name remote_appl;
@@ -16,7 +16,7 @@ struct pending_flow_req {
 };
 
 static inline void
-pfr_free(struct pending_flow_req *pfr)
+rinalite_pending_flow_req_free(struct rinalite_pending_flow_req *pfr)
 {
     rina_name_free(&pfr->remote_appl);
     free(pfr);
@@ -49,17 +49,17 @@ int rinalite_flow_allocate(struct rinalite_appl *application,
                   unsigned int *port_id, unsigned int wait_ms,
                   uint16_t upper_ipcp_id);
 
-struct pending_flow_req *flow_request_wait(struct rinalite_appl *application);
+struct rinalite_pending_flow_req *rinalite_flow_req_wait(struct rinalite_appl *application);
 
 int rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
                        uint16_t upper_ipcp_id,uint32_t port_id,
                        uint8_t response);
 
-int open_port_appl(uint32_t port_id);
+int rinalite_open_appl_port(uint32_t port_id);
 
-int open_ipcp_mgmt(uint16_t ipcp_id);
+int rinalite_open_mgmt_port(uint16_t ipcp_id);
 
-int flow_allocate_open(struct rinalite_appl *application,
+int rinalite_flow_allocate_open(struct rinalite_appl *application,
                        struct rina_name *dif_name, int dif_fallback,
                        struct rina_name *ipcp_name,
                        const struct rina_name *local_application,
@@ -67,8 +67,8 @@ int flow_allocate_open(struct rinalite_appl *application,
                        const struct rina_flow_config *flowcfg,
                        unsigned int wait_ms);
 
-int flow_request_wait_open(struct rinalite_appl *application);
+int rinalite_flow_req_wait_open(struct rinalite_appl *application);
 
-void flow_config_default(struct rina_flow_config *cfg);
+void rinalite_flow_cfg_default(struct rina_flow_config *cfg);
 
-#endif  /* __RINA_APPLICATION_H__ */
+#endif  /* __RINALITE_APPL_H__ */

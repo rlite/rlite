@@ -365,7 +365,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = flow_request_wait_open(&rp->application);
+        rp->dfd = rinalite_flow_req_wait_open(&rp->application);
         if (rp->dfd < 0) {
             continue;
         }
@@ -581,7 +581,7 @@ main(int argc, char **argv)
     int i;
 
     /* Start with a default flow configuration (unreliable flow). */
-    flow_config_default(&flowcfg);
+    rinalite_flow_cfg_default(&flowcfg);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:x")) != -1) {
         switch (opt) {
@@ -744,7 +744,7 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1,
+        rp.dfd = rinalite_flow_allocate_open(&rp.application, &rp.dif_name, 1,
                                     &rp.ipcp_name, &rp.client_appl_name,
                                     &rp.server_appl_name, &flowcfg, 1500);
         if (rp.dfd < 0) {

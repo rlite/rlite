@@ -136,7 +136,7 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
         goto err;
     }
 
-    neigh->flow_fd = open_port_appl(port_id);
+    neigh->flow_fd = rinalite_open_appl_port(port_id);
     if (neigh->flow_fd < 0) {
         goto err;
     }
@@ -546,7 +546,7 @@ uipcp_server(void *arg)
 
     for (;;) {
         struct enrolled_neighbor *neigh;
-        struct pending_flow_req *pfr;
+        struct rinalite_pending_flow_req *pfr;
         unsigned int port_id;
         int result;
 
@@ -557,7 +557,7 @@ uipcp_server(void *arg)
         }
         memset(neigh, 0, sizeof(*neigh));
 
-        pfr = flow_request_wait(&uipcp->appl);
+        pfr = rinalite_flow_req_wait(&uipcp->appl);
         port_id = pfr->port_id;
         PD("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
@@ -566,20 +566,20 @@ uipcp_server(void *arg)
                                     uipcp->ipcp_id, pfr->port_id, 0);
 
         if (result) {
-            pfr_free(pfr);
+            rinalite_pending_flow_req_free(pfr);
             free(neigh);
             continue;
         }
 
-        neigh->flow_fd = open_port_appl(port_id);
+        neigh->flow_fd = rinalite_open_appl_port(port_id);
         if (neigh->flow_fd < 0) {
-            pfr_free(pfr);
+            rinalite_pending_flow_req_free(pfr);
             free(neigh);
             continue;
         }
         rina_name_copy(&neigh->ipcp_name, &pfr->remote_appl);
         list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
-        pfr_free(pfr);
+        rinalite_pending_flow_req_free(pfr);
 
         /* XXX This usleep() is a temporary hack to make sure that the
          * flow allocation response has the time to be processed by the neighbor,
@@ -685,7 +685,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err2;
     }
 
-    uipcp->mgmtfd = open_ipcp_mgmt(ipcp_id);
+    uipcp->mgmtfd = rinalite_open_mgmt_port(ipcp_id);
     if (uipcp->mgmtfd < 0) {
         ret = uipcp->mgmtfd;
         goto err2;
