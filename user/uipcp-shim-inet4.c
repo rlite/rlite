@@ -30,6 +30,7 @@ struct inet4_endpoint {
 
 struct shim_inet4 {
     struct uipcp *uipcp;
+    char *ipcp_name;  /* My name. */
     struct list_head endpoints;
     struct list_head bindpoints;
     uint32_t kevent_id_cnt;
@@ -38,7 +39,7 @@ struct shim_inet4 {
 #define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
 
 static int
-parse_directory(struct shim_inet4 *shim, int addr2sock,
+parse_directory(struct shim_inet4 *shim, int appl2sock, int use_shim_name,
                 struct sockaddr_in *addr, struct rina_name *appl_name)
 {
     char *appl_name_s = NULL;
@@ -49,7 +50,7 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
     ssize_t n;
     int found = 0;
 
-    if (addr2sock) {
+    if (appl2sock) {
         appl_name_s = rina_name_to_string(appl_name);
         if (!appl_name_s) {
             UPE(shim->uipcp, "Out of memory\n");
@@ -70,7 +71,7 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
         /* I know, strtok_r, strsep, etc. etc. I just wanted to have
          * some fun ;) */
         char *nm = linebuf;
-        char *ip, *port, *eol;
+        char *ip, *port, *shnm, *eol;
         struct sockaddr_in cur_addr;
         int ret;
 
@@ -95,7 +96,15 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
         while (*port != '\0' && isspace(*port)) port++;
         if (*port == '\0') continue;
 
-        eol = port;
+        shnm = port;
+        while (*shnm != '\0' && !isspace(*shnm)) shnm++;
+        if (*shnm == '\0') continue;
+
+        *shnm = '\0';
+        shnm++;
+        while (*shnm != '\0' && isspace(*shnm)) shnm++;
+
+        eol = shnm;
         while (*eol != '\0' && !isspace(*eol)) eol++;
         if (*eol != '\0') *eol = '\0';
 
@@ -108,13 +117,14 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
             continue;
         }
 
-        if (addr2sock) {
-            if (strcmp(nm, appl_name_s) == 0) {
+        if (appl2sock) {
+            if (strcmp(nm, appl_name_s) == 0 &&
+                    (!use_shim_name || strcmp(shnm, shim->ipcp_name) == 0)) {
                 memcpy(addr, &cur_addr, sizeof(cur_addr));
                 found = 1;
             }
 
-        } else { /* sock2addr */
+        } else { /* sock2appl */
             if (addr->sin_family == cur_addr.sin_family &&
                     /* addr->sin_port == cur_addr.sin_port && */
                     memcmp(&addr->sin_addr, &cur_addr.sin_addr,
@@ -146,16 +156,18 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
 static int
 appl_name_to_sock_addr(struct shim_inet4 *shim,
                        const struct rina_name *appl_name,
-                       struct sockaddr_in *addr)
+                       struct sockaddr_in *addr, int use_shim_name)
 {
-    return parse_directory(shim, 1, addr, (struct rina_name *)appl_name);
+    return parse_directory(shim, 1, use_shim_name, addr,
+                           (struct rina_name *)appl_name);
 }
 
 static int
 sock_addr_to_appl_name(struct shim_inet4 *shim, const struct sockaddr_in *addr,
                        struct rina_name *appl_name)
 {
-    return parse_directory(shim, 0, (struct sockaddr_in *)addr, appl_name);
+    return parse_directory(shim, 0, 0, (struct sockaddr_in *)addr,
+                           appl_name);
 }
 
 static int
@@ -259,7 +271,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr);
+    ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr, 1);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address from appl_name '%s'\n",
            bp->appl_name_s);
@@ -326,13 +338,15 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
 
     ep->port_id = req->local_port;
 
-    ret = appl_name_to_sock_addr(shim, &req->local_appl, &ep->addr);
+    /* This first lookup is currently useless, since we don't bind(). */
+    ret = appl_name_to_sock_addr(shim, &req->local_appl, &ep->addr, 0);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address for local appl\n");
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr);
+    /* This lookup is needed for the connect(). */
+    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr, 0);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address for remote appl\n");
         goto err1;
@@ -543,14 +557,32 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
 static int
 shim_inet4_init(struct uipcp *uipcp)
 {
-    struct shim_inet4 *shim = malloc(sizeof(*shim));
+    struct rlite_ipcp *rlite_ipcp;
+    struct shim_inet4 *shim;
 
+    rlite_ipcps_fetch(&uipcp->appl.loop);
+    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+    if (!rlite_ipcp) {
+        PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);
+        return -1;
+    }
+
+    shim = malloc(sizeof(*shim));
     if (!shim) {
         UPE(uipcp, "Out of memory\n");
         return -1;
     }
 
     uipcp->priv = shim;
+
+    /* Store the serialized name of the new IPCP, it will be
+     * used during the registration. */
+    shim->ipcp_name = rina_name_to_string(&rlite_ipcp->ipcp_name);
+    if (!shim->ipcp_name) {
+        UPE(uipcp, "Out of memory\n");
+        free(shim);
+        return -1;
+    }
 
     shim->uipcp = uipcp;
     list_init(&shim->endpoints);
@@ -586,6 +618,8 @@ shim_inet4_fini(struct uipcp *uipcp)
             free(ep);
         }
     }
+
+    free(shim->ipcp_name);
 
     free(shim);
 
