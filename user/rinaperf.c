@@ -284,6 +284,119 @@ clos:
     return 0;
 }
 
+static int
+parse_flowcfg_bool(const char *arg, uint8_t *field, const char *fieldname)
+{
+    if (!arg) {
+        return -1;
+    }
+
+    if (strcmp(arg, fieldname) == 0) {
+        *field = 1;
+        return 0;
+    }
+
+    return -1;
+}
+
+static int
+parse_flowcfg_int(const char *arg, int *field, const char *fieldname)
+{
+    const char *eq;
+
+    if (!arg) {
+        return -1;
+    }
+
+    eq = strchr(arg, '=');
+    if (!eq) {
+        return -1;
+    }
+
+    if (strncmp(arg, fieldname, eq - arg) != 0) {
+        return -1;
+    }
+
+    *field = atoi(eq+1);
+
+    return 0;
+}
+
+static int
+update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
+{
+    int field_int;
+
+    if (parse_flowcfg_bool(arg, &flowcfg->partial_delivery,
+                                            "partial_delivery") == 0)
+        return 0;
+
+    if (parse_flowcfg_bool(arg, &flowcfg->incomplete_delivery,
+                                            "incomplete_delivery") == 0)
+        return 0;
+
+    if (parse_flowcfg_bool(arg, &flowcfg->in_order_delivery,
+                                            "in_order_delivery") == 0)
+        return 0;
+
+    if (parse_flowcfg_int(arg, &field_int, "max_sdu_gap") == 0) {
+        flowcfg->max_sdu_gap = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_bool(arg, &flowcfg->dtcp_present, "dtcp_present") == 0)
+        return 0;
+
+    if (parse_flowcfg_bool(arg, &flowcfg->dtcp.flow_control,
+                                            "dtcp.flow_control") == 0)
+        return 0;
+
+    if (parse_flowcfg_bool(arg, &flowcfg->dtcp.rtx_control,
+                                            "dtcp.rtx_control") == 0)
+        return 0;
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.sending_rate") == 0) {
+        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.fc.cfg.r.sending_rate = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.time_period") == 0) {
+        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.fc.cfg.r.time_period = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.max_cwq_len") == 0) {
+        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.fc.cfg.w.max_cwq_len = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.initial_credit") == 0) {
+        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.fc.cfg.w.initial_credit = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.max_time_to_retry") == 0) {
+        flowcfg->dtcp.rtx.max_time_to_retry = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.data_rxms_max") == 0) {
+        flowcfg->dtcp.rtx.data_rxms_max = field_int;
+        return 0;
+    }
+
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.initial_rtx_max") == 0) {
+        flowcfg->dtcp.rtx.initial_rtx_max = field_int;
+        return 0;
+    }
+
+    return -1;
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -319,6 +432,7 @@ main(int argc, char **argv)
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
+    struct rina_flow_config flowcfg;
     int listen = 0;
     int cnt = 1;
     int size = 1;
@@ -327,7 +441,10 @@ main(int argc, char **argv)
     int opt;
     int i;
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:")) != -1) {
+    /* Start with a default flow configuration (unreliable flow). */
+    flow_config_default(&flowcfg);
+
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -372,6 +489,14 @@ main(int argc, char **argv)
                 interval = atoi(optarg);
                 if (interval < 0) {
                     printf("    Invalid 'interval' %d\n", interval);
+                    return -1;
+                }
+                break;
+
+            case 'f':
+                /* Update the flow configuration. */
+                if (update_flow_config(&flowcfg, optarg)) {
+                    printf("    Invalid flow config %s\n", optarg);
                     return -1;
                 }
                 break;
