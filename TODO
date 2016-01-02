@@ -22,5 +22,3 @@
 - flow_allocator_ ==> fa_
 
 - FLOW_ALLOCATOR_ ==> FA_
-
-- rimuovi l'implementazione DFT nel kernel

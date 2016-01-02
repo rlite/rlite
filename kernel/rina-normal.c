@@ -42,16 +42,6 @@ struct rina_normal {
 
     /* Implementation of the PDU Forwarding Table (PDUFT). */
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
-
-    /* Implementation of the Directory Forwarding Table (DFT). */
-    struct list_head dft;
-};
-
-struct dft_entry {
-    struct rina_name appl_name;
-    uint64_t remote_addr;
-
-    struct list_head node;
 };
 
 static void *
@@ -66,7 +56,6 @@ rina_normal_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
-    INIT_LIST_HEAD(&priv->dft);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -197,41 +186,6 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     return 0;
 }
 
-static struct dft_entry *
-dft_lookup(struct rina_normal *priv, const struct rina_name *appl_name)
-{
-    struct dft_entry *entry;
-
-    list_for_each_entry(entry, &priv->dft, node) {
-        if (rina_name_cmp(&entry->appl_name, appl_name) == 0) {
-            return entry;
-        }
-    }
-
-    return NULL;
-}
-
-static int
-rina_normal_dft_set(struct ipcp_entry *ipcp, const struct rina_name *appl_name,
-                    uint64_t remote_addr)
-{
-    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
-    struct dft_entry *entry;
-
-    entry = dft_lookup(priv, appl_name);
-    if (!entry) {
-        entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-        if (!entry) {
-            return -ENOMEM;
-        }
-        rina_name_copy(&entry->appl_name, appl_name);
-        list_add_tail(&entry->node, &priv->dft);
-    }
-    entry->remote_addr = remote_addr;
-
-    return 0;
-}
-
 static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
@@ -269,7 +223,6 @@ rina_normal_init(void)
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
-    factory.ops.dft_set = rina_normal_dft_set;
     factory.ops.sdu_rx = rina_normal_sdu_rx;
 
     ret = rina_ipcp_factory_register(&factory);
