@@ -107,63 +107,6 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
     return 0;
 }
 
-// TODO move to lower-flows.cpp
-int
-uipcp_rib::pduft_sync()
-{
-    map<uint64_t, unsigned int> next_hop_to_port_id;
-
-    /* Flush previous entries. */
-    uipcp_pduft_flush(uipcp, uipcp->ipcp_id);
-
-    /* Precompute the port-ids corresponding to all the possible
-     * next-hops. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
-        map<string, Neighbor>::iterator neigh;
-        string neigh_name;
-
-        if (next_hop_to_port_id.count(r->second)) {
-            continue;
-        }
-
-        neigh_name = static_cast<string>(
-                                lookup_neighbor_by_address(r->second));
-        if (neigh_name == string()) {
-            PE("Could not find neighbor with address %lu\n",
-                    (long unsigned)r->second);
-            continue;
-        }
-
-        neigh = neighbors.find(neigh_name);
-
-        if (neigh == neighbors.end()) {
-            PE("Could not find neighbor with name %s\n",
-                    neigh_name.c_str());
-            continue;
-        }
-
-        next_hop_to_port_id[r->second] = neigh->second.port_id;
-    }
-
-    /* Generate PDUFT entries. */
-    for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
-            unsigned int port_id = next_hop_to_port_id[r->second];
-            int ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,
-                                      port_id);
-            if (ret) {
-                PE("Failed to insert %lu --> %u PDUFT entry\n",
-                    (long unsigned)r->first, port_id);
-            } else {
-                PD("Add PDUFT entry %lu --> %u\n",
-                    (long unsigned)r->first, port_id);
-            }
-    }
-
-    return 0;
-}
-
 int
 uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
