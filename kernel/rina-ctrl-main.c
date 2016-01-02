@@ -257,7 +257,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->uipcp = NULL;
         entry->mgmt_txrx = NULL;
         mutex_init(&entry->lock);
-        entry->refcnt = 0;
+        entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
@@ -386,8 +386,8 @@ ipcp_application_del_entry(struct ipcp_entry *ipcp,
                            struct registered_application *app)
 {
     list_del(&app->node);
-    ipcp->refcnt--;
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
+    ipcp_del_entry(ipcp, 0);
     rina_name_free(&app->name);
     kfree(app);
 }
@@ -530,8 +530,9 @@ flow_del_entry(struct flow_entry *entry, int locked)
 
     dtp_fini(&entry->dtp);
 
-    entry->txrx.ipcp->refcnt--;
     PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
+    ipcp_del_entry(entry->txrx.ipcp, 0);
+
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         rina_buf_free(rb);
     }
@@ -606,9 +607,9 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
         mutex_lock(&rina_dm.lock);
     }
 
+    entry->refcnt--;
     if (entry->refcnt) {
-        PD("BUSY %u with %u\n", entry->id, entry->refcnt);
-        ret = -EBUSY;
+        ret = 0;
         goto out;
     }
 
@@ -1810,8 +1811,8 @@ rina_io_release_internal(struct rina_io *rio)
              * so let's unbind from it. */
             rio->flow->refcnt--;
             if (rio->flow->upper.ipcp) {
-                rio->flow->upper.ipcp->refcnt--;
                 PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
+                ipcp_del_entry(rio->flow->upper.ipcp, 0);
             }
             flow_del_entry(rio->flow, 0);
             rio->flow = NULL;
@@ -1822,8 +1823,8 @@ rina_io_release_internal(struct rina_io *rio)
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
-            rio->txrx->ipcp->refcnt--;
             PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id, rio->txrx->ipcp->refcnt);
+            ipcp_del_entry(rio->txrx->ipcp, 0);
             kfree(rio->txrx);
             rio->txrx = NULL;
             break;
