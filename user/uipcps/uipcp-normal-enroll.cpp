@@ -175,14 +175,14 @@ enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
 void
 Neighbor::enroll_tmr_start()
 {
-    enroll_timeout_id = rlite_evloop_schedule(&rib->uipcp->appl.loop, 1000,
+    enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->appl.loop, 1000,
                                               enroll_timeout_cb, this);
 }
 
 void
 Neighbor::enroll_tmr_stop()
 {
-    rlite_evloop_schedule_canc(&rib->uipcp->appl.loop, enroll_timeout_id);
+    rl_evloop_schedule_canc(&rib->uipcp->appl.loop, enroll_timeout_id);
 }
 
 int
@@ -878,10 +878,10 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         }
     }
 
-    event_id = rlite_evloop_get_id(&rib->uipcp->appl.loop);
+    event_id = rl_evloop_get_id(&rib->uipcp->appl.loop);
 
     /* Allocate a flow for the enrollment. */
-    ret = rlite_flow_allocate(&rib->uipcp->appl, event_id, supp_dif_name, NULL,
+    ret = rl_appl_flow_alloc(&rib->uipcp->appl, event_id, supp_dif_name, NULL,
                               &info->ipcp_name, &neigh_name, NULL,
                               &port_id_, 2000, info->ipcp_id);
     rina_name_free(&neigh_name);

@@ -406,13 +406,13 @@ uipcps_update(struct uipcps *uipcps)
     struct rlite_ipcp *rlite_ipcp;
     int ret = 0;
 
-    ret = rlite_evloop_init(&uipcps->loop, "/dev/rlite", NULL,
+    ret = rl_evloop_init(&uipcps->loop, "/dev/rlite", NULL,
                             RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
     }
 
-    rlite_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
+    rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
                              uipcps_ipcp_update);
 
     rlite_ipcps_print(&uipcps->loop);

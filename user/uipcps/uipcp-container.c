@@ -311,7 +311,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
-    ret = rlite_appl_init(&uipcp->appl, RLITE_EVLOOP_SPAWN);
+    ret = rl_appl_init(&uipcp->appl, RLITE_EVLOOP_SPAWN);
     if (ret) {
         goto err0;
     }
@@ -323,17 +323,17 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ,
+    ret |= rl_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ,
                                     uipcp->ops.fa_req);
 
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_RESP,
+    ret |= rl_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_RESP,
                                     uipcp->ops.fa_resp);
 
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+    ret |= rl_evloop_set_handler(&uipcp->appl.loop,
                                    RLITE_KER_APPL_REGISTER,
                                    uipcp->ops.appl_register);
 
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+    ret |= rl_evloop_set_handler(&uipcp->appl.loop,
                                     RLITE_KER_FLOW_DEALLOCATED,
                                     uipcp->ops.flow_deallocated);
     if (ret) {
@@ -355,7 +355,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 err2:
     uipcp->ops.fini(uipcp);
 err1:
-    rlite_appl_fini(&uipcp->appl);
+    rl_appl_fini(&uipcp->appl);
 err0:
     list_del(&uipcp->node);
     free(uipcp);
@@ -376,7 +376,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         return 0;
     }
 
-    ret = rlite_appl_fini(&uipcp->appl);
+    ret = rl_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);
 

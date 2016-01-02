@@ -21,9 +21,9 @@
 #include "rlite/evloop.h"
 
 
-struct rlite_evloop_fdcb {
+struct rl_evloop_fdcb {
     int fd;
-    rlite_evloop_fdcb_t cb;
+    rl_evloop_fdcb_t cb;
 
     struct list_head node;
 };
@@ -214,7 +214,7 @@ barrier_resp(struct rlite_evloop *loop,
 }
 
 uint32_t
-rlite_evloop_get_id(struct rlite_evloop *loop)
+rl_evloop_get_id(struct rlite_evloop *loop)
 {
     uint32_t ret;
 
@@ -243,7 +243,7 @@ flow_fetch(struct rlite_evloop *loop, int *result)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RLITE_KER_FLOW_FETCH;
-    msg->event_id = rlite_evloop_get_id(loop);
+    msg->event_id = rl_evloop_get_id(loop);
 
     NPD("Requesting IPC processes fetch...\n");
 
@@ -367,7 +367,7 @@ evloop_function(void *arg)
 
     for (;;) {
         struct rlite_msg_base_resp *resp;
-        struct rlite_evloop_fdcb *fdcb;
+        struct rl_evloop_fdcb *fdcb;
         struct timeval to;
         struct timeval *top = NULL;
         fd_set rdfs;
@@ -430,7 +430,7 @@ evloop_function(void *arg)
 
         } else if (ret == 0) {
             /* Timeout. Process expired timers. Timer callbacks
-             * are allowed to call rlite_evloop_schedule(), so
+             * are allowed to call rl_evloop_schedule(), so
              * rescheduling is possible. */
             struct timespec now;
             struct list_head expired;
@@ -597,7 +597,7 @@ notify_requestor:
 }
 
 int
-rlite_evloop_stop(struct rlite_evloop *loop)
+rl_evloop_stop(struct rlite_evloop *loop)
 {
     uint64_t x = 1;
     int n;
@@ -757,7 +757,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
 }
 
 static int
-rlite_evloop_barrier(struct rlite_evloop *loop)
+rl_evloop_barrier(struct rlite_evloop *loop)
 {
     struct rlite_msg_base *msg;
     int result;
@@ -771,7 +771,7 @@ rlite_evloop_barrier(struct rlite_evloop *loop)
     memset(msg, 0, sizeof(*msg));
 
     msg->msg_type = RLITE_KER_BARRIER;
-    msg->event_id = rlite_evloop_get_id(loop);
+    msg->event_id = rl_evloop_get_id(loop);
 
     msg = rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, &result);
 
@@ -787,7 +787,7 @@ rlite_evloop_barrier(struct rlite_evloop *loop)
 }
 
 int
-rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
+rl_evloop_init(struct rlite_evloop *loop, const char *dev,
                  rlite_resp_handler_t *handlers,
                  unsigned int flags)
 {
@@ -868,14 +868,14 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
             return ret;
         }
         loop->running = 1;
-        ret = rlite_evloop_barrier(loop);
+        ret = rl_evloop_barrier(loop);
     }
 
     return ret;
 }
 
 int
-rlite_evloop_run(struct rlite_evloop *loop)
+rl_evloop_run(struct rlite_evloop *loop)
 {
     pthread_mutex_lock(&loop->lock);
     if (loop->running) {
@@ -887,7 +887,7 @@ rlite_evloop_run(struct rlite_evloop *loop)
     loop->running = 1;
     pthread_mutex_unlock(&loop->lock);
 
-    if (rlite_evloop_barrier(loop)) {
+    if (rl_evloop_barrier(loop)) {
         PE("barrier() failed\n");
         pthread_mutex_lock(&loop->lock);
         loop->running = 0;
@@ -902,7 +902,7 @@ rlite_evloop_run(struct rlite_evloop *loop)
 }
 
 int
-rlite_evloop_join(struct rlite_evloop *loop)
+rl_evloop_join(struct rlite_evloop *loop)
 {
     if (!(loop->flags & RLITE_EVLOOP_SPAWN)) {
         PE("Cannot join evloop, RLITE_EVLOOP_SPAWN flag not set\n");
@@ -924,10 +924,10 @@ rlite_evloop_join(struct rlite_evloop *loop)
 }
 
 int
-rlite_evloop_fini(struct rlite_evloop *loop)
+rl_evloop_fini(struct rlite_evloop *loop)
 {
     /* Stop if nobody has already stopped. */
-    rlite_evloop_stop(loop);
+    rl_evloop_stop(loop);
 
     pthread_mutex_lock(&loop->lock);
     rlite_flows_purge(loop, loop->flows);
@@ -937,7 +937,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
     {
         /* Clean up the fdcbs list. */
-        struct rlite_evloop_fdcb *fdcb, *tmp;
+        struct rl_evloop_fdcb *fdcb, *tmp;
 
         pthread_mutex_lock(&loop->lock);
         list_for_each_entry_safe(fdcb, tmp, &loop->fdcbs, node) {
@@ -962,7 +962,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
     pending_queue_fini(&loop->pqueue);
 
     if ((loop->flags & RLITE_EVLOOP_SPAWN)) {
-        rlite_evloop_join(loop);
+        rl_evloop_join(loop);
     }
 
     /* Clean up all the data structures. To be completed. */
@@ -978,7 +978,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 }
 
 int
-rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
+rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
                          rlite_resp_handler_t handler)
 {
     if (index >= RLITE_KER_MSG_MAX) {
@@ -995,9 +995,9 @@ rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
 }
 
 int
-rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rlite_evloop_fdcb_t cb)
+rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rl_evloop_fdcb_t cb)
 {
-    struct rlite_evloop_fdcb *fdcb;
+    struct rl_evloop_fdcb *fdcb;
 
     if (!cb || fd < 0) {
         PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
@@ -1022,9 +1022,9 @@ rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rlite_evloop_fdcb_t cb)
 }
 
 int
-rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
+rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 {
-    struct rlite_evloop_fdcb *fdcb;
+    struct rl_evloop_fdcb *fdcb;
 
     pthread_mutex_lock(&loop->lock);
     list_for_each_entry(fdcb, &loop->fdcbs, node) {
@@ -1146,7 +1146,7 @@ rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id)
 #define TIMER_EVENTS_MAX    64
 
 int
-rlite_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
+rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
                       rlite_tmr_cb_t cb, void *arg)
 {
     struct rlite_tmr_event *e, *cur;
@@ -1203,7 +1203,7 @@ rlite_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
 }
 
 int
-rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id)
+rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
 {
     struct rlite_tmr_event *cur, *e = NULL;
     int ret = -1;

@@ -394,7 +394,7 @@ Gateway::Gateway()
 
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
-    if (rlite_appl_init(&appl, RLITE_EVLOOP_SPAWN)) {
+    if (rl_appl_init(&appl, RLITE_EVLOOP_SPAWN)) {
         throw std::exception();
     }
 }
@@ -406,7 +406,7 @@ Gateway::~Gateway()
         close(mit->first);
     }
 
-    rlite_appl_fini(&appl);
+    rl_appl_fini(&appl);
 
     for (unsigned int i=0; i<workers.size(); i++) {
         delete workers[i];
@@ -416,7 +416,7 @@ Gateway::~Gateway()
 int
 Gateway::join()
 {
-    return rlite_evloop_join(&appl.loop);
+    return rl_evloop_join(&appl.loop);
 }
 
 Gateway gw;
@@ -549,11 +549,11 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    ret = rlite_flow_allocate_resp(&gw->appl, req->kevent_id,
+    ret = rl_appl_fa_resp(&gw->appl, req->kevent_id,
                                    req->ipcp_id, 0xffff,
                                    req->port_id, RLITE_SUCC);
     if (ret != RLITE_SUCC) {
-        PE("rlite_flow_allocate_resp() failed\n");
+        PE("rl_appl_fa_resp() failed\n");
         close(cfd);
         return 0;
     }
@@ -653,10 +653,10 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     }
 
     strcpy(flowspec.cubename, "rel");
-    event_id = rlite_evloop_get_id(loop);
+    event_id = rl_evloop_get_id(loop);
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rlite_flow_allocate(appl, event_id, mit->second.dif_name_s.c_str(),
+    ret = rl_appl_flow_alloc(appl, event_id, mit->second.dif_name_s.c_str(),
                               NULL, &gw->appl_name, &mit->second.name_r,
                               &flowspec, &unused, 0, 0xffff);
     if (ret) {
@@ -701,8 +701,8 @@ inet_server_socket(const InetName& inet_name)
         return -1;
     }
 
-    if (rlite_evloop_fdcb_add(&gw.appl.loop, fd, accept_inet_conn)) {
-        PE("rlite_evloop_fcdb_add() failed [%d]\n", errno);
+    if (rl_evloop_fdcb_add(&gw.appl.loop, fd, accept_inet_conn)) {
+        PE("rl_evloop_fcdb_add() failed [%d]\n", errno);
         close(fd);
         return -1;
     }
@@ -718,9 +718,9 @@ setup()
     /* Register the handler for incoming flow allocation requests and
      * response, since we'll not be using rlite/appl.h functionalities for
      * that. */
-    ret = rlite_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_REQ_ARRIVED,
+    ret = rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_REQ_ARRIVED,
                                    gw_fa_req_arrived);
-    ret |= rlite_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_RESP_ARRIVED,
+    ret |= rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_RESP_ARRIVED,
                                     gw_fa_resp_arrived);
     if (ret) {
         return -1;
@@ -740,7 +740,7 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rlite_appl_register_wait(&gw.appl, 1, mit->first.dif_name_s.c_str(),
+        rl_appl_register_wait(&gw.appl, 1, mit->first.dif_name_s.c_str(),
                                  NULL, &mit->first.name_r, 3000);
         if (ret) {
             PE("Registration of application '%s'\n",

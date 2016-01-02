@@ -72,7 +72,7 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
     if (!pfr) {
         PE("Out of memory\n");
         /* Negative flow allocation response. */
-        return rlite_flow_allocate_resp(appl, req->kevent_id,
+        return rl_appl_fa_resp(appl, req->kevent_id,
                                         req->ipcp_id, 0xffff,
                                         req->port_id, RLITE_ERR);
     }
@@ -138,7 +138,7 @@ static rlite_resp_handler_t rlite_kernel_handlers[] = {
 };
 
 struct rl_kmsg_appl_register_resp *
-rlite_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
+rl_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
                         unsigned int wait_ms,
                         int reg, unsigned int ipcp_id,
                         const struct rina_name *appl_name)
@@ -226,7 +226,7 @@ flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
 }
 
 int
-rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
+rl_appl_fa_resp(struct rlite_appl *appl, uint32_t kevent_id,
                          uint16_t ipcp_id, uint16_t upper_ipcp_id,
                          uint32_t port_id, uint8_t response)
 {
@@ -260,7 +260,7 @@ rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
 }
 
 struct rl_kmsg_appl_register_resp *
-rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
+rl_appl_register(struct rlite_appl *appl, uint32_t event_id,
                     unsigned int wait_ms, int reg,
                     const char *dif_name,
                     const struct rina_name *ipcp_name,
@@ -278,22 +278,22 @@ rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
     }
 
     /* Forward the request to the kernel. */
-    return rlite_appl_register_req(appl, event_id, wait_ms,
+    return rl_appl_register_req(appl, event_id, wait_ms,
                                    reg, rlite_ipcp->ipcp_id, appl_name);
 }
 
 int
-rlite_appl_register_wait(struct rlite_appl *appl, int reg,
+rl_appl_register_wait(struct rlite_appl *appl, int reg,
                          const char *dif_name,
                          const struct rina_name *ipcp_name,
                          const struct rina_name *appl_name,
                          unsigned int wait_ms)
 {
     struct rl_kmsg_appl_register_resp *resp;
-    uint32_t event_id = rlite_evloop_get_id(&appl->loop);
+    uint32_t event_id = rl_evloop_get_id(&appl->loop);
     int ret = 0;
 
-    resp = rlite_appl_register(appl, event_id, wait_ms, reg, dif_name,
+    resp = rl_appl_register(appl, event_id, wait_ms, reg, dif_name,
                                ipcp_name, appl_name);
 
     if (!resp) {
@@ -312,7 +312,7 @@ rlite_appl_register_wait(struct rlite_appl *appl, int reg,
 }
 
 int
-rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
+rl_appl_flow_alloc(struct rlite_appl *appl, uint32_t event_id,
                     const char *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *local_appl,
@@ -362,7 +362,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
 }
 
 struct rlite_pending_flow_req *
-rlite_flow_req_wait(struct rlite_appl *appl)
+rl_appl_flow_accept(struct rlite_appl *appl)
 {
     struct list_head *elem = NULL;
 
@@ -415,9 +415,9 @@ int rlite_open_mgmt_port(uint16_t ipcp_id)
     return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
-/* rlite_flow_allocate() + rlite_open_appl_port() */
+/* rl_appl_flow_alloc() + rlite_open_appl_port() */
 int
-rlite_flow_allocate_open(struct rlite_appl *appl,
+rl_appl_flow_alloc_open(struct rlite_appl *appl,
                    const char *dif_name,
                    const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
@@ -431,14 +431,14 @@ rlite_flow_allocate_open(struct rlite_appl *appl,
 
     if (wait_ms == 0) {
         /* If the user wants to work in non-blocking mode, it
-         * must use rlite_flow_allocate() directly. */
+         * must use rl_appl_flow_alloc() directly. */
         PE("Cannot work in non-blocking mode\n");
         return -1;
     }
 
-    event_id = rlite_evloop_get_id(&appl->loop);
+    event_id = rl_evloop_get_id(&appl->loop);
 
-    ret = rlite_flow_allocate(appl, event_id, dif_name, ipcp_name,
+    ret = rl_appl_flow_alloc(appl, event_id, dif_name, ipcp_name,
                               local_appl, remote_appl, flowspec,
                               &port_id, wait_ms, 0xffff);
     if (ret) {
@@ -448,24 +448,24 @@ rlite_flow_allocate_open(struct rlite_appl *appl,
     return rlite_open_appl_port(port_id);
 }
 
-/* rlite_flow_req_wait() + rlite_open_appl_port() */
+/* rl_appl_flow_accept() + rlite_open_appl_port() */
 int
-rlite_flow_req_wait_open(struct rlite_appl *appl)
+rl_appl_flow_accept_open(struct rlite_appl *appl)
 {
     struct rlite_pending_flow_req *pfr;
     unsigned int port_id;
     int result;
 
-    pfr = rlite_flow_req_wait(appl);
+    pfr = rl_appl_flow_accept(appl);
     PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
             pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
-    result = rlite_flow_allocate_resp(appl, pfr->kevent_id,
+    result = rl_appl_fa_resp(appl, pfr->kevent_id,
                                       pfr->ipcp_id, 0xffff,
                                       pfr->port_id, 0);
     port_id = pfr->port_id;
-    rlite_pending_flow_req_free(pfr);
+    rl_pfr_free(pfr);
 
     if (result) {
         return -1;
@@ -475,7 +475,7 @@ rlite_flow_req_wait_open(struct rlite_appl *appl)
 }
 
 int
-rlite_appl_init(struct rlite_appl *appl, unsigned int flags)
+rl_appl_init(struct rlite_appl *appl, unsigned int flags)
 {
     int ret;
 
@@ -483,7 +483,7 @@ rlite_appl_init(struct rlite_appl *appl, unsigned int flags)
     pthread_cond_init(&appl->flow_req_arrived_cond, NULL);
     list_init(&appl->pending_flow_reqs);
 
-    ret = rlite_evloop_init(&appl->loop, "/dev/rlite",
+    ret = rl_evloop_init(&appl->loop, "/dev/rlite",
                             rlite_kernel_handlers, flags);
     if (ret) {
         return ret;
@@ -493,7 +493,7 @@ rlite_appl_init(struct rlite_appl *appl, unsigned int flags)
 }
 
 int
-rlite_appl_fini(struct rlite_appl *appl)
+rl_appl_fini(struct rlite_appl *appl)
 {
-    return rlite_evloop_fini(&appl->loop);
+    return rl_evloop_fini(&appl->loop);
 }

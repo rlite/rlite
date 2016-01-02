@@ -244,7 +244,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
         throw std::exception();
     }
 
-    ret = rlite_evloop_fdcb_add(&uipcp->appl.loop, mgmtfd, mgmt_fd_ready);
+    ret = rl_evloop_fdcb_add(&uipcp->appl.loop, mgmtfd, mgmt_fd_ready);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
@@ -265,7 +265,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
 uipcp_rib::~uipcp_rib()
 {
-    rlite_evloop_fdcb_del(&uipcp->appl.loop, mgmtfd);
+    rl_evloop_fdcb_del(&uipcp->appl.loop, mgmtfd);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }
@@ -648,7 +648,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
             req->ipcp_id, req->port_id);
 
     /* First of all we update the neighbors in the RIB. This
-     * must be done before invoking rlite_flow_allocate_resp,
+     * must be done before invoking rl_appl_fa_resp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
@@ -659,11 +659,11 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         result = RLITE_ERR;
     }
 
-    ret = rlite_flow_allocate_resp(&uipcp->appl, req->kevent_id, req->ipcp_id,
+    ret = rl_appl_fa_resp(&uipcp->appl, req->kevent_id, req->ipcp_id,
                                    uipcp->ipcp_id, req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
-        UPE(uipcp, "rlite_flow_allocate_resp() failed\n");
+        UPE(uipcp, "rl_appl_fa_resp() failed\n");
         goto err;
     }
 
@@ -740,7 +740,7 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
-    return rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ_ARRIVED,
+    return rl_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ_ARRIVED,
                                     neigh_fa_req_arrived);
 
     return 0;
@@ -764,7 +764,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
     int ret;
 
     /* Perform the registration. */
-    ret = rlite_appl_register_wait(&uipcp->appl, reg, lower_dif,
+    ret = rl_appl_register_wait(&uipcp->appl, reg, lower_dif,
                                       NULL, ipcp_name, 2000);
 
     if (ret) {

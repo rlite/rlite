@@ -396,7 +396,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rlite_flow_req_wait_open(&rp->application);
+        rp->dfd = rl_appl_flow_accept_open(&rp->application);
         if (rp->dfd < 0) {
             continue;
         }
@@ -607,7 +607,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    ret = rlite_appl_init(&rp.application, RLITE_EVLOOP_SPAWN);
+    ret = rl_appl_init(&rp.application, RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
     }
@@ -627,7 +627,7 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rlite_appl_register_wait(&rp.application, 1, dif_name,
+            ret = rl_appl_register_wait(&rp.application, 1, dif_name,
                                            &rp.ipcp_name, &server_ctrl_name,
                                            3000);
             if (ret) {
@@ -635,7 +635,7 @@ main(int argc, char **argv)
             }
         }
 
-        ret = rlite_appl_register_wait(&rp.application, 1, dif_name,
+        ret = rl_appl_register_wait(&rp.application, 1, dif_name,
                                        &rp.ipcp_name, &rp.server_appl_name,
                                        3000);
         if (ret) {
@@ -646,7 +646,7 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rlite_flow_allocate_open(&rp.application, dif_name,
+        rp.dfd = rl_appl_flow_alloc_open(&rp.application, dif_name,
                                     &rp.ipcp_name, &rp.client_appl_name,
                                     &rp.server_appl_name, &flowspec, 1500);
         if (rp.dfd < 0) {
@@ -661,5 +661,5 @@ main(int argc, char **argv)
         perf_function(&rp);
     }
 
-    return rlite_appl_fini(&rp.application);
+    return rl_appl_fini(&rp.application);
 }

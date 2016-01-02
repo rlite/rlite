@@ -164,7 +164,7 @@ rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RLITE_KER_IPCP_CREATE;
-    msg->event_id = rlite_evloop_get_id(&rc->loop);
+    msg->event_id = rl_evloop_get_id(&rc->loop);
     rina_name_copy(&msg->name, name);
     msg->dif_type = strdup(dif_type);
     msg->dif_name = strdup(dif_name);
@@ -659,7 +659,7 @@ int main(int argc, char **argv)
     int enable_testing = 0;
     int ret;
 
-    ret = rlite_evloop_init(&rc.loop, "/dev/rlite", rlite_kernel_handlers,
+    ret = rl_evloop_init(&rc.loop, "/dev/rlite", rlite_kernel_handlers,
                             RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
@@ -688,7 +688,7 @@ int main(int argc, char **argv)
 
     ret = process_args(argc, argv, &rc);
 
-    rlite_evloop_fini(&rc.loop);
+    rl_evloop_fini(&rc.loop);
 
     return 0;
 }

@@ -1669,7 +1669,7 @@ upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
 }
 
 static int
-rlite_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req =
                     (struct rl_kmsg_appl_register *)bmsg;
@@ -1732,7 +1732,7 @@ rlite_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register_resp *resp =
                     (struct rl_kmsg_appl_register_resp *)bmsg;
@@ -2197,8 +2197,8 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_IPCP_CONFIG] = rlite_ipcp_config,
     [RLITE_KER_IPCP_PDUFT_SET] = rlite_ipcp_pduft_set,
     [RLITE_KER_IPCP_PDUFT_FLUSH] = rlite_ipcp_pduft_flush,
-    [RLITE_KER_APPL_REGISTER] = rlite_appl_register,
-    [RLITE_KER_APPL_REGISTER_RESP] = rlite_appl_register_resp,
+    [RLITE_KER_APPL_REGISTER] = rl_appl_register,
+    [RLITE_KER_APPL_REGISTER_RESP] = rl_appl_register_resp,
     [RLITE_KER_FA_REQ] = rlite_fa_req,
     [RLITE_KER_FA_RESP] = rlite_fa_resp,
     [RLITE_KER_IPCP_UIPCP_SET] = rlite_ipcp_uipcp_set,

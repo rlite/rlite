@@ -46,7 +46,7 @@ typedef int (*rlite_resp_handler_t)(struct rlite_evloop *loop,
                                     const struct rlite_msg_base *b_req);
 
 /* The signature of file descriptor callback. */
-typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
+typedef void (*rl_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
 
 /* The signature of timer callback. */
 typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop, void *arg);
@@ -55,7 +55,7 @@ struct rlite_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
 
-    /* Flags used in rlite_evloop_init(). */
+    /* Flags used in rl_evloop_init(). */
     unsigned int flags;
 
     /* Is the evloop running already?. */
@@ -107,41 +107,41 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
                     unsigned int wait_for_completion, int *result);
 
 int
-rlite_evloop_stop(struct rlite_evloop *loop);
+rl_evloop_stop(struct rlite_evloop *loop);
 
 int
-rlite_evloop_join(struct rlite_evloop *loop);
+rl_evloop_join(struct rlite_evloop *loop);
 
 #define RLITE_EVLOOP_SPAWN 0x0001
 
 int
-rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
+rl_evloop_init(struct rlite_evloop *loop, const char *dev,
                   rlite_resp_handler_t *handlers,
                   unsigned int flags);
 
 int
-rlite_evloop_run(struct rlite_evloop *loop);
+rl_evloop_run(struct rlite_evloop *loop);
 
 int
-rlite_evloop_fini(struct rlite_evloop *loop);
+rl_evloop_fini(struct rlite_evloop *loop);
 
 int
-rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
+rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
                          rlite_resp_handler_t handler);
 
 int
-rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd,
-                      rlite_evloop_fdcb_t cb);
+rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd,
+                      rl_evloop_fdcb_t cb);
 
 int
-rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
+rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
 
 int
-rlite_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
+rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
                       rlite_tmr_cb_t cb, void *arg);
 
 int
-rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id);
+rl_evloop_schedule_canc(struct rlite_evloop *loop, int id);
 
 int
 rlite_ipcps_print(struct rlite_evloop *loop);
@@ -154,7 +154,7 @@ int
 rlite_flows_fetch(struct rlite_evloop *loop);
 
 uint32_t
-rlite_evloop_get_id(struct rlite_evloop *loop);
+rl_evloop_get_id(struct rlite_evloop *loop);
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
