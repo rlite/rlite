@@ -70,14 +70,14 @@ rcv_work(struct work_struct *w)
         unsigned int remote_port;
         unsigned int local_port;
 
-        spin_lock(&priv->lock);
+        spin_lock_irq(&priv->lock);
         if (priv->rdh != priv->rdt) {
             rb = priv->rxr[priv->rdh].rb;
             remote_port = priv->rxr[priv->rdh].remote_port;
             local_port = priv->rxr[priv->rdh].local_port;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
         }
-        spin_unlock(&priv->lock);
+        spin_unlock_irq(&priv->lock);
 
         if (!rb) {
             break;
@@ -232,12 +232,12 @@ rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
     if (unlikely(priv->drop_fract)) {
         bool drop = false;
 
-        spin_lock(&priv->lock);
+        spin_lock_irq(&priv->lock);
         if (--priv->drop_cdown == 0) {
             priv->drop_cdown = priv->drop_fract;
             drop = true;
         }
-        spin_unlock(&priv->lock);
+        spin_unlock_irq(&priv->lock);
 
         if (drop) {
             rina_buf_free(rb);
@@ -249,7 +249,7 @@ rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         unsigned int next;
         int ret = 0;
 
-        spin_lock(&priv->lock);
+        spin_lock_irq(&priv->lock);
         next = (priv->rdt + 1) & (RX_ENTRIES -1);
         if (unlikely(next == priv->rdh)) {
             ret = -EAGAIN;
@@ -259,7 +259,7 @@ rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
             priv->rxr[priv->rdt].local_port = flow->local_port;
             priv->rdt = next;
         }
-        spin_unlock(&priv->lock);
+        spin_unlock_irq(&priv->lock);
 
         if (ret) {
             return ret;
@@ -286,9 +286,9 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
 
         ret = kstrtouint(param_value, 10, &queued);
         if (ret == 0) {
-            spin_lock(&priv->lock);
+            spin_lock_irq(&priv->lock);
             priv->queued = queued ? 1 : 0;
-            spin_unlock(&priv->lock);
+            spin_unlock_irq(&priv->lock);
         }
 
         if (ret == 0) {
@@ -300,9 +300,9 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
 
         ret = kstrtouint(param_value, 10, &drop_fract);
         if (ret == 0) {
-            spin_lock(&priv->lock);
+            spin_lock_irq(&priv->lock);
             priv->drop_fract = priv->drop_cdown = drop_fract;
-            spin_unlock(&priv->lock);
+            spin_unlock_irq(&priv->lock);
         }
 
         if (ret == 0) {

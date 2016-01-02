@@ -228,9 +228,9 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 {
     struct pduft_entry *entry;
 
-    spin_lock(&priv->pduft_lock);
+    spin_lock_irq(&priv->pduft_lock);
     entry = pduft_lookup_internal(priv, dest_addr);
-    spin_unlock(&priv->pduft_lock);
+    spin_unlock_irq(&priv->pduft_lock);
 
     return entry ? entry->flow : NULL;
 }
@@ -273,10 +273,10 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
             if (unlikely(ret == -EAGAIN)) {
                 if (!maysleep) {
                     /* Enqueue in the RMT queue. */
-                    spin_lock(&lower_flow->rmtq_lock);
+                    spin_lock_irq(&lower_flow->rmtq_lock);
                     list_add_tail(&rb->node, &lower_flow->rmtq);
                     lower_flow->rmtq_len++;
-                    spin_unlock(&lower_flow->rmtq_lock);
+                    spin_unlock_irq(&lower_flow->rmtq_lock);
                 } else {
                     /* Cannot restart system call from here... */
 
@@ -497,7 +497,7 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
-    spin_lock(&priv->pduft_lock);
+    spin_lock_irq(&priv->pduft_lock);
 
     entry = pduft_lookup_internal(priv, dest_addr);
 
@@ -518,7 +518,7 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     entry->flow = flow;
     entry->address = dest_addr;
 
-    spin_unlock(&priv->pduft_lock);
+    spin_unlock_irq(&priv->pduft_lock);
 
     return 0;
 }
@@ -528,10 +528,10 @@ rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
 
-    spin_lock(&priv->pduft_lock);
+    spin_lock_irq(&priv->pduft_lock);
     list_del(&entry->fnode);
     hash_del(&entry->node);
-    spin_unlock(&priv->pduft_lock);
+    spin_unlock_irq(&priv->pduft_lock);
 
     kfree(entry);
 

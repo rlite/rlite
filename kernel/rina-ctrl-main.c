@@ -99,8 +99,8 @@ struct rina_dm {
 
 static struct rina_dm rina_dm;
 
-#define FLOCK() spin_lock(&rina_dm.flows_lock)
-#define FUNLOCK() spin_unlock(&rina_dm.flows_lock)
+#define FLOCK() spin_lock_irq(&rina_dm.flows_lock)
+#define FUNLOCK() spin_unlock_irq(&rina_dm.flows_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(uint8_t dif_type)
@@ -479,17 +479,17 @@ tx_completion_func(unsigned long arg)
         struct rina_buf *rb;
         int ret;
 
-        spin_lock(&flow->rmtq_lock);
+        spin_lock_irq(&flow->rmtq_lock);
         if (flow->rmtq_len == 0) {
             drained = true;
-            spin_unlock(&flow->rmtq_lock);
+            spin_unlock_irq(&flow->rmtq_lock);
             break;
         }
 
         rb = list_first_entry(&flow->rmtq, struct rina_buf, node);
         list_del(&rb->node);
         flow->rmtq_len--;
-        spin_unlock(&flow->rmtq_lock);
+        spin_unlock_irq(&flow->rmtq_lock);
 
         PD("%s: Sending [%lu] from rmtq\n", __func__,
                 (long unsigned)RINA_BUF_PCI(rb)->seqnum);
@@ -498,10 +498,10 @@ tx_completion_func(unsigned long arg)
         if (unlikely(ret == -EAGAIN)) {
             PD("%s: Pushing [%lu] back to rmtq\n", __func__,
                     (long unsigned)RINA_BUF_PCI(rb)->seqnum);
-            spin_lock(&flow->rmtq_lock);
+            spin_lock_irq(&flow->rmtq_lock);
             list_add(&rb->node, &flow->rmtq);
             flow->rmtq_len++;
-            spin_unlock(&flow->rmtq_lock);
+            spin_unlock_irq(&flow->rmtq_lock);
             break;
         }
     }
@@ -1511,7 +1511,7 @@ EXPORT_SYMBOL_GPL(rina_sdu_rx);
 void
 rina_write_restart_flow(struct flow_entry *flow)
 {
-    spin_lock(&flow->rmtq_lock);
+    spin_lock_irq(&flow->rmtq_lock);
 
     if (flow->rmtq_len > 0) {
         /* Schedule a tasklet to complete the tx work.
@@ -1524,7 +1524,7 @@ rina_write_restart_flow(struct flow_entry *flow)
                 POLLWRBAND | POLLWRNORM);
     }
 
-    spin_unlock(&flow->rmtq_lock);
+    spin_unlock_irq(&flow->rmtq_lock);
 }
 EXPORT_SYMBOL_GPL(rina_write_restart_flow);
 
