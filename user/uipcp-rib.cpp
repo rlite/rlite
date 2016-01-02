@@ -558,9 +558,6 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
            enrollment_state < ENROLLMENT_STATE_LAST);
     assert(enroll_fsm_handlers[enrollment_state]);
     ret = (this->*(enroll_fsm_handlers[enrollment_state]))(rm);
-    if (ret) {
-        return ret;
-    }
 
     if (old_state != enrollment_state) {
         PI("switching state %s --> %s\n",
@@ -568,7 +565,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
              enrollment_state_repr(enrollment_state));
     }
 
-    return 0;
+    return ret;
 }
 
 list<Neighbor>::iterator
