@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 
 #define COMMON_ALLOC(_sz)   kmalloc(_sz, GFP_KERNEL)
+#define COMMON_FREE(_p)   kfree(_p)
 #define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
 
 #else
@@ -16,13 +17,14 @@
 #include <string.h>
 
 #define COMMON_ALLOC(_sz)   malloc(_sz)
+#define COMMON_FREE(_p)   free(_p)
 #define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
 
 #endif
 
 /* Size of a serialized string, not including the storage for the size
  * field itself. */
-unsigned int
+static unsigned int
 string_prlen(const char *s)
 {
     unsigned int slen;
@@ -220,4 +222,43 @@ deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
     }
 
     return 0;
+}
+
+void
+rina_name_free(struct rina_name *name)
+{
+    if (!name) {
+        return;
+    }
+
+    if (name->apn) {
+        COMMON_FREE(name->apn);
+    }
+
+    if (name->api) {
+        COMMON_FREE(name->api);
+    }
+
+    if (name->aen) {
+        COMMON_FREE(name->aen);
+    }
+
+    if (name->aei) {
+        COMMON_FREE(name->aei);
+    }
+}
+
+void
+rina_msg_free(struct rina_ctrl_base_msg *msg)
+{
+    unsigned int copylen = rina_msg_numtables[msg->msg_type].copylen;
+    struct rina_name *name;
+    int i;
+
+    /* Skip the copiable part and scan all the RINA names contained in
+     * the message. */
+    name = (struct rina_name *)(((void *)msg) + copylen);
+    for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
+        rina_name_free(name);
+    }
 }

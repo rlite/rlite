@@ -56,26 +56,3 @@ rina_name_to_string(const struct rina_name *name)
     return str;
 }
 
-void
-rina_name_free(struct rina_name *name)
-{
-    if (!name) {
-        return;
-    }
-
-    if (name->apn) {
-        kfree(name->apn);
-    }
-
-    if (name->api) {
-        kfree(name->api);
-    }
-
-    if (name->aen) {
-        kfree(name->aen);
-    }
-
-    if (name->aei) {
-        kfree(name->aei);
-    }
-}

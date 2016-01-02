@@ -5,6 +5,5 @@
 
 
 char *rina_name_to_string(const struct rina_name *name);
-void rina_name_free(struct rina_name *name);
 
 #endif  /* __RINA_UTILS_H__ */

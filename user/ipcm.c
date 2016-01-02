@@ -139,7 +139,7 @@ void *evloop_function(void *arg)
 
 free_entry:
         /* Free the pending queue entry and the associated request message. */
-        free(req_entry->msg);
+        rina_msg_free(req_entry->msg);
         free(req_entry);
     }
 
@@ -150,10 +150,10 @@ static void
 rina_name_fill(struct rina_name *name, char *apn,
                char *api, char *aen, char *aei)
 {
-    name->apn = apn;
-    name->api = api;
-    name->aen = aen;
-    name->aei = aei;
+    name->apn = apn ? strdup(apn) : NULL;
+    name->api = api ? strdup(api) : NULL;
+    name->aen = aen ? strdup(aen) : NULL;
+    name->aei = aei ? strdup(aei) : NULL;
 }
 
 /* Issue a request message to the kernel. */
@@ -228,7 +228,7 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     ret = issue_request(ipcm, (struct rina_ctrl_base_msg *)msg,
                                 sizeof(*msg));
     if (ret < 0) {
-        free(msg);
+        rina_msg_free((struct rina_ctrl_base_msg *)msg);
         return ret;
     }
 
@@ -258,7 +258,7 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
     ret = issue_request(ipcm, (struct rina_ctrl_base_msg *)msg,
                                 sizeof(*msg));
     if (ret < 0) {
-        free(msg);
+        rina_msg_free((struct rina_ctrl_base_msg *)msg);
         return ret;
     }
 
@@ -286,7 +286,7 @@ fetch_ipcps(struct ipcm *ipcm)
 
     ret = issue_request(ipcm, msg, sizeof(*msg));
     if (ret < 0) {
-        free(msg);
+        rina_msg_free(msg);
         return ret;
     }
 

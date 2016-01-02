@@ -157,7 +157,7 @@ rina_ipcp_create(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
     return 0;
 
 err3:
-    kfree(resp);
+    rina_msg_free((struct rina_ctrl_base_msg *)resp);
 err2:
     ipcp_id_release(ipcp_id);
 
@@ -194,7 +194,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
     return 0;
 
 err1:
-    kfree(resp);
+    rina_msg_free((struct rina_ctrl_base_msg *)resp);
 
     return ret;
 }
@@ -226,7 +226,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *req)
     return 0;
 
 err1:
-    kfree(resp);
+    rina_msg_free((struct rina_ctrl_base_msg *)resp);
 
     return ret;
 }
