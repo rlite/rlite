@@ -143,10 +143,11 @@ rtx_tmr_cb(long unsigned arg)
             }
 
         } else {
-            if (rb->rtx_jiffies != dtp->rtx_tmr_next) {
+            BUG_ON(!dtp->rtx_tmr_next);
+            if (rb->rtx_jiffies != dtp->rtx_tmr_next->rtx_jiffies) {
                 PD("%s: Forward rtx timer by %u\n", __func__,
                         jiffies_to_msecs(rb->rtx_jiffies - jiffies));
-                dtp->rtx_tmr_next = rb->rtx_jiffies;
+                dtp->rtx_tmr_next = rb;
                 mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
             }
             break;
@@ -185,7 +186,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rcv_inact_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data = (unsigned long)flow;
-    dtp->rtx_tmr_next = 0;
+    dtp->rtx_tmr_next = NULL;
 
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -385,7 +386,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             if (!timer_pending(&dtp->rtx_tmr)) {
                 PD("%s: Forward rtx timer by %u\n", __func__,
                         jiffies_to_msecs(crb->rtx_jiffies - jiffies));
-                dtp->rtx_tmr_next = crb->rtx_jiffies;
+                dtp->rtx_tmr_next = crb;
                 mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
             }
             PD("%s: cloning [%lu] into rtxq\n", __func__,
@@ -745,10 +746,11 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         /* The rtxq is sorted by seqnum, so we can safely
                          * stop here. Let's update the rtx timer
                          * expiration time. */
-                        if (cur->rtx_jiffies != dtp->rtx_tmr_next) {
+                        BUG_ON(!dtp->rtx_tmr_next);
+                        if (cur->rtx_jiffies != dtp->rtx_tmr_next->rtx_jiffies) {
                             PD("%s: Forward rtx timer by %u\n", __func__,
                                     jiffies_to_msecs(cur->rtx_jiffies - jiffies));
-                            dtp->rtx_tmr_next = cur->rtx_jiffies;
+                            dtp->rtx_tmr_next = cur;
                             mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
                         }
                         break;

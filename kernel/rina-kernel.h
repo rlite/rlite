@@ -124,7 +124,7 @@ struct dtp {
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
-    long unsigned rtx_tmr_next;
+    struct rina_buf *rtx_tmr_next;
 };
 
 struct flow_entry {
