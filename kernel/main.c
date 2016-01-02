@@ -43,7 +43,7 @@ struct rlite_ctrl;
 
 /* The signature of a message handler. */
 typedef int (*rlite_msg_handler_t)(struct rlite_ctrl *rc,
-                                  struct rlite_msg_base *bmsg);
+                                   struct rlite_msg_base *bmsg);
 
 /* Data structure associated to the /dev/rlite file descriptor. */
 struct rlite_ctrl {
@@ -2129,6 +2129,27 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EINVAL;
     }
 
+    /* Check permissions. */
+    switch (bmsg->msg_type) {
+        case RLITE_KER_IPCP_CREATE:
+        case RLITE_KER_IPCP_DESTROY:
+        case RLITE_KER_IPCP_CONFIG:
+        case RLITE_KER_IPCP_PDUFT_SET:
+        case RLITE_KER_IPCP_PDUFT_FLUSH:
+        case RLITE_KER_APPL_REGISTER_RESP:
+        case RLITE_KER_IPCP_UIPCP_SET:
+        case RLITE_KER_UIPCP_FA_REQ_ARRIVED:
+        case RLITE_KER_UIPCP_FA_RESP_ARRIVED:
+        case RLITE_KER_FLOW_DEALLOC:
+            if (0) {
+                /* TODO check euid == 0 */
+                kfree(kbuf);
+                return -EINVAL;
+            }
+            break;
+    }
+
+    /* Carry out the requested operation. */
     ret = rc->handlers[bmsg->msg_type](rc, bmsg);
     if (ret) {
         kfree(kbuf);
