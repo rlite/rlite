@@ -1,7 +1,6 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <rina/rina-ctrl.h>
 

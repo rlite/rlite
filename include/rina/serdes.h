@@ -1,13 +1,11 @@
 #ifndef __RINA_SERDES_H__
 #define __RINA_SERDES_H__
 
-#include <stdlib.h>
-#include <stdint.h>
 #include <rina/rina-ctrl.h>
 
 
-size_t string_prlen(char *s);
-size_t rina_name_serlen(struct rina_name *name);
+unsigned int string_prlen(char *s);
+unsigned rina_name_serlen(struct rina_name *name);
 void serialize_string(void **pptr, char *s);
 void serialize_rina_name(void **pptr, struct rina_name *name);
 

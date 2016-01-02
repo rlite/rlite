@@ -20,6 +20,7 @@
 
 #include <linux/types.h>
 #include <rina/rina-ctrl.h>
+#include <rina/serdes.h>
 #include "rina-utils.h"
 
 #include <linux/module.h>

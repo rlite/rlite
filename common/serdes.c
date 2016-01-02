@@ -1,12 +1,18 @@
 #include <rina/serdes.h>
+
+#ifdef __KERNEL__
+#include <linux/string.h>
+#else
+#include <stdlib.h>
 #include <string.h>
+#endif
 
 /* Size of a serialized string, not including the storage for the size
  * field itself. */
-size_t
+unsigned int
 string_prlen(char *s)
 {
-    size_t slen;
+    unsigned int slen;
 
     slen = s ? strlen(s) : 0;
 
@@ -14,10 +20,10 @@ string_prlen(char *s)
 }
 
 /* Size of a serialized RINA name. */
-size_t
+unsigned int
 rina_name_serlen(struct rina_name *name)
 {
-    size_t ret = 4 * sizeof(uint8_t);
+    unsigned int ret = 4 * sizeof(uint8_t);
 
     if (!name) {
         return ret;

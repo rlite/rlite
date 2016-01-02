@@ -5,6 +5,11 @@
  * When compiling from userspace include <stdint.h>,
  * when compiling from kernelspace include <linux/types.h>
  */
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
+#include <stdint.h>
+#endif
 
 
 /* Application naming information:

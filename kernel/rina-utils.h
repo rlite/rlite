@@ -1,7 +1,6 @@
 #ifndef __RINA_UTILS_H__
 #define __RINA_UTILS_H__
 
-#include <linux/types.h>
 #include <rina/rina-ctrl.h>
 
 
