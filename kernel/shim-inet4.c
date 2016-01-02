@@ -40,6 +40,10 @@
 
 struct rlite_shim_inet4 {
     struct ipcp_entry *ipcp;
+    struct work_struct txw;
+    spinlock_t txq_lock;
+    unsigned int txq_len;
+    struct list_head txq;
 };
 
 struct shim_inet4_flow {
@@ -58,6 +62,16 @@ struct shim_inet4_flow {
     spinlock_t txstats_lock;
 };
 
+#define INET4_MAX_TXQ_LEN     64
+
+struct txq_entry {
+    struct rlite_buf *rb;
+    struct shim_inet4_flow *flow_priv;
+    struct list_head node;
+};
+
+static void inet4_tx_worker(struct work_struct *w);
+
 static void *
 rlite_shim_inet4_create(struct ipcp_entry *ipcp)
 {
@@ -69,6 +83,11 @@ rlite_shim_inet4_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
+
+    priv->txq_len = 0;
+    INIT_LIST_HEAD(&priv->txq);
+    INIT_WORK(&priv->txw, inet4_tx_worker);
+    spin_lock_init(&priv->txq_lock);
 
     PD("New IPCP created [%p]\n", priv);
 
@@ -293,21 +312,14 @@ rlite_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
-                      struct flow_entry *flow,
-                      struct rlite_buf *rb, bool maysleep)
+inet4_xmit(struct shim_inet4_flow *flow_priv,
+           struct rlite_buf *rb)
 {
-    struct shim_inet4_flow *priv = flow->priv;
     struct msghdr msghdr;
     struct iovec iov[2];
     uint16_t lenhdr = htons(rb->len);
     int totlen = rb->len + sizeof(lenhdr);
     int ret;
-
-    if (sk_stream_wspace(priv->sock->sk) < totlen + 2) {
-        /* Backpressure: We will be called again. */
-        return -EAGAIN;
-    }
 
     memset(&msghdr, 0, sizeof(msghdr));
     iov[0].iov_base = &lenhdr;
@@ -323,12 +335,12 @@ rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 2;
 #endif
-    ret = kernel_sendmsg(priv->sock, &msghdr, (struct kvec *)iov, 2,
+    ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)iov, 2,
                          totlen);
 
     if (unlikely(ret != totlen)) {
-        PD("wspaces: %d, %lu\n", sk_stream_wspace(priv->sock->sk),
-                                 sock_wspace(priv->sock->sk));
+        PD("wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
+                                 sock_wspace(flow_priv->sock->sk));
         if (ret < 0) {
             PE("kernel_sendmsg(): failed [%d]\n", ret);
 
@@ -337,20 +349,94 @@ rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                ret, (int)rb->len);
         }
 
-        spin_lock_bh(&priv->txstats_lock);
-        flow->stats.tx_err++;
-        spin_unlock_bh(&priv->txstats_lock);
+        spin_lock_bh(&flow_priv->txstats_lock);
+        flow_priv->flow->stats.tx_err++;
+        spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
         NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
-        spin_lock_bh(&priv->txstats_lock);
-        flow->stats.tx_pkt++;
-        flow->stats.tx_byte += rb->len;
-        spin_unlock_bh(&priv->txstats_lock);
+        spin_lock_bh(&flow_priv->txstats_lock);
+        flow_priv->flow->stats.tx_pkt++;
+        flow_priv->flow->stats.tx_byte += rb->len;
+        spin_unlock_bh(&flow_priv->txstats_lock);
     }
 
     rlite_buf_free(rb);
 
     return 0;
+}
+
+static void
+inet4_tx_worker(struct work_struct *w)
+{
+    struct rlite_shim_inet4 *priv =
+            container_of(w, struct rlite_shim_inet4, txw);
+
+    for (;;) {
+        struct txq_entry *qe = NULL;
+
+        spin_lock_bh(&priv->txq_lock);
+        if (priv->txq_len) {
+            qe = list_first_entry(&priv->txq, struct txq_entry, node);
+            list_del(&qe->node);
+            priv->txq_len--;
+        }
+        spin_unlock_bh(&priv->txq_lock);
+
+        inet4_xmit(qe->flow_priv, qe->rb);
+
+        flow_put(qe->flow_priv->flow);
+        kfree(qe);
+    }
+}
+
+static int
+rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
+                      struct flow_entry *flow,
+                      struct rlite_buf *rb, bool maysleep)
+{
+    struct shim_inet4_flow *flow_priv = flow->priv;
+    struct rlite_shim_inet4 *shim = ipcp->priv;
+    int totlen = rb->len + sizeof(uint16_t);
+
+    if (sk_stream_wspace(flow_priv->sock->sk) < totlen + 2) {
+        /* Backpressure: We will be called again. */
+        return -EAGAIN;
+    }
+
+    if (!maysleep) {
+        struct txq_entry *qe = kmalloc(sizeof(*qe), GFP_ATOMIC);
+        bool drop = false;
+
+        if (unlikely(!qe)) {
+            rlite_buf_free(rb);
+            PE("Out of memory, dropping packet\n");
+            return -ENOMEM;
+        }
+
+        qe->rb = rb;
+        flow_get_ref(flow);
+        qe->flow_priv = flow_priv;
+        spin_lock_bh(&shim->txq_lock);
+        if (shim->txq_len > INET4_MAX_TXQ_LEN) {
+            drop = true;
+        } else {
+            list_add_tail(&qe->node, &shim->txq);
+            shim->txq_len++;
+        }
+        spin_unlock_bh(&shim->txq_lock);
+
+        if (drop) {
+            NPD(5, "Queue full, dropping PDU [len=%u]\n", rb->len);
+            rlite_buf_free(rb);
+            return -ENOSPC;
+        }
+
+        schedule_work(&shim->txw);
+
+        return 0;
+    }
+
+    return inet4_xmit(flow_priv, rb);
 }
 
 static int
