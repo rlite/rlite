@@ -124,8 +124,8 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 
     remote_addr = le64toh(*((uint64_t *)(buf)));
 
-    PD("%s: Received enrollment management SDU from IPCP addr %lu\n",
-            __func__, (long unsigned)remote_addr);
+    PD("%s: [uipcp %u] Received enrollment management SDU from IPCP addr %lu\n",
+            __func__, uipcp->ipcp_id, (long unsigned)remote_addr);
 
     ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
                    mhdr->local_port);
@@ -158,7 +158,8 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
-    PD("Issuing UIPCP_FA_REQ_ARRIVED message...\n");
+    PD("[uipcp %u] Issuing UIPCP_FA_REQ_ARRIVED message...\n",
+        uipcp->ipcp_id);
 
     resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
@@ -177,8 +178,8 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     uint32_t remote_port;
     int ret;
 
-    PD("%s: Received fa req management SDU from IPCP addr %lu\n",
-            __func__, (long unsigned)mhdr->remote_addr);
+    PD("%s: [uipcp %u] Received fa req management SDU from IPCP addr %lu\n",
+            __func__, uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
 
     remote_port = le32toh(*((uint32_t *)ptr));
     ptr += sizeof(uint32_t);
@@ -223,7 +224,8 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     req->remote_addr = remote_addr;
     req->response = response;
 
-    PD("Issuing UIPCP_FA_RESP_ARRIVED message...\n");
+    PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
+        uipcp->ipcp_id);
 
     resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
@@ -241,8 +243,8 @@ uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     uint32_t remote_port, local_port;
     uint8_t response;
 
-    PD("%s: Received fa resp management SDU from IPCP addr %lu\n",
-            __func__, (long unsigned)mhdr->remote_addr);
+    PD("%s: [uipcp %u] Received fa resp management SDU from IPCP addr %lu\n",
+            __func__, uipcp->ipcp_id, (long unsigned)mhdr->remote_addr);
 
     remote_port = le32toh(*((uint32_t *)ptr));
     ptr += sizeof(uint32_t);
@@ -353,8 +355,8 @@ uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
     entry->remote_addr = remote_addr;
 
     appl_s = rina_name_to_string(appl_name);
-    PD("%s: '%s' --> %llu\n", __func__, appl_s,
-            (long long unsigned)remote_addr);
+    PD("%s: [uipcp %u] '%s' --> %llu\n", __func__, uipcp->ipcp_id,
+        appl_s, (long long unsigned)remote_addr);
     if (appl_s) {
         free(appl_s);
     }
@@ -376,7 +378,7 @@ uipcp_fa_req(struct rina_evloop *loop,
     void *cur;
     size_t len;
 
-    PD("%s: Got reflected message\n", __func__);
+    PD("%s: [uipcp %u] Got reflected message\n", __func__, uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
@@ -425,7 +427,7 @@ uipcp_fa_resp(struct rina_evloop *loop,
     void *cur;
     size_t len;
 
-    PD("%s: Got reflected message\n", __func__);
+    PD("%s: [uipcp %u] Got reflected message\n", __func__, uipcp->ipcp_id);
 
     assert(b_req == NULL);
     (void)uipcp;
