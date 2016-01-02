@@ -1,4 +1,5 @@
 #include <rina/rina-utils.h>
+#include <rina/rina-ctrl.h>
 
 
 struct rina_msg_layout rina_kernel_numtables[] = {

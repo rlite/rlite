@@ -13,6 +13,7 @@
 
 #include <rina/rina-ipcp-types.h>
 #include <rina/rina-common.h>
+#include <rina/rina-utils.h>
 
 
 /* Message types. They **must** be listed alternating requests with
@@ -33,6 +34,10 @@ enum {
 
     RINA_CTRL_MSG_MAX,
 };
+
+/* Numtables for kernel <==> ipcm messages exchange. */
+
+extern struct rina_msg_layout rina_kernel_numtables[RINA_CTRL_MSG_MAX+1];
 
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_msg_ipcp_create {

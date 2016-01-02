@@ -5,7 +5,12 @@
 
 #include <rina/rina-ipcp-types.h>
 #include <rina/rina-common.h>
+#include <rina/rina-utils.h>
 
+
+/* Numtables for application <==> ipcm messages exchange. */
+
+extern struct rina_msg_layout rina_application_numtables[0];
 
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */

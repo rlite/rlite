@@ -21,7 +21,6 @@
 #include <linux/types.h>
 #include <rina/rina-ctrl.h>
 #include <rina/rina-utils.h>
-#include <rina/rina-kernel-numtables.h>
 #include "rina-ipcp.h"
 
 #include <linux/module.h>
