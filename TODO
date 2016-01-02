@@ -8,8 +8,6 @@
 - flow entry in stato ALLOCATED ma mai associate ad un file descriptor con
   bind() dovrebbero sparire dopo un po', altrimenti c'è leakage
 
-- rimuovere usleep() hack in uipcp_server
-
 - rina-utils: routine di deserializzazione devono gestire errori di lunghezza
 
 - vedere come inserire il campo lunghezza nel PCI header

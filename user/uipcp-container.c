@@ -73,28 +73,6 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
-static int
-uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
-{
-    int ret;
-    uint64_t local_addr;
-    uint8_t cmd = IPCP_MGMT_ENROLL;
-    uint8_t mgmtsdu[sizeof(cmd) + sizeof(local_addr)];
-
-    /* Exchange IPCP addresses. */
-    ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                          &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-
-    mgmtsdu[0] = cmd;
-    memcpy(mgmtsdu + 1, &local_addr, sizeof(local_addr));
-
-    ret = mgmt_write_to_local_port(uipcp, port_id, mgmtsdu, sizeof(mgmtsdu));
-
-    return ret;
-}
-
 int
 uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
                 uint64_t dest_addr, uint32_t local_port)
@@ -124,23 +102,6 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     PD("result: %d\n", result);
 
     return result;
-}
-
-static int
-uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
-                      uint8_t *buf, size_t buflen)
-{
-    uint64_t remote_addr;
-
-    remote_addr = le64toh(*((uint64_t *)(buf)));
-
-    PD("[uipcp %u] Received enrollment management SDU from IPCP addr %lu\n",
-            uipcp->ipcp_id, (long unsigned)remote_addr);
-
-    uipcp_pduft_set(uipcp, uipcp->ipcp_id, remote_addr,
-                   mhdr->local_port);
-
-    return 0;
 }
 
 static int
@@ -319,7 +280,6 @@ mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
 
     switch (cmd) {
         case IPCP_MGMT_ENROLL:
-            uipcp_mgmt_sdu_enroll(uipcp, mhdr, buf, buflen);
             break;
 
         case IPCP_MGMT_FA_REQ:
@@ -489,13 +449,6 @@ uipcp_server(void *arg)
         if (ret) {
             PE("rib_neighbor_flow() failed\n");
         }
-
-        /* XXX This usleep() is a temporary hack to make sure that the
-         * flow allocation response has the time to be processed by the neighbor,
-         * so that the flow 'port_id' is setup properly and can receive the
-         * enrollment management sdu. */
-        //usleep(100000);
-        //uipcp_enroll_send_mgmtsdu(uipcp, port_id);
 
         fflush(stdout);
     }
