@@ -556,3 +556,337 @@ rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp)
 
     return rib->fa_resp(resp);
 }
+
+/**********************************/
+
+#define MGMTBUF_SIZE_MAX 4096
+
+static int
+mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
+           void *buf, size_t buflen)
+{
+    char *mgmtbuf;
+    int n;
+    int ret = 0;
+
+    if (buflen > MGMTBUF_SIZE_MAX) {
+        PE("Dropping oversized mgmt message %d/%d\n",
+            (int)buflen, MGMTBUF_SIZE_MAX);
+    }
+
+    mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
+    if (!mgmtbuf) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    memcpy(mgmtbuf, mhdr, sizeof(*mhdr));
+    memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
+    buflen += sizeof(*mhdr);
+
+    n = write(uipcp->mgmtfd, mgmtbuf, buflen);
+    if (n < 0) {
+        PE("write(): %d\n", n);
+        ret = n;
+    } else if (n != (int)buflen) {
+        PE("partial write %d/%d\n", n, (int)buflen);
+        ret = -1;
+    }
+
+    free(mgmtbuf);
+
+    return ret;
+}
+
+int
+mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+                         void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    memset(&mhdr, 0, sizeof(mhdr));
+    mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
+    mhdr.local_port = local_port;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+int
+mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
+                       void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    memset(&mhdr, 0, sizeof(mhdr));
+    mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.remote_addr = dst_addr;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+static void
+mgmt_fd_ready(struct rlite_evloop *loop, int fd)
+{
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    struct rina_mgmt_hdr *mhdr;
+    int n;
+
+    assert(fd == uipcp->mgmtfd);
+
+    /* Read a buffer that contains a management header followed by
+     * a management SDU. */
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        PE("Error: read() failed [%d]\n", n);
+        return;
+
+    } else if (n < (int)sizeof(*mhdr)) {
+        PE("Error: read() does not contain mgmt header, %d<%d\n",
+                n, (int)sizeof(*mhdr));
+        return;
+    }
+
+    /* Grab the management header. */
+    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
+    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
+
+    /* Hand off the message to the RIB. */
+    rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
+                  n - sizeof(*mhdr));
+}
+
+static int
+uipcp_appl_register(struct rlite_evloop *loop,
+                           const struct rina_msg_base_resp *b_resp,
+                           const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_appl_register *req =
+                (struct rina_kmsg_appl_register *)b_resp;
+
+    rib_appl_register(uipcp->rib, req);
+
+    return 0;
+}
+
+static int
+uipcp_fa_req(struct rlite_evloop *loop,
+             const struct rina_msg_base_resp *b_resp,
+             const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
+
+    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+
+    assert(b_req == NULL);
+
+    return rib_fa_req(uipcp->rib, req);
+}
+
+static int
+uipcp_fa_req_arrived(struct rlite_evloop *loop,
+                     const struct rina_msg_base_resp *b_resp,
+                     const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_fa_req_arrived *req =
+                    (struct rina_kmsg_fa_req_arrived *)b_resp;
+    int flow_fd;
+    int result = 0;
+    int ret;
+
+    assert(b_req == NULL);
+
+    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+            req->ipcp_id, req->port_id);
+
+    /* First of all we update the neighbors in the RIB. This
+     * must be done before invoking rlite_flow_allocate_resp,
+     * otherwise a race condition would exist (us receiving
+     * an M_CONNECT from the neighbor before having the
+     * chance to call rib_neigh_set_port_id()). */
+    ret = rib_neigh_set_port_id(uipcp->rib, &req->remote_appl,
+                                req->port_id);
+    if (ret) {
+        PE("rib_neigh_set_port_id() failed\n");
+        result = 1;
+    }
+
+    ret = rlite_flow_allocate_resp(&uipcp->appl, req->ipcp_id,
+            uipcp->ipcp_id, req->port_id, result);
+
+    if (ret || result) {
+        PE("rlite_flow_allocate_resp() failed\n");
+        goto err;
+    }
+
+    flow_fd = rlite_open_appl_port(req->port_id);
+    if (flow_fd < 0) {
+        goto err;
+    }
+
+    ret = rib_neigh_set_flow_fd(uipcp->rib, &req->remote_appl, flow_fd);
+    if (ret) {
+        goto err;
+    }
+
+    return 0;
+
+err:
+    rib_del_neighbor(uipcp->rib, &req->remote_appl);
+
+    return 0;
+}
+
+static int
+uipcp_fa_resp(struct rlite_evloop *loop,
+              const struct rina_msg_base_resp *b_resp,
+              const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_fa_resp *resp =
+                (struct rina_kmsg_fa_resp *)b_resp;
+
+    PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
+
+    assert(b_req == NULL);
+
+    return rib_fa_resp(uipcp->rib, resp);
+}
+
+static int
+uipcp_flow_deallocated(struct rlite_evloop *loop,
+                       const struct rina_msg_base_resp *b_resp,
+                       const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_flow_deallocated *req =
+                (struct rina_kmsg_flow_deallocated *)b_resp;
+
+    rib_flow_deallocated(uipcp->rib, req);
+
+    return 0;
+}
+
+static int
+normal_init(struct uipcp *uipcp)
+{
+    int ret;
+
+    uipcp->rib = rib_create(uipcp);
+    if (!uipcp->rib) {
+        return -1;
+    }
+
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                   uipcp_fa_req_arrived);
+
+    /* Set the evloop handlers for flow allocation request/response and
+     * registration reflected messages. */
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+                                   uipcp_fa_req);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+                                   uipcp_fa_resp);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                   RINA_KERN_APPL_REGISTER,
+                                   uipcp_appl_register);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                   RINA_KERN_FLOW_DEALLOCATED,
+                                   uipcp_flow_deallocated);
+    if (ret) {
+        goto err;
+    }
+
+    uipcp->mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
+    if (uipcp->mgmtfd < 0) {
+        ret = uipcp->mgmtfd;
+        goto err;
+    }
+
+    ret = rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
+    if (ret) {
+        close(uipcp->mgmtfd);
+        goto err;
+    }
+
+    return 0;
+
+err:
+    rib_destroy(uipcp->rib);
+
+    return -1;
+}
+
+static int
+normal_fini(struct uipcp *uipcp)
+{
+    close(uipcp->mgmtfd);
+    rib_destroy(uipcp->rib);
+
+    return 0;
+}
+
+static int
+normal_ipcp_register(struct uipcp *uipcp, int reg,
+                     const struct rina_name *dif_name,
+                     unsigned int ipcp_id,
+                     const struct rina_name *ipcp_name)
+{
+    int result;
+
+    /* Perform the registration. */
+    result = rlite_appl_register_wait(&uipcp->appl, reg, dif_name,
+                                      0, NULL, ipcp_name);
+
+    if (result == 0) {
+        rib_ipcp_register(uipcp->rib, reg, dif_name);
+    }
+
+    return result;
+}
+
+static int
+normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
+{
+    /* Perform enrollment in userspace. */
+    return rib_enroll(uipcp->rib, req);
+}
+
+static int
+normal_ipcp_dft_set(struct uipcp *uipcp, struct rina_cmsg_ipcp_dft_set *req)
+{
+    return rib_dft_set(uipcp->rib, &req->appl_name, req->remote_addr);
+}
+
+static char *
+normal_ipcp_rib_show(struct uipcp *uipcp)
+{
+    return rib_dump(uipcp->rib);
+}
+
+struct uipcp_ops normal_ops = {
+    .dif_type = "normal",
+    .init = normal_init,
+    .fini = normal_fini,
+    .ipcp_register = normal_ipcp_register,
+    .ipcp_enroll = normal_ipcp_enroll,
+    .ipcp_dft_set = normal_ipcp_dft_set,
+    .ipcp_rib_show = normal_ipcp_rib_show,
+};
+
