@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cassert>
+#include <cerrno>
 #include <pthread.h>
 
 #include "uipcp-normal.hpp"
@@ -71,7 +72,7 @@ mgmt_write(struct uipcp *uipcp, const struct rlite_mgmt_hdr *mhdr,
 
     n = write(rib->mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
-        UPE(uipcp, "write(): %d\n", n);
+        UPE(uipcp, "write(): %s\n", strerror(errno));
         ret = n;
     } else if (n != (int)buflen) {
         UPE(uipcp, "partial write %d/%d\n", n, (int)buflen);
