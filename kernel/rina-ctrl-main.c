@@ -366,6 +366,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     rina_name_copy(&app->name, application_name);
     app->rc = rc;
     ipcp->refcnt++;
+    PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
 
     list_add_tail(&app->node, &ipcp->registered_applications);
 
@@ -386,6 +387,7 @@ ipcp_application_del_entry(struct ipcp_entry *ipcp,
 {
     list_del(&app->node);
     ipcp->refcnt--;
+    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     rina_name_free(&app->name);
     kfree(app);
 }
@@ -492,6 +494,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
             memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
         }
         ipcp->refcnt++;
+        PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
         if (ipcp->ops.flow_init) {
             /* Let the IPCP do some
              * specific initialization. */
@@ -528,6 +531,7 @@ flow_del_entry(struct flow_entry *entry, int locked)
     dtp_fini(&entry->dtp);
 
     entry->txrx.ipcp->refcnt--;
+    PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         rina_buf_free(rb);
     }
@@ -603,6 +607,7 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
     }
 
     if (entry->refcnt) {
+        PD("BUSY %u with %u\n", entry->id, entry->refcnt);
         ret = -EBUSY;
         goto out;
     }
@@ -1760,6 +1765,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         }
         rio->flow->upper.ipcp = ipcp;
         rio->flow->upper.ipcp->refcnt++;
+        PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
     }
 
     return ret;
@@ -1787,6 +1793,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 
     txrx_init(rio->txrx, ipcp);
     ipcp->refcnt++;
+    PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     ipcp->mgmt_txrx = rio->txrx;
 
     return ret;
@@ -1804,6 +1811,7 @@ rina_io_release_internal(struct rina_io *rio)
             rio->flow->refcnt--;
             if (rio->flow->upper.ipcp) {
                 rio->flow->upper.ipcp->refcnt--;
+                PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
             }
             flow_del_entry(rio->flow, 0);
             rio->flow = NULL;
@@ -1815,6 +1823,7 @@ rina_io_release_internal(struct rina_io *rio)
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
             rio->txrx->ipcp->refcnt--;
+            PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id, rio->txrx->ipcp->refcnt);
             kfree(rio->txrx);
             rio->txrx = NULL;
             break;
