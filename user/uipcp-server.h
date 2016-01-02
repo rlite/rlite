@@ -28,11 +28,6 @@ int
 ipcp_pduft_set(struct uipcps *uipcps, uint16_t ipcp_id,
                uint64_t dest_addr, uint32_t local_port);
 
-uint8_t
-rina_ipcp_register(struct uipcps *uipcps, int reg,
-                   const struct rina_name *dif_name, unsigned int ipcp_id,
-                   const struct rina_name *ipcp_name);
-
 struct uipcp {
     struct application appl;
     struct uipcps *uipcps;
@@ -56,7 +51,6 @@ enum {
 };
 
 void *uipcp_server(void *arg);
-int uipcps_update(struct uipcps *uipcps);
 int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);

@@ -95,7 +95,7 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
     }
 }
 
-uint8_t
+static uint8_t
 rina_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *dif_name,
                    unsigned int ipcp_id,
@@ -328,6 +328,79 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
         }
         fclose(fpreg);
     }
+}
+
+static int
+uipcps_update(struct uipcps *uipcps)
+{
+    struct rina_evloop loop;
+    struct ipcp *ipcp;
+    int ret = 0;
+
+    ret = rina_evloop_init(&loop, "/dev/rina-ctrl", NULL);
+    if (ret) {
+        return ret;
+    }
+
+    ipcps_fetch(&loop);
+
+    /* Create an userspace IPCP for each existing IPCP. */
+    list_for_each_entry(ipcp, &loop.ipcps, node) {
+        if (ipcp->dif_type == DIF_TYPE_NORMAL) {
+            ret = uipcp_add(uipcps, ipcp->ipcp_id);
+            if (ret) {
+                return ret;
+            }
+        }
+    }
+
+    rina_evloop_stop(&loop);
+    rina_evloop_fini(&loop);
+
+    /* Perform a fetch operation on the evloops of
+     * all the userspace IPCPs. */
+    uipcps_fetch(uipcps);
+
+    if (1) {
+        /* Read the persistent IPCP registration file into
+         * the ipcps_registrations list. */
+        FILE *fpreg = fopen(RINA_PERSISTENT_REG_FILE, "r");
+        char line[4096];
+
+        if (fpreg) {
+            while (fgets(line, sizeof(line), fpreg)) {
+                char *s1 = NULL;
+                char *s2 = NULL;
+                char *s3 = NULL;
+                struct rina_name dif_name;
+                struct rina_name ipcp_name;
+                unsigned int ipcp_id;
+                uint8_t reg_result;
+
+                s1 = strchr(line, '\n');
+                if (s1) {
+                    *s1 = '\0';
+                }
+
+                s1 = strtok(line, " ");
+                s2 = strtok(0, " ");
+                s3 = strtok(0, " ");
+
+                if (s1 && s2 && s3 && rina_name_from_string(s1, &dif_name) == 0
+                        && rina_name_from_string(s3, &ipcp_name) == 0) {
+                    ipcp_id = atoi(s2);
+                    reg_result = rina_ipcp_register(uipcps, 1, &dif_name,
+                                                    ipcp_id, &ipcp_name);
+                    PI("%s: Automatic re-registration for %s --> %s\n",
+                        __func__, s3, (reg_result == 0) ? "DONE" : "FAILED");
+                }
+            }
+
+            fclose(fpreg);
+        }
+    }
+
+    return 0;
 }
 
 static void
