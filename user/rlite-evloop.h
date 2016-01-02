@@ -90,26 +90,26 @@ struct rlite_evloop {
  * @msg. */
 struct rina_msg_base *
 rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
-                       size_t msg_len, int has_response,
-                       unsigned int wait_for_completion, int *result);
+                    size_t msg_len, int has_response,
+                    unsigned int wait_for_completion, int *result);
 
 int
 rlite_evloop_stop(struct rlite_evloop *loop);
 
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
-                     rina_resp_handler_t *handlers);
+                  rina_resp_handler_t *handlers);
 
 int
 rlite_evloop_fini(struct rlite_evloop *loop);
 
 int
 rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                            rina_resp_handler_t handler);
+                         rina_resp_handler_t handler);
 
 int
 rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd,
-                         rlite_evloop_fdcb_t cb);
+                      rlite_evloop_fdcb_t cb);
 
 int
 rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
@@ -130,16 +130,16 @@ rlite_ipcps_fetch(struct rlite_evloop *loop);
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
-                            const struct rina_name *dif_name,
-                            int fallback);
+                         const struct rina_name *dif_name,
+                         int fallback);
 
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_name(struct rlite_evloop *loop,
-                             const struct rina_name *name);
+                          const struct rina_name *name);
 
 int
 rlite_lookup_ipcp_addr_by_id(struct rlite_evloop *loop, unsigned int id,
-                                uint64_t *addr);
+                             uint64_t *addr);
 
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id);

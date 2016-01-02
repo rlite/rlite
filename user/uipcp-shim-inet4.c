@@ -4,18 +4,29 @@
 #include <assert.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <unistd.h>
 
 #include "uipcp-container.h"
 
-/*static */int
-parse_directory()
+static int
+parse_directory(int addr2sock, struct sockaddr_in *addr,
+                struct rina_name *appl_name)
 {
+    char *appl_name_s = rina_name_to_string(appl_name);
     const char *dirfile = "/etc/rlite/shim-inet4-dir";
-    FILE *fin = fopen(dirfile, "r");
+    FILE *fin;
     char *linebuf = NULL;
     size_t sz;
     size_t n;
+    int found = 0;
 
+    if (!appl_name_s) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    fin = fopen(dirfile, "r");
     if (!fin) {
         PE("Could not open directory file '%s'\n", dirfile);
         return -1;
@@ -26,8 +37,7 @@ parse_directory()
          * some fun ;) */
         char *nm = linebuf;
         char *ip, *port, *eol;
-        struct in_addr addr;
-        struct rina_name appl_name;
+        struct sockaddr_in cur_addr;
         int ret;
 
         while (*nm != '\0' && isspace(*nm)) nm++;
@@ -55,16 +65,32 @@ parse_directory()
         while (*eol != '\0' && !isspace(*eol)) eol++;
         if (*eol != '\0') *eol = '\0';
 
-        ret = inet_pton(AF_INET, ip, &addr);
+        memset(&cur_addr, 0, sizeof(cur_addr));
+        cur_addr.sin_family = AF_INET;
+        cur_addr.sin_port = htons(atoi(port));
+        ret = inet_pton(AF_INET, ip, &cur_addr.sin_addr);
         if (ret != 1) {
             PE("Invalid IP address '%s'\n", ip);
             continue;
         }
 
-        ret = rina_name_from_string(nm, &appl_name);
-        if (ret) {
-            PE("Invalid name '%s'\n", nm);
-            continue;
+        if (addr2sock) {
+            if (strcmp(nm, appl_name_s) == 0) {
+                memcpy(addr, &cur_addr, sizeof(cur_addr));
+                found = 1;
+            }
+
+        } else { /* sock2addr */
+            if (addr->sin_family == cur_addr.sin_family &&
+                    addr->sin_port == cur_addr.sin_port &&
+                    memcmp(&addr->sin_addr, &cur_addr.sin_addr,
+                    sizeof(cur_addr.sin_addr)) == 0) {
+                ret = rina_name_from_string(nm, appl_name);
+                if (ret) {
+                    PE("Invalid name '%s'\n", nm);
+                }
+                found = (ret == 0);
+            }
         }
 
         printf("oho '%s' '%s'[%d] '%d'\n", nm, ip, ret, atoi(port));
@@ -76,30 +102,84 @@ parse_directory()
 
     fclose(fin);
 
-    return 0;
+    return found ? 0 : -1;
+}
+
+static int
+appl_name_to_sock_addr(const struct rina_name *appl_name,
+                       struct sockaddr_in *addr)
+{
+    return parse_directory(1, addr, (struct rina_name *)appl_name);
+}
+
+static void
+accept_conn(struct rlite_evloop *loop, int fd)
+{
 }
 
 static int
 shim_inet4_appl_register(struct rlite_evloop *loop,
-                     const struct rina_msg_base_resp *b_resp,
-                     const struct rina_msg_base *b_req)
+                         const struct rina_msg_base_resp *b_resp,
+                         const struct rina_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_appl_register *req =
                 (struct rina_kmsg_appl_register *)b_resp;
+    struct sockaddr_in bind_addr;
+    char *appl_name_s = rina_name_to_string(&req->appl_name);
+    int ret;
+    int sfd;
 
-    (void)req;
-    (void)uipcp;
+    ret = appl_name_to_sock_addr(&req->appl_name, &bind_addr);
+    if (ret) {
+
+        PE("Failed to get inet4 address from appl_name '%s'\n", appl_name_s);
+    }
+
+    if (appl_name_s) {
+        free(appl_name_s);
+    }
+
+    sfd = socket(PF_INET, SOCK_STREAM, 0);
+    if (sfd < 0) {
+        PE("socket() failed [%d]\n", errno);
+        return -1;
+    }
+
+    {
+        int enable = 1;
+
+        if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &enable,
+                       sizeof(enable))) {
+            PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
+            close(sfd);
+            return -1;
+        }
+    }
+
+    if (bind(sfd, (struct sockaddr *)&bind_addr, sizeof(bind_addr))) {
+        PE("bind() failed [%d]\n", errno);
+        close(sfd);
+        return -1;
+    }
+
+    if (listen(sfd, 5)) {
+        PE("listen() failed [%d]\n", errno);
+        close(sfd);
+        return -1;
+    }
+
+    rlite_evloop_fdcb_add(&uipcp->appl.loop, sfd, accept_conn);
 
     return 0;
 }
 
 static int
 shim_inet4_fa_req(struct rlite_evloop *loop,
-             const struct rina_msg_base_resp *b_resp,
-             const struct rina_msg_base *b_req)
+                  const struct rina_msg_base_resp *b_resp,
+                  const struct rina_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
