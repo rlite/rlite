@@ -208,6 +208,7 @@ deserialize_rina_msg(struct rina_msg_layout *numtables,
 
     return 0;
 }
+COMMON_EXPORT(deserialize_rina_msg);
 
 unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
                                      unsigned int n)

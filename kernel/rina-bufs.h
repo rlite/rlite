@@ -12,7 +12,7 @@ struct rina_buf {
     struct list_head node;
 };
 
-struct rina_buf *rina_buf_alloc(size_t size);
+struct rina_buf *rina_buf_alloc(size_t size, gfp_t gfp);
 
 void rina_buf_free(struct rina_buf *rb);
 

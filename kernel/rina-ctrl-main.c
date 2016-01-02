@@ -1343,7 +1343,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     }
     ipcp = rio->flow->ipcp;
 
-    rb = rina_buf_alloc(len);
+    rb = rina_buf_alloc(len, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }

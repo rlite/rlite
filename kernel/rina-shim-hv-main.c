@@ -68,10 +68,71 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     return !(ret == serlen);
 }
 
+static void
+shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
+                            const char *serbuf, int serlen)
+{
+    int ret;
+
+    rina_msg_t ty = *((const rina_msg_t *)serbuf);
+
+    if (ty == RINA_SHIM_HV_FLOW_ALLOCATE_REQ) {
+        struct rina_hmsg_flow_allocate_req req;
+
+        ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
+                                   &req, sizeof(req));
+        if (ret) {
+            goto des_fail;
+        }
+    } else if (ty == RINA_SHIM_HV_FLOW_ALLOCATE_RESP) {
+        struct rina_hmsg_flow_allocate_resp resp;
+
+        ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
+                                   &resp, sizeof(resp));
+        if (ret) {
+            goto des_fail;
+        }
+    } else {
+        printk("%s: unknown ctrl msg type %u\n", __func__, ty);
+    }
+
+    return;
+
+des_fail:
+    if (ret) {
+        printk("%s: failed to deserialize msg type %u\n", __func__, ty);
+    }
+}
+
+static void
+shim_hv_read_callback(void *opaque, unsigned int channel,
+                      const char *buf, int len)
+{
+    struct rina_shim_hv *priv = (struct rina_shim_hv *)opaque;
+    struct rina_buf *rb;
+
+    if (unlikely(channel == 0)) {
+        /* Control message. */
+        shim_hv_handle_ctrl_message(priv, buf, len);
+        return;
+    }
+
+    rb = rina_buf_alloc(len, GFP_ATOMIC);
+    if (!rb) {
+        printk("%s: Out of memory\n", __func__);
+        return;
+    }
+
+    rina_sdu_rx(priv->ipcp, rb, channel - 1);
+}
+
 static void *
 rina_shim_hv_create(struct ipcp_entry *ipcp)
 {
     struct rina_shim_hv *priv;
+    unsigned int provider = VMPI_PROVIDER_AUTO;
+    unsigned int id = 0; // XXX
+    int ret;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -79,6 +140,19 @@ rina_shim_hv_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
+
+    ret = vmpi_provider_find_instance(provider, id, &priv->vmpi_ops);
+    if (ret) {
+        printk("vmpi_provider_find(%u, %u) failed\n", provider, id);
+        return NULL;
+    }
+
+    ret = priv->vmpi_ops.register_read_callback(&priv->vmpi_ops,
+            shim_hv_read_callback, priv);
+    if (ret) {
+        printk("register_read_callback() failed\n");
+        return NULL;
+    }
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -141,16 +215,18 @@ rina_shim_hv_flow_allocate_resp(struct ipcp_entry *ipcp,
 
 static int
 rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
-                          struct flow_entry *flow,
-                          struct rina_buf *rb)
+                       struct flow_entry *flow,
+                       struct rina_buf *rb)
 {
-    int ret = rina_sdu_rx(ipcp, rb, flow->remote_port);
+    struct iovec iov;
+    struct rina_shim_hv *priv = (struct rina_shim_hv *)ipcp->priv;
+    struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;
 
-    if (ret) {
-        return 0;
-    }
+    iov.iov_base = rb->ptr;
+    iov.iov_len = rb->size;
 
-    return rb->size;
+    return vmpi_ops->write(vmpi_ops, flow->remote_port + 1,
+                           &iov, 1);
 }
 
 static int __init

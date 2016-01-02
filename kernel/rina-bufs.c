@@ -4,12 +4,12 @@
 
 
 struct rina_buf *
-rina_buf_alloc(size_t size)
+rina_buf_alloc(size_t size, gfp_t gfp)
 {
     struct rina_buf *rb = NULL;
     uint8_t *kbuf;
 
-    rb = kmalloc(sizeof(*rb), GFP_KERNEL);
+    rb = kmalloc(sizeof(*rb), gfp);
     if (unlikely(!rb)) {
         printk("%s: Out of memory\n", __func__);
         return NULL;
