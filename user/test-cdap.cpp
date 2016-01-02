@@ -76,6 +76,7 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 {
     const char *apn, *api, *aen, *aei;
     gpb::objVal_t objvalue = gm.objvalue();
+    int ret;
 
     abs_syntax = gm.abssyntax();
     op_code = gm.opcode();
@@ -156,6 +157,14 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gpb::CDAPMessage gm;
     gpb::objVal_t *objvalue = new gpb::objVal_t();
     gpb::authValue_t *authvalue = new gpb::authValue_t();
+
+    if (!objvalue || !authvalue) {
+        PD("%s: Out of memory\n", __func__);
+        if (objvalue) delete objvalue;
+        if (authvalue) delete authvalue;
+
+        return gpb::CDAPMessage();
+    }
 
     gm.set_abssyntax(abs_syntax);
     gm.set_opcode(op_code);

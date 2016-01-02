@@ -8,6 +8,7 @@
 #ifdef __KERNEL__
 #include <linux/types.h>
 #else
+#include <stdio.h>
 #include <stdint.h>
 #endif
 
