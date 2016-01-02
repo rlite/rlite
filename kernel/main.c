@@ -1512,6 +1512,11 @@ rlite_flow_dealloc(struct rlite_ctrl *rc,
             ret = 0;
         }
         spin_unlock_bh(&flow->txrx.rx_lock);
+        if (ret == 0) {
+            /* Wake up readers and pollers, so that they can read the EOF. */
+            wake_up_interruptible_poll(&flow->txrx.rx_wqh, POLLIN |
+                                       POLLRDNORM | POLLRDBAND);
+        }
     }
     flow_put(flow);
     ipcp_put(ipcp);
@@ -2003,7 +2008,7 @@ int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
-                    POLLIN | POLLRDNORM | POLLRDBAND);
+                               POLLIN | POLLRDNORM | POLLRDBAND);
 out:
 
     return ret;
