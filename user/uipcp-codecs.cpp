@@ -31,6 +31,17 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
     return gm.ByteSize();
 }
 
+RinaName::RinaName(const std::string& apn_,
+                   const std::string& api_,
+                   const std::string& aen_,
+                   const std::string& aei_)
+{
+    apn = apn_;
+    api = api_;
+    aen = aen_;
+    aei = aei_;
+}
+
 RinaName::RinaName(const struct rina_name *name)
 {
     apn = name->apn ? string(name->apn) : string();
@@ -42,6 +53,17 @@ RinaName::RinaName(const struct rina_name *name)
 RinaName::operator std::string() const
 {
     return apn + '/' + api + '/' + aen + '/' + aei;
+}
+
+bool RinaName::operator==(const RinaName& other)
+{
+    return api == other.api && apn == other.apn &&
+            aen == other.aen && aei == other.aei;
+}
+
+bool RinaName::operator!=(const RinaName& other)
+{
+    return !(*this == other);
 }
 
 static void

@@ -532,10 +532,10 @@ uipcp_server(void *arg)
             rinalite_pending_flow_req_free(pfr);
             continue;
         }
-        rinalite_pending_flow_req_free(pfr);
 
         ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
                                 flow_fd, port_id);
+        rinalite_pending_flow_req_free(pfr);
         if (ret) {
             PE("rib_neighbor_flow() failed\n");
         }

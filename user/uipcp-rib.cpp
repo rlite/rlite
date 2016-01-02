@@ -99,11 +99,14 @@ struct uipcp_rib {
 
     /* Neighbors. */
     list< Neighbor > neighbors;
+    map< string, NeighborCandidate > cand_neighbors;
 
     /* Directory Forwarding Table. */
     map< string, DFTEntry > dft;
 
     uipcp_rib(struct uipcp *_u);
+
+    struct rinalite_ipcp *ipcp_info() const;
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
@@ -114,12 +117,25 @@ struct uipcp_rib {
 
     /* RIB handlers. */
     int dft_handler(const CDAPMessage *rm);
+    int neighbors_handler(const CDAPMessage *rm);
 };
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 {
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
+    handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
+}
+
+struct rinalite_ipcp *
+uipcp_rib::ipcp_info() const
+{
+    struct rinalite_ipcp *ipcp;
+
+    ipcp = rinalite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+    assert(ipcp);
+
+    return ipcp;
 }
 
 int
@@ -181,6 +197,90 @@ uipcp_rib::dft_handler(const CDAPMessage *rm)
             } else {
                 dft.erase(mit);
                 PD("DFT entry %s removed remotely\n", key.c_str());
+            }
+
+        }
+    }
+
+    return 0;
+}
+
+static string
+common_lower_dif(const list<string> l1, const list<string> l2)
+{
+    for (list<string>::const_iterator i = l1.begin(); i != l1.end(); i++) {
+        for (list<string>::const_iterator j = l2.begin(); j != l2.end(); j++) {
+            if (*i == *j) {
+                return *i;
+            }
+        }
+    }
+
+    return string();
+}
+
+int
+uipcp_rib::neighbors_handler(const CDAPMessage *rm)
+{
+    struct rinalite_ipcp *ipcp;
+    const char *objbuf;
+    size_t objlen;
+    bool add = true;
+
+    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+        PE("M_CREATE or M_DELETE expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_DELETE) {
+        add = false;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("M_START does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    ipcp = ipcp_info();
+
+    NeighborCandidateList ncl(objbuf, objlen);
+    RinaName my_name = RinaName(&ipcp->ipcp_name);
+
+    for (list<NeighborCandidate>::iterator neigh = ncl.candidates.begin();
+                                neigh != ncl.candidates.end(); neigh++) {
+        RinaName neigh_name = RinaName(neigh->apn, neigh->api, string(),
+                                       string());
+        string key = static_cast<string>(neigh_name);
+        map< string, NeighborCandidate >::iterator mit = cand_neighbors.find(key);
+
+        if (neigh_name == my_name) {
+            /* Skip myself (as a neighbor of the slave). */
+            continue;
+        }
+
+        if (add) {
+            string common_dif = common_lower_dif(neigh->lower_difs, lower_difs);
+            if (common_dif == string()) {
+                PD("Neighbor %s discarded because there are no lower DIFs in "
+                        "common with us\n", key.c_str());
+                continue;
+            }
+
+            if (mit != cand_neighbors.end()) {
+                PD("Candidate neighbor %s already exist\n", key.c_str());
+            } else {
+                cand_neighbors.insert(make_pair(key, *neigh));
+                PD("Candidate neighbor %s added remotely\n", key.c_str());
+            }
+
+        } else {
+            if (mit == cand_neighbors.end()) {
+                PI("Candidate neighbor does not exist\n");
+            } else {
+                cand_neighbors.erase(mit);
+                PD("Candidate neighbor %s removed remotely\n", key.c_str());
             }
 
         }
@@ -344,11 +444,9 @@ Neighbor::none(const CDAPMessage *rm)
         /* (1) I --> S: M_CONNECT */
 
         CDAPAuthValue av;
-        struct uipcp *uipcp = rib->uipcp;
         struct rinalite_ipcp *ipcp;
 
-        ipcp = rinalite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
-        assert(ipcp);
+        ipcp = rib->ipcp_info();
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
@@ -493,8 +591,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         ncl.candidates.push_back(cand);
     }
 
-    ipcp = rinalite_lookup_ipcp_by_id(&rib->uipcp->appl.loop, rib->uipcp->ipcp_id);
-    assert(ipcp);
+    ipcp = rib->ipcp_info();
     cand = NeighborCandidate();
     cand_name = RinaName(&ipcp->ipcp_name);
     cand.apn = cand_name.apn;

@@ -30,8 +30,14 @@ struct RinaName {
     std::string aei;
 
     RinaName() { }
+    RinaName(const std::string& apn_,
+             const std::string& api_,
+             const std::string& aen_,
+             const std::string& aei_);
     RinaName(const struct rina_name *name);
     operator std::string() const;
+    bool operator==(const RinaName& other);
+    bool operator!=(const RinaName& other);
 };
 
 struct DFTEntry : public UipcpObject {
