@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-#define RINA_UIPCPS_UNIX_NAME     "/var/rinalite/uipcp-server"
+#define RINA_UIPCPS_UNIX_NAME     "/var/rlite/uipcp-server"
 
 /* Application naming information:
  *   - Application Process Name

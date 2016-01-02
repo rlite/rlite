@@ -11,17 +11,17 @@
 #include <sys/un.h>
 #include <sys/ioctl.h>
 #include <assert.h>
-#include "rinalite/kernel-msg.h"
-#include "rinalite/conf-msg.h"
-#include "rinalite/utils.h"
+#include "rlite/kernel-msg.h"
+#include "rlite/conf-msg.h"
+#include "rlite/utils.h"
 
-#include "rinalite-list.h"
-#include "rinalite-evloop.h"
-#include "rinalite-appl.h"
+#include "rlite-list.h"
+#include "rlite-evloop.h"
+#include "rlite-appl.h"
 
 
 static int
-flow_allocate_resp_arrived(struct rinalite_evloop *loop,
+flow_allocate_resp_arrived(struct rlite_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
 {
@@ -57,22 +57,22 @@ flow_allocate_resp_arrived(struct rinalite_evloop *loop,
 }
 
 static int
-flow_allocate_req_arrived(struct rinalite_evloop *loop,
+flow_allocate_req_arrived(struct rlite_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
-    struct rinalite_appl *application = container_of(loop,
-                                       struct rinalite_appl, loop);
+    struct rlite_appl *application = container_of(loop,
+                                       struct rlite_appl, loop);
     struct rina_kmsg_fa_req_arrived *req =
             (struct rina_kmsg_fa_req_arrived *)b_resp;
-    struct rinalite_pending_flow_req *pfr = NULL;
+    struct rlite_pending_flow_req *pfr = NULL;
 
     assert(b_req == NULL);
     pfr = malloc(sizeof(*pfr));
     if (!pfr) {
         PE("Out of memory\n");
         /* Negative flow allocation response. */
-        return rinalite_flow_allocate_resp(application,req->ipcp_id, 0xffff,
+        return rlite_flow_allocate_resp(application,req->ipcp_id, 0xffff,
                                     req->port_id, 1);
     }
     pfr->ipcp_id = req->ipcp_id;
@@ -91,9 +91,9 @@ flow_allocate_req_arrived(struct rinalite_evloop *loop,
 
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
- * Response handlers must not call rinalite_issue_request(), in
+ * Response handlers must not call rlite_issue_request(), in
  * order to avoid deadlocks.
- * These would happen because rinalite_issue_request() may block for
+ * These would happen because rlite_issue_request() may block for
  * completion, and is waken up by the event-loop thread itself.
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
@@ -104,7 +104,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-rinalite_appl_register_req(struct rinalite_appl *application,
+rlite_appl_register_req(struct rlite_appl *application,
                          int reg, unsigned int ipcp_id,
                          const struct rina_name *application_name)
 {
@@ -127,7 +127,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
 
     PD("Requesting application %sregistration...\n", (reg ? "": "un"));
 
-    resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
+    resp = rlite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -136,7 +136,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
 }
 
 void
-rinalite_flow_cfg_default(struct rina_flow_config *cfg)
+rlite_flow_cfg_default(struct rina_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->partial_delivery = 0;
@@ -148,7 +148,7 @@ rinalite_flow_cfg_default(struct rina_flow_config *cfg)
 }
 
 static struct rina_kmsg_fa_resp_arrived *
-flow_allocate_req(struct rinalite_appl *application,
+flow_allocate_req(struct rlite_appl *application,
                   unsigned int wait_for_completion, uint16_t ipcp_id,
                   uint16_t upper_ipcp_id,
                   const struct rina_name *local_application,
@@ -171,7 +171,7 @@ flow_allocate_req(struct rinalite_appl *application,
     if (flowcfg) {
         memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
-        rinalite_flow_cfg_default(&req->flowcfg);
+        rlite_flow_cfg_default(&req->flowcfg);
     }
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
@@ -179,12 +179,12 @@ flow_allocate_req(struct rinalite_appl *application,
     PD("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_fa_resp_arrived *)
-           rinalite_issue_request(&application->loop, RINALITE_RMB(req),
+           rlite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 1, wait_for_completion, result);
 }
 
 int
-rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
+rlite_flow_allocate_resp(struct rlite_appl *application, uint16_t ipcp_id,
                    uint16_t upper_ipcp_id, uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
@@ -206,7 +206,7 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 
     PD("Responding to flow allocation request...\n");
 
-    resp = rinalite_issue_request(&application->loop, RINALITE_RMB(req),
+    resp = rlite_issue_request(&application->loop, RINALITE_RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -215,29 +215,29 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 }
 
 int
-rinalite_appl_register(struct rinalite_appl *application, int reg,
+rlite_appl_register(struct rlite_appl *application, int reg,
                      const struct rina_name *dif_name, int fallback,
                      const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
 {
-    struct rinalite_ipcp *rinalite_ipcp;
+    struct rlite_ipcp *rlite_ipcp;
 
-    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (!rinalite_ipcp) {
-        rinalite_ipcp = rinalite_select_ipcp_by_dif(&application->loop, dif_name, fallback);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name, fallback);
     }
-    if (!rinalite_ipcp) {
+    if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return -1;
     }
 
     /* Forward the request to the kernel. */
-    return rinalite_appl_register_req(application, reg, rinalite_ipcp->ipcp_id,
+    return rlite_appl_register_req(application, reg, rlite_ipcp->ipcp_id,
                                      application_name);
 }
 
 int
-rinalite_flow_allocate(struct rinalite_appl *application,
+rlite_flow_allocate(struct rlite_appl *application,
               struct rina_name *dif_name, int dif_fallback,
               struct rina_name *ipcp_name,
               const struct rina_name *local_application,
@@ -247,21 +247,21 @@ rinalite_flow_allocate(struct rinalite_appl *application,
               uint16_t upper_ipcp_id)
 {
     struct rina_kmsg_fa_resp_arrived *kresp;
-    struct rinalite_ipcp *rinalite_ipcp;
+    struct rlite_ipcp *rlite_ipcp;
     int result;
 
-    rinalite_ipcp = rinalite_lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (!rinalite_ipcp) {
-        rinalite_ipcp = rinalite_select_ipcp_by_dif(&application->loop, dif_name,
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name,
                                   dif_fallback);
     }
-    if (!rinalite_ipcp) {
+    if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
         return -1;
     }
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              rinalite_ipcp->ipcp_id, upper_ipcp_id, local_application,
+                              rlite_ipcp->ipcp_id, upper_ipcp_id, local_application,
                               remote_application, flowcfg, &result);
     if (!kresp) {
         PE("Flow allocation request failed\n");
@@ -277,8 +277,8 @@ rinalite_flow_allocate(struct rinalite_appl *application,
     return result;
 }
 
-struct rinalite_pending_flow_req *
-rinalite_flow_req_wait(struct rinalite_appl *application)
+struct rlite_pending_flow_req *
+rlite_flow_req_wait(struct rlite_appl *application)
 {
     struct list_head *elem = NULL;
 
@@ -289,7 +289,7 @@ rinalite_flow_req_wait(struct rinalite_appl *application)
     }
     pthread_mutex_unlock(&application->lock);
 
-    return container_of(elem, struct rinalite_pending_flow_req, node);
+    return container_of(elem, struct rlite_pending_flow_req, node);
 }
 
 static int
@@ -319,21 +319,21 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 }
 
 int
-rinalite_open_appl_port(uint32_t port_id)
+rlite_open_appl_port(uint32_t port_id)
 {
     return open_port_common(port_id, RINA_IO_MODE_APPL_BIND, 0);
 }
 
-int rinalite_open_mgmt_port(uint16_t ipcp_id)
+int rlite_open_mgmt_port(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
     return open_port_common(~0U, RINA_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
-/* rinalite_flow_allocate() + rinalite_open_appl_port() */
+/* rlite_flow_allocate() + rlite_open_appl_port() */
 int
-rinalite_flow_allocate_open(struct rinalite_appl *application,
+rlite_flow_allocate_open(struct rlite_appl *application,
                    struct rina_name *dif_name, int dif_fallback,
                    struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
@@ -344,43 +344,43 @@ rinalite_flow_allocate_open(struct rinalite_appl *application,
     unsigned int port_id;
     int ret;
 
-    ret = rinalite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
+    ret = rlite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
                         local_application, remote_application, flowcfg,
                         &port_id, wait_ms, 0xffff);
     if (ret) {
         return -1;
     }
 
-    return rinalite_open_appl_port(port_id);
+    return rlite_open_appl_port(port_id);
 }
 
-/* rinalite_flow_req_wait() + rinalite_open_appl_port() */
+/* rlite_flow_req_wait() + rlite_open_appl_port() */
 int
-rinalite_flow_req_wait_open(struct rinalite_appl *application)
+rlite_flow_req_wait_open(struct rlite_appl *application)
 {
-    struct rinalite_pending_flow_req *pfr;
+    struct rlite_pending_flow_req *pfr;
     unsigned int port_id;
     int result;
 
-    pfr = rinalite_flow_req_wait(application);
+    pfr = rlite_flow_req_wait(application);
     PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
             pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
-    result = rinalite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
+    result = rlite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
                                 pfr->port_id, 0);
     port_id = pfr->port_id;
-    rinalite_pending_flow_req_free(pfr);
+    rlite_pending_flow_req_free(pfr);
 
     if (result) {
         return -1;
     }
 
-    return rinalite_open_appl_port(port_id);
+    return rlite_open_appl_port(port_id);
 }
 
 int
-rinalite_appl_init(struct rinalite_appl *application)
+rlite_appl_init(struct rlite_appl *application)
 {
     int ret;
 
@@ -388,7 +388,7 @@ rinalite_appl_init(struct rinalite_appl *application)
     pthread_cond_init(&application->flow_req_arrived_cond, NULL);
     list_init(&application->pending_flow_reqs);
 
-    ret = rinalite_evloop_init(&application->loop, "/dev/rinalite",
+    ret = rlite_evloop_init(&application->loop, "/dev/rlite",
                                rina_kernel_handlers);
     if (ret) {
         return ret;
@@ -398,7 +398,7 @@ rinalite_appl_init(struct rinalite_appl *application)
 }
 
 int
-rinalite_appl_fini(struct rinalite_appl *application)
+rlite_appl_fini(struct rlite_appl *application)
 {
-    return rinalite_evloop_fini(&application->loop);
+    return rlite_evloop_fini(&application->loop);
 }

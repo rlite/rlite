@@ -21,8 +21,8 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/timer.h>
-#include <rinalite/utils.h>
-#include "rinalite-kernel.h"
+#include <rlite/utils.h>
+#include "rlite-kernel.h"
 
 
 void

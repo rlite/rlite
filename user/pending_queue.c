@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "rinalite/common.h"
+#include "rlite/common.h"
 #include "pending_queue.h"
-#include "rinalite-list.h"
+#include "rlite-list.h"
 
 
 struct pending_entry *

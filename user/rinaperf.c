@@ -9,9 +9,9 @@
 #include <endian.h>
 #include <signal.h>
 #include <poll.h>
-#include "rinalite/utils.h"
+#include "rlite/utils.h"
 
-#include "rinalite-appl.h"
+#include "rlite-appl.h"
 
 
 #define SDU_SIZE_MAX    65535
@@ -23,7 +23,7 @@ struct rinaperf_test_config {
 };
 
 struct rinaperf {
-    struct rinalite_appl application;
+    struct rlite_appl application;
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
@@ -365,7 +365,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rinalite_flow_req_wait_open(&rp->application);
+        rp->dfd = rlite_flow_req_wait_open(&rp->application);
         if (rp->dfd < 0) {
             continue;
         }
@@ -581,7 +581,7 @@ main(int argc, char **argv)
     int i;
 
     /* Start with a default flow configuration (unreliable flow). */
-    rinalite_flow_cfg_default(&flowcfg);
+    rlite_flow_cfg_default(&flowcfg);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:x")) != -1) {
         switch (opt) {
@@ -703,13 +703,13 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RINA application library. */
-    ret = rinalite_appl_init(&rp.application);
+    ret = rlite_appl_init(&rp.application);
     if (ret) {
         return ret;
     }
 
-    /* This fetch is necessary to use rinalite_appl_register(). */
-    rinalite_ipcps_fetch(&rp.application.loop);
+    /* This fetch is necessary to use rlite_appl_register(). */
+    rlite_ipcps_fetch(&rp.application.loop);
 
     /* Rinaperf-specific initialization. */
     rina_name_fill(&rp.dif_name, dif_name, NULL, NULL, NULL);
@@ -727,14 +727,14 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rinalite_appl_register(&rp.application, 1, &rp.dif_name,
+            ret = rlite_appl_register(&rp.application, 1, &rp.dif_name,
                                        1, &rp.ipcp_name, &server_ctrl_name);
             if (ret) {
                 return ret;
             }
         }
 
-        ret = rinalite_appl_register(&rp.application, 1, &rp.dif_name,
+        ret = rlite_appl_register(&rp.application, 1, &rp.dif_name,
                                    1, &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
             return ret;
@@ -744,7 +744,7 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rinalite_flow_allocate_open(&rp.application, &rp.dif_name, 1,
+        rp.dfd = rlite_flow_allocate_open(&rp.application, &rp.dif_name, 1,
                                     &rp.ipcp_name, &rp.client_appl_name,
                                     &rp.server_appl_name, &flowcfg, 1500);
         if (rp.dfd < 0) {
@@ -760,7 +760,7 @@ main(int argc, char **argv)
     }
 
     /* Stop the event loop. */
-    rinalite_evloop_stop(&rp.application.loop);
+    rlite_evloop_stop(&rp.application.loop);
 
-    return rinalite_appl_fini(&rp.application);
+    return rlite_appl_fini(&rp.application);
 }

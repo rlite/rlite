@@ -1,13 +1,13 @@
-obj-m += rinalite.o
-rinalite-y := main.o rinalite-utils.o rina-kernel-numtables.o bufs.o efcp-utils.o
+obj-m += rlite.o
+rlite-y := main.o rlite-utils.o rina-kernel-numtables.o bufs.o efcp-utils.o
 
-obj-m += rinalite-shim-loopback.o
-rinalite-shim-loopback-y := shim-loopback.o
+obj-m += rlite-shim-loopback.o
+rlite-shim-loopback-y := shim-loopback.o
 
-obj-m += rinalite-shim-eth.o
-rinalite-shim-eth-y := shim-eth.o
+obj-m += rlite-shim-eth.o
+rlite-shim-eth-y := shim-eth.o
 
-obj-m += rinalite-normal.o
-rinalite-normal-y := normal.o
+obj-m += rlite-normal.o
+rlite-normal-y := normal.o
 
 EXTRA_CFLAGS := -I$(PWD)/include

@@ -11,15 +11,15 @@ if [ HAVE_VMPI == "y" ]; then
     popd
 fi
 
-sudo insmod kernel/rinalite.ko
-sudo insmod kernel/rinalite-shim-loopback.ko
+sudo insmod kernel/rlite.ko
+sudo insmod kernel/rlite-shim-loopback.ko
 if [ HAVE_VMPI == "y" ]; then
-    sudo insmod kernel/rinalite-shim-hv.ko
+    sudo insmod kernel/rlite-shim-hv.ko
 fi
-sudo insmod kernel/rinalite-shim-eth.ko
-sudo insmod kernel/rinalite-normal.ko
-sudo chmod a+rwx /dev/rinalite
+sudo insmod kernel/rlite-shim-eth.ko
+sudo insmod kernel/rlite-normal.ko
+sudo chmod a+rwx /dev/rlite
 sudo chmod a+rwx /dev/rina-io
 
-sudo mkdir -p /var/rinalite
-sudo chmod -R a+rwx /var/rinalite
+sudo mkdir -p /var/rlite
+sudo chmod -R a+rwx /var/rlite

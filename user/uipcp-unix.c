@@ -12,14 +12,14 @@
 #include <signal.h>
 #include <assert.h>
 #include <endian.h>
-#include "rinalite/kernel-msg.h"
-#include "rinalite/conf-msg.h"
-#include "rinalite/utils.h"
+#include "rlite/kernel-msg.h"
+#include "rlite/conf-msg.h"
+#include "rlite/utils.h"
 
-#include "rinalite-list.h"
+#include "rlite-list.h"
 #include "helpers.h"
-#include "rinalite-evloop.h"
-#include "rinalite-appl.h"
+#include "rlite-evloop.h"
+#include "rlite-appl.h"
 #include "uipcp-container.h"
 
 
@@ -117,10 +117,10 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
 
     /* Perform a fetch to find out if shim IPCPs have been created,
      * deleted or configured from the last fetch. */
-    rinalite_ipcps_fetch(&uipcp->appl.loop);
+    rlite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform the registration. */
-    result = rinalite_appl_register(&uipcp->appl, reg, dif_name,
+    result = rlite_appl_register(&uipcp->appl, reg, dif_name,
                                   0, NULL, ipcp_name);
 
     if (result == 0) {
@@ -166,7 +166,7 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
 
     /* Perform a fetch to find out if shim IPCPs have been created,
      * deleted or configured from the last fetch. */
-    rinalite_ipcps_fetch(&uipcp->appl.loop);
+    rlite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform enrollment in userspace. */
     ret = rib_enroll(uipcp->rib, req);
@@ -394,32 +394,32 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
 static int
 uipcps_update(struct uipcps *uipcps)
 {
-    struct rinalite_evloop loop;
-    struct rinalite_ipcp *rinalite_ipcp;
+    struct rlite_evloop loop;
+    struct rlite_ipcp *rlite_ipcp;
     int ret = 0;
 
-    ret = rinalite_evloop_init(&loop, "/dev/rinalite", NULL);
+    ret = rlite_evloop_init(&loop, "/dev/rlite", NULL);
     if (ret) {
         return ret;
     }
 
-    rinalite_ipcps_fetch(&loop);
+    rlite_ipcps_fetch(&loop);
 
-    rinalite_ipcps_print(&loop);
+    rlite_ipcps_print(&loop);
     fflush(stdout);
 
     /* Create an userspace IPCP for each existing IPCP. */
-    list_for_each_entry(rinalite_ipcp, &loop.ipcps, node) {
-        if (strcmp(rinalite_ipcp->dif_type, "normal") == 0) {
-            ret = uipcp_add(uipcps, rinalite_ipcp->ipcp_id);
+    list_for_each_entry(rlite_ipcp, &loop.ipcps, node) {
+        if (strcmp(rlite_ipcp->dif_type, "normal") == 0) {
+            ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id);
             if (ret) {
                 return ret;
             }
         }
     }
 
-    rinalite_evloop_stop(&loop);
-    rinalite_evloop_fini(&loop);
+    rlite_evloop_stop(&loop);
+    rlite_evloop_fini(&loop);
 
     /* Perform a fetch operation on the evloops of
      * all the userspace IPCPs. */

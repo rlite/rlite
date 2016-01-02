@@ -51,8 +51,8 @@ cp kernel/Makefile.in kernel/Makefile
 if [ $HAVE_VMPI == "y" ]; then
     cat << EOS >> kernel/Makefile
 
-obj-m += rinalite-shim-hv.o
-rinalite-shim-hv-y := shim-hv.o shim-hv-numtables.o
+obj-m += rlite-shim-hv.o
+rlite-shim-hv-y := shim-hv.o shim-hv-numtables.o
 
 EXTRA_CFLAGS += -I\$(PWD)/kernel/vmpi
 

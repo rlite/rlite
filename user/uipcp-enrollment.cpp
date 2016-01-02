@@ -156,7 +156,7 @@ Neighbor::none(const CDAPMessage *rm)
         /* (1) I --> S: M_CONNECT */
 
         CDAPAuthValue av;
-        struct rinalite_ipcp *ipcp;
+        struct rlite_ipcp *ipcp;
         struct rina_name dst_name;
 
         ipcp = rib->ipcp_info();
@@ -217,7 +217,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 {
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START */
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     EnrollmentInfo enr_info;
     CDAPMessage m;
     int ret;
@@ -258,7 +258,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
      * (4) S --> I: M_START_R
      * (5) S --> I: M_CREATE
      * (6) S --> I: M_STOP */
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool has_address;
@@ -486,7 +486,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 {
     /* (7) S <-- I: M_STOP_R */
     /* (8) S --> I: M_START(status) */
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     CDAPMessage m;
     int ret;
 
@@ -631,7 +631,7 @@ common_lower_dif(const list<string> l1, const list<string> l2)
 int
 uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
@@ -725,14 +725,14 @@ int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
     }
 
     /* Allocate a flow for the enrollment. */
-    ret = rinalite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
+    ret = rlite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
                          &req->ipcp_name, &req->neigh_ipcp_name, NULL,
                          &port_id, 2000, uipcp->ipcp_id);
     if (ret) {
         goto err;
     }
 
-    flow_fd = rinalite_open_appl_port(port_id);
+    flow_fd = rlite_open_appl_port(port_id);
     if (flow_fd < 0) {
         goto err;
     }

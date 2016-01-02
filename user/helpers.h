@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "rinalite/utils.h"
-#include "rinalite/conf-msg.h"
+#include "rlite/utils.h"
+#include "rlite/conf-msg.h"
 
 
 static inline int

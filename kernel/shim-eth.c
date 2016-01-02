@@ -19,8 +19,8 @@
  */
 
 #include <linux/types.h>
-#include <rinalite/utils.h>
-#include "rinalite-kernel.h"
+#include <rlite/utils.h>
+#include "rlite-kernel.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>

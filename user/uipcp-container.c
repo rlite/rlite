@@ -4,8 +4,8 @@
 #include <errno.h>
 #include <string.h>
 
-#include "rinalite/utils.h"
-#include "rinalite/conf-msg.h"
+#include "rlite/utils.h"
+#include "rlite/conf-msg.h"
 
 #include "uipcp-container.h"
 
@@ -96,7 +96,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     PD("Requesting IPCP pdu forwarding table set...\n");
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -124,7 +124,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 
     PD("Requesting IPCP pdu forwarding table flush...\n");
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req),
                                   sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -162,7 +162,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     PD("[uipcp %u] Issuing UIPCP_FA_REQ_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -197,7 +197,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -206,9 +206,9 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 }
 
 static void
-mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
+mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 {
-    struct rinalite_appl *appl = container_of(loop, struct rinalite_appl, loop);
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rina_mgmt_hdr *mhdr;
@@ -240,11 +240,11 @@ out:
 }
 
 static int
-uipcp_fa_req(struct rinalite_evloop *loop,
+uipcp_fa_req(struct rlite_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
              const struct rina_msg_base *b_req)
 {
-    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
@@ -257,11 +257,11 @@ uipcp_fa_req(struct rinalite_evloop *loop,
 }
 
 static int
-uipcp_fa_resp(struct rinalite_evloop *loop,
+uipcp_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
-    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_resp *resp =
@@ -275,11 +275,11 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
 }
 
 static int
-uipcp_application_register(struct rinalite_evloop *loop,
+uipcp_application_register(struct rlite_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
 {
-    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_application_register *req =
@@ -291,11 +291,11 @@ uipcp_application_register(struct rinalite_evloop *loop,
 }
 
 static int
-uipcp_flow_deallocated(struct rinalite_evloop *loop,
+uipcp_flow_deallocated(struct rlite_evloop *loop,
                        const struct rina_msg_base_resp *b_resp,
                        const struct rina_msg_base *b_req)
 {
-    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
@@ -312,34 +312,34 @@ uipcp_server(void *arg)
     struct uipcp *uipcp = arg;
 
     for (;;) {
-        struct rinalite_pending_flow_req *pfr;
+        struct rlite_pending_flow_req *pfr;
         unsigned int port_id;
         int flow_fd;
         int result;
         int ret;
 
-        pfr = rinalite_flow_req_wait(&uipcp->appl);
+        pfr = rlite_flow_req_wait(&uipcp->appl);
         port_id = pfr->port_id;
         PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 pfr->ipcp_id, pfr->port_id);
 
-        result = rinalite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
+        result = rlite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
                                     uipcp->ipcp_id, pfr->port_id, 0);
 
         if (result) {
-            rinalite_pending_flow_req_free(pfr);
+            rlite_pending_flow_req_free(pfr);
             continue;
         }
 
-        flow_fd = rinalite_open_appl_port(port_id);
+        flow_fd = rlite_open_appl_port(port_id);
         if (flow_fd < 0) {
-            rinalite_pending_flow_req_free(pfr);
+            rlite_pending_flow_req_free(pfr);
             continue;
         }
 
         ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
                                 flow_fd, port_id);
-        rinalite_pending_flow_req_free(pfr);
+        rlite_pending_flow_req_free(pfr);
         if (ret) {
             PE("rib_neighbor_flow() failed\n");
         }
@@ -370,7 +370,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     PD("Requesting IPCP uipcp set...\n");
 
-    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -415,33 +415,33 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
-    ret = rinalite_appl_init(&uipcp->appl);
+    ret = rlite_appl_init(&uipcp->appl);
     if (ret) {
         goto err1;
     }
 
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
-    ret = rinalite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
                                       uipcp_fa_req);
     if (ret) {
         goto err2;
     }
 
-    ret = rinalite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
                                       uipcp_fa_resp);
     if (ret) {
         goto err2;
     }
 
-    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop,
                                       RINA_KERN_APPLICATION_REGISTER,
                                       uipcp_application_register);
     if (ret) {
         goto err2;
     }
 
-    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop,
                                       RINA_KERN_FLOW_DEALLOCATED,
                                       uipcp_flow_deallocated);
     if (ret) {
@@ -456,13 +456,13 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err2;
     }
 
-    uipcp->mgmtfd = rinalite_open_mgmt_port(ipcp_id);
+    uipcp->mgmtfd = rlite_open_mgmt_port(ipcp_id);
     if (uipcp->mgmtfd < 0) {
         ret = uipcp->mgmtfd;
         goto err2;
     }
 
-    rinalite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
+    rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
 
     ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
     if (ret) {
@@ -476,7 +476,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 err3:
     close(uipcp->mgmtfd);
 err2:
-    rinalite_appl_fini(&uipcp->appl);
+    rlite_appl_fini(&uipcp->appl);
 err1:
     list_del(&uipcp->node);
 err0:
@@ -498,13 +498,13 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         return 0;
     }
 
-    rinalite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
+    rlite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
 
     close(uipcp->mgmtfd);
 
-    rinalite_evloop_stop(&uipcp->appl.loop);
+    rlite_evloop_stop(&uipcp->appl.loop);
 
-    ret = rinalite_appl_fini(&uipcp->appl);
+    ret = rlite_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);
 
@@ -527,7 +527,7 @@ uipcps_fetch(struct uipcps *uipcps)
     int first = 1;
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        ret = rinalite_ipcps_fetch(&uipcp->appl.loop);
+        ret = rlite_ipcps_fetch(&uipcp->appl.loop);
         if (ret) {
             return ret;
         }
@@ -535,7 +535,7 @@ uipcps_fetch(struct uipcps *uipcps)
         if (first) {
             /* This is just for debugging purposes. */
             first = 0;
-            rinalite_ipcps_print(&uipcp->appl.loop);
+            rlite_ipcps_print(&uipcp->appl.loop);
             fflush(stdout);
         }
     }

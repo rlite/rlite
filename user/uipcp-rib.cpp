@@ -48,12 +48,12 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
 }
 
-struct rinalite_ipcp *
+struct rlite_ipcp *
 uipcp_rib::ipcp_info() const
 {
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
 
-    ipcp = rinalite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+    ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
     assert(ipcp);
 
     return ipcp;
@@ -63,7 +63,7 @@ char *
 uipcp_rib::dump() const
 {
     stringstream ss;
-    struct rinalite_ipcp *ipcp = ipcp_info();
+    struct rlite_ipcp *ipcp = ipcp_info();
 
     ss << "Address: " << ipcp->ipcp_addr << endl << endl;
 
@@ -138,7 +138,7 @@ uipcp_rib::set_address(uint64_t address)
     stringstream addr_ss;
 
     addr_ss << address;
-    return rinalite_ipcp_config(&uipcp->appl.loop, uipcp->ipcp_id,
+    return rlite_ipcp_config(&uipcp->appl.loop, uipcp->ipcp_id,
                                 "address", addr_ss.str().c_str());
 }
 
@@ -176,7 +176,7 @@ int
 uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
                             const UipcpObject& obj)
 {
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     AData adata;
     CDAPMessage am;
     char objbuf[4096];

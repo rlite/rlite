@@ -2,8 +2,8 @@
 #define __LIST_H__
 
 #include <stdint.h>
-#include <rinalite/common.h>
-#include "rinalite-list.h"
+#include <rlite/common.h>
+#include "rlite-list.h"
 
 struct pending_entry {
     struct rina_msg_base *msg;

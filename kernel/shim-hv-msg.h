@@ -11,8 +11,8 @@
 #include <stdint.h>
 #endif
 
-#include <rinalite/common.h>
-#include <rinalite/utils.h>
+#include <rlite/common.h>
+#include <rlite/utils.h>
 
 
 enum {

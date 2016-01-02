@@ -5,11 +5,11 @@
 #include <map>
 #include <list>
 
-#include "rinalite/common.h"
-#include "rinalite/utils.h"
-#include "rinalite/conf-msg.h"
-#include "rinalite-appl.h"
-#include "rinalite-conf.h"
+#include "rlite/common.h"
+#include "rlite/utils.h"
+#include "rlite/conf-msg.h"
+#include "rlite-appl.h"
+#include "rlite-conf.h"
 
 #include "uipcp-codecs.hpp"
 #include "uipcp-container.h"
@@ -146,7 +146,7 @@ struct uipcp_rib {
 
     uipcp_rib(struct uipcp *_u);
 
-    struct rinalite_ipcp *ipcp_info() const;
+    struct rlite_ipcp *ipcp_info() const;
     char *dump() const;
 
     int set_address(uint64_t address);

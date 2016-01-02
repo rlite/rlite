@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "rinalite/common.h"
-#include "rinalite/utils.h"
+#include "rlite/common.h"
+#include "rlite/utils.h"
 #include "cdap.hpp"
 
 using namespace std;

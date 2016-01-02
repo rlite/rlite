@@ -1,7 +1,7 @@
 #ifndef __RINALITE_KERNEL_H__
 #define __RINALITE_KERNEL_H__
 
-#include <rinalite/utils.h>
+#include <rlite/utils.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
@@ -10,7 +10,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 
-#include "rinalite-bufs.h"
+#include "rlite-bufs.h"
 
 
 struct ipcp_entry;

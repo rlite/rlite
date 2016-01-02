@@ -28,5 +28,3 @@
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
 
 - addr size non consistente (PCI/resto dello stack)
-
-- rinalite --> rlite, e rimuovi il prefisso dal nome degli header

@@ -53,7 +53,7 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 int
 uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;

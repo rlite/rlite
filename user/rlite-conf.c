@@ -4,11 +4,11 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "rinalite-conf.h"
+#include "rlite-conf.h"
 
 
 int
-rinalite_ipcp_config(struct rinalite_evloop *loop, uint16_t ipcp_id,
+rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
     struct rina_kmsg_ipcp_config *req;
@@ -30,7 +30,7 @@ rinalite_ipcp_config(struct rinalite_evloop *loop, uint16_t ipcp_id,
 
     PD("Requesting IPCP config...\n");
 
-    resp = rinalite_issue_request(loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(loop, RINALITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);

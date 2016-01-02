@@ -19,10 +19,10 @@
  */
 
 #include <linux/types.h>
-#include <rinalite/kernel-msg.h>
-#include <rinalite/utils.h>
-#include "rinalite-kernel.h"
-#include "rinalite-bufs.h"
+#include <rlite/kernel-msg.h>
+#include <rlite/utils.h>
+#include "rlite-kernel.h"
+#include "rlite-bufs.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -45,7 +45,7 @@ struct rina_ctrl;
 typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
                                   struct rina_msg_base *bmsg);
 
-/* Data structure associated to the /dev/rinalite file descriptor. */
+/* Data structure associated to the /dev/rlite file descriptor. */
 struct rina_ctrl {
     char msgbuf[1024];
 
@@ -2449,7 +2449,7 @@ static const struct file_operations rina_ctrl_fops = {
 
 static struct miscdevice rina_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rinalite",
+    .name = "rlite",
     .fops = &rina_ctrl_fops,
 };
 
@@ -2487,7 +2487,7 @@ rina_ctrl_init(void)
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {
-        printk("Failed to register rinalite misc device\n");
+        printk("Failed to register rlite misc device\n");
         return ret;
     }
 
@@ -2511,4 +2511,4 @@ rina_ctrl_fini(void)
 module_init(rina_ctrl_init);
 module_exit(rina_ctrl_fini);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("devname: rinalite");
+MODULE_ALIAS("devname: rlite");

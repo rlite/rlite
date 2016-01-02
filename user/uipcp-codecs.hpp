@@ -5,7 +5,7 @@
 #include <list>
 #include <string>
 
-#include "rinalite/common.h"
+#include "rlite/common.h"
 #include "cdap.hpp"
 
 

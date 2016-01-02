@@ -1,10 +1,10 @@
 #ifndef __RINA_UIPCP_H__
 #define __RINA_UIPCP_H__
 
-#include "rinalite/conf-msg.h"
-#include "rinalite/kernel-msg.h"
-#include "rinalite-list.h"
-#include "rinalite-appl.h"
+#include "rlite/conf-msg.h"
+#include "rlite/kernel-msg.h"
+#include "rlite-list.h"
+#include "rlite-appl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,10 +26,10 @@ struct uipcps {
     struct list_head ipcps_registrations;
 };
 
-#define RINA_PERSISTENT_REG_FILE   "/var/rinalite/uipcps-pers-reg"
+#define RINA_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
 
 struct uipcp {
-    struct rinalite_appl appl;
+    struct rlite_appl appl;
     struct uipcps *uipcps;
     unsigned int ipcp_id;
     int mgmtfd;

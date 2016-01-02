@@ -124,15 +124,15 @@ for i in vms:
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'sudo hostname %(name)s\n'\
             '\n'\
-            'sudo modprobe rinalite\n'\
-            'sudo modprobe rinalite-shim-eth\n'\
-            'sudo modprobe rinalite-normal\n'\
-            'sudo chmod a+rwx /dev/rinalite\n'\
+            'sudo modprobe rlite\n'\
+            'sudo modprobe rlite-shim-eth\n'\
+            'sudo modprobe rlite-normal\n'\
+            'sudo chmod a+rwx /dev/rlite\n'\
             'sudo chmod a+rwx /dev/rina-io\n'\
-            'sudo mkdir -p /var/rinalite\n'\
-            'sudo chmod -R a+rw /var/rinalite\n'\
+            'sudo mkdir -p /var/rlite\n'\
+            'sudo chmod -R a+rw /var/rlite\n'\
             '\n'\
-            'rinalite-uipcps &> uipcp.log &\n'\
+            'rlite-uipcps &> uipcp.log &\n'\
             'rina-config ipcp-create n.IPCP %(id)s normal n.DIF\n'\
             'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'],

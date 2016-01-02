@@ -118,7 +118,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_application);
     uint64_t remote_addr = dft_lookup(dest_appl);
-    struct rinalite_ipcp *ipcp;
+    struct rlite_ipcp *ipcp;
     CDAPMessage m;
     FlowRequest freq;
     ConnId conn_id;

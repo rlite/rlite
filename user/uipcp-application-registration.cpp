@@ -44,7 +44,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
+    ret = rlite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
                                           uipcp->ipcp_id,
                                           &local_addr);
     assert(!ret);
