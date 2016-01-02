@@ -1,0 +1,20 @@
+pkgbase = rlite
+	pkgdesc = Recursive InterNetwork Architecture user/kernel prototype written in C.
+	pkgver = 0.3
+	pkgrel = 1
+	install = rlite.install
+	arch = any
+	license = BSD
+	makedepends = git
+	makedepends = linux-headers
+	depends = linux
+	depends = glibc
+	source = rlite.install,
+	source = rlite.conf,
+	source = rlite.service
+	md5sums = 047aa5adec4c52ddbf86d12dbf300f71,
+	md5sums = 76e6df2e7a96156829f702a42f000f42,
+	md5sums = 2665013aa35f3ec0728b06f0135789fd
+
+pkgname = rlite
+
