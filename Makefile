@@ -3,10 +3,7 @@ KER=`uname -r`
 all: userspace kernelspace
 
 userspace:
-	-mkdir build &> /dev/null;	\
-	cd build; 			\
-	cmake ..;			\
-	make
+	cd build && make
 
 kernelspace:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules

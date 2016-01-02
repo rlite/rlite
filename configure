@@ -1,0 +1,15 @@
+#!/bin/sh
+
+no_cmake() {
+    echo "Cannot find CMake, required for build of userspace components"
+    exit 1
+}
+
+# Make sure CMake is installed
+which cmake || no_cmake
+
+# Configure CMake for out-of-tree build
+rm -rf build &> /dev/null
+mkdir build
+cd build
+cmake ..
