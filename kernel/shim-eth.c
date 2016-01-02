@@ -936,33 +936,31 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
     return 0;
 }
 
+#define SHIM_DIF_TYPE   "shim-eth"
+
+static struct ipcp_factory shim_eth_factory = {
+    .owner = THIS_MODULE,
+    .dif_type = SHIM_DIF_TYPE,
+    .create = rina_shim_eth_create,
+    .ops.destroy = rina_shim_eth_destroy,
+    .ops.flow_allocate_req = rina_shim_eth_fa_req,
+    .ops.flow_allocate_resp = rina_shim_eth_fa_resp,
+    .ops.sdu_write = rina_shim_eth_sdu_write,
+    .ops.config = rina_shim_eth_config,
+    .ops.application_register = rina_shim_eth_register,
+    .ops.flow_deallocated = rina_shim_eth_flow_deallocated,
+};
+
 static int __init
 rina_shim_eth_init(void)
 {
-    struct ipcp_factory factory;
-    int ret;
-
-    memset(&factory, 0, sizeof(factory));
-    factory.owner = THIS_MODULE;
-    factory.dif_type = "shim-eth";
-    factory.create = rina_shim_eth_create;
-    factory.ops.destroy = rina_shim_eth_destroy;
-    factory.ops.flow_allocate_req = rina_shim_eth_fa_req;
-    factory.ops.flow_allocate_resp = rina_shim_eth_fa_resp;
-    factory.ops.sdu_write = rina_shim_eth_sdu_write;
-    factory.ops.config = rina_shim_eth_config;
-    factory.ops.application_register = rina_shim_eth_register;
-    factory.ops.flow_deallocated = rina_shim_eth_flow_deallocated;
-
-    ret = rina_ipcp_factory_register(&factory);
-
-    return ret;
+    return rina_ipcp_factory_register(&shim_eth_factory);
 }
 
 static void __exit
 rina_shim_eth_fini(void)
 {
-    rina_ipcp_factory_unregister("shim-eth");
+    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
 module_init(rina_shim_eth_init);

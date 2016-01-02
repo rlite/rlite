@@ -312,31 +312,29 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
     return ret;
 }
 
+#define SHIM_DIF_TYPE   "shim-loopback"
+
+static struct ipcp_factory shim_loopback_factory = {
+    .owner = THIS_MODULE,
+    .dif_type = SHIM_DIF_TYPE,
+    .create = rina_shim_loopback_create,
+    .ops.destroy = rina_shim_loopback_destroy,
+    .ops.flow_allocate_req = rina_shim_loopback_fa_req,
+    .ops.flow_allocate_resp = rina_shim_loopback_fa_resp,
+    .ops.sdu_write = rina_shim_loopback_sdu_write,
+    .ops.config = rina_shim_loopback_config,
+};
+
 static int __init
 rina_shim_loopback_init(void)
 {
-    struct ipcp_factory factory;
-    int ret;
-
-    memset(&factory, 0, sizeof(factory));
-    factory.owner = THIS_MODULE;
-    factory.dif_type = "shim-loopback";
-    factory.create = rina_shim_loopback_create;
-    factory.ops.destroy = rina_shim_loopback_destroy;
-    factory.ops.flow_allocate_req = rina_shim_loopback_fa_req;
-    factory.ops.flow_allocate_resp = rina_shim_loopback_fa_resp;
-    factory.ops.sdu_write = rina_shim_loopback_sdu_write;
-    factory.ops.config = rina_shim_loopback_config;
-
-    ret = rina_ipcp_factory_register(&factory);
-
-    return ret;
+    return rina_ipcp_factory_register(&shim_loopback_factory);
 }
 
 static void __exit
 rina_shim_loopback_fini(void)
 {
-    rina_ipcp_factory_unregister("shim-loopback");
+    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
 module_init(rina_shim_loopback_init);

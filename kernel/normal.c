@@ -1045,36 +1045,34 @@ snd_crb:
     return ret;
 }
 
+#define SHIM_DIF_TYPE   "normal"
+
+static struct ipcp_factory normal_factory = {
+    .owner = THIS_MODULE,
+    .dif_type = SHIM_DIF_TYPE,
+    .create = rina_normal_create,
+    .ops.destroy = rina_normal_destroy,
+    .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
+    .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
+    .ops.flow_init = rina_normal_flow_init,
+    .ops.sdu_write = rina_normal_sdu_write,
+    .ops.config = rina_normal_config,
+    .ops.pduft_set = rina_normal_pduft_set,
+    .ops.pduft_del = rina_normal_pduft_del,
+    .ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write,
+    .ops.sdu_rx = rina_normal_sdu_rx,
+};
+
 static int __init
 rina_normal_init(void)
 {
-    struct ipcp_factory factory;
-    int ret;
-
-    memset(&factory, 0, sizeof(factory));
-    factory.owner = THIS_MODULE;
-    factory.dif_type = "normal";
-    factory.create = rina_normal_create;
-    factory.ops.destroy = rina_normal_destroy;
-    factory.ops.flow_allocate_req = NULL; /* Reflect to userspace. */
-    factory.ops.flow_allocate_resp = NULL; /* Reflect to userspace. */
-    factory.ops.flow_init = rina_normal_flow_init;
-    factory.ops.sdu_write = rina_normal_sdu_write;
-    factory.ops.config = rina_normal_config;
-    factory.ops.pduft_set = rina_normal_pduft_set;
-    factory.ops.pduft_del = rina_normal_pduft_del;
-    factory.ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write;
-    factory.ops.sdu_rx = rina_normal_sdu_rx;
-
-    ret = rina_ipcp_factory_register(&factory);
-
-    return ret;
+    return rina_ipcp_factory_register(&normal_factory);
 }
 
 static void __exit
 rina_normal_fini(void)
 {
-    rina_ipcp_factory_unregister("normal");
+    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
 module_init(rina_normal_init);

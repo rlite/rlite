@@ -268,31 +268,29 @@ rina_shim_hv_config(struct ipcp_entry *ipcp,
     return ret;
 }
 
+#define SHIM_DIF_TYPE   "shim-hv"
+
+static struct ipcp_factory shim_hv_factory = {
+    .owner = THIS_MODULE,
+    .dif_type = SHIM_DIF_TYPE,
+    .create = rina_shim_hv_create,
+    .ops.destroy = rina_shim_hv_destroy,
+    .ops.flow_allocate_req = rina_shim_hv_fa_req,
+    .ops.flow_allocate_resp = rina_shim_hv_fa_resp,
+    .ops.sdu_write = rina_shim_hv_sdu_write,
+    .ops.config = rina_shim_hv_config,
+};
+
 static int __init
 rina_shim_hv_init(void)
 {
-    struct ipcp_factory factory;
-    int ret;
-
-    memset(&factory, 0, sizeof(factory));
-    factory.owner = THIS_MODULE;
-    factory.dif_type = "shim-hv";
-    factory.create = rina_shim_hv_create;
-    factory.ops.destroy = rina_shim_hv_destroy;
-    factory.ops.flow_allocate_req = rina_shim_hv_fa_req;
-    factory.ops.flow_allocate_resp = rina_shim_hv_fa_resp;
-    factory.ops.sdu_write = rina_shim_hv_sdu_write;
-    factory.ops.config = rina_shim_hv_config;
-
-    ret = rina_ipcp_factory_register(&factory);
-
-    return ret;
+    return rina_ipcp_factory_register(&shim_hv_factory);
 }
 
 static void __exit
 rina_shim_hv_fini(void)
 {
-    rina_ipcp_factory_unregister("shim-hv");
+    rina_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
 module_init(rina_shim_hv_init);
