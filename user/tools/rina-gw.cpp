@@ -146,6 +146,7 @@ struct Worker {
 
     int repoll();
     int drain_syncfd();
+    void run();
 };
 
 #define NUM_WORKERS     1
@@ -175,7 +176,16 @@ struct Gateway {
     ~Gateway();
 };
 
-static void *worker_function(void *opaque);
+static void *
+worker_function(void *opaque)
+{
+    Worker *w = (Worker *)opaque;
+
+    w->run();
+
+    return NULL;
+}
+
 
 Worker::Worker()
 {
@@ -230,6 +240,79 @@ Worker::drain_syncfd()
     }
 
     return 0;
+}
+
+#define MAX_FDS         16
+#define MAX_BUF_SIZE    4096
+
+void
+Worker::run()
+{
+    struct pollfd pollfds[1 + MAX_FDS];
+    char buf[MAX_BUF_SIZE];
+
+    for (;;) {
+        int ret;
+        int nfds = 1;
+
+        pollfds[0].fd = syncfd;
+        pollfds[0].events = POLLIN;
+
+        pthread_mutex_lock(&lock);
+        for (map<int, int>::iterator mit = active_mappings.begin();
+                                mit != active_mappings.end(); mit++, nfds++) {
+            pollfds[nfds].fd = mit->first;
+            pollfds[nfds].events = POLLIN | POLLOUT;
+        }
+        pthread_mutex_unlock(&lock);
+
+        ret = poll(pollfds, MAX_FDS, -1);
+        if (ret < 0) {
+            perror("poll()");
+            break;
+
+        } else if (ret == 0) {
+            PI("poll() timeout\n");
+            continue;
+        }
+
+        if (pollfds[0].revents & POLLIN) {
+            PD("Mappings changed, rebuliding poll array\n");
+            pthread_mutex_lock(&lock);
+            drain_syncfd();
+            pthread_mutex_unlock(&lock);
+            continue;
+        }
+
+        for (int i=1, j=0; j<ret; i++) {
+            if (pollfds[i].revents) {
+                if (pollfds[i].revents & POLLIN) {
+                    int n = read(pollfds[i].fd, buf, MAX_BUF_SIZE);
+                    int m;
+
+                    if (n > 0) {
+                        m = write(active_mappings[pollfds[i].fd], buf, n);
+                        if (m != n) {
+                            if (m < 0) {
+                                perror("write()");
+
+                            } else {
+                                PE("Partial write %d/%d\n", m, n);
+                            }
+                        }
+
+                    } else if (n < 0) {
+                        perror("read()");
+
+                    } else {
+                        PI("Read 0 bytes from %d\n", pollfds[i].fd);
+                    }
+                }
+                j++;
+            }
+        }
+    }
+
 }
 
 Gateway::Gateway()
@@ -523,83 +606,6 @@ print_conf()
         cout << "DST: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
     }
-}
-
-#define MAX_FDS         16
-#define MAX_BUF_SIZE    4096
-
-static void *
-worker_function(void *opaque)
-{
-    Worker *w = (Worker *)opaque;
-    struct pollfd pollfds[1 + MAX_FDS];
-    char buf[MAX_BUF_SIZE];
-
-    (void) w;
-
-    for (;;) {
-        int ret;
-        int nfds = 1;
-
-        pollfds[0].fd = w->syncfd;
-        pollfds[0].events = POLLIN;
-
-        pthread_mutex_lock(&w->lock);
-        for (map<int, int>::iterator mit = w->active_mappings.begin();
-                                mit != w->active_mappings.end(); mit++, nfds++) {
-            pollfds[nfds].fd = mit->first;
-            pollfds[nfds].events = POLLIN | POLLOUT;
-        }
-        pthread_mutex_unlock(&w->lock);
-
-        ret = poll(pollfds, MAX_FDS, -1);
-        if (ret < 0) {
-            perror("poll()");
-            break;
-
-        } else if (ret == 0) {
-            PI("poll() timeout\n");
-            continue;
-        }
-
-        if (pollfds[0].revents & POLLIN) {
-            PD("Mappings changed, rebuliding poll array\n");
-            pthread_mutex_lock(&w->lock);
-            w->drain_syncfd();
-            pthread_mutex_unlock(&w->lock);
-            continue;
-        }
-
-        for (int i=1, j=0; j<ret; i++) {
-            if (pollfds[i].revents) {
-                if (pollfds[i].revents & POLLIN) {
-                    int n = read(pollfds[i].fd, buf, MAX_BUF_SIZE);
-                    int m;
-
-                    if (n > 0) {
-                        m = write(w->active_mappings[pollfds[i].fd], buf, n);
-                        if (m != n) {
-                            if (m < 0) {
-                                perror("write()");
-
-                            } else {
-                                PE("Partial write %d/%d\n", m, n);
-                            }
-                        }
-
-                    } else if (n < 0) {
-                        perror("read()");
-
-                    } else {
-                        PI("Read 0 bytes from %d\n", pollfds[i].fd);
-                    }
-                }
-                j++;
-            }
-        }
-    }
-
-    return NULL;
 }
 
 int main()
