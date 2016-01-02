@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <cassert>
+#include <pthread.h>
 
 #include "uipcp-normal.hpp"
 
@@ -18,6 +19,7 @@ NeighFlow::NeighFlow(Neighbor *n, unsigned int pid, int ffd,
                                   pending_keepalive_reqs(0),
                                   enrollment_state(NEIGH_NONE)
 {
+    pthread_cond_init(&enrollment_stopped, NULL);
     assert(neigh);
 }
 
@@ -50,6 +52,8 @@ NeighFlow::~NeighFlow()
     uipcps_lower_flow_removed(neigh->rib->uipcp->uipcps,
                               neigh->rib->uipcp->ipcp_id,
                               lower_ipcp_id);
+
+    pthread_cond_destroy(&enrollment_stopped);
 }
 
 int
@@ -129,6 +133,8 @@ NeighFlow::abort_enrollment()
     if (conn) {
         conn->reset();
     }
+
+    pthread_cond_signal(&enrollment_stopped);
 }
 
 static void
@@ -648,6 +654,8 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 
         remote_sync_rib(nf);
 
+        pthread_cond_signal(&nf->enrollment_stopped);
+
     } else {
         UPI(rib->uipcp, "Initiator is not allowed to start early\n");
         nf->enroll_tmr_stop();
@@ -702,6 +710,8 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     rib->commit_lower_flow(ipcp->ipcp_addr, *this);
 
     remote_sync_rib(nf);
+
+    pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
 }
@@ -1124,19 +1134,22 @@ int
 normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
     Neighbor *neigh;
     NeighFlow *nf;
     int ret;
 
+    pthread_mutex_lock(&rib->lock);
+
     neigh = rib->get_neighbor(&req->neigh_ipcp_name);
     if (!neigh) {
         UPE(uipcp, "Failed to add neighbor\n");
+        pthread_mutex_unlock(&rib->lock);
         return -1;
     }
 
     ret = neigh->alloc_flow(req->supp_dif_name);
     if (ret) {
+        pthread_mutex_unlock(&rib->lock);
         return ret;
     }
 
@@ -1144,16 +1157,31 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 
     nf = neigh->mgmt_conn();
 
-    /* Start the enrollment procedure as initiator. */
     if (nf->enrollment_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment already in progress, current state "
             "is %s\n", neigh->enrollment_state_repr(nf->enrollment_state));
+        pthread_mutex_unlock(&rib->lock);
         return 0;
     }
 
+    /* Start the enrollment procedure as initiator. This will move
+     * the internal state to  NEIGH_I_WAIT_CONNECT_R. */
     neigh->enroll_fsm_run(nf, NULL);
 
-    return 0;
+    /* Wait for the enrollment procedure to stop, either because of
+     * successful completion (NEIGH_ENROLLED), or because of an abort
+     * (NEIGH_NONE).
+     */
+    while (nf->enrollment_state != NEIGH_NONE &&
+            nf->enrollment_state != NEIGH_ENROLLED) {
+        pthread_cond_wait(&nf->enrollment_stopped, &rib->lock);
+    }
+
+    ret = nf->enrollment_state == NEIGH_ENROLLED ? 0 : -1;
+
+    pthread_mutex_unlock(&rib->lock);
+
+    return ret;
 }
 
 int

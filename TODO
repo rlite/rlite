@@ -24,3 +24,7 @@
   getting ERR in the logs
 
 - implement persistent enrollment
+
+- remove race condition on IPCP creation, since we currently don't wait for uipcp
+  to issue UIPCP_SET operation, and so registration or flow allocation requests
+  may come before the UIPCP_SET, and fail

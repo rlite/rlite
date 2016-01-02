@@ -71,6 +71,7 @@ struct NeighFlow {
     int enroll_tmrid;
     int keepalive_tmrid;
     int pending_keepalive_reqs;
+    pthread_cond_t enrollment_stopped;
     enum state_t enrollment_state;
 
     NeighFlow(Neighbor *n, unsigned int pid, int ffd,
