@@ -50,7 +50,8 @@ build() {
     msg "Building on kernel ${RKVER}..."
 
     cd "$srcdir/$_gitname"
-    ./configure --with-vmpi || exit 1
+    #./configure --with-vmpi || exit 1
+    ./configure || exit 1
     make || exit 1
     msg "Build complete"
 }
@@ -63,7 +64,7 @@ package() {
     # Install the rina kernel modules into the extramodules-VERSION directory
     mkdir -p "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
     cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
-    cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
+    #cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
 
     # Install the userspace programs and libraries
     mkdir -p "$pkgdir/usr/bin"
