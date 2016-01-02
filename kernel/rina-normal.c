@@ -107,8 +107,15 @@ rcv_inact_tmr_cb(struct hrtimer *timer)
 static int
 rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
-    flow->dtp.snd_inact_tmr.function = snd_inact_tmr_cb;
-    flow->dtp.rcv_inact_tmr.function = rcv_inact_tmr_cb;
+    struct dtp *dtp = &flow->dtp;
+
+    dtp->set_drf = true;
+    dtp->next_seq_num_to_send = 0;
+    dtp->snd_lwe = dtp->next_seq_num_to_send;
+    dtp->last_seq_num_sent = -1;
+
+    dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
+    dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
 
     return 0;
 }
@@ -168,8 +175,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.src_cep = flow->local_port;
     pci->pdu_type = PDU_TYPE_DT;
     pci->pdu_flags = dtp->set_drf ? 1 : 0;
+    pci->seqnum = dtp->next_seq_num_to_send++;
+
     dtp->set_drf = false;
-    pci->seqnum = flow->dtp.next_seq_num_to_send++;
+    /* DTCP not present */
+    dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
+    dtp->last_seq_num_sent = pci->seqnum;
 
     if (lower_flow) {
         /* Directly call the underlying IPCP for now. RMT component
