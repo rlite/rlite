@@ -47,6 +47,10 @@ enum {
 };
 
 static int
+ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,
+               uint64_t dest_addr, uint32_t local_port);
+
+static int
 ipcp_create_resp(struct rina_evloop *loop,
                  const struct rina_msg_base_resp *b_resp,
                  const struct rina_msg_base *b_req)
@@ -76,7 +80,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-uipcp_server_enroll(struct uipcp *uipcp, int fd)
+uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
 {
     uint64_t remote_addr, local_addr;
     ssize_t n;
@@ -104,6 +108,8 @@ uipcp_server_enroll(struct uipcp *uipcp, int fd)
     if (n != sizeof(local_addr)) {
         goto fail;
     }
+
+    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
 
     /* Do not deallocate the flow. */
 
@@ -151,7 +157,7 @@ uipcp_server(void *arg)
 
         switch (cmd) {
             case IPCP_MGMT_ENROLL:
-                uipcp_server_enroll(uipcp, fd);
+                uipcp_server_enroll(uipcp, port_id, fd);
                 break;
             default:
                 PI("%s: Unknown cmd %u received\n", __func__, cmd);
@@ -423,6 +429,37 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
 }
 
 static int
+ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,
+               uint64_t dest_addr, uint32_t local_port)
+{
+    struct rina_kmsg_ipcp_pduft_set *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_PDUFT_SET;
+    req->ipcp_id = ipcp_id;
+    req->dest_addr = dest_addr;
+    req->local_port = local_port;
+
+    PD("Requesting IPCP pdu forwarding table set...\n");
+
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -659,6 +696,8 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
     remote_addr = le64toh(remote_addr);
+
+    ipcp_pduft_set(ipcm, uipcp->ipcp_id, remote_addr, port_id);
 
     resp.result = 0;
 
