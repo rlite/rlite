@@ -16,21 +16,23 @@ find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(CDAP_GPB_SRC CDAP_GPB_HDR user/CDAP.proto)
 
 add_library(rinalite SHARED user/rinalite-utils.c user/rina-kernel-numtables.c user/rina-conf-numtables.c user/rinalite-evloop.c user/pending_queue.c user/rinalite-appl.c)
+add_library(rinalite-cdap SHARED user/cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 
 target_link_libraries(rinalite pthread)
+target_link_libraries(rinalite-cdap rinalite ${PROTOBUF_LIBRARY})
+
+message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to rinalite-cdap target")
+target_include_directories(rinalite-cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(rinaperf user/rinaperf.c)
 add_executable(rinalite-uipcps user/uipcp-container.c user/uipcp-unix.c)
 add_executable(rina-config user/rina-config.c)
-add_executable(test-cdap user/test-cdap.cpp user/cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
-
-message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to test-cdap target")
-target_include_directories(test-cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+add_executable(test-cdap user/test-cdap.cpp)
 
 target_link_libraries(rinaperf rinalite)
 target_link_libraries(rinalite-uipcps rinalite)
 target_link_libraries(rina-config rinalite)
-target_link_libraries(test-cdap rinalite ${PROTOBUF_LIBRARY})
+target_link_libraries(test-cdap rinalite-cdap)
 
 install(TARGETS rinaperf rinalite-uipcps rina-config DESTINATION usr/bin)
 install(TARGETS rinalite DESTINATION usr/lib)
