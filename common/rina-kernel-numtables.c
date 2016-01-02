@@ -56,6 +56,15 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
+    [RINA_KERN_FLOW_ALLOCATE_REQ] = {
+        .copylen = sizeof(struct rina_kmsg_flow_allocate_req) -
+                    2 * sizeof(struct rina_name),
+        .names = 2,
+    },
+    [RINA_KERN_FLOW_ALLOCATE_RESP] = {
+        .copylen = sizeof(struct rina_kmsg_flow_allocate_resp),
+        .names = 0,
+    },
     [RINA_KERN_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

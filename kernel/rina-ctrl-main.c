@@ -50,6 +50,8 @@ struct registered_application {
 
 #define IPCP_ID_BITMAP_SIZE 1024
 #define IPCP_HASHTABLE_BITS  7
+#define PORT_ID_BITMAP_SIZE 1024
+#define PORT_ID_HASHTABLE_BITS  7
 
 struct rina_dm {
     /* Bitmap to manage IPC process ids. */
@@ -57,6 +59,12 @@ struct rina_dm {
 
     /* Hash table to store information about each IPC process. */
     DECLARE_HASHTABLE(ipcp_table, IPCP_HASHTABLE_BITS);
+
+    /* Bitmap to manage port ids. */
+    DECLARE_BITMAP(port_id_bitmap, PORT_ID_BITMAP_SIZE);
+
+    /* Hash table to store information about each flow. */
+    DECLARE_HASHTABLE(flow_table, PORT_ID_HASHTABLE_BITS);
 
     /* Pointer used to implement the IPC processes fetch operations. */
     struct ipcp_entry *ipcp_fetch_last;
@@ -607,6 +615,151 @@ err3:
     return ret;
 }
 
+/* Code improvement: we may merge ipcp_table_find() and flow_table_find()
+ * into a template (a macro). */
+static struct flow_entry *
+flow_table_find(unsigned int port_id)
+{
+    struct flow_entry *entry;
+    struct hlist_head *head;
+
+    head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->local_port == port_id) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry)
+{
+    struct flow_entry *entry;
+    int ret = 0;
+
+    *pentry = entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    if (!entry) {
+        return -ENOMEM;
+    }
+    memset(entry, 0, sizeof(*entry));
+
+    mutex_lock(&rina_dm.lock);
+
+    /* Try to alloc a port id from the bitmap. */
+    entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
+                                                PORT_ID_BITMAP_SIZE, 0, 1, 0);
+    if (entry->local_port < PORT_ID_BITMAP_SIZE) {
+        bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
+        /* Build and insert a flow entry in the hash table. */
+        rina_name_move(&entry->local_application, &req->local_application);
+        rina_name_move(&entry->remote_application, &req->remote_application);
+        entry->remote_port = 0;  /* Not valid. */
+        entry->state = FLOW_STATE_NULL;
+        mutex_init(&entry->lock);
+        hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+    } else {
+        kfree(entry);
+        *pentry = NULL;
+        ret = -ENOSPC;
+    }
+
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+flow_del(unsigned int port_id)
+{
+    struct flow_entry *entry;
+    int ret = -1;  /* No flow found. */
+
+    if (port_id >= PORT_ID_BITMAP_SIZE) {
+        return ret;
+    }
+
+    mutex_lock(&rina_dm.lock);
+    /* Lookup and remove the flow entry in the hash table corresponding
+     * to the given port_id. */
+    entry = flow_table_find(port_id);
+    if (entry) {
+        hash_del(&entry->node);
+        rina_name_free(&entry->local_application);
+        rina_name_free(&entry->remote_application);
+        kfree(entry);
+        ret = 0;
+    }
+    bitmap_clear(rina_dm.port_id_bitmap, port_id, 1);
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_flow_allocate_req *req =
+                    (struct rina_kmsg_flow_allocate_req *)bmsg;
+    struct rina_kmsg_flow_allocate_resp *resp;
+    struct ipcp_entry *ipcp_entry = NULL;
+    struct flow_entry *flow_entry = NULL;
+    int ret;
+
+    mutex_lock(&rina_dm.lock);
+    /* Find the IPC process entry corresponding to req->ipcp_id. */
+    ipcp_entry = ipcp_table_find(req->ipcp_id);
+    if (!ipcp_entry) {
+        goto negative;
+    }
+
+    /* Allocate a port id and the associated flow entry. */
+    ret = flow_add(req, &flow_entry);
+    if (ret) {
+        goto negative;
+    }
+
+    ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+    if (ret) {
+        goto negative;
+    }
+
+    mutex_unlock(&rina_dm.lock);
+
+    printk("%s: Flow allocation requested to IPC process %u\n",
+                    __func__, req->ipcp_id);
+
+    return 0;
+
+negative:
+    if (flow_entry) {
+        flow_del(flow_entry->local_port);
+    }
+
+    mutex_unlock(&rina_dm.lock);
+
+    /* Create a negative response message. */
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
+        return -ENOMEM;
+    }
+
+    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP;
+    resp->event_id = req->event_id;
+    resp->result = 1;  /* Report failure. */
+    resp->port_id = 0;  /* Not valid. */
+
+    /* Enqueue the response into the upqueue. */
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
+    if (ret) {
+        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        return ret;
+    }
+
+    return 0;
+}
+
 /* The signature of a message handler. */
 typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
                                   struct rina_msg_base *bmsg);
@@ -619,6 +772,7 @@ static rina_msg_handler_t rina_handlers[] = {
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
+    [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
