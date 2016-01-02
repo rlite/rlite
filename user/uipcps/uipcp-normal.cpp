@@ -507,11 +507,15 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
     if (ret) {
         UPE(uipcp, "message serialization failed\n");
         invoke_id_mgr.put_invoke_id(m.invoke_id);
-        delete serbuf;
+        delete [] serbuf;
         return -1;
     }
 
-    return mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
+    ret = mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
+
+    delete [] serbuf;
+
+    return ret;
 }
 
 /* To be called under RIB lock. */
