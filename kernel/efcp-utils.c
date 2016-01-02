@@ -51,6 +51,7 @@ dtp_fini(struct dtp *dtp)
     del_timer(&dtp->rcv_inact_tmr);
     del_timer(&dtp->rtx_tmr);
 
+    /* XXX Are those duplicated ? */
     list_for_each_entry_safe(rb, next, &dtp->cwq, node) {
         list_del(&rb->node);
         rlite_buf_free(rb);

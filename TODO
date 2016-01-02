@@ -21,5 +21,3 @@
 - addr size not consistent (PCI/all the stack)
 
 - support RIB M_READ (and M_WRITE)
-
-- fix inactivity timer callbacks

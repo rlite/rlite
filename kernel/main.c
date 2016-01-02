@@ -775,27 +775,28 @@ tx_completion_func(unsigned long arg)
 static void
 remove_flow_work(struct work_struct *work)
 {
-    struct flow_entry *flow = container_of(work, struct flow_entry, remove.work);
+    struct flow_entry *flow = container_of(work, struct flow_entry,
+                                           remove.work);
     struct dtp *dtp = &flow->dtp;
     struct rlite_buf *rb, *tmp;
 
     if (flow->cfg.dtcp_present) {
         spin_lock_bh(&dtp->lock);
 
-        PD("Delayed flow removal, dropping %u PDUs from cwq\n",
-                dtp->cwq_len);
-        list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-            list_del(&rb->node);
-            rlite_buf_free(rb);
-            dtp->cwq_len--;
-        }
-
         PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
-                dtp->rtxq_len);
+           dtp->rtxq_len);
         list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
             list_del(&rb->node);
             rlite_buf_free(rb);
             dtp->rtxq_len--;
+        }
+
+        PD("Delayed flow removal, dropping %u PDUs from cwq\n",
+           dtp->cwq_len);
+        list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
+            list_del(&rb->node);
+            rlite_buf_free(rb);
+            dtp->cwq_len--;
         }
 
         spin_unlock_bh(&dtp->lock);

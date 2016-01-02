@@ -76,36 +76,98 @@ rlite_normal_destroy(struct ipcp_entry *ipcp)
     PD("IPC [%p] destroyed\n", priv);
 }
 
+/* To be called under DTP lock */
+static void
+dtp_snd_reset(struct flow_entry *flow)
+{
+    struct fc_config *fc = &flow->cfg.dtcp.fc;
+    struct dtp *dtp = &flow->dtp;
+
+    dtp->set_drf = true;
+    /* InitialSeqNumPolicy */
+    dtp->next_seq_num_to_send = 0;
+    dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
+    dtp->last_seq_num_sent = -1;
+    dtp->next_snd_ctl_seq = 0;
+    if (fc->fc_type == RLITE_FC_T_WIN) {
+        dtp->snd_rwe += fc->cfg.w.initial_credit;
+    }
+}
+
+/* To be called under DTP lock */
+static void
+dtp_rcv_reset(struct flow_entry *flow)
+{
+    struct fc_config *fc = &flow->cfg.dtcp.fc;
+    struct dtp *dtp = &flow->dtp;
+
+    dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
+    dtp->max_seq_num_rcvd = -1;
+    dtp->last_snd_data_ack = 0;
+    dtp->last_ctrl_seq_num_rcvd = 0;
+    if (fc->fc_type == RLITE_FC_T_WIN) {
+        dtp->rcv_rwe += fc->cfg.w.initial_credit;
+    }
+}
+
 static void
 snd_inact_tmr_cb(long unsigned arg)
 {
     struct flow_entry *flow = (struct flow_entry *)arg;
     struct dtp *dtp = &flow->dtp;
-
-    PD("\n");
+    struct rlite_buf *rb, *tmp;
 
     spin_lock_bh(&dtp->lock);
-    dtp->set_drf = true;
 
-    /* InitialSeqNumPolicy */
-    //dtp->next_seq_num_to_send = 0;
+    /* Re-initialize send-side state variables. */
+    dtp_snd_reset(flow);
 
-    /* Discard the retransmission queue. */
+    /* Flush the retransmission queue. */
+    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
+        list_del(&rb->node);
+        rlite_buf_free(rb);
+        dtp->rtxq_len--;
+    }
 
-    /* Discard the closed window queue */
+    /* Flush the closed window queue */
+    PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
+        list_del(&rb->node);
+        rlite_buf_free(rb);
+        dtp->cwq_len--;
+    }
 
     /* Send control ack PDU */
 
     /* Send transfer PDU with zero length. */
 
     /* Notify user flow that there has been no activity for a while */
+
     spin_unlock_bh(&dtp->lock);
 }
 
 static void
 rcv_inact_tmr_cb(long unsigned arg)
 {
-    PD("\n");
+    struct flow_entry *flow = (struct flow_entry *)arg;
+    struct dtp *dtp = &flow->dtp;
+    struct rlite_buf *rb, *tmp;
+
+    spin_lock_bh(&dtp->lock);
+
+    /* Re-initialize receive-side state variables. */
+    dtp_rcv_reset(flow);
+
+    /* Flush sequencing queue. */
+    PD("%s: dropping %u PDUs from seqq\n", __func__, dtp->seqq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
+        list_del(&rb->node);
+        rlite_buf_free(rb);
+        dtp->seqq_len--;
+    }
+
+    spin_unlock_bh(&dtp->lock);
 }
 
 static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
@@ -200,14 +262,8 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     flow_config_dump(&flow->cfg);
 
-    dtp->set_drf = true;
-    dtp->next_seq_num_to_send = 0;
-    dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
-    dtp->last_seq_num_sent = -1;
-    dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
-    dtp->max_seq_num_rcvd = -1;
-    dtp->last_snd_data_ack = 0;
-    dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
+    dtp_snd_reset(flow);
+    dtp_rcv_reset(flow);
 
     if (ipcp->dif) {
         mpl = msecs_to_jiffies(ipcp->dif->max_pdu_life);
@@ -249,8 +305,6 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
-        dtp->snd_rwe += fc->cfg.w.initial_credit;
-        dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }
 
     if (flow->cfg.dtcp.rtx_control) {
