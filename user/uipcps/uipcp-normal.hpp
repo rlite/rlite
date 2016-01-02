@@ -205,7 +205,7 @@ struct uipcp_rib {
     int pduft_sync();
     uint64_t address_allocate() const;
 
-    int send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
+    int send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
                          const UipcpObject *obj);
 
     /* Synchronize neighbors. */

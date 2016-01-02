@@ -278,6 +278,7 @@ struct AData : public UipcpObject {
 
     AData() : cdap(NULL) { }
     AData(const char *buf, unsigned int size);
+    ~AData() { if (cdap) delete cdap; }
     int serialize(char *buf, unsigned int size) const;
 };
 

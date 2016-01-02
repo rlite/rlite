@@ -448,8 +448,9 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
     return 0;
 }
 
+/* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
+uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
                             const UipcpObject *obj)
 {
     struct rlite_ipcp *ipcp;
@@ -469,29 +470,34 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
+            delete m;
+
             return -1;
         }
 
-        m.set_obj_value(objbuf, objlen);
+        m->set_obj_value(objbuf, objlen);
     }
 
-    m.invoke_id = invoke_id_mgr.get_invoke_id();
+    m->invoke_id = invoke_id_mgr.get_invoke_id();
 
     if (dst_addr == ipcp->ipcp_addr) {
         /* This is a message to be delivered to myself. */
-        return cdap_dispatch(&m, NULL);
+        ret = cdap_dispatch(m, NULL);
+        delete m;
+
+        return ret;
     }
 
     adata.src_addr = ipcp->ipcp_addr;
     adata.dst_addr = dst_addr;
-    adata.cdap = &m;
+    adata.cdap = m; /* Ownership passing */
 
     am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata,
                0, 0, string());
 
     aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
     if (aobjlen < 0) {
-        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        invoke_id_mgr.put_invoke_id(m->invoke_id);
         UPE(uipcp, "serialization failed\n");
         return -1;
     }
@@ -506,7 +512,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
 
     if (ret) {
         UPE(uipcp, "message serialization failed\n");
-        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        invoke_id_mgr.put_invoke_id(m->invoke_id);
         delete [] serbuf;
         return -1;
     }

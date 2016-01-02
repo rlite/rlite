@@ -85,7 +85,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_appl);
     uint64_t remote_addr;
-    CDAPMessage m;
+    CDAPMessage *m;
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
@@ -145,7 +145,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     obj_name << obj_name::flows << "/" << freq.src_addr
                 << "-" << req->local_port;
 
-    m.m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
+    m = new CDAPMessage();
+    m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
                0, 0, string());
 
     freq.invoke_id = 0;  /* invoke_id is actually set in send_to_dst_addr() */
@@ -162,7 +163,7 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
     stringstream obj_name;
     map<unsigned int, FlowRequest>::iterator f;
     string reason;
-    CDAPMessage m;
+    CDAPMessage *m;
     int ret;
 
     /* Lookup the corresponding FlowRequest. */
@@ -190,7 +191,8 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
         flow_reqs[obj_name.str() + string("R")] = freq;
     }
 
-    m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
+    m = new CDAPMessage();
+    m->m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                  resp->response ? -1 : 0, reason);
 
     ret = send_to_dst_addr(m, freq.src_addr, &freq);
@@ -223,12 +225,13 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     if (ret) {
         /* We don't know how where this application is registered,
          * reject the request. */
-        CDAPMessage m;
+        CDAPMessage *m;
 
         UPI(uipcp, "Cannot find DFT entry for %s\n",
            static_cast<string>(freq.dst_app).c_str());
 
-        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+        m = new CDAPMessage();
+        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
         return send_to_dst_addr(m, freq.src_addr, &freq);
@@ -237,20 +240,22 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     if (dft_next_hop != ipcp_info()->ipcp_addr) {
         /* freq.dst_app is not registered with us, we have
          * to forward the request. TODO */
-        CDAPMessage m;
+        CDAPMessage *m;
 
         UPE(uipcp, "Flow request forwarding not supported\n");
-        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+        m = new CDAPMessage();
+        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Flow request forwarding not supported");
 
         return send_to_dst_addr(m, freq.src_addr, &freq);
     }
 
     if (freq.connections.size() < 1) {
-        CDAPMessage m;
+        CDAPMessage *m;
 
         UPE(uipcp, "No connections specified on this flow\n");
-        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+        m = new CDAPMessage();
+        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
         return send_to_dst_addr(m, freq.src_addr, &freq);
@@ -320,7 +325,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     map<string, FlowRequest>::iterator f;
     stringstream obj_name;
     uint64_t remote_addr;
-    CDAPMessage m;
+    CDAPMessage *m;
 
     /* Lookup the corresponding FlowRequest, and figure out whether we
      * were the initiator of the request. */
@@ -359,7 +364,8 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
 
     /* We should wait 2 MPL here before notifying the peer. */
-    m.m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
+    m = new CDAPMessage();
+    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
                0, 0, string());
 
     return send_to_dst_addr(m, remote_addr, NULL);
