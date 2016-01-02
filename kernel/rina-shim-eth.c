@@ -645,6 +645,26 @@ rina_shim_eth_config(struct ipcp_entry *ipcp,
     return ret;
 }
 
+static int
+rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
+{
+    struct rina_shim_eth *priv = (struct rina_shim_eth *)ipcp->priv;
+    struct arpt_entry *entry;
+
+    spin_lock_irq(&priv->arpt_lock);
+
+    list_for_each_entry(entry, &priv->arp_table, node) {
+        if (entry->flow == flow) {
+            PD("%s: Detached from flow %p\n", __func__, entry->flow);
+            entry->flow = NULL;
+        }
+    }
+
+    spin_unlock_irq(&priv->arpt_lock);
+
+    return 0;
+}
+
 static int __init
 rina_shim_eth_init(void)
 {
@@ -661,6 +681,7 @@ rina_shim_eth_init(void)
     factory.ops.sdu_write = rina_shim_eth_sdu_write;
     factory.ops.config = rina_shim_eth_config;
     factory.ops.application_register = rina_shim_eth_register;
+    factory.ops.flow_deallocated = rina_shim_eth_flow_deallocated;
 
     ret = rina_ipcp_factory_register(&factory);
 

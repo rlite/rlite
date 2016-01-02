@@ -675,6 +675,7 @@ flow_put(struct flow_entry *entry)
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
+    struct ipcp_entry *ipcp;
 
     if (unlikely(!entry)) {
         return NULL;
@@ -725,6 +726,12 @@ flow_put(struct flow_entry *entry)
 
     ret = NULL;
 
+    ipcp = entry->txrx.ipcp;
+
+    if (ipcp->ops.flow_deallocated) {
+        ipcp->ops.flow_deallocated(ipcp, entry);
+    }
+
     dtp_fini(&entry->dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
@@ -756,7 +763,7 @@ flow_put(struct flow_entry *entry)
      * removal in a worker process context. This is done for either
      * the IPCP which supports the flow (entry->txrx.ipcp) and the
      * IPCP which uses the flow (entry->upper.ipcp). */
-    schedule_work(&entry->txrx.ipcp->remove);
+    schedule_work(&ipcp->remove);
     if (entry->upper.ipcp) {
         schedule_work(&entry->upper.ipcp->remove);
     }

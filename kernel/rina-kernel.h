@@ -35,6 +35,7 @@ struct ipcp_ops {
                               uint8_t response);
 
     int (*flow_init)(struct ipcp_entry *ipcp, struct flow_entry *flow);
+    int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb, bool maysleep);
