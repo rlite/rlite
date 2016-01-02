@@ -520,13 +520,18 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Change permissions to rlite control device and uipcp
+    /* Change permissions to rlite control and I/O device and uipcp
      * Unix socket, so that anyone can read and write. This
      * a temporary solution, to be used until a precise
      * permission scheme is designed. */
     if (chmod("/dev/rlite", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
                             | S_IROTH | S_IWOTH)) {
         perror("warning: chmod(/dev/rlite) failed\n");
+    }
+
+    if (chmod("/dev/rlite-io", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
+                               | S_IROTH | S_IWOTH)) {
+        perror("warning: chmod(/dev/rlite-io) failed\n");
     }
 
     if (chmod(RINA_UIPCPS_UNIX_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
