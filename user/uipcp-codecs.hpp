@@ -254,7 +254,7 @@ struct FlowRequest {
     uint32_t create_flow_retries;
     uint32_t hop_cnt;
 
-    FlowRequest() { }
+    FlowRequest() : access_ctrl(NULL) { }
     FlowRequest(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };

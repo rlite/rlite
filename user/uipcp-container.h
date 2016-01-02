@@ -2,6 +2,7 @@
 #define __RINA_UIPCP_H__
 
 #include "rinalite/rina-conf-msg.h"
+#include "rinalite/rina-kernel-msg.h"
 #include "rinalite-list.h"
 #include "rinalite-appl.h"
 
@@ -80,6 +81,8 @@ uint64_t rib_dft_lookup(struct uipcp_rib *rib,
 
 int rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
                 uint64_t remote_addr);
+
+int rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req);
 
 char *rib_dump(struct uipcp_rib *rib);
 

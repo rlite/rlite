@@ -345,9 +345,11 @@ uipcp_fa_req(struct rinalite_evloop *loop,
 
     assert(b_req == NULL);
 
+    return rib_fa_req(uipcp->rib, req);
+
+    // TODO remove the following
     remote_addr = rib_dft_lookup(uipcp->rib, &req->remote_application);
     if (!remote_addr) {
-        /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
         PI("No DFT matching entry\n");
         return 0;
     }

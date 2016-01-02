@@ -158,6 +158,7 @@ struct uipcp_rib {
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
     int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
+    int fa_req(struct rina_kmsg_fa_req *req);
     int pduft_sync();
     map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
@@ -530,6 +531,87 @@ uipcp_rib::pduft_sync()
                     (long unsigned)r->first, port_id);
             }
     }
+
+    return 0;
+}
+
+static void
+flowcfg2policies(struct rina_flow_config *cfg,
+                 QosSpec &q,
+                 ConnPolicies& p)
+{
+    q.partial_delivery = cfg->partial_delivery;
+    /* req->flowcfg.incomplete_delivery ? */
+    q.in_order_delivery = cfg->in_order_delivery;
+    q.max_sdu_gap = cfg->max_sdu_gap;
+
+    p.dtcp_present = cfg->dtcp_present;
+    p.initial_a_timer = cfg->dtcp.initial_a; /* mismatch... */
+
+    p.dtcp_cfg.flow_ctrl = cfg->dtcp.flow_control;
+    p.dtcp_cfg.rtx_ctrl = cfg->dtcp.rtx_control;
+
+    p.dtcp_cfg.flow_ctrl_cfg.fc_type = cfg->dtcp.fc.fc_type;
+    if (cfg->dtcp.fc.fc_type == RINA_FC_T_WIN) {
+        p.dtcp_cfg.flow_ctrl_cfg.win.max_cwq_len =
+                        cfg->dtcp.fc.cfg.w.max_cwq_len;
+        p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit =
+                        cfg->dtcp.fc.cfg.w.initial_credit;
+
+    } else if (cfg->dtcp.fc.fc_type == RINA_FC_T_RATE) {
+        p.dtcp_cfg.flow_ctrl_cfg.rate.sending_rate =
+                        cfg->dtcp.fc.cfg.r.sending_rate;
+        p.dtcp_cfg.flow_ctrl_cfg.rate.time_period =
+                        cfg->dtcp.fc.cfg.r.time_period;
+    }
+
+    p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry =
+                        cfg->dtcp.rtx.max_time_to_retry;
+    p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max =
+                        cfg->dtcp.rtx.data_rxms_max; /* mismatch... */
+    p.dtcp_cfg.rtx_ctrl_cfg.initial_tr =
+                        cfg->dtcp.rtx.initial_tr ;
+}
+
+int
+uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
+{
+    RinaName dest_appl(&req->remote_application);
+    uint64_t remote_addr = dft_lookup(dest_appl);
+    struct rinalite_ipcp *ipcp;
+    FlowRequest freq;
+    ConnId conn_id;
+
+    if (!remote_addr) {
+        /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
+        PI("No DFT matching entry for destination %s\n",
+                static_cast<string>(dest_appl).c_str());
+        return 0;
+    }
+
+    ipcp = ipcp_info();
+
+    conn_id.qos_id = 0;
+    conn_id.src_cep = req->local_port;
+    conn_id.src_cep = 0;
+
+    freq.src_app = RinaName(&ipcp->ipcp_name);
+    freq.dst_app = dest_appl;
+    freq.src_port = req->local_port;
+    freq.dst_port = 0;
+    freq.src_addr = ipcp->ipcp_addr;
+    freq.dst_addr = remote_addr;
+    freq.connections.push_back(conn_id);
+    freq.cur_conn_idx = 0;
+    freq.state = true;
+
+    flowcfg2policies(&req->flowcfg, freq.qos, freq.policies);
+
+    freq.max_create_flow_retries = 3;
+    freq.create_flow_retries = 0;
+    freq.hop_cnt = 0;
+
+    /* TODO send */
 
     return 0;
 }
@@ -1658,3 +1740,8 @@ rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
     return rib->dft_set(RinaName(appl_name), remote_addr);
 }
 
+extern "C" int
+rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req)
+{
+    return rib->fa_req(req);
+}
