@@ -143,7 +143,7 @@ store_pending_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
     return 0;
 }
 
-/* Create an IPC process of type shim-dummy. */
+/* Create an IPC process. */
 static int
 create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 {
@@ -189,6 +189,51 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     return ret;
 }
 
+/* Destroy an IPC process. */
+static int
+destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
+{
+    struct rina_ctrl_destroy_ipcp *msg;
+    int ret;
+
+    /* Allocate and create a request message. */
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        return ENOMEM;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_CTRL_DESTROY_IPCP;
+    msg->event_id = ipcm->event_id_counter++;
+    msg->ipcp_id = ipcp_id;
+
+    /* Store the request in the pending queue before issuing the request
+     * itself to the kernel. This is necessary in order to avoid race
+     * conditions between the event loop and this thread, resulting in
+     * the event loop not being able to find the pending request. */
+    ret = store_pending_request(ipcm, (struct rina_ctrl_base_msg *)msg,
+                                sizeof(*msg));
+    if (ret < 0) {
+        free(msg);
+        return ret;
+    }
+
+    /* Issue the request to the kernel. */
+    ret = write(ipcm->rfd, msg, sizeof(*msg));
+    if (ret != sizeof(*msg)) {
+        if (ret < 0) {
+            perror("write(create_ipcp)");
+        } else {
+            printf("%s: Error: partial write [%u/%lu]\n", __func__,
+                    ret, sizeof(*msg));
+        }
+    }
+
+    printf("IPC process destruction requested\n");
+
+    return ret;
+}
+
 static int
 test(struct ipcm *ipcm)
 {
@@ -198,6 +243,9 @@ test(struct ipcm *ipcm)
     /* Create an IPC process of type shim-dummy. */
     rina_name_fill(&ipcp_name, "prova.IPCP", "1", NULL, NULL);
     ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
+    if (0) {
+        destroy_ipcp(ipcm, 349);
+    }
 
     return ret;
 }
