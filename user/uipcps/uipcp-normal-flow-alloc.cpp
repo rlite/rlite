@@ -129,7 +129,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     if (qcmi == qos_cubes.end()) {
         UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
            cubename.c_str());
-        rlite_flow_cfg_default(&flowcfg);
+        rl_flow_cfg_default(&flowcfg);
     } else {
         flowcfg = qcmi->second;
         UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());

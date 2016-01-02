@@ -359,7 +359,7 @@ evloop_function(void *arg)
 notify_requestor:
         pthread_mutex_lock(&loop->lock);
         if (req_entry->wait_for_completion) {
-            /* Signal the rlite_issue_request() caller that the operation is
+            /* Signal the rl_evloop_issue_request() caller that the operation is
              * complete, reporting the response in the 'resp' pointer field. */
             req_entry->op_complete = 1;
             req_entry->resp = RLITE_MB(resp);
@@ -402,9 +402,9 @@ rl_evloop_stop(struct rlite_evloop *loop)
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rlite_msg_base *
-rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
-                    size_t msg_len, int has_response,
-                    unsigned int wait_for_completion, int *result)
+rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
+                        size_t msg_len, int has_response,
+                        unsigned int wait_for_completion, int *result)
 {
     struct rlite_msg_base *resp = NULL;
     struct pending_entry *entry = NULL;
@@ -450,7 +450,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     }
 
     /* Issue the request to the kernel. */
-    ret = write_msg(loop->ctrl.rfd, msg);
+    ret = rl_write_msg(loop->ctrl.rfd, msg);
     if (ret < 0) {
         /* System call reports an error (incomplete write is not acceptable)
          * for a rlite control device. */
@@ -822,7 +822,7 @@ rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
 
     PD("Responding to flow allocation request...\n");
 
-    resp = rlite_issue_request(loop, RLITE_MB(req),
+    resp = rl_evloop_issue_request(loop, RLITE_MB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -841,9 +841,9 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
     struct rlite_ipcp *rlite_ipcp;
     int result;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&loop->ctrl, dif_name);
+        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
@@ -863,7 +863,7 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
 
     return (struct rl_kmsg_appl_register_resp *)
-           rlite_issue_request(loop, RLITE_MB(req),
+           rl_evloop_issue_request(loop, RLITE_MB(req),
                                sizeof(*req), 1, wait_ms, &result);
 }
 
@@ -911,9 +911,9 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
     struct rlite_ipcp *rlite_ipcp;
     int result;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&loop->ctrl, dif_name);
+        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
@@ -932,7 +932,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
     PD("Requesting flow allocation...\n");
 
     kresp = (struct rl_kmsg_fa_resp_arrived *)
-            rlite_issue_request(loop, RLITE_MB(req),
+            rl_evloop_issue_request(loop, RLITE_MB(req),
                          sizeof(*req), 1, wait_ms, &result);
 
     if (!kresp) {
@@ -978,7 +978,7 @@ rl_evloop_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
 
     PD("Requesting IPCP config...\n");
 
-    resp = rlite_issue_request(loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);

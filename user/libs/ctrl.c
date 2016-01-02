@@ -23,7 +23,7 @@
 
 
 static void
-rlite_ipcps_purge(struct list_head *ipcps)
+rl_ipcps_purge(struct list_head *ipcps)
 {
     struct rlite_ipcp *rlite_ipcp, *tmp;
 
@@ -134,7 +134,7 @@ rl_ctrl_get_id(struct rlite_ctrl *ctrl)
 }
 
 int
-rlite_ipcps_print(struct rlite_ctrl *ctrl)
+rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl)
 {
     struct rlite_ipcp *rlite_ipcp;
 
@@ -198,7 +198,7 @@ read_next_msg(int rfd)
 }
 
 int
-write_msg(int rfd, struct rlite_msg_base *msg)
+rl_write_msg(int rfd, struct rlite_msg_base *msg)
 {
     char serbuf[4096];
     unsigned int serlen;
@@ -232,8 +232,8 @@ write_msg(int rfd, struct rlite_msg_base *msg)
 }
 
 struct rlite_ipcp *
-rlite_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
-                         const char *dif_name)
+rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
+                           const char *dif_name)
 {
     struct rlite_ipcp *cur;
 
@@ -271,8 +271,8 @@ rlite_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
 }
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
-                          const struct rina_name *name)
+rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
+                            const struct rina_name *name)
 {
     struct rlite_ipcp *ipcp;
 
@@ -294,8 +294,8 @@ rlite_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
 }
 
 int
-rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
-                       uint64_t *addr)
+rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
+                               uint64_t *addr)
 {
     struct rlite_ipcp *ipcp;
 
@@ -315,7 +315,7 @@ rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
 }
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
+rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
 {
     struct rlite_ipcp *ipcp;
 
@@ -334,7 +334,7 @@ rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
 }
 
 void
-rlite_flow_spec_default(struct rlite_flow_spec *spec)
+rl_flow_spec_default(struct rlite_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
     strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
@@ -342,7 +342,7 @@ rlite_flow_spec_default(struct rlite_flow_spec *spec)
 
 /* This is used by uipcp, not by applications. */
 void
-rlite_flow_cfg_default(struct rlite_flow_config *cfg)
+rl_flow_cfg_default(struct rlite_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->partial_delivery = 0;
@@ -380,12 +380,12 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 }
 
 int
-rlite_open_appl_port(uint32_t port_id)
+rl_open_appl_port(uint32_t port_id)
 {
     return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
 }
 
-int rlite_open_mgmt_port(uint16_t ipcp_id)
+int rl_open_mgmt_port(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
@@ -481,7 +481,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     if (flowspec) {
         memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
     } else {
-        rlite_flow_spec_default(&req->flowspec);
+        rl_flow_spec_default(&req->flowspec);
     }
     rina_name_copy(&req->local_appl, local_appl);
     rina_name_copy(&req->remote_appl, remote_appl);
@@ -531,7 +531,7 @@ rl_ctrl_barrier(struct rlite_ctrl *ctrl)
     req.msg_type = RLITE_KER_BARRIER;
     req.event_id = rl_ctrl_get_id(ctrl);
 
-    ret = write_msg(ctrl->rfd, &req);
+    ret = rl_write_msg(ctrl->rfd, &req);
     if (ret < 0) {
         return -1;
     }
@@ -592,7 +592,7 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
 {
     pthread_mutex_lock(&ctrl->lock);
     pending_queue_fini(&ctrl->pqueue);
-    rlite_ipcps_purge(&ctrl->ipcps);
+    rl_ipcps_purge(&ctrl->ipcps);
     pthread_mutex_unlock(&ctrl->lock);
 
     if (ctrl->rfd >= 0) {
@@ -614,9 +614,9 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
     uint32_t event_id;
     int ret;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(ctrl, dif_name);
+        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
@@ -633,7 +633,7 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
         return 0;
     }
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&req));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         event_id = 0;
@@ -656,9 +656,9 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
     uint32_t event_id;
     int ret;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(ctrl, dif_name);
+        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
@@ -674,7 +674,7 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
         return 0;
     }
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&req));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         event_id = 0;
@@ -816,7 +816,7 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
         PE("Flow allocation request denied\n");
         fd = -1;
     } else {
-        fd = rlite_open_appl_port(resp->port_id);
+        fd = rl_open_appl_port(resp->port_id);
     }
 
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
@@ -882,13 +882,13 @@ rl_ctrl_flow_accept(struct rlite_ctrl *ctrl)
         goto out;
     }
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&resp));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&resp));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         goto out;
     }
 
-    ret = rlite_open_appl_port(req->port_id);
+    ret = rl_open_appl_port(req->port_id);
 
 out:
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,

@@ -544,8 +544,8 @@ shim_inet4_init(struct uipcp *uipcp)
     struct rlite_ipcp *rlite_ipcp;
     struct shim_inet4 *shim;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->loop.ctrl,
-                                         uipcp->ipcp_id);
+    rlite_ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl,
+                                           uipcp->ipcp_id);
     if (!rlite_ipcp) {
         PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);
         return -1;

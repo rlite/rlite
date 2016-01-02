@@ -237,7 +237,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
     kevent_id_cnt = 1;
 
-    mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
+    mgmtfd = rl_open_mgmt_port(uipcp->ipcp_id);
     if (mgmtfd < 0) {
         ret = mgmtfd;
         throw std::exception();
@@ -274,7 +274,7 @@ uipcp_rib::ipcp_info() const
 {
     struct rlite_ipcp *ipcp;
 
-    ipcp = rlite_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
+    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
     assert(ipcp);
 
     return ipcp;
@@ -660,7 +660,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    flow_fd = rlite_open_appl_port(req->port_id);
+    flow_fd = rl_open_appl_port(req->port_id);
     if (flow_fd < 0) {
         goto err;
     }

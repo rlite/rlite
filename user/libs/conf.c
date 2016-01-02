@@ -25,7 +25,7 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
     msg.dif_type = strdup(dif_type);
     msg.dif_name = strdup(dif_name);
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
@@ -62,7 +62,7 @@ rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
     msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
     }
@@ -83,7 +83,7 @@ rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
 
     rl_ipcp_config_fill(&msg, ipcp_id, param_name, param_value);
 
-    ret = write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
     }
@@ -142,7 +142,7 @@ rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
 
         msg.event_id = rl_ctrl_get_id(ctrl);
 
-        ret = write_msg(ctrl->rfd, RLITE_MB(&msg));
+        ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
         if (ret < 0) {
             PE("Failed to issue request to the kernel\n");
         }

@@ -184,7 +184,7 @@ main(int argc, char **argv)
     int opt;
 
     /* Start with a default flow configuration (unreliable flow). */
-    rlite_flow_spec_default(&rr.flowspec);
+    rl_flow_spec_default(&rr.flowspec);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:a:A:z:Z:x")) != -1) {
         switch (opt) {

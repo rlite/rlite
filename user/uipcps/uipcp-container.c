@@ -37,7 +37,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
 
     UPD(uipcp, "Issuing application register response ...\n");
 
-    fkresp = rlite_issue_request(&uipcp->loop, RLITE_MB(resp),
+    fkresp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(resp),
                                sizeof(*resp), 0, 0, &result);
     assert(!fkresp);
     UPD(uipcp, "result: %d\n", result);
@@ -69,7 +69,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table set...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -98,7 +98,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req),
                                   sizeof(*req), 0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -143,7 +143,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     UPD(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -180,12 +180,12 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     if (flowcfg) {
         memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
-        rlite_flow_cfg_default(&req->flowcfg);
+        rl_flow_cfg_default(&req->flowcfg);
     }
 
     UPD(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -215,7 +215,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, uint32_t local_port)
 
     UPD(uipcp, "Issuing FLOW_DEALLOC message...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -244,7 +244,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     UPD(uipcp, "Requesting IPCP uipcp set...\n");
 
-    resp = rlite_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -400,7 +400,7 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         /* This is just for debugging purposes. */
-        rlite_ipcps_print(&uipcp->loop.ctrl);
+        rl_ctrl_ipcps_print(&uipcp->loop.ctrl);
         break;
     }
 

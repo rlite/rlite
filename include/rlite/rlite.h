@@ -47,40 +47,40 @@ struct rlite_ctrl {
 };
 
 uint32_t
-rl_ctrl_get_id(struct rlite_ctrl *loop);
+rl_ctrl_get_id(struct rlite_ctrl *ctrl);
 
 int
-rlite_ipcps_print(struct rlite_ctrl *ctrl);
+rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl);
 
 struct rlite_ipcp *
-rlite_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
+rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
                          const char *dif_name);
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
+rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
                           const struct rina_name *name);
 
 int
-rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
+rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
                              uint64_t *addr);
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
+rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
 
 void
-rlite_flow_spec_default(struct rlite_flow_spec *spec);
+rl_flow_spec_default(struct rlite_flow_spec *spec);
 
 void
-rlite_flow_cfg_default(struct rlite_flow_config *cfg);
+rl_flow_cfg_default(struct rlite_flow_config *cfg);
 
 int
-rlite_open_appl_port(uint32_t port_id);
+rl_open_appl_port(uint32_t port_id);
 
 int
-rlite_open_mgmt_port(uint16_t ipcp_id);
+rl_open_mgmt_port(uint16_t ipcp_id);
 
 int
-write_msg(int rfd, struct rlite_msg_base *msg);
+rl_write_msg(int rfd, struct rlite_msg_base *msg);
 
 int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);

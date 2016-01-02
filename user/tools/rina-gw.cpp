@@ -557,7 +557,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    rfd = rlite_open_appl_port(req->port_id);
+    rfd = rl_open_appl_port(req->port_id);
     if (rfd < 0) {
         PE("rlite_open_appl_port() failed\n");
         close(cfd);
@@ -604,7 +604,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    rfd = rlite_open_appl_port(resp->port_id);
+    rfd = rl_open_appl_port(resp->port_id);
     if (rfd < 0) {
         PE("Failed to open application port\n");
         close(cfd);

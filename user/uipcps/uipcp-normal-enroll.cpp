@@ -868,7 +868,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
     {
         struct rlite_ipcp *ipcp;
 
-        ipcp = rlite_select_ipcp_by_dif(&rib->uipcp->loop.ctrl,
+        ipcp = rl_ctrl_select_ipcp_by_dif(&rib->uipcp->loop.ctrl,
                                         supp_dif_name);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->ipcp_id;
@@ -890,7 +890,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         return -1;
     }
 
-    flow_fd_ = rlite_open_appl_port(port_id_);
+    flow_fd_ = rl_open_appl_port(port_id_);
     if (flow_fd_ < 0) {
         UPE(rib->uipcp, "Failed to access the flow towards the neighbor\n");
         return -1;

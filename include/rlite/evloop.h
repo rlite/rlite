@@ -66,9 +66,9 @@ struct rlite_evloop {
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rlite_msg_base *
-rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
-                    size_t msg_len, int has_response,
-                    unsigned int wait_for_completion, int *result);
+rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
+                        size_t msg_len, int has_response,
+                        unsigned int wait_for_completion, int *result);
 
 int
 rl_evloop_stop(struct rlite_evloop *loop);

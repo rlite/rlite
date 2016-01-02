@@ -414,7 +414,7 @@ uipcps_update(struct uipcps *uipcps)
     rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
                           uipcps_ipcp_update);
 
-    rlite_ipcps_print(&uipcps->loop.ctrl);
+    rl_ctrl_ipcps_print(&uipcps->loop.ctrl);
 
     /* Create an userspace IPCP for each existing IPCP. */
     pthread_mutex_lock(&uipcps->loop.lock);
