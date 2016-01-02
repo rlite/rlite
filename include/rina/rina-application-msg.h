@@ -72,8 +72,8 @@ struct rina_amsg_ipcp_register {
     uint32_t event_id;
 
     uint8_t reg;
-    struct rina_name ipcp_who_name;
-    struct rina_name ipcp_where_name;
+    struct rina_name ipcp_name;
+    struct rina_name dif_name;
 } __attribute__((packed));
 
 #endif  /* __RINA_APPLICATION_MSG_H__ */

@@ -210,21 +210,19 @@ static int ipcp_config(int argc, char **argv)
 static int ipcp_register_common(int argc, char **argv, unsigned int reg)
 {
     struct rina_amsg_ipcp_register req;
-    const char *ipcp_who_apn;
-    const char *ipcp_who_api;
-    const char *ipcp_where_apn;
-    const char *ipcp_where_api;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    const char *dif_name;
 
-    assert(argc >= 4);
-    ipcp_who_apn = argv[0];
-    ipcp_who_api = argv[1];
-    ipcp_where_apn = argv[2];
-    ipcp_where_api = argv[3];
+    assert(argc >= 3);
+    dif_name = argv[0];
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
 
     req.msg_type = RINA_APPL_IPCP_REGISTER;
     req.event_id = 0;
-    rina_name_fill(&req.ipcp_who_name, ipcp_who_apn, ipcp_who_api, NULL, NULL);
-    rina_name_fill(&req.ipcp_where_name, ipcp_where_apn, ipcp_where_api, NULL, NULL);
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     req.reg = reg;
 
     return request_response((struct rina_msg_base *)&req);
@@ -274,14 +272,14 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "ipcp-register",
-        .usage = "IPCP_WHO_APN IPCP_WHO_API IPCP_WHERE_APN IPCP_WHERE_API",
-        .num_args = 4,
+        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .num_args = 3,
         .func = ipcp_register,
     },
     {
         .name = "ipcp-unregister",
-        .usage = "IPCP_WHO_APN IPCP_WHO_API IPCP_WHERE_APN IPCP_WHERE_API",
-        .num_args = 4,
+        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .num_args = 3,
         .func = ipcp_unregister,
     },
 };

@@ -383,13 +383,13 @@ rina_appl_ipcp_register(struct ipcm *ipcm, int sfd,
 
     resp.result = 1;  /* Report failure by default. */
 
-    ipcp_id_who = lookup_ipcp_by_name(ipcm, &req->ipcp_who_name);
+    ipcp_id_who = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
     if (ipcp_id_who == ~0U) {
         printf("%s: Could not find who IPC process\n", __func__);
         goto out;
     }
 
-    ipcp_id_where = lookup_ipcp_by_name(ipcm, &req->ipcp_where_name);
+    ipcp_id_where = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
     if (ipcp_id_where == ~0U) {
         printf("%s: Could not find where IPC process\n", __func__);
         goto out;
