@@ -608,7 +608,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          const struct rina_name *local_application,
          const struct rina_name *remote_application,
          const struct rina_flow_config *flowcfg,
-         struct flow_entry **pentry, int locked)
+         struct flow_entry **pentry)
 {
     struct flow_entry *entry;
     int ret = 0;
@@ -1166,7 +1166,7 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
                                   &req->local_application,
-                                  &req->remote_application, &req->flowcfg, 0);
+                                  &req->remote_application, &req->flowcfg);
     }
 
     ipcp_put(ipcp);
@@ -1187,7 +1187,7 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
                                    req->remote_port, req->remote_addr,
-                                   req->response, 0);
+                                   req->response);
     }
     ipcp_put(ipcp);
 
@@ -1245,7 +1245,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, &req->flowcfg, &flow_entry, 0);
+                   remote_application, &req->flowcfg, &flow_entry);
     if (ret) {
         goto out;
     }
@@ -1266,7 +1266,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * arguments. */
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                       ipcp_entry->addr, remote_application,
-                                      local_application, &req->flowcfg, 0);
+                                      local_application, &req->flowcfg);
             ipcp_application_put(app);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
@@ -1384,7 +1384,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
                     flow_entry->local_port,
                     ipcp->addr,
-                    response, 0);
+                    response);
         } else if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
              * to this IPCP. */
@@ -1443,8 +1443,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
                     uint32_t remote_port, uint64_t remote_addr,
                     const struct rina_name *local_application,
                     const struct rina_name *remote_application,
-                    const struct rina_flow_config *flowcfg,
-                    bool locked)
+                    const struct rina_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
@@ -1463,7 +1462,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     upper.rc = app->rc;
     upper.ipcp = NULL;
     ret = flow_add(ipcp, upper, 0, local_application,
-                   remote_application, flowcfg, &flow_entry, 0);
+                   remote_application, flowcfg, &flow_entry);
     if (ret) {
         goto out;
     }
@@ -1498,8 +1497,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
                      uint64_t remote_addr,
-                     uint8_t response,
-                     bool locked)
+                     uint8_t response)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
