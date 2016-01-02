@@ -31,7 +31,7 @@ struct ipcp_entry {
 
 struct ipcp_factory {
     uint8_t dif_type;
-    void *(*create)(void);
+    void *(*create)(struct ipcp_entry *ipcp);
     struct ipcp_ops ops;
     struct list_head node;
 };

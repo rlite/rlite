@@ -35,12 +35,12 @@
 
 
 struct rina_shim_dummy {
-    int fake;
     struct work_struct decouple;
+    struct ipcp_entry *ipcp;
 };
 
 static void *
-rina_shim_dummy_create(void)
+rina_shim_dummy_create(struct ipcp_entry *ipcp)
 {
     struct rina_shim_dummy *priv;
 
@@ -50,6 +50,7 @@ rina_shim_dummy_create(void)
     }
 
     memset(priv, 0, sizeof(*priv));
+    priv->ipcp = ipcp;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
