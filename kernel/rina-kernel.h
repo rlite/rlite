@@ -155,6 +155,7 @@ struct flow_entry {
     void                *priv;
 
     unsigned int        refcnt;
+    bool                never_bound;
     struct hlist_node   node;
 };
 

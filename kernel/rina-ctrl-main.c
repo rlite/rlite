@@ -632,6 +632,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
+        entry->never_bound = true;
         entry->priv = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
@@ -874,11 +875,20 @@ flow_rc_unbind(struct rina_ctrl *rc)
 }
 
 static void
-flow_orphan(struct flow_entry *flow)
+flow_make_mortal(struct flow_entry *flow)
 {
     if (flow) {
         FLOCK();
-        flow->refcnt--;
+
+        if (flow->never_bound) {
+            /* Here reference counter is (likely) 2. Reset it to 1, so that
+             * proper flow destruction happens in rina_io_release(). If we
+             * didn't do it, the flow would live forever with its refcount
+             * set to 1. */
+            flow->never_bound = false;
+            flow->refcnt--;
+        }
+
         FUNLOCK();
     }
 }
@@ -1467,11 +1477,6 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     ret = rina_fa_resp_internal(flow_entry, req->response, req);
 
     flow_entry = flow_put(flow_entry);
-    /* Here reference counter is (likely) 1. Reset it to 0, so that
-     * proper flow destruction happens in rina_io_release(). If we
-     * didn't do it, the flow would live forever with its refcount
-     * set to 1. */
-    flow_orphan(flow_entry);
 
     return ret;
 }
@@ -1570,8 +1575,6 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
 
 out:
     flow_entry = flow_put(flow_entry);
-    /* Same operation as above. */
-    flow_orphan(flow_entry);
 
     return ret;
 }
@@ -2075,6 +2078,9 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
     /* Bind the flow to this file descriptor. */
     rio->flow = flow;
     rio->txrx = &flow->txrx;
+
+    /* Make sure this flow can ever be destroyed. */
+    flow_make_mortal(flow);
 
     return 0;
 }
