@@ -39,6 +39,38 @@ uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     return result;
 }
 
+/*static */int
+uipcp_flow_allocate_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
+                                 uint32_t remote_port, uint8_t response)
+{
+    struct rina_kmsg_uipcp_flow_allocate_resp_arrived *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED;
+    req->ipcp_id = uipcp->ipcp_id;
+    req->local_port = local_port;
+    req->remote_port = remote_port;
+    req->response = response;
+
+    PD("Issuing UIPCP_FLOW_ALLOCATE_RESP_ARRIVED message...\n");
+
+    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
 static int
 uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
 {
