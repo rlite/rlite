@@ -29,11 +29,6 @@
 
 - addr size non consistente (PCI/resto dello stack)
 
-- poichè la registrazione non ha un messaggio di risposta, attualmente
-  non è possibile per l'userspace IPCP il rifiuto della registrazione,
-  con conseguenti malfunzionamenti, visto che in kernelspace non è
-  disponibile la DFT completa
-
 - implementare un semplice livello di protezione, ad esempio distinguendo
   quelle operazioni che possono essere effettuate solo da UIPCP, ed altre
   che possono essere fatte da tutte le applicazioni
@@ -43,3 +38,7 @@
 - uniformare l'uso di RLITE_SUCC e RLITE_ERR
 
 - testare normal-over-normal-over-shim e flussi concorrenti
+
+- registrazione + risposta negativa + uipcp: se c'era una applicazione
+  già registrata, la risposta negativa arriva a quest'ultima, piuttosto
+  che a quella che ha chiesto la registrazione
