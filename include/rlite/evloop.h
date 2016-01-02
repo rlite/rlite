@@ -196,6 +196,10 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                const struct rlite_flow_spec *flowspec,
                uint16_t upper_ipcp_id);
 
+int rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
+                    uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                    uint32_t port_id, uint8_t response);
+
 void
 rlite_flow_spec_default(struct rlite_flow_spec *spec);
 

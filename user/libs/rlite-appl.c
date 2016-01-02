@@ -72,8 +72,8 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
         PE("Out of memory\n");
         /* Negative flow allocation response. */
         return rl_appl_fa_resp(appl, req->kevent_id,
-                                        req->ipcp_id, 0xffff,
-                                        req->port_id, RLITE_ERR);
+                               req->ipcp_id, 0xffff,
+                               req->port_id, RLITE_ERR);
     }
 
     pfr->kevent_id = req->kevent_id;
@@ -150,15 +150,7 @@ rl_appl_fa_resp(struct rlite_appl *appl, uint32_t kevent_id,
         PE("Out of memory\n");
         return ENOMEM;
     }
-    memset(req, 0, sizeof(*req));
-
-    req->msg_type = RLITE_KER_FA_RESP;
-    req->event_id = 1;
-    req->kevent_id = kevent_id;
-    req->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
-    req->upper_ipcp_id = upper_ipcp_id;
-    req->port_id = port_id;
-    req->response = response;
+    rl_fa_resp_fill(req, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
 
     PD("Responding to flow allocation request...\n");
 
@@ -361,8 +353,8 @@ rl_appl_flow_accept_open(struct rlite_appl *appl)
 
     /* Always accept incoming connection, for now. */
     result = rl_appl_fa_resp(appl, pfr->kevent_id,
-                                      pfr->ipcp_id, 0xffff,
-                                      pfr->port_id, 0);
+                             pfr->ipcp_id, 0xffff,
+                             pfr->port_id, RLITE_SUCC);
     port_id = pfr->port_id;
     rl_pfr_free(pfr);
 

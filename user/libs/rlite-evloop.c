@@ -1333,6 +1333,24 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
 }
 
 int
+rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
+                uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                uint32_t port_id, uint8_t response)
+{
+    memset(resp, 0, sizeof(*resp));
+
+    resp->msg_type = RLITE_KER_FA_RESP;
+    resp->event_id = 1;
+    resp->kevent_id = kevent_id;
+    resp->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
+    resp->upper_ipcp_id = upper_ipcp_id;
+    resp->port_id = port_id;
+    resp->response = response;
+
+    return 0;
+}
+
+int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
 {
     int ret;
@@ -1633,6 +1651,45 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
+
+    return ret;
+}
+
+int
+rl_ctrl_flow_accept(struct rlite_ctrl *ctrl)
+{
+    struct rl_kmsg_fa_req_arrived *req;
+    struct rl_kmsg_fa_resp resp;
+    int ret;
+
+    req = (struct rl_kmsg_fa_req_arrived *)
+          rl_ctrl_wait_any(ctrl, RLITE_KER_FA_REQ_ARRIVED);
+
+    if (!req) {
+        return -1;
+    }
+
+    ret = rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
+                          req->port_id, RLITE_SUCC);
+    if (ret) {
+        PE("Failed to fill flow allocation response\n");
+        goto out;
+    }
+
+    ret = write_msg(ctrl->rfd, RLITE_MB(&resp));
+    if (ret < 0) {
+        PE("Failed to issue request to the kernel\n");
+        goto out;
+    }
+
+    ret = rlite_open_appl_port(req->port_id);
+
+out:
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&resp));
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&req));
+    free(req);
 
     return ret;
 }

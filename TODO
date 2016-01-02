@@ -30,3 +30,5 @@
 - RLITE_MBR() is not coveniente --> replace using RLITE_MB()
 
 - evloop --> ctrl, evloop
+
+- remove rl_appl_flow_alloc_open et similia
