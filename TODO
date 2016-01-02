@@ -7,5 +7,4 @@
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 - flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
-- aggiustare gli identificatori di port_id e ipcp_id --> non sono consistenti
 - sostituire tutti i kmalloc() con kzalloc()

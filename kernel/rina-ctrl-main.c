@@ -892,7 +892,7 @@ out:
 
 int
 rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
-                               uint16_t remote_port,
+                               uint32_t remote_port,
                                struct rina_name *local_application,
                                struct rina_name *remote_application)
 {
@@ -949,8 +949,8 @@ EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
 
 int
 rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
-                                uint16_t local_port,
-                                uint16_t remote_port,
+                                uint32_t local_port,
+                                uint32_t remote_port,
                                 uint8_t response)
 {
     struct flow_entry *flow_entry = NULL;
@@ -989,7 +989,7 @@ out:
 EXPORT_SYMBOL_GPL(rina_flow_allocate_resp_arrived);
 
 int
-rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint16_t local_port)
+rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 {
     struct flow_entry *flow;
     int ret = 0;

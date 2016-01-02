@@ -32,6 +32,9 @@ user/application: user/application.o user/pending_queue.o user/rina-utils.o user
 
 user/application.o: $(HEADERS) user/pending_queue.h user/evloop.h
 
+count:
+	find . -type f -and \( -name "*.c" -or -name "*.h" \) | xargs wc -l
+
 clean:
 	-rm user/*.o
 	-rm $(EXES)

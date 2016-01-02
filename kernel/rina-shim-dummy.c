@@ -92,7 +92,7 @@ struct flow_allocate_req_work {
     struct ipcp_entry *ipcp;
     struct rina_name local_application;
     struct rina_name remote_application;
-    uint16_t remote_port;
+    uint32_t remote_port;
 };
 
 static void
@@ -138,8 +138,8 @@ rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
 struct flow_allocate_resp_work {
     struct work_struct w;
     struct ipcp_entry *ipcp;
-    uint16_t local_port;
-    uint16_t remote_port;
+    uint32_t local_port;
+    uint32_t remote_port;
     uint8_t response;
 };
 

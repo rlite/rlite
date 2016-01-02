@@ -83,16 +83,16 @@ int rina_ipcp_factory_register(struct ipcp_factory *factory);
 int rina_ipcp_factory_unregister(uint8_t dif_type);
 
 int rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
-                                   uint16_t remote_port,
+                                   uint32_t remote_port,
                                    struct rina_name *local_application,
                                    struct rina_name *remote_application);
 
 int rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
-                                    uint16_t local_port,
-                                    uint16_t remote_port,
+                                    uint32_t local_port,
+                                    uint32_t remote_port,
                                     uint8_t response);
 
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
-                uint16_t local_port);
+                uint32_t local_port);
 
 #endif  /* __RINA_IPCP_H__ */
