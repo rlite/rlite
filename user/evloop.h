@@ -18,7 +18,17 @@
 #include <rina/rina-utils.h>
 
 #include "pending_queue.h"
+#include "list.h"
 
+
+struct ipcp {
+    unsigned int ipcp_id;
+    struct rina_name ipcp_name;
+    unsigned int dif_type;
+    struct rina_name dif_name;
+
+    struct list_head node;
+};
 
 /* Some useful macros for casting. */
 #define RMB(m) (struct rina_msg_base *)(m)
@@ -50,6 +60,8 @@ struct rina_evloop {
     /* Synchronization variables used to implement mutual exclusion between the
      * event-loop thread and the script thead. */
     pthread_mutex_t lock;
+
+    struct list_head ipcps;
 };
 
 /* Issue a request message to the kernel. Takes the ownership of
@@ -64,5 +76,12 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
 int
 rina_evloop_fini(struct rina_evloop *loop);
+
+int
+ipcps_print(struct rina_evloop *loop);
+
+/* Fetch information about all IPC processes. */
+int
+ipcps_fetch(struct rina_evloop *loop);
 
 #endif  /* __RINA_EVLOOP_H__ */

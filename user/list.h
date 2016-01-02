@@ -1,5 +1,5 @@
 #ifndef __TEMPLATE_LIST_H__
-#define __TEMPLATE_LIST_H__aa
+#define __TEMPLATE_LIST_H__
 
 struct list_head {
         struct list_head *prev;

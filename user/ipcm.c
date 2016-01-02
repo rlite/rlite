@@ -19,20 +19,9 @@
 #include "evloop.h"
 
 
-struct ipcp {
-    unsigned int ipcp_id;
-    struct rina_name ipcp_name;
-    unsigned int dif_type;
-    struct rina_name dif_name;
-
-    struct list_head node;
-};
-
 /* IPC Manager data model. */
 struct ipcm {
     struct rina_evloop loop;
-
-    struct list_head ipcps;
 
     /* Unix domain socket file descriptor used to accept request from
      * applications. */
@@ -69,41 +58,6 @@ ipcp_destroy_resp(struct rina_evloop *loop,
     } else {
         printf("%s: Destroyed IPC process %d\n", __func__, req->ipcp_id);
     }
-
-    return 0;
-}
-
-static int
-ipcp_fetch_resp(struct rina_evloop *loop,
-                const struct rina_msg_base_resp *b_resp,
-                const struct rina_msg_base *b_req)
-{
-    struct ipcm *ipcm = container_of(loop, struct ipcm, loop);
-    const struct rina_kmsg_fetch_ipcp_resp *resp =
-        (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
-    struct ipcp *ipcp;
-
-    if (resp->end) {
-        /* This response is just to say there are no
-         * more IPCPs --> nothing to do. */
-        return 0;
-    }
-
-    printf("%s: Fetch IPCP response id=%u, type=%u\n",
-            __func__, resp->ipcp_id, resp->dif_type);
-
-    ipcp = malloc(sizeof(*ipcp));
-    if (ipcp) {
-        ipcp->ipcp_id = resp->ipcp_id;
-        ipcp->dif_type = resp->dif_type;
-        rina_name_copy(&ipcp->ipcp_name, &resp->ipcp_name);
-        rina_name_copy(&ipcp->dif_name, &resp->dif_name);
-        list_add_tail(&ipcm->ipcps, &ipcp->node);
-    } else {
-        printf("%s: Out of memory\n", __func__);
-    }
-
-    (void)b_req;
 
     return 0;
 }
@@ -208,15 +162,12 @@ flow_allocate_resp(struct rina_evloop *loop,
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
     [RINA_KERN_IPCP_DESTROY_RESP] = ipcp_destroy_resp,
-    [RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp,
     [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
-
-int ipcps_fetch(struct ipcm *ipcm);
 
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
@@ -244,7 +195,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
            issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
-    ipcps_fetch(ipcm);
+    ipcps_fetch(&ipcm->loop);
 
     return resp;
 }
@@ -273,92 +224,9 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
            issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
-    ipcps_fetch(ipcm);
+    ipcps_fetch(&ipcm->loop);
 
     return resp;
-}
-
-/* Fetch information about a single IPC process. */
-static struct rina_kmsg_fetch_ipcp_resp *
-ipcp_fetch(struct ipcm *ipcm)
-{
-    struct rina_msg_base *msg;
-
-    /* Allocate and create a request message. */
-    msg = malloc(sizeof(*msg));
-    if (!msg) {
-        printf("%s: Out of memory\n", __func__);
-        return NULL;
-    }
-
-    memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_FETCH;
-
-    printf("Requesting IPC processes fetch...\n");
-
-    return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(&ipcm->loop, msg, sizeof(*msg), 1);
-}
-
-static int
-ipcps_print(struct ipcm *ipcm)
-{
-    struct ipcp *ipcp;
-
-    printf("IPC Processes table:\n");
-    list_for_each_entry(ipcp, &ipcm->ipcps, node) {
-            char *ipcp_name_s = NULL;
-            char *dif_name_s = NULL;
-
-            ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
-            dif_name_s = rina_name_to_string(&ipcp->dif_name);
-            printf("    id = %d, name = '%s' dif_name = '%s'\n",
-                        ipcp->ipcp_id, ipcp_name_s, dif_name_s);
-
-            if (ipcp_name_s) {
-                    free(ipcp_name_s);
-            }
-
-            if (dif_name_s) {
-                    free(dif_name_s);
-            }
-    }
-
-    return 0;
-}
-
-/* Fetch information about all IPC processes. */
-int
-ipcps_fetch(struct ipcm *ipcm)
-{
-    struct rina_kmsg_fetch_ipcp_resp *resp;
-    struct ipcp *ipcp;
-    struct list_head *elem;
-    int end = 0;
-
-    /* Purge the IPCPs list. */
-    pthread_mutex_lock(&ipcm->loop.lock);
-    while ((elem = list_pop_front(&ipcm->ipcps))) {
-        ipcp = container_of(elem, struct ipcp, node);
-        free(ipcp);
-    }
-    pthread_mutex_unlock(&ipcm->loop.lock);
-
-    /* Reload the IPCPs list. */
-    while (!end) {
-        resp = ipcp_fetch(ipcm);
-        if (!resp) {
-            end = 1;
-        } else {
-            end = resp->end;
-            rina_msg_free(rina_kernel_numtables,
-                          RMB(resp));
-        }
-    }
-
-    ipcps_print(ipcm);
-
-    return 0;
 }
 
 static struct rina_msg_base_resp *
@@ -386,7 +254,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
            issue_request(&ipcm->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 
-    ipcps_fetch(ipcm);
+    ipcps_fetch(&ipcm->loop);
 
     return resp;
 }
@@ -477,7 +345,7 @@ test(struct ipcm *ipcm)
     rina_name_free(&name);
 
     /* Fetch IPC processes table. */
-    ipcps_fetch(ipcm);
+    ipcps_fetch(&ipcm->loop);
 
     /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
@@ -557,7 +425,7 @@ lookup_ipcp_by_name(struct ipcm *ipcm, const struct rina_name *name)
     struct ipcp *ipcp;
 
     if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &ipcm->ipcps, node) {
+        list_for_each_entry(ipcp, &ipcm->loop.ipcps, node) {
             if (rina_name_valid(&ipcp->ipcp_name)
                     && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
                 return ipcp->ipcp_id;
@@ -632,7 +500,7 @@ select_ipcp_by_dif(struct ipcm *ipcm, const struct rina_name *dif_name,
 
     if (rina_name_valid(dif_name)) {
         /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &ipcm->ipcps, node) {
+        list_for_each_entry(cur, &ipcm->loop.ipcps, node) {
             if (rina_name_valid(&cur->dif_name)
                     && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
                 return cur->ipcp_id;
@@ -643,7 +511,7 @@ select_ipcp_by_dif(struct ipcm *ipcm, const struct rina_name *dif_name,
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
-        list_for_each_entry(cur, &ipcm->ipcps, node) {
+        list_for_each_entry(cur, &ipcm->loop.ipcps, node) {
             if (rina_name_valid(&cur->dif_name) &&
                     (cur->dif_type == DIF_TYPE_NORMAL ||
                         !ipcp)) {
@@ -900,10 +768,6 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* Initialize the remaining fields of the IPC Manager data model
-     * instance. */
-    list_init(&ipcm.ipcps);
-
     /* Create and start the unix server thread. */
     ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
     if (ret) {
@@ -912,7 +776,7 @@ int main()
     }
 
     /* Run the script thread. */
-    ipcps_fetch(&ipcm);
+    ipcps_fetch(&ipcm.loop);
     if (0) test(&ipcm);
 
     ret = pthread_join(unix_th, NULL);

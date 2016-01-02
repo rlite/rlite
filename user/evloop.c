@@ -18,6 +18,123 @@
 #include "evloop.h"
 
 
+static int
+ipcp_fetch_resp(struct rina_evloop *loop,
+                const struct rina_msg_base_resp *b_resp,
+                const struct rina_msg_base *b_req)
+{
+    const struct rina_kmsg_fetch_ipcp_resp *resp =
+        (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
+    struct ipcp *ipcp;
+
+    if (resp->end) {
+        /* This response is just to say there are no
+         * more IPCPs --> nothing to do. */
+        return 0;
+    }
+
+    printf("%s: Fetch IPCP response id=%u, type=%u\n",
+            __func__, resp->ipcp_id, resp->dif_type);
+
+    ipcp = malloc(sizeof(*ipcp));
+    if (ipcp) {
+        ipcp->ipcp_id = resp->ipcp_id;
+        ipcp->dif_type = resp->dif_type;
+        rina_name_copy(&ipcp->ipcp_name, &resp->ipcp_name);
+        rina_name_copy(&ipcp->dif_name, &resp->dif_name);
+        list_add_tail(&loop->ipcps, &ipcp->node);
+    } else {
+        printf("%s: Out of memory\n", __func__);
+    }
+
+    (void)b_req;
+
+    return 0;
+}
+
+/* Fetch information about a single IPC process. */
+static struct rina_kmsg_fetch_ipcp_resp *
+ipcp_fetch(struct rina_evloop *loop)
+{
+    struct rina_msg_base *msg;
+
+    /* Allocate and create a request message. */
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        printf("%s: Out of memory\n", __func__);
+        return NULL;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_KERN_IPCP_FETCH;
+
+    printf("Requesting IPC processes fetch...\n");
+
+    return (struct rina_kmsg_fetch_ipcp_resp *)
+           issue_request(loop, msg, sizeof(*msg), 1);
+}
+
+int
+ipcps_print(struct rina_evloop *loop)
+{
+    struct ipcp *ipcp;
+
+    printf("IPC Processes table:\n");
+    list_for_each_entry(ipcp, &loop->ipcps, node) {
+            char *ipcp_name_s = NULL;
+            char *dif_name_s = NULL;
+
+            ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
+            dif_name_s = rina_name_to_string(&ipcp->dif_name);
+            printf("    id = %d, name = '%s' dif_name = '%s'\n",
+                        ipcp->ipcp_id, ipcp_name_s, dif_name_s);
+
+            if (ipcp_name_s) {
+                    free(ipcp_name_s);
+            }
+
+            if (dif_name_s) {
+                    free(dif_name_s);
+            }
+    }
+
+    return 0;
+}
+
+/* Fetch information about all IPC processes. */
+int
+ipcps_fetch(struct rina_evloop *loop)
+{
+    struct rina_kmsg_fetch_ipcp_resp *resp;
+    struct ipcp *ipcp;
+    struct list_head *elem;
+    int end = 0;
+
+    /* Purge the IPCPs list. */
+    pthread_mutex_lock(&loop->lock);
+    while ((elem = list_pop_front(&loop->ipcps))) {
+        ipcp = container_of(elem, struct ipcp, node);
+        free(ipcp);
+    }
+    pthread_mutex_unlock(&loop->lock);
+
+    /* Reload the IPCPs list. */
+    while (!end) {
+        resp = ipcp_fetch(loop);
+        if (!resp) {
+            end = 1;
+        } else {
+            end = resp->end;
+            rina_msg_free(rina_kernel_numtables,
+                          RMB(resp));
+        }
+    }
+
+    ipcps_print(loop);
+
+    return 0;
+}
+
 /* The event loop function for kernel responses management. */
 static void *
 evloop_function(void *arg)
@@ -235,7 +352,14 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     pthread_mutex_init(&loop->lock, NULL);
     pending_queue_init(&loop->pqueue);
     loop->event_id_counter = 1;
+    list_init(&loop->ipcps);
     loop->handlers = handlers;
+
+    /* If not redefined, setup default fetch handler. */
+    if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
+printf("SETTING DEFAULT FETCH\n");
+        loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
+    }
 
     /* Create and start the event-loop thread. */
     ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);

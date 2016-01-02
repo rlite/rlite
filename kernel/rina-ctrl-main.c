@@ -889,6 +889,7 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
 };
 
 static rina_msg_handler_t rina_flow_ctrl_handlers[] = {
+    [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_MSG_MAX] = NULL,
 };
