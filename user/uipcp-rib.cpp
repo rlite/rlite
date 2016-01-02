@@ -201,12 +201,9 @@ uipcp_rib::dft_handler(const CDAPMessage *rm)
         map< string, DFTEntry >::iterator mit = dft.find(key);
 
         if (add) {
-            if (mit != dft.end()) {
-                PD("DFT entry already exist\n");
-            } else {
-                dft.insert(make_pair(key, *e));
-                PD("DFT entry %s added remotely\n", key.c_str());
-            }
+            dft[key] = *e;
+            PD("DFT entry %s %s remotely\n", key.c_str(),
+                    (mit != dft.end() ? "updated" : "added"));
 
         } else {
             if (mit == dft.end()) {
@@ -285,12 +282,9 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm)
                 continue;
             }
 
-            if (mit != cand_neighbors.end()) {
-                PD("Candidate neighbor %s already exist\n", key.c_str());
-            } else {
-                cand_neighbors.insert(make_pair(key, *neigh));
-                PD("Candidate neighbor %s added remotely\n", key.c_str());
-            }
+            cand_neighbors[key] = *neigh;
+            PD("Candidate neighbor %s %s remotely\n", key.c_str(),
+                    (mit != cand_neighbors.end() ? "updated" : "added"));
 
         } else {
             if (mit == cand_neighbors.end()) {
@@ -576,6 +570,16 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         enr_info.address = address = rib->address_allocate();
     }
 
+    /* Add the initiator to the set of candidate neighbors. */
+    NeighborCandidate cand;
+    RinaName cand_name(&ipcp_name);
+
+    cand.apn = cand_name.apn;
+    cand.api = cand_name.api;
+    cand.address = enr_info.address;
+    cand.lower_difs = enr_info.lower_difs;
+    rib->cand_neighbors[static_cast<string>(cand_name)] = cand;
+
     m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
 
     ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
@@ -592,8 +596,6 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     /* Send my neighbors, including a neighbor representing
      * myself. */
     NeighborCandidateList ncl;
-    NeighborCandidate cand;
-    RinaName cand_name;
 
     for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
                         neigh != rib->neighbors.end(); neigh++) {
