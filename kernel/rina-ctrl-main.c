@@ -699,6 +699,7 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
         mutex_init(&entry->lock);
         entry->refcnt = 0;
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+        ipcp->refcnt++;
     } else {
         kfree(entry);
         *pentry = NULL;
@@ -738,6 +739,7 @@ flow_del(unsigned int port_id, int locked)
         goto out;
     }
 
+    entry->ipcp->refcnt--;
     hash_del(&entry->node);
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
@@ -1244,6 +1246,12 @@ rina_io_release(struct inode *inode, struct file *f)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
 
+    if (rio->flow) {
+        mutex_lock(&rina_dm.lock);
+        rio->flow->refcnt--;
+        mutex_unlock(&rina_dm.lock);
+    }
+
     kfree(rio);
 
     return 0;
@@ -1307,6 +1315,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
 
     /* Associate a flow to this file descriptor. */
     rio->flow = flow;
+    rio->flow->refcnt++;
 out:
     mutex_unlock(&rina_dm.lock);
 
