@@ -107,6 +107,9 @@ struct uipcp_rib {
     /* Directory Forwarding Table. */
     map< string, DFTEntry > dft;
 
+    /* Lower Flow Database. */
+    map< string, LowerFlow > lfdb;
+
     uipcp_rib(struct uipcp *_u);
 
     struct rinalite_ipcp *ipcp_info() const;
@@ -180,6 +183,19 @@ uipcp_rib::dump() const
         ss << "    Application: " << static_cast<string>(entry.appl_name)
             << ", Address: " << entry.address << ", Timestamp: "
                 << entry.timestamp << endl;
+    }
+
+    ss << endl;
+
+    ss << "Lower Flow Database:" << endl;
+    for (map<string, LowerFlow>::const_iterator
+            mit = lfdb.begin(); mit != lfdb.end(); mit++) {
+        const LowerFlow& flow = mit->second;
+
+        ss << "    LocalAddr: " << flow.local_addr << ", RemoteAddr: "
+            << flow.remote_addr << ", Cost: " << flow.cost <<
+                ", Seqnum: " << flow.seqnum << ", State: " << flow.state
+                    << ", Age: " << flow.age << endl;
     }
 
     return strdup(ss.str().c_str());
