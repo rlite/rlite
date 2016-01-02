@@ -190,6 +190,8 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
+    unsigned long mpl = 0;
+    unsigned long mpl_r_a;
 
     dtp->set_drf = true;
     dtp->next_seq_num_to_send = 0;
@@ -200,20 +202,35 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->last_snd_data_ack = 0;
     dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
 
-    dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
-    dtp->snd_inact_tmr.data = (unsigned long)flow;
-    dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
-    dtp->rcv_inact_tmr.data = (unsigned long)flow;
-    dtp->rtx_tmr.function = rtx_tmr_cb;
-    dtp->rtx_tmr.data = (unsigned long)flow;
-    dtp->rtx_tmr_next = NULL;
-    dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
+    if (ipcp->dif) {
+        mpl = msecs_to_jiffies(ipcp->dif->max_pdu_life);
+    }
+
+    if (!mpl) {
+        PI("%s: fixing MPL to %u ms\n", __func__, MPL_MSECS_DEFAULT);
+        mpl = msecs_to_jiffies(MPL_MSECS_DEFAULT);
+    }
 
     if (flow->cfg.dtcp.rtx_control && ! dtp->rtx_tmr_int) {
         PI("%s: fixing initial_tr parameter to %u ms\n",
                 __func__, RTX_MSECS_DEFAULT);
-        dtp->rtx_tmr_int = msecs_to_jiffies(RTX_MSECS_DEFAULT);
+        flow->cfg.dtcp.rtx.initial_tr = RTX_MSECS_DEFAULT;
     }
+
+    mpl_r_a = mpl + 0/* R*/ + msecs_to_jiffies(flow->cfg.dtcp.initial_a);
+
+    dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
+    dtp->snd_inact_tmr.data = (unsigned long)flow;
+    dtp->snd_inact_tmr_int = 3 * mpl_r_a;
+
+    dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
+    dtp->rcv_inact_tmr.data = (unsigned long)flow;
+    dtp->snd_inact_tmr_int = 2 * mpl_r_a;
+
+    dtp->rtx_tmr.function = rtx_tmr_cb;
+    dtp->rtx_tmr.data = (unsigned long)flow;
+    dtp->rtx_tmr_next = NULL;
+    dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
 
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -336,8 +353,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     spin_lock_bh(&dtp->lock);
 
     if (dtcp_present) {
-        /* 3 * (MPL + R + A) */
-        mod_timer(&dtp->snd_inact_tmr, jiffies + msecs_to_jiffies(1000));
+        mod_timer(&dtp->snd_inact_tmr, jiffies + dtp->snd_inact_tmr_int);
     }
 
     if (unlikely((fc->fc_type == RINA_FC_T_WIN &&
@@ -872,8 +888,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     spin_lock_bh(&dtp->lock);
 
     if (flow->cfg.dtcp_present) {
-        /* 2 * (MPL + R + A) */
-        mod_timer(&dtp->rcv_inact_tmr, jiffies + jiffies_to_msecs(668));
+        mod_timer(&dtp->rcv_inact_tmr, jiffies + dtp->rcv_inact_tmr_int);
     }
 
     if (pci->pdu_flags & 1) {

@@ -29,3 +29,5 @@
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
 
 - kernel: usare i valori di timeout indicati nel flow_config
+
+- impedire la flow allocation se un IPCP non è ancora stato assegnato ad un DIF

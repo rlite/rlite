@@ -95,7 +95,7 @@ struct fc_config {
 } __attribute__((packed));
 
 struct rtx_config {
-    uint32_t max_time_to_retry; /* R */
+    uint32_t max_time_to_retry; /* R div initial_tr */
     uint16_t data_rxms_max;
     uint32_t initial_tr;
 } __attribute__((packed));
@@ -105,6 +105,7 @@ struct dtcp_config {
     struct fc_config fc;
     uint8_t rtx_control;
     struct rtx_config rtx;
+    uint32_t initial_a;  /* A */
 } __attribute__((packed));
 
 struct rina_flow_config {

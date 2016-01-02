@@ -290,8 +290,8 @@ dif_get(const char *dif_name, uint8_t dif_type, int *err)
     }
 
     cur->ty = dif_type;
-    cur->max_pdu_size = 8000;
-    cur->max_pdu_life = 10000; /* ms */
+    cur->max_pdu_size = 8000;  /* Currently unused. */
+    cur->max_pdu_life = MPL_MSECS_DEFAULT;
     cur->refcnt = 1;
     list_add_tail(&cur->node, &rina_dm.difs);
 

@@ -451,6 +451,12 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
     if (parse_flowcfg_bool(arg, &flowcfg->dtcp_present, "dtcp_present") == 0)
         return 0;
 
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.intial_a") == 0) {
+        flowcfg->dtcp_present = 1;
+        flowcfg->dtcp.initial_a = field_int;
+        return 0;
+    }
+
     if (parse_flowcfg_bool(arg, &flowcfg->dtcp.flow_control,
                                             "dtcp.flow_control") == 0) {
         flowcfg->dtcp_present = 1;

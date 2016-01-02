@@ -117,6 +117,7 @@ struct upper_ref {
 
 struct dtp {
     spinlock_t lock;
+
     bool set_drf;
     uint64_t snd_lwe;
     uint64_t snd_rwe;
@@ -129,7 +130,9 @@ struct dtp {
     uint64_t next_snd_ctl_seq;
     uint64_t last_ctrl_seq_num_rcvd;
     struct timer_list snd_inact_tmr;
+    unsigned long snd_inact_tmr_int;
     struct timer_list rcv_inact_tmr;
+    unsigned long rcv_inact_tmr_int;
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
@@ -221,5 +224,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
+
+#define MPL_MSECS_DEFAULT   1000
 
 #endif  /* __RINA_IPCP_H__ */
