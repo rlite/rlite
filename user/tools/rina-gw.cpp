@@ -263,7 +263,7 @@ Worker::forward_data(int ifd, int ofd, char *buf)
         return n;
 
     } else {
-        PI("Read 0 bytes from %d\n", ifd);
+        NPD("Read 0 bytes from %d\n", ifd);
     }
 
     return n;
@@ -293,7 +293,7 @@ Worker::run()
         }
         pthread_mutex_unlock(&lock);
 
-        PD("w%d polls %d file descriptors\n", idx, nfds);
+        NPD("w%d polls %d file descriptors\n", idx, nfds);
         nrdy = poll(pollfds, nfds, -1);
         if (nrdy < 0) {
             perror("poll()");
@@ -336,7 +336,7 @@ Worker::run()
             /* Consume the events on this fd. */
             j++;
 
-            PD("w%d: fd %d ready, events %d\n", idx,
+            NPD("w%d: fd %d ready, events %d\n", idx,
                pollfds[i].fd, pollfds[i].revents);
 
             if (!(pollfds[i].revents & POLLIN)) {
@@ -374,8 +374,9 @@ Worker::run()
                 mit = fdmap.find(ofd);
                 assert(mit != fdmap.end());
                 fdmap.erase(mit);
+
             } else {
-                PD("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
+                NPD("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
             }
         }
 
