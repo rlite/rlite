@@ -141,6 +141,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
         if (add) {
             if (mit == dft.end() || e->timestamp > mit->second.timestamp) {
                 dft[key] = *e;
+                prop_dft.entries.push_back(*e);
                 PD("DFT entry %s %s remotely\n", key.c_str(),
                         (mit != dft.end() ? "updated" : "added"));
             }
@@ -157,14 +158,9 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
         }
     }
 
-    if (add) {
-        prop_dft = dft_slice;
-    }
-
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        /* TODO loops are not managed here! */
         remote_sync_excluding(neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
