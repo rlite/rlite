@@ -100,12 +100,6 @@ struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 
 int uipcps_fetch(struct uipcps *uipcps);
 
-int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
-                             void *buf, size_t buflen);
-
-int mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
-                           void *buf, size_t buflen);
-
 int uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
                              uint8_t response,
                              const struct rina_kmsg_appl_register *req);
@@ -128,17 +122,6 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 /* uipcp RIB definitions */
 struct uipcp_rib *rib_create(struct uipcp *uipcp);
 void rib_destroy(struct uipcp_rib *rib);
-
-int rib_neigh_set_port_id(struct uipcp_rib *rib,
-                          const struct rina_name *neigh_name,
-                          unsigned int neigh_port_id);
-
-int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
-                          const struct rina_name *neigh_name,
-                          int neigh_fd);
-
-int rib_del_neighbor(struct uipcp_rib *rib,
-                     const struct rina_name *neigh_name);
 
 int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                   char *serbuf, int serlen);

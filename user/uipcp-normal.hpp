@@ -228,4 +228,15 @@ private:
 
 int normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
 
+int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+                             void *buf, size_t buflen);
+
+int rib_neigh_set_port_id(struct uipcp_rib *rib,
+                          const struct rina_name *neigh_name,
+                          unsigned int neigh_port_id);
+
+int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
+                          const struct rina_name *neigh_name,
+                          int neigh_fd);
+
 #endif  /* __UIPCP_RIB_H__ */

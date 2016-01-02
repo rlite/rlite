@@ -846,7 +846,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
     return 0;
 }
 
-extern "C" int
+int
 rib_neigh_set_port_id(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       unsigned int neigh_port_id)
@@ -863,7 +863,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
     return 0;
 }
 
-extern "C" int
+int
 rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       int neigh_fd)
@@ -879,9 +879,3 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
     return 0;
 }
 
-extern "C" int
-rib_del_neighbor(struct uipcp_rib *rib,
-                 const struct rina_name *neigh_name)
-{
-    return rib->del_neighbor(RinaName(neigh_name));
-}

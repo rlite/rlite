@@ -41,6 +41,104 @@ namespace obj_name {
     string flows = "/dif/ra/fa/" + obj_class::flows;
 };
 
+#define MGMTBUF_SIZE_MAX 4096
+
+static int
+mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
+           void *buf, size_t buflen)
+{
+    char *mgmtbuf;
+    int n;
+    int ret = 0;
+
+    if (buflen > MGMTBUF_SIZE_MAX) {
+        PE("Dropping oversized mgmt message %d/%d\n",
+            (int)buflen, MGMTBUF_SIZE_MAX);
+    }
+
+    mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
+    if (!mgmtbuf) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    memcpy(mgmtbuf, mhdr, sizeof(*mhdr));
+    memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
+    buflen += sizeof(*mhdr);
+
+    n = write(uipcp->mgmtfd, mgmtbuf, buflen);
+    if (n < 0) {
+        PE("write(): %d\n", n);
+        ret = n;
+    } else if (n != (int)buflen) {
+        PE("partial write %d/%d\n", n, (int)buflen);
+        ret = -1;
+    }
+
+    free(mgmtbuf);
+
+    return ret;
+}
+
+int
+mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+                         void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    memset(&mhdr, 0, sizeof(mhdr));
+    mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
+    mhdr.local_port = local_port;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+int
+mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
+                       void *buf, size_t buflen)
+{
+    struct rina_mgmt_hdr mhdr;
+
+    memset(&mhdr, 0, sizeof(mhdr));
+    mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.remote_addr = dst_addr;
+
+    return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+static void
+mgmt_fd_ready(struct rlite_evloop *loop, int fd)
+{
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    struct rina_mgmt_hdr *mhdr;
+    int n;
+
+    assert(fd == uipcp->mgmtfd);
+
+    /* Read a buffer that contains a management header followed by
+     * a management SDU. */
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        PE("Error: read() failed [%d]\n", n);
+        return;
+
+    } else if (n < (int)sizeof(*mhdr)) {
+        PE("Error: read() does not contain mgmt header, %d<%d\n",
+                n, (int)sizeof(*mhdr));
+        return;
+    }
+
+    /* Grab the management header. */
+    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
+    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
+
+    /* Hand off the message to the RIB. */
+    rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
+                  n - sizeof(*mhdr));
+}
+
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 {
     pthread_mutex_init(&lock, NULL);
@@ -488,104 +586,6 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     return ret;
 }
 
-#define MGMTBUF_SIZE_MAX 4096
-
-static int
-mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
-           void *buf, size_t buflen)
-{
-    char *mgmtbuf;
-    int n;
-    int ret = 0;
-
-    if (buflen > MGMTBUF_SIZE_MAX) {
-        PE("Dropping oversized mgmt message %d/%d\n",
-            (int)buflen, MGMTBUF_SIZE_MAX);
-    }
-
-    mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
-    if (!mgmtbuf) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    memcpy(mgmtbuf, mhdr, sizeof(*mhdr));
-    memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
-    buflen += sizeof(*mhdr);
-
-    n = write(uipcp->mgmtfd, mgmtbuf, buflen);
-    if (n < 0) {
-        PE("write(): %d\n", n);
-        ret = n;
-    } else if (n != (int)buflen) {
-        PE("partial write %d/%d\n", n, (int)buflen);
-        ret = -1;
-    }
-
-    free(mgmtbuf);
-
-    return ret;
-}
-
-int
-mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
-                         void *buf, size_t buflen)
-{
-    struct rina_mgmt_hdr mhdr;
-
-    memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
-    mhdr.local_port = local_port;
-
-    return mgmt_write(uipcp, &mhdr, buf, buflen);
-}
-
-int
-mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
-                       void *buf, size_t buflen)
-{
-    struct rina_mgmt_hdr mhdr;
-
-    memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
-    mhdr.remote_addr = dst_addr;
-
-    return mgmt_write(uipcp, &mhdr, buf, buflen);
-}
-
-static void
-mgmt_fd_ready(struct rlite_evloop *loop, int fd)
-{
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    char mgmtbuf[MGMTBUF_SIZE_MAX];
-    struct rina_mgmt_hdr *mhdr;
-    int n;
-
-    assert(fd == uipcp->mgmtfd);
-
-    /* Read a buffer that contains a management header followed by
-     * a management SDU. */
-    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
-    if (n < 0) {
-        PE("Error: read() failed [%d]\n", n);
-        return;
-
-    } else if (n < (int)sizeof(*mhdr)) {
-        PE("Error: read() does not contain mgmt header, %d<%d\n",
-                n, (int)sizeof(*mhdr));
-        return;
-    }
-
-    /* Grab the management header. */
-    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
-    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
-
-    /* Hand off the message to the RIB. */
-    rib_msg_rcvd(uipcp->rib, mhdr, ((char *)(mhdr + 1)),
-                  n - sizeof(*mhdr));
-}
-
 static int
 normal_appl_register(struct rlite_evloop *loop,
                      const struct rina_msg_base_resp *b_resp,
@@ -674,7 +674,7 @@ normal_fa_req_arrived(struct rlite_evloop *loop,
     return 0;
 
 err:
-    rib_del_neighbor(uipcp->rib, &req->remote_appl);
+    uipcp->rib->del_neighbor(RinaName(&req->remote_appl));
 
     return 0;
 }
