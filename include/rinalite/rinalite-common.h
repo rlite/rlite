@@ -148,8 +148,10 @@ struct rina_flow_config {
 
 #ifdef PD_ON
 #define PD(FMT, ...) PRINTFUN2("DBG", FMT, ##__VA_ARGS__)
+#define PD_S(FMT, ...) PRINTFUN1(FMT, ##__VA_ARGS__)
 #else
 #define PD(FMT, ...)
+#define PD_S(FMT, ...)
 #endif
 
 #ifdef PI_ON
