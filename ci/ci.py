@@ -73,9 +73,11 @@ outs += '\n'                                                        \
         '    git checkout %(branch)s\n'                             \
         '    git merge %(remote)s/%(branch)s\n'                     \
         '    ./configure && make && sudo make install\n'            \
+        '    sync\n'                                                \
         'else\n'                                                    \
         '    echo BRANCHUNCHANGED\n'                                \
-        'fi\n'  % {'branch': 'master', 'remote': 'origin'}
+        'fi\n'                                                      \
+        'true\n' % {'branch': 'master', 'remote': 'origin'}
 
 outs += 'sleep 1\n'\
         'true\n'\
@@ -118,6 +120,8 @@ try:
 except:
     print("Cannot kill program script")
     raise
+
+subprocess.run(['rm', 'ci-update.sh'])
 
 
 topologies = ['gen.conf']
