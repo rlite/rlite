@@ -325,6 +325,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
          * to be a response to wait for. */
         PE("%s: has_response == 0 --> wait_for_completion "
                 "== 0\n", __func__);
+        rina_msg_free(rina_kernel_numtables, msg);
         *result = EINVAL;
         return NULL;
     }
@@ -379,7 +380,9 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     ret = write(loop->rfd, serbuf, serlen);
     if (ret != serlen) {
         if (has_response) {
-            /* TODO remove element from pending_queue. */
+            /* Remove the entry from the pending queue and free it. */
+            pending_queue_remove_by_event_id(&loop->pqueue, msg->event_id);
+            free(entry);
         }
         if (ret < 0) {
             perror("write(rfd)");
@@ -390,6 +393,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
                     ret, serlen);
             *result = EINVAL;
         }
+        rina_msg_free(rina_kernel_numtables, msg);
 
     } else if (has_response && entry->wait_for_completion) {
         while (!entry->op_complete && *result == 0) {
