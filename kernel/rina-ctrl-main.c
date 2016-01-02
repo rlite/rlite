@@ -774,6 +774,8 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
 static int
 flow_del_entry(struct flow_entry *entry, int locked)
 {
+    struct rina_buf *rb;
+    struct rina_buf *tmp;
     int ret = 0;
 
     if (locked)
@@ -786,6 +788,9 @@ flow_del_entry(struct flow_entry *entry, int locked)
     }
 
     entry->ipcp->refcnt--;
+    list_for_each_entry_safe(rb, tmp, &entry->rxq, node) {
+        rina_buf_free(rb);
+    }
     hash_del(&entry->node);
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
