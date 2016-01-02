@@ -657,7 +657,7 @@ flow_table_find(unsigned int port_id)
 }
 
 static int
-flow_add(struct ipcp_entry *ipcp,
+flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
          struct rina_name *local_application,
          struct rina_name *remote_application,
          struct flow_entry **pentry, int locked)
@@ -685,6 +685,7 @@ flow_add(struct ipcp_entry *ipcp,
         entry->remote_port = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
         entry->ipcp = ipcp;
+        entry->rc = rc;
         mutex_init(&entry->lock);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
     } else {
@@ -726,6 +727,26 @@ flow_del(unsigned int port_id, int locked)
         mutex_unlock(&rina_dm.lock);
 
     return ret;
+}
+
+static void
+flow_del_by_rc(struct rina_ctrl *rc)
+{
+    struct flow_entry *flow;
+    struct hlist_node *tmp;
+    int bucket;
+
+    mutex_lock(&rina_dm.lock);
+    hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
+        if (flow->rc == rc) {
+            printk("%s: Removing flow %u\n", __func__, flow->local_port);
+            hash_del(&flow->node);
+            rina_name_free(&flow->local_application);
+            rina_name_free(&flow->remote_application);
+            kfree(flow);
+        }
+    }
+    mutex_unlock(&rina_dm.lock);
 }
 
 static int
@@ -772,7 +793,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, &req->local_application,
+    ret = flow_add(ipcp_entry, rc, &req->local_application,
                    &req->remote_application, &flow_entry, 0);
     if (ret) {
         goto negative;
@@ -869,7 +890,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp, local_application, remote_application,
+    ret = flow_add(ipcp, app->rc, local_application, remote_application,
                    &flow_entry, 0);
     if (ret) {
         mutex_unlock(&rina_dm.lock);
@@ -1129,6 +1150,7 @@ rina_ctrl_release(struct inode *inode, struct file *f)
          * We must invalidate (e.g. unregister) all the
          * application names registered with this device. */
         application_del_by_rc(rc);
+        flow_del_by_rc(rc);
     }
 
     kfree(rc);

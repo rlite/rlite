@@ -43,6 +43,8 @@ enum {
     FLOW_STATE_ALLOCATED,
 };
 
+struct rina_ctrl;
+
 struct flow_entry {
     uint16_t            local_port;  /* key */
     uint16_t            remote_port;
@@ -50,6 +52,7 @@ struct flow_entry {
     struct rina_name    local_application;
     struct rina_name    remote_application;
     struct ipcp_entry   *ipcp;
+    struct rina_ctrl    *rc;
 
     struct mutex        lock;
     struct hlist_node   node;
