@@ -13,6 +13,8 @@
 #include "application.h"
 
 
+#define SDU_SIZE_MAX    65535
+
 struct rinaperf_test_config {
     uint32_t ty;
     uint32_t size;
@@ -92,11 +94,12 @@ echo_client(struct rinaperf *rp)
     struct timeval t_start, t_end;
     unsigned long us;
     int ret;
-    char buf[4096];
+    char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
+        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
 
@@ -137,7 +140,7 @@ echo_server(struct rinaperf *rp)
 {
     int n, ret;
     unsigned int i;
-    char buf[4096];
+    char buf[SDU_SIZE_MAX];
 
     for (i = 0; i < rp->test_config.cnt; i++) {
         n = read(rp->dfd, buf, sizeof(buf));
@@ -166,11 +169,12 @@ perf_client(struct rinaperf *rp)
     struct timeval t_start, t_end;
     unsigned long us;
     int ret;
-    char buf[4096];
+    char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
+        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
 
@@ -209,7 +213,7 @@ perf_server(struct rinaperf *rp)
 {
     int n;
     unsigned int i;
-    char buf[4096];
+    char buf[SDU_SIZE_MAX];
 
     for (i = 0; i < rp->test_config.cnt; i++) {
         n = read(rp->dfd, buf, sizeof(buf));
