@@ -21,13 +21,13 @@
 
 
 static int
-ipcp_fetch_resp(struct rina_evloop *loop,
+ipcp_fetch_resp(struct rinalite_evloop *loop,
                 const struct rina_msg_base_resp *b_resp,
                 const struct rina_msg_base *b_req)
 {
     const struct rina_kmsg_fetch_ipcp_resp *resp =
         (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     if (resp->end) {
         /* This response is just to say there are no
@@ -38,14 +38,14 @@ ipcp_fetch_resp(struct rina_evloop *loop,
     NPD("%s: Fetch IPCP response id=%u, type=%u\n",
        __func__, resp->ipcp_id, resp->dif_type);
 
-    ipcp = malloc(sizeof(*ipcp));
-    if (ipcp) {
-        ipcp->ipcp_id = resp->ipcp_id;
-        ipcp->dif_type = resp->dif_type;
-        ipcp->ipcp_addr = resp->ipcp_addr;
-        rina_name_copy(&ipcp->ipcp_name, &resp->ipcp_name);
-        rina_name_copy(&ipcp->dif_name, &resp->dif_name);
-        list_add_tail(&ipcp->node, &loop->ipcps);
+    rinalite_ipcp = malloc(sizeof(*rinalite_ipcp));
+    if (rinalite_ipcp) {
+        rinalite_ipcp->ipcp_id = resp->ipcp_id;
+        rinalite_ipcp->dif_type = resp->dif_type;
+        rinalite_ipcp->ipcp_addr = resp->ipcp_addr;
+        rina_name_copy(&rinalite_ipcp->ipcp_name, &resp->ipcp_name);
+        rina_name_copy(&rinalite_ipcp->dif_name, &resp->dif_name);
+        list_add_tail(&rinalite_ipcp->node, &loop->ipcps);
     } else {
         PE("%s: Out of memory\n", __func__);
     }
@@ -57,7 +57,7 @@ ipcp_fetch_resp(struct rina_evloop *loop,
 
 /* Fetch information about a single IPC process. */
 static struct rina_kmsg_fetch_ipcp_resp *
-ipcp_fetch(struct rina_evloop *loop, int *result)
+ipcp_fetch(struct rinalite_evloop *loop, int *result)
 {
     struct rina_msg_base *msg;
 
@@ -74,26 +74,26 @@ ipcp_fetch(struct rina_evloop *loop, int *result)
     NPD("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
+           rinalite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
 }
 
 int
-ipcps_print(struct rina_evloop *loop)
+rinalite_ipcps_print(struct rinalite_evloop *loop)
 {
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     PI("IPC Processes table:\n");
-    list_for_each_entry(ipcp, &loop->ipcps, node) {
+    list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
             char *ipcp_name_s = NULL;
             char *dif_name_s = NULL;
 
-            ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
-            dif_name_s = rina_name_to_string(&ipcp->dif_name);
+            ipcp_name_s = rina_name_to_string(&rinalite_ipcp->ipcp_name);
+            dif_name_s = rina_name_to_string(&rinalite_ipcp->dif_name);
             PI("    id = %d, name = '%s', dif_type ='%d', dif_name = '%s',"
                     " address = %llu\n",
-                        ipcp->ipcp_id, ipcp_name_s, ipcp->dif_type,
+                        rinalite_ipcp->ipcp_id, ipcp_name_s, rinalite_ipcp->dif_type,
                         dif_name_s,
-                        (long long unsigned int)ipcp->ipcp_addr);
+                        (long long unsigned int)rinalite_ipcp->ipcp_addr);
 
             if (ipcp_name_s) {
                     free(ipcp_name_s);
@@ -109,18 +109,18 @@ ipcps_print(struct rina_evloop *loop)
 
 /* Fetch information about all IPC processes. */
 int
-ipcps_fetch(struct rina_evloop *loop)
+rinalite_ipcps_fetch(struct rinalite_evloop *loop)
 {
     struct rina_kmsg_fetch_ipcp_resp *resp;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
     struct list_head *elem;
     int end = 0;
 
     /* Purge the IPCPs list. */
     pthread_mutex_lock(&loop->lock);
     while ((elem = list_pop_front(&loop->ipcps))) {
-        ipcp = container_of(elem, struct ipcp, node);
-        free(ipcp);
+        rinalite_ipcp = container_of(elem, struct rinalite_ipcp, node);
+        free(rinalite_ipcp);
     }
     pthread_mutex_unlock(&loop->lock);
 
@@ -147,7 +147,7 @@ ipcps_fetch(struct rina_evloop *loop)
 static void *
 evloop_function(void *arg)
 {
-    struct rina_evloop *loop = (struct rina_evloop *)arg;
+    struct rinalite_evloop *loop = (struct rinalite_evloop *)arg;
     struct pending_entry *req_entry;
     char serbuf[4096];
     unsigned int max_resp_size = rina_numtables_max_size(
@@ -156,7 +156,7 @@ evloop_function(void *arg)
 
     for (;;) {
         struct rina_msg_base_resp *resp;
-        struct rina_evloop_fdcb *fdcb;
+        struct rinalite_evloop_fdcb *fdcb;
         fd_set rdfs;
         int ret;
         int maxfd = MAX(loop->rfd, loop->eventfd);
@@ -283,7 +283,7 @@ evloop_function(void *arg)
 
 notify_requestor:
         if (req_entry->wait_for_completion) {
-            /* Signal the issue_request() caller that the operation is
+            /* Signal the rinalite_issue_request() caller that the operation is
              * complete, reporting the response in the 'resp' pointer field. */
             pthread_mutex_lock(&loop->lock);
             req_entry->op_complete = 1;
@@ -303,7 +303,7 @@ notify_requestor:
 }
 
 int
-rina_evloop_stop(struct rina_evloop *loop)
+rinalite_evloop_stop(struct rinalite_evloop *loop)
 {
     uint64_t x = 1;
     int n;
@@ -326,7 +326,7 @@ rina_evloop_stop(struct rina_evloop *loop)
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rina_msg_base *
-issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
+rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int has_response,
               unsigned int wait_for_completion, int *result)
 {
@@ -450,7 +450,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
 }
 
 int
-rina_evloop_init(struct rina_evloop *loop, const char *dev,
+rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
                  rina_resp_handler_t *handlers)
 {
     int ret;
@@ -512,7 +512,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 }
 
 int
-rina_evloop_fini(struct rina_evloop *loop)
+rinalite_evloop_fini(struct rinalite_evloop *loop)
 {
     int ret;
 
@@ -537,7 +537,7 @@ rina_evloop_fini(struct rina_evloop *loop)
 }
 
 int
-rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
+rina_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
                         rina_resp_handler_t handler)
 {
     if (index >= RINA_KERN_MSG_MAX) {
@@ -550,9 +550,9 @@ rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
 }
 
 int
-rina_evloop_fdcb_add(struct rina_evloop *loop, int fd, rina_evloop_fdcb_t cb)
+rina_evloop_fdcb_add(struct rinalite_evloop *loop, int fd, rina_evloop_fdcb_t cb)
 {
-    struct rina_evloop_fdcb *fdcb;
+    struct rinalite_evloop_fdcb *fdcb;
 
     if (!cb || fd < 0) {
         PE("%s: Invalid arguments fd [%d], cb[%p]\n", __func__, fd, cb);
@@ -574,9 +574,9 @@ rina_evloop_fdcb_add(struct rina_evloop *loop, int fd, rina_evloop_fdcb_t cb)
 }
 
 int
-rina_evloop_fdcb_del(struct rina_evloop *loop, int fd)
+rina_evloop_fdcb_del(struct rinalite_evloop *loop, int fd)
 {
-    struct rina_evloop_fdcb *fdcb;
+    struct rinalite_evloop_fdcb *fdcb;
 
     list_for_each_entry(fdcb, &loop->fdcbs, node) {
         if (fdcb->fd == fd) {
@@ -588,11 +588,11 @@ rina_evloop_fdcb_del(struct rina_evloop *loop, int fd)
     return -1;
 }
 
-struct ipcp *
-select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
+struct rinalite_ipcp *
+select_ipcp_by_dif(struct rinalite_evloop *loop, const struct rina_name *dif_name,
                    int fallback)
 {
-    struct ipcp *cur;
+    struct rinalite_ipcp *cur;
 
     if (rina_name_valid(dif_name)) {
         /* The request specifies a DIF: lookup that. */
@@ -603,34 +603,34 @@ select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
             }
         }
     } else if (fallback) {
-        struct ipcp *ipcp = NULL;
+        struct rinalite_ipcp *rinalite_ipcp = NULL;
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
         list_for_each_entry(cur, &loop->ipcps, node) {
             if (rina_name_valid(&cur->dif_name) &&
                     (cur->dif_type == DIF_TYPE_NORMAL ||
-                        !ipcp)) {
-                ipcp = cur;
+                        !rinalite_ipcp)) {
+                rinalite_ipcp = cur;
             }
         }
 
-        return ipcp;
+        return rinalite_ipcp;
     }
 
     return NULL;
 }
 
-struct ipcp *
-lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
+struct rinalite_ipcp *
+lookup_ipcp_by_name(struct rinalite_evloop *loop, const struct rina_name *name)
 {
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &loop->ipcps, node) {
-            if (rina_name_valid(&ipcp->ipcp_name)
-                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
-                return ipcp;
+        list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
+            if (rina_name_valid(&rinalite_ipcp->ipcp_name)
+                    && rina_name_cmp(&rinalite_ipcp->ipcp_name, name) == 0) {
+                return rinalite_ipcp;
             }
         }
     }
@@ -639,14 +639,14 @@ lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
 }
 
 int
-lookup_ipcp_addr_by_id(struct rina_evloop *loop, unsigned int id,
+lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                        uint64_t *addr)
 {
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
-    list_for_each_entry(ipcp, &loop->ipcps, node) {
-        if (ipcp->ipcp_id == id) {
-            *addr = ipcp->ipcp_addr;
+    list_for_each_entry(rinalite_ipcp, &loop->ipcps, node) {
+        if (rinalite_ipcp->ipcp_id == id) {
+            *addr = rinalite_ipcp->ipcp_addr;
             return 0;
         }
     }

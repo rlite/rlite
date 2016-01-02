@@ -21,7 +21,7 @@
 
 
 static int
-flow_allocate_resp_arrived(struct rina_evloop *loop,
+flow_allocate_resp_arrived(struct rinalite_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
 {
@@ -57,7 +57,7 @@ flow_allocate_resp_arrived(struct rina_evloop *loop,
 }
 
 static int
-flow_allocate_req_arrived(struct rina_evloop *loop,
+flow_allocate_req_arrived(struct rinalite_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
@@ -91,9 +91,9 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
 
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
- * Response handlers must not call issue_request(), in
+ * Response handlers must not call rinalite_issue_request(), in
  * order to avoid deadlocks.
- * These would happen because issue_request() may block for
+ * These would happen because rinalite_issue_request() may block for
  * completion, and is waken up by the event-loop thread itself.
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
@@ -127,7 +127,7 @@ rinalite_appl_register_req(struct rinalite_appl *application,
 
     PD("Requesting application %sregistration...\n", (reg ? "": "un"));
 
-    resp = issue_request(&application->loop, RMB(req),
+    resp = rinalite_issue_request(&application->loop, RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -179,7 +179,7 @@ flow_allocate_req(struct rinalite_appl *application,
     PD("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_fa_resp_arrived *)
-           issue_request(&application->loop, RMB(req),
+           rinalite_issue_request(&application->loop, RMB(req),
                          sizeof(*req), 1, wait_for_completion, result);
 }
 
@@ -206,7 +206,7 @@ rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 
     PD("Responding to flow allocation request...\n");
 
-    resp = issue_request(&application->loop, RMB(req),
+    resp = rinalite_issue_request(&application->loop, RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -220,19 +220,19 @@ rinalite_appl_register(struct rinalite_appl *application, int reg,
                      const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
 {
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
-    ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (!ipcp) {
-        ipcp = select_ipcp_by_dif(&application->loop, dif_name, fallback);
+    rinalite_ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!rinalite_ipcp) {
+        rinalite_ipcp = select_ipcp_by_dif(&application->loop, dif_name, fallback);
     }
-    if (!ipcp) {
+    if (!rinalite_ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
         return -1;
     }
 
     /* Forward the request to the kernel. */
-    return rinalite_appl_register_req(application, reg, ipcp->ipcp_id,
+    return rinalite_appl_register_req(application, reg, rinalite_ipcp->ipcp_id,
                                      application_name);
 }
 
@@ -247,21 +247,21 @@ rinalite_flow_allocate(struct rinalite_appl *application,
               uint16_t upper_ipcp_id)
 {
     struct rina_kmsg_fa_resp_arrived *kresp;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
     int result;
 
-    ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (!ipcp) {
-        ipcp = select_ipcp_by_dif(&application->loop, dif_name,
+    rinalite_ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!rinalite_ipcp) {
+        rinalite_ipcp = select_ipcp_by_dif(&application->loop, dif_name,
                                   dif_fallback);
     }
-    if (!ipcp) {
+    if (!rinalite_ipcp) {
         PE("%s: No suitable IPCP found\n", __func__);
         return -1;
     }
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              ipcp->ipcp_id, upper_ipcp_id, local_application,
+                              rinalite_ipcp->ipcp_id, upper_ipcp_id, local_application,
                               remote_application, flowcfg, &result);
     if (!kresp) {
         PE("%s: Flow allocation request failed\n", __func__);
@@ -388,7 +388,7 @@ rinalite_appl_init(struct rinalite_appl *application)
     pthread_cond_init(&application->flow_req_arrived_cond, NULL);
     list_init(&application->pending_flow_reqs);
 
-    ret = rina_evloop_init(&application->loop, "/dev/rina-ctrl",
+    ret = rinalite_evloop_init(&application->loop, "/dev/rina-ctrl",
                      rina_kernel_handlers);
     if (ret) {
         return ret;
@@ -400,5 +400,5 @@ rinalite_appl_init(struct rinalite_appl *application)
 int
 rinalite_appl_fini(struct rinalite_appl *application)
 {
-    return rina_evloop_fini(&application->loop);
+    return rinalite_evloop_fini(&application->loop);
 }

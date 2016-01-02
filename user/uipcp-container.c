@@ -175,7 +175,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     PD("Requesting IPCP pdu forwarding table set...\n");
 
-    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -230,7 +230,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     PD("[uipcp %u] Issuing UIPCP_FA_REQ_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -301,7 +301,7 @@ uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     PD("[uipcp %u] Issuing UIPCP_FA_RESP_ARRIVED message...\n",
         uipcp->ipcp_id);
 
-    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -334,7 +334,7 @@ uipcp_mgmt_sdu_fa_resp(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 }
 
 static void
-mgmt_fd_ready(struct rina_evloop *loop, int fd)
+mgmt_fd_ready(struct rinalite_evloop *loop, int fd)
 {
     struct rinalite_appl *appl = container_of(loop, struct rinalite_appl, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
@@ -443,7 +443,7 @@ uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
 }
 
 static int
-uipcp_fa_req(struct rina_evloop *loop,
+uipcp_fa_req(struct rinalite_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
              const struct rina_msg_base *b_req)
 {
@@ -495,7 +495,7 @@ uipcp_fa_req(struct rina_evloop *loop,
 }
 
 static int
-uipcp_fa_resp(struct rina_evloop *loop,
+uipcp_fa_resp(struct rinalite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
 {
@@ -614,7 +614,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     PD("Requesting IPCP uipcp set...\n");
 
-    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
@@ -736,7 +736,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 
     close(uipcp->mgmtfd);
 
-    rina_evloop_stop(&uipcp->appl.loop);
+    rinalite_evloop_stop(&uipcp->appl.loop);
 
     ret = rinalite_appl_fini(&uipcp->appl);
 
@@ -759,7 +759,7 @@ uipcps_fetch(struct uipcps *uipcps)
     int first = 1;
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        ret = ipcps_fetch(&uipcp->appl.loop);
+        ret = rinalite_ipcps_fetch(&uipcp->appl.loop);
         if (ret) {
             return ret;
         }
@@ -767,7 +767,7 @@ uipcps_fetch(struct uipcps *uipcps)
         if (first) {
             /* This is just for debugging purposes. */
             first = 0;
-            ipcps_print(&uipcp->appl.loop);
+            rinalite_ipcps_print(&uipcp->appl.loop);
             fflush(stdout);
         }
     }

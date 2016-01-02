@@ -12,7 +12,7 @@
 #include "list.h"
 
 
-struct ipcp {
+struct rinalite_ipcp {
     /* IPCP attributes. */
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
@@ -27,23 +27,23 @@ struct ipcp {
 #define RMB(m) (struct rina_msg_base *)(m)
 #define RMBR(m) (struct rina_msg_base_resp *)(m)
 
-struct rina_evloop;
+struct rinalite_evloop;
 
 /* The signature of a response handler. */
-typedef int (*rina_resp_handler_t)(struct rina_evloop *loop,
+typedef int (*rina_resp_handler_t)(struct rinalite_evloop *loop,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
-typedef void (*rina_evloop_fdcb_t)(struct rina_evloop *loop, int fd);
+typedef void (*rina_evloop_fdcb_t)(struct rinalite_evloop *loop, int fd);
 
-struct rina_evloop_fdcb {
+struct rinalite_evloop_fdcb {
     int fd;
     rina_evloop_fdcb_t cb;
 
     struct list_head node;
 };
 
-struct rina_evloop {
+struct rinalite_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
 
@@ -74,45 +74,48 @@ struct rina_evloop {
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rina_msg_base *
-issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
+rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int has_response,
               unsigned int wait_for_completion, int *result);
 
-int rina_evloop_stop(struct rina_evloop *loop);
+int rinalite_evloop_stop(struct rinalite_evloop *loop);
 
 int
-rina_evloop_init(struct rina_evloop *loop, const char *dev,
+rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
                  rina_resp_handler_t *handlers);
 
 int
-rina_evloop_fini(struct rina_evloop *loop);
+rinalite_evloop_fini(struct rinalite_evloop *loop);
 
 int
-rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
+rina_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
                         rina_resp_handler_t handler);
 
 int
-rina_evloop_fdcb_add(struct rina_evloop *loop, int fd, rina_evloop_fdcb_t cb);
+rina_evloop_fdcb_add(struct rinalite_evloop *loop, int fd,
+                     rina_evloop_fdcb_t cb);
 
 int
-rina_evloop_fdcb_del(struct rina_evloop *loop, int fd);
+rina_evloop_fdcb_del(struct rinalite_evloop *loop, int fd);
 
 int
-ipcps_print(struct rina_evloop *loop);
+rinalite_ipcps_print(struct rinalite_evloop *loop);
 
 /* Fetch information about all IPC processes. */
 int
-ipcps_fetch(struct rina_evloop *loop);
+rinalite_ipcps_fetch(struct rinalite_evloop *loop);
 
-struct ipcp *
-select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
+struct rinalite_ipcp *
+select_ipcp_by_dif(struct rinalite_evloop *loop,
+                   const struct rina_name *dif_name,
                    int fallback);
 
-struct ipcp *
-lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name);
+struct rinalite_ipcp *
+lookup_ipcp_by_name(struct rinalite_evloop *loop,
+                    const struct rina_name *name);
 
 int
-lookup_ipcp_addr_by_id(struct rina_evloop *loop, unsigned int id,
+lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
                        uint64_t *addr);
 
 #endif  /* __RINA_EVLOOP_H__ */

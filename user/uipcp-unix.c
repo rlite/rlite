@@ -117,7 +117,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
 
     /* Perform a fetch to find out if shim IPCPs have been created,
      * deleted or configured from the last fetch. */
-    ipcps_fetch(&uipcp->appl.loop);
+    rinalite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform the registration. */
     result = rinalite_appl_register(&uipcp->appl, reg, dif_name,
@@ -165,7 +165,7 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
 
     /* Perform a fetch to find out if shim IPCPs have been created,
      * deleted or configured from the last fetch. */
-    ipcps_fetch(&uipcp->appl.loop);
+    rinalite_ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform enrollment in userspace. */
     ret = uipcp_enroll(uipcp, req);
@@ -352,32 +352,32 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
 static int
 uipcps_update(struct uipcps *uipcps)
 {
-    struct rina_evloop loop;
-    struct ipcp *ipcp;
+    struct rinalite_evloop loop;
+    struct rinalite_ipcp *rinalite_ipcp;
     int ret = 0;
 
-    ret = rina_evloop_init(&loop, "/dev/rina-ctrl", NULL);
+    ret = rinalite_evloop_init(&loop, "/dev/rina-ctrl", NULL);
     if (ret) {
         return ret;
     }
 
-    ipcps_fetch(&loop);
+    rinalite_ipcps_fetch(&loop);
 
-    ipcps_print(&loop);
+    rinalite_ipcps_print(&loop);
     fflush(stdout);
 
     /* Create an userspace IPCP for each existing IPCP. */
-    list_for_each_entry(ipcp, &loop.ipcps, node) {
-        if (ipcp->dif_type == DIF_TYPE_NORMAL) {
-            ret = uipcp_add(uipcps, ipcp->ipcp_id);
+    list_for_each_entry(rinalite_ipcp, &loop.ipcps, node) {
+        if (rinalite_ipcp->dif_type == DIF_TYPE_NORMAL) {
+            ret = uipcp_add(uipcps, rinalite_ipcp->ipcp_id);
             if (ret) {
                 return ret;
             }
         }
     }
 
-    rina_evloop_stop(&loop);
-    rina_evloop_fini(&loop);
+    rinalite_evloop_stop(&loop);
+    rinalite_evloop_fini(&loop);
 
     /* Perform a fetch operation on the evloops of
      * all the userspace IPCPs. */

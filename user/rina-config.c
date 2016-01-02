@@ -18,12 +18,12 @@
 
 
 struct rinaconf {
-    struct rina_evloop loop;
+    struct rinalite_evloop loop;
 };
 
 /* Kernel response handlers. */
 static int
-ipcp_create_resp(struct rina_evloop *loop,
+ipcp_create_resp(struct rinalite_evloop *loop,
                  const struct rina_msg_base_resp *b_resp,
                  const struct rina_msg_base *b_req)
 {
@@ -40,9 +40,9 @@ ipcp_create_resp(struct rina_evloop *loop,
 
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
- * Response handlers must not call issue_request(), in
+ * Response handlers must not call rinalite_issue_request(), in
  * order to avoid deadlocks.
- * These would happen because issue_request() may block for
+ * These would happen because rinalite_issue_request() may block for
  * completion, and is waken up by the event-loop thread itself.
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
@@ -187,10 +187,10 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
     PD("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
-           issue_request(&rc->loop, RMB(msg),
+           rinalite_issue_request(&rc->loop, RMB(msg),
                          sizeof(*msg), 1, wait_for_completion, result);
 
-    ipcps_fetch(&rc->loop);
+    rinalite_ipcps_fetch(&rc->loop);
 
     if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
         uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id);
@@ -269,12 +269,12 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     PD("Requesting IPC process destruction...\n");
 
-    resp = issue_request(&rc->loop, RMB(msg),
+    resp = rinalite_issue_request(&rc->loop, RMB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
 
-    ipcps_fetch(&rc->loop);
+    rinalite_ipcps_fetch(&rc->loop);
 
     uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, ipcp_id);
 
@@ -287,7 +287,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
     int ret = -1;
 
     assert(argc >= 2);
@@ -297,12 +297,12 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* Does the request specifies an existing IPC process ? */
-    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (!ipcp) {
+    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (!rinalite_ipcp) {
         PE("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        ret = rina_ipcp_destroy(rc, ipcp->ipcp_id, ipcp->dif_type);
+        ret = rina_ipcp_destroy(rc, rinalite_ipcp->ipcp_id, rinalite_ipcp->dif_type);
     }
 
     return ret;
@@ -331,14 +331,14 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
 
     PD("Requesting IPCP config...\n");
 
-    resp = issue_request(&rc->loop, RMB(req), sizeof(*req),
+    resp = rinalite_issue_request(&rc->loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("%s: result: %d\n", __func__, result);
 
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
-        ipcps_fetch(&rc->loop);
+        rinalite_ipcps_fetch(&rc->loop);
         uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0);
     }
 
@@ -353,7 +353,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     const char *param_name;
     const char *param_value;
     struct rina_name ipcp_name;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
     int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 4);
@@ -365,12 +365,12 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (!ipcp) {
+    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (!rinalite_ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        ret = rina_ipcp_config(rc, ipcp->ipcp_id, param_name, param_value);
+        ret = rina_ipcp_config(rc, rinalite_ipcp->ipcp_id, param_name, param_value);
     }
 
     return ret;
@@ -384,7 +384,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     assert(argc >= 3);
     dif_name = argv[0];
@@ -393,15 +393,15 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     /* Lookup the id of the registering IPCP. */
-    ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
-    if (!ipcp) {
+    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    if (!rinalite_ipcp) {
         PE("%s: Could not find the IPC process to register\n", __func__);
         return -1;
     }
 
     req.msg_type = RINA_CONF_IPCP_REGISTER;
     req.event_id = 0;
-    req.ipcp_id = ipcp->ipcp_id;
+    req.ipcp_id = rinalite_ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     req.reg = reg;
 
@@ -430,7 +430,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     const char *neigh_ipcp_api;
     const char *dif_name;
     const char *supp_dif_name;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     assert(argc >= 6);
     dif_name = argv[0];
@@ -441,15 +441,15 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     supp_dif_name = argv[5];
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
-    if (!ipcp) {
+    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    if (!rinalite_ipcp) {
         PE("%s: Could not find enrolling IPC process\n", __func__);
         return -1;
     }
 
     req.msg_type = RINA_CONF_IPCP_ENROLL;
     req.event_id = 0;
-    req.ipcp_id = ipcp->ipcp_id;
+    req.ipcp_id = rinalite_ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
@@ -467,7 +467,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     const char *appl_api;
     unsigned long remote_addr;
     struct rina_name ipcp_name;
-    struct ipcp *ipcp;
+    struct rinalite_ipcp *rinalite_ipcp;
 
     assert(argc >= 5);
     ipcp_apn = argv[0];
@@ -482,16 +482,16 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     }
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rinalite_ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
     rina_name_free(&ipcp_name);
-    if (!ipcp) {
+    if (!rinalite_ipcp) {
         PE("%s: Could not find IPC process\n", __func__);
         return -1;
     }
 
     req.msg_type = RINA_CONF_IPCP_DFT_SET;
     req.event_id = 0;
-    req.ipcp_id = ipcp->ipcp_id;
+    req.ipcp_id = rinalite_ipcp->ipcp_id;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
@@ -501,7 +501,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcps_show(int argc, char **argv, struct rinaconf *rc)
 {
-    ipcps_print(&rc->loop);
+    rinalite_ipcps_print(&rc->loop);
 
     return 0;
 }
@@ -537,7 +537,7 @@ test(struct rinaconf *rc)
     assert(!ret);
 
     /* Fetch IPC processes table. */
-    ipcps_fetch(&rc->loop);
+    rinalite_ipcps_fetch(&rc->loop);
 
     /* Destroy the IPCPs. */
     ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_LOOPBACK);
@@ -673,7 +673,7 @@ int main(int argc, char **argv)
     int enable_testing = 0;
     int ret;
 
-    ret = rina_evloop_init(&rc.loop, "/dev/rina-ctrl",
+    ret = rinalite_evloop_init(&rc.loop, "/dev/rina-ctrl",
                      rina_kernel_handlers);
     if (ret) {
         return ret;
@@ -696,7 +696,7 @@ int main(int argc, char **argv)
     }
 
     /* Fetch kernel state. */
-    ipcps_fetch(&rc.loop);
+    rinalite_ipcps_fetch(&rc.loop);
 
     if (enable_testing) {
         /* Run the hardwired test script. */
@@ -705,9 +705,9 @@ int main(int argc, char **argv)
 
     ret = process_args(argc, argv, &rc);
 
-    rina_evloop_stop(&rc.loop);
+    rinalite_evloop_stop(&rc.loop);
 
-    rina_evloop_fini(&rc.loop);
+    rinalite_evloop_fini(&rc.loop);
 
     return 0;
 }

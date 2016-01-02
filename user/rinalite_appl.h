@@ -24,7 +24,7 @@ rinalite_pending_flow_req_free(struct rinalite_pending_flow_req *pfr)
 
 /* Application data model. */
 struct rinalite_appl {
-    struct rina_evloop loop;
+    struct rinalite_evloop loop;
 
     pthread_cond_t flow_req_arrived_cond;
     struct list_head pending_flow_reqs;

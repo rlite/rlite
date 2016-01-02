@@ -709,7 +709,7 @@ main(int argc, char **argv)
     }
 
     /* This fetch is necessary to use rinalite_appl_register(). */
-    ipcps_fetch(&rp.application.loop);
+    rinalite_ipcps_fetch(&rp.application.loop);
 
     /* Rinaperf-specific initialization. */
     rina_name_fill(&rp.dif_name, dif_name, NULL, NULL, NULL);
@@ -760,7 +760,7 @@ main(int argc, char **argv)
     }
 
     /* Stop the event loop. */
-    rina_evloop_stop(&rp.application.loop);
+    rinalite_evloop_stop(&rp.application.loop);
 
     return rinalite_appl_fini(&rp.application);
 }
