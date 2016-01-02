@@ -460,7 +460,8 @@ CDAPConn::m_connect_send(int *invoke_id,
 }
 
 int
-CDAPConn::m_connect_r_send(const struct CDAPMessage *req)
+CDAPConn::m_connect_r_send(const struct CDAPMessage *req, int result,
+                           const std::string& result_reason)
 {
     struct CDAPMessage m(gpb::M_CONNECT_R);
     int ret;
@@ -469,11 +470,37 @@ CDAPConn::m_connect_r_send(const struct CDAPMessage *req)
     m.auth_value = req->auth_value;
     ret = rina_name_copy(&m.src_appl, &req->dst_appl);
     ret |= rina_name_copy(&m.dst_appl, &req->src_appl);
+    m.result = result;
+    m.result_reason = result_reason;
 
     if (ret) {
         PE("%s: Out of memory\n", __func__);
         return ret;
     }
+
+    return msg_send(&m, req->invoke_id);
+}
+
+int
+CDAPConn::m_release_send(int *invoke_id, gpb::flagValues_t flags)
+{
+    struct CDAPMessage m(gpb::M_RELEASE);
+
+    m.flags = flags;
+
+    return msg_send(&m, 0);
+}
+
+int
+CDAPConn::m_release_r_send(const struct CDAPMessage *req,
+                           gpb::flagValues_t flags, int result,
+                           const std::string& result_reason)
+{
+    struct CDAPMessage m(gpb::M_RELEASE_R);
+
+    m.flags = flags;
+    m.result = result;
+    m.result_reason = result_reason;
 
     return msg_send(&m, req->invoke_id);
 }

@@ -41,8 +41,14 @@ public:
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl);
 
-    int m_connect_r_send(const struct CDAPMessage *req);
+    int m_connect_r_send(const struct CDAPMessage *req, int result,
+                         const std::string& result_reason);
 
+    int m_release_send(int *invoke_id, gpb::flagValues_t flags);
+
+    int m_release_r_send(const struct CDAPMessage *req,
+                         gpb::flagValues_t flags, int result,
+                         const std::string& result_reason);
 
     struct rina_name local_appl;
     struct rina_name remote_appl;

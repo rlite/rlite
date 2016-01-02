@@ -87,7 +87,7 @@ test_cdap_server(int port)
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
-                mgr.m_connect_r_send(m);
+                mgr.m_connect_r_send(m, 0, string());
                 break;
 
             default:
