@@ -16,20 +16,16 @@
 
 - rina-utils: routine di deserializzazione devono gestire errori di lunghezza
 
-- shim-link --> ha il vantaggio di non necessitare di sistemi di directory, e
-  permette di costruire topologie di DIF arbitrarie su un singolo host
-
 - vedere come inserire il campo lunghezza nel PCI header
 
 - se si perde la PDU iniziale contenente il DRF è un casino, anche se c'è la
   ritrasmissione. Dal punto di vista del protocollo, infatti, come gestisco
   i pacchetti successivi (che arrivano prima che il trasmettitore si accorge
   di dover ritrasmettere la PDU con il DRF settato)? Sarebbe una stupidaggine
-  buttare questi pacchetti
+  buttare questi pacchetti. Sembra sia conveniente introdurre nel DTP un flag
+  di stato "waitingForDRF" che aiuti a "forzare il DRF" quando esso non è
+  presente ma dovrebbe
 
 - limitare le dimensioni della seqq
-
-- shim-eth: implementare la funzionalità di unpadding per estrarre rina_name
-  serializzati dai messaggi ARP.
 
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
