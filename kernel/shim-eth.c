@@ -59,6 +59,14 @@ struct arpt_entry {
     unsigned int rx_tmpq_len;
     bool fa_req_arrived;
 
+    /* Statistics. */
+    unsigned int tx_pkt;
+    unsigned int tx_byte;
+    unsigned int tx_err;
+    unsigned int rx_pkt;
+    unsigned int rx_byte;
+    unsigned int rx_err;
+
     struct list_head node;
 };
 
@@ -410,6 +418,10 @@ rlite_shim_eth_fa_req(struct ipcp_entry *ipcp,
     INIT_LIST_HEAD(&entry->rx_tmpq);
     entry->rx_tmpq_len = 0;
     arpt_flow_bind(entry, flow);
+
+    entry->tx_pkt = entry->tx_byte = entry->tx_err = 0;
+    entry->rx_pkt = entry->rx_byte = entry->rx_err = 0;
+
     list_add_tail(&entry->node, &priv->arp_table);
 
     spin_unlock_bh(&priv->arpt_lock);
@@ -673,6 +685,8 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
     }
 
     if (likely(flow)) {
+        entry->rx_pkt++;
+        entry->rx_byte += rb->len;
         spin_unlock_bh(&priv->arpt_lock);
 
         rlite_sdu_rx_flow(priv->ipcp, flow, rb, true);
@@ -734,10 +748,14 @@ enq:
         entry->rx_tmpq_len++;
     }
 
+    entry->rx_pkt++;
+    entry->rx_byte += rb->len;
+
     spin_unlock_bh(&priv->arpt_lock);
     return;
 
 drop:
+    entry->rx_err++;
     spin_unlock_bh(&priv->arpt_lock);
     rlite_buf_free(rb);
 }
@@ -831,6 +849,10 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     priv->ntu++;
 
+    /* Also per-flow TX statistics are protected by the tx_lock. */
+    entry->tx_pkt++;
+    entry->tx_byte += rb->len;
+
     spin_unlock(&priv->tx_lock);
 
     skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
@@ -859,13 +881,19 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     /* Copy data into the skb. */
     memcpy(skb_put(skb, rb->len), RLITE_BUF_DATA(rb), rb->len);
 
-    rlite_buf_free(rb);
-
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
     if (unlikely(ret != NET_XMIT_SUCCESS)) {
         RPD(5, "dev_queue_xmit() error %d\n", ret);
+
+        spin_lock(&priv->tx_lock);
+        entry->tx_pkt--;
+        entry->tx_byte -= rb->len;
+        entry->tx_err++;
+        spin_unlock(&priv->tx_lock);
     }
+
+    rlite_buf_free(rb);
 
     return 0;
 }
