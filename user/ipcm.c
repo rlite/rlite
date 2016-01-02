@@ -153,11 +153,28 @@ uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
 }
 
 static int
+uipcps_fetch(struct ipcm *ipcm)
+{
+    struct uipcp *uipcp;
+    int ret;
+
+    list_for_each_entry(uipcp, &ipcm->uipcps, node) {
+        ret = ipcps_fetch(&uipcp->appl.loop);
+        if (ret) {
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+static int
 uipcps_update(struct ipcm *ipcm)
 {
     struct ipcp *ipcp;
     int ret = 0;
 
+    /* Create an userspace IPCP for each existing IPCP. */
     list_for_each_entry(ipcp, &ipcm->loop.ipcps, node) {
         if (ipcp->dif_type == DIF_TYPE_NORMAL) {
             ret = uipcp_add(ipcm, ipcp->ipcp_id);
@@ -166,6 +183,10 @@ uipcps_update(struct ipcm *ipcm)
             }
         }
     }
+
+    /* Perform a fetch operation on the evloops of
+     * all the userspace IPCPs. */
+    uipcps_fetch(ipcm);
 
     return 0;
 }
@@ -203,6 +224,8 @@ ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
         *result = uipcp_add(ipcm, resp->ipcp_id);
     }
 
+    uipcps_fetch(ipcm);
+
     return resp;
 }
 
@@ -238,6 +261,8 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
         result = uipcp_del(ipcm, ipcp_id);
     }
 
+    uipcps_fetch(ipcm);
+
     return result;
 }
 
@@ -269,6 +294,7 @@ assign_to_dif(struct ipcm *ipcm,
     PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
+    uipcps_fetch(ipcm);
 
     return result;
 }
@@ -589,6 +615,8 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     if (ret) {
         goto out;
     }
+
+    resp.result = 0;
 
     fd = open_port(port_id);
 
