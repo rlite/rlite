@@ -12,6 +12,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <sys/eventfd.h>
+#include <poll.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -133,10 +135,14 @@ RinaName::operator=(const RinaName& other)
 struct Worker {
     pthread_t th;
     pthread_mutex_t lock;
+    int syncfd;
 
     /* Holds the active mappings between rlite file descriptors and
      * socket file descriptors. */
     map<int, int> active_mappings;
+
+    Worker();
+    ~Worker();
 };
 
 #define NUM_WORKERS     1
@@ -160,14 +166,37 @@ struct Gateway {
      * fa_req_event_id --> tcp_client_fd */
     map<unsigned int, int> pending_fa_reqs;
 
-    Worker workers[NUM_WORKERS];
+    Worker *workers;
 
     Gateway();
     ~Gateway();
 };
 
+static void *worker_function(void *opaque);
+
+Worker::Worker()
+{
+    pthread_create(&th, NULL, worker_function, this);
+    pthread_mutex_init(&lock, NULL);
+    syncfd = eventfd(0, 0);
+    if (syncfd < 0) {
+        perror("eventfd()");
+        throw std::exception();
+    }
+}
+
+Worker::~Worker()
+{
+    if (pthread_join(th, NULL)) {
+        perror("pthread_join");
+    }
+    close(syncfd);
+}
+
 Gateway::Gateway()
 {
+    workers = new Worker[NUM_WORKERS];
+
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
     if (rlite_appl_init(&appl)) {
@@ -185,6 +214,8 @@ Gateway::~Gateway()
     }
 
     rlite_appl_fini(&appl);
+
+    delete [] workers;
 }
 
 Gateway gw;
@@ -454,25 +485,78 @@ print_conf()
     }
 }
 
+#define MAX_FDS         16
+#define MAX_BUF_SIZE    4096
+
 static void *
 worker_function(void *opaque)
 {
-    Gateway *gw = (Gateway *)opaque;
+    Worker *w = (Worker *)opaque;
+    struct pollfd pollfds[1 + MAX_FDS];
+    char buf[MAX_BUF_SIZE];
 
-    (void) gw;
+    (void) w;
 
-    return NULL;
-}
+    for (;;) {
+        int ret;
+        int nfds = 1;
 
-static int
-start_workers()
-{
-    for (int i=0; i<NUM_WORKERS; i++) {
-        pthread_create(&gw.workers[i].th, NULL, worker_function, &gw);
-        pthread_mutex_init(&gw.workers[i].lock, NULL);
+        pollfds[0].fd = w->syncfd;
+        pollfds[0].events = POLLIN;
+
+        pthread_mutex_lock(&w->lock);
+        for (map<int, int>::iterator mit = w->active_mappings.begin();
+                                mit != w->active_mappings.end(); mit++, nfds++) {
+            pollfds[nfds].fd = mit->first;
+            pollfds[nfds].events = POLLIN | POLLOUT;
+        }
+        pthread_mutex_unlock(&w->lock);
+
+        ret = poll(pollfds, MAX_FDS, -1);
+        if (ret < 0) {
+            perror("poll()");
+            break;
+
+        } else if (ret == 0) {
+            PI("poll() timeout\n");
+            continue;
+        }
+
+        if (pollfds[0].revents & POLLIN) {
+            PD("Mappings changed, rebuliding poll array\n");
+            continue;
+        }
+
+        for (int i=1, j=0; j<ret; i++) {
+            if (pollfds[i].revents) {
+                if (pollfds[i].revents & POLLIN) {
+                    int n = read(pollfds[i].fd, buf, MAX_BUF_SIZE);
+                    int m;
+
+                    if (n > 0) {
+                        m = write(w->active_mappings[pollfds[i].fd], buf, n);
+                        if (m != n) {
+                            if (m < 0) {
+                                perror("write()");
+
+                            } else {
+                                PE("Partial write %d/%d\n", m, n);
+                            }
+                        }
+
+                    } else if (n < 0) {
+                        perror("read()");
+
+                    } else {
+                        PI("Read 0 bytes from %d\n", pollfds[i].fd);
+                    }
+                }
+                j++;
+            }
+        }
     }
 
-    return 0;
+    return NULL;
 }
 
 int main()
@@ -486,7 +570,6 @@ int main()
     }
 
     print_conf();
-    start_workers();
     setup();
 
     PI("Main thread exits\n");
