@@ -29,11 +29,6 @@ struct rina_name {
     uint16_t aei_len;
 };
 
-/* Information about a DIF */
-struct dif_information {
-    struct rina_name dif_name;
-};
-
 /* DIF types */
 enum {
     DIF_TYPE_NORMAL = 1,
@@ -66,8 +61,8 @@ struct rina_ctrl_create_ipcp {
     rina_msg_t msg_type;
     uint32_t event_id;
 
-    struct rina_name name;
     uint8_t dif_type;
+    struct rina_name name;
 };
 
 /* IPCM <-- kernel message to inform the IPCM about the ID of a new
@@ -101,7 +96,7 @@ struct rina_ctrl_assign_to_dif {
     uint32_t event_id;
 
     uint32_t ipcp_id;
-    struct dif_information dif_info;
+    struct rina_name dif_name;
 };
 
 #endif  /* __RINA_CTRL_H__ */

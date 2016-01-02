@@ -19,18 +19,13 @@ struct ipcm {
 };
 
 static int
-create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
-                 const struct rina_ctrl_base_msg *b_req, size_t req_len)
+create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
+                 const struct rina_ctrl_base_msg *b_req)
 {
     struct rina_ctrl_create_ipcp_resp *resp =
             (struct rina_ctrl_create_ipcp_resp *)b_resp;
     struct rina_ctrl_create_ipcp *req =
             (struct rina_ctrl_create_ipcp *)b_req;
-
-    if (resp_len != sizeof(*resp) || req_len != sizeof(*req)) {
-        printf("%s: Invalid message size\n", __func__);
-        return EINVAL;
-    }
 
     printf("%s: Assigned id %d\n", __func__, resp->ipcp_id);
     (void)req;
@@ -39,18 +34,13 @@ create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
 }
 
 static int
-destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
-                 const struct rina_ctrl_base_msg *b_req, size_t req_len)
+destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
+                 const struct rina_ctrl_base_msg *b_req)
 {
     struct rina_ctrl_destroy_ipcp_resp *resp =
             (struct rina_ctrl_destroy_ipcp_resp *)b_resp;
     struct rina_ctrl_destroy_ipcp *req =
             (struct rina_ctrl_destroy_ipcp *)b_req;
-
-    if (resp_len != sizeof(*resp) || req_len != sizeof(*req)) {
-        printf("%s: Invalid message size\n", __func__);
-        return EINVAL;
-    }
 
     printf("%s: Destroyed IPC process %d, result = %d\n", __func__,
             req->ipcp_id, resp->result);
@@ -60,9 +50,7 @@ destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
 
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
-                                   size_t resp_len,
-                                   const struct rina_ctrl_base_msg *b_req,
-                                   size_t req_len);
+                                   const struct rina_ctrl_base_msg *b_req);
 
 /* The table containing all response handlers. */
 static rina_resp_handler_t rina_handlers[] = {
@@ -76,21 +64,24 @@ void *evloop_function(void *arg)
 {
     struct ipcm *ipcm = (struct ipcm *)arg;
     struct pending_entry *req_entry;
-    char buffer[1024];
+    char serbuf[4096];
+    char msgbuf[4096];
 
     for (;;) {
-        int ret;
         struct rina_ctrl_base_msg *resp;
+        int ret;
 
         /* Read the next message posted by the kernel. */
-        ret = read(ipcm->rfd, buffer, sizeof(buffer));
+        ret = read(ipcm->rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
             perror("read(rfd)");
             continue;
         }
 
+        /* Lookup the first two fields of the message. */
+        resp = (struct rina_ctrl_base_msg *)serbuf;
+
         /* Do we have an handler for this response message? */
-        resp = (struct rina_ctrl_base_msg *)buffer;
         if (resp->msg_type > RINA_CTRL_MSG_MAX ||
                 !rina_handlers[resp->msg_type]) {
             printf("%s: Invalid message type [%d] received",__func__,
@@ -114,11 +105,18 @@ void *evloop_function(void *arg)
             goto free_entry;
         }
 
+        /* Deserialize the message from serbuf into msgbuf. */
+        ret = deserialize_rina_msg(serbuf, ret, msgbuf, sizeof(msgbuf));
+        if (ret) {
+            printf("%s: Problems during deserialization [%d]\n",
+                    __func__, ret);
+        }
+        resp = (struct rina_ctrl_base_msg *)msgbuf;
+
         printf("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler. */
-        ret = rina_handlers[resp->msg_type](resp, ret, req_entry->msg,
-                                            req_entry->msg_len);
+        ret = rina_handlers[resp->msg_type](resp, req_entry->msg);
         if (ret) {
             printf("%s: Error while handling message type [%d]", __func__,
                     resp->msg_type);
@@ -153,6 +151,8 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
                       size_t msg_len)
 {
     struct pending_entry *entry;
+    char serbuf[4096];
+    size_t serlen;
     int ret;
 
     /* Store the request in the pending queue before issuing the request
@@ -169,47 +169,22 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
     entry->msg_len = msg_len;
     pending_queue_enqueue(&ipcm->pqueue, entry);
 
+    /* Serialize the message. */
+    serlen = serialize_rina_msg(serbuf, sizeof(serbuf), msg);
+
     /* Issue the request to the kernel. */
-    ret = write(ipcm->rfd, msg, msg_len);
-    if (ret != msg_len) {
+    ret = write(ipcm->rfd, serbuf, serlen);
+    if (ret != serlen) {
         if (ret < 0) {
             perror("write(rfd)");
         } else {
             printf("%s: Error: partial write [%u/%lu]\n", __func__,
-                    ret, msg_len);
+                    ret, serlen);
         }
     }
 
     return 0;
 }
-
-static void
-serialize_create_ipcp(struct rina_ctrl_base_msg *bmsg, char **buf, size_t *len)
-{
-    struct rina_ctrl_create_ipcp *msg = (struct rina_ctrl_create_ipcp *)bmsg;
-    void *ptr;
-
-    *len = sizeof(msg->msg_type) + sizeof(msg->event_id) +
-            rina_name_serlen(&msg->name) + sizeof(msg->dif_type);
-    ptr = *buf = malloc(*len);
-    if (!(ptr)) {
-        return;
-    }
-
-    serialize_obj(ptr, rina_msg_t, msg->msg_type);
-    serialize_obj(ptr, uint32_t, msg->event_id);
-    serialize_rina_name(&ptr, &msg->name);
-    serialize_obj(ptr, uint8_t, msg->dif_type);
-}
-
-typedef void (*rina_serializer_t)(struct rina_ctrl_base_msg *bmsg, char **buf,
-                                   size_t *len);
-
-/* Table of RINA message serializers. */
-static rina_serializer_t rina_serializers[] = {
-    [RINA_CTRL_CREATE_IPCP] = serialize_create_ipcp,
-    [RINA_CTRL_MSG_MAX] = NULL,
-};
 
 /* Create an IPC process. */
 static int
@@ -322,8 +297,6 @@ int main()
         perror("pthread_join()");
         exit(EXIT_FAILURE);
     }
-
-    (void)rina_serializers;
 
     return 0;
 }

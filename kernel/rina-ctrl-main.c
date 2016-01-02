@@ -52,6 +52,8 @@ struct rina_dm {
 static struct rina_dm rina_dm;
 
 struct rina_ctrl {
+    char msgbuf[1024];
+
     /* Upqueue-related data structures. */
     struct list_head upqueue;
     struct mutex upqueue_lock;
@@ -108,125 +110,96 @@ ipcp_id_acquire(void)
     return ipcp_id;
 }
 
-static ssize_t
-rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
+static int
+rina_ipcp_create(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
 {
-    const struct rina_ctrl_create_ipcp *umsg =
-                    (const struct rina_ctrl_create_ipcp *)buf;
-    struct rina_ctrl_create_ipcp kmsg;
-    struct rina_ctrl_create_ipcp_resp *rmsg;
+    const struct rina_ctrl_create_ipcp *req = (const struct rina_ctrl_create_ipcp *)bmsg;
+    struct rina_ctrl_create_ipcp_resp *resp;
     int ret;
     char *name_s;
     unsigned int ipcp_id;
-
-    if (len != sizeof(*umsg)) {
-        return -EINVAL;
-    }
-
-    /* Copy the message onto the kernel stack, temporarily including
-     * (kernelspace-invalid) pointers to userspace strings. */
-    if (unlikely(copy_from_user(&kmsg, umsg, len))) {
-        return -EFAULT;
-    }
 
     ipcp_id = ipcp_id_acquire();
     if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
         return -ENOSPC;
     }
 
-    /* Copy in the userspace strings. */
-    ret = copy_name_from_user(&kmsg.name, &umsg->name);
-    if (ret) {
-        goto err1;
-    }
-
     /* Create the response message. */
-    rmsg = kmalloc(sizeof(*rmsg), GFP_KERNEL);
-    if (!rmsg) {
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
         ret = -ENOMEM;
         goto err2;
     }
-    rmsg->msg_type = RINA_CTRL_CREATE_IPCP_RESP;
-    rmsg->event_id = kmsg.event_id;
-    rmsg->ipcp_id = ipcp_id;
+    resp->msg_type = RINA_CTRL_CREATE_IPCP_RESP;
+    resp->event_id = req->event_id;
+    resp->ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)rmsg,
-                              sizeof(*rmsg));
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp,
+                              sizeof(*resp));
     if (ret) {
         goto err3;
     }
 
-    name_s = rina_name_to_string(&kmsg.name);
+    name_s = rina_name_to_string(&req->name);
     printk("IPC process %s created\n", name_s);
     kfree(name_s);
 
-    return len;
+    return 0;
 
 err3:
-    kfree(rmsg);
+    kfree(resp);
 err2:
-    rina_name_free(&kmsg.name);
-err1:
     ipcp_id_release(ipcp_id);
 
     return ret;
 }
 
-static ssize_t
-rina_ipcp_destroy(struct rina_ctrl *rc, const char __user *buf, size_t len)
+static int
+rina_ipcp_destroy(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
 {
-    const struct rina_ctrl_destroy_ipcp *umsg =
-                    (const struct rina_ctrl_destroy_ipcp *)buf;
-    struct rina_ctrl_destroy_ipcp kmsg;
-    struct rina_ctrl_destroy_ipcp_resp *rmsg;
+    const struct rina_ctrl_destroy_ipcp *req =
+                        (const struct rina_ctrl_destroy_ipcp *)bmsg;
+    struct rina_ctrl_destroy_ipcp_resp *resp;
     int ret;
 
-    if (len != sizeof(*umsg)) {
-        return -EINVAL;
-    }
-
-    if (unlikely(copy_from_user(&kmsg, umsg, len))) {
-        return -EFAULT;
-    }
-
     /* Create the response message. */
-    rmsg = kmalloc(sizeof(*rmsg), GFP_KERNEL);
-    if (!rmsg) {
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
         return -ENOMEM;
     }
-    rmsg->msg_type = RINA_CTRL_DESTROY_IPCP_RESP;
-    rmsg->event_id = kmsg.event_id;
-    rmsg->result = 0;
+    resp->msg_type = RINA_CTRL_DESTROY_IPCP_RESP;
+    resp->event_id = req->event_id;
+    resp->result = 0;
 
     /* Release the IPC process ID. */
-    ipcp_id_release(kmsg.ipcp_id);
+    ipcp_id_release(req->ipcp_id);
 
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)rmsg,
-                              sizeof(*rmsg));
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp,
+                              sizeof(*resp));
     if (ret) {
         goto err1;
     }
 
-    printk("IPC process %u destroyed\n", kmsg.ipcp_id);
+    printk("IPC process %u destroyed\n", req->ipcp_id);
 
-    return len;
+    return 0;
 
 err1:
-    kfree(rmsg);
+    kfree(resp);
 
     return ret;
 }
 
-static ssize_t
-rina_assign_to_dif(struct rina_ctrl *rc, const char __user *buf, size_t len)
+static int
+rina_assign_to_dif(struct rina_ctrl *rc, const struct rina_ctrl_base_msg *bmsg)
 {
-    return len;
+    return 0;
 }
 
 /* The signature of a message handler. */
-typedef ssize_t (*rina_msg_handler_t)(struct rina_ctrl *rc,
-                                      const char __user *buf, size_t len);
+typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
+                                  const struct rina_ctrl_base_msg *bmsg);
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
@@ -237,10 +210,11 @@ static rina_msg_handler_t rina_handlers[] = {
 };
 
 static ssize_t
-rina_ctrl_write(struct file *f, const char __user *buf, size_t len, loff_t *ppos)
+rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
-    rina_msg_t msg_type;
+    struct rina_ctrl_base_msg *bmsg;
+    char *kbuf;
     ssize_t ret;
 
     if (len < sizeof(rina_msg_t)) {
@@ -248,18 +222,42 @@ rina_ctrl_write(struct file *f, const char __user *buf, size_t len, loff_t *ppos
         return -EINVAL;
     }
 
-    /* Demultiplex the message to the right message handler. */
-    msg_type = *((rina_msg_t *)buf);
-    if (msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[msg_type]) {
+    kbuf = kmalloc(len, GFP_KERNEL);
+    if (!kbuf) {
+        return -ENOMEM;
+    }
+
+    /* Copy the userspace serialized message into a temporary kernelspace
+     * buffer. */
+    if (unlikely(copy_from_user(kbuf, ubuf, len))) {
+        kfree(kbuf);
+        return -EFAULT;
+    }
+
+    ret = deserialize_rina_msg(kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
+    if (ret) {
+        kfree(kbuf);
         return -EINVAL;
     }
-    ret = rina_handlers[msg_type](rc, buf, len);
 
-    if (ret >= 0) {
-        *ppos += ret;
+    bmsg = (struct rina_ctrl_base_msg *)rc->msgbuf;
+
+    /* Demultiplex the message to the right message handler. */
+    if (bmsg->msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[bmsg->msg_type]) {
+        kfree(kbuf);
+        return -EINVAL;
     }
 
-    return ret;
+    ret = rina_handlers[bmsg->msg_type](rc, bmsg);
+    if (ret) {
+        kfree(kbuf);
+        return ret;
+    }
+
+    *ppos += len;
+    kfree(kbuf);
+
+    return len;
 }
 
 static ssize_t
