@@ -58,6 +58,7 @@ struct RinaName {
     RinaName() { memset(&name_r, 0, sizeof(name_r)); }
     RinaName(const string& n);
     RinaName(const RinaName& other);
+    RinaName& operator=(const RinaName& other);
     ~RinaName() { rina_name_free(&name_r); }
 
     bool operator<(const RinaName& other) const {
@@ -69,6 +70,8 @@ struct RinaName {
 
 RinaName::RinaName(const string& n) : name_s(n)
 {
+    memset(&name_r, 0, sizeof(name_r));
+
     if (rina_name_from_string(n.c_str(), &name_r)) {
         throw std::bad_alloc();
     }
@@ -76,10 +79,27 @@ RinaName::RinaName(const string& n) : name_s(n)
 
 RinaName::RinaName(const RinaName& other)
 {
+    memset(&name_r, 0, sizeof(name_r));
+
     name_s = other.name_s;
     if (rina_name_copy(&name_r, &other.name_r)) {
         throw std::bad_alloc();
     }
+}
+
+RinaName&
+RinaName::operator=(const RinaName& other)
+{
+    if (this == &other) {
+        return *this;
+    }
+
+    name_s = other.name_s;
+    if (rina_name_copy(&name_r, &other.name_r)) {
+        throw std::bad_alloc();
+    }
+
+    return *this;
 }
 
 struct Gateway {
@@ -242,18 +262,6 @@ setup()
 {
     for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
                                     mit != gw.srv_map.end(); mit++) {
-        cout << "SRV: " << static_cast<string>(mit->first) << " --> "
-                << static_cast<string>(mit->second) << endl;
-    }
-
-    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
-                                    mit != gw.dst_map.end(); mit++) {
-        cout << "DST: " << static_cast<string>(mit->first) << " --> "
-                << static_cast<string>(mit->second) << endl;
-    }
-
-    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
-                                    mit != gw.srv_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
 
         if (fd < 0) {
@@ -264,7 +272,35 @@ setup()
         }
     }
 
+    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
+                                    mit != gw.dst_map.end(); mit++) {
+        // TODO dif argument is missing
+        int ret = rlite_appl_register_wait(&gw.appl, 1, NULL, 0, NULL,
+                                           &mit->first.name_r);
+
+        if (ret) {
+            PE("Registration of application '%s'\n",
+               static_cast<string>(mit->first).c_str());
+        }
+    }
+
     return 0;
+}
+
+static void
+print_conf()
+{
+    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
+                                    mit != gw.srv_map.end(); mit++) {
+        cout << "SRV: " << static_cast<string>(mit->first) << " --> "
+                << static_cast<string>(mit->second) << endl;
+    }
+
+    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
+                                    mit != gw.dst_map.end(); mit++) {
+        cout << "DST: " << static_cast<string>(mit->first) << " --> "
+                << static_cast<string>(mit->second) << endl;
+    }
 }
 
 int main()
@@ -277,6 +313,7 @@ int main()
         return ret;
     }
 
+    print_conf();
     setup();
 
     return 0;
