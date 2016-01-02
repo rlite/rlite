@@ -461,12 +461,11 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
         dev = "/dev/rina-ctrl";
     }
 
-    if (!handlers) {
-        PE("NULL handlers\n");
-        return EINVAL;
+    if (handlers) {
+        memcpy(loop->handlers, handlers, sizeof(loop->handlers));
+    } else {
+        memset(loop->handlers, 0, sizeof(loop->handlers));
     }
-
-    memcpy(loop->handlers, handlers, sizeof(loop->handlers));
     pthread_mutex_init(&loop->lock, NULL);
     list_init(&loop->pqueue);
     loop->event_id_counter = 1;

@@ -764,11 +764,19 @@ uipcps_fetch(struct ipcm *ipcm)
 int
 uipcps_update(struct ipcm *ipcm)
 {
+    struct rina_evloop loop;
     struct ipcp *ipcp;
     int ret = 0;
 
+    ret = rina_evloop_init(&loop, "/dev/rina-ctrl", NULL);
+    if (ret) {
+        return ret;
+    }
+
+    ipcps_fetch(&loop);
+
     /* Create an userspace IPCP for each existing IPCP. */
-    list_for_each_entry(ipcp, &ipcm->loop.ipcps, node) {
+    list_for_each_entry(ipcp, &loop.ipcps, node) {
         if (ipcp->dif_type == DIF_TYPE_NORMAL) {
             ret = uipcp_add(ipcm, ipcp->ipcp_id);
             if (ret) {
@@ -776,6 +784,9 @@ uipcps_update(struct ipcm *ipcm)
             }
         }
     }
+
+    evloop_stop(&loop);
+    rina_evloop_fini(&loop);
 
     /* Perform a fetch operation on the evloops of
      * all the userspace IPCPs. */

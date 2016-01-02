@@ -8,8 +8,6 @@
 
 /* IPC Manager data model. */
 struct ipcm {
-    struct rina_evloop loop;
-
     /* Unix domain socket file descriptor used to accept request from
      * applications. */
     int lfd;

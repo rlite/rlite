@@ -38,11 +38,6 @@ struct registered_ipcp {
  */
 static struct ipcm gipcm;
 
-/* Empty kernel handlers. */
-static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_MSG_MAX] = NULL,
-};
-
 static int
 rina_conf_response(int sfd, struct rina_msg_base *req,
                    struct rina_msg_base_resp *resp)
@@ -204,7 +199,6 @@ rina_conf_uipcp_update(struct ipcm *ipcm, int sfd,
         resp.result = uipcp_del(ipcm, req->ipcp_id);
     }
 
-    ipcps_fetch(&ipcm->loop);
     uipcps_fetch(ipcm);
 
     resp.result = 0;
@@ -344,12 +338,6 @@ int main(int argc, char **argv)
     struct sigaction sa;
     int ret;
 
-    ret = rina_evloop_init(&ipcm->loop, "/dev/rina-ctrl",
-                     rina_kernel_handlers);
-    if (ret) {
-        return ret;
-    }
-
     /* Open a Unix domain socket to listen to. */
     ipcm->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (ipcm->lfd < 0) {
@@ -416,7 +404,6 @@ int main(int argc, char **argv)
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
-    ipcps_fetch(&ipcm->loop);
     ret = uipcps_update(ipcm);
     if (ret) {
         PE("Failed to load userspace ipcps\n");
@@ -437,8 +424,6 @@ int main(int argc, char **argv)
         perror("pthread_join(unix)");
         exit(EXIT_FAILURE);
     }
-
-    rina_evloop_fini(&ipcm->loop);
 
     return 0;
 }
