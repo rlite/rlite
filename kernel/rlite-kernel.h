@@ -15,7 +15,7 @@
 
 struct ipcp_entry;
 struct flow_entry;
-struct rina_ctrl;
+struct rlite_ctrl;
 struct pduft_entry;
 
 struct ipcp_ops {
@@ -87,7 +87,7 @@ struct ipcp_entry {
     uint8_t             depth;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
-    struct rina_ctrl    *uipcp;
+    struct rlite_ctrl    *uipcp;
     struct txrx         *mgmt_txrx;
 
     /* The module that owns this IPC process. */
@@ -115,7 +115,7 @@ enum {
 };
 
 struct upper_ref {
-    struct rina_ctrl    *rc;
+    struct rlite_ctrl    *rc;
     struct ipcp_entry   *ipcp;
 };
 

@@ -39,14 +39,14 @@
 #include <linux/spinlock.h>
 
 
-struct rina_ctrl;
+struct rlite_ctrl;
 
 /* The signature of a message handler. */
-typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
+typedef int (*rina_msg_handler_t)(struct rlite_ctrl *rc,
                                   struct rina_msg_base *bmsg);
 
 /* Data structure associated to the /dev/rlite file descriptor. */
-struct rina_ctrl {
+struct rlite_ctrl {
     char msgbuf[1024];
 
     rina_msg_handler_t *handlers;
@@ -71,7 +71,7 @@ struct registered_appl {
 
     /* The event-loop where the registered applications registered
      * (and where it can be reached by flow allocation requests). */
-    struct rina_ctrl *rc;
+    struct rlite_ctrl *rc;
 
     /* Event id used by the registration request, needed if the
      * the IPCP is partially implemented in userspace. */
@@ -224,7 +224,7 @@ rina_ipcp_factory_unregister(const char *dif_type)
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
 
 static int
-rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
+rina_upqueue_append(struct rlite_ctrl *rc, const struct rina_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -586,7 +586,7 @@ ipcp_application_put(struct registered_appl *app)
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *appl_name,
-                     struct rina_ctrl *rc,
+                     struct rlite_ctrl *rc,
                      uint32_t event_id)
 {
     struct registered_appl *app, *newapp;
@@ -1005,7 +1005,7 @@ out:
 EXPORT_SYMBOL_GPL(flow_put);
 
 static void
-application_del_by_rc(struct rina_ctrl *rc)
+application_del_by_rc(struct rlite_ctrl *rc)
 {
     struct ipcp_entry *ipcp;
     int bucket;
@@ -1079,7 +1079,7 @@ application_del_by_rc(struct rina_ctrl *rc)
 }
 
 static void
-flow_rc_unbind(struct rina_ctrl *rc)
+flow_rc_unbind(struct rlite_ctrl *rc)
 {
     struct flow_entry *flow;
     struct hlist_node *tmp;
@@ -1091,7 +1091,7 @@ flow_rc_unbind(struct rina_ctrl *rc)
              * the reference stored into this flow. */
             flow->upper.rc = NULL;
             if (flow->state != FLOW_STATE_ALLOCATED) {
-                /* This flow is still pending. Since this rina_ctrl
+                /* This flow is still pending. Since this rlite_ctrl
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
                  * remove the flow. */
@@ -1202,7 +1202,7 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
-rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_create(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_create *req = (struct rina_kmsg_ipcp_create *)bmsg;
     struct rina_kmsg_ipcp_create_resp resp;
@@ -1240,7 +1240,7 @@ err:
 }
 
 static int
-rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_destroy(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_destroy *req =
                         (struct rina_kmsg_ipcp_destroy *)bmsg;
@@ -1262,7 +1262,7 @@ struct ipcps_fetch_q_entry {
 };
 
 static int
-rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
+rina_ipcp_fetch(struct rlite_ctrl *rc, struct rina_msg_base *req)
 {
     struct ipcps_fetch_q_entry *fqe;
     struct ipcp_entry *entry;
@@ -1325,7 +1325,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 }
 
 static int
-rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_config(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_config *req =
                     (struct rina_kmsg_ipcp_config *)bmsg;
@@ -1367,7 +1367,7 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_pduft_set *req =
                     (struct rina_kmsg_ipcp_pduft_set *)bmsg;
@@ -1401,7 +1401,7 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_flush(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_pduft_flush *req =
                     (struct rina_kmsg_ipcp_pduft_flush *)bmsg;
@@ -1426,7 +1426,7 @@ rina_ipcp_pduft_flush(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_uipcp_set *req =
                     (struct rina_kmsg_ipcp_uipcp_set *)bmsg;
@@ -1453,7 +1453,7 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req =
                     (struct rina_kmsg_uipcp_fa_req_arrived *)bmsg;
@@ -1474,7 +1474,7 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
+rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
                                       struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_uipcp_fa_resp_arrived *req =
@@ -1496,7 +1496,7 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
 /* Connect the upper IPCP which is using this flow
  * so that rina_sdu_rx() can deliver SDU to the IPCP. */
 static int
-upper_ipcp_flow_bind(struct rina_ctrl *rc, uint16_t upper_ipcp_id,
+upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
                      struct flow_entry *flow)
 {
     struct ipcp_entry *upper_ipcp;
@@ -1524,7 +1524,7 @@ upper_ipcp_flow_bind(struct rina_ctrl *rc, uint16_t upper_ipcp_id,
 }
 
 static int
-rina_appl_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_appl_register(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_appl_register *req =
                     (struct rina_kmsg_appl_register *)bmsg;
@@ -1587,7 +1587,7 @@ rina_appl_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_appl_register_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_appl_register_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_appl_register_resp *resp =
                     (struct rina_kmsg_appl_register_resp *)bmsg;
@@ -1635,7 +1635,7 @@ rina_appl_register_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
+rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
 {
     struct rina_kmsg_fa_resp_arrived resp;
@@ -1651,7 +1651,7 @@ rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
 }
 
 static int
-rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_req(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_fa_req *req =
                     (struct rina_kmsg_fa_req *)bmsg;
@@ -1722,7 +1722,7 @@ out:
 }
 
 static int
-rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_fa_resp *resp =
                     (struct rina_kmsg_fa_resp *)bmsg;
@@ -2030,7 +2030,7 @@ rina_write_restart(uint32_t local_port)
 EXPORT_SYMBOL_GPL(rina_write_restart);
 
 /* The table containing all the message handlers. */
-static rina_msg_handler_t rina_ctrl_handlers[] = {
+static rina_msg_handler_t rlite_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
@@ -2048,9 +2048,9 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
 };
 
 static ssize_t
-rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
+rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
-    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
     struct rina_msg_base *bmsg;
     char *kbuf;
     ssize_t ret;
@@ -2100,11 +2100,11 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
 }
 
 static ssize_t
-rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
+rlite_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 {
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
-    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
     int blocking = !(f->f_flags & O_NONBLOCK);
     int ret = 0;
 
@@ -2164,9 +2164,9 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 }
 
 static unsigned int
-rina_ctrl_poll(struct file *f, poll_table *wait)
+rlite_ctrl_poll(struct file *f, poll_table *wait)
 {
-    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
     unsigned int mask = 0;
 
     poll_wait(f, &rc->upqueue_wqh, wait);
@@ -2182,10 +2182,10 @@ rina_ctrl_poll(struct file *f, poll_table *wait)
     return mask;
 }
 
-static struct rina_ctrl *
-rina_ctrl_open_common(struct inode *inode, struct file *f)
+static struct rlite_ctrl *
+rlite_ctrl_open_common(struct inode *inode, struct file *f)
 {
-    struct rina_ctrl *rc;
+    struct rlite_ctrl *rc;
 
     rc = kzalloc(sizeof(*rc), GFP_KERNEL);
     if (!rc) {
@@ -2203,23 +2203,23 @@ rina_ctrl_open_common(struct inode *inode, struct file *f)
 }
 
 static int
-rina_ctrl_open(struct inode *inode, struct file *f)
+rlite_ctrl_open(struct inode *inode, struct file *f)
 {
-    struct rina_ctrl *rc = rina_ctrl_open_common(inode, f);
+    struct rlite_ctrl *rc = rlite_ctrl_open_common(inode, f);
 
     if (!rc) {
         return -ENOMEM;
     }
 
-    rc->handlers = rina_ctrl_handlers;
+    rc->handlers = rlite_ctrl_handlers;
 
     return 0;
 }
 
 static int
-rina_ctrl_release(struct inode *inode, struct file *f)
+rlite_ctrl_release(struct inode *inode, struct file *f)
 {
-    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
 
     /* This is a ctrl device opened by an application.
      * We must invalidate (e.g. unregister) all the
@@ -2553,20 +2553,20 @@ rina_io_release(struct inode *inode, struct file *f)
     return 0;
 }
 
-static const struct file_operations rina_ctrl_fops = {
+static const struct file_operations rlite_ctrl_fops = {
     .owner          = THIS_MODULE,
-    .release        = rina_ctrl_release,
-    .open           = rina_ctrl_open,
-    .write          = rina_ctrl_write,
-    .read           = rina_ctrl_read,
-    .poll           = rina_ctrl_poll,
+    .release        = rlite_ctrl_release,
+    .open           = rlite_ctrl_open,
+    .write          = rlite_ctrl_write,
+    .read           = rlite_ctrl_read,
+    .poll           = rlite_ctrl_poll,
     .llseek         = noop_llseek,
 };
 
-static struct miscdevice rina_ctrl_misc = {
+static struct miscdevice rlite_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
     .name = "rlite",
-    .fops = &rina_ctrl_fops,
+    .fops = &rlite_ctrl_fops,
 };
 
 static const struct file_operations rina_io_fops = {
@@ -2587,7 +2587,7 @@ static struct miscdevice rina_io_misc = {
 };
 
 static int __init
-rina_ctrl_init(void)
+rlite_ctrl_init(void)
 {
     int ret;
 
@@ -2604,7 +2604,7 @@ rina_ctrl_init(void)
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
     INIT_LIST_HEAD(&rina_dm.difs);
 
-    ret = misc_register(&rina_ctrl_misc);
+    ret = misc_register(&rlite_ctrl_misc);
     if (ret) {
         printk("Failed to register rlite misc device\n");
         return ret;
@@ -2612,7 +2612,7 @@ rina_ctrl_init(void)
 
     ret = misc_register(&rina_io_misc);
     if (ret) {
-        misc_deregister(&rina_ctrl_misc);
+        misc_deregister(&rlite_ctrl_misc);
         printk("Failed to register rlite-io misc device\n");
         return ret;
     }
@@ -2621,13 +2621,13 @@ rina_ctrl_init(void)
 }
 
 static void __exit
-rina_ctrl_fini(void)
+rlite_ctrl_fini(void)
 {
     misc_deregister(&rina_io_misc);
-    misc_deregister(&rina_ctrl_misc);
+    misc_deregister(&rlite_ctrl_misc);
 }
 
-module_init(rina_ctrl_init);
-module_exit(rina_ctrl_fini);
+module_init(rlite_ctrl_init);
+module_exit(rlite_ctrl_fini);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("devname: rlite");
