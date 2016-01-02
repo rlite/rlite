@@ -142,7 +142,7 @@ flow_config_default(struct rina_flow_config *cfg)
     cfg->partial_delivery = 0;
     cfg->incomplete_delivery = 0;
     cfg->in_order_delivery = 0;
-    cfg->max_sdu_gap = -1;
+    cfg->max_sdu_gap = (uint64_t)-1;
     cfg->dtcp_present = 0;
     cfg->dtcp.fc.fc_type = RINA_FC_T_NONE;
 }

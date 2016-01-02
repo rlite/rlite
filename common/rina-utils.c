@@ -490,14 +490,14 @@ flow_config_dump(const struct rina_flow_config *c)
                 "   partial_delivery=%u\n"
                 "   incomplete_delivery=%u\n"
                 "   in_order_delivery=%u\n"
-                "   max_sdu_gap=%d\n"
+                "   max_sdu_gap=%llu\n"
                 "   dtcp_present=%u\n"
                 "   dtcp.flow_control=%u\n"
                 "   dtcp.rtx_control=%u\n",
                 c->partial_delivery,
                 c->incomplete_delivery,
                 c->in_order_delivery,
-                c->max_sdu_gap,
+                (long long unsigned)c->max_sdu_gap,
                 c->dtcp_present,
                 c->dtcp.flow_control,
                 c->dtcp.rtx_control);

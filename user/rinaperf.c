@@ -341,7 +341,7 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
 
     if (parse_flowcfg_int(arg, &field_int, "max_sdu_gap") == 0) {
         flowcfg->max_sdu_gap = field_int;
-        if (flowcfg->max_sdu_gap >= 0) {
+        if (flowcfg->max_sdu_gap != ((uint64_t)-1)) {
             flowcfg->dtcp_present = 1;
         }
         return 0;

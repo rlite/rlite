@@ -114,7 +114,7 @@ struct rina_flow_config {
     uint8_t partial_delivery;
     uint8_t incomplete_delivery;
     uint8_t in_order_delivery;
-    int32_t max_sdu_gap;
+    uint64_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
 } __attribute__((packed));

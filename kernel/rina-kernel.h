@@ -110,6 +110,7 @@ struct dtp {
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
+    struct list_head seqq;
 };
 
 struct flow_entry {

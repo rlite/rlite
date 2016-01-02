@@ -393,6 +393,36 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 }
 
+/* Takes the ownership of the rb. */
+static void
+seqq_push(struct dtp *dtp, struct rina_buf *rb)
+{
+    struct rina_buf *cur;
+    uint64_t seqnum = RINA_BUF_PCI(rb)->seqnum;
+    struct list_head *pos = &dtp->seqq;
+
+    list_for_each_entry(cur, &dtp->seqq, node) {
+        struct rina_pci *pci = RINA_BUF_PCI(cur);
+
+        if (seqnum < pci->seqnum) {
+            pos = &cur->node;
+            break;
+        } else if (seqnum == pci->seqnum) {
+            /* This is a duplicate amongst the gaps, we can
+             * drop it. */
+            rina_buf_free(rb);
+            PD("%s: Duplicate amongs the gaps [%lu] dropped\n",
+                __func__, (long unsigned)seqnum);
+
+            return;
+        }
+    }
+
+    /* Insert the rb right before 'pos'. */
+    list_add_tail(&rb->node, pos);
+    PD("%s: [%lu] inserted\n", __func__, (long unsigned)seqnum);
+}
+
 static int
 sdu_rx_ctrl(struct rina_buf *rb)
 {
@@ -462,30 +492,32 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         }
 
     } else {
-        bool drop = false;
+        bool drop;
+        bool deliver;
         unsigned int a = 0;
+        uint64_t seqnum = pci->seqnum;
 
-        if (unlikely(dtp->rcv_lwe < pci->seqnum &&
-                    pci->seqnum <= dtp->max_seq_num_rcvd)) {
+        if (unlikely(dtp->rcv_lwe < seqnum &&
+                    seqnum <= dtp->max_seq_num_rcvd)) {
             /* This may go in a gap or be a duplicate
              * amongst the gaps. */
 
             PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
                     __func__, (long unsigned)dtp->rcv_lwe,
-                    (unsigned long)pci->seqnum + 1);
+                    (unsigned long)seqnum + 1);
 
-        } else if (pci->seqnum == dtp->max_seq_num_rcvd + 1) {
+        } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
             /* In order PDU. */
 
         } else {
             /* Out of order. */
             PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
                     __func__, (long unsigned)dtp->rcv_lwe,
-                    (unsigned long)pci->seqnum + 1);
+                    (unsigned long)seqnum + 1);
         }
 
-        if (pci->seqnum > dtp->max_seq_num_rcvd) {
-            dtp->max_seq_num_rcvd = pci->seqnum;
+        if (seqnum > dtp->max_seq_num_rcvd) {
+            dtp->max_seq_num_rcvd = seqnum;
         }
 
         /* Here we may have received a PDU that it's not the next expected
@@ -508,17 +540,25 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
          */
         drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) &&
                 !a && !flow->cfg.dtcp.rtx_control &&
-                pci->seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
-        if (!drop) {
-            dtp->rcv_lwe = dtp->max_seq_num_rcvd + 1;
+                seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
+
+        deliver = (seqnum - dtp->rcv_lwe <= flow->cfg.max_sdu_gap) && !drop;
+
+        if (deliver) {
+            dtp->rcv_lwe = seqnum + 1;
         }
 
-        sdu_rx_sv_update(ipcp, flow, pci->seqnum);
+        sdu_rx_sv_update(ipcp, flow, seqnum);
 
-        if (!drop) {
+        if (deliver) {
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-        } else {
+        } else if (drop) {
             rina_buf_free(rb);
+        } else {
+            /* What is not dropped nor delivered goes in the
+             * sequencing queue.
+             */
+            seqq_push(dtp, rb);
         }
     }
 
