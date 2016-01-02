@@ -1,22 +1,19 @@
-- vmpi_provider_find_instance non dovrebbe essere bloccante
+- flow entries in ALLOCATED state but never associated to a file descriptor
+  with a bind operation should disappear after a while, otherwise we
+  have leakage
 
-- flow entry in stato ALLOCATED ma mai associate ad un file descriptor con
-  bind() dovrebbero sparire dopo un po', altrimenti c'è leakage
+- rlite-utils: deserialization routines should check lengths
 
-- rlite-utils: routine di deserializzazione devono gestire errori di lunghezza
+- if we lose initial PDU containing the DRF, it's a mess, even in presence
+  of retransmissions. From an EFCP point of view, in facto, how to I manage
+  subsequent packets (that comes before the transmitter realizes it needs
+  to retransmit the first PDU with the DRF set)? It would be silly dropping
+  all these packets. To solve this problem, it could be convenient to
+  introduce in the DTP a state flag "waitingForDRF", that forces the DRF
+  when this is present but it shouldn't
 
-- se si perde la PDU iniziale contenente il DRF è un casino, anche se c'è la
-  ritrasmissione. Dal punto di vista del protocollo, infatti, come gestisco
-  i pacchetti successivi (che arrivano prima che il trasmettitore si accorge
-  di dover ritrasmettere la PDU con il DRF settato)? Sarebbe una stupidaggine
-  buttare questi pacchetti. Sembra sia conveniente introdurre nel DTP un flag
-  di stato "waitingForDRF" che aiuti a "forzare il DRF" quando esso non è
-  presente ma dovrebbe
-
-- CDAP: supportare un semplice meccanismo di ritrasmissione, in caso la
-  connessione CDAP sia supportata da un flusso non affidabile
-
-- VMPI: TX ring is probably useless w.r.t. kernelspace-only usage
+- CDAP: support a simple retransmission mechanism, in case the CDAP
+  connection is not supported by a reliable flow
 
 - addr size not consistent (PCI/all the stack)
 
