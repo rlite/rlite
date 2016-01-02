@@ -187,7 +187,13 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
                           struct flow_entry *flow,
                           struct rina_buf *rb)
 {
-    return rina_sdu_rx(ipcp, rb, flow->remote_port);
+    int ret = rina_sdu_rx(ipcp, rb, flow->remote_port);
+
+    if (ret) {
+        return 0;
+    }
+
+    return rb->size;
 }
 
 static int __init

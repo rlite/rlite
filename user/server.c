@@ -33,7 +33,7 @@ server(int argc, char **argv, struct application *application)
         int result;
         int fd;
         char buf[4096];
-        int n;
+        int n, m;
 
         pfr = flow_request_wait(application);
         port_id = pfr->port_id;
@@ -54,15 +54,21 @@ server(int argc, char **argv, struct application *application)
             continue;
         }
 
-        printf("%s: Open fd %d\n", __func__, fd);
-
         n = read(fd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
-        } else {
-            printf("%s: read %d bytes\n", __func__, n);
+            goto clos;
         }
 
+        m = write(fd, buf, n);
+        if (m != n) {
+            if (m < 0) {
+                perror("write(flow)");
+            } else {
+                printf("partial write");
+            }
+        }
+clos:
         close(fd);
     }
 
