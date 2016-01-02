@@ -641,7 +641,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         kfree(name_s);
     }
 
-    return 0;
+    return ret;
 }
 
 /* Code improvement: we may merge ipcp_table_find() and flow_table_find()

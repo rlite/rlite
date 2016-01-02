@@ -192,6 +192,7 @@ test(struct ipcm *ipcm)
     struct rina_name name;
     struct rina_kmsg_ipcp_create_resp *icresp;
     int result;
+    int ret;
 
     /* Create an IPC process of type shim-dummy. */
     rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
@@ -218,25 +219,37 @@ test(struct ipcm *ipcm)
 
     /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    application_register(ipcm, 1, 0, &name);
+    ret = application_register(ipcm, 1, 0, &name);
+    assert(!ret);
+    ret = application_register(ipcm, 1, 0, &name);
+    assert(ret);
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    application_register(ipcm, 1, 1, &name);
+    ret = application_register(ipcm, 1, 1, &name);
+    assert(!ret);
     rina_name_free(&name);
 
     /* Unregister the applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 0, &name);
+    ret = application_register(ipcm, 0, 0, &name);
+    assert(!ret);
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
     application_register(ipcm, 0, 1, &name);
+    assert(!ret);
+    ret = application_register(ipcm, 0, 1, &name);
+    assert(ret);
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    ipcp_destroy(ipcm, 0);
-    ipcp_destroy(ipcm, 1);
+    ret = ipcp_destroy(ipcm, 0);
+    assert(!ret);
+    ret = ipcp_destroy(ipcm, 1);
+    assert(!ret);
+    ret = ipcp_destroy(ipcm, 0);
+    assert(ret);
 
     return 0;
 }
@@ -461,13 +474,20 @@ sigpipe_handler(int signum)
     printf("SIGPIPE received\n");
 }
 
-int main()
+int main(int argc, char **argv)
 {
     struct ipcm ipcm;
     pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
+    int enable_testing = 0;
     int ret;
+
+    /* Trivial option parsing. We will switch to getopt()
+     * as soon as we need more than one option. */
+    if (argc > 1) {
+        enable_testing = 1;
+    }
 
     rina_evloop_init(&ipcm.loop, "/dev/rina-ipcm-ctrl",
                      rina_kernel_handlers);
@@ -538,7 +558,10 @@ int main()
 
     /* Run the script thread. */
     ipcps_fetch(&ipcm.loop);
-    if (0) test(&ipcm);
+
+    if (enable_testing) {
+        test(&ipcm);
+    }
 
     ret = pthread_join(unix_th, NULL);
     if (ret < 0) {

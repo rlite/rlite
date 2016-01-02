@@ -35,6 +35,9 @@ user/application.o: $(HEADERS) user/pending_queue.h user/evloop.h
 count:
 	find . -type f -and \( -name "*.c" -or -name "*.h" \) | xargs wc -l
 
+test:
+	(./unprepare.sh || true; ./prepare.sh && user/ipcm -t)
+
 clean:
 	-rm user/*.o
 	-rm $(EXES)
