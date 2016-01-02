@@ -48,6 +48,53 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
     return rina_msg_write(sfd, RMB(resp));
 }
 
+static void
+track_ipcp_registration(struct uipcps *uipcps, int reg,
+                        const struct rina_name *dif_name,
+                        unsigned int ipcp_id,
+                        const struct rina_name *ipcp_name)
+{
+    struct registered_ipcp *ripcp;
+
+    if (reg) {
+        int found = 0;
+
+        /* Append a successful registration to the persistent
+         * registration list. */
+        list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
+            if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
+                    rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            ripcp = malloc(sizeof(*ripcp));
+            if (!ripcp) {
+                PE("%s: ripcp allocation failed\n", __func__);
+            } else {
+                memset(ripcp, 0, sizeof(*ripcp));
+                rina_name_copy(&ripcp->dif_name, dif_name);
+                ripcp->ipcp_id = ipcp_id;
+                rina_name_copy(&ripcp->ipcp_name, ipcp_name);
+                list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
+            }
+        }
+    } else {
+        /* Remove a registration element from the persistent
+         * registration list. */
+        list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
+            if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
+                    rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) {
+                list_del(&ripcp->node);
+                free(ripcp);
+                break;
+            }
+        }
+    }
+}
+
 uint8_t
 rina_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *dif_name,
@@ -69,34 +116,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
                                   0, NULL, ipcp_name);
 
     if (result == 0) {
-        struct registered_ipcp *ripcp;
-
-        if (reg) {
-            /* Append a successful registration to the persistent
-             * registration list. */
-            ripcp = malloc(sizeof(*ripcp));
-            if (!ripcp) {
-                PE("%s: ripcp allocation failed\n", __func__);
-            } else {
-                memset(ripcp, 0, sizeof(*ripcp));
-                rina_name_copy(&ripcp->dif_name, dif_name);
-                ripcp->ipcp_id = ipcp_id;
-                rina_name_copy(&ripcp->ipcp_name, ipcp_name);
-                list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
-            }
-        } else {
-            /* Remove a registration element from the persistent
-             * registration list. */
-            list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-                if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
-                        rina_name_cmp(&ripcp->ipcp_name,
-                            ipcp_name) == 0) {
-                    list_del(&ripcp->node);
-                    free(ripcp);
-                    break;
-                }
-            }
-        }
+        track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
     }
 
     return result;
