@@ -14,6 +14,7 @@
 
 struct rinaperf_test_config {
     uint32_t ty;
+    uint32_t size;
     uint32_t cnt;
 };
 
@@ -39,6 +40,7 @@ client_test_config(struct rinaperf *rp)
 
     cfg.ty = htole32(cfg.ty);
     cfg.cnt = htole32(cfg.cnt);
+    cfg.size = htole32(cfg.size);
 
     ret = write(rp->dfd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
@@ -71,8 +73,10 @@ server_test_config(struct rinaperf *rp)
 
     cfg.ty = le32toh(cfg.ty);
     cfg.cnt = le32toh(cfg.cnt);
+    cfg.size = le32toh(cfg.size);
 
-    printf("Configuring test type %u, SDU count %u\n", cfg.ty, cfg.cnt);
+    printf("Configuring test type %u, SDU count %u, SDU size %u\n",
+                cfg.ty, cfg.cnt, cfg.size);
 
     rp->test_config = cfg;
 
@@ -86,7 +90,7 @@ echo_client(struct rinaperf *rp)
     unsigned long us;
     int ret;
     char buf[4096];
-    int size = 10;
+    int size = rp->test_config.size;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
@@ -240,13 +244,14 @@ main(int argc, char **argv)
     struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
     int cnt = 1;
+    int size = 1;
     int ret;
     int opt;
     int i;
 
     assert(sizeof(client_descs) == sizeof(server_descs));
 
-    while ((opt = getopt(argc, argv, "lt:d:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "lt:d:c:s:")) != -1) {
         switch (opt) {
             case 'l':
                 listen = 1;
@@ -263,8 +268,15 @@ main(int argc, char **argv)
             case 'c':
                 cnt = atoi(optarg);
                 if (cnt <= 0) {
-                    printf("    Invalid cnt %d\n", cnt);
+                    printf("    Invalid 'cnt' %d\n", cnt);
                     return -1;
+                }
+                break;
+
+            case 's':
+                size = atoi(optarg);
+                if (cnt <= 0) {
+                    printf("    Invalid 'size' %d\n", size);
                 }
                 break;
 
@@ -291,6 +303,7 @@ main(int argc, char **argv)
     }
     rp.test_config.ty = i;
     rp.test_config.cnt = cnt;
+    rp.test_config.size = size;
 
     /* Initialization of RINA application library. */
     ret = rina_application_init(&rp.application);
