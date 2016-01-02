@@ -38,6 +38,19 @@ struct rlite_flow {
     struct list_head node;
 };
 
+struct rlite_ctrl {
+    /* File descriptor for the RLITE control device ("/dev/rlite") */
+    int rfd;
+
+    /* A FIFO queue that stores pending RLITE events. */
+    /* A FIFO queue that stores expired events, that can be
+     * returned when user calls rl_ctrl_wait() or rl_ctrl_wait_any(). */
+    struct list_head pqueue;
+
+    struct list_head ipcps;
+
+};
+
 struct rlite_evloop;
 
 /* The signature of a response handler. */
@@ -52,6 +65,8 @@ typedef void (*rl_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
 typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop, void *arg);
 
 struct rlite_evloop {
+    struct rlite_ctrl ctrl;
+
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
 
@@ -63,12 +78,6 @@ struct rlite_evloop {
 
     /* Table containing the kernel handlers. */
     rlite_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
-
-    /* File descriptor for the RLITE control device ("/dev/rlite") */
-    int rfd;
-
-    /* A FIFO queue that stores pending RLITE events. */
-    struct list_head pqueue;
 
     /* What event-id to use for the next request issued to the kernel. */
     uint32_t event_id_counter;
@@ -89,13 +98,12 @@ struct rlite_evloop {
     int timer_events_cnt;
     int timer_next_id;
 
-    /* Used to store the list of ipcp entries fetched from kernel.
-     * User can only access the 'ipcps'. The other ones are private. */
+    /* Used to store the list of flow entries fetched from kernel.
+     * User can only access the 'flows'. The other ones are private. */
     struct list_head *flows;
     struct list_head *flows_next;
     struct list_head flows_lists[2];
 
-    struct list_head ipcps;
     rlite_resp_handler_t usr_ipcp_update;
 };
 
@@ -170,6 +178,24 @@ rlite_lookup_ipcp_addr_by_id(struct rlite_evloop *loop, unsigned int id,
 
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id);
+
+int
+rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);
+
+int
+rl_ctrl_fini(struct rlite_ctrl *ctrl);
+
+int
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl);
+
+int
+rl_ctrl_register(struct rlite_ctrl *ctrl);
+
+struct rlite_msg_base *
+rl_ctrl_wait(struct rlite_ctrl *ctrl);
+
+struct rlite_msg_base *
+rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
 
 #ifdef __cplusplus
 }

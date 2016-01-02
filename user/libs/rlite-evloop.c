@@ -38,7 +38,7 @@ struct rlite_tmr_event {
 };
 
 static void
-rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
+rlite_ipcps_purge(struct list_head *ipcps)
 {
     struct rlite_ipcp *rlite_ipcp, *tmp;
 
@@ -56,7 +56,7 @@ rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
 }
 
 static void
-rlite_flows_purge(struct rlite_evloop *loop, struct list_head *flows)
+rlite_flows_purge(struct list_head *flows)
 {
     struct rlite_flow *rlite_flow, *tmp;
 
@@ -88,7 +88,7 @@ flow_fetch_resp(struct rlite_evloop *loop,
         tmp = loop->flows;
         loop->flows = loop->flows_next;
         loop->flows_next = tmp;
-        rlite_flows_purge(loop, loop->flows_next);
+        rlite_flows_purge(loop->flows_next);
 
         pthread_mutex_unlock(&loop->lock);
 
@@ -133,7 +133,7 @@ ipcp_update(struct rlite_evloop *loop,
 
     pthread_mutex_lock(&loop->lock);
 
-    list_for_each_entry(cur, &loop->ipcps, node) {
+    list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
         if (cur->ipcp_id == upd->ipcp_id) {
             rlite_ipcp = cur;
             break;
@@ -189,7 +189,7 @@ ipcp_update(struct rlite_evloop *loop,
         rina_name_copy(&rlite_ipcp->ipcp_name, &upd->ipcp_name);
         rlite_ipcp->dif_name = strdup(upd->dif_name);
 
-        list_add_tail(&rlite_ipcp->node, &loop->ipcps);
+        list_add_tail(&rlite_ipcp->node, &loop->ctrl.ipcps);
     }
 
 out:
@@ -259,7 +259,7 @@ rlite_ipcps_print(struct rlite_evloop *loop)
     pthread_mutex_lock(&loop->lock);
 
     PI_S("IPC Processes table:\n");
-    list_for_each_entry(rlite_ipcp, &loop->ipcps, node) {
+    list_for_each_entry(rlite_ipcp, &loop->ctrl.ipcps, node) {
             char *ipcp_name_s = NULL;
 
             ipcp_name_s = rina_name_to_string(&rlite_ipcp->ipcp_name);
@@ -372,10 +372,10 @@ evloop_function(void *arg)
         struct timeval *top = NULL;
         fd_set rdfs;
         int ret;
-        int maxfd = MAX(loop->rfd, loop->eventfd);
+        int maxfd = MAX(loop->ctrl.rfd, loop->eventfd);
 
         FD_ZERO(&rdfs);
-        FD_SET(loop->rfd, &rdfs);
+        FD_SET(loop->ctrl.rfd, &rdfs);
         FD_SET(loop->eventfd, &rdfs);
         list_for_each_entry(fdcb, &loop->fdcbs, node) {
             FD_SET(fdcb->fd, &rdfs);
@@ -486,7 +486,7 @@ evloop_function(void *arg)
                 }
             }
 
-            if (!FD_ISSET(loop->rfd, &rdfs)) {
+            if (!FD_ISSET(loop->ctrl.rfd, &rdfs)) {
                 /* We did some fdcb processing, but no events are
                  * available on the rina control device. */
                 continue;
@@ -494,7 +494,7 @@ evloop_function(void *arg)
         }
 
         /* Read the next message posted by the kernel. */
-        ret = read(loop->rfd, serbuf, sizeof(serbuf));
+        ret = read(loop->ctrl.rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
             perror("read(rfd)");
             continue;
@@ -543,7 +543,8 @@ evloop_function(void *arg)
         pthread_mutex_lock(&loop->lock);
         /* Try to match the event_id in the response to the event_id of
          * a previous request. */
-        req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
+        req_entry = pending_queue_remove_by_event_id(&loop->ctrl.pqueue,
+                                                     resp->event_id);
         pthread_mutex_unlock(&loop->lock);
 
         if (!req_entry) {
@@ -668,7 +669,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         entry->wait_for_completion = wait_for_completion;
         entry->op_complete = 0;
         pthread_cond_init(&entry->op_complete_cond, NULL);
-        list_add_tail(&entry->node, &loop->pqueue);
+        list_add_tail(&entry->node, &loop->ctrl.pqueue);
     }
 
     /* Serialize the message. */
@@ -687,14 +688,15 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
                                 serbuf, msg);
 
     /* Issue the request to the kernel. */
-    ret = write(loop->rfd, serbuf, serlen);
+    ret = write(loop->ctrl.rfd, serbuf, serlen);
     if (ret != serlen) {
         /* System call reports an error (incomplete write is not acceptable)
          * for a rina control device. */
 
         if (has_response) {
             /* Remove the entry from the pending queue and free it. */
-            pending_queue_remove_by_event_id(&loop->pqueue, msg->event_id);
+            pending_queue_remove_by_event_id(&loop->ctrl.pqueue,
+                                             msg->event_id);
             free(entry);
         }
         if (ret < 0) {
@@ -788,14 +790,10 @@ rl_evloop_barrier(struct rlite_evloop *loop)
 
 int
 rl_evloop_init(struct rlite_evloop *loop, const char *dev,
-                 rlite_resp_handler_t *handlers,
-                 unsigned int flags)
+               rlite_resp_handler_t *handlers,
+               unsigned int flags)
 {
     int ret;
-
-    if (!dev) {
-        dev = "/dev/rlite";
-    }
 
     loop->flags = flags;
 
@@ -805,37 +803,23 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
         memset(loop->handlers, 0, sizeof(loop->handlers));
     }
     pthread_mutex_init(&loop->lock, NULL);
-    list_init(&loop->pqueue);
     loop->event_id_counter = 1;
     loop->flows= &loop->flows_lists[0];
     loop->flows_next = &loop->flows_lists[1];
     list_init(loop->flows);
     list_init(loop->flows_next);
-    list_init(&loop->ipcps);
     list_init(&loop->fdcbs);
     list_init(&loop->timer_events);
     pthread_mutex_init(&loop->timer_lock, NULL);
     loop->timer_events_cnt = 0;
     loop->timer_next_id = 0;
-    loop->rfd = -1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
     loop->running = 0;
     loop->usr_ipcp_update = NULL;
 
-    /* Open the RLITE control device. */
-    loop->rfd = open(dev, O_RDWR);
-    if (loop->rfd < 0) {
-        PE("Cannot open '%s'\n", dev);
-        perror("open(ctrldev)");
-        return loop->rfd;
-    }
-
-    /* Set non-blocking operation for the RLITE control device, so that
-     * the event-loop can synchronize with the kernel through select(). */
-    ret = fcntl(loop->rfd, F_SETFL, O_NONBLOCK);
+    ret = rl_ctrl_init(&loop->ctrl, dev);
     if (ret) {
-        perror("fcntl(O_NONBLOCK)");
         return ret;
     }
 
@@ -930,9 +914,8 @@ rl_evloop_fini(struct rlite_evloop *loop)
     rl_evloop_stop(loop);
 
     pthread_mutex_lock(&loop->lock);
-    rlite_flows_purge(loop, loop->flows);
-    rlite_flows_purge(loop, loop->flows_next);
-    rlite_ipcps_purge(loop, &loop->ipcps);
+    rlite_flows_purge(loop->flows);
+    rlite_flows_purge(loop->flows_next);
     pthread_mutex_unlock(&loop->lock);
 
     {
@@ -959,20 +942,17 @@ rl_evloop_fini(struct rlite_evloop *loop)
         pthread_mutex_unlock(&loop->timer_lock);
     }
 
-    pending_queue_fini(&loop->pqueue);
+    pending_queue_fini(&loop->ctrl.pqueue);
 
     if ((loop->flags & RLITE_EVLOOP_SPAWN)) {
         rl_evloop_join(loop);
     }
 
-    /* Clean up all the data structures. To be completed. */
     if (loop->eventfd >= 0) {
         close(loop->eventfd);
     }
 
-    if (loop->rfd >= 0) {
-        close(loop->rfd);
-    }
+    rl_ctrl_fini(&loop->ctrl);
 
     return 0;
 }
@@ -1052,7 +1032,7 @@ rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
 
     if (dif_name) {
         /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &loop->ipcps, node) {
+        list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
             if (strcmp(cur->dif_name, dif_name) == 0) {
                 pthread_mutex_unlock(&loop->lock);
                 return cur;
@@ -1064,7 +1044,7 @@ rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
-        list_for_each_entry(cur, &loop->ipcps, node) {
+        list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
             if ((strcmp(cur->dif_type, "normal") == 0 ||
                         !rlite_ipcp)) {
                 rlite_ipcp = cur;
@@ -1089,7 +1069,7 @@ rlite_lookup_ipcp_by_name(struct rlite_evloop *loop, const struct rina_name *nam
     pthread_mutex_lock(&loop->lock);
 
     if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &loop->ipcps, node) {
+        list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
             if (rina_name_valid(&ipcp->ipcp_name)
                     && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
                 pthread_mutex_unlock(&loop->lock);
@@ -1111,7 +1091,7 @@ rlite_lookup_ipcp_addr_by_id(struct rlite_evloop *loop, unsigned int id,
 
     pthread_mutex_lock(&loop->lock);
 
-    list_for_each_entry(ipcp, &loop->ipcps, node) {
+    list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
         if (ipcp->ipcp_id == id) {
             *addr = ipcp->ipcp_addr;
             pthread_mutex_unlock(&loop->lock);
@@ -1131,7 +1111,7 @@ rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id)
 
     pthread_mutex_lock(&loop->lock);
 
-    list_for_each_entry(ipcp, &loop->ipcps, node) {
+    list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
         if (rina_name_valid(&ipcp->ipcp_name) && ipcp->ipcp_id == id) {
             pthread_mutex_unlock(&loop->lock);
             return ipcp;
@@ -1229,4 +1209,72 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
     pthread_mutex_unlock(&loop->timer_lock);
 
     return ret;
+}
+
+
+int
+rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
+{
+    int ret;
+
+    if (!dev) {
+        dev = "/dev/rlite";
+    }
+
+    list_init(&ctrl->pqueue);
+    list_init(&ctrl->ipcps);
+
+    /* Open the RLITE control device. */
+    ctrl->rfd = open(dev, O_RDWR);
+    if (ctrl->rfd < 0) {
+        PE("Cannot open '%s'\n", dev);
+        perror("open(ctrldev)");
+        return ctrl->rfd;
+    }
+
+    /* Set non-blocking operation for the RLITE control device, so that
+     * we can synchronize with the kernel through select(). */
+    ret = fcntl(ctrl->rfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        perror("fcntl(O_NONBLOCK)");
+        return ret;
+    }
+
+    return 0;
+}
+
+int
+rl_ctrl_fini(struct rlite_ctrl *ctrl)
+{
+    if (ctrl->rfd >= 0) {
+        close(ctrl->rfd);
+    }
+
+    rlite_ipcps_purge(&ctrl->ipcps);
+
+    return 0;
+}
+
+int
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl)
+{
+    return 0;
+}
+
+int
+rl_ctrl_register(struct rlite_ctrl *ctrl)
+{
+    return 0;
+}
+
+struct rlite_msg_base *
+rl_ctrl_wait(struct rlite_ctrl *ctrl)
+{
+    return NULL;
+}
+
+struct rlite_msg_base *
+rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
+{
+    return NULL;
 }

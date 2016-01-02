@@ -419,7 +419,7 @@ uipcps_update(struct uipcps *uipcps)
 
     /* Create an userspace IPCP for each existing IPCP. */
     pthread_mutex_lock(&uipcps->loop.lock);
-    list_for_each_entry(rlite_ipcp, &uipcps->loop.ipcps, node) {
+    list_for_each_entry(rlite_ipcp, &uipcps->loop.ctrl.ipcps, node) {
         if (type_has_uipcp(rlite_ipcp->dif_type)) {
             ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id,
                             rlite_ipcp->dif_type);
