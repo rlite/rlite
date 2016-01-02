@@ -87,6 +87,7 @@ echo_client(struct rinaperf *rp)
     int ret;
     char buf[4096];
     int size = 10;
+    unsigned int i = 0;
 
     if (size > sizeof(buf)) {
         size = sizeof(buf);
@@ -112,25 +113,28 @@ echo_client(struct rinaperf *rp)
 
     gettimeofday(&t_start, NULL);
 
-    ret = write(rp->dfd, buf, size);
-    if (ret != size) {
-        if (ret < 0) {
-            perror("write(buf)");
-        } else {
-            printf("Partial write %d/%d\n", ret, size);
+    for (i = 0; i < rp->test_config.cnt; i++) {
+        ret = write(rp->dfd, buf, size);
+        if (ret != size) {
+            if (ret < 0) {
+                perror("write(buf)");
+            } else {
+                printf("Partial write %d/%d\n", ret, size);
+            }
         }
-    }
 
-    ret = read(rp->dfd, buf, sizeof(buf));
-    if (ret < 0) {
-        perror("read(buf");
+        ret = read(rp->dfd, buf, sizeof(buf));
+        if (ret < 0) {
+            perror("read(buf");
+        }
     }
 
     gettimeofday(&t_end, NULL);
     us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
             (t_end.tv_usec - t_start.tv_usec);
 
-    printf("SDU size: %d bytes, latency: %lu us\n", ret, us);
+    printf("SDU size: %d bytes, latency: %lu us\n", ret,
+            us/rp->test_config.cnt);
 
     close(rp->dfd);
 
@@ -141,22 +145,25 @@ static int
 echo_server(struct rinaperf *rp)
 {
     int n, ret;
+    unsigned int i;
     char buf[4096];
 
-    n = read(rp->dfd, buf, sizeof(buf));
-    if (n < 0) {
-        perror("read(flow)");
-        return -1;
-    }
-
-    ret = write(rp->dfd, buf, n);
-    if (ret != n) {
-        if (ret < 0) {
-            perror("write(flow)");
-        } else {
-            printf("partial write");
+    for (i = 0; i < rp->test_config.cnt; i++) {
+        n = read(rp->dfd, buf, sizeof(buf));
+        if (n < 0) {
+            perror("read(flow)");
+            return -1;
         }
-        return -1;
+
+        ret = write(rp->dfd, buf, n);
+        if (ret != n) {
+            if (ret < 0) {
+                perror("write(flow)");
+            } else {
+                printf("partial write");
+            }
+            return -1;
+        }
     }
 
     return 0;
@@ -232,13 +239,14 @@ main(int argc, char **argv)
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
+    int cnt = 1;
     int ret;
     int opt;
     int i;
 
     assert(sizeof(client_descs) == sizeof(server_descs));
 
-    while ((opt = getopt(argc, argv, "lt:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "lt:d:c:")) != -1) {
         switch (opt) {
             case 'l':
                 listen = 1;
@@ -250,6 +258,14 @@ main(int argc, char **argv)
 
             case 'd':
                 dif_name = optarg;
+                break;
+
+            case 'c':
+                cnt = atoi(optarg);
+                if (cnt <= 0) {
+                    printf("    Invalid cnt %d\n", cnt);
+                    return -1;
+                }
                 break;
 
             default:
@@ -274,7 +290,7 @@ main(int argc, char **argv)
         return -1;
     }
     rp.test_config.ty = i;
-    rp.test_config.cnt = 1;
+    rp.test_config.cnt = cnt;
 
     /* Initialization of RINA application library. */
     ret = rina_application_init(&rp.application);
