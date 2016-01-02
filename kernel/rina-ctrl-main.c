@@ -458,6 +458,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
          const struct rina_name *local_application,
          const struct rina_name *remote_application,
+         const struct rina_flow_config *flowcfg,
          struct flow_entry **pentry, int locked)
 {
     struct flow_entry *entry;
@@ -490,6 +491,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         dtp_init(&entry->dtp);
+        if (flowcfg) {
+            memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
+        }
         ipcp->refcnt++;
     } else {
         kfree(entry);
@@ -888,7 +892,7 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
                                   &req->local_application,
-                                  &req->remote_application, 0);
+                                  &req->remote_application, &req->flowcfg, 0);
     }
 
     mutex_unlock(&rina_dm.lock);
@@ -969,7 +973,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, &flow_entry, 0);
+                   remote_application, &req->flowcfg, &flow_entry, 0);
     if (ret) {
         goto out;
     }
@@ -991,7 +995,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * arguments. */
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                       ipcp_entry->addr, remote_application,
-                                      local_application, 0);
+                                      local_application, &req->flowcfg, 0);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
              * to this IPCP. */
@@ -1178,6 +1182,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
                     uint32_t remote_port, uint64_t remote_addr,
                     const struct rina_name *local_application,
                     const struct rina_name *remote_application,
+                    const struct rina_flow_config *flowcfg,
                     bool locked)
 {
     struct flow_entry *flow_entry = NULL;
@@ -1202,7 +1207,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     upper.ipcp = NULL;
     upper.userspace = 1;
     ret = flow_add(ipcp, upper, 0, local_application,
-                   remote_application, &flow_entry, 0);
+                   remote_application, flowcfg, &flow_entry, 0);
     if (ret) {
         goto out;
     }

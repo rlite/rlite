@@ -115,6 +115,7 @@ struct flow_entry {
     uint32_t            event_id; /* requestor event id */
     struct txrx         txrx;
     struct dtp          dtp;
+    struct rina_flow_config cfg;
 
     struct mutex        lock; /* Unused */
     unsigned int        refcnt;
@@ -129,6 +130,7 @@ int rina_fa_req_arrived(struct ipcp_entry *ipcp,
                         uint32_t remote_port, uint64_t remote_addr,
                         const struct rina_name *local_application,
                         const struct rina_name *remote_application,
+                        const struct rina_flow_config *flowcfg,
                         bool locked);
 
 int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
