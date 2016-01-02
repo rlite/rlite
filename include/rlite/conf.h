@@ -37,7 +37,7 @@ rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
 
 /* Fetch information about all flows in the system. */
 int
-rl_conf_flows_print(struct list_head *flows);
+rl_conf_flows_print(struct rlite_ctrl *ctrl, struct list_head *flows);
 
 int
 rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows);

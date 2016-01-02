@@ -353,7 +353,7 @@ flows_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 
     list_init(&flows);
     rl_conf_flows_fetch(ctrl, &flows);
-    rl_conf_flows_print(&flows);
+    rl_conf_flows_print(ctrl, &flows);
     rl_conf_flows_purge(&flows);
 
     return 0;

@@ -60,12 +60,7 @@ struct arpt_entry {
     bool fa_req_arrived;
 
     /* Statistics. */
-    unsigned int tx_pkt;
-    unsigned int tx_byte;
-    unsigned int tx_err;
-    unsigned int rx_pkt;
-    unsigned int rx_byte;
-    unsigned int rx_err;
+    struct rl_flow_stats stats;
 
     struct list_head node;
 };
@@ -419,8 +414,7 @@ rlite_shim_eth_fa_req(struct ipcp_entry *ipcp,
     entry->rx_tmpq_len = 0;
     arpt_flow_bind(entry, flow);
 
-    entry->tx_pkt = entry->tx_byte = entry->tx_err = 0;
-    entry->rx_pkt = entry->rx_byte = entry->rx_err = 0;
+    rl_flow_stats_init(&entry->stats);
 
     list_add_tail(&entry->node, &priv->arp_table);
 
@@ -685,8 +679,8 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
     }
 
     if (likely(flow)) {
-        entry->rx_pkt++;
-        entry->rx_byte += rb->len;
+        entry->stats.rx_pkt++;
+        entry->stats.rx_byte += rb->len;
         spin_unlock_bh(&priv->arpt_lock);
 
         rlite_sdu_rx_flow(priv->ipcp, flow, rb, true);
@@ -748,14 +742,14 @@ enq:
         entry->rx_tmpq_len++;
     }
 
-    entry->rx_pkt++;
-    entry->rx_byte += rb->len;
+    entry->stats.rx_pkt++;
+    entry->stats.rx_byte += rb->len;
 
     spin_unlock_bh(&priv->arpt_lock);
     return;
 
 drop:
-    entry->rx_err++;
+    entry->stats.rx_err++;
     spin_unlock_bh(&priv->arpt_lock);
     rlite_buf_free(rb);
 }
@@ -850,8 +844,8 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     priv->ntu++;
 
     /* Also per-flow TX statistics are protected by the tx_lock. */
-    entry->tx_pkt++;
-    entry->tx_byte += rb->len;
+    entry->stats.tx_pkt++;
+    entry->stats.tx_byte += rb->len;
 
     spin_unlock(&priv->tx_lock);
 
@@ -887,9 +881,9 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         RPD(5, "dev_queue_xmit() error %d\n", ret);
 
         spin_lock(&priv->tx_lock);
-        entry->tx_pkt--;
-        entry->tx_byte -= rb->len;
-        entry->tx_err++;
+        entry->stats.tx_pkt--;
+        entry->stats.tx_byte -= rb->len;
+        entry->stats.tx_err++;
         spin_unlock(&priv->tx_lock);
     }
 
@@ -979,15 +973,15 @@ rlite_shim_eth_flow_get_stats(struct flow_entry *flow,
     struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp;
 
     spin_lock_bh(&priv->tx_lock);
-    resp->tx_pkt = flow_priv->tx_pkt;
-    resp->tx_byte = flow_priv->tx_byte;
-    resp->tx_err = flow_priv->tx_err;
+    resp->stats.tx_pkt = flow_priv->stats.tx_pkt;
+    resp->stats.tx_byte = flow_priv->stats.tx_byte;
+    resp->stats.tx_err = flow_priv->stats.tx_err;
     spin_unlock_bh(&priv->tx_lock);
 
     spin_lock_bh(&priv->arpt_lock);
-    resp->rx_pkt = flow_priv->rx_pkt;
-    resp->rx_byte = flow_priv->rx_byte;
-    resp->rx_err = flow_priv->rx_err;
+    resp->stats.rx_pkt = flow_priv->stats.rx_pkt;
+    resp->stats.rx_byte = flow_priv->stats.rx_byte;
+    resp->stats.rx_err = flow_priv->stats.rx_err;
     spin_unlock_bh(&priv->arpt_lock);
 
     return 0;

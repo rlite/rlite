@@ -143,6 +143,22 @@ struct rlite_flow_spec {
     char cubename[32];  /* This is just temporary. */
 };
 
+struct rl_flow_stats {
+    uint64_t tx_pkt;
+    uint64_t tx_byte;
+    uint64_t tx_err;
+    uint64_t rx_pkt;
+    uint64_t rx_byte;
+    uint64_t rx_err;
+    /*uint64_t unused[6];*/
+};
+
+static inline void
+rl_flow_stats_init(struct rl_flow_stats *stats) {
+    stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
+    stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
+}
+
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */

@@ -35,6 +35,8 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
 
     resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id);
     if (!resp) {
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                       RLITE_MB(&msg));
         return -1;
     }
 
@@ -204,18 +206,66 @@ rl_conf_flows_purge(struct list_head *flows)
 }
 
 int
-rl_conf_flows_print(struct list_head *flows)
+rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, unsigned int port_id,
+                       struct rl_flow_stats *stats)
+{
+    struct rl_kmsg_flow_stats_req msg;
+    struct rl_kmsg_flow_stats_resp *resp;
+    int ret;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_type = RLITE_KER_FLOW_STATS_REQ;
+    msg.event_id = rl_ctrl_get_id(ctrl);
+    msg.port_id = port_id;
+
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    if (ret < 0) {
+        PE("Failed to issue request to the kernel\n");
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                       RLITE_MB(&msg));
+        return -1;
+    }
+
+    resp = (struct rl_kmsg_flow_stats_resp *)rl_ctrl_wait(ctrl, msg.event_id);
+    if (!resp) {
+        return -1;
+    }
+
+    *stats = resp->stats;
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&msg));
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(resp));
+    free(resp);
+
+    return 0;
+}
+
+int
+rl_conf_flows_print(struct rlite_ctrl *ctrl, struct list_head *flows)
 {
     struct rlite_flow *rlite_flow;
 
     PI_S("Flows table:\n");
     list_for_each_entry(rlite_flow, flows, node) {
-            PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
-                    "local_addr = %llu, remote_addr = %llu\n",
-                        rlite_flow->ipcp_id, rlite_flow->local_port,
-                        rlite_flow->remote_port,
-                        (long long unsigned int)rlite_flow->local_addr,
-                        (long long unsigned int)rlite_flow->remote_addr);
+        struct rl_flow_stats stats;
+        int ret;
+
+        PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
+             "local_addr = %llu, remote_addr = %llu\n",
+                rlite_flow->ipcp_id, rlite_flow->local_port,
+                rlite_flow->remote_port,
+                (long long unsigned int)rlite_flow->local_addr,
+                (long long unsigned int)rlite_flow->remote_addr);
+
+        ret = rl_conf_flow_get_stats(ctrl, rlite_flow->local_port, &stats);
+        if (!ret) {
+            PI_S("      tx_pkt: %lu, tx_byte: %lu, tx_err: %lu\n"
+                 "      rx_pkt: %lu, rx_byte: %lu, rx_err: %lu\n\n",
+                 stats.tx_pkt, stats.tx_byte, stats.tx_err, stats.rx_pkt,
+                 stats.rx_byte, stats.rx_err);
+        }
     }
 
     return 0;

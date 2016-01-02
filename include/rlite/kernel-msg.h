@@ -296,13 +296,7 @@ struct rl_kmsg_flow_stats_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint64_t tx_pkt;
-    uint64_t tx_byte;
-    uint64_t tx_err;
-    uint64_t rx_pkt;
-    uint64_t rx_byte;
-    uint64_t rx_err;
-    uint64_t unused[6];
+    struct rl_flow_stats stats;
 } __attribute__((packed));
 
 #endif  /* __RLITE_KER_H__ */

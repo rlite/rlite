@@ -1698,22 +1698,26 @@ rlite_flow_get_stats(struct rlite_ctrl *rc,
 {
     struct rl_kmsg_flow_stats_req *req =
                 (struct rl_kmsg_flow_stats_req *)bmsg;
+    struct rl_kmsg_flow_stats_resp resp;
     struct flow_entry *flow;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret = 0;
 
     flow = flow_get(req->port_id);
-    if (flow && flow->txrx.ipcp->ops.flow_get_stats) {
-        struct rl_kmsg_flow_stats_resp resp;
+    if (!flow) {
+        return -EINVAL;
+    }
 
+    memset(&resp, 0, sizeof(resp));
+    resp.msg_type = RLITE_KER_FLOW_STATS_RESP;
+    resp.event_id = req->event_id;
+
+    if (flow->txrx.ipcp->ops.flow_get_stats) {
         ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp);
-        if (ret == 0) {
-            ret = rlite_upqueue_append(rc, (const struct rlite_msg_base *)
-                                           &resp);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(&resp));
-        }
     }
     flow_put(flow);
+
+    ret = rlite_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ret;
 }
