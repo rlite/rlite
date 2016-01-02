@@ -104,6 +104,34 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     return result;
 }
 
+int
+uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
+{
+    struct rina_kmsg_ipcp_pduft_flush *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("Out of memory\n");
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_PDUFT_FLUSH;
+    req->ipcp_id = ipcp_id;
+
+    PD("Requesting IPCP pdu forwarding table flush...\n");
+
+    resp = rinalite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req),
+                                  sizeof(*req), 0, 0, &result);
+    assert(!resp);
+    PD("result: %d\n", result);
+
+    return result;
+}
+
 static int
 uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                      uint64_t remote_addr,

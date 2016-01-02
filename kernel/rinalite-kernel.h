@@ -45,6 +45,7 @@ struct ipcp_ops {
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
+    int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*dft_set)(struct ipcp_entry *ipcp, const struct rina_name *appl_name,
                    uint64_t remote_addr);
     int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,

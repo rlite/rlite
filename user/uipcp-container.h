@@ -50,6 +50,7 @@ int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcps_fetch(struct uipcps *uipcps);
+int uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id);
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
 int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,

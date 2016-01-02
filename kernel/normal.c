@@ -580,6 +580,27 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
 }
 
 static int
+rina_normal_pduft_flush(struct ipcp_entry *ipcp)
+{
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct pduft_entry *entry;
+    struct hlist_node *tmp;
+    int bucket;
+
+    spin_lock_bh(&priv->pduft_lock);
+
+    hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
+        list_del(&entry->fnode);
+        hash_del(&entry->node);
+        kfree(entry);
+    }
+
+    spin_unlock_bh(&priv->pduft_lock);
+
+    return 0;
+}
+
+static int
 rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
@@ -1089,6 +1110,7 @@ static struct ipcp_factory normal_factory = {
     .ops.sdu_write = rina_normal_sdu_write,
     .ops.config = rina_normal_config,
     .ops.pduft_set = rina_normal_pduft_set,
+    .ops.pduft_flush = rina_normal_pduft_flush,
     .ops.pduft_del = rina_normal_pduft_del,
     .ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write,
     .ops.sdu_rx = rina_normal_sdu_rx,

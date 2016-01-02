@@ -53,6 +53,9 @@ struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_KERN_IPCP_PDUFT_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_pduft_set),
     },
+    [RINA_KERN_IPCP_PDUFT_FLUSH] = {
+        .copylen = sizeof(struct rina_kmsg_ipcp_pduft_flush),
+    },
     [RINA_KERN_IPCP_UIPCP_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_uipcp_set),
     },

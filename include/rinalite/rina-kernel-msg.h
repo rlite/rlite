@@ -30,9 +30,10 @@ enum {
     RINA_KERN_FA_REQ_ARRIVED, /* 10 */
     RINA_KERN_IPCP_CONFIG, /* 11 */
     RINA_KERN_IPCP_PDUFT_SET, /* 12 */
-    RINA_KERN_IPCP_UIPCP_SET, /* 13 */
-    RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 14 */
-    RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 15 */
+    RINA_KERN_IPCP_PDUFT_FLUSH, /* 13 */
+    RINA_KERN_IPCP_UIPCP_SET, /* 14 */
+    RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 15 */
+    RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 16 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -72,12 +73,7 @@ struct rina_kmsg_ipcp_create_resp {
 } __attribute__((packed));
 
 /* application --> kernel message to destroy an IPC process. */
-struct rina_kmsg_ipcp_destroy {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-
-    uint16_t ipcp_id;
-} __attribute__((packed));
+#define rina_kmsg_ipcp_destroy rina_kmsg_ipcp_create_resp
 
 /* application <-- kernel message to fetch IPC process information. */
 struct rina_kmsg_fetch_ipcp_resp {
@@ -174,6 +170,9 @@ struct rina_kmsg_ipcp_pduft_set {
      * can be reached. */
     uint16_t local_port;
 } __attribute__((packed));
+
+/* application --> kernel message to flush the PDUFT of an IPC Process. */
+#define rina_kmsg_ipcp_pduft_flush rina_kmsg_ipcp_create_resp
 
 /* uipcp (application) --> kernel to tell the kernel that this event
  * loop corresponds to an uipcp. */

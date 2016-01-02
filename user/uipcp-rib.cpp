@@ -481,7 +481,8 @@ uipcp_rib::pduft_sync()
 {
     map<uint64_t, unsigned int> next_hop_to_port_id;
 
-    /* TODO Here we should also flush previous entries. */
+    /* Flush previous entries. */
+    uipcp_pduft_flush(uipcp, uipcp->ipcp_id);
 
     /* Precompute the port-ids corresponding to all the possible
      * next-hops. */

@@ -1257,6 +1257,31 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
+rina_ipcp_pduft_flush(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_pduft_flush *req =
+                    (struct rina_kmsg_ipcp_pduft_flush *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    ipcp = ipcp_get(req->ipcp_id);
+
+    if (ipcp && ipcp->ops.pduft_flush) {
+        mutex_lock(&ipcp->lock);
+        ret = ipcp->ops.pduft_flush(ipcp);
+        mutex_unlock(&ipcp->lock);
+    }
+
+    ipcp_put(ipcp);
+
+    if (ret == 0) {
+        printk("Flushed PDUFT for IPC process %u\n", req->ipcp_id);
+    }
+
+    return ret;
+}
+
+static int
 rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_uipcp_set *req =
@@ -1806,6 +1831,7 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
+    [RINA_KERN_IPCP_PDUFT_FLUSH] = rina_ipcp_pduft_flush,
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_FA_REQ] = rina_fa_req,
     [RINA_KERN_FA_RESP] = rina_fa_resp,
