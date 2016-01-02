@@ -59,6 +59,12 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
+    ret = serialize_rina_msg(rina_shim_hv_numtables, serbuf, msg);
+    if (ret != serlen) {
+        printk("%s: Error while serializing\n", __func__);
+        return -EINVAL;
+    }
+
     iov.iov_base = serbuf;
     iov.iov_len = serlen;
     ret = priv->vmpi_ops.write(&priv->vmpi_ops, 0, &iov, 1);
@@ -84,6 +90,13 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         if (ret) {
             goto des_fail;
         }
+
+        ret = rina_flow_allocate_req_arrived(priv->ipcp, req.local_port,
+                    &req.remote_application, &req.local_application);
+        if (ret) {
+            printk("%s: failed to report flow allocation request\n",
+                    __func__);
+        }
     } else if (ty == RINA_SHIM_HV_FLOW_ALLOCATE_RESP) {
         struct rina_hmsg_flow_allocate_resp resp;
 
@@ -91,6 +104,13 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
                                    &resp, sizeof(resp));
         if (ret) {
             goto des_fail;
+        }
+
+        ret = rina_flow_allocate_resp_arrived(priv->ipcp, resp.remote_port,
+                resp.local_port, resp.response);
+        if (ret) {
+            printk("%s: failed to report flow allocation response\n",
+                    __func__);
         }
     } else {
         printk("%s: unknown ctrl msg type %u\n", __func__, ty);
@@ -122,6 +142,8 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
         printk("%s: Out of memory\n", __func__);
         return;
     }
+
+    memcpy(rb->ptr, buf, len);
 
     rina_sdu_rx(priv->ipcp, rb, channel - 1);
 }
@@ -210,7 +232,15 @@ rina_shim_hv_flow_allocate_resp(struct ipcp_entry *ipcp,
                                    struct flow_entry *flow,
                                    uint8_t response)
 {
-    return -1;
+    struct rina_hmsg_flow_allocate_resp resp;
+
+    resp.msg_type = RINA_SHIM_HV_FLOW_ALLOCATE_RESP;
+    resp.event_id = 0;
+    resp.local_port = flow->local_port;
+    resp.remote_port = flow->remote_port;
+    resp.response = response;
+
+    return shim_hv_send_ctrl_msg(ipcp, (struct rina_msg_base *)&resp);
 }
 
 static int
@@ -255,7 +285,7 @@ rina_shim_hv_init(void)
 static void __exit
 rina_shim_hv_fini(void)
 {
-    rina_ipcp_factory_unregister(DIF_TYPE_SHIM_DUMMY);
+    rina_ipcp_factory_unregister(DIF_TYPE_SHIM_HV);
 }
 
 module_init(rina_shim_hv_init);

@@ -176,6 +176,7 @@ serialize_rina_msg(struct rina_msg_layout *numtables,
 
     return serlen;
 }
+COMMON_EXPORT(serialize_rina_msg);
 
 /* Deserialize from serbuf into msgbuf. */
 int
