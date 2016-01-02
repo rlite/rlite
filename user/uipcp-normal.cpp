@@ -626,9 +626,9 @@ normal_fa_req(struct rlite_evloop *loop,
 }
 
 static int
-normal_fa_req_arrived(struct rlite_evloop *loop,
-                      const struct rina_msg_base_resp *b_resp,
-                      const struct rina_msg_base *b_req)
+neigh_fa_req_arrived(struct rlite_evloop *loop,
+                     const struct rina_msg_base_resp *b_resp,
+                     const struct rina_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -736,6 +736,9 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
+    return rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                    neigh_fa_req_arrived);
+
     return 0;
 }
 
@@ -807,7 +810,6 @@ struct uipcp_ops normal_ops = {
     .appl_register = normal_appl_register,
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
-    .neigh_fa_req_arrived = normal_fa_req_arrived,
     .flow_deallocated = normal_flow_deallocated,
 };
 

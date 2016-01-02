@@ -58,10 +58,6 @@ struct uipcp_ops {
                    const struct rina_msg_base_resp *b_resp,
                    const struct rina_msg_base *b_req);
 
-    int (*neigh_fa_req_arrived)(struct rlite_evloop *loop,
-                                const struct rina_msg_base_resp *b_resp,
-                                const struct rina_msg_base *b_req);
-
     int (*flow_deallocated)(struct rlite_evloop *loop,
                             const struct rina_msg_base_resp *b_resp,
                             const struct rina_msg_base *b_req);

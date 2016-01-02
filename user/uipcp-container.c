@@ -280,9 +280,6 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
         goto err1;
     }
 
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
-                                   uipcp->ops.neigh_fa_req_arrived);
-
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
