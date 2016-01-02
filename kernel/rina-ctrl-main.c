@@ -1323,9 +1323,59 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 }
 
 static ssize_t
-rina_io_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
+rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
-    return -ENXIO;
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct flow_entry *flow = rio->flow;
+    DECLARE_WAITQUEUE(wait, current);
+    ssize_t ret = 0;
+
+    if (unlikely(!flow)) {
+        return -ENXIO;
+    }
+
+    add_wait_queue(&flow->rxq_wqh, &wait);
+    while (len) {
+        ssize_t copylen;
+        struct rina_buf *rb;
+
+        current->state = TASK_INTERRUPTIBLE;
+
+        spin_lock(&flow->rxq_lock);
+        if (list_empty(&flow->rxq)) {
+            spin_unlock(&flow->rxq_lock);
+            if (signal_pending(current)) {
+                ret = -ERESTARTSYS;
+                break;
+            }
+
+            /* Nothing to read, let's sleep. */
+            schedule();
+            continue;
+        }
+
+        rb = list_first_entry(&flow->rxq, struct rina_buf, node);
+        list_del(&rb->node);
+        spin_unlock(&flow->rxq_lock);
+
+        copylen = rb->size;
+        if (copylen > len) {
+            copylen = len;
+        }
+        ret = copylen;
+        if (unlikely(copy_to_user(ubuf, rb->ptr, copylen))) {
+            ret = -EFAULT;
+        }
+
+        kfree(rb->ptr);
+
+        break;
+    }
+
+    current->state = TASK_RUNNING;
+    remove_wait_queue(&flow->rxq_wqh, &wait);
+
+    return ret;
 }
 
 static unsigned int
