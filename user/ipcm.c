@@ -37,227 +37,10 @@ struct registered_ipcp {
  */
 static struct ipcm gipcm;
 
-/* Kernel response handlers. */
-static int
-ipcp_create_resp(struct rina_evloop *loop,
-                 const struct rina_msg_base_resp *b_resp,
-                 const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_ipcp_create_resp *resp =
-            (struct rina_kmsg_ipcp_create_resp *)b_resp;
-    struct rina_kmsg_ipcp_create *req =
-            (struct rina_kmsg_ipcp_create *)b_req;
-
-    PI("%s: Assigned id %d\n", __func__, resp->ipcp_id);
-    (void)req;
-
-    return 0;
-}
-
-/* The table containing all kernel response handlers, executed
- * in the event-loop context.
- * Response handlers must not call issue_request(), in
- * order to avoid deadlocks.
- * These would happen because issue_request() may block for
- * completion, and is waken up by the event-loop thread itself.
- * Therefore, the event-loop thread would wait for itself, i.e.
- * we would have a deadlock. */
+/* Empty kernel handlers. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
-
-/* Create an IPC process. */
-static struct rina_kmsg_ipcp_create_resp *
-ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
-            const struct rina_name *name, uint8_t dif_type,
-            int *result)
-{
-    struct rina_kmsg_ipcp_create *msg;
-    struct rina_kmsg_ipcp_create_resp *resp;
-
-    /* Allocate and create a request message. */
-    msg = malloc(sizeof(*msg));
-    if (!msg) {
-        PE("%s: Out of memory\n", __func__);
-        return NULL;
-    }
-
-    memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_CREATE;
-    rina_name_copy(&msg->name, name);
-    msg->dif_type = dif_type;
-
-    PD("Requesting IPC process creation...\n");
-
-    resp = (struct rina_kmsg_ipcp_create_resp *)
-           issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), 1, wait_for_completion, result);
-
-    ipcps_fetch(&ipcm->loop);
-
-    if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
-        *result = uipcp_add(ipcm, resp->ipcp_id);
-    }
-
-    uipcps_fetch(ipcm);
-
-    return resp;
-}
-
-/* Destroy an IPC process. */
-static int
-ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
-{
-    struct rina_kmsg_ipcp_destroy *msg;
-    struct rina_msg_base *resp;
-    int result;
-
-    result = uipcp_del(ipcm, ipcp_id);
-    if (result) {
-        return result;
-    }
-
-    /* Allocate and create a request message. */
-    msg = malloc(sizeof(*msg));
-    if (!msg) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_DESTROY;
-    msg->ipcp_id = ipcp_id;
-
-    PD("Requesting IPC process destruction...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), 0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    ipcps_fetch(&ipcm->loop);
-
-    uipcps_fetch(ipcm);
-
-    return result;
-}
-
-static int
-assign_to_dif(struct ipcm *ipcm,
-              uint16_t ipcp_id, struct rina_name *dif_name)
-{
-    struct rina_kmsg_assign_to_dif *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_ASSIGN_TO_DIF;
-    req->ipcp_id = ipcp_id;
-    rina_name_copy(&req->dif_name, dif_name);
-
-    PD("Requesting DIF assignment...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    ipcps_fetch(&ipcm->loop);
-    uipcps_fetch(ipcm);
-
-    return result;
-}
-
-static int
-ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
-            char *param_name, char *param_value)
-{
-    struct rina_kmsg_ipcp_config *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_CONFIG;
-    req->ipcp_id = ipcp_id;
-    req->name = param_name;
-    req->value = param_value;
-
-    PD("Requesting IPCP config...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    if (result == 0 && strcmp(param_name, "address") == 0) {
-        /* Fetch after a succesfull address setting operation. */
-        ipcps_fetch(&ipcm->loop);
-        uipcps_fetch(ipcm);
-    }
-
-    return result;
-}
-
-static int
-test(struct ipcm *ipcm)
-{
-    struct rina_name name;
-    struct rina_kmsg_ipcp_create_resp *icresp;
-    int result;
-    int ret;
-
-    /* Create an IPC process of type shim-dummy. */
-    rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
-    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
-    assert(!icresp);
-    rina_name_free(&name);
-
-    rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
-    icresp = ipcp_create(ipcm, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
-    assert(icresp);
-    if (icresp) {
-        rina_msg_free(rina_kernel_numtables, RMB(icresp));
-    }
-    icresp = ipcp_create(ipcm, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
-    assert(!icresp);
-    rina_name_free(&name);
-
-    /* Assign to DIF. */
-    rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
-    ret = assign_to_dif(ipcm, 0, &name);
-    assert(!ret);
-    ret = assign_to_dif(ipcm, 0, &name);
-    assert(!ret);
-    rina_name_free(&name);
-
-    /* Fetch IPC processes table. */
-    ipcps_fetch(&ipcm->loop);
-
-    /* Destroy the IPCPs. */
-    ret = ipcp_destroy(ipcm, 0);
-    assert(!ret);
-    ret = ipcp_destroy(ipcm, 1);
-    assert(!ret);
-    ret = ipcp_destroy(ipcm, 0);
-    assert(ret);
-
-    return 0;
-}
 
 static int
 rina_conf_response(int sfd, struct rina_msg_base *req,
@@ -267,91 +50,6 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
     resp->event_id = req->event_id;
 
     return rina_msg_write(sfd, RMB(resp));
-}
-
-static int
-rina_conf_ipcp_create(struct ipcm *ipcm, int sfd,
-                      const struct rina_msg_base *b_req)
-{
-    struct rina_amsg_ipcp_create *req = (struct rina_amsg_ipcp_create *)b_req;
-    struct rina_msg_base_resp resp;
-    struct rina_kmsg_ipcp_create_resp *kresp;
-    int result;
-
-    kresp = ipcp_create(ipcm, ~0U, &req->ipcp_name, req->dif_type, &result);
-    if (kresp) {
-        rina_msg_free(rina_kernel_numtables, RMB(kresp));
-    }
-
-    resp.result = result;
-
-    return rina_conf_response(sfd, RMB(req), &resp);
-}
-
-static int
-rina_conf_ipcp_destroy(struct ipcm *ipcm, int sfd,
-                       const struct rina_msg_base *b_req)
-{
-    struct rina_amsg_ipcp_destroy *req = (struct rina_amsg_ipcp_destroy *)b_req;
-    struct rina_msg_base_resp resp;
-    unsigned int ipcp_id;
-
-    resp.result = 1;
-
-    /* Does the request specifies an existing IPC process ? */
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
-    if (ipcp_id == ~0U) {
-        PE("%s: No such IPCP process\n", __func__);
-    } else {
-        /* Valid IPCP id. Forward the request to the kernel. */
-        resp.result = ipcp_destroy(ipcm, ipcp_id);
-    }
-
-    return rina_conf_response(sfd, RMB(req), &resp);
-}
-
-static int
-rina_conf_assign_to_dif(struct ipcm *ipcm, int sfd,
-                        const struct rina_msg_base *b_req)
-{
-    unsigned int ipcp_id;
-    struct rina_amsg_assign_to_dif *req = (struct rina_amsg_assign_to_dif *)b_req;
-    struct rina_msg_base_resp resp;
-
-    resp.result = 1;  /* Report failure by default. */
-
-    /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->application_name);
-    if (ipcp_id == ~0U) {
-        PE("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        resp.result = assign_to_dif(ipcm, ipcp_id, &req->dif_name);
-    }
-
-    return rina_conf_response(sfd, RMB(req), &resp);
-}
-
-static int
-rina_conf_ipcp_config(struct ipcm *ipcm, int sfd,
-                      const struct rina_msg_base *b_req)
-{
-    unsigned int ipcp_id;
-    struct rina_amsg_ipcp_config *req = (struct rina_amsg_ipcp_config *)b_req;
-    struct rina_msg_base_resp resp;
-
-    resp.result = 1;  /* Report failure by default. */
-
-    /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
-    if (ipcp_id == ~0U) {
-        PE("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        resp.result = ipcp_config(ipcm, ipcp_id, req->name, req->value);
-    }
-
-    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 uint8_t
@@ -501,10 +199,6 @@ typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
 
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_config_handlers[] = {
-    [RINA_CONF_IPCP_CREATE] = rina_conf_ipcp_create,
-    [RINA_CONF_IPCP_DESTROY] = rina_conf_ipcp_destroy,
-    [RINA_CONF_ASSIGN_TO_DIF] = rina_conf_assign_to_dif,
-    [RINA_CONF_IPCP_CONFIG] = rina_conf_ipcp_config,
     [RINA_CONF_IPCP_REGISTER] = rina_conf_ipcp_register,
     [RINA_CONF_IPCP_ENROLL] = rina_conf_ipcp_enroll,
     [RINA_CONF_IPCP_DFT_SET] = rina_conf_ipcp_dft_set,
@@ -626,14 +320,7 @@ int main(int argc, char **argv)
     pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
-    int enable_testing = 0;
     int ret;
-
-    /* Trivial option parsing. We will switch to getopt()
-     * as soon as we need more than one option. */
-    if (argc > 1) {
-        enable_testing = 1;
-    }
 
     ret = rina_evloop_init(&ipcm->loop, "/dev/rina-ctrl",
                      rina_kernel_handlers);
@@ -712,11 +399,6 @@ int main(int argc, char **argv)
     if (ret) {
         PE("Failed to load userspace ipcps\n");
         exit(EXIT_FAILURE);
-    }
-
-    if (enable_testing) {
-        /* Run the hardwired test script. */
-        test(ipcm);
     }
 
     /* Create and start the unix server thread. */

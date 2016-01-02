@@ -526,6 +526,52 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int
+test(struct rinaconf *rc)
+{
+    struct rina_name name;
+    struct rina_kmsg_ipcp_create_resp *icresp;
+    int result;
+    int ret;
+
+    /* Create an IPC process of type shim-dummy. */
+    rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
+    icresp = rina_ipcp_create(rc, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    assert(!icresp);
+    rina_name_free(&name);
+
+    rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
+    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    assert(icresp);
+    if (icresp) {
+        rina_msg_free(rina_kernel_numtables, RMB(icresp));
+    }
+    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    assert(!icresp);
+    rina_name_free(&name);
+
+    /* Assign to DIF. */
+    rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
+    ret = rina_assign_to_dif(rc, 0, &name);
+    assert(!ret);
+    ret = rina_assign_to_dif(rc, 0, &name);
+    assert(!ret);
+    rina_name_free(&name);
+
+    /* Fetch IPC processes table. */
+    ipcps_fetch(&rc->loop);
+
+    /* Destroy the IPCPs. */
+    ret = rina_ipcp_destroy(rc, 0);
+    assert(!ret);
+    ret = rina_ipcp_destroy(rc, 1);
+    assert(!ret);
+    ret = rina_ipcp_destroy(rc, 0);
+    assert(ret);
+
+    return 0;
+}
+
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -646,6 +692,7 @@ int main(int argc, char **argv)
 {
     struct rinaconf rc;
     struct sigaction sa;
+    int enable_testing = 0;
     int ret;
 
     ret = rina_evloop_init(&rc.loop, "/dev/rina-ctrl",
@@ -672,6 +719,11 @@ int main(int argc, char **argv)
 
     /* Fetch kernel state. */
     ipcps_fetch(&rc.loop);
+
+    if (enable_testing) {
+        /* Run the hardwired test script. */
+        test(&rc);
+    }
 
     ret = process_args(argc, argv, &rc);
 
