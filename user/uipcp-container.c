@@ -320,7 +320,7 @@ uipcp_server(void *arg)
         struct rlite_pending_flow_req *pfr;
         unsigned int port_id;
         int flow_fd;
-        int result;
+        int result = 0;
         int ret;
 
         pfr = rlite_flow_req_wait(&uipcp->appl);
@@ -328,26 +328,34 @@ uipcp_server(void *arg)
         PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 pfr->ipcp_id, pfr->port_id);
 
-        result = rlite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
-                                    uipcp->ipcp_id, pfr->port_id, 0);
+        /* First of all we update the neighbors in the RIB. This
+         * must be done before invoking rlite_flow_allocate_resp,
+         * otherwise a race condition would exist (us receiving
+         * an M_CONNECT from the neighbor before having the
+         * chance to call rib_neighbor_flow()). */
+        ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
+                                flow_fd, port_id);
+        if (ret) {
+            PE("rib_neighbor_flow() failed\n");
+            result = 1;
+        }
 
-        if (result) {
-            rlite_pending_flow_req_free(pfr);
-            continue;
+        ret = rlite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
+                                       uipcp->ipcp_id, pfr->port_id, result);
+
+        if (ret || result) {
+            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
+            goto out;
         }
 
         flow_fd = rlite_open_appl_port(port_id);
         if (flow_fd < 0) {
-            rlite_pending_flow_req_free(pfr);
-            continue;
+            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
+            goto out;
         }
 
-        ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
-                                flow_fd, port_id);
+out:
         rlite_pending_flow_req_free(pfr);
-        if (ret) {
-            PE("rib_neighbor_flow() failed\n");
-        }
 
         fflush(stdout);
     }

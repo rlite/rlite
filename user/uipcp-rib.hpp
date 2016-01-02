@@ -155,6 +155,7 @@ struct uipcp_rib {
     int set_address(uint64_t address);
     int add_neighbor(const struct rina_name *neigh_name, int neigh_flow_fd,
                      unsigned int neigh_port_id, bool start_enrollment);
+    int del_neighbor(const RinaName& neigh_name);
     uint64_t dft_lookup(const RinaName& appl_name) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int ipcp_register(int reg, std::string lower_dif);

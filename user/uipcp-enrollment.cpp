@@ -586,6 +586,21 @@ uipcp_rib::add_neighbor(const struct rina_name *neigh_name,
     return 0;
 }
 
+int
+uipcp_rib::del_neighbor(const RinaName& neigh_name)
+{
+    map<string, Neighbor>::iterator mit =
+                    neighbors.find(static_cast<string>(neigh_name));
+
+    if (mit == neighbors.end()) {
+        return -1;
+    }
+
+    neighbors.erase(mit);
+
+    return 0;
+}
+
 uint64_t
 uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
 {
@@ -771,3 +786,9 @@ rib_neighbor_flow(struct uipcp_rib *rib,
     return rib->add_neighbor(neigh_name, neigh_fd, neigh_port_id, false);
 }
 
+extern "C" int
+rib_del_neighbor(struct uipcp_rib *rib,
+                 const struct rina_name *neigh_name)
+{
+    return rib->del_neighbor(RinaName(neigh_name));
+}
