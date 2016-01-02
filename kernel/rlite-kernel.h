@@ -38,8 +38,8 @@ struct ipcp_ops {
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rina_buf *rb, bool maysleep);
-    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rina_buf *rb);
+                     struct rlite_buf *rb, bool maysleep);
+    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rlite_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
@@ -50,7 +50,7 @@ struct ipcp_ops {
                    uint64_t remote_addr);
     int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,
                           const struct rina_mgmt_hdr *hdr,
-                          struct rina_buf *rb);
+                          struct rlite_buf *rb);
 };
 
 struct txrx {
@@ -144,7 +144,7 @@ struct dtp {
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
-    struct rina_buf *rtx_tmr_next;
+    struct rlite_buf *rtx_tmr_next;
 };
 
 struct flow_entry {
@@ -161,7 +161,7 @@ struct flow_entry {
     struct rina_flow_config cfg;
 
     int (*sdu_rx_consumed)(struct flow_entry *flow,
-                           struct rina_buf *rb);
+                           struct rlite_buf *rb);
 
     struct list_head    rmtq;
     unsigned int        rmtq_len;
@@ -201,11 +201,11 @@ int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                          uint8_t response,
                          struct rina_flow_config *flowcfg);
 
-int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
+int rina_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb,
                 uint32_t local_port);
 
 int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rina_buf *rb, bool qlimit);
+                     struct rlite_buf *rb, bool qlimit);
 
 void rina_write_restart(uint32_t local_port);
 

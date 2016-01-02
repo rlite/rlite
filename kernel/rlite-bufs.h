@@ -1,5 +1,5 @@
-#ifndef __RINA_BUFS_H__
-#define __RINA_BUFS_H__
+#ifndef __RLITE_BUFS_H__
+#define __RLITE_BUFS_H__
 
 #include <linux/types.h>
 #include <linux/list.h>
@@ -22,7 +22,7 @@
 
 
 /* PCI header to be used for transfer PDUs. */
-struct rina_pci {
+struct rlite_pci {
     /* We miss the version field. */
     uint32_t dst_addr;
     uint32_t src_addr;
@@ -38,8 +38,8 @@ struct rina_pci {
 } __attribute__((packed));
 
 /* PCI header to be used for control PDUs. */
-struct rina_pci_ctrl {
-    struct rina_pci base;
+struct rlite_pci_ctrl {
+    struct rlite_pci base;
     uint64_t last_ctrl_seq_num_rcvd;
     uint64_t ack_nack_seq_num;
     uint64_t new_rwe;
@@ -54,9 +54,9 @@ struct rina_rawbuf {
     uint8_t buf[0];
 };
 
-struct rina_buf {
+struct rlite_buf {
     struct rina_rawbuf  *raw;
-    struct rina_pci     *pci;
+    struct rlite_pci     *pci;
     size_t              len;
 
     unsigned long       rtx_jiffies;
@@ -64,36 +64,36 @@ struct rina_buf {
     struct list_head    node;
 };
 
-struct rina_buf *rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
+struct rlite_buf *rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
 
-struct rina_buf * rina_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
+struct rlite_buf * rlite_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
 
-struct rina_buf * rina_buf_clone(struct rina_buf *rb, gfp_t gfp);
+struct rlite_buf * rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp);
 
-void rina_buf_free(struct rina_buf *rb);
+void rlite_buf_free(struct rlite_buf *rb);
 
-static inline void rina_buf_pci_pop(struct rina_buf *rb)
+static inline void rlite_buf_pci_pop(struct rlite_buf *rb)
 {
     rb->pci++;
-    rb->len -= sizeof(struct rina_pci);
+    rb->len -= sizeof(struct rlite_pci);
 }
 
-static inline void rina_buf_pci_push(struct rina_buf *rb)
+static inline void rlite_buf_pci_push(struct rlite_buf *rb)
 {
     rb->pci--;
-    rb->len += sizeof(struct rina_pci);
+    rb->len += sizeof(struct rlite_pci);
 }
 
-static inline void rina_buf_custom_push(struct rina_buf *rb, size_t len)
+static inline void rlite_buf_custom_push(struct rlite_buf *rb, size_t len)
 {
-    rb->pci = (struct rina_pci *)(((void *)rb->pci) - len);
+    rb->pci = (struct rlite_pci *)(((void *)rb->pci) - len);
     rb->len += len;
 }
 
-void rina_pci_dump(struct rina_pci *pci);
+void rlite_pci_dump(struct rlite_pci *pci);
 
-#define RINA_BUF_DATA(rb) ((uint8_t *)rb->pci)
-#define RINA_BUF_PCI(rb) rb->pci
-#define RINA_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
+#define RLITE_BUF_DATA(rb) ((uint8_t *)rb->pci)
+#define RLITE_BUF_PCI(rb) rb->pci
+#define RLITE_BUF_PCI_CTRL(rb) ((struct rlite_pci_ctrl *)rb->pci)
 
-#endif  /* __RINA_BUFS_H__ */
+#endif  /* __RLITE_BUFS_H__ */

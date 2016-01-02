@@ -463,7 +463,7 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry;
     char *remote_app_s;
-    struct rina_buf *rb, *tmp;
+    struct rlite_buf *rb, *tmp;
     int ret = -ENXIO;
 
     remote_app_s = rina_name_to_string(&flow->remote_appl);
@@ -638,7 +638,7 @@ out:
 static void
 shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rina_buf *rb = rina_buf_alloc(skb->len, RLITE_MAX_LAYERS,
+    struct rlite_buf *rb = rlite_buf_alloc(skb->len, RLITE_MAX_LAYERS,
                                          GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
@@ -655,7 +655,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
         return;
     }
 
-    skb_copy_bits(skb, 0, RINA_BUF_DATA(rb), skb->len);
+    skb_copy_bits(skb, 0, RLITE_BUF_DATA(rb), skb->len);
 
     /* TODO This lookup could be (partially) avoided if core implements
      * another version of rina_sdu_rx_flow() that does not need the flow
@@ -738,7 +738,7 @@ enq:
 
 drop:
     spin_unlock_bh(&priv->arpt_lock);
-    rina_buf_free(rb);
+    rlite_buf_free(rb);
 }
 
 static rx_handler_result_t
@@ -801,7 +801,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
 static int
 rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
                         struct flow_entry *flow,
-                        struct rina_buf *rb,
+                        struct rlite_buf *rb,
                         bool maysleep)
 {
     struct rina_shim_eth *priv = ipcp->priv;
@@ -854,9 +854,9 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     skb_shinfo(skb)->destructor_arg = (void *)flow;
 
     /* Copy data into the skb. */
-    memcpy(skb_put(skb, rb->len), RINA_BUF_DATA(rb), rb->len);
+    memcpy(skb_put(skb, rb->len), RLITE_BUF_DATA(rb), rb->len);
 
-    rina_buf_free(rb);
+    rlite_buf_free(rb);
 
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
@@ -917,7 +917,7 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     list_for_each_entry(entry, &priv->arp_table, node) {
         if (entry->flow == flow) {
-            struct rina_buf *rb, *tmp;
+            struct rlite_buf *rb, *tmp;
 
             /* Unbind the flow from this ARP table entry. */
             PD("Unbinding from flow %p\n", entry->flow);
@@ -926,7 +926,7 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
             entry->fa_req_arrived = false;
             list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
                 list_del(&rb->node);
-                rina_buf_free(rb);
+                rlite_buf_free(rb);
             }
             entry->rx_tmpq_len = 0;
         }

@@ -34,7 +34,7 @@
 
 
 struct rx_entry {
-    struct rina_buf *rb;
+    struct rlite_buf *rb;
     unsigned int remote_port;
     unsigned int local_port;
 };
@@ -65,7 +65,7 @@ rcv_work(struct work_struct *w)
             container_of(w, struct rina_shim_loopback, rcv);
 
     for (;;) {
-        struct rina_buf *rb = NULL;
+        struct rlite_buf *rb = NULL;
         unsigned int remote_port;
         unsigned int local_port;
 
@@ -117,7 +117,7 @@ rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
     cancel_work_sync(&priv->rcv);
 
     while (priv->rdh != priv->rdt) {
-        rina_buf_free(priv->rxr[priv->rdh].rb);
+        rlite_buf_free(priv->rxr[priv->rdh].rb);
         priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
     }
 
@@ -223,7 +223,7 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 static int
 rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                              struct flow_entry *flow,
-                             struct rina_buf *rb,
+                             struct rlite_buf *rb,
                              bool maysleep)
 {
     struct rina_shim_loopback *priv = ipcp->priv;
@@ -239,7 +239,7 @@ rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         spin_unlock_bh(&priv->lock);
 
         if (drop) {
-            rina_buf_free(rb);
+            rlite_buf_free(rb);
             return 0;
         }
     }

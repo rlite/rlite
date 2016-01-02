@@ -678,7 +678,7 @@ tx_completion_func(unsigned long arg)
     bool drained = false;
 
     for (;;) {
-        struct rina_buf *rb;
+        struct rlite_buf *rb;
         int ret;
 
         spin_lock_bh(&flow->rmtq_lock);
@@ -688,18 +688,18 @@ tx_completion_func(unsigned long arg)
             break;
         }
 
-        rb = list_first_entry(&flow->rmtq, struct rina_buf, node);
+        rb = list_first_entry(&flow->rmtq, struct rlite_buf, node);
         list_del(&rb->node);
         flow->rmtq_len--;
         spin_unlock_bh(&flow->rmtq_lock);
 
         PD("Sending [%lu] from rmtq\n",
-                (long unsigned)RINA_BUF_PCI(rb)->seqnum);
+                (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
 
         ret = ipcp->ops.sdu_write(ipcp, flow, rb, false);
         if (unlikely(ret == -EAGAIN)) {
             PD("Pushing [%lu] back to rmtq\n",
-                    (long unsigned)RINA_BUF_PCI(rb)->seqnum);
+                    (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
             spin_lock_bh(&flow->rmtq_lock);
             list_add(&rb->node, &flow->rmtq);
             flow->rmtq_len++;
@@ -719,7 +719,7 @@ remove_flow_work(struct work_struct *work)
 {
     struct flow_entry *flow = container_of(work, struct flow_entry, remove.work);
     struct dtp *dtp = &flow->dtp;
-    struct rina_buf *rb, *tmp;
+    struct rlite_buf *rb, *tmp;
 
     if (flow->cfg.dtcp_present) {
         spin_lock_bh(&dtp->lock);
@@ -728,7 +728,7 @@ remove_flow_work(struct work_struct *work)
                 dtp->cwq_len);
         list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
             list_del(&rb->node);
-            rina_buf_free(rb);
+            rlite_buf_free(rb);
             dtp->cwq_len--;
         }
 
@@ -736,7 +736,7 @@ remove_flow_work(struct work_struct *work)
                 dtp->rtxq_len);
         list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
             list_del(&rb->node);
-            rina_buf_free(rb);
+            rlite_buf_free(rb);
             dtp->rtxq_len--;
         }
 
@@ -820,8 +820,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 struct flow_entry *
 flow_put(struct flow_entry *entry)
 {
-    struct rina_buf *rb;
-    struct rina_buf *tmp;
+    struct rlite_buf *rb;
+    struct rlite_buf *tmp;
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
@@ -886,12 +886,12 @@ flow_put(struct flow_entry *entry)
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
         list_del(&rb->node);
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
     }
 
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         list_del(&rb->node);
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
     }
     entry->txrx.rx_qlen = 0;
 
@@ -1874,41 +1874,41 @@ EXPORT_SYMBOL_GPL(rina_fa_resp_arrived);
 #define USR_Q_TH        128
 
 int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rina_buf *rb, bool qlimit)
+                     struct rlite_buf *rb, bool qlimit)
 {
     struct txrx *txrx;
     int ret = 0;
 
     if (flow->upper.ipcp) {
         /* The flow on which the PDU is received is used by an IPCP. */
-        if (unlikely(rb->len < sizeof(struct rina_pci))) {
+        if (unlikely(rb->len < sizeof(struct rlite_pci))) {
             RPD(5, "Dropping SDU shorter [%u] than PCI\n",
                     (unsigned int)rb->len);
-            rina_buf_free(rb);
+            rlite_buf_free(rb);
             ret = -EINVAL;
             goto out;
         }
 
-        if (unlikely(RINA_BUF_PCI(rb)->pdu_type == PDU_T_MGMT &&
-                     (RINA_BUF_PCI(rb)->dst_addr == flow->upper.ipcp->addr ||
-                      RINA_BUF_PCI(rb)->dst_addr == 0))) {
+        if (unlikely(RLITE_BUF_PCI(rb)->pdu_type == PDU_T_MGMT &&
+                     (RLITE_BUF_PCI(rb)->dst_addr == flow->upper.ipcp->addr ||
+                      RLITE_BUF_PCI(rb)->dst_addr == 0))) {
             /* Management PDU for this IPC process. Post it to the userspace
              * IPCP. */
             struct rina_mgmt_hdr *mhdr;
-            uint64_t src_addr = RINA_BUF_PCI(rb)->src_addr;
+            uint64_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
 
             if (!flow->upper.ipcp->mgmt_txrx) {
                 PE("Missing mgmt_txrx\n");
-                rina_buf_free(rb);
+                rlite_buf_free(rb);
                 ret = -EINVAL;
                 goto out;
             }
             txrx = flow->upper.ipcp->mgmt_txrx;
-            rina_buf_pci_pop(rb);
+            rlite_buf_pci_pop(rb);
             /* Push a management header using the room made available
-             * by rina_buf_pci_pop(). */
-            rina_buf_custom_push(rb, sizeof(*mhdr));
-            mhdr = (struct rina_mgmt_hdr *)RINA_BUF_DATA(rb);
+             * by rlite_buf_pci_pop(). */
+            rlite_buf_custom_push(rb, sizeof(*mhdr));
+            mhdr = (struct rina_mgmt_hdr *)RLITE_BUF_DATA(rb);
             mhdr->type = RINA_MGMT_HDR_T_IN;
             mhdr->local_port = flow->local_port;
             mhdr->remote_addr = src_addr;
@@ -1930,7 +1930,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
         /* This is useful when flow control is not used on a flow. */
         RPD(5, "dropping PDU [length %lu] to avoid userspace rx queue "
                 "overrun\n", (long unsigned)rb->len);
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
     } else {
         list_add_tail(&rb->node, &txrx->rx_q);
         txrx->rx_qlen++;
@@ -1945,13 +1945,13 @@ out:
 EXPORT_SYMBOL_GPL(rina_sdu_rx_flow);
 
 int
-rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
+rina_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
 {
     struct flow_entry *flow = flow_get(local_port);
     int ret;
 
     if (!flow) {
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
         return -ENXIO;
     }
 
@@ -2224,7 +2224,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
     struct ipcp_entry *ipcp;
-    struct rina_buf *rb;
+    struct rlite_buf *rb;
     struct rina_mgmt_hdr mhdr;
     size_t orig_len = ulen;
     ssize_t ret;
@@ -2245,15 +2245,15 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         ulen -= sizeof(mhdr);
     }
 
-    rb = rina_buf_alloc(ulen, RLITE_MAX_LAYERS, GFP_KERNEL);
+    rb = rlite_buf_alloc(ulen, RLITE_MAX_LAYERS, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }
 
     /* Copy in the userspace SDU. */
-    if (copy_from_user(RINA_BUF_DATA(rb), ubuf, ulen)) {
+    if (copy_from_user(RLITE_BUF_DATA(rb), ubuf, ulen)) {
         PE("copy_from_user(data)\n");
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
         return -EFAULT;
     }
 
@@ -2315,7 +2315,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
     add_wait_queue(&txrx->rx_wqh, &wait);
     while (len) {
         ssize_t copylen;
-        struct rina_buf *rb;
+        struct rlite_buf *rb;
 
         current->state = TASK_INTERRUPTIBLE;
 
@@ -2332,7 +2332,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             continue;
         }
 
-        rb = list_first_entry(&txrx->rx_q, struct rina_buf, node);
+        rb = list_first_entry(&txrx->rx_q, struct rlite_buf, node);
         list_del(&rb->node);
         txrx->rx_qlen--;
         spin_unlock_bh(&txrx->rx_lock);
@@ -2342,16 +2342,16 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             copylen = len;
         }
         ret = copylen;
-        if (unlikely(copy_to_user(ubuf, RINA_BUF_DATA(rb), copylen))) {
+        if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), copylen))) {
             ret = -EFAULT;
         }
 
         if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-            rina_buf_pci_push(rb);
+            rlite_buf_pci_push(rb);
             rio->flow->sdu_rx_consumed(rio->flow, rb);
         }
 
-        rina_buf_free(rb);
+        rlite_buf_free(rb);
 
         break;
     }

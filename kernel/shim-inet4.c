@@ -49,7 +49,7 @@ struct shim_inet4_flow {
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
 
-    struct rina_buf *cur_rx_rb;
+    struct rlite_buf *cur_rx_rb;
     uint16_t cur_rx_rblen;
     int cur_rx_buflen;
     bool cur_rx_hdr;
@@ -107,7 +107,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
 
         } else {
             /* We're reading the SDU. */
-            iov.iov_base = RINA_BUF_DATA(priv->cur_rx_rb);
+            iov.iov_base = RLITE_BUF_DATA(priv->cur_rx_rb);
             iov.iov_len = priv->cur_rx_rblen;
         }
 
@@ -139,7 +139,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
                 PE("Warning: zero lenght packet\n");
             } else {
                 priv->cur_rx_hdr = false;
-                priv->cur_rx_rb = rina_buf_alloc(priv->cur_rx_rblen,
+                priv->cur_rx_rb = rlite_buf_alloc(priv->cur_rx_rblen,
                                                  RLITE_MAX_LAYERS, GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     PE("Out of memory\n");
@@ -286,7 +286,7 @@ rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 static int
 rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
-                      struct rina_buf *rb, bool maysleep)
+                      struct rlite_buf *rb, bool maysleep)
 {
     struct shim_inet4_flow *priv= flow->priv;
     struct msghdr msghdr;
@@ -303,7 +303,7 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
     memset(&msghdr, 0, sizeof(msghdr));
     iov[0].iov_base = &lenhdr;
     iov[0].iov_len = sizeof(lenhdr);
-    iov[1].iov_base = RINA_BUF_DATA(rb);
+    iov[1].iov_base = RLITE_BUF_DATA(rb);
     iov[1].iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
@@ -332,7 +332,7 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
         NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
     }
 
-    rina_buf_free(rb);
+    rlite_buf_free(rb);
 
     return 0;
 }
