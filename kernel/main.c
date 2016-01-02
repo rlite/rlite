@@ -2598,18 +2598,24 @@ static ssize_t
 rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 {
     struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct flow_entry *flow;
     struct ipcp_entry *ipcp;
     struct rlite_buf *rb;
     struct rlite_mgmt_hdr mhdr;
     size_t orig_len = ulen;
     bool blocking = !(f->f_flags & O_NONBLOCK);
+    DECLARE_WAITQUEUE(wait, current);
     ssize_t ret;
 
     if (unlikely(!rio->txrx)) {
         PE("Error: Not bound to a flow nor IPCP\n");
         return -ENXIO;
     }
+
+    /* Assume an application write, by default. If this is a management
+     * write, rio->flow is NULL. */
     ipcp = rio->txrx->ipcp;
+    flow = rio->flow;
 
     if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
         /* Copy in the management header. */
@@ -2619,6 +2625,10 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         }
         ubuf += sizeof(mhdr);
         ulen -= sizeof(mhdr);
+
+    } else if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
+        RPD(3, "Unknown mode, this should not happen\n");
+        return -EINVAL;
     }
 
     rb = rlite_buf_alloc(ulen, ipcp->depth, GFP_KERNEL);
@@ -2633,48 +2643,62 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         return -EFAULT;
     }
 
-    if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
-        if (rio->mode == RLITE_IO_MODE_IPCP_MGMT) {
-            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb, blocking);
-        } else {
-            PE("Unknown mode, this should not happen\n");
-            ret = -EINVAL;
-        }
-    } else {
-        /* Regular application write. */
-        DECLARE_WAITQUEUE(wait, current);
+    if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
+        struct ipcp_entry *lower_ipcp;
+        struct flow_entry *lower_flow;
 
-        if (blocking) {
-            add_wait_queue(rio->flow->txrx.tx_wqh, &wait);
+        if (!ipcp->ops.mgmt_sdu_write) {
+            RPD(3, "Missing mgmt_sdu_write() operation\n");
+            rlite_buf_free(rb);
+            return -ENXIO;
         }
 
-        for (;;) {
-            current->state = TASK_INTERRUPTIBLE;
+        /* Management write. Prepare the buffer and get the lower
+         * flow and lower IPCP. */
+        ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb, &lower_ipcp,
+                                       &lower_flow);
+        if (ret) {
+            rlite_buf_free(rb);
+            return ret;
+        }
 
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, blocking);
+        /* Prepare to write to an N-1 flow. */
+        ipcp = lower_ipcp;
+        flow = lower_flow;
+    }
 
-            if (unlikely(ret == -EAGAIN)) {
-                if (signal_pending(current)) {
-                    ret = -ERESTARTSYS;
-                    break;
-                }
+    /* Write to the flow, sleeping if needed. This can be a management write
+     * (to an N-1 flow) or an application write (to an N-flow). */
+    if (blocking) {
+        add_wait_queue(flow->txrx.tx_wqh, &wait);
+    }
 
-                if (!blocking) {
-                    break;
-                }
+    for (;;) {
+        current->state = TASK_INTERRUPTIBLE;
 
-                /* No room to write, let's sleep. */
-                schedule();
-                continue;
+        ret = ipcp->ops.sdu_write(ipcp, flow, rb, blocking);
+
+        if (unlikely(ret == -EAGAIN)) {
+            if (signal_pending(current)) {
+                ret = -ERESTARTSYS;
+                break;
             }
 
-            break;
+            if (!blocking) {
+                break;
+            }
+
+            /* No room to write, let's sleep. */
+            schedule();
+            continue;
         }
 
-        current->state = TASK_RUNNING;
-        if (blocking) {
-            remove_wait_queue(rio->flow->txrx.tx_wqh, &wait);
-        }
+        break;
+    }
+
+    current->state = TASK_RUNNING;
+    if (blocking) {
+        remove_wait_queue(flow->txrx.tx_wqh, &wait);
     }
 
     if (unlikely(ret < 0)) {

@@ -503,52 +503,52 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     return rmt_tx(ipcp, flow->remote_addr, rb, maysleep);
 }
 
+/* Get N-1 flow and N-1 IPCP where the mgmt PDU should be
+ * written. Does not take ownership of the PDU, since it's
+ * not a transmission routine. */
 static int
 rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                            const struct rlite_mgmt_hdr *mhdr,
-                           struct rlite_buf *rb, bool mayblock)
+                           struct rlite_buf *rb,
+                           struct ipcp_entry **lower_ipcp,
+                           struct flow_entry **lower_flow)
 {
     struct rlite_normal *priv = (struct rlite_normal *)ipcp->priv;
     struct rina_pci *pci;
-    struct flow_entry *lower_flow;
-    struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
 
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
-        lower_flow = pduft_lookup(priv, mhdr->remote_addr);
-        if (unlikely(!lower_flow)) {
+        *lower_flow = pduft_lookup(priv, mhdr->remote_addr);
+        if (unlikely(!(*lower_flow))) {
             RPD(5, "No route to IPCP %lu, dropping packet\n",
                     (long unsigned)mhdr->remote_addr);
-            rlite_buf_free(rb);
 
-            return 0;
+            return -EHOSTUNREACH;
         }
         dst_addr = mhdr->remote_addr;
+
     } else if (mhdr->type == RLITE_MGMT_HDR_T_OUT_LOCAL_PORT) {
-        lower_flow = flow_get(mhdr->local_port);
-        if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
+        *lower_flow = flow_get(mhdr->local_port);
+        if (!(*lower_flow) || (*lower_flow)->upper.ipcp != ipcp) {
             RPD(5, "Invalid mgmt header local port %u, "
                     "dropping packet\n",
                     mhdr->local_port);
-            rlite_buf_free(rb);
 
-            if (lower_flow) {
-                flow_put(lower_flow);
+            if (*lower_flow) {
+                flow_put(*lower_flow);
             }
 
-            return 0;
+            return -EINVAL;
         }
-        flow_put(lower_flow);
-    } else {
-        rlite_buf_free(rb);
+        flow_put(*lower_flow);
 
-        return 0;
+    } else {
+        return -EINVAL;
     }
-    lower_ipcp = lower_flow->txrx.ipcp;
-    BUG_ON(!lower_ipcp);
+    *lower_ipcp = (*lower_flow)->txrx.ipcp;
+    BUG_ON(!(*lower_ipcp));
 
     if (unlikely(rlite_buf_pci_push(rb))) {
-        rlite_buf_free(rb);
 
         return -ENOSPC;
     }
@@ -564,7 +564,8 @@ rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_len = rb->len;
     pci->seqnum = 0; /* Not valid. */
 
-    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, mayblock);
+    /* Caller can proceed and send the mgmt PDU. */
+    return 0;
 }
 
 static int

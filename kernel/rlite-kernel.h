@@ -50,7 +50,8 @@ struct ipcp_ops {
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,
                           const struct rlite_mgmt_hdr *hdr,
-                          struct rlite_buf *rb, bool mayblock);
+                          struct rlite_buf *rb, struct ipcp_entry **lower_ipcp,
+                          struct flow_entry **lower_flow);
 };
 
 struct txrx {
