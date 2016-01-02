@@ -540,7 +540,7 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
 int
 rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                        rina_resp_handler_t handler)
+                         rina_resp_handler_t handler)
 {
     if (index >= RINA_KERN_MSG_MAX) {
         return -1;

@@ -2466,7 +2466,7 @@ static const struct file_operations rina_io_fops = {
 
 static struct miscdevice rina_io_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rina-io",
+    .name = "rlite-io",
     .fops = &rina_io_fops,
 };
 
@@ -2494,7 +2494,7 @@ rina_ctrl_init(void)
     ret = misc_register(&rina_io_misc);
     if (ret) {
         misc_deregister(&rina_ctrl_misc);
-        printk("Failed to register rina-io misc device\n");
+        printk("Failed to register rlite-io misc device\n");
         return ret;
     }
 

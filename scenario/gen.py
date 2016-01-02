@@ -128,7 +128,7 @@ for i in vms:
             'sudo modprobe rlite-shim-eth\n'\
             'sudo modprobe rlite-normal\n'\
             'sudo chmod a+rwx /dev/rlite\n'\
-            'sudo chmod a+rwx /dev/rina-io\n'\
+            'sudo chmod a+rwx /dev/rlite-io\n'\
             'sudo mkdir -p /var/rlite\n'\
             'sudo chmod -R a+rw /var/rlite\n'\
             '\n'\

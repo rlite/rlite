@@ -299,9 +299,9 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
     int fd;
     int ret;
 
-    fd = open("/dev/rina-io", O_RDWR);
+    fd = open("/dev/rlite-io", O_RDWR);
     if (fd < 0) {
-        perror("open(/dev/rina-io)");
+        perror("open(/dev/rlite-io)");
         return -1;
     }
 
@@ -311,7 +311,7 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 
     ret = ioctl(fd, 73, &info);
     if (ret) {
-        perror("ioctl(/dev/rina-io)");
+        perror("ioctl(/dev/rlite-io)");
         return -1;
     }
 

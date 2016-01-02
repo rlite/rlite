@@ -19,7 +19,7 @@ fi
 sudo insmod kernel/rlite-shim-eth.ko
 sudo insmod kernel/rlite-normal.ko
 sudo chmod a+rwx /dev/rlite
-sudo chmod a+rwx /dev/rina-io
+sudo chmod a+rwx /dev/rlite-io
 
 sudo mkdir -p /var/rlite
 sudo chmod -R a+rwx /var/rlite

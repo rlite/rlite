@@ -66,7 +66,7 @@ struct rina_ioctl_info {
 #define RINA_MGMT_HDR_T_IN                  3
 
 /* Header used across user/kernel boundary when writing/reading
- * management SDUs from rina-io devices working in RINA_IO_MODE_IPCP_MGMT
+ * management SDUs from rlite-io devices working in RINA_IO_MODE_IPCP_MGMT
  * mode.
  * Userspace can write a management SDU specifying either a local
  * port (type OUT_LOCAL_PORT) or a destination address (OUT_DST_ADDR). In
