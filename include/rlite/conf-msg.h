@@ -14,11 +14,8 @@ enum {
     RLITE_CFG_IPCP_ENROLL,        /* 2 */
     RLITE_CFG_IPCP_DFT_SET,       /* 3 */
     RLITE_CFG_BASE_RESP,          /* 4 */
-    RLITE_CFG_UIPCP_CREATE,       /* 5 */
-    RLITE_CFG_UIPCP_DESTROY,      /* 6 */
-    RLITE_CFG_UIPCP_UPDATE,       /* 7 */
-    RLITE_CFG_IPCP_RIB_SHOW_REQ,  /* 8 */
-    RLITE_CFG_IPCP_RIB_SHOW_RESP, /* 9 */
+    RLITE_CFG_IPCP_RIB_SHOW_REQ,  /* 5 */
+    RLITE_CFG_IPCP_RIB_SHOW_RESP, /* 6 */
 
     RLITE_CFG_MSG_MAX,
 };
@@ -65,16 +62,14 @@ struct rl_cmsg_ipcp_dft_set {
     struct rina_name appl_name;
 } __attribute__((packed));
 
-/* rinaconf --> uipcps message to update the uipcps */
-struct rl_cmsg_uipcp_update {
+/* rinaconf --> uipcps message to query the whole RIB */
+struct rl_cmsg_ipcp_rib_show_req {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
     char *dif_type;
 } __attribute__((packed));
-
-#define rl_cmsg_ipcp_rib_show_req rl_cmsg_uipcp_update
 
 /* rinaconf <-- uipcps message to report a RIB dump */
 struct rl_cmsg_ipcp_rib_show_resp {

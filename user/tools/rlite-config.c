@@ -146,28 +146,6 @@ request_response(struct rlite_msg_base *req, response_handler_t handler)
     return uipcps_disconnect(fd);
 }
 
-static int
-uipcp_update(struct rinaconf *rc, rlite_msg_t update_type, uint16_t ipcp_id,
-             const char *dif_type)
-{
-    struct rl_cmsg_uipcp_update req;
-
-    req.msg_type = update_type;
-    req.event_id = 0;
-    req.ipcp_id = ipcp_id;
-    if (dif_type) {
-        req.dif_type = strdup(dif_type);
-        if (!req.dif_type) {
-            PE("Out of memory\n");
-            return -1;
-        }
-    } else {
-        req.dif_type = NULL;
-    }
-
-    return request_response((struct rlite_msg_base *)&req, NULL);
-}
-
 /* Create an IPC process. */
 static struct rl_kmsg_ipcp_create_resp *
 rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
@@ -196,12 +174,6 @@ rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
     resp = (struct rl_kmsg_ipcp_create_resp *)
            rlite_issue_request(&rc->loop, RLITE_RMB(msg),
                          sizeof(*msg), 1, wait_ms, result);
-
-    if (type_has_uipcp(dif_type) && *result == 0 && resp) {
-        uipcp_update(rc, RLITE_CFG_UIPCP_CREATE, resp->ipcp_id, dif_type);
-    } else {
-        uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
-    }
 
     return resp;
 }
@@ -251,10 +223,6 @@ rlconf_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
         return ENOMEM;
     }
 
-    if (type_has_uipcp(dif_type)) {
-        uipcp_update(rc, RLITE_CFG_UIPCP_DESTROY, ipcp_id, dif_type);
-    }
-
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RLITE_KER_IPCP_DESTROY;
     msg->event_id = 1;
@@ -266,8 +234,6 @@ rlconf_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
-
-    uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
 
     return result;
 }
@@ -303,14 +269,8 @@ static int
 rlconf_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
-    int result = rlite_ipcp_config(&rc->loop, ipcp_id,
-                                      param_name, param_value);
-
-    if (result == 0 && strcmp(param_name, "address") == 0) {
-        uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
-    }
-
-    return result;
+    return rlite_ipcp_config(&rc->loop, ipcp_id,
+                             param_name, param_value);
 }
 
 static int

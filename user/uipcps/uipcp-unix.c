@@ -198,18 +198,6 @@ out:
 }
 
 static int
-rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
-                        const struct rlite_msg_base *b_req)
-{
-    struct rl_cmsg_uipcp_update *req = (struct rl_cmsg_uipcp_update *)b_req;
-    struct rlite_msg_base_resp resp;
-
-    resp.result = RLITE_SUCC;
-
-    return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
-}
-
-static int
 rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                         const struct rlite_msg_base *b_req)
 {
@@ -257,9 +245,6 @@ static rlite_req_handler_t rlite_config_handlers[] = {
     [RLITE_CFG_IPCP_REGISTER] = rlite_conf_ipcp_register,
     [RLITE_CFG_IPCP_ENROLL] = rlite_conf_ipcp_enroll,
     [RLITE_CFG_IPCP_DFT_SET] = rlite_conf_ipcp_dft_set,
-    [RLITE_CFG_UIPCP_CREATE] = rlite_conf_uipcp_update,
-    [RLITE_CFG_UIPCP_DESTROY] = rlite_conf_uipcp_update,
-    [RLITE_CFG_UIPCP_UPDATE] = rlite_conf_uipcp_update,
     [RLITE_CFG_IPCP_RIB_SHOW_REQ] = rlite_conf_ipcp_rib_show,
     [RLITE_CFG_MSG_MAX] = NULL,
 };

@@ -20,21 +20,6 @@ struct rlite_msg_layout rlite_conf_numtables[] = {
                    1 * sizeof(struct rina_name),
         .names = 1,
     },
-    [RLITE_CFG_UIPCP_CREATE] = {
-        .copylen = sizeof(struct rl_cmsg_uipcp_update) -
-                   1 * sizeof(char *),
-        .strings = 1,
-    },
-    [RLITE_CFG_UIPCP_DESTROY] = {
-        .copylen = sizeof(struct rl_cmsg_uipcp_update) -
-                   1 * sizeof(char *),
-        .strings = 1,
-    },
-    [RLITE_CFG_UIPCP_UPDATE] = {
-        .copylen = sizeof(struct rl_cmsg_uipcp_update) -
-                   1 * sizeof(char *),
-        .strings = 1,
-    },
     [RLITE_CFG_BASE_RESP] = {
         .copylen = sizeof(struct rlite_msg_base_resp),
     },
