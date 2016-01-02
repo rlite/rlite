@@ -119,13 +119,6 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                           uint8_t response,
                           const struct rina_flow_config *flowcfg);
 
-/* uipcp RIB definitions */
-struct uipcp_rib *rib_create(struct uipcp *uipcp);
-void rib_destroy(struct uipcp_rib *rib);
-
-int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
-                  char *serbuf, int serlen);
-
 #ifdef __cplusplus
 }
 #endif

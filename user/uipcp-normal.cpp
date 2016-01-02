@@ -106,6 +106,95 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
+static int
+rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
+             char *serbuf, int serlen)
+{
+    map<string, Neighbor>::iterator neigh;
+    CDAPMessage *m = NULL;
+    int ret;
+
+    try {
+        m = msg_deser_stateless(serbuf, serlen);
+
+        if (m->obj_class == obj_class::adata &&
+                    m->obj_name == obj_name::adata) {
+            /* A-DATA message, does not belong to any CDAP
+             * session. */
+            const char *objbuf;
+            size_t objlen;
+
+            m->get_obj_value(objbuf, objlen);
+            if (!objbuf) {
+                PE("CDAP message does not contain a nested message\n");
+
+                delete m;
+                return 0;
+            }
+
+            AData adata(objbuf, objlen);
+
+            if (!adata.cdap) {
+                PE("A_DATA does not contain an encapsulated CDAP message\n");
+
+                delete m;
+                return 0;
+            }
+
+            ScopeLock(rib->lock);
+
+            rib->cdap_dispatch(adata.cdap, NULL);
+
+            delete m;
+            return 0;
+        }
+
+        /* This is not an A-DATA message, so we try to match it
+         * against existing CDAP connections.
+         */
+
+        /* Easy and inefficient solution for now. We delete the
+         * already parsed CDAP message and call msg_deser() on
+         * the matching connection (if found) --> This causes the
+         * same message to be deserialized twice. The second
+         * deserialization can be avoided extending the CDAP
+         * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
+        delete m;
+        m = NULL;
+
+        ScopeLock(rib->lock);
+
+        /* Lookup neighbor by port id. */
+        neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
+        if (neigh == rib->neighbors.end()) {
+            PE("Received message from unknown port id %d\n",
+                    mhdr->local_port);
+            return -1;
+        }
+
+        if (!neigh->second.conn) {
+            neigh->second.conn = new CDAPConn(neigh->second.flow_fd, 1);
+        }
+
+        /* Deserialize the received CDAP message. */
+        m = neigh->second.conn->msg_deser(serbuf, serlen);
+        if (!m) {
+            PE("msg_deser() failed\n");
+            return -1;
+        }
+
+        /* Feed the enrollment state machine. */
+        ret = neigh->second.enroll_fsm_run(m);
+
+    } catch (std::bad_alloc) {
+        PE("Out of memory\n");
+    }
+
+    delete m;
+
+    return ret;
+}
+
 static void
 mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 {
@@ -421,27 +510,6 @@ uipcp_rib::address_allocate() const
     return 0; // TODO
 }
 
-extern "C" struct uipcp_rib *
-rib_create(struct uipcp *uipcp)
-{
-    struct uipcp_rib *rib = NULL;
-
-    try {
-        rib = new uipcp_rib(uipcp);
-
-    } catch (std::bad_alloc) {
-        PE("Out of memory\n");
-    }
-
-    return rib;
-}
-
-extern "C" void
-rib_destroy(struct uipcp_rib *rib)
-{
-    delete rib;
-}
-
 int
 uipcp_rib::remote_sync_neigh(const Neighbor& neigh, bool create,
                              const string& obj_class, const string& obj_name,
@@ -495,95 +563,6 @@ uipcp_rib::remote_sync_all(bool create, const string& obj_class,
                            const UipcpObject *obj_value) const
 {
     return remote_sync_excluding(NULL, create, obj_class, obj_name, obj_value);
-}
-
-extern "C" int
-rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
-             char *serbuf, int serlen)
-{
-    map<string, Neighbor>::iterator neigh;
-    CDAPMessage *m = NULL;
-    int ret;
-
-    try {
-        m = msg_deser_stateless(serbuf, serlen);
-
-        if (m->obj_class == obj_class::adata &&
-                    m->obj_name == obj_name::adata) {
-            /* A-DATA message, does not belong to any CDAP
-             * session. */
-            const char *objbuf;
-            size_t objlen;
-
-            m->get_obj_value(objbuf, objlen);
-            if (!objbuf) {
-                PE("CDAP message does not contain a nested message\n");
-
-                delete m;
-                return 0;
-            }
-
-            AData adata(objbuf, objlen);
-
-            if (!adata.cdap) {
-                PE("A_DATA does not contain an encapsulated CDAP message\n");
-
-                delete m;
-                return 0;
-            }
-
-            ScopeLock(rib->lock);
-
-            rib->cdap_dispatch(adata.cdap, NULL);
-
-            delete m;
-            return 0;
-        }
-
-        /* This is not an A-DATA message, so we try to match it
-         * against existing CDAP connections.
-         */
-
-        /* Easy and inefficient solution for now. We delete the
-         * already parsed CDAP message and call msg_deser() on
-         * the matching connection (if found) --> This causes the
-         * same message to be deserialized twice. The second
-         * deserialization can be avoided extending the CDAP
-         * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
-        delete m;
-        m = NULL;
-
-        ScopeLock(rib->lock);
-
-        /* Lookup neighbor by port id. */
-        neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
-        if (neigh == rib->neighbors.end()) {
-            PE("Received message from unknown port id %d\n",
-                    mhdr->local_port);
-            return -1;
-        }
-
-        if (!neigh->second.conn) {
-            neigh->second.conn = new CDAPConn(neigh->second.flow_fd, 1);
-        }
-
-        /* Deserialize the received CDAP message. */
-        m = neigh->second.conn->msg_deser(serbuf, serlen);
-        if (!m) {
-            PE("msg_deser() failed\n");
-            return -1;
-        }
-
-        /* Feed the enrollment state machine. */
-        ret = neigh->second.enroll_fsm_run(m);
-
-    } catch (std::bad_alloc) {
-        PE("Out of memory\n");
-    }
-
-    delete m;
-
-    return ret;
 }
 
 static int
@@ -721,8 +700,11 @@ normal_init(struct uipcp *uipcp)
 {
     int ret;
 
-    uipcp->rib = rib_create(uipcp);
-    if (!uipcp->rib) {
+    try {
+        uipcp->rib = new uipcp_rib(uipcp);
+
+    } catch (std::bad_alloc) {
+        PE("Out of memory\n");
         return -1;
     }
 
@@ -741,7 +723,7 @@ normal_init(struct uipcp *uipcp)
     return 0;
 
 err:
-    rib_destroy(uipcp->rib);
+    delete uipcp->rib;
 
     return -1;
 }
@@ -750,7 +732,7 @@ static int
 normal_fini(struct uipcp *uipcp)
 {
     close(uipcp->mgmtfd);
-    rib_destroy(uipcp->rib);
+    delete uipcp->rib;
 
     return 0;
 }
