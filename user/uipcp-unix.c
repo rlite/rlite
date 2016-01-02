@@ -92,6 +92,8 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
                     rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) ||
                     (!dif_name && !ipcp_name && ripcp->ipcp_id == ipcp_id)) {
                 list_del(&ripcp->node);
+                rina_name_free(&ripcp->dif_name);
+                rina_name_free(&ripcp->ipcp_name);
                 free(ripcp);
                 break;
             }
