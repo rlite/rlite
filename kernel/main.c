@@ -1575,31 +1575,36 @@ rina_appl_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
             ret = ipcp_application_del(ipcp, appl_name);
         }
 
-        if (ipcp->uipcp) {
-            /* Reflect to userspace this (un)registration, so that userspace
-             * IPCP can take appropriate actions. */
+        if (!ret && ipcp->uipcp) {
+            /* Reflect to userspace this (un)registration, so that
+             * userspace IPCP can take appropriate actions. */
             req->event_id = 0;
-            rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)req);
+            rina_upqueue_append(ipcp->uipcp,
+                    (const struct rina_msg_base *)req);
         }
 
-        if (!ipcp->uipcp || !req->reg) {
-            /* Complete the (un)registration immediately notifying the requesting
-             * application. */
-            if (ret == 0) {
-                struct rina_kmsg_appl_register_resp resp;
+        if (ret || !ipcp->uipcp || !req->reg) {
+            /* Complete the (un)registration immediately notifying the
+             * requesting application. */
+            struct rina_kmsg_appl_register_resp resp;
 
-                resp.msg_type = RINA_KERN_APPL_REGISTER_RESP;
-                resp.event_id = req->event_id;
-                resp.ipcp_id = req->ipcp_id;
-                resp.reg = req->reg;
-                resp.response = 0;
-                rina_name_move(&resp.appl_name, &req->appl_name);
+            resp.msg_type = RINA_KERN_APPL_REGISTER_RESP;
+            resp.event_id = req->event_id;
+            resp.ipcp_id = req->ipcp_id;
+            resp.reg = req->reg;
+            resp.response = ret ? RLITE_ERR : RLITE_SUCC;
+            rina_name_move(&resp.appl_name, &req->appl_name);
 
-                rina_upqueue_append(rc, (const struct rina_msg_base *)&resp);
+            rina_upqueue_append(rc, (const struct rina_msg_base *)&resp);
 
+            if (!ret) {
                 PI("Application process %s %sregistered to IPC process %u\n",
                         name_s, (req->reg ? "" : "un"), req->ipcp_id);
             }
+
+            /* If ret != 0, we just appended a negative response, so the error
+             * code for the system call can be reset. */
+            ret = 0;
         }
     }
 

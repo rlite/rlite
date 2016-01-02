@@ -38,7 +38,3 @@
 - uniformare l'uso di RLITE_SUCC e RLITE_ERR
 
 - testare normal-over-normal-over-shim e flussi concorrenti
-
-- registrazione + risposta negativa + uipcp: se c'era una applicazione
-  già registrata, la risposta negativa arriva a quest'ultima, piuttosto
-  che a quella che ha chiesto la registrazione
