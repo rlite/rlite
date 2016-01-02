@@ -227,4 +227,14 @@ struct ConnPolicies {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct ConnId {
+    uint32_t qos_id;
+    uint32_t src_cep;
+    uint32_t dst_cep;
+
+    ConnId() { }
+    ConnId(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

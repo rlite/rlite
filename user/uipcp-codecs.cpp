@@ -19,6 +19,7 @@
 #include "QoSSpecification.pb.h"
 #include "PolicyDescriptorMessage.pb.h"
 #include "ConnectionPoliciesMessage.pb.h"
+#include "FlowMessage.pb.h"
 
 using namespace std;
 
@@ -880,6 +881,45 @@ ConnPolicies::serialize(char *buf, unsigned int size) const
     gpb::connectionPolicies_t gm;
 
     ConnPolicies2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
+static void
+gpb2ConnId(ConnId& id,
+           const gpb::connectionId_t &gm)
+{
+    id.qos_id = gm.qosid();
+    id.src_cep = gm.sourcecepid();
+    id.dst_cep = gm.destinationcepid();
+}
+
+static int
+ConnId2gpb(const ConnId& id,
+           gpb::connectionId_t &gm)
+{
+    gm.set_qosid(id.qos_id);
+    gm.set_sourcecepid(id.src_cep);
+    gm.set_destinationcepid(id.dst_cep);
+
+    return 0;
+}
+
+ConnId::ConnId(const char *buf, unsigned int size)
+{
+    gpb::connectionId_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2ConnId(*this, gm);
+}
+
+int
+ConnId::serialize(char *buf, unsigned int size) const
+{
+    gpb::connectionId_t gm;
+
+    ConnId2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
