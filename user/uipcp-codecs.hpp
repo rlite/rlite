@@ -31,6 +31,7 @@ struct RinaName {
 
     RinaName() { }
     RinaName(const struct rina_name *name);
+    operator std::string() const;
 };
 
 struct DFTEntry : public UipcpObject {

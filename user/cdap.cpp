@@ -256,7 +256,7 @@ CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 
     pending.erase(invoke_id);
 
-    PD("put %d\n", invoke_id);
+    NPD("put %d\n", invoke_id);
 
     return 0;
 }
@@ -273,7 +273,7 @@ CDAPConn::get_invoke_id()
     ret = invoke_id_next++;
     pending_invoke_ids.insert(ret);
 
-    PD("got %d\n", ret);
+    NPD("got %d\n", ret);
 
     return ret;
 }
@@ -293,7 +293,7 @@ CDAPConn::get_invoke_id_remote(int invoke_id)
 
     pending_invoke_ids_remote.insert(invoke_id);
 
-    PD("got %d\n", invoke_id);
+    NPD("got %d\n", invoke_id);
 
     return 0;
 }

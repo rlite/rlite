@@ -37,6 +37,11 @@ RinaName::RinaName(const struct rina_name *name)
     aei = name->aei ? string(name->aei) : string();
 }
 
+RinaName::operator std::string() const
+{
+    return apn + '/' + api + '/' + aen + '/' + aei;
+}
+
 static void
 gpb2RinaName(RinaName &name, const gpb::applicationProcessNamingInfo_t& gname)
 {

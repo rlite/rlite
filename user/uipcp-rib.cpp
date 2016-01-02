@@ -140,6 +140,52 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
 int
 uipcp_rib::dft_handler(const CDAPMessage *rm)
 {
+    const char *objbuf;
+    size_t objlen;
+    bool add = true;
+
+    if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
+        PE("M_CREATE or M_DELETE expected\n");
+        return 0;
+    }
+
+    if (rm->op_code == gpb::M_DELETE) {
+        add = false;
+    }
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("M_START does not contain a nested message\n");
+        abort();
+        return 0;
+    }
+
+    DFTSlice dft_slice(objbuf, objlen);
+
+    for (list<DFTEntry>::iterator e = dft_slice.entries.begin();
+                                e != dft_slice.entries.end(); e++) {
+        string key = static_cast<string>(e->appl_name);
+        map< string, DFTEntry >::iterator mit = dft.find(key);
+
+        if (add) {
+            if (mit != dft.end()) {
+                PD("DFT entry already exist\n");
+            } else {
+                dft.insert(make_pair(key, *e));
+                PD("DFT entry %s added remotely\n", key.c_str());
+            }
+
+        } else {
+            if (mit == dft.end()) {
+                PI("DFT entry does not exist\n");
+            } else {
+                dft.erase(mit);
+                PD("DFT entry %s removed remotely\n", key.c_str());
+            }
+
+        }
+    }
+
     return 0;
 }
 
