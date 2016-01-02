@@ -5,6 +5,7 @@
 
 
 struct ipcp_ops {
+    void (*destroy)(void *data);
     int (*assign_to_dif)(void *data, struct rina_name *dif_name);
     int (*application_register)(void *data, struct rina_name *app_name);
     int (*application_unregister)(void *data, struct rina_name *app_name);
@@ -14,7 +15,6 @@ struct ipcp_ops {
 struct ipcp_factory {
     uint8_t dif_type;
     void *(*create)(void);
-    void (*destroy)(void *data);
     struct ipcp_ops ops;
     struct list_head node;
 };

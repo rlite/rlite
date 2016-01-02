@@ -49,6 +49,7 @@ struct ipcp_entry {
     struct rina_name    dif_name;
     uint8_t             dif_type;
     struct ipcp_ops     ops;
+    void                *priv;
     struct hlist_node   node;
 };
 
@@ -91,7 +92,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 {
     struct ipcp_factory *f;
 
-    if (!factory) {
+    if (!factory || !factory->create) {
         return -EINVAL;
     }
 
@@ -177,43 +178,69 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
     return 0;
 }
 
-static unsigned int
-ipcp_add(struct rina_msg_ipcp_create *req)
+static int
+ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
 {
     struct ipcp_entry *entry;
+    struct ipcp_factory *factory;
+    void *ipcp_priv;
+
+    mutex_lock(&rina_dm.lock);
+
+    factory = ipcp_factories_find(req->dif_type);
+    if (!factory) {
+        mutex_unlock(&rina_dm.lock);
+        return -EINVAL;
+    }
+
+    ipcp_priv = factory->create();
+    if (!ipcp_priv) {
+        mutex_unlock(&rina_dm.lock);
+        return -ENOMEM;
+    }
 
     entry = kmalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
-        return IPCP_ID_BITMAP_SIZE + 1;
+        if (factory->ops.destroy) {
+            factory->ops.destroy(ipcp_priv);
+        }
+        mutex_unlock(&rina_dm.lock);
+        return -ENOMEM;
     }
     memset(entry, 0, sizeof(*entry));
 
-    mutex_lock(&rina_dm.lock);
     /* Try to alloc an IPC process id from the bitmap. */
-    entry->id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
-                IPCP_ID_BITMAP_SIZE, 0, 1, 0);
+    *ipcp_id = entry->id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,
+                            IPCP_ID_BITMAP_SIZE, 0, 1, 0);
     if (entry->id < IPCP_ID_BITMAP_SIZE) {
         bitmap_set(rina_dm.ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
         entry->dif_type = req->dif_type;
+        entry->priv = ipcp_priv;
+        entry->ops = factory->ops;
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
     } else {
+        if (factory->ops.destroy) {
+            factory->ops.destroy(ipcp_priv);
+        }
         kfree(entry);
     }
+
     mutex_unlock(&rina_dm.lock);
 
-    return entry->id;
+    return 0;
 }
 
-static void
+static uint8_t
 ipcp_del(unsigned int ipcp_id)
 {
     struct ipcp_entry *entry;
     struct hlist_head *head;
+    uint8_t result = 1; /* No IPC process found. */
 
     if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
-        return;
+        return result;
     }
 
     mutex_lock(&rina_dm.lock);
@@ -225,16 +252,22 @@ ipcp_del(unsigned int ipcp_id)
             hash_del(&entry->node);
             rina_name_free(&entry->name);
             rina_name_free(&entry->dif_name);
+            if (entry->ops.destroy) {
+                entry->ops.destroy(entry->priv);
+            }
             /* Invalid the IPCP fetch pointer, if necessary. */
             if (entry == rina_dm.ipcp_fetch_last) {
                 rina_dm.ipcp_fetch_last = NULL;
             }
             kfree(entry);
+            result = 0;
             break;
         }
     }
     bitmap_clear(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
     mutex_unlock(&rina_dm.lock);
+
+    return result;
 }
 
 static int
@@ -246,9 +279,9 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     unsigned int ipcp_id;
     int ret;
 
-    ipcp_id = ipcp_add(req);
-    if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
-        return -ENOSPC;
+    ret = ipcp_add(req, &ipcp_id);
+    if (ret) {
+        return ret;
     }
 
     /* Create the response message. */
@@ -267,7 +300,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto err3;
     }
 
-    printk("IPC process %s created\n", name_s);
+    printk("%s: IPC process %s created\n", __func__, name_s);
     kfree(name_s);
 
     return 0;
@@ -295,17 +328,18 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
     resp->msg_type = RINA_CTRL_DESTROY_IPCP_RESP;
     resp->event_id = req->event_id;
-    resp->result = 0;
 
     /* Release the IPC process ID. */
-    ipcp_del(req->ipcp_id);
+    resp->result = ipcp_del(req->ipcp_id);
 
     ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
     if (ret) {
         goto err1;
     }
 
-    printk("IPC process %u destroyed\n", req->ipcp_id);
+    if (resp->result == 0) {
+        printk("%s: IPC process %u destroyed\n", __func__, req->ipcp_id);
+    }
 
     return 0;
 
@@ -411,7 +445,10 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto err3;
     }
 
-    printk("Assigning IPC process %u to DIF %s\n", req->ipcp_id, name_s);
+    if (resp->result == 0) {
+        printk("%s: Assigning IPC process %u to DIF %s\n", __func__,
+            req->ipcp_id, name_s);
+    }
     kfree(name_s);
 
     return 0;
@@ -599,7 +636,7 @@ rina_ctrl_init(void)
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {
-        printk("Failed to register rina-ctrl misc device\n");
+        printk("%s: Failed to register rina-ctrl misc device\n", __func__);
         return ret;
     }
 

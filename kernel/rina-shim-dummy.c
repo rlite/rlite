@@ -82,8 +82,8 @@ rina_shim_dummy_init(void)
 
     factory.dif_type = DIF_TYPE_SHIM_DUMMY;
     factory.create = rina_shim_dummy_create;
-    factory.destroy = rina_shim_dummy_destroy;
     memset(&factory.ops, 0, sizeof(factory.ops));
+    factory.ops.destroy = rina_shim_dummy_destroy;
     factory.ops.assign_to_dif = rina_shim_dummy_assign_to_dif;
 
     ret = rina_ipcp_factory_register(&factory);

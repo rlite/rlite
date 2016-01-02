@@ -47,8 +47,12 @@ ipcp_destroy_resp(struct ipcm *ipcm,
     struct rina_msg_ipcp_destroy *req =
             (struct rina_msg_ipcp_destroy *)b_req;
 
-    printf("%s: Destroyed IPC process %d, result = %d\n", __func__,
-            req->ipcp_id, resp->result);
+    if (resp->result) {
+        printf("%s: Failed to destroy IPC process %d\n", __func__,
+                req->ipcp_id);
+    } else {
+        printf("%s: Destroyed IPC process %d\n", __func__, req->ipcp_id);
+    }
 
     return 0;
 }
@@ -110,8 +114,13 @@ assign_to_dif_resp(struct ipcm *ipcm,
 
     name_s = rina_name_to_string(&req->dif_name);
 
-    printf("%s: Assigned IPC process %u to DIF %s, result = %u\n",
-            __func__, req->ipcp_id, name_s, resp->result);
+    if (resp->result) {
+        printf("%s: Failed to assign IPC process %u to DIF %s\n",
+                __func__, req->ipcp_id, name_s);
+    } else {
+        printf("%s: Assigned IPC process %u to DIF %s\n",
+                __func__, req->ipcp_id, name_s);
+    }
     (void)req;
 
     if (name_s) {
