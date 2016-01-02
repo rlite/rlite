@@ -17,6 +17,7 @@
 #include "FlowStateGroupMessage.pb.h"
 #include "CommonMessages.pb.h"
 #include "QoSSpecification.pb.h"
+#include "PolicyDescriptorMessage.pb.h"
 
 using namespace std;
 
@@ -370,14 +371,29 @@ LowerFlowList::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2Property(Property& p, const gpb::property_t &gm)
+{
+    p.name = gm.name();
+    p.value = gm.value();
+}
+
+static int
+Property2gpb(const Property& p, gpb::property_t &gm)
+{
+    gm.set_name(p.name);
+    gm.set_value(p.value);
+
+    return 0;
+}
+
 Property::Property(const char *buf, unsigned int size)
 {
     gpb::property_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    name = gm.name();
-    value = gm.value();
+    gpb2Property(*this, gm);
 }
 
 int
@@ -385,8 +401,7 @@ Property::serialize(char *buf, unsigned int size) const
 {
     gpb::property_t gm;
 
-    gm.set_name(name);
-    gm.set_value(value);
+    Property2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
@@ -430,6 +445,42 @@ QosSpec::serialize(char *buf, unsigned int size) const
     gm.set_delay(delay);
     gm.set_jitter(jitter);
     /* missing extra_parameters */
+
+    return ser_common(gm, buf, size);
+}
+
+PolicyDescr::PolicyDescr(const char *buf, unsigned int size)
+{
+    gpb::policyDescriptor_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    name = gm.policyname();
+    impl_name = gm.policyimplname();
+    version = gm.version();
+
+    for (int i = 0; i < gm.policyparameters_size(); i++) {
+        parameters.push_back(Property());
+        gpb2Property(parameters.back(), gm.policyparameters(i));
+    }
+}
+
+int
+PolicyDescr::serialize(char *buf, unsigned int size) const
+{
+    gpb::policyDescriptor_t gm;
+
+    gm.set_policyname(name);
+    gm.set_policyimplname(impl_name);
+    gm.set_version(version);
+
+    for (list<Property>::const_iterator p = parameters.begin();
+                            p != parameters.end(); p++) {
+        gpb::property_t *param;
+
+        param = gm.add_policyparameters();
+        Property2gpb(*p, *param);
+    }
 
     return ser_common(gm, buf, size);
 }

@@ -129,4 +129,15 @@ struct QosSpec : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct PolicyDescr : public UipcpObject {
+    std::string name;
+    std::string impl_name;
+    std::string version;
+    std::list<Property> parameters;
+
+    PolicyDescr() { }
+    PolicyDescr(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
