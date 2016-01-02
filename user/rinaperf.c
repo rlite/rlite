@@ -290,6 +290,25 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
+static void
+usage(void)
+{
+    printf("rinaperf [OPTIONS]\n"
+        "   -h : show this help\n"
+        "   -l : run in server mode (listen)\n"
+        "   -t TEST : specify the type of the test to be performed (ping, perf)\n"
+        "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
+        "   -c NUM : number of SDUs to send during the test\n"
+        "   -s NUM : size of the SDUs that are sent during the test\n"
+        "   -i NUM : number of microseconds to wait after each SDUs is sent "
+                     "(ping mode)\n"
+        "   -p APNAME : application process name of the IPC process that "
+                "overrides what is specified by the -d option (debug only)\n"
+        "   -P APNAME : application process instance of the IPC process that "
+                "overrides what is specified by the -d option (debug only)\n"
+          );
+}
+
 int
 main(int argc, char **argv)
 {
@@ -308,8 +327,12 @@ main(int argc, char **argv)
     int opt;
     int i;
 
-    while ((opt = getopt(argc, argv, "lt:d:c:s:p:P:i:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:")) != -1) {
         switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
             case 'l':
                 listen = 1;
                 break;
@@ -341,6 +364,7 @@ main(int argc, char **argv)
                 size = atoi(optarg);
                 if (size <= 0) {
                     printf("    Invalid 'size' %d\n", size);
+                    return -1;
                 }
                 break;
 
@@ -348,11 +372,13 @@ main(int argc, char **argv)
                 interval = atoi(optarg);
                 if (interval < 0) {
                     printf("    Invalid 'interval' %d\n", interval);
+                    return -1;
                 }
                 break;
 
             default:
                 printf("    Unrecognized option %c\n", opt);
+                usage();
                 return -1;
         }
     }
@@ -367,6 +393,7 @@ main(int argc, char **argv)
 
         if (perf_function == NULL) {
             printf("    Unknown test type '%s'\n", type);
+            usage();
             return -1;
         }
         rp.test_config.ty = i;

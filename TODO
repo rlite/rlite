@@ -20,8 +20,6 @@
 
 - fix permissions to /var/rina/ directory
 
-- add help() function to rinaperf
-
 - aggiustare il locking:
     a) flow_lookup() dovrebbe sparire
     b) il global lock deve sparire, almeno nel datapath.
