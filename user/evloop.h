@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <rina/rina-kernel-msg.h>
-#include <rina/rina-application-msg.h>
+#include <rina/rina-conf-msg.h>
 #include <rina/rina-utils.h>
 
 #include "pending_queue.h"

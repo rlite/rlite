@@ -23,9 +23,9 @@ enum {
 
 extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX];
 
-/* Application --> IPCM message to register an IPC process
+/* rinaconf --> IPCM message to register an IPC process
  * to another IPC process */
-struct rina_amsg_ipcp_register {
+struct rina_cmsg_ipcp_register {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -34,9 +34,9 @@ struct rina_amsg_ipcp_register {
     struct rina_name dif_name;
 } __attribute__((packed));
 
-/* Application --> IPCM message to enroll an IPC process
+/* rinaconf --> IPCM message to enroll an IPC process
  * to another IPC process */
-struct rina_amsg_ipcp_enroll {
+struct rina_cmsg_ipcp_enroll {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -46,8 +46,8 @@ struct rina_amsg_ipcp_enroll {
     struct rina_name supp_dif_name;
 } __attribute__((packed));
 
-/* Application --> IPCM message to set an IPC process DFT entry */
-struct rina_amsg_ipcp_dft_set {
+/* rinaconf --> IPCM message to set an IPC process DFT entry */
+struct rina_cmsg_ipcp_dft_set {
     rina_msg_t msg_type;
     uint32_t event_id;
 

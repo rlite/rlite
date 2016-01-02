@@ -12,7 +12,7 @@
 #include <signal.h>
 #include <assert.h>
 
-#include <rina/rina-application-msg.h>
+#include <rina/rina-conf-msg.h>
 #include "helpers.h"
 #include "evloop.h"
 
@@ -435,7 +435,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_register_common(int argc, char **argv, unsigned int reg)
 {
-    struct rina_amsg_ipcp_register req;
+    struct rina_cmsg_ipcp_register req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
@@ -469,7 +469,7 @@ ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_amsg_ipcp_enroll req;
+    struct rina_cmsg_ipcp_enroll req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *neigh_ipcp_apn;
@@ -498,7 +498,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_amsg_ipcp_dft_set req;
+    struct rina_cmsg_ipcp_dft_set req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *appl_apn;

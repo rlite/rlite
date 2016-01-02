@@ -1,7 +1,7 @@
 #ifndef __RINA_UIPCP_H__
 #define __RINA_UIPCP_H__
 
-#include <rina/rina-application-msg.h>
+#include <rina/rina-conf-msg.h>
 #include "list.h"
 #include "application.h"
 
@@ -65,6 +65,6 @@ struct uipcp *uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id);
 int uipcps_fetch(struct ipcm *ipcm);
 int uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
                   uint64_t remote_addr);
-int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req);
+int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
 
 #endif /* __RINA_UIPCP_H__ */

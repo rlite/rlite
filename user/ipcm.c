@@ -13,7 +13,7 @@
 #include <assert.h>
 #include <endian.h>
 #include <rina/rina-kernel-msg.h>
-#include <rina/rina-application-msg.h>
+#include <rina/rina-conf-msg.h>
 #include <rina/rina-utils.h>
 
 #include "list.h"
@@ -113,7 +113,7 @@ static int
 rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
-    struct rina_amsg_ipcp_register *req = (struct rina_amsg_ipcp_register *)b_req;
+    struct rina_cmsg_ipcp_register *req = (struct rina_cmsg_ipcp_register *)b_req;
     struct rina_msg_base_resp resp;
 
     resp.result = rina_ipcp_register(ipcm, req->reg, &req->dif_name,
@@ -126,7 +126,7 @@ static int
 rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
-    struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
+    struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
     unsigned int ipcp_id;
     struct uipcp *uipcp;
@@ -163,7 +163,7 @@ static int
 rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
-    struct rina_amsg_ipcp_dft_set *req = (struct rina_amsg_ipcp_dft_set *)b_req;
+    struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
     struct rina_msg_base_resp resp;
     unsigned int ipcp_id;
     struct uipcp *uipcp;

@@ -12,7 +12,7 @@ all: $(EXES) ker
 ker:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
-user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o user/rina-application-numtables.o user/helpers.o user/evloop.o user/application.o user/uipcp.o
+user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o user/rina-conf-numtables.o user/helpers.o user/evloop.o user/application.o user/uipcp.o
 
 user/ipcm.o:  $(HEADERS) user/pending_queue.h user/helpers.h user/evloop.h user/application.h user/ipcm.h
 
@@ -22,7 +22,7 @@ user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
 user/evloop.o: $(HEADERS) user/evloop.h user/pending_queue.h
 
-user/rina-config: user/rina-config.o user/rina-application-numtables.o user/rina-utils.o user/helpers.o user/evloop.o user/rina-kernel-numtables.o user/pending_queue.o
+user/rina-config: user/rina-config.o user/rina-conf-numtables.o user/rina-utils.o user/helpers.o user/evloop.o user/rina-kernel-numtables.o user/pending_queue.o
 
 user/rina-config.o: $(HEADERS)
 

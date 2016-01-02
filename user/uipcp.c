@@ -99,7 +99,7 @@ struct enrolled_neighbor {
     struct list_head node;
 };
 
-int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
+int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 {
     struct enrolled_neighbor *neigh;
     unsigned int port_id;
