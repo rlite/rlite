@@ -1004,30 +1004,29 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
          * currently true for shim IPCPs. */
         ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
     } else {
-        /* This IPCP handles the flow allocation in user-space. This is
-         * currently true for normal IPCPs. */
-        if (!ipcp_entry->uipcp) {
-            /* No userspace IPCP to use, this should not happen. */
-        } else {
-            struct registered_application *app;
+        struct registered_application *app;
 
-            app = ipcp_application_lookup(ipcp_entry, remote_application);
-            if (app) {
-                /* If the remote application is registered within this very
-                 * IPCP, the allocating flow can managed entirely inside this
-                 * IPCP. Then bypass all the userspace flow allocation request
-                 * and directly invoke rina_fa_req_arrived, with reversed
-                 * arguments. */
-                ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
-                                          ipcp_entry->addr, remote_application,
-                                          local_application, 0);
-            } else {
-                /* Reflect the flow allocation request message to userspace. */
-                req->event_id = 0;
-                req->local_port = flow_entry->local_port;
-                ret = rina_upqueue_append(ipcp_entry->uipcp,
-                        (const struct rina_msg_base *)req);
-            }
+        app = ipcp_application_lookup(ipcp_entry, remote_application);
+        if (app) {
+            /* If the remote application is registered within this very
+             * IPCP, the allocating flow can managed entirely inside this
+             * IPCP. Then bypass all the userspace flow allocation request
+             * and directly invoke rina_fa_req_arrived, with reversed
+             * arguments. */
+            ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
+                                      ipcp_entry->addr, remote_application,
+                                      local_application, 0);
+        } else if (!ipcp_entry->uipcp) {
+            /* No userspace IPCP to use, this should not happen. */
+            BUG_ON(1);
+        } else {
+            /* This IPCP handles the flow allocation in user-space. This is
+             * currently true for normal IPCPs.
+             * Reflect the flow allocation request message to userspace. */
+            req->event_id = 0;
+            req->local_port = flow_entry->local_port;
+            ret = rina_upqueue_append(ipcp_entry->uipcp,
+                    (const struct rina_msg_base *)req);
         }
     }
 
@@ -1144,29 +1143,28 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
          * currently true for shim IPCPs. */
         ret = ipcp->ops.flow_allocate_resp(ipcp, flow_entry, response);
     } else {
-        /* This IPCP handles the flow allocation in user-space. This is
-         * currently true for normal IPCPs. */
-        if (!ipcp->uipcp) {
+        if (flow_entry->remote_addr == ipcp->addr) {
+            /* This flow is managed entirely in this IPCP - basically
+             * the flow is established between the IPCP and itself.
+             * Bypass all the userspace flow allocation response
+             * and directly invoke rina_fa_resp_arrived, with reversed
+             * arguments. */
+            ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
+                    flow_entry->local_port,
+                    ipcp->addr,
+                    response, 0);
+        } else if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this should not happen. */
+            BUG_ON(1);
         } else {
-            if (flow_entry->remote_addr == ipcp->addr) {
-                /* This flow is managed entirely in this IPCP - basically
-                 * the flow is established between the IPCP and itself.
-                 * Bypass all the userspace flow allocation response
-                 * and directly invoke rina_fa_resp_arrived, with reversed
-                 * arguments. */
-                ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
-                                           flow_entry->local_port,
-                                           ipcp->addr,
-                                           response, 0);
-            } else {
-                /* Reflect the flow allocation response message to userspace. */
-                resp->event_id = 0;
-                resp->remote_port = flow_entry->remote_port;
-                resp->remote_addr = flow_entry->remote_addr;
-                ret = rina_upqueue_append(ipcp->uipcp,
-                                          (const struct rina_msg_base *)resp);
-            }
+            /* This IPCP handles the flow allocation in user-space. This is
+             * currently true for normal IPCPs.
+             * Reflect the flow allocation response message to userspace. */
+            resp->event_id = 0;
+            resp->remote_port = flow_entry->remote_port;
+            resp->remote_addr = flow_entry->remote_addr;
+            ret = rina_upqueue_append(ipcp->uipcp,
+                    (const struct rina_msg_base *)resp);
         }
     }
 
