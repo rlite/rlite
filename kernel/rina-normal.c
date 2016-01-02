@@ -116,6 +116,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->last_seq_num_sent = -1;
     dtp->rcv_lwe = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
+    dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
@@ -370,7 +371,13 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     pcic->base.conn_id.src_cep = flow->local_port;
                     pcic->base.pdu_type = PDU_TYPE_FC;
                     pcic->base.pdu_flags = 0;
-                    pcic->base.seqnum = 0;
+                    pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
+                    pcic->last_ctrl_seq_num_rcvd =
+                            flow->dtp.last_ctrl_seq_num_rcvd;
+                    pcic->new_rwe = flow->dtp.rcv_rwe;
+                    pcic->new_lwe = flow->dtp.rcv_lwe;
+                    pcic->my_rwe = flow->dtp.snd_rwe;
+                    pcic->my_lwe = flow->dtp.snd_lwe;
                     rina_buf_free(rb); //TODO
                 }
             }
