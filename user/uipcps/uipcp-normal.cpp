@@ -275,7 +275,7 @@ uipcp_rib::ipcp_info() const
 {
     struct rlite_ipcp *ipcp;
 
-    ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+    ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop.ctrl, uipcp->ipcp_id);
     assert(ipcp);
 
     return ipcp;

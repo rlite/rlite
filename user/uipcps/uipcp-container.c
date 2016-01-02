@@ -400,7 +400,7 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         /* This is just for debugging purposes. */
-        rlite_ipcps_print(&uipcp->appl.loop);
+        rlite_ipcps_print(&uipcp->appl.loop.ctrl);
         break;
     }
 

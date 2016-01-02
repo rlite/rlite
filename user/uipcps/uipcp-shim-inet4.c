@@ -541,7 +541,8 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
     /* Close the TCP/UDP connection associated to this flow. */
     ret = remove_endpoint_by_port_id(shim, req->local_port_id);
     if (ret) {
-        UPE(uipcp, "Cannot find endpoint corresponding to port '%d'\n", req->local_port_id);
+        UPE(uipcp, "Cannot find endpoint corresponding to port '%d'\n",
+            req->local_port_id);
     }
 
     return 0;
@@ -553,7 +554,8 @@ shim_inet4_init(struct uipcp *uipcp)
     struct rlite_ipcp *rlite_ipcp;
     struct shim_inet4 *shim;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop.ctrl,
+                                         uipcp->ipcp_id);
     if (!rlite_ipcp) {
         PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);
         return -1;

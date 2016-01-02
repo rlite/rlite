@@ -268,9 +268,9 @@ rl_appl_register(struct rlite_appl *appl, uint32_t event_id,
 {
     struct rlite_ipcp *rlite_ipcp;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&appl->loop, ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&appl->loop.ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&appl->loop, dif_name);
+        rlite_ipcp = rlite_select_ipcp_by_dif(&appl->loop.ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
@@ -325,9 +325,9 @@ rl_appl_flow_alloc(struct rlite_appl *appl, uint32_t event_id,
     struct rlite_ipcp *rlite_ipcp;
     int result;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&appl->loop, ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&appl->loop.ctrl, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&appl->loop, dif_name);
+        rlite_ipcp = rlite_select_ipcp_by_dif(&appl->loop.ctrl, dif_name);
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");

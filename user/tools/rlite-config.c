@@ -254,7 +254,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* Does the request specifies an existing IPC process ? */
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &ipcp_name);
     if (!rlite_ipcp) {
         PE("No such IPCP process\n");
     } else {
@@ -293,7 +293,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
     } else {
@@ -321,7 +321,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     /* Lookup the id of the registering IPCP. */
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &req.ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find the IPC process to register\n");
         return -1;
@@ -369,7 +369,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     supp_dif_name = argv[5];
 
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &req.ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find enrolling IPC process\n");
         return -1;
@@ -410,7 +410,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     }
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &ipcp_name);
     rina_name_free(&ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find IPC process\n");
@@ -429,7 +429,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcps_show(int argc, char **argv, struct rinaconf *rc)
 {
-    rlite_ipcps_print(&rc->loop);
+    rlite_ipcps_print(&rc->loop.ctrl);
 
     return 0;
 }
@@ -470,7 +470,7 @@ ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
     ipcp_api = argv[1];
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&rc->loop.ctrl, &ipcp_name);
     rina_name_free(&ipcp_name);
     if (!rlite_ipcp) {
         PE("Could not find IPC process\n");

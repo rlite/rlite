@@ -131,7 +131,7 @@ ipcp_update(struct rlite_evloop *loop,
         upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
         upd->dif_name, upd->dif_type);
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&loop->ctrl.lock);
 
     list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
         if (cur->ipcp_id == upd->ipcp_id) {
@@ -193,7 +193,7 @@ ipcp_update(struct rlite_evloop *loop,
     }
 
 out:
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&loop->ctrl.lock);
 
     /* We do handler chaining here, because it's always necessary
      * to manage the RLITE_KER_IPCP_UPDATE message internally. */
@@ -252,14 +252,14 @@ flow_fetch(struct rlite_evloop *loop, int *result)
 }
 
 int
-rlite_ipcps_print(struct rlite_evloop *loop)
+rlite_ipcps_print(struct rlite_ctrl *ctrl)
 {
     struct rlite_ipcp *rlite_ipcp;
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&ctrl->lock);
 
     PI_S("IPC Processes table:\n");
-    list_for_each_entry(rlite_ipcp, &loop->ctrl.ipcps, node) {
+    list_for_each_entry(rlite_ipcp, &ctrl->ipcps, node) {
             char *ipcp_name_s = NULL;
 
             ipcp_name_s = rina_name_to_string(&rlite_ipcp->ipcp_name);
@@ -275,7 +275,7 @@ rlite_ipcps_print(struct rlite_evloop *loop)
             }
     }
 
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&ctrl->lock);
 
     return 0;
 }
@@ -1023,18 +1023,18 @@ rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 }
 
 struct rlite_ipcp *
-rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
+rlite_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
                          const char *dif_name)
 {
     struct rlite_ipcp *cur;
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&ctrl->lock);
 
     if (dif_name) {
         /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
+        list_for_each_entry(cur, &ctrl->ipcps, node) {
             if (strcmp(cur->dif_name, dif_name) == 0) {
-                pthread_mutex_unlock(&loop->lock);
+                pthread_mutex_unlock(&ctrl->lock);
                 return cur;
             }
         }
@@ -1044,81 +1044,82 @@ rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
-        list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
+        list_for_each_entry(cur, &ctrl->ipcps, node) {
             if ((strcmp(cur->dif_type, "normal") == 0 ||
                         !rlite_ipcp)) {
                 rlite_ipcp = cur;
             }
         }
 
-        pthread_mutex_unlock(&loop->lock);
+        pthread_mutex_unlock(&ctrl->lock);
 
         return rlite_ipcp;
     }
 
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_name(struct rlite_evloop *loop, const struct rina_name *name)
+rlite_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
+                          const struct rina_name *name)
 {
     struct rlite_ipcp *ipcp;
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&ctrl->lock);
 
     if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
+        list_for_each_entry(ipcp, &ctrl->ipcps, node) {
             if (rina_name_valid(&ipcp->ipcp_name)
                     && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
-                pthread_mutex_unlock(&loop->lock);
+                pthread_mutex_unlock(&ctrl->lock);
                 return ipcp;
             }
         }
     }
 
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
 
 int
-rlite_lookup_ipcp_addr_by_id(struct rlite_evloop *loop, unsigned int id,
+rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
                        uint64_t *addr)
 {
     struct rlite_ipcp *ipcp;
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&ctrl->lock);
 
-    list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
+    list_for_each_entry(ipcp, &ctrl->ipcps, node) {
         if (ipcp->ipcp_id == id) {
             *addr = ipcp->ipcp_addr;
-            pthread_mutex_unlock(&loop->lock);
+            pthread_mutex_unlock(&ctrl->lock);
             return 0;
         }
     }
 
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&ctrl->lock);
 
     return -1;
 }
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id)
+rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
 {
     struct rlite_ipcp *ipcp;
 
-    pthread_mutex_lock(&loop->lock);
+    pthread_mutex_lock(&ctrl->lock);
 
-    list_for_each_entry(ipcp, &loop->ctrl.ipcps, node) {
+    list_for_each_entry(ipcp, &ctrl->ipcps, node) {
         if (rina_name_valid(&ipcp->ipcp_name) && ipcp->ipcp_id == id) {
-            pthread_mutex_unlock(&loop->lock);
+            pthread_mutex_unlock(&ctrl->lock);
             return ipcp;
         }
     }
 
-    pthread_mutex_unlock(&loop->lock);
+    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
@@ -1223,6 +1224,7 @@ rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
 
     list_init(&ctrl->pqueue);
     list_init(&ctrl->ipcps);
+    pthread_mutex_init(&ctrl->lock, NULL);
 
     /* Open the RLITE control device. */
     ctrl->rfd = open(dev, O_RDWR);

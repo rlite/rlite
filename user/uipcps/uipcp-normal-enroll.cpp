@@ -868,7 +868,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
     {
         struct rlite_ipcp *ipcp;
 
-        ipcp = rlite_select_ipcp_by_dif(&rib->uipcp->appl.loop,
+        ipcp = rlite_select_ipcp_by_dif(&rib->uipcp->appl.loop.ctrl,
                                         supp_dif_name);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->ipcp_id;

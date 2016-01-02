@@ -47,7 +47,11 @@ struct rlite_ctrl {
      * returned when user calls rl_ctrl_wait() or rl_ctrl_wait_any(). */
     struct list_head pqueue;
 
+    /* Keeps the list of IPCPs in the system. */
     struct list_head ipcps;
+
+    /* Lock to be used with ipcps list. */
+    pthread_mutex_t lock;
 
 };
 
@@ -83,7 +87,7 @@ struct rlite_evloop {
     uint32_t event_id_counter;
 
     /* Synchronization variables used to implement mutual exclusion between the
-     * event-loop thread and the script thead. */
+     * event-loop thread and the user thead. */
     pthread_mutex_t lock;
 
     /* Used to stop the event-loop. */
@@ -152,9 +156,6 @@ int
 rl_evloop_schedule_canc(struct rlite_evloop *loop, int id);
 
 int
-rlite_ipcps_print(struct rlite_evloop *loop);
-
-int
 rlite_flows_print(struct rlite_evloop *loop);
 
 /* Fetch information about all IPC processes. */
@@ -164,20 +165,23 @@ rlite_flows_fetch(struct rlite_evloop *loop);
 uint32_t
 rl_evloop_get_id(struct rlite_evloop *loop);
 
+int
+rlite_ipcps_print(struct rlite_ctrl *ctrl);
+
 struct rlite_ipcp *
-rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
+rlite_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
                          const char *dif_name);
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_name(struct rlite_evloop *loop,
+rlite_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
                           const struct rina_name *name);
 
 int
-rlite_lookup_ipcp_addr_by_id(struct rlite_evloop *loop, unsigned int id,
+rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
                              uint64_t *addr);
 
 struct rlite_ipcp *
-rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id);
+rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
 
 int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);
