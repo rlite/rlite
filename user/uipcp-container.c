@@ -8,6 +8,7 @@
 #include "rlite/conf-msg.h"
 
 #include "uipcp-container.h"
+#include "rlite-conf.h"
 
 
 int
@@ -438,6 +439,44 @@ relax(struct uipcps *uipcps, int up)
 }
 
 static int
+uipcps_update_depths(struct uipcps *uipcps)
+{
+    struct rlite_evloop loop;
+    struct ipcp_node *ipn;
+    unsigned int depth;
+    char strbuf[10];
+    int ret;
+
+    ret = rlite_evloop_init(&loop, "/dev/rlite", NULL);
+    if (ret) {
+        return ret;
+    }
+
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        /* Shims have down_depth set to 0, so we use the up_depth
+         * for them. For all the other (normal) IPCPs we use the
+         * down_depth. */
+        depth = (ipn->down_depth == 0) ? ipn->up_depth : ipn->down_depth;
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", depth);
+        if (ret <= 0 || ret >= sizeof(strbuf)) {
+            PE("Impossible depth %u\n", depth);
+            continue;
+        }
+
+        ret = rlite_ipcp_config(&loop, ipn->ipcp_id, "depth",
+                                strbuf);
+        if (ret) {
+            PE("'ipcp-config depth %u' failed\n", depth);
+        }
+    }
+
+    rlite_evloop_stop(&loop);
+    rlite_evloop_fini(&loop);
+
+    return 0;
+}
+
+static int
 uipcps_compute_depths(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
@@ -470,6 +509,8 @@ uipcps_compute_depths(struct uipcps *uipcps)
         }
         PD_S("]\n");
     }
+
+    uipcps_update_depths(uipcps);
 
     return 0;
 }
