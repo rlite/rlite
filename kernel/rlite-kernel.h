@@ -220,6 +220,22 @@ struct pduft_entry {
     struct list_head    fnode;      /* for the flow->pduft_entries list */
 };
 
+int __ipcp_put(struct ipcp_entry *entry);
+struct ipcp_entry * __ipcp_get(rl_ipcp_id_t ipcp_id);
+
+#define ipcp_put(_ie)                                                   \
+        ({								\
+            if (_ie) PD("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt);     \
+            __ipcp_put(_ie);                                            \
+        })
+
+#define ipcp_get(_id)                                                   \
+        ({                                                              \
+            struct ipcp_entry *tmp = __ipcp_get(_id);                   \
+            if (tmp) PD("REFCNT++ %u: %u\n", tmp->id, tmp->refcnt);     \
+            tmp;                                                        \
+        })
+
 int rlite_ipcp_factory_register(struct ipcp_factory *factory);
 int rlite_ipcp_factory_unregister(const char *dif_type);
 
@@ -261,6 +277,8 @@ struct flow_entry *flow_get(rl_port_t port_id);
 struct flow_entry *flow_get_by_cep(unsigned int cep_id);
 
 void flow_get_ref(struct flow_entry *flow);
+
+void flow_make_mortal(struct flow_entry *flow);
 
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
