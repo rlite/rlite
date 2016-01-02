@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <endian.h>
+#include <signal.h>
 #include <rina/rina-utils.h>
 
 #include "application.h"
@@ -287,9 +288,17 @@ clos:
     return 0;
 }
 
+static void
+sigint_handler(int signum)
+{
+    unlink(RINA_IPCM_UNIX_NAME);
+    exit(EXIT_SUCCESS);
+}
+
 int
 main(int argc, char **argv)
 {
+    struct sigaction sa;
     struct rinaperf rp;
     const char *type = "echo";
     const char *dif_name = "d.DIF";
@@ -352,6 +361,21 @@ main(int argc, char **argv)
         rp.test_config.ty = i;
         rp.test_config.cnt = cnt;
         rp.test_config.size = size;
+    }
+
+    /* Set some signal handler */
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    ret = sigaction(SIGINT, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGINT)");
+        return ret;
+    }
+    ret = sigaction(SIGTERM, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGTERM)");
+        return ret;
     }
 
     /* Initialization of RINA application library. */

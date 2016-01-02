@@ -10,7 +10,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 #include <assert.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
@@ -264,13 +263,6 @@ flow_request_wait(struct application *application)
     return container_of(elem, struct pending_flow_req, node);
 }
 
-static void
-sigint_handler(int signum)
-{
-    unlink(RINA_IPCM_UNIX_NAME);
-    exit(EXIT_SUCCESS);
-}
-
 int
 open_port(unsigned port_id)
 {
@@ -295,7 +287,6 @@ open_port(unsigned port_id)
 int
 rina_application_init(struct application *application)
 {
-    struct sigaction sa;
     int ret;
 
     pthread_mutex_init(&application->lock, NULL);
@@ -305,22 +296,6 @@ rina_application_init(struct application *application)
     ret = rina_evloop_init(&application->loop, "/dev/rina-app-ctrl",
                      rina_kernel_handlers);
     if (ret) {
-        return ret;
-    }
-
-    /* Set an handler for SIGINT and SIGTERM so that we can remove
-     * the Unix domain socket used to access the IPCM server. */
-    sa.sa_handler = sigint_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    ret = sigaction(SIGINT, &sa, NULL);
-    if (ret) {
-        perror("sigaction(SIGINT)");
-        return ret;
-    }
-    ret = sigaction(SIGTERM, &sa, NULL);
-    if (ret) {
-        perror("sigaction(SIGTERM)");
         return ret;
     }
 
