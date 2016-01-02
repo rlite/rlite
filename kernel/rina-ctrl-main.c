@@ -634,7 +634,8 @@ flow_table_find(unsigned int port_id)
 }
 
 static int
-flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry)
+flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry,
+         int locked)
 {
     struct flow_entry *entry;
     int ret = 0;
@@ -645,7 +646,8 @@ flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry)
     }
     memset(entry, 0, sizeof(*entry));
 
-    mutex_lock(&rina_dm.lock);
+    if (locked)
+        mutex_lock(&rina_dm.lock);
 
     /* Try to alloc a port id from the bitmap. */
     entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
@@ -665,13 +667,14 @@ flow_add(struct rina_kmsg_flow_allocate_req *req, struct flow_entry **pentry)
         ret = -ENOSPC;
     }
 
-    mutex_unlock(&rina_dm.lock);
+    if (locked)
+        mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
 
 static int
-flow_del(unsigned int port_id)
+flow_del(unsigned int port_id, int locked)
 {
     struct flow_entry *entry;
     int ret = -1;  /* No flow found. */
@@ -680,7 +683,8 @@ flow_del(unsigned int port_id)
         return ret;
     }
 
-    mutex_lock(&rina_dm.lock);
+    if (locked)
+        mutex_lock(&rina_dm.lock);
     /* Lookup and remove the flow entry in the hash table corresponding
      * to the given port_id. */
     entry = flow_table_find(port_id);
@@ -692,7 +696,8 @@ flow_del(unsigned int port_id)
         ret = 0;
     }
     bitmap_clear(rina_dm.port_id_bitmap, port_id, 1);
-    mutex_unlock(&rina_dm.lock);
+    if (locked)
+        mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -715,7 +720,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(req, &flow_entry);
+    ret = flow_add(req, &flow_entry, 0);
     if (ret) {
         goto negative;
     }
@@ -734,7 +739,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
 negative:
     if (flow_entry) {
-        flow_del(flow_entry->local_port);
+        flow_del(flow_entry->local_port, 0);
     }
 
     mutex_unlock(&rina_dm.lock);
