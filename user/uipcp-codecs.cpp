@@ -18,6 +18,7 @@
 #include "CommonMessages.pb.h"
 #include "QoSSpecification.pb.h"
 #include "PolicyDescriptorMessage.pb.h"
+#include "ConnectionPoliciesMessage.pb.h"
 
 using namespace std;
 
@@ -495,6 +496,109 @@ PolicyDescr::serialize(char *buf, unsigned int size) const
     gpb::policyDescriptor_t gm;
 
     PolicyDescr2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
+static void
+gpb2WindowBasedFlowCtrlConfig(WindowBasedFlowCtrlConfig& cfg,
+                              const gpb::dtcpWindowBasedFlowControlConfig_t &gm)
+{
+    cfg.max_cwq_len = gm.maxclosedwindowqueuelength();
+    cfg.initial_credit = gm.initialcredit();
+    gpb2PolicyDescr(cfg.rcvr_flow_ctrl, gm.rcvrflowcontrolpolicy());
+    gpb2PolicyDescr(cfg.tx_ctrl, gm.txcontrolpolicy());
+}
+
+static int
+WindowBasedFlowCtrlConfig2gpb(const WindowBasedFlowCtrlConfig& cfg,
+                              gpb::dtcpWindowBasedFlowControlConfig_t &gm)
+{
+    gpb::policyDescriptor_t *p;
+
+    gm.set_maxclosedwindowqueuelength(cfg.max_cwq_len);
+    gm.set_initialcredit(cfg.initial_credit);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rcvr_flow_ctrl, *p);
+    gm.set_allocated_rcvrflowcontrolpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.tx_ctrl, *p);
+    gm.set_allocated_txcontrolpolicy(p);
+
+    return 0;
+}
+
+WindowBasedFlowCtrlConfig::WindowBasedFlowCtrlConfig(const char *buf, unsigned int size)
+{
+    gpb::dtcpWindowBasedFlowControlConfig_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2WindowBasedFlowCtrlConfig(*this, gm);
+}
+
+int
+WindowBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
+{
+    gpb::dtcpWindowBasedFlowControlConfig_t gm;
+
+    WindowBasedFlowCtrlConfig2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
+static void
+gpb2RateBasedFlowCtrlConfig(RateBasedFlowCtrlConfig& cfg,
+                            const gpb::dtcpRateBasedFlowControlConfig_t &gm)
+{
+    cfg.sending_rate = gm.sendingrate();
+    cfg.time_period = gm.timeperiod();
+    gpb2PolicyDescr(cfg.no_rate_slow_down, gm.norateslowdownpolicy());
+    gpb2PolicyDescr(cfg.no_override_default_peak, gm.nooverridedefaultpeakpolicy());
+    gpb2PolicyDescr(cfg.rate_reduction, gm.ratereductionpolicy());
+}
+
+static int
+RateBasedFlowCtrlConfig2gpb(const RateBasedFlowCtrlConfig& cfg,
+                            gpb::dtcpRateBasedFlowControlConfig_t &gm)
+{
+    gpb::policyDescriptor_t *p;
+
+    gm.set_sendingrate(cfg.sending_rate);
+    gm.set_timeperiod(cfg.time_period);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.no_rate_slow_down, *p);
+    gm.set_allocated_norateslowdownpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.no_override_default_peak, *p);
+    gm.set_allocated_nooverridedefaultpeakpolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rate_reduction, *p);
+    gm.set_allocated_ratereductionpolicy(p);
+
+    return 0;
+}
+
+RateBasedFlowCtrlConfig::RateBasedFlowCtrlConfig(const char *buf, unsigned int size)
+{
+    gpb::dtcpRateBasedFlowControlConfig_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2RateBasedFlowCtrlConfig(*this, gm);
+}
+
+int
+RateBasedFlowCtrlConfig::serialize(char *buf, unsigned int size) const
+{
+    gpb::dtcpRateBasedFlowControlConfig_t gm;
+
+    RateBasedFlowCtrlConfig2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
