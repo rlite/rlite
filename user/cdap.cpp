@@ -217,6 +217,11 @@ CDAPConn::CDAPConn(int arg_fd, long arg_version)
     state = NONE;
 }
 
+CDAPConn::CDAPConn(const CDAPConn& o)
+{
+    assert(0);
+}
+
 CDAPConn::~CDAPConn()
 {
     rina_name_free(&local_appl);
@@ -714,6 +719,9 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                     local = &m->dst_appl;
                     remote = &m->src_appl;
                 }
+
+                rina_name_free(&local_appl);
+                rina_name_free(&remote_appl);
                 ret = rina_name_copy(&local_appl, local);
                 ret |= rina_name_copy(&remote_appl, remote);
                 if (ret) {

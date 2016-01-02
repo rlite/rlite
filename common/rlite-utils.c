@@ -320,18 +320,22 @@ rina_name_free(struct rina_name *name)
 
     if (name->apn) {
         COMMON_FREE(name->apn);
+        name->apn = NULL;
     }
 
     if (name->api) {
         COMMON_FREE(name->api);
+        name->api = NULL;
     }
 
     if (name->aen) {
         COMMON_FREE(name->aen);
+        name->aen = NULL;
     }
 
     if (name->aei) {
         COMMON_FREE(name->aei);
+        name->aei = NULL;
     }
 }
 COMMON_EXPORT(rina_name_free);
@@ -363,6 +367,10 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
     if (!dst || !src) {
         return 0;
     }
+
+#if 0
+    rina_name_free(dst);
+#endif
 
     dst->apn = src->apn ? COMMON_STRDUP(src->apn, 1) : NULL;
     dst->api = src->api ? COMMON_STRDUP(src->api, 1) : NULL;

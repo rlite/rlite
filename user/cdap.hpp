@@ -49,6 +49,8 @@ class CDAPConn {
 
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
+    CDAPConn(const CDAPConn& o);
+
 public:
     CDAPConn(int fd, long version);
     ~CDAPConn();
