@@ -193,6 +193,36 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     return result;
 }
 
+int
+uipcp_issue_flow_dealloc(struct uipcp *uipcp, uint32_t local_port)
+{
+    struct rl_kmsg_flow_dealloc *req;
+    struct rlite_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        UPE(uipcp, "Out of memory\n");
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_FLOW_DEALLOC;
+    req->event_id = 1;
+    req->ipcp_id = uipcp->ipcp_id;
+    req->port_id = local_port;
+
+    UPD(uipcp, "Issuing FLOW_DEALLOC message...\n");
+
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req), sizeof(*req),
+                               0, 0, &result);
+    assert(!resp);
+    UPD(uipcp, "result: %d\n", result);
+
+    return result;
+}
+
 static int
 uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 {

@@ -391,7 +391,8 @@ uipcp_rib::dump() const
             mit = flow_reqs.begin(); mit != flow_reqs.end(); mit++) {
         const FlowRequest& freq = mit->second;
 
-        ss << "    SrcAppl: " << static_cast<string>(freq.src_app) <<
+        ss << "    [" << (freq.initiator ? "L" : "R") << "]" <<
+                ", SrcAppl: " << static_cast<string>(freq.src_app) <<
                 ", DstAppl: " << static_cast<string>(freq.dst_app) <<
                 ", SrcAddr: " << freq.src_addr << ", SrcPort: " <<
                 freq.src_port << ", DstAddr: " << freq.dst_addr <<

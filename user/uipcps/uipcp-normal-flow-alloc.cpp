@@ -149,6 +149,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
                0, 0, string());
 
     freq.invoke_id = 0;  /* invoke_id is actually set in send_to_dst_addr() */
+    freq.initiator = true;
     flow_reqs[obj_name.str()] = freq;
 
     return send_to_dst_addr(m, freq.dst_addr, &freq);
@@ -270,6 +271,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     rina_name_free(&remote_appl);
 
     freq.invoke_id = rm->invoke_id;
+    freq.initiator = false;
     flow_reqs_tmp[kevent_id_cnt] = freq;
 
     kevent_id_cnt++;
@@ -316,7 +318,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     map<string, FlowRequest>::iterator f;
     stringstream obj_name;
-    uint64_t dst_addr;
+    uint64_t remote_addr;
     CDAPMessage m;
 
     /* Lookup the corresponding FlowRequest. */
@@ -340,7 +342,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
         return -1;
     }
 
-    dst_addr = f->second.dst_addr;
+    remote_addr = f->second.initiator ? f->second.dst_addr : f->second.src_addr;
     flow_reqs.erase(f);
 
     UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
@@ -349,13 +351,15 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     m.m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
                0, 0, string());
 
-    return send_to_dst_addr(m, dst_addr, NULL);
+    return send_to_dst_addr(m, remote_addr, NULL);
 }
 
 int
 uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
 {
     map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
+    uint32_t local_port;
+    int ret;
 
     if (f == flow_reqs.end()) {
         UPI(uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
@@ -364,7 +368,11 @@ uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
 
     PD("I WILL ERASE '%s'\n", rm->obj_name.c_str());
 
-    return 0;
+    local_port = f->second.initiator ? f->second.src_port : f->second.dst_port;
+
+    ret = uipcp_issue_flow_dealloc(uipcp, local_port);
+
+    return ret;
 }
 
 int

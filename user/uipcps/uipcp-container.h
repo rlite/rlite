@@ -132,6 +132,8 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                           uint64_t remote_addr, uint8_t response,
                           const struct rina_flow_config *flowcfg);
 
+int uipcp_issue_flow_dealloc(struct uipcp *uipcp, uint32_t local_port);
+
 #define UPRINT(_u, LEV, FMT, ...)    \
     DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->ipcp_id, __func__, ##__VA_ARGS__)
 
