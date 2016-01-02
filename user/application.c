@@ -64,14 +64,14 @@ application_register_resp(struct rina_evloop *loop,
 }
 
 static int
-flow_allocate_resp(struct rina_evloop *loop,
-                        const struct rina_msg_base_resp *b_resp,
-                        const struct rina_msg_base *b_req)
+flow_allocate_resp_arrived(struct rina_evloop *loop,
+                           const struct rina_msg_base_resp *b_resp,
+                           const struct rina_msg_base *b_req)
 {
     struct rina_kmsg_flow_allocate_req *req =
             (struct rina_kmsg_flow_allocate_req *)b_req;
-    struct rina_kmsg_flow_allocate_resp *resp =
-            (struct rina_kmsg_flow_allocate_resp *)b_resp;
+    struct rina_kmsg_flow_allocate_resp_arrived *resp =
+            (struct rina_kmsg_flow_allocate_resp_arrived *)b_resp;
     char *local_s = NULL;
     char *remote_s = NULL;
 
@@ -142,7 +142,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED] = flow_allocate_req_arrived,
-    [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
+    [RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED] = flow_allocate_resp_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -174,7 +174,7 @@ application_register_req(struct application *application,
                          sizeof(*req), wait_for_completion);
 }
 
-static struct rina_kmsg_flow_allocate_resp *
+static struct rina_kmsg_flow_allocate_resp_arrived *
 flow_allocate_req(struct application *application, int wait_for_completion,
                   uint16_t ipcp_id, struct rina_name *local_application,
                   struct rina_name *remote_application)
@@ -197,7 +197,7 @@ flow_allocate_req(struct application *application, int wait_for_completion,
 
     printf("Requesting flow allocation...\n");
 
-    return (struct rina_kmsg_flow_allocate_resp *)
+    return (struct rina_kmsg_flow_allocate_resp_arrived *)
            issue_request(&application->loop, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
@@ -232,7 +232,7 @@ static int flow_allocate(struct application *application,
                          struct rina_name *remote_application)
 {
     unsigned int ipcp_id;
-    struct rina_kmsg_flow_allocate_resp *kresp;
+    struct rina_kmsg_flow_allocate_resp_arrived *kresp;
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
 

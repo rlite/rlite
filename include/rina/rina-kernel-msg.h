@@ -33,7 +33,7 @@ enum {
     RINA_KERN_APPLICATION_UNREGISTER, /* 11 */
     RINA_KERN_APPLICATION_UNREGISTER_RESP, /* 12 */
     RINA_KERN_FLOW_ALLOCATE_REQ, /* 13 */
-    RINA_KERN_FLOW_ALLOCATE_RESP, /* 14 */
+    RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 14 */
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 15 */
 
     RINA_KERN_MSG_MAX,
@@ -107,7 +107,7 @@ struct rina_kmsg_flow_allocate_req {
     struct rina_name remote_application;
 } __attribute__((packed));
 
-struct rina_kmsg_flow_allocate_resp {
+struct rina_kmsg_flow_allocate_resp_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 

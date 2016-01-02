@@ -797,7 +797,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_flow_allocate_req *req =
                     (struct rina_kmsg_flow_allocate_req *)bmsg;
-    struct rina_kmsg_flow_allocate_resp *resp;
+    struct rina_kmsg_flow_allocate_resp_arrived *resp;
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
     int ret;
@@ -841,7 +841,7 @@ negative:
         return -ENOMEM;
     }
 
-    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP;
+    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED;
     resp->event_id = req->event_id;
     resp->result = 1;  /* Report failure. */
     resp->port_id = 0;  /* Not valid. */
