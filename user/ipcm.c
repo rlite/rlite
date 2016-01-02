@@ -698,9 +698,9 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_MSG_MAX] = NULL,
 };
 
-/* Function to manage application requests. */
+/* Unix server thread to manage application requests. */
 static void *
-server_function(void *arg)
+unix_server(void *arg)
 {
     struct ipcm *ipcm = arg;
     char serbuf[4096];
@@ -769,7 +769,7 @@ int main()
 {
     struct ipcm ipcm;
     pthread_t evloop_th;
-    pthread_t server_th;
+    pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
     int ret;
@@ -860,10 +860,10 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    /* Create and start the server thread. */
-    ret = pthread_create(&server_th, NULL, server_function, &ipcm);
+    /* Create and start the unix server thread. */
+    ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
     if (ret) {
-        perror("pthread_create(server)");
+        perror("pthread_create(unix)");
         exit(EXIT_FAILURE);
     }
 
@@ -876,9 +876,9 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    ret = pthread_join(server_th, NULL);
+    ret = pthread_join(unix_th, NULL);
     if (ret < 0) {
-        perror("pthread_join(server)");
+        perror("pthread_join(unix)");
         exit(EXIT_FAILURE);
     }
 
