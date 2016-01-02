@@ -21,6 +21,7 @@ add_library(uipcp-rib STATIC user/uipcp-rib.cpp)
 
 target_link_libraries(rinalite pthread)
 target_link_libraries(rinalite-cdap rinalite ${PROTOBUF_LIBRARY})
+target_link_libraries(uipcp-rib rinalite-cdap)
 
 message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to rinalite-cdap target")
 target_include_directories(rinalite-cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
@@ -36,5 +37,5 @@ target_link_libraries(rina-config rinalite)
 target_link_libraries(test-cdap rinalite-cdap)
 
 install(TARGETS rinaperf rinalite-uipcps rina-config DESTINATION usr/bin)
-install(TARGETS rinalite DESTINATION usr/lib)
+install(TARGETS rinalite rinalite-cdap DESTINATION usr/lib)
 install(FILES ${RINA_HEADERS} DESTINATION include/rina)

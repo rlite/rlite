@@ -95,13 +95,6 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
     return ret;
 }
 
-struct enrolled_neighbor {
-    struct rina_name ipcp_name;
-    int flow_fd;
-
-    struct list_head node;
-};
-
 int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 {
     struct enrolled_neighbor *neigh;

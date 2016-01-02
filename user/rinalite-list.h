@@ -57,11 +57,11 @@ list_del(struct list_head *elem)
     elem->succ->prev = elem->prev;
 }
 
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#define offsetof1(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 #define container_of(ptr, type, member) ({                      \
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
+        (type *)( (char *)__mptr - offsetof1(type,member) );})
 
 #define list_for_each_entry(_cur, _list, _member)                            \
         for (_cur = container_of((_list)->succ, typeof(*_cur), _member);     \

@@ -10,12 +10,14 @@
 #include "rinalite/rinalite-common.h"
 #include "rinalite/rinalite-utils.h"
 
+#include "cdap.hpp"
 #include "uipcp-container.h"
 
 using namespace std;
 
 
 static string dft_obj_name = "/dif/mgmt/fa/dft";
+static string dft_obj_class = "dft";
 static string whatevercast_obj_name = "/daf/mgmt/naming/whatevercast";
 
 typedef int (*rib_handler_t)(struct uipcp_rib *);
@@ -69,6 +71,25 @@ rib_destroy(struct uipcp_rib *rib)
     delete rib;
 }
 
+static int
+rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
+                const string& obj_name, int x)
+{
+    struct enrolled_neighbor *neigh;
+    CDAPConn conn(neigh->flow_fd, 1);
+    int invoke_id;
+
+    list_for_each_entry(neigh, &rib->uipcp->enrolled_neighbors, node) {
+        if (0 && create) {
+            conn.m_create(&invoke_id, gpb::F_NO_FLAGS, obj_class, obj_name,
+                           0, 0, "");
+        } else if (0) {
+            conn.m_delete(&invoke_id, gpb::F_NO_FLAGS, obj_class, obj_name,
+                            0, 0, "");
+        }
+    }
+}
+
 extern "C" int
 rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
@@ -79,6 +100,7 @@ rib_application_register(struct uipcp_rib *rib, int reg,
     uint64_t local_addr;
     string name_str;
     int ret;
+    bool create = true;
 
     ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
                                           uipcp->ipcp_id,
@@ -115,7 +137,10 @@ rib_application_register(struct uipcp_rib *rib, int reg,
 
         /* Remove the object from the RIB. */
         rib->dft.erase(mit);
+        create = false;
     }
+
+    rib_remote_sync(rib, create, dft_obj_class, dft_obj_name, 10329);
 
     PD("%s: Application %s %sregistered %s uipcp %d\n", __func__,
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",

@@ -49,6 +49,13 @@ struct uipcp {
     struct list_head node;
 };
 
+struct enrolled_neighbor {
+    struct rina_name ipcp_name;
+    int flow_fd;
+
+    struct list_head node;
+};
+
 enum {
     IPCP_MGMT_ENROLL = 5,
     IPCP_MGMT_FA_REQ = 6,
