@@ -128,7 +128,8 @@ struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
 
-    typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm);
+    typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
+                                            Neighbor *neigh);
     map< string, rib_handler_t > handlers;
 
     /* Lower DIFs. */
@@ -190,16 +191,16 @@ struct uipcp_rib {
                         const UipcpObject *obj_value) const;
 
     /* Receive info from neighbors. */
-    int cdap_dispatch(const CDAPMessage *rm);
+    int cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh);
 
     /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm);
-    int neighbors_handler(const CDAPMessage *rm);
-    int lfdb_handler(const CDAPMessage *rm);
-    int flows_handler(const CDAPMessage *rm);
+    int dft_handler(const CDAPMessage *rm, Neighbor *neigh);
+    int neighbors_handler(const CDAPMessage *rm, Neighbor *neigh);
+    int lfdb_handler(const CDAPMessage *rm, Neighbor *neigh);
+    int flows_handler(const CDAPMessage *rm, Neighbor *neigh);
 
-    int flows_handler_create(const CDAPMessage *rm);
-    int flows_handler_create_r(const CDAPMessage *rm);
+    int flows_handler_create(const CDAPMessage *rm, Neighbor *neigh);
+    int flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh);
 };
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
@@ -794,7 +795,7 @@ uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
 }
 
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
@@ -817,11 +818,11 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
         return -1;
     }
 
-    return (this->*(hi->second))(rm);
+    return (this->*(hi->second))(rm, neigh);
 }
 
 int
-uipcp_rib::dft_handler(const CDAPMessage *rm)
+uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     const char *objbuf;
     size_t objlen;
@@ -884,7 +885,7 @@ common_lower_dif(const list<string> l1, const list<string> l2)
 }
 
 int
-uipcp_rib::neighbors_handler(const CDAPMessage *rm)
+uipcp_rib::neighbors_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     struct rinalite_ipcp *ipcp;
     const char *objbuf;
@@ -951,7 +952,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm)
 }
 
 int
-uipcp_rib::lfdb_handler(const CDAPMessage *rm)
+uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     struct rinalite_ipcp *ipcp;
     const char *objbuf;
@@ -1010,7 +1011,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_excluding(NULL, add, obj_class::lfdb,
+        remote_sync_excluding(neigh, add, obj_class::lfdb,
                               obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
@@ -1023,7 +1024,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-uipcp_rib::flows_handler_create(const CDAPMessage *rm)
+uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
 {
     const char *objbuf;
     size_t objlen;
@@ -1086,7 +1087,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
 
 /* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-uipcp_rib::flows_handler_create_r(const CDAPMessage *rm)
+uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
 {
     const char *objbuf;
     size_t objlen;
@@ -1116,14 +1117,14 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm)
 }
 
 int
-uipcp_rib::flows_handler(const CDAPMessage *rm)
+uipcp_rib::flows_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     switch (rm->op_code) {
         case gpb::M_CREATE:
-            return flows_handler_create(rm);
+            return flows_handler_create(rm, neigh);
 
         case gpb::M_CREATE_R:
-            return flows_handler_create_r(rm);
+            return flows_handler_create_r(rm, neigh);
 
         case gpb::M_DELETE:
         case gpb::M_DELETE_R:
@@ -1667,7 +1668,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     /* Here M_CREATE messages from the slave are accepted and
      * dispatched to the rib. */
     if (rm->op_code == gpb::M_CREATE) {
-        return rib->cdap_dispatch(rm);
+        return rib->cdap_dispatch(rm, this);
     }
 
     if (rm->op_code != gpb::M_STOP) {
@@ -1786,7 +1787,7 @@ Neighbor::enrolled(const CDAPMessage *rm)
 
     /* We are enrolled to this neighbor, so we can dispatch its
      * CDAP message to the RIB. */
-    return rib->cdap_dispatch(rm);
+    return rib->cdap_dispatch(rm, this);
 }
 
 int
@@ -2009,7 +2010,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                 return 0;
             }
 
-            rib->cdap_dispatch(adata.cdap);
+            rib->cdap_dispatch(adata.cdap, NULL);
 
             delete m;
 
