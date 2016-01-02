@@ -517,16 +517,16 @@ test(struct ipcm *ipcm)
     struct rina_name name;
 
     /* Create an IPC process of type shim-dummy. */
-    rina_name_fill(&name, "prova.IPCP", "1", NULL, NULL);
+    rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
     ret = ipcp_create(ipcm, &name, DIF_TYPE_SHIM_DUMMY);
     rina_name_free(&name);
 
-    rina_name_fill(&name, "prova.IPCP", "2", NULL, NULL);
+    rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
     ret = ipcp_create(ipcm, &name, DIF_TYPE_SHIM_DUMMY);
     rina_name_free(&name);
 
     /* Assign to DIF. */
-    rina_name_fill(&name, "prova.DIF", NULL, NULL, NULL);
+    rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
     ret = assign_to_dif(ipcm, 0, &name);
     rina_name_free(&name);
 
@@ -604,12 +604,49 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
     return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
 
+static int
+rina_appl_unregister(struct ipcm *ipcm, int sfd,
+                     const struct rina_msg_base *b_req)
+{
+    struct ipcp *ipcp = NULL;
+    struct ipcp *cur;
+    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+    struct rina_msg_base_resp resp;
+
+    if (rina_name_valid(&req->dif_name)) {
+        /* The request specifies a DIF: lookup that. */
+        list_for_each_entry(cur, &ipcm->ipcps, node) {
+            if (rina_name_valid(&cur->dif_name)
+                    && rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
+                ipcp = cur;
+                break;
+            }
+        }
+    }
+
+    if (!ipcp) {
+        printf("%s: Could not find a suitable IPC process\n", __func__);
+    } else {
+        char *s = rina_name_to_string(&ipcp->ipcp_name);
+
+        printf("%s: Ok, selected %s\n", __func__, s);
+        if (s) free(s);
+    }
+
+    resp.msg_type = RINA_APPL_UNREGISTER_RESP;
+    resp.event_id = req->event_id;
+    resp.result = (ipcp != NULL) ? 0 : 1;
+
+    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+}
+
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_REGISTER] = rina_appl_register,
+    [RINA_APPL_UNREGISTER] = rina_appl_unregister,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 

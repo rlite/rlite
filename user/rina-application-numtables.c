@@ -12,4 +12,13 @@ struct rina_msg_layout rina_application_numtables[] = {
         .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
+    [RINA_APPL_UNREGISTER] = {
+        .copylen = sizeof(struct rina_amsg_register) -
+                   sizeof(struct rina_name),
+        .names = 1,
+    },
+    [RINA_APPL_UNREGISTER_RESP] = {
+        .copylen = sizeof(struct rina_msg_base_resp),
+        .names = 0,
+    },
 };

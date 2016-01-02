@@ -81,16 +81,16 @@ read_response(int sfd)
     return ret;
 }
 
-static int application_register(char *apn, char *api, char *aen, char *aei,
-                                char *dif_name)
+static int application_register_common(const struct rina_name *app_name,
+                                       char *dif_name, int reg)
 {
     struct rina_amsg_register msg;
     int fd;
     int ret;
 
-    msg.msg_type = RINA_APPL_REGISTER;
+    msg.msg_type = reg ? RINA_APPL_REGISTER : RINA_APPL_UNREGISTER;
     msg.event_id = 0;
-    rina_name_fill(&msg.application_name, apn, api, aen, aei);
+    rina_name_copy(&msg.application_name, app_name);
     rina_name_fill(&msg.dif_name, dif_name, NULL, NULL, NULL);
 
     if (!rina_name_valid(&msg.application_name)) {
@@ -121,9 +121,16 @@ static int application_register(char *apn, char *api, char *aen, char *aei,
     return ipcm_disconnect(fd);
 }
 
-static int application_unregister()
+static int application_register(const struct rina_name *app_name,
+                                char *dif_name)
 {
-    return 0;
+    return application_register_common(app_name, dif_name, 1);
+}
+
+static int application_unregister(const struct rina_name *app_name,
+                                  char *dif_name)
+{
+    return application_register_common(app_name, dif_name, 0);
 }
 
 static void
@@ -136,6 +143,7 @@ int main()
 {
     struct sigaction sa;
     int ret;
+    struct rina_name application_name;
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -153,9 +161,9 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    application_register("echo-client", "1", NULL, NULL,
-                         "test-shim-dummy.DIF");
-    application_unregister();
+    rina_name_fill(&application_name, "echo-client", "1", NULL, NULL);
+    application_register(&application_name, "test-shim-dummy.DIF");
+    application_unregister(&application_name, "test-shim-dummy.DIF");
 
     return 0;
 }
