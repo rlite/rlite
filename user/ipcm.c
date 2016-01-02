@@ -460,14 +460,9 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
 {
     struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
-    uint64_t remote_addr, local_addr;
     unsigned int ipcp_id;
     struct uipcp *uipcp;
-    unsigned int port_id;
-    uint8_t cmd;
-    int fd = -1;
     int ret;
-    ssize_t n;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -484,50 +479,15 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    /* Allocate a flow for the enrollment. */
-    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
-                         &req->ipcp_name, &req->neigh_ipcp_name,
-                         &port_id, 2000);
+    /* Perform enrollment in userspace. */
+    ret = uipcp_enroll(uipcp, req);
     if (ret) {
         goto out;
     }
 
-    fd = open_port_ipcp(port_id, uipcp->ipcp_id);
-    if (fd < 0) {
-        goto out;
-    }
-
-    /* Request an enrollment. */
-    PD("%s: Enrollment phase (client)\n", __func__);
-    cmd = IPCP_MGMT_ENROLL;
-    if (write(fd, &cmd, sizeof(cmd)) != 1) {
-        PE("%s: write(cmd) failed\n", __func__);
-        goto out;
-    }
-
-    /* Exchange IPCP addresses. */
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-    n = write(fd, &local_addr, sizeof(local_addr));
-    if (n != sizeof(local_addr)) {
-        goto out;
-    }
-
-    n = read(fd, &remote_addr, sizeof(remote_addr));
-    if (n != sizeof(remote_addr)) {
-        goto out;
-    }
-    remote_addr = le64toh(remote_addr);
-
-    ipcp_pduft_set(ipcm, uipcp->ipcp_id, remote_addr, port_id);
-
     resp.result = 0;
 
 out:
-    /* Don't dellocate the flow. */
-
     return rina_conf_response(sfd, RMB(req), &resp);
 }
 
