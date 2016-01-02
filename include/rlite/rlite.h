@@ -92,7 +92,6 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl);
 
 uint32_t
 rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
-               const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
                const struct rlite_flow_spec *flowspec);
@@ -100,7 +99,6 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
 uint32_t
 rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
                 const char *dif_name,
-                const struct rina_name *ipcp_name,
                 const struct rina_name *appl_name);
 
 struct rlite_msg_base *
@@ -127,6 +125,20 @@ rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
 
 int
 rl_ctrl_flow_accept(struct rlite_ctrl *ctrl);
+
+/* Variant of the asynchronous API, mostly for testing purposes.
+ * The IPCP name can be specified in place of the DIF name. */
+uint32_t
+rl_ctrl_fa_req2(struct rlite_ctrl *ctrl,
+                const struct rina_name *ipcp_name,
+                const struct rina_name *local_appl,
+                const struct rina_name *remote_appl,
+                const struct rlite_flow_spec *flowspec);
+
+uint32_t
+rl_ctrl_reg_req2(struct rlite_ctrl *ctrl, int reg,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name);
 
 /* Variant of the synchronous API, mostly for testing purposes.
  * The IPCP name can be specified in place of the DIF name. */

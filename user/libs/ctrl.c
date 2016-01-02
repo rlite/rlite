@@ -602,12 +602,12 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
     return 0;
 }
 
-uint32_t
-rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
-               const struct rina_name *ipcp_name,
-               const struct rina_name *local_appl,
-               const struct rina_name *remote_appl,
-               const struct rlite_flow_spec *flowspec)
+static uint32_t
+rl_ctrl_fa_req_common(struct rlite_ctrl *ctrl, const char *dif_name,
+                      const struct rina_name *ipcp_name,
+                      const struct rina_name *local_appl,
+                      const struct rina_name *remote_appl,
+                      const struct rlite_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     struct rl_ipcp *rl_ipcp;
@@ -648,10 +648,30 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
 }
 
 uint32_t
-rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
-                const char *dif_name,
-                const struct rina_name *ipcp_name,
-                const struct rina_name *appl_name)
+rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
+               const struct rina_name *local_appl,
+               const struct rina_name *remote_appl,
+               const struct rlite_flow_spec *flowspec)
+{
+    return rl_ctrl_fa_req_common(ctrl, dif_name, NULL, local_appl,
+                                 remote_appl, flowspec);
+}
+
+uint32_t
+rl_ctrl_fa_req2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+                const struct rina_name *local_appl,
+                const struct rina_name *remote_appl,
+                const struct rlite_flow_spec *flowspec)
+{
+    return rl_ctrl_fa_req_common(ctrl, NULL, ipcp_name, local_appl,
+                                 remote_appl, flowspec);
+}
+
+static uint32_t
+rl_ctrl_reg_req_common(struct rlite_ctrl *ctrl, int reg,
+                       const char *dif_name,
+                       const struct rina_name *ipcp_name,
+                       const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register req;
     struct rl_ipcp *rl_ipcp;
@@ -689,6 +709,21 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
                    RLITE_MB(&req));
 
     return event_id;
+}
+
+uint32_t
+rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg, const char *dif_name,
+                const struct rina_name *appl_name)
+{
+    return rl_ctrl_reg_req_common(ctrl, reg, dif_name, NULL, appl_name);
+}
+
+uint32_t
+rl_ctrl_reg_req2(struct rlite_ctrl *ctrl, int reg,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name)
+{
+    return rl_ctrl_reg_req_common(ctrl, reg, NULL, ipcp_name, appl_name);
 }
 
 static struct rlite_msg_base *
@@ -804,8 +839,8 @@ rl_ctrl_flow_alloc_common(struct rlite_ctrl *ctrl, const char *dif_name,
     uint32_t event_id;
     int fd;
 
-    event_id = rl_ctrl_fa_req(ctrl, dif_name, ipcp_name, local_appl,
-                              remote_appl, flowspec);
+    event_id = rl_ctrl_fa_req_common(ctrl, dif_name, ipcp_name, local_appl,
+                                     remote_appl, flowspec);
 
     if (!event_id) {
         return -1;
@@ -862,7 +897,8 @@ rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
     uint32_t event_id;
     int ret;
 
-    event_id = rl_ctrl_reg_req(ctrl, reg, dif_name, ipcp_name, appl_name);
+    event_id = rl_ctrl_reg_req_common(ctrl, reg, dif_name, ipcp_name,
+                                      appl_name);
 
     if (!event_id) {
         return -1;
