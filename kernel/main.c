@@ -255,15 +255,6 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
 
 static int ipcp_put(struct ipcp_entry *entry);
 
-static void
-ipcp_remove_work(struct work_struct *w)
-{
-    struct ipcp_entry *ipcp = container_of(w, struct ipcp_entry, remove);
-
-    PD("REFCNT-- %u: %u\n", ipcp->id, ipcp->refcnt);
-    ipcp_put(ipcp);
-}
-
 static struct dif *
 dif_get(const char *dif_name, const char *dif_type, int *err)
 {
@@ -422,7 +413,6 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
-        INIT_WORK(&entry->remove, ipcp_remove_work);
         mutex_init(&entry->lock);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
@@ -721,25 +711,27 @@ remove_flow_work(struct work_struct *work)
     struct dtp *dtp = &flow->dtp;
     struct rina_buf *rb, *tmp;
 
-    spin_lock_bh(&dtp->lock);
+    if (flow->cfg.dtcp_present) {
+        spin_lock_bh(&dtp->lock);
 
-    PD("Delayed flow removal, dropping %u PDUs from cwq\n",
-            dtp->cwq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-        list_del(&rb->node);
-        rina_buf_free(rb);
-        dtp->cwq_len--;
+        PD("Delayed flow removal, dropping %u PDUs from cwq\n",
+                dtp->cwq_len);
+        list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
+            list_del(&rb->node);
+            rina_buf_free(rb);
+            dtp->cwq_len--;
+        }
+
+        PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
+                dtp->rtxq_len);
+        list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
+            list_del(&rb->node);
+            rina_buf_free(rb);
+            dtp->rtxq_len--;
+        }
+
+        spin_unlock_bh(&dtp->lock);
     }
-
-    PD("Delayed flow removal, dropping %u PDUs from rtxq\n",
-            dtp->rtxq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        list_del(&rb->node);
-        rina_buf_free(rb);
-        dtp->rtxq_len--;
-    }
-
-    spin_unlock_bh(&dtp->lock);
 
     flow_put(flow);
 }
@@ -865,11 +857,11 @@ flow_put(struct flow_entry *entry)
     struct flow_entry *ret = entry;
     struct notify_flow_removal_work *notifier;
     struct ipcp_entry *ipcp;
+    unsigned long postpone = 0;
 
     if (unlikely(!entry)) {
         return NULL;
     }
-
     dtp = &entry->dtp;
 
     FLOCK();
@@ -885,14 +877,13 @@ flow_put(struct flow_entry *entry)
          * removal. The work_busy() function is invoked to make sure
          * that this flow_entry() invocation is not due to a postponed
          * removal, so that we avoid postponing forever. */
-        bool postpone = false;
 
         spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
             PD("Flow removal postponed since cwq contains "
                     "%u PDUs and rtxq contains %u PDUs\n",
                     dtp->cwq_len, dtp->rtxq_len);
-            postpone = true;
+            postpone = 2 * HZ;
 
             /* No one can write or read from this flow anymore, so there
              * is no reason to have the inactivity timer running. */
@@ -900,17 +891,17 @@ flow_put(struct flow_entry *entry)
             del_timer(&dtp->rcv_inact_tmr);
         }
         spin_unlock_bh(&dtp->lock);
+    }
 
-        if (postpone) {
-            schedule_delayed_work(&entry->remove, 2 * HZ);
-            /* Reference counter is zero here, but since the delayed
-             * worker is going to use the flow, we reset the reference
-             * counter to 1. The delayed worker will invoke flow_put()
-             * after having performed is work.
-             */
-            entry->refcnt++;
-            goto out;
-        }
+    if (!work_busy(&entry->remove.work)) {
+        schedule_delayed_work(&entry->remove, postpone);
+        /* Reference counter is zero here, but since the delayed
+         * worker is going to use the flow, we reset the reference
+         * counter to 1. The delayed worker will invoke flow_put()
+         * after having performed is work.
+         */
+        entry->refcnt++;
+        goto out;
     }
 
     ret = NULL;
@@ -965,13 +956,17 @@ flow_put(struct flow_entry *entry)
         }
     }
 
-    /* We could be in atomic context here, so let's defer the ipcp
-     * removal in a worker process context. This is done for either
-     * the IPCP which supports the flow (entry->txrx.ipcp) and the
-     * IPCP which uses the flow (entry->upper.ipcp). */
-    schedule_work(&ipcp->remove);
+    /* We are in process context here, so we can safely do the
+     * removal. This is done for either the IPCP which supports
+     * the flow (entry->txrx.ipcp) and the IPCP which uses the
+     * flow (entry->upper.ipcp). */
+    PD("REFCNT-- %u: %u\n", ipcp->id, ipcp->refcnt);
+    ipcp_put(ipcp);
+
     if (entry->upper.ipcp) {
-        schedule_work(&entry->upper.ipcp->remove);
+        PD("REFCNT-- %u: %u\n", entry->upper.ipcp->id,
+                                entry->upper.ipcp->refcnt);
+        ipcp_put(entry->upper.ipcp);
     }
 
     hash_del(&entry->node);

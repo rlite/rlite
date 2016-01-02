@@ -90,7 +90,6 @@ struct ipcp_entry {
 
     /* The module that owns this IPC process. */
     struct module       *owner;
-    struct work_struct  remove;
     unsigned int        refcnt;
     struct mutex        lock;
     struct hlist_node   node;
