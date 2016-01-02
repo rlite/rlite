@@ -32,6 +32,7 @@
 #include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
+#include <linux/rtnetlink.h>
 
 
 #define ETH_P_RINA  0xD1F0
@@ -83,6 +84,9 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     }
 
     if (priv->netdev) {
+        rtnl_lock();
+        netdev_rx_handler_unregister(priv->netdev);
+        rtnl_unlock();
         dev_put(priv->netdev);
     }
 
@@ -236,6 +240,23 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return -EINVAL;
 }
 
+static rx_handler_result_t
+shim_eth_rx_handler(struct sk_buff **skbp)
+{
+    struct sk_buff *skb = (*skbp);
+    struct rina_shim_eth *priv = (struct rina_shim_eth *)
+                rcu_dereference(skb->dev->rx_handler_data);
+
+    PD("%s: intercept skb %u\n", __func__, skb->len);
+
+    /* Steal the skb from the kernel stack. */
+    dev_consume_skb_any(skb);
+
+    (void)priv;
+
+    return RX_HANDLER_CONSUMED;
+}
+
 static int
 rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
                              struct flow_entry *flow,
@@ -266,8 +287,16 @@ rina_shim_eth_config(struct ipcp_entry *ipcp,
 #endif
         priv->netdev = dev_get_by_name(ns, param_value);
         if (priv->netdev) {
-            ret = 0;
-            PD("%s: netdev set to %p\n", __func__, priv->netdev);
+            rtnl_lock();
+            ret = netdev_rx_handler_register(priv->netdev, shim_eth_rx_handler,
+                                             priv);
+            rtnl_unlock();
+            if (ret == 0) {
+                PD("%s: netdev set to %p\n", __func__, priv->netdev);
+            } else {
+                dev_put(priv->netdev);
+                priv->netdev = NULL;
+            }
         }
     }
 
