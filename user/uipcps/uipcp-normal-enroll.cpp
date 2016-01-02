@@ -5,6 +5,15 @@
 using namespace std;
 
 
+bool
+NeighFlow::enrollment_starting(const CDAPMessage *rm) const
+{
+    return enrollment_state == NEIGH_S_WAIT_START &&
+           rm->op_code == gpb::M_START &&
+           rm->obj_name == obj_name::enrollment &&
+           rm->obj_class == obj_class::enrollment;
+}
+
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
 {
     rib = rib_;
@@ -589,12 +598,11 @@ Neighbor::enrolled(NeighFlow *nf, const CDAPMessage *rm)
     return rib->cdap_dispatch(rm, this);
 }
 
+/* Did we complete the enrollment procedure with the neighbor? */
 bool
-Neighbor::enrollment_ongoing()
+Neighbor::is_enrolled()
 {
-    return has_mgmt_flow() &&
-           mgmt_conn()->enrollment_state >= NEIGH_S_WAIT_START &&
-           mgmt_conn()->enrollment_state < NEIGH_ENROLLED;
+    return has_mgmt_flow() && mgmt_conn()->enrollment_state == NEIGH_ENROLLED;
 }
 
 int
@@ -602,6 +610,18 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
 {
     state_t old_state = nf->enrollment_state;
     int ret;
+
+    if (is_enrolled() && nf != mgmt_conn() && nf->enrollment_starting(rm)) {
+        /* We thought we were already enrolled with this neighbor, but
+         * he is trying to start again the enrollment procedure on a
+         * different flow. We therefore assume that the neighbor
+         * crashed before we could detect it, and select the new flow
+         * as the management one. */
+        UPI(rib->uipcp, "Switch management flow, port-id %u --> port-id %u\n",
+                mgmt_conn()->port_id,
+                nf->port_id);
+        mgmt_port_id = nf->port_id;
+    }
 
     assert(nf->enrollment_state >= NEIGH_NONE &&
            nf->enrollment_state < NEIGH_STATE_LAST);

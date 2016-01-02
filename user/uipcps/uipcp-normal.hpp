@@ -74,6 +74,8 @@ struct NeighFlow {
               unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
                                   lower_ipcp_id(lid), conn(NULL),
                                   enrollment_state(NEIGH_NONE) { }
+
+    bool enrollment_starting(const CDAPMessage *m) const;
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -100,7 +102,7 @@ struct Neighbor {
 
     NeighFlow *mgmt_conn();
     bool has_mgmt_flow() const { return flows.size() > 0; }
-    bool enrollment_ongoing();
+    bool is_enrolled();
     int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
     int alloc_flow(const char *supp_dif_name);
     int send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,

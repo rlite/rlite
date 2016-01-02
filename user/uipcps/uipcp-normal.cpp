@@ -108,7 +108,7 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 }
 
 static int
-rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
+rib_recv_msg(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     CDAPMessage *m = NULL;
@@ -225,7 +225,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
-    rib_msg_rcvd(rib, mhdr, ((char *)(mhdr + 1)),
+    rib_recv_msg(rib, mhdr, ((char *)(mhdr + 1)),
                  n - sizeof(*mhdr));
 }
 
