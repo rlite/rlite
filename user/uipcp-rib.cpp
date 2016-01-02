@@ -71,6 +71,28 @@ struct Neighbor {
     int s_connect_r_sent(const CDAPMessage *rm);
 };
 
+typedef int (*rib_handler_t)(struct uipcp_rib *);
+
+struct uipcp_rib {
+    /* Backpointer to parent data structure. */
+    struct uipcp *uipcp;
+
+    map< string, rib_handler_t > handlers;
+
+    /* Lower DIFs. */
+    list< string > lower_difs;
+
+    /* Neighbors. */
+    list< Neighbor > neighbors;
+
+    /* Directory Forwarding Table. */
+    map< string, uint64_t > dft;
+
+    uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
+
+    list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
+};
+
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
                    int fd, unsigned int port_id_)
 {
@@ -102,112 +124,6 @@ Neighbor::~Neighbor()
     if (conn) {
         delete conn;
     }
-}
-
-typedef int (*rib_handler_t)(struct uipcp_rib *);
-
-struct uipcp_rib {
-    /* Backpointer to parent data structure. */
-    struct uipcp *uipcp;
-
-    map< string, rib_handler_t > handlers;
-
-    /* Lower DIFs. */
-    list< string > lower_difs;
-
-    /* Neighbors. */
-    list< Neighbor > neighbors;
-
-    /* Directory Forwarding Table. */
-    map< string, uint64_t > dft;
-
-    uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
-
-    list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
-};
-
-list<Neighbor>::iterator
-uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
-{
-    for (list<Neighbor>::iterator neigh = neighbors.begin();
-                        neigh != neighbors.end(); neigh++) {
-        if (neigh->port_id == port_id) {
-            return neigh;
-        }
-    }
-
-    return neighbors.end();
-}
-
-static int
-dft_handler(struct uipcp_rib *)
-{
-    return 0;
-}
-
-static int
-whatevercast_handler(struct uipcp_rib *)
-{
-    return 0;
-}
-
-extern "C" struct uipcp_rib *
-rib_create(struct uipcp *uipcp)
-{
-    struct uipcp_rib *rib = new uipcp_rib(uipcp);
-
-    if (!rib) {
-        return NULL;
-    }
-
-    /* Insert the handlers for the RIB objects. */
-
-    rib->handlers.insert(make_pair(obj_name::dft, dft_handler));
-
-    rib->handlers.insert(make_pair(obj_name::whatevercast,
-                                   whatevercast_handler));
-
-    return rib;
-}
-
-extern "C" void
-rib_destroy(struct uipcp_rib *rib)
-{
-    int ret;
-
-    for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
-                        neigh != rib->neighbors.end(); neigh++) {
-        ret = close(neigh->flow_fd);
-        if (ret) {
-            PE("%s: Error deallocating N-1 flow fd %d\n", __func__,
-               neigh->flow_fd);
-        }
-    }
-
-    delete rib;
-}
-
-static int
-rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
-                const string& obj_name, int x)
-{
-    struct enrolled_neighbor *neigh;
-#if 0
-    CDAPMessage m;
-    int invoke_id;
-
-    list_for_each_entry(neigh, &rib->uipcp->enrolled_neighbors, node) {
-        if (create) {
-            m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
-                       0, 0, "");
-        } else {
-            m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
-                       0, 0, "");
-        }
-    }
-
-    conn.msg_send(&m, 0);
-#endif
 }
 
 int
@@ -353,6 +269,90 @@ Neighbor::fsm_run(const CDAPMessage *rm)
     }
 
     return 0;
+}
+
+list<Neighbor>::iterator
+uipcp_rib::lookup_neigh_by_port_id(unsigned int port_id)
+{
+    for (list<Neighbor>::iterator neigh = neighbors.begin();
+                        neigh != neighbors.end(); neigh++) {
+        if (neigh->port_id == port_id) {
+            return neigh;
+        }
+    }
+
+    return neighbors.end();
+}
+
+static int
+dft_handler(struct uipcp_rib *)
+{
+    return 0;
+}
+
+static int
+whatevercast_handler(struct uipcp_rib *)
+{
+    return 0;
+}
+
+extern "C" struct uipcp_rib *
+rib_create(struct uipcp *uipcp)
+{
+    struct uipcp_rib *rib = new uipcp_rib(uipcp);
+
+    if (!rib) {
+        return NULL;
+    }
+
+    /* Insert the handlers for the RIB objects. */
+
+    rib->handlers.insert(make_pair(obj_name::dft, dft_handler));
+
+    rib->handlers.insert(make_pair(obj_name::whatevercast,
+                                   whatevercast_handler));
+
+    return rib;
+}
+
+extern "C" void
+rib_destroy(struct uipcp_rib *rib)
+{
+    int ret;
+
+    for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
+                        neigh != rib->neighbors.end(); neigh++) {
+        ret = close(neigh->flow_fd);
+        if (ret) {
+            PE("%s: Error deallocating N-1 flow fd %d\n", __func__,
+               neigh->flow_fd);
+        }
+    }
+
+    delete rib;
+}
+
+static int
+rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
+                const string& obj_name, int x)
+{
+    struct enrolled_neighbor *neigh;
+#if 0
+    CDAPMessage m;
+    int invoke_id;
+
+    list_for_each_entry(neigh, &rib->uipcp->enrolled_neighbors, node) {
+        if (create) {
+            m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
+                       0, 0, "");
+        } else {
+            m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
+                       0, 0, "");
+        }
+    }
+
+    conn.msg_send(&m, 0);
+#endif
 }
 
 extern "C"
