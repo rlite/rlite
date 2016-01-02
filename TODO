@@ -30,5 +30,3 @@
 
 - rendere uipcp-server compatibile con la redirezione dell'output o implementare
   il logging
-
-- rina-config: aggiungere il comando ipcps-fetch

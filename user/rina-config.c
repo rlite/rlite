@@ -499,6 +499,14 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 }
 
 static int
+ipcps_show(int argc, char **argv, struct rinaconf *rc)
+{
+    ipcps_print(&rc->loop);
+
+    return 0;
+}
+
+static int
 test(struct rinaconf *rc)
 {
     struct rina_name name;
@@ -591,6 +599,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_APN IPCP_API APPL_APN APPL_API REMOTE_ADDR",
         .num_args = 5,
         .func = ipcp_dft_set,
+    },
+    {
+        .name = "ipcps-show",
+        .usage = "",
+        .num_args = 0,
+        .func = ipcps_show,
     },
 };
 
