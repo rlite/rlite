@@ -248,6 +248,9 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
                  const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name);
 
+int
+rl_ctrl_flow_accept(struct rlite_ctrl *ctrl);
+
 #ifdef __cplusplus
 }
 #endif

@@ -116,25 +116,20 @@ flow_fetch_resp(struct rlite_evloop *loop,
 }
 
 static int
-ipcp_update(struct rlite_evloop *loop,
-            const struct rlite_msg_base_resp *b_resp,
-            const struct rlite_msg_base *b_req)
+ctrl_ipcp_update(struct rlite_ctrl *ctrl,
+                 const struct rl_kmsg_ipcp_update *upd)
 {
-    const struct rl_kmsg_ipcp_update *upd =
-        (const struct rl_kmsg_ipcp_update *)b_resp;
     struct rlite_ipcp *rlite_ipcp = NULL;
     struct rlite_ipcp *cur;
-
-    (void)b_req;
 
     NPD("UPDATE IPCP update_type=%d, id=%u, addr=%lu, depth=%u, dif_name=%s "
        "dif_type=%s\n",
         upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
         upd->dif_name, upd->dif_type);
 
-    pthread_mutex_lock(&loop->ctrl.lock);
+    pthread_mutex_lock(&ctrl->lock);
 
-    list_for_each_entry(cur, &loop->ctrl.ipcps, node) {
+    list_for_each_entry(cur, &ctrl->ipcps, node) {
         if (cur->ipcp_id == upd->ipcp_id) {
             rlite_ipcp = cur;
             break;
@@ -190,11 +185,26 @@ ipcp_update(struct rlite_evloop *loop,
         rina_name_copy(&rlite_ipcp->ipcp_name, &upd->ipcp_name);
         rlite_ipcp->dif_name = strdup(upd->dif_name);
 
-        list_add_tail(&rlite_ipcp->node, &loop->ctrl.ipcps);
+        list_add_tail(&rlite_ipcp->node, &ctrl->ipcps);
     }
 
 out:
-    pthread_mutex_unlock(&loop->ctrl.lock);
+    pthread_mutex_unlock(&ctrl->lock);
+
+    return 0;
+}
+
+static int
+evloop_ipcp_update(struct rlite_evloop *loop,
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
+{
+    const struct rl_kmsg_ipcp_update *upd =
+        (const struct rl_kmsg_ipcp_update *)b_resp;
+
+    (void)b_req;
+
+    ctrl_ipcp_update(&loop->ctrl, upd);
 
     /* We do handler chaining here, because it's always necessary
      * to manage the RLITE_KER_IPCP_UPDATE message internally. */
@@ -857,7 +867,7 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
     }
 
     loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
-    loop->handlers[RLITE_KER_IPCP_UPDATE] = ipcp_update;
+    loop->handlers[RLITE_KER_IPCP_UPDATE] = evloop_ipcp_update;
 
     if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
         NPD("setting default barrier handler\n");
@@ -1350,6 +1360,31 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
     return 0;
 }
 
+static int
+rl_ctrl_barrier(struct rlite_ctrl *ctrl)
+{
+    struct rlite_msg_base req;
+    struct rlite_msg_base *resp;
+    int ret;
+
+    req.msg_type = RLITE_KER_BARRIER;
+    req.event_id = rl_ctrl_get_id(ctrl);
+
+    ret = write_msg(ctrl->rfd, &req);
+    if (ret < 0) {
+        return -1;
+    }
+
+    resp = RLITE_MB(rl_ctrl_wait(ctrl, req.event_id));
+    if (!resp) {
+        return -1;
+    }
+
+    free(resp);
+
+    return 0;
+}
+
 int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
 {
@@ -1377,6 +1412,14 @@ rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
     ret = fcntl(ctrl->rfd, F_SETFL, O_NONBLOCK);
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
+        return ret;
+    }
+
+    /* Issue a barrier operation, in order to process all
+     * pending RLITE_KER_IPCP_UPDATE messages before returing to the caller. */
+    ret = rl_ctrl_barrier(ctrl);
+    if (ret) {
+        PE("rl_ctrl_barrier() failed\n");
         return ret;
     }
 
@@ -1540,9 +1583,10 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
             return resp;
         }
 
-        /* Filter out certain types of message. */
+        /* Filter out and process certain types of message. */
         switch (resp->msg_type) {
             case RLITE_KER_IPCP_UPDATE:
+                ctrl_ipcp_update(ctrl, (struct rl_kmsg_ipcp_update *)resp);
                 rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                RLITE_MB(resp));
                 free(resp);
@@ -1607,7 +1651,7 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
 
 
     if (resp->response) {
-        PE("Flow allocation request denied by remote peer\n");
+        PE("Flow allocation request denied\n");
         fd = -1;
     } else {
         fd = rlite_open_appl_port(resp->port_id);
@@ -1688,7 +1732,7 @@ out:
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&req));
+                   RLITE_MB(req));
     free(req);
 
     return ret;

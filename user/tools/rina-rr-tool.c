@@ -11,13 +11,13 @@
 #include <poll.h>
 
 #include "rlite/utils.h"
-#include "rlite/appl.h"
+#include "rlite/evloop.h"
 
 
 #define SDU_SIZE_MAX    65535
 
 struct rlite_rr {
-    struct rlite_appl application;
+    struct rlite_ctrl ctrl;
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
@@ -37,9 +37,9 @@ client(struct rlite_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rl_appl_flow_alloc_open(&rr->application, rr->dif_name,
-                                   &rr->ipcp_name, &rr->client_appl_name,
-                                   &rr->server_appl_name, &rr->flowspec, 1500);
+    dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
+                             &rr->ipcp_name, &rr->client_appl_name,
+                             &rr->server_appl_name, &rr->flowspec);
     if (dfd < 0) {
         return dfd;
     }
@@ -92,15 +92,14 @@ server(struct rlite_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rl_appl_register_wait(&rr->application, 1, rr->dif_name,
-            &rr->ipcp_name, &rr->server_appl_name,
-            3000);
+    ret = rl_ctrl_register(&rr->ctrl, 1, rr->dif_name,
+                           &rr->ipcp_name, &rr->server_appl_name);
     if (ret) {
         return ret;
     }
 
     for (;;) {
-        dfd = rl_appl_flow_accept_open(&rr->application);
+        dfd = rl_ctrl_flow_accept(&rr->ctrl);
         if (dfd < 0) {
             continue;
         }
@@ -253,7 +252,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    ret = rl_appl_init(&rr.application, RLITE_EVLOOP_SPAWN);
+    ret = rl_ctrl_init(&rr.ctrl, NULL);
     if (ret) {
         return ret;
     }
@@ -276,5 +275,5 @@ main(int argc, char **argv)
         client(&rr);
     }
 
-    return rl_appl_fini(&rr.application);
+    return rl_ctrl_fini(&rr.ctrl);
 }
