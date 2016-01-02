@@ -30,4 +30,12 @@ struct rina_msg_layout rina_conf_numtables[] = {
     [RINA_CONF_BASE_RESP] = {
         .copylen = sizeof(struct rina_msg_base_resp),
     },
+    [RINA_CONF_IPCP_RIB_SHOW_REQ] = {
+        .copylen = sizeof(struct rina_cmsg_ipcp_rib_show_req),
+    },
+    [RINA_CONF_IPCP_RIB_SHOW_RESP] = {
+        .copylen = sizeof(struct rina_cmsg_ipcp_rib_show_resp) -
+                   1 * sizeof(char *),
+        .strings = 1,
+    },
 };

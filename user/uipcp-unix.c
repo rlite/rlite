@@ -245,6 +245,46 @@ out:
     return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
 }
 
+static int
+rina_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
+                        const struct rina_msg_base *b_req)
+{
+    struct rina_cmsg_ipcp_rib_show_req *req =
+                    (struct rina_cmsg_ipcp_rib_show_req *)b_req;
+    struct rina_cmsg_ipcp_rib_show_resp resp;
+    struct uipcp *uipcp;
+    int ret;
+
+    resp.result = 1; /* Report failure by default. */
+    resp.dump = NULL;
+
+    uipcp = uipcp_lookup(uipcps, req->ipcp_id);
+    if (!uipcp) {
+        PE("Could not find uipcp for IPC process %u\n",
+            req->ipcp_id);
+        goto out;
+    }
+
+    resp.dump = rib_dump(uipcp->rib);
+    if (!resp.dump) {
+        goto out;
+    }
+
+    resp.result = 0;
+
+out:
+    resp.msg_type = RINA_CONF_IPCP_RIB_SHOW_RESP;
+    resp.event_id = req->event_id;
+
+    ret = rina_msg_write_fd(sfd, RINALITE_RMB(&resp));
+
+    if (resp.dump) {
+        free(resp.dump);
+    }
+
+    return ret;
+}
+
 typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -256,6 +296,7 @@ static rina_req_handler_t rina_config_handlers[] = {
     [RINA_CONF_UIPCP_CREATE] = rina_conf_uipcp_update,
     [RINA_CONF_UIPCP_DESTROY] = rina_conf_uipcp_update,
     [RINA_CONF_UIPCP_UPDATE] = rina_conf_uipcp_update,
+    [RINA_CONF_IPCP_RIB_SHOW_REQ] = rina_conf_ipcp_rib_show,
     [RINA_CONF_MSG_MAX] = NULL,
 };
 

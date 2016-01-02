@@ -1127,3 +1127,8 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
     return 0;
 }
 
+extern "C" char *
+rib_dump(struct uipcp_rib *rib)
+{
+    return NULL;
+}

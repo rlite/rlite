@@ -17,6 +17,8 @@ enum {
     RINA_CONF_UIPCP_CREATE,       /* 5 */
     RINA_CONF_UIPCP_DESTROY,      /* 6 */
     RINA_CONF_UIPCP_UPDATE,       /* 7 */
+    RINA_CONF_IPCP_RIB_SHOW_REQ,  /* 8 */
+    RINA_CONF_IPCP_RIB_SHOW_RESP, /* 9 */
 
     RINA_CONF_MSG_MAX,
 };
@@ -69,6 +71,17 @@ struct rina_cmsg_uipcp_update {
     uint32_t event_id;
 
     uint16_t ipcp_id;
+} __attribute__((packed));
+
+#define rina_cmsg_ipcp_rib_show_req rina_cmsg_uipcp_update
+
+/* rinaconf <-- uipcps message to report a RIB dump */
+struct rina_cmsg_ipcp_rib_show_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t result;
+    char *dump;
 } __attribute__((packed));
 
 #endif  /* __RINA_CONF_MSG_H__ */

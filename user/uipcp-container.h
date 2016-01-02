@@ -81,6 +81,8 @@ int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 int rib_ipcp_register(struct uipcp_rib *rib, int reg,
                       const struct rina_name *lower_dif);
 
+char *rib_dump(struct uipcp_rib *rib);
+
 #ifdef __cplusplus
 }
 #endif
