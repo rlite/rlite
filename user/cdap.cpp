@@ -758,14 +758,27 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 }
 
 int
-CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
-                  char **buf, size_t *len)
+msg_ser_stateless(struct CDAPMessage *m, char **buf, size_t *len)
 {
     gpb::CDAPMessage gm;
 
     *buf = NULL;
     *len = 0;
 
+    gm = static_cast<gpb::CDAPMessage>(*m);
+
+    *len = gm.ByteSize();
+    *buf = new char[*len];
+
+    gm.SerializeToArray(*buf, *len);
+
+    return 0;
+}
+
+int
+CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
+                  char **buf, size_t *len)
+{
     m->version = version;
 
     if (!m->valid(false)) {
@@ -790,14 +803,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
         }
     }
 
-    gm = static_cast<gpb::CDAPMessage>(*m);
-
-    *len = gm.ByteSize();
-    *buf = new char[*len];
-
-    gm.SerializeToArray(*buf, *len);
-
-    return 0;
+    return msg_ser_stateless(m, buf, len);
 }
 
 int
@@ -828,7 +834,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 }
 
 struct CDAPMessage *
-msg_deser_stateless(char *serbuf, size_t serlen)
+msg_deser_stateless(const char *serbuf, size_t serlen)
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;
@@ -846,7 +852,7 @@ msg_deser_stateless(char *serbuf, size_t serlen)
 }
 
 struct CDAPMessage *
-CDAPConn::msg_deser(char *serbuf, size_t serlen)
+CDAPConn::msg_deser(const char *serbuf, size_t serlen)
 {
     struct CDAPMessage *m = msg_deser_stateless(serbuf, serlen);
 

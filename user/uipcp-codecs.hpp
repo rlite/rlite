@@ -6,6 +6,7 @@
 #include <string>
 
 #include "rinalite/rinalite-common.h"
+#include "cdap.hpp"
 
 
 struct UipcpObject {
@@ -256,6 +257,16 @@ struct FlowRequest {
 
     FlowRequest() : access_ctrl(NULL) { }
     FlowRequest(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+struct AData {
+    uint64_t src_addr;
+    uint64_t dst_addr;
+    CDAPMessage *cdap;
+
+    AData() : cdap(NULL) { }
+    AData(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
 

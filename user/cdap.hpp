@@ -51,7 +51,7 @@ public:
                 char **buf, size_t *len);
 
     struct CDAPMessage * msg_recv();
-    struct CDAPMessage * msg_deser(char *serbuf, size_t serlen);
+    struct CDAPMessage * msg_deser(const char *serbuf, size_t serlen);
 
     struct rina_name local_appl;
     struct rina_name remote_appl;
@@ -59,8 +59,9 @@ public:
     long version;
 };
 
-struct CDAPMessage *
-msg_deser_stateless(char *serbuf, size_t serlen);
+struct CDAPMessage *msg_deser_stateless(const char *serbuf, size_t serlen);
+
+int msg_ser_stateless(struct CDAPMessage *m, char **buf, size_t *len);
 
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {

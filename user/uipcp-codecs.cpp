@@ -1024,3 +1024,31 @@ FlowRequest::serialize(char *buf, unsigned int size) const
 
     return ser_common(gm, buf, size);
 }
+
+AData::AData(const char *buf, unsigned int size)
+{
+    gpb::a_data_t gm;
+
+    src_addr = gm.sourceaddress();
+    dst_addr = gm.destaddress();
+    cdap = msg_deser_stateless(gm.cdapmessage().data(),
+                               gm.cdapmessage().size());
+}
+
+int
+AData::serialize(char *buf, unsigned int size) const
+{
+    gpb::a_data_t gm;
+
+    gm.set_sourceaddress(src_addr);
+    gm.set_destaddress(dst_addr);
+    if (cdap) {
+        char *serbuf;
+        size_t serlen;
+
+        msg_ser_stateless(cdap, &serbuf, &serlen);
+        gm.set_cdapmessage(serbuf, serlen);
+    }
+
+    return ser_common(gm, buf, size);
+}
