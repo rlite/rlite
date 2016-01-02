@@ -108,16 +108,22 @@ static int
 rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct dtp *dtp = &flow->dtp;
+    struct fc_config *fc = &flow->cfg.dtcp.fc;
 
     dtp->set_drf = true;
     dtp->next_seq_num_to_send = 0;
-    dtp->snd_lwe = dtp->next_seq_num_to_send;
+    dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
     dtp->rcv_lwe = 0;
     dtp->max_seq_num_rcvd = -1;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
+
+    if (fc->fc_type == RINA_FC_T_WIN) {
+        dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
+        dtp->snd_rwe += fc->cfg.w.initial_credit;
+    }
 
     return 0;
 }

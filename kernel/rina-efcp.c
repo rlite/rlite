@@ -19,6 +19,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/list.h>
 #include <rina/rina-utils.h>
 #include "rina-kernel.h"
 
@@ -28,23 +29,34 @@ dtp_init(struct dtp *dtp)
 {
     hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    INIT_LIST_HEAD(&dtp->cwq);
+    dtp->cwq_len = dtp->max_cwq_len = 0;
 }
 EXPORT_SYMBOL_GPL(dtp_init);
 
 void
 dtp_fini(struct dtp *dtp)
 {
+    struct rina_buf *rb, *next;
+
     hrtimer_cancel(&dtp->snd_inact_tmr);
     hrtimer_cancel(&dtp->rcv_inact_tmr);
+
+    list_for_each_entry_safe(rb, next, &dtp->cwq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+    }
+    dtp->cwq_len = 0;
 }
 EXPORT_SYMBOL(dtp_fini);
 
 void
 dtp_dump(struct dtp *dtp)
 {
-    printk("DTP: set_drf=%u,snd_lwe=%lu,next_seq_num_to_send=%lu,"
+    printk("DTP: set_drf=%u,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
             "last_seq_num_sent=%lu,rcv_lwe=%lu\n",
             dtp->set_drf, (long unsigned)dtp->snd_lwe,
+            (long unsigned)dtp->snd_rwe,
             (long unsigned)dtp->next_seq_num_to_send,
             (long unsigned)dtp->last_seq_num_sent,
             (long unsigned)dtp->rcv_lwe);

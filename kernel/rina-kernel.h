@@ -96,12 +96,16 @@ struct upper_ref {
 struct dtp {
     bool set_drf;
     uint64_t snd_lwe;
+    uint64_t snd_rwe;
     uint64_t next_seq_num_to_send;
     uint64_t last_seq_num_sent;
     uint64_t rcv_lwe;
     uint64_t max_seq_num_rcvd;
     struct hrtimer snd_inact_tmr;
     struct hrtimer rcv_inact_tmr;
+    struct list_head cwq;
+    unsigned int cwq_len;
+    unsigned int max_cwq_len;
 };
 
 struct flow_entry {
