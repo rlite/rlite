@@ -461,34 +461,31 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             }
         }
 
-    } else if (unlikely(dtp->rcv_lwe < pci->seqnum &&
-                pci->seqnum <= dtp->max_seq_num_rcvd)) {
-        /* This may go in a gap or be a duplicate
-         * amongst the gaps. */
-
-        PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
-                __func__, (long unsigned)dtp->rcv_lwe,
-                (unsigned long)pci->seqnum + 1);
-        // TODO, for now just pass it up, and ignore gaps
-
-        dtp->rcv_lwe = pci->seqnum + 1;
-        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-
-    } else if (pci->seqnum == dtp->max_seq_num_rcvd + 1) {
-        /* In order PDU. */
-        dtp->rcv_lwe++;
-        dtp->max_seq_num_rcvd++;
-        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-
     } else {
-        /* Out of order. */
-        PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
-                __func__, (long unsigned)dtp->rcv_lwe,
-                (unsigned long)pci->seqnum + 1);
+        if (unlikely(dtp->rcv_lwe < pci->seqnum &&
+                    pci->seqnum <= dtp->max_seq_num_rcvd)) {
+            /* This may go in a gap or be a duplicate
+             * amongst the gaps. */
 
-        // TODO, for now just pass it up, and ignore out of order
-        dtp->rcv_lwe = pci->seqnum + 1;
-        dtp->max_seq_num_rcvd = pci->seqnum;
+            PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
+                    __func__, (long unsigned)dtp->rcv_lwe,
+                    (unsigned long)pci->seqnum + 1);
+
+        } else if (pci->seqnum == dtp->max_seq_num_rcvd + 1) {
+            /* In order PDU. */
+
+        } else {
+            /* Out of order. */
+            PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+                    __func__, (long unsigned)dtp->rcv_lwe,
+                    (unsigned long)pci->seqnum + 1);
+        }
+
+        if (pci->seqnum > dtp->max_seq_num_rcvd) {
+            dtp->max_seq_num_rcvd = pci->seqnum;
+        }
+        dtp->rcv_lwe = dtp->max_seq_num_rcvd + 1;
+
         ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
     }
 
