@@ -26,6 +26,20 @@
 
 #endif
 
+/* Serialize a numeric variable _v of type _t. */
+#define serialize_obj(_p, _t, _v)       \
+        do {                            \
+            *((_t *)_p) = _v;           \
+            _p += sizeof(_t);           \
+        } while (0)
+
+/* Deserialize a numeric variable of type _t from _p into _r. */
+#define deserialize_obj(_p, _t, _r)     \
+        do {                            \
+            *(_r) = *((_t *)_p);        \
+            _p += sizeof(_t);           \
+        } while (0)
+
 /* Size of a serialized string, not including the storage for the size
  * field itself. */
 static unsigned int
