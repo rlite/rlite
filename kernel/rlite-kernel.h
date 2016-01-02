@@ -230,6 +230,8 @@ struct flow_entry *flow_get(unsigned int port_id);
 
 struct flow_entry *flow_get_by_cep(unsigned int cep_id);
 
+void flow_get_ref(struct flow_entry *flow);
+
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
 {

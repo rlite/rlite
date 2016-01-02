@@ -35,8 +35,8 @@
 
 struct rx_entry {
     struct rlite_buf *rb;
-    unsigned int remote_port;
-    unsigned int local_port;
+    struct flow_entry *tx_flow;
+    struct flow_entry *rx_flow;
 };
 
 #define RX_POW      8
@@ -66,14 +66,14 @@ rcv_work(struct work_struct *w)
 
     for (;;) {
         struct rlite_buf *rb = NULL;
-        unsigned int remote_port;
-        unsigned int local_port;
+        struct flow_entry *rx_flow;
+        struct flow_entry *tx_flow;
 
         spin_lock_bh(&priv->lock);
         if (priv->rdh != priv->rdt) {
             rb = priv->rxr[priv->rdh].rb;
-            remote_port = priv->rxr[priv->rdh].remote_port;
-            local_port = priv->rxr[priv->rdh].local_port;
+            rx_flow = priv->rxr[priv->rdh].rx_flow;
+            tx_flow = priv->rxr[priv->rdh].tx_flow;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
         }
         spin_unlock_bh(&priv->lock);
@@ -81,9 +81,12 @@ rcv_work(struct work_struct *w)
         if (!rb) {
             break;
         }
-        rlite_sdu_rx(priv->ipcp, rb, remote_port);
 
-        rlite_write_restart(local_port);
+        rlite_sdu_rx_flow(priv->ipcp, rx_flow, rb, true);
+        flow_put(rx_flow);
+
+        rlite_write_restart_flow(tx_flow);
+        flow_put(tx_flow);
     }
 }
 
@@ -222,11 +225,13 @@ rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
 static int
 rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
-                             struct flow_entry *flow,
+                             struct flow_entry *tx_flow,
                              struct rlite_buf *rb,
                              bool maysleep)
 {
     struct rlite_shim_loopback *priv = ipcp->priv;
+    struct flow_entry *rx_flow;
+    int ret = 0;
 
     if (unlikely(priv->drop_fract)) {
         bool drop = false;
@@ -244,32 +249,40 @@ rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         }
     }
 
+    rx_flow = flow_get(tx_flow->remote_port);
+    if (!rx_flow) {
+        rlite_buf_free(rb);
+        return -ENXIO;
+    }
+
     if (priv->queued) {
         unsigned int next;
-        int ret = 0;
 
         spin_lock_bh(&priv->lock);
         next = (priv->rdt + 1) & (RX_ENTRIES -1);
         if (unlikely(next == priv->rdh)) {
             ret = -EAGAIN;
         } else {
+            flow_get_ref(tx_flow);
             priv->rxr[priv->rdt].rb = rb;
-            priv->rxr[priv->rdt].remote_port = flow->remote_port;
-            priv->rxr[priv->rdt].local_port = flow->local_port;
+            priv->rxr[priv->rdt].tx_flow = tx_flow;
+            priv->rxr[priv->rdt].rx_flow = rx_flow;
             priv->rdt = next;
         }
         spin_unlock_bh(&priv->lock);
 
         if (ret) {
+            flow_put(rx_flow);
             return ret;
         }
         schedule_work(&priv->rcv);
 
     } else {
-        rlite_sdu_rx(ipcp, rb, flow->remote_port);
+        ret = rlite_sdu_rx_flow(ipcp, rx_flow, rb, true);
+        flow_put(rx_flow);
     }
 
-    return 0;
+    return ret;
 }
 
 static int

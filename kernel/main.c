@@ -708,6 +708,19 @@ flow_get_by_cep(unsigned int cep_id)
 }
 EXPORT_SYMBOL_GPL(flow_get_by_cep);
 
+void
+flow_get_ref(struct flow_entry *flow)
+{
+    if (unlikely(!flow)) {
+        return;
+    }
+
+    FLOCK();
+    flow->refcnt++;
+    FUNLOCK();
+}
+EXPORT_SYMBOL_GPL(flow_get_ref);
+
 static void
 tx_completion_func(unsigned long arg)
 {
