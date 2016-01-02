@@ -1241,3 +1241,36 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
     return 0;
 }
 
+int
+normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    struct enrolled_neigh *ni;
+    ScopeLock(rib->lock);
+    struct rlite_ipcp *rlite_ipcp = rib->ipcp_info();
+
+    list_init(neighs);
+
+    for (map<string, Neighbor*>::iterator nit = rib->neighbors.begin();
+                        nit != rib->neighbors.end(); nit++) {
+        Neighbor *neigh = nit->second;
+
+        ni = static_cast<struct enrolled_neigh *>(malloc(sizeof(*ni)));
+        if (!ni) {
+            PE("Out of memory\n");
+            return -1;
+        }
+
+        if (neigh->ipcp_name.rina_name_fill(&ni->neigh_name) ||
+                rina_name_copy(&ni->ipcp_name, &rlite_ipcp->ipcp_name) ||
+                (ni->dif_name = strdup(rlite_ipcp->dif_name)) == NULL) {
+            PE("Out of memory\n");
+            free(ni);
+            return -1;
+        }
+        ni->supp_dif = NULL;
+        list_add_tail(&ni->node, neighs);
+    }
+
+    return 0;
+}

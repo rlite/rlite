@@ -35,6 +35,16 @@ struct uipcps {
 
 #define RLITE_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
 
+struct enrolled_neigh {
+    // TODO these can be serialized names
+    char *dif_name;
+    struct rina_name ipcp_name;
+    struct rina_name neigh_name;
+    char *supp_dif;
+
+    struct list_head node;
+};
+
 struct uipcp;
 
 struct uipcp_ops {
@@ -67,6 +77,8 @@ struct uipcp_ops {
     int (*flow_deallocated)(struct rlite_evloop *loop,
                             const struct rlite_msg_base *b_resp,
                             const struct rlite_msg_base *b_req);
+
+    int (*get_enrolled_neighs)(struct uipcp *, struct list_head *neighs);
 };
 
 struct ipcp_node {

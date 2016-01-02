@@ -272,6 +272,8 @@ private:
 
 int normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req);
 
+int normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs);
+
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
 

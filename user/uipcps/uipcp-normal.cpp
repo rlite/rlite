@@ -817,5 +817,6 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
+    .get_enrolled_neighs = normal_get_enrolled_neighs,
 };
 
