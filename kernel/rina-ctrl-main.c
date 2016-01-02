@@ -492,6 +492,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
             memcpy(&entry->cfg, flowcfg, sizeof(*flowcfg));
         }
         ipcp->refcnt++;
+        if (ipcp->ops.flow_init) {
+            /* Let the IPCP do some
+             * specific initialization. */
+            ipcp->ops.flow_init(ipcp, entry);
+        }
     } else {
         kfree(entry);
         *pentry = NULL;
@@ -1136,10 +1141,6 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
 
     if (ret || response) {
         flow_del_entry(flow_entry, 0);
-    } else if (ipcp->ops.flow_init) {
-        /* Positive response, let the IPCP do some
-         * specific initialization. */
-        ipcp->ops.flow_init(ipcp, flow_entry);
     }
 out:
 
@@ -1273,10 +1274,6 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     if (response) {
         /* Negative response --> delete the flow. */
         flow_del_entry(flow_entry, 0);
-    } else if (ipcp->ops.flow_init) {
-        /* Positive response, let the IPCP do some
-         * specific initialization. */
-        ipcp->ops.flow_init(ipcp, flow_entry);
     }
 
 out:
