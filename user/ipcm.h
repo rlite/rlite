@@ -23,7 +23,7 @@ struct ipcm {
     struct list_head ipcps_registrations;
 };
 
-#define RINA_PERSISTENT_REG_FILE   "/tmp/rina-pers-reg"
+#define RINA_PERSISTENT_REG_FILE   "/var/rina/ipcm-pers-reg"
 
 int
 ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,

@@ -2,7 +2,7 @@
 #define __RINA_COMMON_H__
 
 
-#define RINA_IPCM_UNIX_NAME     "/tmp/rina-ipcm"
+#define RINA_IPCM_UNIX_NAME     "/var/rina/ipcm"
 
 /* Application naming information:
  *   - Application Process Name
