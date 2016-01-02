@@ -5,7 +5,13 @@
 #include <list>
 #include <string>
 
-struct EnrollmentInfo {
+
+struct UipcpObject {
+    virtual int serialize(char *buf, unsigned int size) const = 0;
+    virtual ~UipcpObject() { }
+};
+
+struct EnrollmentInfo : public UipcpObject {
     uint64_t address;
     std::list< std::string > lower_difs;
     bool start_early;

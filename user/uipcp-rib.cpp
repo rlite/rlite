@@ -60,7 +60,7 @@ struct Neighbor {
     Neighbor(const Neighbor &other);
     ~Neighbor();
 
-    int send_to_port_id(CDAPMessage *m);
+    int send_to_port_id(CDAPMessage *m, const UipcpObject *obj);
     int fsm_run(const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
@@ -205,11 +205,24 @@ rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
 }
 
 int
-Neighbor::send_to_port_id(CDAPMessage *m)
+Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
 {
     char *serbuf;
     size_t serlen;
     int ret;
+
+    if (obj) {
+        char objbuf[4096];
+        int objlen;
+
+        objlen = obj->serialize(objbuf, sizeof(objbuf));
+        if (objlen < 0) {
+            PE("%s: serialization failed\n", __func__);
+            return objlen;
+        }
+
+        m->set_obj_value(objbuf, objlen);
+    }
 
     ret = conn->msg_ser(m, 0, &serbuf, &serlen);
     if (ret) {
@@ -264,7 +277,7 @@ Neighbor::none(const CDAPMessage *rm)
         enrollment_state = S_CONNECT_RCVD;
     }
 
-    return send_to_port_id(&m);
+    return send_to_port_id(&m, NULL);
 }
 
 int
@@ -272,23 +285,13 @@ Neighbor::i_connect_sent(const CDAPMessage *rm)
 {
     EnrollmentInfo enr_info;
     CDAPMessage m;
-    char objbuf[4096];
-    int objlen;
 
     assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
 
     m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
               0, 0, string());
 
-    objlen = enr_info.serialize(objbuf, sizeof(objbuf));
-    if (objlen < 0) {
-        PE("%s: serialization failed\n", __func__);
-        return objlen;
-    }
-
-    m.set_obj_value(objbuf, objlen);
-
-    return send_to_port_id(&m);
+    return send_to_port_id(&m, &enr_info);
 }
 
 int
