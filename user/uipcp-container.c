@@ -167,8 +167,8 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 }
 
 int
-uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
-                     uint64_t remote_addr,
+uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
+                     uint32_t remote_port, uint64_t remote_addr,
                      const struct rina_name *local_application,
                      const struct rina_name *remote_application,
                      const struct rina_flow_config *flowcfg)
@@ -205,7 +205,7 @@ uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
 }
 
 int
-uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
+uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                       uint32_t remote_port, uint64_t remote_addr,
                       uint8_t response, const struct rina_flow_config *flowcfg)
 {

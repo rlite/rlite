@@ -132,7 +132,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
         PI("No DFT matching entry for destination %s\n",
                 static_cast<string>(dest_appl).c_str());
 
-        return uipcp_fa_resp_arrived(uipcp, req->local_port,
+        return uipcp_issue_fa_resp_arrived(uipcp, req->local_port,
                                      0 /* don't care */,
                                      0 /* dont't care */,
                                      1, NULL);
@@ -274,8 +274,8 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     freq.src_app.rina_name_fill(&remote_appl);
     policies2flowcfg(&flowcfg, freq.qos, freq.policies);
 
-    uipcp_fa_req_arrived(uipcp, freq.src_port, freq.src_addr,
-                         &local_appl, &remote_appl, &flowcfg);
+    uipcp_issue_fa_req_arrived(uipcp, freq.src_port, freq.src_addr,
+                               &local_appl, &remote_appl, &flowcfg);
 
     rina_name_free(&local_appl);
     rina_name_free(&remote_appl);
@@ -313,7 +313,7 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
     /* Update the local freq object with the remote one. */
     freq.dst_port = remote_freq.dst_port;
 
-    return uipcp_fa_resp_arrived(uipcp, freq.src_port, freq.dst_port,
+    return uipcp_issue_fa_resp_arrived(uipcp, freq.src_port, freq.dst_port,
                                  freq.dst_addr, rm->result, &freq.flowcfg);
 }
 
