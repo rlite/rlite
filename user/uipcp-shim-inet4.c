@@ -423,6 +423,23 @@ err1:
 }
 
 static int
+remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
+{
+    struct inet4_endpoint *ep;
+
+    list_for_each_entry(ep, &shim->endpoints, node) {
+        if (port_id == ep->port_id) {
+            PD("Removing endpoint [port=%u,sfd=%d]\n", ep->port_id, ep->fd);
+            close(ep->fd);
+            free(ep);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+static int
 shim_inet4_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
@@ -430,14 +447,25 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct shim_inet4 *shim = SHIM(uipcp);
     struct rina_kmsg_fa_resp *resp =
                 (struct rina_kmsg_fa_resp *)b_resp;
+    int ret;
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
-    (void)resp;
+    if (!resp->response) {
+        /* If response is positive, there is nothing to do here. */
+        return 0;
+    }
+
+    /* Negative response, we have to close the TCP/UDP connection. */
+    ret = remove_endpoint_by_port_id(shim, resp->port_id);
+    if (ret) {
+        PE("Cannot find endpoint corresponding to port '%d'\n", resp->port_id);
+    }
 
     return 0;
 }
@@ -452,9 +480,14 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
     struct rina_kmsg_flow_deallocated *req =
                 (struct rina_kmsg_flow_deallocated *)b_resp;
+    struct shim_inet4 *shim = SHIM(uipcp);
+    int ret;
 
-    (void)req;
-    (void)uipcp;
+    /* Close the TCP/UDP connection associated to this flow. */
+    ret = remove_endpoint_by_port_id(shim, req->local_port_id);
+    if (ret) {
+        PE("Cannot find endpoint corresponding to port '%d'\n", req->local_port_id);
+    }
 
     return 0;
 }
