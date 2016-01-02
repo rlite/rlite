@@ -269,6 +269,7 @@ select_uipcp_ops(const char *dif_type)
     return NULL;
 }
 
+/* To be called under uipcps lock. */
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 {
@@ -283,6 +284,7 @@ uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
     return NULL;
 }
 
+/* To be called under uipcps lock. */
 int
 uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 {
@@ -361,6 +363,7 @@ err0:
     return ret;
 }
 
+/* To be called under uipcps lock. */
 int
 uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 {
@@ -395,11 +398,15 @@ uipcps_print(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
 
+    pthread_mutex_lock(&uipcps->lock);
+
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         /* This is just for debugging purposes. */
         rlite_ipcps_print(&uipcp->appl.loop);
         break;
     }
+
+    pthread_mutex_unlock(&uipcps->lock);
 
     return 0;
 }

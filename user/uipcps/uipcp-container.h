@@ -1,6 +1,8 @@
 #ifndef __RLITE_UIPCP_H__
 #define __RLITE_UIPCP_H__
 
+#include <pthread.h>
+
 #include "rlite/conf-msg.h"
 #include "rlite/kernel-msg.h"
 #include "rlite/list.h"
@@ -18,6 +20,7 @@ struct uipcps {
 
     /* List of userspace IPCPs: There is one for each non-shim IPCP. */
     struct list_head uipcps;
+    pthread_mutex_t lock;
 
     /* Each element of this list corresponds to the registration of
      * and IPCP within a DIF. This is useful to implement the persistent

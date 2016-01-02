@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <endian.h>
 #include <sys/stat.h>
+#include <pthread.h>
 
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
@@ -113,9 +114,11 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
     uint8_t result = RLITE_ERR;
 
     /* Grab the corresponding userspace IPCP. */
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
         PE("No such uipcp [%u]\n", ipcp_id);
+        pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
 
@@ -129,6 +132,7 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
             track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
         }
     }
+    pthread_mutex_unlock(&uipcps->lock);
 
     return result;
 }
@@ -157,6 +161,7 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     resp.result = RLITE_ERR; /* Report failure by default. */
 
     /* Find the userspace part of the enrolling IPCP. */
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
         PE("Could not find userspace IPC process %u\n",
@@ -169,6 +174,8 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     }
 
 out:
+    pthread_mutex_unlock(&uipcps->lock);
+
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
@@ -182,6 +189,7 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
 
     resp.result = RLITE_ERR; /* Report failure by default. */
 
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
         PE("Could not find uipcp for IPC process %u\n",
@@ -194,6 +202,8 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     }
 
 out:
+    pthread_mutex_unlock(&uipcps->lock);
+
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
@@ -210,6 +220,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     resp.result = RLITE_ERR; /* Report failure by default. */
     resp.dump = NULL;
 
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
         PE("Could not find uipcp for IPC process %u\n",
@@ -225,6 +236,8 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     }
 
 out:
+    pthread_mutex_unlock(&uipcps->lock);
+
     resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
@@ -347,6 +360,8 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
     struct uipcp *uipcp;
     int ret = -1;
 
+    pthread_mutex_lock(&uipcps->lock);
+
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
             if (upd->dif_type && type_has_uipcp(upd->dif_type)) {
@@ -373,6 +388,8 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
             ret = 0;
             break;
     }
+
+    pthread_mutex_unlock(&uipcps->lock);
 
     if (ret) {
         PE("IPCP update synchronization failed\n");
@@ -538,6 +555,7 @@ int main(int argc, char **argv)
     }
 
     list_init(&uipcps->uipcps);
+    pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcps_registrations);
     list_init(&uipcps->ipcp_nodes);
 
