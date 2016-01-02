@@ -48,6 +48,8 @@ struct shim_inet4_flow {
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
+
+    struct mutex rxw_lock;
 };
 
 static void *
@@ -89,6 +91,8 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
     uint16_t lenhdr;
     int ret;
 
+    mutex_lock(&priv->rxw_lock);
+
     for (;;) {
         memset(&msghdr, 0, sizeof(msghdr));
         msghdr.msg_flags = MSG_DONTWAIT;
@@ -117,7 +121,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         rb = rina_buf_alloc(lenhdr, 3, GFP_ATOMIC);
         if (!rb) {
             PE("Out of memory\n");
-            return;
+            break;
         }
 
         memset(&msghdr, 0, sizeof(msghdr));
@@ -139,6 +143,8 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         NPD("read %d bytes\n", ret);
         rina_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
     }
+
+    mutex_unlock(&priv->rxw_lock);
 }
 
 static void
@@ -202,6 +208,7 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     priv->sock = sock;
     INIT_WORK(&priv->rxw, inet4_rx_worker);
+    mutex_init(&priv->rxw_lock);
     priv->flow = flow;
     flow->priv = priv;
 
@@ -239,6 +246,7 @@ rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
     /* Decrement the file descriptor reference counter, in order to
      * match flow_init(). */
     fput(sock->file);
+    // mutex_destroy(&priv->rxw_lock);
     flow->priv = NULL;
     kfree(priv);
 

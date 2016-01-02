@@ -346,9 +346,9 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     /* Don't select() on ep->fd for incoming packets, that will be received in
      * kernel space. */
 
-    if (connect(ep->fd, (const struct sockaddr *)&remote_addr,
-                sizeof(remote_addr))) {
-        PE("Failed to connect to remote addr\n");
+    if ((ret = connect(ep->fd, (const struct sockaddr *)&remote_addr,
+                sizeof(remote_addr)))) {
+        PE("Failed to connect to remote addr [%d]\n", ret);
         goto err2;
     }
 
