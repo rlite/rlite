@@ -171,7 +171,7 @@ for i in sorted(vms):
             'sudo mkdir -p /var/rlite\n'\
             'sudo chmod -R a+rw /var/rlite\n'\
             '\n'\
-            'rlite-uipcps &> uipcp.log &\n'\
+            'sudo rlite-uipcps &> uipcp.log &\n'\
             '\n'\
             'for i in $(seq 1 %(levels)s); do\n'\
             '   rlite-config ipcp-create n.${i}.IPCP %(id)s normal n.${i}.DIF\n'\
