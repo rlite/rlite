@@ -11,6 +11,7 @@
 
 struct ipcp_entry;
 struct flow_entry;
+struct rina_ctrl;
 
 struct ipcp_ops {
     void (*destroy)(struct ipcp_entry *ipcp);
@@ -39,9 +40,20 @@ struct ipcp_ops {
                      struct flow_entry *flow);
     int (*dft_set)(struct ipcp_entry *ipcp, const struct rina_name *appl_name,
                    uint64_t remote_addr);
+    int (*mgmt_sdu_write)(struct ipcp_entry *ipcp,
+                          const struct rina_mgmt_hdr *hdr,
+                          struct rina_buf *rb);
 };
 
-struct rina_ctrl;
+struct txrx {
+    /* Read operation support. */
+    struct list_head    queue;
+    wait_queue_head_t   wqh;
+    spinlock_t          lock;
+
+    /* Write operation support. */
+    struct ipcp_entry   *ipcp;
+};
 
 struct ipcp_entry {
     uint16_t            id;    /* Key */
@@ -53,6 +65,7 @@ struct ipcp_entry {
     void                *priv;
     struct list_head    registered_applications;
     struct rina_ctrl    *uipcp;
+    struct txrx         *mgmt_txrx;
 
     /* The module that owns this IPC process. */
     struct module       *owner;
@@ -84,16 +97,6 @@ struct upper_ref {
 
 struct dtp {
     uint64_t next_seq_num_to_send;
-};
-
-struct txrx {
-    /* Read operation support. */
-    struct list_head    queue;
-    wait_queue_head_t   wqh;
-    spinlock_t          lock;
-
-    /* Write operation support. */
-    struct ipcp_entry   *ipcp;
 };
 
 static inline void txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
@@ -137,5 +140,7 @@ int rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
 
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);
+
+struct flow_entry *flow_lookup(unsigned int port_id);
 
 #endif  /* __RINA_IPCP_H__ */

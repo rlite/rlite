@@ -260,6 +260,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->priv = NULL;
         entry->owner = NULL;
         entry->uipcp = NULL;
+        entry->mgmt_txrx = NULL;
         mutex_init(&entry->lock);
         entry->refcnt = 0;
         INIT_LIST_HEAD(&entry->registered_applications);
@@ -440,6 +441,20 @@ flow_table_find(unsigned int port_id)
 
     return NULL;
 }
+
+/* Exported (and locked) version of flow_table_find(). */
+struct flow_entry *
+flow_lookup(unsigned int port_id)
+{
+    struct flow_entry *flow;
+
+    mutex_lock(&rina_dm.lock);
+    flow = flow_table_find(port_id);
+    mutex_unlock(&rina_dm.lock);
+
+    return flow;
+}
+EXPORT_SYMBOL_GPL(flow_lookup);
 
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
@@ -1264,6 +1279,7 @@ int
 rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 {
     struct flow_entry *flow;
+    struct txrx *txrx;
     int ret = 0;
 
     mutex_lock(&rina_dm.lock);  /* Here we should use ipcp mutex! */
@@ -1288,15 +1304,23 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             mutex_unlock(&rina_dm.lock);
 
             return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
+        } else if (0 && flow->upper.ipcp->mgmt_txrx) {
+            /* TODO new managament, to be enabled. */
+            txrx = flow->upper.ipcp->mgmt_txrx;
+        } else {
+            /* TODO old management, to be deleted */
+            txrx = &flow->txrx;
         }
 
         rina_buf_pci_pop(rb);
+    } else {
+        txrx = &flow->txrx;
     }
 
-    spin_lock(&flow->txrx.lock);
-    list_add_tail(&rb->node, &flow->txrx.queue);
-    spin_unlock(&flow->txrx.lock);
-    wake_up_interruptible_poll(&flow->txrx.wqh,
+    spin_lock(&txrx->lock);
+    list_add_tail(&rb->node, &txrx->queue);
+    spin_unlock(&txrx->lock);
+    wake_up_interruptible_poll(&txrx->wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
     mutex_unlock(&rina_dm.lock);
@@ -1601,9 +1625,10 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     struct ipcp_entry *ipcp;
     struct rina_buf *rb;
     ssize_t ret;
+    unsigned int ofs = 0;
 
     if (unlikely(!rio->txrx)) {
-        printk("%s: Error: Flow not assigned\n", __func__);
+        printk("%s: Error: Not bound to a flow nor IPCP\n", __func__);
         return -ENXIO;
     }
     ipcp = rio->txrx->ipcp;
@@ -1613,27 +1638,37 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         return -ENOMEM;
     }
 
+    if (unlikely(rio->mode == RINA_IOCTL_CMD_IPCP_MGMT)) {
+        ofs += sizeof(struct rina_mgmt_hdr);
+    }
+
     /* Copy in the userspace SDU. */
-    if (copy_from_user(RINA_BUF_DATA(rb), ubuf, ulen)) {
+    if (copy_from_user(RINA_BUF_DATA(rb), ubuf + ofs, ulen - ofs)) {
         printk("%s: copy_from_user()\n", __func__);
         rina_buf_free(rb);
         return -EFAULT;
     }
 
-    if (unlikely(rio->flow && rio->flow->upper.ipcp)) {
-        /* Fill the PCI for a management PDU. */
-        rina_buf_pci_push(rb);
-        memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
-        RINA_BUF_PCI(rb)->pdu_type = PDU_TYPE_MGMT;
-    }
-
-    // TODO flow is NULL if MGMT
-    ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
-
-    if (unlikely(rio->flow && rio->flow->upper.ipcp)) {
-        if (ret > sizeof(struct rina_pci)) {
-            ret -= sizeof(struct rina_pci);
+    if (unlikely(rio->mode != RINA_IOCTL_CMD_APPL_BIND)) {
+        if (rio->mode == RINA_IOCTL_CMD_IPCP_BIND) {
+            /* Fill the PCI for a management PDU. */
+            rina_buf_pci_push(rb);
+            memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
+            RINA_BUF_PCI(rb)->pdu_type = PDU_TYPE_MGMT;
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
+            if (ret > sizeof(struct rina_pci)) {
+                ret -= sizeof(struct rina_pci);
+            }
+        } else if (rio->mode == RINA_IOCTL_CMD_IPCP_MGMT) {
+            ret = ipcp->ops.mgmt_sdu_write(ipcp, (struct rina_mgmt_hdr *)ubuf,
+                                           rb);
+        } else {
+            PE("%s: Unknown mode, this should not happen\n", __func__);
+            ret = -EINVAL;
         }
+    } else {
+        /* Regular application write. */
+        ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
     }
 
     return ret;
@@ -1759,6 +1794,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 
     txrx_init(rio->txrx, ipcp);
     ipcp->refcnt++;
+    ipcp->mgmt_txrx = rio->txrx;
 
     return ret;
 }
@@ -1796,6 +1832,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         case RINA_IOCTL_CMD_IPCP_MGMT:
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
+            rio->txrx->ipcp->mgmt_txrx = NULL;
             rio->txrx->ipcp->refcnt--;
             kfree(rio->txrx);
             rio->txrx = NULL;

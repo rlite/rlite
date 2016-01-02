@@ -50,6 +50,17 @@ struct rina_ioctl_info {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
+#define RINA_MGMT_HDR_TYPE_LOCAL_PORT 1
+#define RINA_MGMT_HDR_TYPE_DST_ADDR 2
+
+struct rina_mgmt_hdr {
+    uint8_t type;
+    union {
+        uint32_t local_port;
+        uint64_t dst_addr;
+    } u;
+} __attribute__((packed));
+
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */

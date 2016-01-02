@@ -147,6 +147,60 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
+rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
+                           const struct rina_mgmt_hdr *mhdr,
+                           struct rina_buf *rb)
+{
+    struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct rina_pci *pci;
+    struct flow_entry *lower_flow;
+    struct ipcp_entry *lower_ipcp;
+    uint64_t dst_addr = 0; /* Not valid. */
+
+    if (mhdr->type == RINA_MGMT_HDR_TYPE_DST_ADDR) {
+        lower_flow = pduft_lookup(priv, mhdr->u.dst_addr);
+        if (unlikely(!lower_flow)) {
+            PI("%s: No route to IPCP %lu, dropping packet\n", __func__,
+                    (long unsigned)mhdr->u.dst_addr);
+            rina_buf_free(rb);
+
+            return 0;
+        }
+        dst_addr = mhdr->u.dst_addr;
+    } else if (mhdr->type == RINA_MGMT_HDR_TYPE_LOCAL_PORT) {
+        lower_flow = flow_lookup(mhdr->u.local_port);
+        if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
+            PI("%s: Invalid mgmt header local port %u, "
+                    "dropping packet\n", __func__,
+                    mhdr->u.local_port);
+            rina_buf_free(rb);
+
+            return 0;
+        }
+    } else {
+        rina_buf_free(rb);
+
+        return -EINVAL;
+    }
+    lower_ipcp = lower_flow->txrx.ipcp;
+    BUG_ON(!lower_ipcp);
+
+    rina_buf_pci_push(rb);
+
+    pci = RINA_BUF_PCI(rb);
+    pci->dst_addr = dst_addr;
+    pci->src_addr = ipcp->addr;
+    pci->conn_id.qos_id = 0;  /* Not valid. */
+    pci->conn_id.dst_cep = 0; /* Not valid. */
+    pci->conn_id.src_cep = 0; /* Not valid. */
+    pci->pdu_type = PDU_TYPE_MGMT;
+    pci->pdu_flags = 0; /* Not valid. */
+    pci->seqnum = 0; /* Not valid. */
+
+    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+}
+
+static int
 rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
                    const char *param_value)
 {
@@ -223,6 +277,7 @@ rina_normal_init(void)
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
+    factory.ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write;
     factory.ops.sdu_rx = rina_normal_sdu_rx;
 
     ret = rina_ipcp_factory_register(&factory);
