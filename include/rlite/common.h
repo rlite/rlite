@@ -16,7 +16,8 @@
 extern "C" {
 #endif
 
-#define RLITE_UIPCPS_UNIX_NAME     "/var/rlite/uipcp-server"
+#define RLITE_UIPCPS_VAR           "/var/rlite/"
+#define RLITE_UIPCPS_UNIX_NAME     RLITE_UIPCPS_VAR "uipcp-server"
 
 /* Application naming information:
  *   - Application Process Name

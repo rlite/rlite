@@ -628,6 +628,13 @@ int main(int argc, char **argv)
          * This unlink() will clean up in this situation. */
         PI("Cleaned up existing unix domain socket\n");
     }
+
+    ret = mkdir(RLITE_UIPCPS_VAR, 0x777);
+    if (ret && errno != EEXIST) {
+        perror("mkdir(/var/rlite)");
+        exit(EXIT_FAILURE);
+    }
+
     ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
                 sizeof(server_address));
     if (ret) {
