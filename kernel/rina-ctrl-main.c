@@ -1409,19 +1409,11 @@ out:
 }
 EXPORT_SYMBOL_GPL(rina_fa_resp_arrived);
 
-int
-rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
+int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                     struct rina_buf *rb)
 {
-    struct flow_entry *flow;
     struct txrx *txrx;
     int ret = 0;
-
-    flow = flow_get(local_port);
-    if (!flow) {
-        rina_buf_free(rb);
-        ret = -ENXIO;
-        goto out;
-    }
 
     if (flow->upper.ipcp) {
         if (unlikely(rb->len < sizeof(struct rina_pci))) {
@@ -1447,7 +1439,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             rina_buf_custom_push(rb, sizeof(*mhdr));
             mhdr = (struct rina_mgmt_hdr *)RINA_BUF_DATA(rb);
             mhdr->type = RINA_MGMT_HDR_T_IN;
-            mhdr->local_port = local_port;
+            mhdr->local_port = flow->local_port;
             mhdr->remote_addr = src_addr;
 
         } else {
@@ -1466,6 +1458,23 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
+
+    return ret;
+}
+EXPORT_SYMBOL_GPL(rina_sdu_rx_flow);
+
+int
+rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
+{
+    struct flow_entry *flow = flow_get(local_port);
+    int ret;
+
+    if (!flow) {
+        rina_buf_free(rb);
+        return -ENXIO;
+    }
+
+    ret = rina_sdu_rx_flow(ipcp, flow, rb);
     flow_put(flow);
 
     return ret;

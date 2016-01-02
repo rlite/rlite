@@ -716,7 +716,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         spin_unlock_irq(&dtp->lock);
 
-        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        ret = rina_sdu_rx_flow(ipcp, flow, rb);
 
         goto snd_crb;
     }
@@ -806,10 +806,10 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         spin_unlock_irq(&dtp->lock);
 
-        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        ret = rina_sdu_rx_flow(ipcp, flow, rb);
 
         list_for_each_entry(qrb, &qrbs, node) {
-            ret |= rina_sdu_rx(ipcp, qrb, pci->conn_id.dst_cep);
+            ret |= rina_sdu_rx_flow(ipcp, flow, qrb);
         }
 
         goto snd_crb;
