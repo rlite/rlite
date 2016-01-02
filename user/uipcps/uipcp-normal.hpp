@@ -206,7 +206,7 @@ struct uipcp_rib {
     uint64_t address_allocate() const;
 
     int send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
-                         const UipcpObject& obj);
+                         const UipcpObject *obj);
 
     /* Synchronize neighbors. */
     int remote_sync_obj_excluding(const Neighbor *exclude, bool create,
@@ -228,6 +228,7 @@ struct uipcp_rib {
 
     int flows_handler_create(const CDAPMessage *rm, Neighbor *neigh);
     int flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh);
+    int flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh);
 
 private:
     int load_qos_cubes(const char *);

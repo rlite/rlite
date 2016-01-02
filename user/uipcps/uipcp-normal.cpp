@@ -449,7 +449,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
 int
 uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
-                            const UipcpObject& obj)
+                            const UipcpObject *obj)
 {
     struct rlite_ipcp *ipcp;
     AData adata;
@@ -464,13 +464,15 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
 
     ipcp = ipcp_info();
 
-    objlen = obj.serialize(objbuf, sizeof(objbuf));
-    if (objlen < 0) {
-        UPE(uipcp, "serialization failed\n");
-        return -1;
-    }
+    if (obj) {
+        objlen = obj->serialize(objbuf, sizeof(objbuf));
+        if (objlen < 0) {
+            UPE(uipcp, "serialization failed\n");
+            return -1;
+        }
 
-    m.set_obj_value(objbuf, objlen);
+        m.set_obj_value(objbuf, objlen);
+    }
 
     m.invoke_id = invoke_id_mgr.get_invoke_id();
 

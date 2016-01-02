@@ -5,39 +5,6 @@
 using namespace std;
 
 
-int
-uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
-{
-    stringstream obj_name;
-    map<string, FlowRequest>::iterator f;
-
-    /* Lookup the corresponding FlowRequest. */
-
-    obj_name << obj_name::flows << "/" << ipcp_info()->ipcp_addr
-                << "-" << req->local_port_id;
-
-    f = flow_reqs.find(obj_name.str());
-
-    if (f == flow_reqs.end()) {
-        obj_name.str(string());
-        obj_name << obj_name::flows << "/" << req->remote_addr
-            << "-" << req->remote_port_id;
-
-        f = flow_reqs.find(obj_name.str());
-    }
-
-    if (f == flow_reqs.end()) {
-        UPE(uipcp, "Spurious flow allocation response, no object with name %s\n",
-            obj_name.str().c_str());
-        return -1;
-    }
-
-    flow_reqs.erase(f);
-    UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
-
-    return 0;
-}
-
 static void
 flowcfg2policies(const struct rina_flow_config *cfg,
                  QosSpec &q,
@@ -184,7 +151,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     freq.invoke_id = 0;  /* invoke_id is actually set in send_to_dst_addr() */
     flow_reqs[obj_name.str()] = freq;
 
-    return send_to_dst_addr(m, freq.dst_addr, freq);
+    return send_to_dst_addr(m, freq.dst_addr, &freq);
 }
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
@@ -225,7 +192,7 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
     m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                  resp->response ? -1 : 0, reason);
 
-    ret = send_to_dst_addr(m, freq.src_addr, freq);
+    ret = send_to_dst_addr(m, freq.src_addr, &freq);
 
     flow_reqs_tmp.erase(f);
 
@@ -263,7 +230,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
-        return send_to_dst_addr(m, freq.src_addr, freq);
+        return send_to_dst_addr(m, freq.src_addr, &freq);
     }
 
     if (dft_next_hop != ipcp_info()->ipcp_addr) {
@@ -275,7 +242,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Flow request forwarding not supported");
 
-        return send_to_dst_addr(m, freq.src_addr, freq);
+        return send_to_dst_addr(m, freq.src_addr, &freq);
     }
 
     if (freq.connections.size() < 1) {
@@ -285,7 +252,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
-        return send_to_dst_addr(m, freq.src_addr, freq);
+        return send_to_dst_addr(m, freq.src_addr, &freq);
     }
 
     /* freq.dst_app is registered with us, let's go ahead. */
@@ -345,6 +312,62 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
 }
 
 int
+uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
+{
+    map<string, FlowRequest>::iterator f;
+    stringstream obj_name;
+    uint64_t dst_addr;
+    CDAPMessage m;
+
+    /* Lookup the corresponding FlowRequest. */
+
+    obj_name << obj_name::flows << "/" << ipcp_info()->ipcp_addr
+                << "-" << req->local_port_id;
+
+    f = flow_reqs.find(obj_name.str());
+
+    if (f == flow_reqs.end()) {
+        obj_name.str(string());
+        obj_name << obj_name::flows << "/" << req->remote_addr
+            << "-" << req->remote_port_id;
+
+        f = flow_reqs.find(obj_name.str());
+    }
+
+    if (f == flow_reqs.end()) {
+        UPE(uipcp, "Spurious flow allocation response, no object with name %s\n",
+            obj_name.str().c_str());
+        return -1;
+    }
+
+    dst_addr = f->second.dst_addr;
+    flow_reqs.erase(f);
+
+    UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
+
+    /* We should wait 2 MPL here before notifying the peer. */
+    m.m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
+               0, 0, string());
+
+    return send_to_dst_addr(m, dst_addr, NULL);
+}
+
+int
+uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
+{
+    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
+
+    if (f == flow_reqs.end()) {
+        UPI(uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
+        return 0;
+    }
+
+    PD("I WILL ERASE '%s'\n", rm->obj_name.c_str());
+
+    return 0;
+}
+
+int
 uipcp_rib::flows_handler(const CDAPMessage *rm, Neighbor *neigh)
 {
     switch (rm->op_code) {
@@ -355,6 +378,8 @@ uipcp_rib::flows_handler(const CDAPMessage *rm, Neighbor *neigh)
             return flows_handler_create_r(rm, neigh);
 
         case gpb::M_DELETE:
+            return flows_handler_delete(rm, neigh);
+
         case gpb::M_DELETE_R:
             UPE(uipcp, "NOT SUPPORTED YET");
             assert(0);
