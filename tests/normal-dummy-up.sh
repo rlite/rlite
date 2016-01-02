@@ -10,4 +10,7 @@ $RINACONF assign-to-dif n.DIF n.IPCP 1
 $RINACONF ipcp-config n.IPCP 1 address 67
 $RINACONF ipcp-register d.DIF n.IPCP 1
 
+#user/rinaperf -l &
+#user/rinaperf
+
 source tests/epilogue.sh
