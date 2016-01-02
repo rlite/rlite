@@ -627,14 +627,14 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rl_ctrl_register(&rp.ctrl, 1, dif_name,
+            ret = rl_ctrl_register(&rp.ctrl, dif_name,
                                    &rp.ipcp_name, &server_ctrl_name);
             if (ret) {
                 return ret;
             }
         }
 
-        ret = rl_ctrl_register(&rp.ctrl, 1, dif_name,
+        ret = rl_ctrl_register(&rp.ctrl, dif_name,
                                &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
             return ret;

@@ -92,7 +92,7 @@ server(struct rlite_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rl_ctrl_register(&rr->ctrl, 1, rr->dif_name,
+    ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
                            &rr->ipcp_name, &rr->server_appl_name);
     if (ret) {
         return ret;

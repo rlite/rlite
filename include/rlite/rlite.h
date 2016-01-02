@@ -119,10 +119,14 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
                    const struct rlite_flow_spec *flowspec);
 
 int
-rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
-                 const char *dif_name,
+rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
                  const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name);
+
+int
+rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *appl_name);
 
 int
 rl_ctrl_flow_accept(struct rlite_ctrl *ctrl);

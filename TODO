@@ -23,6 +23,3 @@
 - port nginx to rlite
 
 - support RIB M_READ (and M_WRITE)
-
-- tx-completion: cannot use tasklet because shim-inet4 sdu_write() may sleep
-  This causes a scheduling while atomic BUG

@@ -826,11 +826,11 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
     return fd;
 }
 
-int
-rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
-                 const char *dif_name,
-                 const struct rina_name *ipcp_name,
-                 const struct rina_name *appl_name)
+static int
+rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
+                        const char *dif_name,
+                        const struct rina_name *ipcp_name,
+                        const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register_resp *resp;
     uint32_t event_id;
@@ -859,6 +859,22 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
     free(resp);
 
     return ret;
+}
+
+int
+rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name)
+{
+    return rl_ctrl_register_common(ctrl, 1, dif_name, ipcp_name, appl_name);
+}
+
+int
+rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *appl_name)
+{
+    return rl_ctrl_register_common(ctrl, 0, dif_name, ipcp_name, appl_name);
 }
 
 int
