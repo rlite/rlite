@@ -134,14 +134,11 @@ Neighbor::abort()
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
         PE("send_to_port_id() failed\n");
-        return;
     }
 
     if (conn) {
         conn->reset();
     }
-
-    return;
 }
 
 static void
@@ -596,7 +593,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     assert(enroll_fsm_handlers[enrollment_state]);
 
     if (!rm && enrollment_state != NONE) {
-        PI("Enrollment already in progress, current state"
+        PI("Enrollment already in progress, current state "
             "is %s\n", enrollment_state_repr(enrollment_state));
         return 0;
     }
