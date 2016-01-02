@@ -66,7 +66,7 @@ read_response(int sfd)
         return -1;
     }
 
-    ret = deserialize_rina_msg(rina_application_numtables, serbuf,
+    ret = deserialize_rina_msg(rina_conf_numtables, serbuf,
                                n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("%s: error while deserializing response [%d]\n",
@@ -123,7 +123,7 @@ static int ipcp_create(int argc, char **argv)
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
-    req.msg_type = RINA_APPL_IPCP_CREATE;
+    req.msg_type = RINA_CONF_IPCP_CREATE;
     req.event_id = 0;
     req.dif_type = DIF_TYPE_MAX;
     for (i = 0; i < DIF_TYPE_MAX; i++) {
@@ -157,7 +157,7 @@ static int ipcp_destroy(int argc, char **argv)
     ipcp_apn = argv[0];
     ipcp_api = argv[1];
 
-    req.msg_type = RINA_APPL_IPCP_DESTROY;
+    req.msg_type = RINA_CONF_IPCP_DESTROY;
     req.event_id = 0;
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
@@ -176,7 +176,7 @@ static int assign_to_dif(int argc, char **argv)
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
-    req.msg_type = RINA_APPL_ASSIGN_TO_DIF;
+    req.msg_type = RINA_CONF_ASSIGN_TO_DIF;
     req.event_id = 0;
     rina_name_fill(&req.application_name, ipcp_apn, ipcp_api, NULL, NULL);
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
@@ -198,7 +198,7 @@ static int ipcp_config(int argc, char **argv)
     param_name = argv[2];
     param_value = argv[3];
 
-    req.msg_type = RINA_APPL_IPCP_CONFIG;
+    req.msg_type = RINA_CONF_IPCP_CONFIG;
     req.event_id = 0;
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     req.name = strdup(param_name);
@@ -219,7 +219,7 @@ static int ipcp_register_common(int argc, char **argv, unsigned int reg)
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
-    req.msg_type = RINA_APPL_IPCP_REGISTER;
+    req.msg_type = RINA_CONF_IPCP_REGISTER;
     req.event_id = 0;
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
@@ -256,7 +256,7 @@ static int ipcp_enroll(int argc, char **argv)
     neigh_ipcp_api = argv[4];
     supp_dif_name = argv[5];
 
-    req.msg_type = RINA_APPL_IPCP_ENROLL;
+    req.msg_type = RINA_CONF_IPCP_ENROLL;
     req.event_id = 0;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);

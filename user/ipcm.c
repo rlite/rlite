@@ -294,17 +294,17 @@ test(struct ipcm *ipcm)
 }
 
 static int
-rina_appl_response(int sfd, struct rina_msg_base *req,
+rina_conf_response(int sfd, struct rina_msg_base *req,
                    struct rina_msg_base_resp *resp)
 {
-    resp->msg_type = RINA_APPL_BASE_RESP;
+    resp->msg_type = RINA_CONF_BASE_RESP;
     resp->event_id = req->event_id;
 
     return rina_msg_write(sfd, RMB(resp));
 }
 
 static int
-rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_create(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
     struct rina_amsg_ipcp_create *req = (struct rina_amsg_ipcp_create *)b_req;
@@ -319,7 +319,7 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
 
     resp.result = result;
 
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static unsigned int
@@ -340,7 +340,7 @@ lookup_ipcp_by_name(struct ipcm *ipcm, const struct rina_name *name)
 }
 
 static int
-rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_destroy(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
     struct rina_amsg_ipcp_destroy *req = (struct rina_amsg_ipcp_destroy *)b_req;
@@ -358,11 +358,11 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
         resp.result = ipcp_destroy(ipcm, ipcp_id);
     }
 
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static int
-rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
+rina_conf_assign_to_dif(struct ipcm *ipcm, int sfd,
                         const struct rina_msg_base *b_req)
 {
     unsigned int ipcp_id;
@@ -380,11 +380,11 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
         resp.result = assign_to_dif(ipcm, ipcp_id, &req->dif_name);
     }
 
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static int
-rina_appl_ipcp_config(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_config(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
     unsigned int ipcp_id;
@@ -402,11 +402,11 @@ rina_appl_ipcp_config(struct ipcm *ipcm, int sfd,
         resp.result = ipcp_config(ipcm, ipcp_id, req->name, req->value);
     }
 
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static int
-rina_appl_ipcp_register(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
 {
     unsigned int ipcp_id_who, ipcp_id_where;
@@ -430,11 +430,11 @@ rina_appl_ipcp_register(struct ipcm *ipcm, int sfd,
     resp.result = ipcp_register(ipcm, ipcp_id_who, ipcp_id_where, req->reg);
 
 out:
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 static int
-rina_appl_ipcp_enroll(struct ipcm *ipcm, int sfd,
+rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
     unsigned int ipcp_id, supp_ipcp_id;
@@ -459,7 +459,7 @@ rina_appl_ipcp_enroll(struct ipcm *ipcm, int sfd,
                               supp_ipcp_id);
 
 out:
-    return rina_appl_response(sfd, RMB(req), &resp);
+    return rina_conf_response(sfd, RMB(req), &resp);
 }
 
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
@@ -467,13 +467,13 @@ typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
 
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_application_handlers[] = {
-    [RINA_APPL_IPCP_CREATE] = rina_appl_ipcp_create,
-    [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
-    [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
-    [RINA_APPL_IPCP_CONFIG] = rina_appl_ipcp_config,
-    [RINA_APPL_IPCP_REGISTER] = rina_appl_ipcp_register,
-    [RINA_APPL_IPCP_ENROLL] = rina_appl_ipcp_enroll,
-    [RINA_APPL_MSG_MAX] = NULL,
+    [RINA_CONF_IPCP_CREATE] = rina_conf_ipcp_create,
+    [RINA_CONF_IPCP_DESTROY] = rina_conf_ipcp_destroy,
+    [RINA_CONF_ASSIGN_TO_DIF] = rina_conf_assign_to_dif,
+    [RINA_CONF_IPCP_CONFIG] = rina_conf_ipcp_config,
+    [RINA_CONF_IPCP_REGISTER] = rina_conf_ipcp_register,
+    [RINA_CONF_IPCP_ENROLL] = rina_conf_ipcp_enroll,
+    [RINA_CONF_MSG_MAX] = NULL,
 };
 
 /* Unix server thread to manage application requests. */
@@ -503,7 +503,7 @@ unix_server(void *arg)
         }
 
         /* Deserialize into a formatted message. */
-        ret = deserialize_rina_msg(rina_application_numtables, serbuf, n,
+        ret = deserialize_rina_msg(rina_conf_numtables, serbuf, n,
                                         msgbuf, sizeof(msgbuf));
         if (ret) {
             PE("%s: deserialization error [%d]\n", __func__, ret);
@@ -516,7 +516,7 @@ unix_server(void *arg)
 
             PE("%s: Invalid message received [type=%d]\n", __func__,
                     req->msg_type);
-            resp.msg_type = RINA_APPL_BASE_RESP;
+            resp.msg_type = RINA_CONF_BASE_RESP;
             resp.event_id = req->event_id;
             resp.result = 1;
             rina_msg_write(cfd, (struct rina_msg_base *)&resp);

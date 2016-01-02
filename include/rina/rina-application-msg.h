@@ -1,5 +1,5 @@
-#ifndef __RINA_APPLICATION_MSG_H__
-#define __RINA_APPLICATION_MSG_H__
+#ifndef __RINA_CONF_MSG_H__
+#define __RINA_CONF_MSG_H__
 
 #include <stdint.h>
 
@@ -11,23 +11,23 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RINA_APPL_IPCP_CREATE = 1,
-    RINA_APPL_IPCP_CREATE_RESP,   /* 2 */
-    RINA_APPL_IPCP_DESTROY,       /* 3 */
-    RINA_APPL_IPCP_DESTROY_RESP,  /* 4 */
-    RINA_APPL_ASSIGN_TO_DIF,      /* 5 */
-    RINA_APPL_ASSIGN_TO_DIF_RESP, /* 6 */
-    RINA_APPL_IPCP_CONFIG,        /* 7 */
-    RINA_APPL_IPCP_REGISTER,      /* 8 */
-    RINA_APPL_IPCP_ENROLL,        /* 9 */
-    RINA_APPL_BASE_RESP,          /* 10 */
+    RINA_CONF_IPCP_CREATE = 1,
+    RINA_CONF_IPCP_CREATE_RESP,   /* 2 */
+    RINA_CONF_IPCP_DESTROY,       /* 3 */
+    RINA_CONF_IPCP_DESTROY_RESP,  /* 4 */
+    RINA_CONF_ASSIGN_TO_DIF,      /* 5 */
+    RINA_CONF_ASSIGN_TO_DIF_RESP, /* 6 */
+    RINA_CONF_IPCP_CONFIG,        /* 7 */
+    RINA_CONF_IPCP_REGISTER,      /* 8 */
+    RINA_CONF_IPCP_ENROLL,        /* 9 */
+    RINA_CONF_BASE_RESP,          /* 10 */
 
-    RINA_APPL_MSG_MAX,
+    RINA_CONF_MSG_MAX,
 };
 
 /* Numtables for application <==> ipcm messages exchange. */
 
-extern struct rina_msg_layout rina_application_numtables[RINA_APPL_MSG_MAX];
+extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX];
 
 /* Application --> IPCM message to create a new IPC process. */
 struct rina_amsg_ipcp_create {
@@ -89,4 +89,4 @@ struct rina_amsg_ipcp_enroll {
     struct rina_name supp_dif_name;
 } __attribute__((packed));
 
-#endif  /* __RINA_APPLICATION_MSG_H__ */
+#endif  /* __RINA_CONF_MSG_H__ */

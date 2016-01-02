@@ -16,13 +16,13 @@ int rina_msg_write(int sfd, struct rina_msg_base *msg)
     char *serbuf;
     int n;
 
-    serlen = rina_msg_serlen(rina_application_numtables, msg);
+    serlen = rina_msg_serlen(rina_conf_numtables, msg);
     serbuf = malloc(serlen);
     if (!serbuf) {
         return -1;
     }
 
-    serialize_rina_msg(rina_application_numtables, serbuf, msg);
+    serialize_rina_msg(rina_conf_numtables, serbuf, msg);
 
     n = write(sfd, serbuf, serlen);
     if (n != serlen) {
