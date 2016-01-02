@@ -60,9 +60,10 @@ struct RinaName {
     string name_s;
     struct rina_name name_r;
     string dif_name_s;
+    int max_sdu_size;
 
     RinaName();
-    RinaName(const string& n, const string& d);
+    RinaName(const string& n, const string& d, int mss);
     RinaName(const RinaName& other);
     RinaName& operator=(const RinaName& other);
     ~RinaName();
@@ -74,9 +75,12 @@ struct RinaName {
     operator std::string() const { return dif_name_s + ":" + name_s; }
 };
 
+#define MAX_SDU_SIZE    1460
+
 RinaName::RinaName()
 {
     memset(&name_r, 0, sizeof(name_r));
+    max_sdu_size = MAX_SDU_SIZE;
 }
 
 RinaName::~RinaName()
@@ -84,7 +88,8 @@ RinaName::~RinaName()
     rina_name_free(&name_r);
 }
 
-RinaName::RinaName(const string& n, const string& d) : name_s(n), dif_name_s(d)
+RinaName::RinaName(const string& n, const string& d, int mss = MAX_SDU_SIZE) :
+                        name_s(n), dif_name_s(d), max_sdu_size(mss)
 {
     memset(&name_r, 0, sizeof(name_r));
 
@@ -99,6 +104,7 @@ RinaName::RinaName(const RinaName& other)
 
     name_s = other.name_s;
     dif_name_s = other.dif_name_s;
+    max_sdu_size = other.max_sdu_size;
     if (rina_name_copy(&name_r, &other.name_r)) {
         throw std::bad_alloc();
     }
@@ -113,12 +119,22 @@ RinaName::operator=(const RinaName& other)
 
     name_s = other.name_s;
     dif_name_s = other.dif_name_s;
+    max_sdu_size = other.max_sdu_size;
     if (rina_name_copy(&name_r, &other.name_r)) {
         throw std::bad_alloc();
     }
 
     return *this;
 }
+
+/* A wrapper for a file descriptor with associated max read/write size */
+struct Fd {
+    int fd;
+    int max_sdu_size;
+
+    Fd() : fd(-1), max_sdu_size(-1) { }
+    Fd(int _fd, int _mss) : fd(_fd), max_sdu_size(_mss) { }
+};
 
 struct Worker {
     pthread_t th;
@@ -128,7 +144,7 @@ struct Worker {
 
     /* Holds the active mappings between rlite file descriptors and
      * socket file descriptors. */
-    map<int, int> fdmap;
+    map<int, Fd> fdmap;
 
     Worker(int idx_);
     ~Worker();
@@ -138,7 +154,7 @@ struct Worker {
     void run();
 
 private:
-    int forward_data(int ifd, int ofd, char *buf);
+    int forward_data(int ifd, int ofd, char *buf, int max_sdu_size);
 };
 
 #define NUM_WORKERS     1
@@ -160,7 +176,7 @@ struct Gateway {
 
     /* Pending flow allocation requests issued by accept_inet_conn().
      * fa_req_event_id --> tcp_client_fd */
-    map<unsigned int, int> pending_fa_reqs;
+    map<unsigned int, Fd> pending_fa_reqs;
 
     vector<Worker*> workers;
 
@@ -240,9 +256,9 @@ Worker::drain_syncfd()
 #define MAX_BUF_SIZE    4096
 
 int
-Worker::forward_data(int ifd, int ofd, char *buf)
+Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
 {
-    int n = read(ifd, buf, MAX_BUF_SIZE);
+    int n = read(ifd, buf, max_sdu_size);
     int m;
 
     if (n > 0) {
@@ -286,7 +302,7 @@ Worker::run()
 
         /* Load the poll array with the active fd mappings. */
         pthread_mutex_lock(&lock);
-        for (map<int, int>::iterator mit = fdmap.begin();
+        for (map<int, Fd>::iterator mit = fdmap.begin();
                                 mit != fdmap.end(); mit++, nfds++) {
             pollfds[nfds].fd = mit->first;
             pollfds[nfds].events = POLLIN; /* | POLLOUT; */
@@ -325,7 +341,7 @@ Worker::run()
 
         for (int i=1, j=0; j<nrdy; i++) {
             int ifd = pollfds[i].fd;
-            map<int, int>::iterator mit;
+            map<int, Fd>::iterator mit;
             int ofd, ret;
 
             if (!pollfds[i].revents) {
@@ -353,9 +369,9 @@ Worker::run()
                 continue;
             }
 
-            ofd = mit->second;
+            ofd = mit->second.fd;
 
-            ret = forward_data(ifd, ofd, buf);
+            ret = forward_data(ifd, ofd, buf, mit->second.max_sdu_size);
             if (ret <= 0) {
                 /* Forwarding failed for some season, we have to close
                  * the session. */
@@ -455,6 +471,8 @@ parse_conf(const char *confname)
             }
 
             try {
+                int max_sdu_size = MAX_SDU_SIZE;
+
                 memset(&inet_addr, 0, sizeof(inet_addr));
                 inet_addr.sin_family = AF_INET;
                 inet_addr.sin_port = htons(atoi(tokens[4].c_str()));
@@ -472,8 +490,16 @@ parse_conf(const char *confname)
                     continue;
                 }
 
+                if (tokens.size() >= 6) {
+                    max_sdu_size = atoi(tokens[5].c_str());
+                    if (max_sdu_size <= 0) {
+                        PI("Invalid SDU size --> using %d\n", MAX_SDU_SIZE);
+                        max_sdu_size = MAX_SDU_SIZE;
+                    }
+                }
+
                 InetName inet_name(inet_addr);
-                RinaName rina_name(tokens[2], tokens[1]);
+                RinaName rina_name(tokens[2], tokens[1], max_sdu_size);
 
                 if (tokens[0] == "SRV") {
                     gw.srv_map.insert(make_pair(inet_name, rina_name));
@@ -507,6 +533,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     Worker *w = gw->workers[0];
     RinaName dst_name;
     char *dst_name_s;
+    int max_sdu_size;
     int cfd;
     int rfd;
     int ret;
@@ -534,6 +561,8 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
             static_cast<string>(dst_name).c_str());
         return 0;
     }
+
+    max_sdu_size = mit->first.max_sdu_size;
 
     cfd = socket(AF_INET, SOCK_STREAM, 0);
     if (cfd < 0) {
@@ -565,8 +594,8 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     }
 
     pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = rfd;
-    w->fdmap[rfd] = cfd;
+    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
+    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
     w->repoll();
     pthread_mutex_unlock(&w->lock);
 
@@ -583,8 +612,9 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     Gateway * gw = container_of(loop, struct Gateway, loop);
     struct rl_kmsg_fa_resp_arrived *resp =
             (struct rl_kmsg_fa_resp_arrived *)b_resp;
-    map<unsigned int, int>::iterator mit;
+    map<unsigned int, Fd>::iterator mit;
     Worker *w = gw->workers[0];
+    int max_sdu_size;
     int cfd;
     int rfd;
 
@@ -594,7 +624,8 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    cfd = mit->second;
+    cfd = mit->second.fd;
+    max_sdu_size = mit->second.max_sdu_size;
     gw->pending_fa_reqs.erase(mit);
 
     if (resp->response) {
@@ -612,8 +643,8 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     }
 
     pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = rfd;
-    w->fdmap[rfd] = cfd;
+    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
+    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
     w->repoll();
     pthread_mutex_unlock(&w->lock);
 
@@ -661,7 +692,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
         return;
     }
 
-    gw->pending_fa_reqs[event_id] = cfd;
+    gw->pending_fa_reqs[event_id] = Fd(cfd, mit->second.max_sdu_size);
 
     PD("Flow allocation request issued, event id %d\n", event_id);
 }

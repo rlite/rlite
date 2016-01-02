@@ -20,6 +20,6 @@
 
 - addr size not consistent (PCI/all the stack)
 
-- port nginx to rlite
-
 - support RIB M_READ (and M_WRITE)
+
+- fix inactivity timer callbacks
