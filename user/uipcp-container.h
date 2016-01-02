@@ -58,6 +58,11 @@ int mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
                            void *buf, size_t buflen);
 int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
                     uint64_t dest_addr, uint32_t local_port);
+int uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
+                     uint64_t remote_addr,
+                     const struct rina_name *local_application,
+                     const struct rina_name *remote_application,
+                     const struct rina_flow_config *flowcfg);
 
 /* uipcp RIB definitions */
 struct uipcp_rib *rib_create(struct uipcp *uipcp);
@@ -85,6 +90,7 @@ int rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
                 uint64_t remote_addr);
 
 int rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req);
+int rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp);
 
 char *rib_dump(struct uipcp_rib *rib);
 

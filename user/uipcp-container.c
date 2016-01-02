@@ -132,7 +132,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
     return result;
 }
 
-static int
+int
 uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                      uint64_t remote_addr,
                      const struct rina_name *local_application,
@@ -398,8 +398,8 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
-    (void)uipcp;
-    (void)resp;
+
+    return rib_fa_resp(uipcp->rib, resp);
 
     len = 1 + sizeof(resp->port_id) + sizeof(resp->remote_port)
             + sizeof(resp->response);

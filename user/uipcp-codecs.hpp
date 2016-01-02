@@ -39,6 +39,7 @@ struct RinaName {
     operator std::string() const;
     bool operator==(const RinaName& other);
     bool operator!=(const RinaName& other);
+    int rina_name_fill(struct rina_name *name);
 };
 
 struct DFTEntry : public UipcpObject {

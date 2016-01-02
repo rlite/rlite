@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "rinalite/rinalite-common.h"
+#include "rinalite/rinalite-utils.h"
 
 #include "uipcp-codecs.hpp"
 
@@ -72,6 +73,15 @@ bool RinaName::operator==(const RinaName& other)
 bool RinaName::operator!=(const RinaName& other)
 {
     return !(*this == other);
+}
+
+int
+RinaName::rina_name_fill(struct rina_name *rn)
+{
+    ::rina_name_fill(rn, apn.c_str(), api.c_str(),
+                     aen.c_str(), aei.c_str());
+
+    return 0;
 }
 
 static void
