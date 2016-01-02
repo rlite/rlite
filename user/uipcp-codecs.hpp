@@ -140,4 +140,27 @@ struct PolicyDescr : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct WindowBasedFlowCtrlConfig {
+    uint64_t max_cwq_len; /* closed window queue */
+    uint64_t initial_credit;
+    PolicyDescr rcvr_flow_ctrl;
+    PolicyDescr tx_ctrl;
+
+    WindowBasedFlowCtrlConfig() { }
+    WindowBasedFlowCtrlConfig(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+struct RateBasedFlowCtrlConfig {
+    uint64_t sending_rate;
+    uint64_t time_period; /* us */
+    PolicyDescr no_rate_slow_down;
+    PolicyDescr no_override_default_peak;
+    PolicyDescr rate_reduction;
+
+    RateBasedFlowCtrlConfig() { }
+    RateBasedFlowCtrlConfig(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

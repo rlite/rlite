@@ -449,20 +449,44 @@ QosSpec::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2PolicyDescr(PolicyDescr& p, const gpb::policyDescriptor_t &gm)
+{
+    p.name = gm.policyname();
+    p.impl_name = gm.policyimplname();
+    p.version = gm.version();
+
+    for (int i = 0; i < gm.policyparameters_size(); i++) {
+        p.parameters.push_back(Property());
+        gpb2Property(p.parameters.back(), gm.policyparameters(i));
+    }
+}
+
+static int
+PolicyDescr2gpb(const PolicyDescr& p, gpb::policyDescriptor_t &gm)
+{
+    gm.set_policyname(p.name);
+    gm.set_policyimplname(p.impl_name);
+    gm.set_version(p.version);
+
+    for (list<Property>::const_iterator pr = p.parameters.begin();
+                            pr != p.parameters.end(); pr++) {
+        gpb::property_t *param;
+
+        param = gm.add_policyparameters();
+        Property2gpb(*pr, *param);
+    }
+
+    return 0;
+}
+
 PolicyDescr::PolicyDescr(const char *buf, unsigned int size)
 {
     gpb::policyDescriptor_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    name = gm.policyname();
-    impl_name = gm.policyimplname();
-    version = gm.version();
-
-    for (int i = 0; i < gm.policyparameters_size(); i++) {
-        parameters.push_back(Property());
-        gpb2Property(parameters.back(), gm.policyparameters(i));
-    }
+    gpb2PolicyDescr(*this, gm);
 }
 
 int
@@ -470,17 +494,7 @@ PolicyDescr::serialize(char *buf, unsigned int size) const
 {
     gpb::policyDescriptor_t gm;
 
-    gm.set_policyname(name);
-    gm.set_policyimplname(impl_name);
-    gm.set_version(version);
-
-    for (list<Property>::const_iterator p = parameters.begin();
-                            p != parameters.end(); p++) {
-        gpb::property_t *param;
-
-        param = gm.add_policyparameters();
-        Property2gpb(*p, *param);
-    }
+    PolicyDescr2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
