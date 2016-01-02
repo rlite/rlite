@@ -144,6 +144,9 @@ struct uipcp_rib {
     /* Supported flows. */
     std::map< std::string, FlowRequest> flow_reqs;
 
+    /* Available QoS cubes. */
+    std::map< std::string, struct rina_flow_config > qos_cubes;
+
     uipcp_rib(struct uipcp *_u);
 
     struct rlite_ipcp *ipcp_info() const;
