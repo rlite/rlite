@@ -672,7 +672,7 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
     }
 
     if (ipcp_id != ~0) {
-        /* Valid IPCP id. */
+        /* Valid IPCP id. Forward the request to the kernel. */
         kresp = ipcp_destroy(ipcm, ipcp_id);
         if (kresp) {
             rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
@@ -697,6 +697,8 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
     struct ipcp *cur;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
+    uint8_t result = 1;
 
     if (rina_name_valid(&req->dif_name)) {
         /* The request specifies a DIF: lookup that. */
@@ -722,15 +724,17 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
     if (!ipcp) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
-        char *s = rina_name_to_string(&ipcp->ipcp_name);
-
-        printf("%s: Ok, selected %s\n", __func__, s);
-        if (s) free(s);
+        /* Forward the request to the kernel. */
+        kresp = application_register(ipcm, 1, ipcp->ipcp_id, &req->application_name);
+        if (kresp) {
+            result = kresp->result;
+            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+        }
     }
 
     resp.msg_type = RINA_APPL_REGISTER_RESP;
     resp.event_id = req->event_id;
-    resp.result = (ipcp != NULL) ? 0 : 1;
+    resp.result = result;
 
     return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
@@ -743,6 +747,8 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     struct ipcp *cur;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
+    uint8_t result = 1;
 
     if (rina_name_valid(&req->dif_name)) {
         /* The request specifies a DIF: lookup that. */
@@ -758,15 +764,17 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     if (!ipcp) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
-        char *s = rina_name_to_string(&ipcp->ipcp_name);
-
-        printf("%s: Ok, selected %s\n", __func__, s);
-        if (s) free(s);
+        /* Forward the request to the kernel. */
+        kresp = application_register(ipcm, 0, ipcp->ipcp_id, &req->application_name);
+        if (kresp) {
+            result = kresp->result;
+            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+        }
     }
 
     resp.msg_type = RINA_APPL_UNREGISTER_RESP;
     resp.event_id = req->event_id;
-    resp.result = (ipcp != NULL) ? 0 : 1;
+    resp.result = result;
 
     return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
 }
