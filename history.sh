@@ -24,3 +24,5 @@ for l in $(cat .shas); do
 done
 
 rm .shas
+
+git checkout master

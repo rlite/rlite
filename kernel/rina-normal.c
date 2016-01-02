@@ -41,7 +41,6 @@ struct rina_normal {
     struct ipcp_entry *ipcp;
 
     /* Implementation of the PDU forwarding table. */
-    struct flow_entry *default_gateway;
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
 };
 
@@ -56,7 +55,6 @@ rina_normal_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-    priv->default_gateway = NULL;
     hash_init(priv->pdu_ft);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
@@ -227,15 +225,36 @@ rina_normal_config(struct ipcp_entry *ipcp, const char *param_name,
     return ret;
 }
 
+static struct flow_entry *
+pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
+{
+    struct flow_entry *entry;
+    struct hlist_head *head;
+
+    head = &priv->pdu_ft[hash_min(dest_addr, HASH_BITS(priv->pdu_ft))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->pduft_dest_addr == dest_addr) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static int
 rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
                       struct flow_entry *flow)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
+    struct flow_entry *prev;
 
-    PD("%s: %llu --> %u\n", __func__, (unsigned long long)dest_addr,
-        flow->local_port);
-    (void)priv;
+    prev = pduft_lookup(priv, dest_addr);
+    if (prev) {
+        hash_del(&flow->ftnode);
+    }
+
+    flow->pduft_dest_addr = dest_addr;
+    hash_add(priv->pdu_ft, &flow->ftnode, dest_addr);
 
     return 0;
 }

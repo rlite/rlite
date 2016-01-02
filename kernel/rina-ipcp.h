@@ -79,8 +79,9 @@ struct upper_ref {
 };
 
 struct flow_entry {
-    uint16_t            local_port;  /* key */
+    uint16_t            local_port;  /* flow table key */
     uint16_t            remote_port;
+    uint64_t            pduft_dest_addr;  /* pduft key */
     uint8_t             state;
     struct rina_name    local_application;
     struct rina_name    remote_application;
@@ -94,6 +95,7 @@ struct flow_entry {
     struct mutex        lock; /* Unused */
     unsigned int        refcnt;
     struct hlist_node   node;
+    struct hlist_node   ftnode;
 };
 
 int rina_ipcp_factory_register(struct ipcp_factory *factory);

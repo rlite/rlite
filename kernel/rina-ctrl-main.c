@@ -469,6 +469,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         rina_name_copy(&entry->local_application, local_application);
         rina_name_copy(&entry->remote_application, remote_application);
         entry->remote_port = 0;  /* Not valid. */
+        entry->pduft_dest_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
         entry->ipcp = ipcp;
         entry->upper = upper;
@@ -513,6 +514,7 @@ flow_del_entry(struct flow_entry *entry, int locked)
         rina_buf_free(rb);
     }
     hash_del(&entry->node);
+    hash_del(&entry->ftnode);
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
