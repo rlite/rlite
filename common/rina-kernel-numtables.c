@@ -3,28 +3,28 @@
 
 
 struct rina_msg_layout rina_kernel_numtables[] = {
-    [RINA_KERN_CREATE_IPCP] = {
+    [RINA_KERN_IPCP_CREATE] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_create) -
                    sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_CREATE_IPCP_RESP] = {
+    [RINA_KERN_IPCP_CREATE_RESP] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_create_resp),
         .names = 0,
     },
-    [RINA_KERN_DESTROY_IPCP] = {
+    [RINA_KERN_IPCP_DESTROY] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_destroy),
         .names = 0,
     },
-    [RINA_KERN_DESTROY_IPCP_RESP] = {
+    [RINA_KERN_IPCP_DESTROY_RESP] = {
         .copylen = sizeof(struct rina_msg_base_resp),
         .names = 0,
     },
-    [RINA_KERN_FETCH_IPCP] = {
+    [RINA_KERN_IPCP_FETCH] = {
         .copylen = sizeof(struct rina_msg_base),
         .names = 0,
     },
-    [RINA_KERN_FETCH_IPCP_RESP] = {
+    [RINA_KERN_IPCP_FETCH_RESP] = {
         .copylen = sizeof(struct rina_kmsg_fetch_ipcp_resp) -
                     2 * sizeof(struct rina_name),
         .names = 2,

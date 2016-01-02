@@ -89,10 +89,10 @@ ipcp_destroy_resp(struct ipcm *ipcm,
     return 0;
 }
 
-static int fetch_ipcp(struct ipcm *ipcm);
+static int ipcp_fetch(struct ipcm *ipcm);
 
 static int
-fetch_ipcp_resp(struct ipcm *ipcm,
+ipcp_fetch_resp(struct ipcm *ipcm,
                 const struct rina_msg_base *b_resp,
                 const struct rina_msg_base *b_req)
 {
@@ -101,7 +101,7 @@ fetch_ipcp_resp(struct ipcm *ipcm,
     struct ipcp *ipcp;
 
     if (resp->end) {
-        /* Signal fetch_ipcps() that the fetch has been completed. */
+        /* Signal ipcps_fetch() that the fetch has been completed. */
         pthread_mutex_lock(&ipcm->lock);
         ipcm->fetch_complete = 1;
         pthread_cond_signal(&ipcm->fetch_complete_cond);
@@ -128,7 +128,7 @@ fetch_ipcp_resp(struct ipcm *ipcm,
 
     /* The fetch is not complete: Request information about the next
      * IPC process. */
-    fetch_ipcp(ipcm);
+    ipcp_fetch(ipcm);
 
     return 0;
 }
@@ -195,18 +195,18 @@ typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
                                    const struct rina_msg_base * b_resp,
                                    const struct rina_msg_base *b_req);
 
-/* The table containing all response handlers. */
+/* The table containing all kernel response handlers. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_CREATE_IPCP_RESP] = ipcp_create_resp,
-    [RINA_KERN_DESTROY_IPCP_RESP] = ipcp_destroy_resp,
-    [RINA_KERN_FETCH_IPCP_RESP] = fetch_ipcp_resp,
+    [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
+    [RINA_KERN_IPCP_DESTROY_RESP] = ipcp_destroy_resp,
+    [RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp,
     [RINA_KERN_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
-/* The event loop function. */
+/* The event loop function for kernel responses management. */
 static void *
 evloop_function(void *arg)
 {
@@ -363,7 +363,7 @@ ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_CREATE_IPCP;
+    msg->msg_type = RINA_KERN_IPCP_CREATE;
     rina_name_copy(&msg->name, name);
     msg->dif_type = dif_type;
 
@@ -386,7 +386,7 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_DESTROY_IPCP;
+    msg->msg_type = RINA_KERN_IPCP_DESTROY;
     msg->ipcp_id = ipcp_id;
 
     printf("Requesting IPC process destruction...\n");
@@ -397,7 +397,7 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 
 /* Fetch information about a single IPC process. */
 static int
-fetch_ipcp(struct ipcm *ipcm)
+ipcp_fetch(struct ipcm *ipcm)
 {
     struct rina_msg_base *msg;
 
@@ -408,7 +408,7 @@ fetch_ipcp(struct ipcm *ipcm)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_FETCH_IPCP;
+    msg->msg_type = RINA_KERN_IPCP_FETCH;
 
     printf("Requesting IPC processes fetch...\n");
 
@@ -444,9 +444,9 @@ ipcps_print(struct ipcm *ipcm)
 
 /* Fetch information about all IPC processes. */
 static int
-fetch_ipcps(struct ipcm *ipcm)
+ipcps_fetch(struct ipcm *ipcm)
 {
-    int ret = fetch_ipcp(ipcm);
+    int ret = ipcp_fetch(ipcm);
 
     if (ret) {
         return ret;
@@ -531,7 +531,7 @@ test(struct ipcm *ipcm)
     rina_name_free(&name);
 
     /* Fetch IPC processes table. */
-    ret = fetch_ipcps(ipcm);
+    ret = ipcps_fetch(ipcm);
 
     /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
@@ -607,12 +607,13 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
-/* The table containing all response handlers. */
+/* The table containing all application request handlers. */
 static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_REGISTER] = rina_appl_register,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 
+/* Function to manage application requests. */
 static void *
 server_function(void *arg)
 {

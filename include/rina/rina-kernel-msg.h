@@ -19,12 +19,12 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RINA_KERN_CREATE_IPCP = 1,
-    RINA_KERN_CREATE_IPCP_RESP, /* 2 */
-    RINA_KERN_DESTROY_IPCP,     /* 3 */
-    RINA_KERN_DESTROY_IPCP_RESP, /* 4 */
-    RINA_KERN_FETCH_IPCP, /* 5 */
-    RINA_KERN_FETCH_IPCP_RESP, /* 6 */
+    RINA_KERN_IPCP_CREATE = 1,
+    RINA_KERN_IPCP_CREATE_RESP, /* 2 */
+    RINA_KERN_IPCP_DESTROY,     /* 3 */
+    RINA_KERN_IPCP_DESTROY_RESP, /* 4 */
+    RINA_KERN_IPCP_FETCH, /* 5 */
+    RINA_KERN_IPCP_FETCH_RESP, /* 6 */
     RINA_KERN_ASSIGN_TO_DIF, /* 7 */
     RINA_KERN_ASSIGN_TO_DIF_RESP, /* 8 */
     RINA_KERN_APPLICATION_REGISTER, /* 9 */

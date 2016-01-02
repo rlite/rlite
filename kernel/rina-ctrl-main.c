@@ -299,7 +299,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         ret = -ENOMEM;
         goto err2;
     }
-    resp->msg_type = RINA_KERN_CREATE_IPCP_RESP;
+    resp->msg_type = RINA_KERN_IPCP_CREATE_RESP;
     resp->event_id = req->event_id;
     resp->ipcp_id = ipcp_id;
 
@@ -337,7 +337,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (!resp) {
         return -ENOMEM;
     }
-    resp->msg_type = RINA_KERN_DESTROY_IPCP_RESP;
+    resp->msg_type = RINA_KERN_IPCP_DESTROY_RESP;
     resp->event_id = req->event_id;
 
     /* Release the IPC process ID. */
@@ -375,7 +375,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     if (!resp) {
         return -ENOMEM;
     }
-    resp->msg_type = RINA_KERN_FETCH_IPCP_RESP;
+    resp->msg_type = RINA_KERN_IPCP_FETCH_RESP;
     resp->event_id = req->event_id;
     mutex_lock(&rina_dm.lock);
     stop_next = (rina_dm.ipcp_fetch_last == NULL);
@@ -613,9 +613,9 @@ typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
-    [RINA_KERN_CREATE_IPCP] = rina_ipcp_create,
-    [RINA_KERN_DESTROY_IPCP] = rina_ipcp_destroy,
-    [RINA_KERN_FETCH_IPCP] = rina_ipcp_fetch,
+    [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
+    [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
+    [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
