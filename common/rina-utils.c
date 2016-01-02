@@ -152,6 +152,15 @@ static struct rina_msg_layout rina_msg_numtables[] = {
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
+    [RINA_CTRL_ASSIGN_TO_DIF] = {
+        .copylen = sizeof(struct rina_ctrl_assign_to_dif) -
+                    sizeof(struct rina_name),
+        .names = 1,
+    },
+    [RINA_CTRL_ASSIGN_TO_DIF_RESP] = {
+        .copylen = sizeof(struct rina_ctrl_assign_to_dif_resp),
+        .names = 0,
+    },
     [RINA_CTRL_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

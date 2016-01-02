@@ -109,4 +109,11 @@ struct rina_ctrl_assign_to_dif {
     struct rina_name dif_name;
 } __attribute__((packed));
 
+struct rina_ctrl_assign_to_dif_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t result;
+} __attribute__((packed));
+
 #endif  /* __RINA_CTRL_H__ */

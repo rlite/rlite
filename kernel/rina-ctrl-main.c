@@ -303,7 +303,54 @@ err1:
 static int
 rina_assign_to_dif(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
 {
+    struct rina_ctrl_assign_to_dif *req =
+                    (struct rina_ctrl_assign_to_dif *)bmsg;
+    struct rina_ctrl_assign_to_dif_resp *resp;
+    char *name_s = rina_name_to_string(&req->dif_name);
+    struct ipcp_entry *entry;
+    struct hlist_head *head;
+    int ret;
+
+    /* Create the response message. */
+    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    if (!resp) {
+        return -ENOMEM;
+    }
+
+    resp->result = 1;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    /* Find the IPC process entry corresponding to req->ipcp_id and
+     * fill the DIF name field. */
+    head = &rina_dm.ipcp_table[hash_min(req->ipcp_id, HASH_BITS(rina_dm.ipcp_table))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->id == req->ipcp_id) {
+            rina_name_free(&entry->dif_name);
+            rina_name_copy(&entry->dif_name, &req->dif_name);
+            resp->result = 0;  /* Report success. */
+            break;
+        }
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    resp->msg_type = RINA_CTRL_ASSIGN_TO_DIF_RESP;
+    resp->event_id = req->event_id;
+
+    /* Enqueue the response into the upqueue. */
+    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    if (ret) {
+        goto err3;
+    }
+
+    printk("Assigning IPC process %u to DIF %s\n", req->ipcp_id, name_s);
+    kfree(name_s);
+
     return 0;
+
+err3:
+    rina_msg_free((struct rina_ctrl_base_msg *)resp);
+
+    return ret;
 }
 
 /* The signature of a message handler. */

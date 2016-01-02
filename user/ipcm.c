@@ -97,6 +97,30 @@ fetch_ipcp_resp(struct ipcm *ipcm,
     return 0;
 }
 
+static int
+assign_to_dif_resp(struct ipcm *ipcm,
+                   const struct rina_ctrl_base_msg *b_resp,
+                   const struct rina_ctrl_base_msg *b_req)
+{
+    struct rina_ctrl_assign_to_dif_resp *resp =
+            (struct rina_ctrl_assign_to_dif_resp *)b_resp;
+    struct rina_ctrl_assign_to_dif *req =
+            (struct rina_ctrl_assign_to_dif *)b_req;
+    char *name_s = NULL;
+
+    name_s = rina_name_to_string(&req->dif_name);
+
+    printf("%s: Assigned IPC process %u to DIF %s, result = %u\n",
+            __func__, req->ipcp_id, name_s, resp->result);
+    (void)req;
+
+    if (name_s) {
+        free(name_s);
+    }
+
+    return 0;
+}
+
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
                                    const struct rina_ctrl_base_msg * b_resp,
@@ -107,6 +131,7 @@ static rina_resp_handler_t rina_handlers[] = {
     [RINA_CTRL_CREATE_IPCP_RESP] = create_ipcp_resp,
     [RINA_CTRL_DESTROY_IPCP_RESP] = destroy_ipcp_resp,
     [RINA_CTRL_FETCH_IPCP_RESP] = fetch_ipcp_resp,
+    [RINA_CTRL_ASSIGN_TO_DIF_RESP] = assign_to_dif_resp,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
@@ -262,7 +287,7 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_CTRL_CREATE_IPCP;
-    msg->name = *name;
+    rina_name_copy(&msg->name, name);
     msg->dif_type = dif_type;
 
     printf("Requesting IPC process creation...\n");
@@ -356,18 +381,54 @@ fetch_ipcps(struct ipcm *ipcm)
 }
 
 static int
+assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
+{
+    struct rina_ctrl_assign_to_dif *req;
+    int ret;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_CTRL_ASSIGN_TO_DIF;
+    req->ipcp_id = ipcp_id;
+    rina_name_copy(&req->dif_name, dif_name);
+
+    printf("Requesting DIF assignment...\n");
+
+    ret = issue_request(ipcm, (struct rina_ctrl_base_msg *)req, sizeof(*req));
+    if (ret < 0) {
+        rina_msg_free((struct rina_ctrl_base_msg *)req);
+        return ret;
+    }
+
+    return ret;
+}
+
+static int
 test(struct ipcm *ipcm)
 {
     int ret;
-    struct rina_name ipcp_name;
+    struct rina_name name;
 
     /* Create an IPC process of type shim-dummy. */
-    rina_name_fill(&ipcp_name, "prova.IPCP", "1", NULL, NULL);
-    ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
+    rina_name_fill(&name, "prova.IPCP", "1", NULL, NULL);
+    ret = create_ipcp(ipcm, &name, DIF_TYPE_SHIM_DUMMY);
+    rina_name_free(&name);
 
-    rina_name_fill(&ipcp_name, "prova.IPCP", "2", NULL, NULL);
-    ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
+    rina_name_fill(&name, "prova.IPCP", "2", NULL, NULL);
+    ret = create_ipcp(ipcm, &name, DIF_TYPE_SHIM_DUMMY);
+    rina_name_free(&name);
 
+    /* Assign to DIF. */
+    rina_name_fill(&name, "prova.DIF", NULL, NULL, NULL);
+    ret = assign_to_dif(ipcm, 0, &name);
+    rina_name_free(&name);
+
+    /* Fetch IPC processes table. */
     ret = fetch_ipcps(ipcm);
 
     /* Destroy the IPCP. */
