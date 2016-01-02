@@ -1443,7 +1443,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (flow->upper.ipcp) {
         if (unlikely(rb->len < sizeof(struct rina_pci))) {
-            PI("%s: Dropping SDU shorter [%u] than PCI\n",
+            RPD(5, "%s: Dropping SDU shorter [%u] than PCI\n",
                     __func__, (unsigned int)rb->len);
             rina_buf_free(rb);
             ret = -EINVAL;

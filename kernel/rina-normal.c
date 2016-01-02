@@ -175,7 +175,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
     lower_flow = pduft_lookup((struct rina_normal *)ipcp->priv,
                               remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
-        PD("%s: No route to IPCP %lu, dropping packet\n", __func__,
+        RPD(5, "%s: No route to IPCP %lu, dropping packet\n", __func__,
             (long unsigned)remote_addr);
         rina_buf_free(rb);
         return 0;
@@ -342,7 +342,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!lower_flow)) {
-            PI("%s: No route to IPCP %lu, dropping packet\n", __func__,
+            RPD(5, "%s: No route to IPCP %lu, dropping packet\n", __func__,
                     (long unsigned)mhdr->remote_addr);
             rina_buf_free(rb);
 
@@ -352,7 +352,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
         lower_flow = flow_get(mhdr->local_port);
         if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
-            PI("%s: Invalid mgmt header local port %u, "
+            RPD(5, "%s: Invalid mgmt header local port %u, "
                     "dropping packet\n", __func__,
                     mhdr->local_port);
             rina_buf_free(rb);
@@ -550,7 +550,7 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
             /* This is a duplicate amongst the gaps, we can
              * drop it. */
             rina_buf_free(rb);
-            PD("%s: Duplicate amongs the gaps [%lu] dropped\n",
+            RPD(5, "%s: Duplicate amongs the gaps [%lu] dropped\n",
                 __func__, (long unsigned)seqnum);
 
             return;
@@ -604,13 +604,13 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
         /* Gap in the control SDU space. */
         /* POL: Lost control PDU. */
-        PD("%s: Lost control PDUs: [%lu] --> [%lu]\n", __func__,
+        RPD(5, "%s: Lost control PDUs: [%lu] --> [%lu]\n", __func__,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd,
             (long unsigned)pcic->base.seqnum);
     } else if (unlikely(dtp->last_ctrl_seq_num_rcvd &&
                     pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
         /* Duplicated control PDU: just drop it. */
-        PD("%s: Duplicated control PDU [%lu], last [%lu]\n", __func__,
+        RPD(5, "%s: Duplicated control PDU [%lu], last [%lu]\n", __func__,
             (long unsigned)pcic->base.seqnum,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 
@@ -720,7 +720,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     flow = flow_get(pci->conn_id.dst_cep);
     if (!flow) {
-        PI("%s: No flow for port-id %u: dropping PDU\n",
+        RPD(5, "%s: No flow for port-id %u: dropping PDU\n",
                 __func__, pci->conn_id.dst_cep);
         rina_buf_free(rb);
         return 0;
@@ -770,7 +770,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     if (unlikely(seqnum < dtp->rcv_lwe)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
-        PD("%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
+        RPD(5, "%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
                 (long unsigned)seqnum);
         rina_buf_free(rb);
 
@@ -862,7 +862,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     }
 
     if (drop) {
-        PD("%s: dropping PDU [%lu] to meet QoS requirements\n",
+        RPD(5, "%s: dropping PDU [%lu] to meet QoS requirements\n",
                 __func__, (long unsigned)seqnum);
         rina_buf_free(rb);
 

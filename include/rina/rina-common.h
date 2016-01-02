@@ -144,4 +144,22 @@ struct rina_flow_config {
 #define PN(format, ...)
 #define PE(format, ...) PRINTFUN(format, ##__VA_ARGS__)
 
+#ifdef __KERNEL__
+
+#define time_sec_cur     (jiffies_to_msecs(jiffies) / 1000U)
+
+/* Rate-limited version, lps indicate how many per second. */
+#define RPD(lps, format, ...)                           \
+    do {                                                \
+        static int t0, __cnt;                           \
+        if (t0 != time_sec_cur) {                       \
+            t0 = time_sec_cur;                          \
+            __cnt = 0;                                  \
+        }                                               \
+        if (__cnt++ < lps)                              \
+        PD(format, ##__VA_ARGS__);                      \
+    } while (0)
+
+#endif
+
 #endif  /* __RINA_COMMON_H__ */
