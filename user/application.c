@@ -294,11 +294,15 @@ rina_application_init(struct application *application)
     struct sigaction sa;
     int ret;
 
-    rina_evloop_init(&application->loop, "/dev/rina-app-ctrl",
-                     rina_kernel_handlers);
     pthread_mutex_init(&application->lock, NULL);
     pthread_cond_init(&application->flow_req_arrived_cond, NULL);
     list_init(&application->pending_flow_reqs);
+
+    ret = rina_evloop_init(&application->loop, "/dev/rina-app-ctrl",
+                     rina_kernel_handlers);
+    if (ret) {
+        return ret;
+    }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -322,7 +326,5 @@ rina_application_init(struct application *application)
 int
 rina_application_fini(struct application *application)
 {
-    rina_evloop_fini(&application->loop);
-
-    return 0;
+    return rina_evloop_fini(&application->loop);
 }

@@ -416,6 +416,15 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
         return EINVAL;
     }
 
+    loop->handlers = handlers;
+    pthread_mutex_init(&loop->lock, NULL);
+    pending_queue_init(&loop->pqueue);
+    loop->event_id_counter = 1;
+    list_init(&loop->ipcps);
+    loop->rfd = -1;
+    loop->eventfd = -1;
+    loop->evloop_th = 0;
+
     /* Open the RINA control device. */
     loop->rfd = open(dev, O_RDWR);
     if (loop->rfd < 0) {
@@ -438,12 +447,6 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
         return loop->eventfd;
     }
 
-    pthread_mutex_init(&loop->lock, NULL);
-    pending_queue_init(&loop->pqueue);
-    loop->event_id_counter = 1;
-    list_init(&loop->ipcps);
-    loop->handlers = handlers;
-
     /* If not redefined, setup default fetch handler. */
     if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
         printf("%s: setting default fetch handler\n", __func__);
@@ -463,16 +466,24 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 int
 rina_evloop_fini(struct rina_evloop *loop)
 {
-    int ret = pthread_join(loop->evloop_th, NULL);
+    int ret;
 
-    if (ret < 0) {
-        perror("pthread_join(event-loop)");
-        return ret;
+    if (loop->evloop_th) {
+        ret = pthread_join(loop->evloop_th, NULL);
+        if (ret < 0) {
+            perror("pthread_join(event-loop)");
+            return ret;
+        }
     }
 
     /* Clean up all the data structures. To be completed. */
-    close(loop->eventfd);
-    close(loop->rfd);
+    if (loop->eventfd >= 0) {
+        close(loop->eventfd);
+    }
+
+    if (loop->rfd >= 0) {
+        close(loop->rfd);
+    }
 
     return 0;
 }

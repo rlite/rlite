@@ -6,10 +6,16 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <endian.h>
 #include <rina/rina-utils.h>
 
 #include "application.h"
 
+
+struct rinaperf_test_config {
+    uint32_t ty;
+    uint32_t cnt;
+};
 
 struct rinaperf {
     struct application application;
@@ -17,17 +23,66 @@ struct rinaperf {
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
     struct rina_name dif_name;
-    unsigned int ctrl_port_id;
+    unsigned int data_port_id;
+    int dfd;
+
+    struct rinaperf_test_config test_config;
 };
+
+static int
+client_test_config(struct rinaperf *rp)
+{
+    struct rinaperf_test_config cfg = rp->test_config;
+    int ret;
+
+    cfg.ty = htole32(cfg.ty);
+    cfg.cnt = htole32(cfg.cnt);
+
+    ret = write(rp->dfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("write(buf)");
+        } else {
+            printf("%s: partial write %d/%lu\n", __func__, ret, sizeof(cfg));
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+server_test_config(struct rinaperf *rp)
+{
+    struct rinaperf_test_config cfg;
+    int ret;
+
+    ret = read(rp->dfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("read(buf");
+        } else {
+            printf("%s: partial write %d/%lu\n", __func__, ret, sizeof(cfg));
+        }
+        return -1;
+    }
+
+    cfg.ty = le32toh(cfg.ty);
+    cfg.cnt = le32toh(cfg.cnt);
+
+    printf("Configuring test type %u, SDU count %u\n", cfg.ty, cfg.cnt);
+
+    rp->test_config = cfg;
+
+    return 0;
+}
 
 static int
 echo_client(struct rinaperf *rp)
 {
     struct timeval t_start, t_end;
-    unsigned int data_port_id;
     unsigned long us;
     int ret;
-    int fd;
     char buf[4096];
     int size = 10;
 
@@ -36,21 +91,26 @@ echo_client(struct rinaperf *rp)
     }
 
     ret = flow_allocate(&rp->application, &rp->dif_name, &rp->client_appl_name,
-                        &rp->server_appl_name, &data_port_id);
+                        &rp->server_appl_name, &rp->data_port_id);
     if (ret) {
         return ret;
     }
 
-    fd = open_port(data_port_id);
-    if (fd < 0) {
-        return fd;
+    rp->dfd = open_port(rp->data_port_id);
+    if (rp->dfd < 0) {
+        return rp->dfd;
+    }
+
+    ret = client_test_config(rp);
+    if (ret) {
+        return ret;
     }
 
     memset(buf, 'x', size);
 
     gettimeofday(&t_start, NULL);
 
-    ret = write(fd, buf, size);
+    ret = write(rp->dfd, buf, size);
     if (ret != size) {
         if (ret < 0) {
             perror("write(buf)");
@@ -59,7 +119,7 @@ echo_client(struct rinaperf *rp)
         }
     }
 
-    ret = read(fd, buf, sizeof(buf));
+    ret = read(rp->dfd, buf, sizeof(buf));
     if (ret < 0) {
         perror("read(buf");
     }
@@ -70,7 +130,7 @@ echo_client(struct rinaperf *rp)
 
     printf("SDU size: %d bytes, latency: %lu us\n", ret, us);
 
-    close(fd);
+    close(rp->dfd);
 
     return 0;
 }
@@ -81,14 +141,12 @@ echo_server(struct rinaperf *rp)
     struct pending_flow_req *pfr = NULL;
 
     for (;;) {
-        unsigned int data_port_id;
         int result;
-        int fd;
         char buf[4096];
-        int n, m;
+        int n, ret;
 
         pfr = flow_request_wait(&rp->application);
-        data_port_id = pfr->port_id;
+        rp->data_port_id = pfr->port_id;
         printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
 
@@ -101,27 +159,32 @@ echo_server(struct rinaperf *rp)
             continue;
         }
 
-        fd = open_port(data_port_id);
-        if (fd < 0) {
+        rp->dfd = open_port(rp->data_port_id);
+        if (rp->dfd < 0) {
             continue;
         }
 
-        n = read(fd, buf, sizeof(buf));
+        ret = server_test_config(rp);
+        if (ret) {
+            goto clos;
+        }
+
+        n = read(rp->dfd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
             goto clos;
         }
 
-        m = write(fd, buf, n);
-        if (m != n) {
-            if (m < 0) {
+        ret = write(rp->dfd, buf, n);
+        if (ret != n) {
+            if (ret < 0) {
                 perror("write(flow)");
             } else {
                 printf("partial write");
             }
         }
 clos:
-        close(fd);
+        close(rp->dfd);
     }
 
     return 0;
@@ -164,7 +227,7 @@ main(int argc, char **argv)
 
     assert(sizeof(client_descs) == sizeof(server_descs));
 
-    while ((opt = getopt(argc, argv, "lt:")) != -1) {
+    while ((opt = getopt(argc, argv, "lt:d:")) != -1) {
         switch (opt) {
             case 'l':
                 listen = 1;
@@ -191,6 +254,7 @@ main(int argc, char **argv)
     for (i = 0; i < sizeof(client_descs)/sizeof(client_descs[0]); i++) {
         if (strcmp(descs[i].name, type) == 0) {
             perf_function = descs[i].function;
+            break;
         }
     }
 
@@ -198,7 +262,10 @@ main(int argc, char **argv)
         printf("    Unknown test type %s\n", type);
         return -1;
     }
+    rp.test_config.ty = i;
+    rp.test_config.cnt = 1;
 
+    /* Initialization of RINA application library. */
     ret = rina_application_init(&rp.application);
     if (ret) {
         return ret;
