@@ -365,6 +365,8 @@ server_function(void *arg)
         unsigned int port_id;
         int result;
         int fd;
+        char buf[4096];
+        int n;
 
         pfr = flow_request_wait(application);
         port_id = pfr->port_id;
@@ -386,6 +388,13 @@ server_function(void *arg)
         }
 
         printf("%s: Open fd %d\n", __func__, fd);
+
+        n = read(fd, buf, sizeof(buf));
+        if (n < 0) {
+            perror("read(flow)");
+        } else {
+            printf("%s: read %d bytes\n", __func__, n);
+        }
 
         close(fd);
     }

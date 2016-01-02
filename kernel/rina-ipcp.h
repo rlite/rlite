@@ -89,6 +89,7 @@ int rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
 
 int rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
                                     uint16_t local_port,
+                                    uint16_t remote_port,
                                     uint8_t response);
 
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,

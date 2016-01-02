@@ -950,6 +950,7 @@ EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
 int
 rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
                                 uint16_t local_port,
+                                uint16_t remote_port,
                                 uint8_t response)
 {
     struct flow_entry *flow_entry = NULL;
@@ -967,6 +968,7 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
     }
     flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
                                           : FLOW_STATE_NULL;
+    flow_entry->remote_port = remote_port;
 
     printk("%s: Flow allocation response arrived to IPC process %u, "
                 "port-id %u\n", __func__, ipcp->id, local_port);
@@ -1002,9 +1004,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint16_t local_port)
 
     spin_lock(&flow->rxq_lock);
     list_add_tail(&rb->node, &flow->rxq);
+    spin_unlock(&flow->rxq_lock);
     wake_up_interruptible_poll(&flow->rxq_wqh,
                                POLLIN | POLLRDNORM | POLLRDBAND);
-    spin_unlock(&flow->rxq_lock);
 out:
     mutex_unlock(&rina_dm.lock);
 

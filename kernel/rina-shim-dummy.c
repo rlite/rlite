@@ -139,6 +139,7 @@ struct flow_allocate_resp_work {
     struct work_struct w;
     struct ipcp_entry *ipcp;
     uint16_t local_port;
+    uint16_t remote_port;
     uint8_t response;
 };
 
@@ -150,7 +151,7 @@ flow_allocate_resp_work(struct work_struct *w)
     int ret;
 
     ret = rina_flow_allocate_resp_arrived(farw->ipcp, farw->local_port,
-                                          farw->response);
+                                          farw->remote_port, farw->response);
     if (ret) {
         printk("%s: failed to report flow allocation response\n",
                 __func__);
@@ -174,6 +175,7 @@ rina_shim_dummy_flow_allocate_resp(struct ipcp_entry *ipcp,
 
     farw->ipcp = ipcp;
     farw->local_port = flow->remote_port;
+    farw->remote_port = flow->local_port;
     farw->response = response;
     INIT_WORK(&farw->w, flow_allocate_resp_work);
     schedule_work(&farw->w);
