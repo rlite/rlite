@@ -452,9 +452,14 @@ ipcp_application_put(struct registered_application *app)
 
     RAUNLOCK(ipcp);
 
-    /* Perform cleanup operation in process context, because we need
-     * to take the per-ipcp mutex. */
-    schedule_work(&app->remove);
+    if (ipcp->ops.application_register) {
+        /* Perform cleanup operation in process context, because we need
+         * to take the per-ipcp mutex. */
+        schedule_work(&app->remove);
+    } else {
+        /* No mutex required, perform the removal in current context. */
+        app_remove_work(&app->remove);
+    }
 }
 
 static int
