@@ -277,6 +277,7 @@ rina_shim_hv_config(struct ipcp_entry *ipcp,
 static struct ipcp_factory shim_hv_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
+    .use_cep_ids = false,
     .create = rina_shim_hv_create,
     .ops.destroy = rina_shim_hv_destroy,
     .ops.flow_allocate_req = rina_shim_hv_fa_req,

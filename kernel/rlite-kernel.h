@@ -81,6 +81,7 @@ struct ipcp_entry {
     struct rina_name    name;
     struct dif          *dif;
     uint64_t            addr;
+    bool                use_cep_ids;
     struct ipcp_ops     ops;
     void                *priv;
     struct list_head    registered_appls;
@@ -99,6 +100,7 @@ struct ipcp_factory {
     /* The module providing this factory. */
     struct module *owner;
     const char *dif_type;
+    bool use_cep_ids;
     void *(*create)(struct ipcp_entry *ipcp);
     struct ipcp_ops ops;
 
@@ -178,6 +180,7 @@ struct flow_entry {
     unsigned int        refcnt;
     bool                never_bound;
     struct hlist_node   node;
+    struct hlist_node   node_cep;
 };
 
 struct pduft_entry {

@@ -487,6 +487,7 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
     }
 
     entry->ops = factory->ops;
+    entry->use_cep_ids = factory->use_cep_ids;
     *ipcp_id = entry->id;
 
 out:
@@ -686,7 +687,7 @@ flow_get_by_cep(unsigned int cep_id)
 
     head = &rina_dm.flow_table_by_cep[hash_min(cep_id,
                                       HASH_BITS(rina_dm.flow_table_by_cep))];
-    hlist_for_each_entry(entry, head, node) {
+    hlist_for_each_entry(entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             entry->refcnt++;
             FUNLOCK();
@@ -794,20 +795,26 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     FLOCK();
 
-    /* Try to alloc a port id and a cep id from the bitmaps.
-     * In the future we could allocate cep ids only for normal
-     * IPCPs and not for all IPCPs. */
+    /* Try to alloc a port id and a cep id from the bitmaps, cep
+     * ids being allocated only if needed. */
     entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
                                                    PORT_ID_BITMAP_SIZE,
                                                    0, 1, 0);
-    entry->local_cep = bitmap_find_next_zero_area(rina_dm.cep_id_bitmap,
-                                                  CEP_ID_BITMAP_SIZE,
-                                                  0, 1, 0);
+    if (ipcp->use_cep_ids) {
+        entry->local_cep = bitmap_find_next_zero_area(rina_dm.cep_id_bitmap,
+                                                      CEP_ID_BITMAP_SIZE,
+                                                      0, 1, 0);
+    } else {
+        entry->local_cep = 0;
+    }
+
     if (entry->local_port < PORT_ID_BITMAP_SIZE &&
                 entry->local_cep < CEP_ID_BITMAP_SIZE) {
         bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
 
-        bitmap_set(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+        if (ipcp->use_cep_ids) {
+            bitmap_set(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+        }
 
         /* Build and insert a flow entry in the hash table. */
         rina_name_copy(&entry->local_appl, local_appl);
@@ -825,7 +832,10 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
-        hash_add(rina_dm.flow_table_by_cep, &entry->node, entry->local_cep);
+        if (ipcp->use_cep_ids) {
+            hash_add(rina_dm.flow_table_by_cep, &entry->node_cep,
+                     entry->local_cep);
+        }
         INIT_LIST_HEAD(&entry->rmtq);
         entry->rmtq_len = 0;
         spin_lock_init(&entry->rmtq_lock);
@@ -980,7 +990,10 @@ flow_put(struct flow_entry *entry)
     rina_name_free(&entry->local_appl);
     rina_name_free(&entry->remote_appl);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
-    bitmap_clear(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+    if (ipcp->use_cep_ids) {
+        hash_del(&entry->node_cep);
+        bitmap_clear(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+    }
     printk("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 out:
@@ -2609,6 +2622,10 @@ rina_ctrl_init(void)
 
     bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rina_dm.ipcp_table);
+    bitmap_zero(rina_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
+    hash_init(rina_dm.flow_table);
+    bitmap_zero(rina_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
+    hash_init(rina_dm.flow_table_by_cep);
     mutex_init(&rina_dm.general_lock);
     spin_lock_init(&rina_dm.flows_lock);
     spin_lock_init(&rina_dm.ipcps_lock);

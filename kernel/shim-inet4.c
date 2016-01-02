@@ -354,6 +354,7 @@ rina_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
 static struct ipcp_factory shim_inet4_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
+    .use_cep_ids = false,
     .create = rina_shim_inet4_create,
     .ops.destroy = rina_shim_inet4_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */

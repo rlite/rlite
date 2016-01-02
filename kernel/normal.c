@@ -1156,6 +1156,7 @@ static struct ipcp_factory normal_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .create = rina_normal_create,
+    .use_cep_ids = true,
     .ops.destroy = rina_normal_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
