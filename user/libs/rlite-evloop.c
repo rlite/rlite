@@ -1232,6 +1232,21 @@ rlite_flow_cfg_default(struct rlite_flow_config *cfg)
 }
 
 int
+rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
+                     unsigned int ipcp_id, int reg,
+                     const struct rina_name *appl_name)
+{
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_APPL_REGISTER;
+    req->event_id = event_id;
+    req->ipcp_id = ipcp_id;
+    req->reg = reg;
+    rina_name_copy(&req->appl_name, appl_name);
+
+    return 0;
+}
+
+int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, unsigned int ipcp_id,
                const char *dif_name,
@@ -1338,8 +1353,33 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
 }
 
 int
-rl_ctrl_register(struct rlite_ctrl *ctrl)
+rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
+                 const char *dif_name,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name)
 {
+    struct rl_kmsg_appl_register req;
+    struct rlite_ipcp *rlite_ipcp;
+    int ret;
+
+    rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(ctrl, dif_name);
+    }
+    if (!rlite_ipcp) {
+        PE("Could not find a suitable IPC process\n");
+        return NULL;
+    }
+
+    ret = rl_register_req_fill(&req, rl_ctrl_get_id(ctrl), rlite_ipcp->ipcp_id,
+                               reg, appl_name);
+    if (ret) {
+        PE("Failed to fill (un)register request\n");
+        return -1;
+    }
+
+    (void)req;
+
     return 0;
 }
 

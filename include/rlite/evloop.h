@@ -183,6 +183,10 @@ struct rlite_ipcp *
 rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
 
 int
+rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
+                     unsigned int ipcp_id, int reg,
+                     const struct rina_name *appl_name);
+int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, unsigned int ipcp_id,
                const char *dif_name,
@@ -212,7 +216,10 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
                    const struct rlite_flow_spec *flowspec);
 
 int
-rl_ctrl_register(struct rlite_ctrl *ctrl);
+rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
+                 const char *dif_name,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name);
 
 struct rlite_msg_base *
 rl_ctrl_wait(struct rlite_ctrl *ctrl);

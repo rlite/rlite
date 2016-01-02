@@ -137,36 +137,6 @@ static rlite_resp_handler_t rlite_kernel_handlers[] = {
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
-struct rl_kmsg_appl_register_resp *
-rl_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
-                        unsigned int wait_ms,
-                        int reg, unsigned int ipcp_id,
-                        const struct rina_name *appl_name)
-{
-    struct rl_kmsg_appl_register *req;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("Out of memory\n");
-        return NULL;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_APPL_REGISTER;
-    req->event_id = event_id;
-    req->ipcp_id = ipcp_id;
-    req->reg = reg;
-    rina_name_copy(&req->appl_name, appl_name);
-
-    PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
-
-    return (struct rl_kmsg_appl_register_resp *)
-           rlite_issue_request(&appl->loop, RLITE_MB(req),
-                               sizeof(*req), 1, wait_ms, &result);
-}
-
 int
 rl_appl_fa_resp(struct rlite_appl *appl, uint32_t kevent_id,
                          uint16_t ipcp_id, uint16_t upper_ipcp_id,
@@ -208,7 +178,9 @@ rl_appl_register(struct rlite_appl *appl, uint32_t event_id,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name)
 {
+    struct rl_kmsg_appl_register *req;
     struct rlite_ipcp *rlite_ipcp;
+    int result;
 
     rlite_ipcp = rlite_lookup_ipcp_by_name(&appl->loop.ctrl, ipcp_name);
     if (!rlite_ipcp) {
@@ -219,9 +191,21 @@ rl_appl_register(struct rlite_appl *appl, uint32_t event_id,
         return NULL;
     }
 
-    /* Forward the request to the kernel. */
-    return rl_appl_register_req(appl, event_id, wait_ms,
-                                   reg, rlite_ipcp->ipcp_id, appl_name);
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("Out of memory\n");
+        return NULL;
+    }
+
+    rl_register_req_fill(req, event_id, rlite_ipcp->ipcp_id, reg,
+                         appl_name);
+
+    PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
+
+    return (struct rl_kmsg_appl_register_resp *)
+           rlite_issue_request(&appl->loop, RLITE_MB(req),
+                               sizeof(*req), 1, wait_ms, &result);
 }
 
 int
@@ -236,7 +220,7 @@ rl_appl_register_wait(struct rlite_appl *appl, int reg,
     int ret = 0;
 
     resp = rl_appl_register(appl, event_id, wait_ms, reg, dif_name,
-                               ipcp_name, appl_name);
+                            ipcp_name, appl_name);
 
     if (!resp) {
         return -1;
