@@ -247,6 +247,16 @@ Neighbor::none(const CDAPMessage *rm)
             PE("%s: M_CONNECT creation failed\n", __func__);
             return -1;
         }
+
+    } else {
+        /* We are the enrollment slave, let's send an
+         * M_CONNECT_R message. */
+        assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
+        m.m_connect_r(rm, 0, string());
+        if (ret) {
+            PE("%s: M_CONNECT_R creation failed\n", __func__);
+            return -1;
+        }
     }
 
     return send_to_port_id(&m);
