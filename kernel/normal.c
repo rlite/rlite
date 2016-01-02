@@ -116,7 +116,7 @@ rtx_tmr_cb(long unsigned arg)
 {
     struct flow_entry *flow = (struct flow_entry *)arg;
     struct dtp *dtp = &flow->dtp;
-    struct rina_buf *rb, *crb;
+    struct rina_buf *rb, *crb, *tmp;
     struct list_head rrbq;
     struct list_head *cur;
 
@@ -173,7 +173,9 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_unlock_bh(&dtp->lock);
 
-    list_for_each_entry(crb, &rrbq, node) {
+    /* Send PDUs popped out from RTX queue. Note that the rrbq list
+     * is not emptied and must not be used after the scan. */
+    list_for_each_entry_safe(crb, tmp, &rrbq, node) {
         struct rina_pci *pci = RINA_BUF_PCI(crb);
 
         PD("sending [%lu] from rtxq\n",
@@ -784,7 +786,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_pci_ctrl *pcic = RINA_BUF_PCI_CTRL(rb);
     struct dtp *dtp = &flow->dtp;
     struct list_head qrbs;
-    struct rina_buf *qrb;
+    struct rina_buf *qrb, *tmp;
 
     if (unlikely((pcic->base.pdu_type & PDU_T_CTRL_MASK)
                 != PDU_T_CTRL_MASK)) {
@@ -909,8 +911,9 @@ out:
 
     rina_buf_free(rb);
 
-    /* Send PDUs popped out from cwq, if any. */
-    list_for_each_entry(qrb, &qrbs, node) {
+    /* Send PDUs popped out from cwq, if any. Note that the qrbs list
+     * is not emptied and must not be used after the scan.*/
+    list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
         struct rina_pci *pci = RINA_BUF_PCI(qrb);
 
         NPD("sending [%lu] from cwq\n",
