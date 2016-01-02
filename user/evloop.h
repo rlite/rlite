@@ -78,7 +78,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int has_response,
               unsigned int wait_for_completion, int *result);
 
-int evloop_stop(struct rina_evloop *loop);
+int rina_evloop_stop(struct rina_evloop *loop);
 
 int
 rina_evloop_init(struct rina_evloop *loop, const char *dev,

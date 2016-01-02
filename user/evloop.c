@@ -305,7 +305,7 @@ notify_requestor:
 }
 
 int
-evloop_stop(struct rina_evloop *loop)
+rina_evloop_stop(struct rina_evloop *loop)
 {
     uint64_t x = 1;
     int n;

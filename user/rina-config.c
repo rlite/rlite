@@ -763,7 +763,7 @@ int main(int argc, char **argv)
 
     ret = process_args(argc, argv, &rc);
 
-    evloop_stop(&rc.loop);
+    rina_evloop_stop(&rc.loop);
 
     rina_evloop_fini(&rc.loop);
 

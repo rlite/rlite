@@ -619,7 +619,7 @@ main(int argc, char **argv)
     }
 
     /* Stop the event loop. */
-    evloop_stop(&rp.application.loop);
+    rina_evloop_stop(&rp.application.loop);
 
     return rina_application_fini(&rp.application);
 }

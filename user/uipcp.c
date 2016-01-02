@@ -730,7 +730,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 
     close(uipcp->mgmtfd);
 
-    evloop_stop(&uipcp->appl.loop);
+    rina_evloop_stop(&uipcp->appl.loop);
 
     ret = rina_application_fini(&uipcp->appl);
 
@@ -785,7 +785,7 @@ uipcps_update(struct uipcps *uipcps)
         }
     }
 
-    evloop_stop(&loop);
+    rina_evloop_stop(&loop);
     rina_evloop_fini(&loop);
 
     /* Perform a fetch operation on the evloops of
