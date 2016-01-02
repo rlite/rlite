@@ -7,7 +7,7 @@ import common
 import time
 
 
-description = "Python script to launch a scenario"
+description = "Continuous integration for rlite"
 epilog = "2015 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
