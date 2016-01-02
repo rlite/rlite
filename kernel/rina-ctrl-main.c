@@ -1612,8 +1612,8 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     struct rina_io *rio = (struct rina_io *)f->private_data;
     struct ipcp_entry *ipcp;
     struct rina_buf *rb;
+    struct rina_mgmt_hdr mhdr;
     ssize_t ret;
-    unsigned int ofs = 0;
 
     if (unlikely(!rio->txrx)) {
         printk("%s: Error: Not bound to a flow nor IPCP\n", __func__);
@@ -1627,12 +1627,19 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
 
     if (unlikely(rio->mode == RINA_IOCTL_CMD_IPCP_MGMT)) {
-        ofs += sizeof(struct rina_mgmt_hdr);
+        /* Copy in the management header. */
+        if (copy_from_user(&mhdr, ubuf, sizeof(mhdr))) {
+            PE("%s: copy_from_user(mgmthdr)\n", __func__);
+            rina_buf_free(rb);
+            return -EFAULT;
+        }
+        ubuf += sizeof(mhdr);
+        ulen -= sizeof(mhdr);
     }
 
     /* Copy in the userspace SDU. */
-    if (copy_from_user(RINA_BUF_DATA(rb), ubuf + ofs, ulen - ofs)) {
-        printk("%s: copy_from_user()\n", __func__);
+    if (copy_from_user(RINA_BUF_DATA(rb), ubuf, ulen)) {
+        PE("%s: copy_from_user(data)\n", __func__);
         rina_buf_free(rb);
         return -EFAULT;
     }
@@ -1648,7 +1655,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
                 ret -= sizeof(struct rina_pci);
             }
         } else if (rio->mode == RINA_IOCTL_CMD_IPCP_MGMT) {
-            ret = ipcp->ops.mgmt_sdu_write(ipcp, (struct rina_mgmt_hdr *)ubuf,
+            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr,
                                            rb);
         } else {
             PE("%s: Unknown mode, this should not happen\n", __func__);
