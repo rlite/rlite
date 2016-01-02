@@ -33,7 +33,7 @@ namespace obj_name {
     string adata = "a_data";
     string dft = "/dif/mgmt/fa/" + obj_class::dft;
     string neighbors = "/daf/mgmt/" + obj_class::neighbors;
-    string enrollment = "/def/mgmt/" + obj_class::enrollment;
+    string enrollment = "/daf/mgmt/" + obj_class::enrollment;
     string status = "/daf/mgmt/" + obj_class::status;
     string address = "/daf/mgmt/naming" + obj_class::address;
     string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;

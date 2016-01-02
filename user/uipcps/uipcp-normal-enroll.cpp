@@ -337,6 +337,14 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
+    if (rm->obj_class != obj_class::enrollment ||
+            rm->obj_name != obj_name::enrollment) {
+        UPE(rib->uipcp, "%s:%s object expected\n",
+            obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+        abort(nf);
+        return 0;
+    }
+
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(rib->uipcp, "M_START does not contain a nested message\n");
@@ -364,6 +372,8 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     rib->cand_neighbors[static_cast<string>(ipcp_name)] = cand;
 
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());
+    m.obj_class = obj_class::enrollment;
+    m.obj_name = obj_name::enrollment;
 
     ret = send_to_port_id(nf, &m, rm->invoke_id, &enr_info);
     if (ret) {
@@ -427,6 +437,14 @@ Neighbor::i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
+    if (rm->obj_class != obj_class::enrollment ||
+            rm->obj_name != obj_name::enrollment) {
+        UPE(rib->uipcp, "%s:%s object expected\n",
+            obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+        abort(nf);
+        return 0;
+    }
+
     if (rm->result) {
         UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
            rm->result, rm->result_reason.c_str());
@@ -477,6 +495,14 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
+    if (rm->obj_class != obj_class::enrollment ||
+            rm->obj_name != obj_name::enrollment) {
+        UPE(rib->uipcp, "%s:%s object expected\n",
+            obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+        abort(nf);
+        return 0;
+    }
+
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
@@ -498,6 +524,8 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
     /* Here we may M_READ from the slave. */
 
     m.m_stop_r(gpb::F_NO_FLAGS, 0, string());
+    m.obj_class = obj_class::enrollment;
+    m.obj_name = obj_name::enrollment;
 
     ret = send_to_port_id(nf, &m, rm->invoke_id, NULL);
     if (ret) {
