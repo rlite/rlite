@@ -158,7 +158,7 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id)
 
 static const char *dif_types[] = {
     [DIF_TYPE_NORMAL] = "normal",
-    [DIF_TYPE_SHIM_DUMMY] = "shim-dummy",
+    [DIF_TYPE_SHIM_LOOPBACK] = "shim-loopback",
     [DIF_TYPE_SHIM_HV] = "shim-hv",
 };
 
@@ -570,24 +570,24 @@ test(struct rinaconf *rc)
     int result;
     int ret;
 
-    /* Create an IPC process of type shim-dummy. */
-    rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
-    icresp = rina_ipcp_create(rc, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    /* Create an IPC process of type shim-loopback. */
+    rina_name_fill(&name, "test-shim-loopback.IPCP", "1", NULL, NULL);
+    icresp = rina_ipcp_create(rc, 0, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
     assert(!icresp);
     rina_name_free(&name);
 
-    rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
-    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    rina_name_fill(&name, "test-shim-loopback.IPCP", "2", NULL, NULL);
+    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
     assert(icresp);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
-    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    icresp = rina_ipcp_create(rc, ~0U, &name, DIF_TYPE_SHIM_LOOPBACK, &result);
     assert(!icresp);
     rina_name_free(&name);
 
     /* Assign to DIF. */
-    rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
+    rina_name_fill(&name, "test-shim-loopback.DIF", NULL, NULL, NULL);
     ret = rina_assign_to_dif(rc, 0, &name);
     assert(!ret);
     ret = rina_assign_to_dif(rc, 0, &name);
@@ -598,11 +598,11 @@ test(struct rinaconf *rc)
     ipcps_fetch(&rc->loop);
 
     /* Destroy the IPCPs. */
-    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_DUMMY);
+    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_LOOPBACK);
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 1, DIF_TYPE_SHIM_DUMMY);
+    ret = rina_ipcp_destroy(rc, 1, DIF_TYPE_SHIM_LOOPBACK);
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_DUMMY);
+    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_LOOPBACK);
     assert(ret);
 
     return 0;

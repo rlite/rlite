@@ -1,5 +1,5 @@
 /*
- * RINA dummy shim DIF
+ * RINA loopback shim DIF
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
@@ -43,7 +43,7 @@ struct rx_entry {
 #define RX_POW      8
 #define RX_ENTRIES  (1 << RX_POW)
 
-struct rina_shim_dummy {
+struct rina_shim_loopback {
     struct ipcp_entry *ipcp;
     bool queued;
     struct rx_entry rxr[RX_ENTRIES];
@@ -56,8 +56,8 @@ struct rina_shim_dummy {
 static void
 rcv_work(struct work_struct *w)
 {
-    struct rina_shim_dummy *priv =
-            container_of(w, struct rina_shim_dummy, rcv);
+    struct rina_shim_loopback *priv =
+            container_of(w, struct rina_shim_loopback, rcv);
 
     for (;;) {
         struct rina_buf *rb = NULL;
@@ -83,9 +83,9 @@ rcv_work(struct work_struct *w)
 }
 
 static void *
-rina_shim_dummy_create(struct ipcp_entry *ipcp)
+rina_shim_loopback_create(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_dummy *priv;
+    struct rina_shim_loopback *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -104,9 +104,9 @@ rina_shim_dummy_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
+rina_shim_loopback_destroy(struct ipcp_entry *ipcp)
 {
-    struct rina_shim_dummy *priv = ipcp->priv;
+    struct rina_shim_loopback *priv = ipcp->priv;
 
     while (priv->rdh != priv->rdt) {
         rina_buf_free(priv->rxr[priv->rdh].rb);
@@ -145,7 +145,7 @@ flow_allocate_req_work(struct work_struct *w)
 }
 
 static int
-rina_shim_dummy_fa_req(struct ipcp_entry *ipcp,
+rina_shim_loopback_fa_req(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
     struct flow_allocate_req_work *faw;
@@ -192,7 +192,7 @@ flow_allocate_resp_work(struct work_struct *w)
 }
 
 static int
-rina_shim_dummy_fa_resp(struct ipcp_entry *ipcp,
+rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
                                    struct flow_entry *flow,
                                    uint8_t response)
 {
@@ -215,11 +215,11 @@ rina_shim_dummy_fa_resp(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
+rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                           struct flow_entry *flow,
                           struct rina_buf *rb)
 {
-    struct rina_shim_dummy *priv = ipcp->priv;
+    struct rina_shim_loopback *priv = ipcp->priv;
 
     if (priv->queued) {
         unsigned int next;
@@ -250,11 +250,11 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_dummy_config(struct ipcp_entry *ipcp,
+rina_shim_loopback_config(struct ipcp_entry *ipcp,
                        const char *param_name,
                        const char *param_value)
 {
-    struct rina_shim_dummy *priv = (struct rina_shim_dummy *)ipcp->priv;
+    struct rina_shim_loopback *priv = (struct rina_shim_loopback *)ipcp->priv;
     int ret = -EINVAL;
 
     if (strcmp(param_name, "queued") == 0) {
@@ -276,20 +276,20 @@ rina_shim_dummy_config(struct ipcp_entry *ipcp,
 }
 
 static int __init
-rina_shim_dummy_init(void)
+rina_shim_loopback_init(void)
 {
     struct ipcp_factory factory;
     int ret;
 
     memset(&factory, 0, sizeof(factory));
     factory.owner = THIS_MODULE;
-    factory.dif_type = DIF_TYPE_SHIM_DUMMY;
-    factory.create = rina_shim_dummy_create;
-    factory.ops.destroy = rina_shim_dummy_destroy;
-    factory.ops.flow_allocate_req = rina_shim_dummy_fa_req;
-    factory.ops.flow_allocate_resp = rina_shim_dummy_fa_resp;
-    factory.ops.sdu_write = rina_shim_dummy_sdu_write;
-    factory.ops.config = rina_shim_dummy_config;
+    factory.dif_type = DIF_TYPE_SHIM_LOOPBACK;
+    factory.create = rina_shim_loopback_create;
+    factory.ops.destroy = rina_shim_loopback_destroy;
+    factory.ops.flow_allocate_req = rina_shim_loopback_fa_req;
+    factory.ops.flow_allocate_resp = rina_shim_loopback_fa_resp;
+    factory.ops.sdu_write = rina_shim_loopback_sdu_write;
+    factory.ops.config = rina_shim_loopback_config;
 
     ret = rina_ipcp_factory_register(&factory);
 
@@ -297,11 +297,11 @@ rina_shim_dummy_init(void)
 }
 
 static void __exit
-rina_shim_dummy_fini(void)
+rina_shim_loopback_fini(void)
 {
-    rina_ipcp_factory_unregister(DIF_TYPE_SHIM_DUMMY);
+    rina_ipcp_factory_unregister(DIF_TYPE_SHIM_LOOPBACK);
 }
 
-module_init(rina_shim_dummy_init);
-module_exit(rina_shim_dummy_fini);
+module_init(rina_shim_loopback_init);
+module_exit(rina_shim_loopback_fini);
 MODULE_LICENSE("GPL");
