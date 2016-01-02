@@ -12,5 +12,5 @@ count:
 	find kernel user include -type f -and \( -name "*.c" -or -name "*.h" \) | grep -v vmpi | xargs wc -l
 
 clean:
-	-rm -rf build
+	cd build && make clean
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel clean
