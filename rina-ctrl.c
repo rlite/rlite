@@ -18,34 +18,71 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include "rina-ctrl.h"
+
 #include <linux/module.h>
 #include <linux/aio.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
 #include <linux/moduleparam.h>
+#include <linux/mutex.h>
 
 
 static ssize_t
-rina_ctrl_aio_write(struct kiocb *iocb, const struct iovec *iv,
-        unsigned long iovlen, loff_t pos)
+rina_ipcp_create(const char __user *buf, size_t len)
 {
-    struct file *file = iocb->ki_filp;
-    // file->private_data;
-    (void)file;
-
-    /* XXX file->f_flags & O_NONBLOCK */
-
-    return 0;
+    return len;
 }
 
 static ssize_t
-rina_ctrl_aio_read(struct kiocb *iocb, const struct iovec *iv,
-        unsigned long iovcnt, loff_t pos)
+rina_assign_to_dif(const char __user *buf, size_t len)
 {
-    struct file *file = iocb->ki_filp;
+    return len;
+}
+
+/* The signature of a message handler. */
+typedef ssize_t (*rina_msg_handler_t)(const char __user *buf, size_t len);
+
+/* The table containing all the message handlers. */
+static rina_msg_handler_t rina_handlers[] = {
+    [RINA_CTRL_CREATE_IPCP] = rina_ipcp_create,
+    [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
+};
+
+static ssize_t
+rina_ctrl_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
+{
+    rina_msg_t msg_type;
+    ssize_t ret;
+
+    // filp->private_data;
+    (void)filp;
+
+    if (len < sizeof(rina_msg_t)) {
+        /* This message doesn't even contain a message type. */
+        return -EINVAL;
+    }
+
+    /* Demultiplex the message to the right message handler. */
+    msg_type = *((rina_msg_t *)buf);
+    if (msg_type >= RINA_CTRL_MSG_MAX || !rina_handlers[msg_type]) {
+        return -EINVAL;
+    }
+    ret = rina_handlers[msg_type](buf, len);
+
+    if (ret >= 0) {
+        *ppos += ret;
+    }
+
+    return ret;
+}
+
+static ssize_t
+rina_ctrl_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
+{
     //vmpi_info_t *mpi = file->private_data;
 
-    (void)file;
+    (void)filp;
 
     return 0;
 }
@@ -70,10 +107,8 @@ static const struct file_operations rina_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rina_ctrl_release,
     .open           = rina_ctrl_open,
-    .write          = do_sync_write,
-    .aio_write      = rina_ctrl_aio_write,
-    .read           = do_sync_read,
-    .aio_read       = rina_ctrl_aio_read,
+    .write          = rina_ctrl_write,
+    .read           = rina_ctrl_read,
     .llseek         = noop_llseek,
 };
 
