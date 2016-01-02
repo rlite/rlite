@@ -465,6 +465,7 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
 {
     char *apn, *api, *aen, *aei;
     char *strc = COMMON_STRDUP(str, maysleep);
+    char *strc_orig = strc;
     char **strp = &strc;
 
     memset(name, 0, sizeof(*name));
@@ -479,12 +480,12 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
     aei = strsep(strp, "/");
 
     if (!apn || !api || !aen || !aei) {
-        COMMON_FREE(strc);
+        COMMON_FREE(strc_orig);
         return -1;
     }
 
     __rina_name_fill(name, apn, api, aen, aei, maysleep);
-    COMMON_FREE(strc);
+    COMMON_FREE(strc_orig);
 
     return 0;
 }
