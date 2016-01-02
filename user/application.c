@@ -32,6 +32,8 @@ struct application {
     pthread_cond_t flow_req_arrived_cond;
     struct list_head pending_flow_reqs;
     pthread_mutex_t lock;
+
+    pthread_t server_th;
 };
 
 static int
@@ -282,7 +284,6 @@ process(int argc, char **argv, struct application *application)
     struct rina_name dif_name;
     struct rina_name this_application;
     struct rina_name remote_application;
-    struct pending_flow_req *pfr = NULL;
 
     (void) argc;
     (void) argv;
@@ -297,9 +298,22 @@ process(int argc, char **argv, struct application *application)
 
     flow_allocate(application, &dif_name, &this_application,
                   &remote_application);
-    pfr = flow_request_wait(application);
-    printf("Flow request arrived: [ipcp_id = %u, port_id = %u]\n",
-                pfr->ipcp_id, pfr->port_id);
+}
+
+static void *
+server_function(void *arg)
+{
+    struct application *application = arg;
+    struct pending_flow_req *pfr = NULL;
+
+    for (;;) {
+        pfr = flow_request_wait(application);
+        printf("%s: flow request arrived: [ipcp_id = %u, port_id = %u]\n",
+                __func__, pfr->ipcp_id, pfr->port_id);
+        free(pfr);
+    }
+
+    return NULL;
 }
 
 int main(int argc, char **argv)
@@ -312,6 +326,7 @@ int main(int argc, char **argv)
                      rina_kernel_handlers);
     pthread_mutex_init(&application.lock, NULL);
     pthread_cond_init(&application.flow_req_arrived_cond, NULL);
+    list_init(&application.pending_flow_reqs);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -329,7 +344,22 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    /* Create and start the server thread. */
+    ret = pthread_create(&application.server_th, NULL, server_function,
+                         &application);
+    if (ret) {
+        perror("pthread_create(server)");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Execute the client part. */
     process(argc, argv, &application);
+
+    ret = pthread_join(application.server_th, NULL);
+    if (ret < 0) {
+        perror("pthread_join(server)");
+        exit(EXIT_FAILURE);
+    }
 
     rina_evloop_fini(&application.loop);
 
