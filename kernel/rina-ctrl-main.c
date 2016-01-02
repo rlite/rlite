@@ -1268,9 +1268,30 @@ rina_io_poll(struct file *f, poll_table *wait)
 }
 
 static long
-rina_io_ioctl(struct file *file, unsigned int cmd, unsigned long data)
+rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
 {
-    return -ENXIO;
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    uint32_t port_id = (uint32_t)data;
+    struct flow_entry *flow = NULL;
+    long ret = 0;
+
+    /* We have only one command. This should be used and checked. */
+    (void) cmd;
+
+    mutex_lock(&rina_dm.lock);
+    flow = flow_table_find(port_id);
+    if (!flow) {
+        printk("%s: Error: No such flow\n", __func__);
+        ret = -ENXIO;
+        goto out;
+    }
+
+    /* Associate a flow to this file descriptor. */
+    rio->flow = flow;
+out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
 }
 
 static const struct file_operations rina_ipcm_ctrl_fops = {
