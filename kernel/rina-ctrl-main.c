@@ -651,15 +651,20 @@ flow_put(struct flow_entry *entry)
         BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
         ret = entry->upper.ipcp->ops.pduft_del(entry->upper.ipcp, pfte);
         if (ret == 0) {
-            PD("%s: Removed IPC process %u PDUFT entry: %llu --> %u\n", __func__,
-                    entry->upper.ipcp->id, (unsigned long long)dest_addr,
-                    entry->local_port);
+            PD("%s: Removed IPC process %u PDUFT entry: %llu --> %u\n",
+                    __func__, entry->upper.ipcp->id,
+                    (unsigned long long)dest_addr, entry->local_port);
         }
     }
 
     /* We could be in atomic context here, so let's defer the ipcp
-     * removal in a worker process context. */
+     * removal in a worker process context. This is done for either
+     * the IPCP which supports the flow (entry->txrx.ipcp) and the
+     * IPCP which uses the flow (entry->upper.ipcp). */
     schedule_work(&entry->txrx.ipcp->remove);
+    if (entry->upper.ipcp) {
+        schedule_work(&entry->upper.ipcp->remove);
+    }
 
     hash_del(&entry->node);
     rina_name_free(&entry->local_application);
@@ -1937,7 +1942,8 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         }
         rio->flow->upper.ipcp = ipcp;
         rio->flow->upper.ipcp->refcnt++;
-        PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
+        PD("%s: REFCNT++ %u: %u\n", __func__, rio->flow->upper.ipcp->id,
+                rio->flow->upper.ipcp->refcnt);
     }
 
     return 0;
@@ -1978,25 +1984,13 @@ rina_io_release_internal(struct rina_io *rio)
     switch (rio->mode) {
         case RINA_IO_MODE_APPL_BIND:
         case RINA_IO_MODE_IPCP_BIND:
-            {
-                /* A previous flow was bound to this file descriptor,
-                 * so let's unbind from it. */
-                struct ipcp_entry *upper_ipcp;
-
-                BUG_ON(!rio->flow);
-                upper_ipcp = rio->flow->upper.ipcp;  /* save a pointer */
-
-                flow_put(rio->flow);
-
-                if (upper_ipcp) {
-                    PD("%s: REFCNT-- %u: %u\n", __func__, upper_ipcp->id,
-                            upper_ipcp->refcnt);
-                    ipcp_del_entry(upper_ipcp);
-                }
-                rio->flow = NULL;
-                rio->txrx = NULL;
-                break;
-            }
+            /* A previous flow was bound to this file descriptor,
+             * so let's unbind from it. */
+            BUG_ON(!rio->flow);
+            flow_put(rio->flow);
+            rio->flow = NULL;
+            rio->txrx = NULL;
+            break;
 
         case RINA_IO_MODE_IPCP_MGMT:
             BUG_ON(!rio->txrx);
@@ -2004,7 +1998,8 @@ rina_io_release_internal(struct rina_io *rio)
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
-            PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id, rio->txrx->ipcp->refcnt);
+            PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id,
+                    rio->txrx->ipcp->refcnt);
             ipcp_del_entry(rio->txrx->ipcp);
             kfree(rio->txrx);
             rio->txrx = NULL;
