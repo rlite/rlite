@@ -37,7 +37,7 @@ user/application.o: $(HEADERS) user/pending_queue.h user/evloop.h
 user/rinaperf.o: $(HEADERS) user/application.h
 
 count:
-	find . -type f -and \( -name "*.c" -or -name "*.h" \) | xargs wc -l
+	find . -type f -and \( -name "*.c" -or -name "*.h" \) | grep -v vmpi | xargs wc -l
 
 test:
 	(./unprepare.sh || true; ./prepare.sh && user/ipcm -t)
