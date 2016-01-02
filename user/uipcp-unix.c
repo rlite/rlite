@@ -353,6 +353,8 @@ unix_server(void *arg)
             }
         }
 
+        rina_msg_free(rina_conf_numtables, req);
+
         /* Close the connection. */
 	close(cfd);
     }
