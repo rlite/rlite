@@ -62,14 +62,14 @@ read_response(int sfd)
 
     n = read(sfd, serbuf, sizeof(serbuf));
     if (n < 0) {
-        printf("%s: read() error [%d]\n", __func__, n);
+        PE("%s: read() error [%d]\n", __func__, n);
         return -1;
     }
 
     ret = deserialize_rina_msg(rina_application_numtables, serbuf,
                                n, msgbuf, sizeof(msgbuf));
     if (ret) {
-        printf("%s: error while deserializing response [%d]\n",
+        PE("%s: error while deserializing response [%d]\n",
                 __func__, ret);
         return -1;
     }
@@ -77,7 +77,7 @@ read_response(int sfd)
     resp = (struct rina_msg_base_resp *)msgbuf;
     ret = (resp->result) == 0 ? 0 : -1;
 
-    printf("IPCM response [type=%u] --> %d\n", resp->msg_type, ret);
+    PI("IPCM response [type=%u] --> %d\n", resp->msg_type, ret);
 
     return ret;
 }
@@ -136,9 +136,9 @@ static int ipcp_create(int argc, char **argv)
     if (req.dif_type == DIF_TYPE_MAX) {
         /* No such dif type. Print the available types
          * and exit. */
-        printf("No such dif type. Available DIF types:\n");
+        PE("No such dif type. Available DIF types:\n");
         for (i = 0; i < DIF_TYPE_MAX; i++) {
-            printf("    %s\n", dif_types[i]);
+            PE("    %s\n", dif_types[i]);
         }
         return -1;
     }
@@ -318,7 +318,7 @@ process_args(int argc, char **argv)
 
             if (argc - 2 < cmd_descriptors[i].num_args) {
                 /* Not enough arguments. */
-                printf("Not enough arguments\n");
+                PE("Not enough arguments\n");
                 usage();
                 return -1;
             }
@@ -327,7 +327,7 @@ process_args(int argc, char **argv)
         }
     }
 
-    printf("Unknown command '%s'\n", cmd);
+    PE("Unknown command '%s'\n", cmd);
     usage();
 
     return -1;

@@ -39,7 +39,7 @@ ipcp_create_resp(struct rina_evloop *loop,
     struct rina_kmsg_ipcp_create *req =
             (struct rina_kmsg_ipcp_create *)b_req;
 
-    printf("%s: Assigned id %d\n", __func__, resp->ipcp_id);
+    PI("%s: Assigned id %d\n", __func__, resp->ipcp_id);
     (void)req;
 
     return 0;
@@ -70,7 +70,7 @@ ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return NULL;
     }
 
@@ -79,7 +79,7 @@ ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
     rina_name_copy(&msg->name, name);
     msg->dif_type = dif_type;
 
-    printf("Requesting IPC process creation...\n");
+    PD("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
            issue_request(&ipcm->loop, RMB(msg),
@@ -101,7 +101,7 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
 
@@ -109,12 +109,12 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
     msg->msg_type = RINA_KERN_IPCP_DESTROY;
     msg->ipcp_id = ipcp_id;
 
-    printf("Requesting IPC process destruction...\n");
+    PD("Requesting IPC process destruction...\n");
 
     resp = issue_request(&ipcm->loop, RMB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -132,7 +132,7 @@ assign_to_dif(struct ipcm *ipcm,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
 
@@ -141,12 +141,12 @@ assign_to_dif(struct ipcm *ipcm,
     req->ipcp_id = ipcp_id;
     rina_name_copy(&req->dif_name, dif_name);
 
-    printf("Requesting DIF assignment...\n");
+    PD("Requesting DIF assignment...\n");
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -164,7 +164,7 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
 
@@ -174,12 +174,12 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     req->name = param_name;
     req->value = param_value;
 
-    printf("Requesting IPCP config...\n");
+    PD("Requesting IPCP config...\n");
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     return result;
 }
@@ -195,7 +195,7 @@ ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
 
@@ -205,12 +205,12 @@ ipcp_register(struct ipcm *ipcm, uint16_t ipcp_id_who,
     req->ipcp_id_where = ipcp_id_where;
     req->reg = reg;
 
-    printf("Requesting IPCP register...\n");
+    PD("Requesting IPCP register...\n");
 
     resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     return result;
 }
@@ -320,7 +320,7 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
     /* Does the request specifies an existing IPC process ? */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
     if (ipcp_id == ~0U) {
-        printf("%s: No such IPCP process\n", __func__);
+        PE("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
         resp.result = ipcp_destroy(ipcm, ipcp_id);
@@ -342,7 +342,7 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     /* The request specifies an IPCP: lookup that. */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->application_name);
     if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
+        PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
         resp.result = assign_to_dif(ipcm, ipcp_id, &req->dif_name);
@@ -364,7 +364,7 @@ rina_appl_ipcp_config(struct ipcm *ipcm, int sfd,
     /* The request specifies an IPCP: lookup that. */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
     if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
+        PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
         resp.result = ipcp_config(ipcm, ipcp_id, req->name, req->value);
@@ -385,13 +385,13 @@ rina_appl_ipcp_register(struct ipcm *ipcm, int sfd,
 
     ipcp_id_who = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
     if (ipcp_id_who == ~0U) {
-        printf("%s: Could not find who IPC process\n", __func__);
+        PE("%s: Could not find who IPC process\n", __func__);
         goto out;
     }
 
     ipcp_id_where = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
     if (ipcp_id_where == ~0U) {
-        printf("%s: Could not find where IPC process\n", __func__);
+        PE("%s: Could not find where IPC process\n", __func__);
         goto out;
     }
     /* Forward the request to the kernel. */
@@ -437,14 +437,14 @@ unix_server(void *arg)
         /* Read the request message in serialized form. */
         n = read(cfd, serbuf, sizeof(serbuf));
         if (n < 0) {
-                printf("%s: read() error [%d]\n", __func__, n);
+            PE("%s: read() error [%d]\n", __func__, n);
         }
 
         /* Deserialize into a formatted message. */
         ret = deserialize_rina_msg(rina_application_numtables, serbuf, n,
                                         msgbuf, sizeof(msgbuf));
         if (ret) {
-                printf("%s: deserialization error [%d]\n", __func__, ret);
+            PE("%s: deserialization error [%d]\n", __func__, ret);
         }
 
         /* Lookup the message type. */
@@ -452,7 +452,7 @@ unix_server(void *arg)
         if (rina_application_handlers[req->msg_type] == NULL) {
             struct rina_msg_base_resp resp;
 
-            printf("%s: Invalid message received [type=%d]\n", __func__,
+            PE("%s: Invalid message received [type=%d]\n", __func__,
                     req->msg_type);
             resp.msg_type = RINA_APPL_BASE_RESP;
             resp.event_id = req->event_id;
@@ -462,7 +462,7 @@ unix_server(void *arg)
             /* Valid message type: handle the request. */
             ret = rina_application_handlers[req->msg_type](ipcm, cfd, req);
             if (ret) {
-                printf("%s: Error while handling message type [%d]\n",
+                PE("%s: Error while handling message type [%d]\n",
                         __func__, req->msg_type);
             }
         }
@@ -484,7 +484,7 @@ sigint_handler(int signum)
 static void
 sigpipe_handler(int signum)
 {
-    printf("SIGPIPE received\n");
+    PI("SIGPIPE received\n");
 }
 
 int main(int argc, char **argv)
@@ -523,7 +523,7 @@ int main(int argc, char **argv)
          * However, if something goes wrong, the Unix domain socket
          * could still exist and so the following bind() would fail.
          * This unlink() will clean up in this situation. */
-        printf("info: cleaned up existing unix domain socket\n");
+        PI("info: cleaned up existing unix domain socket\n");
     }
     ret = bind(ipcm.lfd, (struct sockaddr *)&server_address,
                 sizeof(server_address));

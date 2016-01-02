@@ -1,6 +1,7 @@
 #ifndef __RINA_COMMON_H__
 #define __RINA_COMMON_H__
 
+
 #define RINA_IPCM_UNIX_NAME     "/tmp/rina-ipcm"
 
 /* Application naming information:
@@ -32,5 +33,30 @@ struct rina_msg_base_resp {
 
     uint8_t result;
 } __attribute__((packed));
+
+/* Logging macros. */
+#define PD_ON  /* Enable debug print. */
+#define PI_ON  /* Enable info print. */
+
+#ifdef __KERNEL__
+#define PRINTFUN printk
+#else
+#define PRINTFUN printf
+#endif
+
+#ifdef PD_ON
+#define PD(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+#else
+#define PD(format, ...)
+#endif
+
+#ifdef PI_ON
+#define PI(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+#else
+#define PI(formt, ...)
+#endif
+
+#define PN(format, ...)
+#define PE(format, ...) PRINTFUN(format, ##__VA_ARGS__)
 
 #endif  /* __RINA_COMMON_H__ */

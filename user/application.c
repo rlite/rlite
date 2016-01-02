@@ -37,11 +37,11 @@ flow_allocate_resp_arrived(struct rina_evloop *loop,
     remote_s = rina_name_to_string(&req->remote_application);
 
     if (resp->result) {
-        printf("%s: Failed to allocate a flow between local application "
+        PE("%s: Failed to allocate a flow between local application "
                "'%s' and remote application '%s'\n", __func__,
                 local_s, remote_s);
     } else {
-        printf("%s: Allocated flow between local application "
+        PI("%s: Allocated flow between local application "
                "'%s' and remote application '%s' [port-id = %u]\n",
                 __func__, local_s, remote_s, resp->port_id);
     }
@@ -71,7 +71,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     assert(b_req == NULL);
     pfr = malloc(sizeof(*pfr));
     if (!pfr) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         /* Negative flow allocation response. */
         return flow_allocate_resp(application,req->ipcp_id,
                                     req->port_id, 1);
@@ -84,7 +84,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     pthread_cond_signal(&application->flow_req_arrived_cond);
     pthread_mutex_unlock(&application->lock);
 
-    printf("%s: port-id %u\n", __func__, req->port_id);
+    PI("%s: port-id %u\n", __func__, req->port_id);
 
     return 0;
 }
@@ -115,7 +115,7 @@ application_register_req(struct application *application,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
 
@@ -125,12 +125,12 @@ application_register_req(struct application *application,
     req->ipcp_id = ipcp_id;
     rina_name_copy(&req->application_name, application_name);
 
-    printf("Requesting application %sregistration...\n", (reg ? "": "un"));
+    PD("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     resp = issue_request(&application->loop, RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     return result;
 }
@@ -146,7 +146,7 @@ flow_allocate_req(struct application *application,
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return NULL;
     }
 
@@ -157,7 +157,7 @@ flow_allocate_req(struct application *application,
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
-    printf("Requesting flow allocation...\n");
+    PD("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_flow_allocate_resp_arrived *)
            issue_request(&application->loop, RMB(req),
@@ -174,7 +174,7 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
 
     req = malloc(sizeof(*req));
     if (!req) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return ENOMEM;
     }
     memset(req, 0, sizeof(*req));
@@ -184,12 +184,12 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
     req->port_id = port_id;
     req->response = response;
 
-    printf("Responding to flow allocation request...\n");
+    PD("Responding to flow allocation request...\n");
 
     resp = issue_request(&application->loop, RMB(req),
                          sizeof(*req), 0, 0, &result);
     assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
+    PD("%s: result: %d\n", __func__, result);
 
     return result;
 }
@@ -203,7 +203,7 @@ application_register(struct application *application, int reg,
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
     if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
+        PE("%s: Could not find a suitable IPC process\n", __func__);
         return -1;
     }
 
@@ -226,7 +226,7 @@ flow_allocate(struct application *application,
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
 
     if (ipcp_id == ~0U) {
-        printf("%s: No suitable IPCP found\n", __func__);
+        PE("%s: No suitable IPCP found\n", __func__);
         return -1;
     }
 
@@ -234,11 +234,11 @@ flow_allocate(struct application *application,
                               ipcp_id, local_application,
                               remote_application, &result);
     if (!kresp) {
-        printf("%s: Flow allocation request failed\n", __func__);
+        PE("%s: Flow allocation request failed\n", __func__);
         return -1;
     }
 
-    printf("%s: Flow allocation response: ret = %u, port-id = %u\n",
+    PI("%s: Flow allocation response: ret = %u, port-id = %u\n",
                 __func__, kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;

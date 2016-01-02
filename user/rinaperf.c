@@ -47,7 +47,7 @@ client_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("write(buf)");
         } else {
-            printf("%s: partial write %d/%lu\n", __func__, ret,
+            PE("%s: partial write %d/%lu\n", __func__, ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -67,7 +67,7 @@ server_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("read(buf");
         } else {
-            printf("%s: partial write %d/%lu\n", __func__, ret,
+            PE("%s: partial write %d/%lu\n", __func__, ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;

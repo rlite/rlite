@@ -740,10 +740,6 @@ rina_ipcp_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_unlock(&rina_dm.lock);
 
-    if (ret == 0) {
-        printk("%s: OOOOOOK [%u]\n", __func__, req->reg);
-    }
-
     return ret;
 }
 

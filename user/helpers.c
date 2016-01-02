@@ -26,7 +26,7 @@ int rina_msg_write(int sfd, struct rina_msg_base *msg)
 
     n = write(sfd, serbuf, serlen);
     if (n != serlen) {
-        printf("write failed [%d/%d]\n", n, serlen);
+        PE("write failed [%d/%d]\n", n, serlen);
     }
 
     free(serbuf);

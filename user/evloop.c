@@ -35,8 +35,8 @@ ipcp_fetch_resp(struct rina_evloop *loop,
         return 0;
     }
 
-    printf("%s: Fetch IPCP response id=%u, type=%u\n",
-            __func__, resp->ipcp_id, resp->dif_type);
+    PN("%s: Fetch IPCP response id=%u, type=%u\n",
+       __func__, resp->ipcp_id, resp->dif_type);
 
     ipcp = malloc(sizeof(*ipcp));
     if (ipcp) {
@@ -46,7 +46,7 @@ ipcp_fetch_resp(struct rina_evloop *loop,
         rina_name_copy(&ipcp->dif_name, &resp->dif_name);
         list_add_tail(&ipcp->node, &loop->ipcps);
     } else {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
     }
 
     (void)b_req;
@@ -63,14 +63,14 @@ ipcp_fetch(struct rina_evloop *loop, int *result)
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
     if (!msg) {
-        printf("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         return NULL;
     }
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_KERN_IPCP_FETCH;
 
-    printf("Requesting IPC processes fetch...\n");
+    PD("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
            issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
@@ -81,14 +81,14 @@ ipcps_print(struct rina_evloop *loop)
 {
     struct ipcp *ipcp;
 
-    printf("IPC Processes table:\n");
+    PI("IPC Processes table:\n");
     list_for_each_entry(ipcp, &loop->ipcps, node) {
             char *ipcp_name_s = NULL;
             char *dif_name_s = NULL;
 
             ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
             dif_name_s = rina_name_to_string(&ipcp->dif_name);
-            printf("    id = %d, name = '%s' dif_name = '%s'\n",
+            PI("    id = %d, name = '%s' dif_name = '%s'\n",
                         ipcp->ipcp_id, ipcp_name_s, dif_name_s);
 
             if (ipcp_name_s) {
@@ -201,7 +201,7 @@ evloop_function(void *arg)
         /* Here we can malloc the maximum kernel message size. */
         resp = RMBR(malloc(max_resp_size));
         if (!resp) {
-            printf("%s: Out of memory\n", __func__);
+            PE("%s: Out of memory\n", __func__);
             continue;
         }
 
@@ -209,14 +209,14 @@ evloop_function(void *arg)
         ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret,
                                    (void *)resp, max_resp_size);
         if (ret) {
-            printf("%s: Problems during deserialization [%d]\n",
+            PE("%s: Problems during deserialization [%d]\n",
                     __func__, ret);
         }
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
                 !loop->handlers[resp->msg_type]) {
-            printf("%s: Invalid message type [%d] received\n", __func__,
+            PE("%s: Invalid message type [%d] received\n", __func__,
                     resp->msg_type);
             continue;
         }
@@ -227,7 +227,7 @@ evloop_function(void *arg)
             pthread_mutex_unlock(&loop->lock);
             ret = loop->handlers[resp->msg_type](loop, resp, NULL);
             if (ret) {
-                printf("%s: Error while handling message type [%d]\n", __func__,
+                PE("%s: Error while handling message type [%d]\n", __func__,
                                         resp->msg_type);
             }
             continue;
@@ -238,24 +238,24 @@ evloop_function(void *arg)
         req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
         pthread_mutex_unlock(&loop->lock);
         if (!req_entry) {
-            printf("%s: No pending request matching event-id [%u]\n", __func__,
+            PE("%s: No pending request matching event-id [%u]\n", __func__,
                     resp->event_id);
             continue;
         }
 
         if (req_entry->msg->msg_type + 1 != resp->msg_type) {
-            printf("%s: Response message mismatch: expected %u, got %u\n",
+            PE("%s: Response message mismatch: expected %u, got %u\n",
                     __func__, req_entry->msg->msg_type + 1,
                     resp->msg_type);
             goto notify_requestor;
         }
 
-        printf("Message type %d received from kernel\n", resp->msg_type);
+        PD("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler, without holding the IPCM lock. */
         ret = loop->handlers[resp->msg_type](loop, resp, req_entry->msg);
         if (ret) {
-            printf("%s: Error while handling message type [%d]\n", __func__,
+            PE("%s: Error while handling message type [%d]\n", __func__,
                     resp->msg_type);
         }
 
@@ -319,7 +319,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     if (!has_response && wait_for_completion) {
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
-        printf("%s: has_response == 0 --> wait_for_completion "
+        PE("%s: has_response == 0 --> wait_for_completion "
                 "== 0\n", __func__);
         *result = EINVAL;
         return NULL;
@@ -333,7 +333,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         entry = malloc(sizeof(*entry));
         if (!entry) {
             rina_msg_free(rina_kernel_numtables, msg);
-            printf("%s: Out of memory\n", __func__);
+            PE("%s: Out of memory\n", __func__);
             *result = ENOMEM;
             return NULL;
         }
@@ -361,7 +361,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     /* Serialize the message. */
     serlen = rina_msg_serlen(rina_kernel_numtables, msg);
     if (serlen > sizeof(serbuf)) {
-        printf("%s: Serialized message would be too long [%u]\n",
+        PE("%s: Serialized message would be too long [%u]\n",
                     __func__, serlen);
         free(entry);
         pthread_mutex_unlock(&loop->lock);
@@ -382,7 +382,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
             *result = ret;
         } else {
             /* This should never happen if kernel code is correct. */
-            printf("%s: Error: partial write [%d/%u]\n", __func__,
+            PE("%s: Error: partial write [%d/%u]\n", __func__,
                     ret, serlen);
             *result = EINVAL;
         }
@@ -406,7 +406,6 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
                                     / ONEBILLION;
                 deadline.tv_nsec = (deadline.tv_nsec + to.tv_nsec)
                                     % ONEBILLION;
-                printf("%u %u\n", (unsigned)deadline.tv_sec, (unsigned)deadline.tv_nsec);
 
                 *result = pthread_cond_timedwait(&entry->op_complete_cond, &loop->lock,
                                                  &deadline);
@@ -436,7 +435,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     }
 
     if (!handlers) {
-        printf("NULL handlers\n");
+        PE("NULL handlers\n");
         return EINVAL;
     }
 
@@ -452,7 +451,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     /* Open the RINA control device. */
     loop->rfd = open(dev, O_RDWR);
     if (loop->rfd < 0) {
-        printf("Cannot open '%s'\n", dev);
+        PE("Cannot open '%s'\n", dev);
         perror("open(ctrldev)");
         return loop->rfd;
     }
@@ -473,7 +472,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
     /* If not redefined, setup default fetch handler. */
     if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
-        printf("%s: setting default fetch handler\n", __func__);
+        PD("%s: setting default fetch handler\n", __func__);
         loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 
