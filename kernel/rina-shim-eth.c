@@ -813,7 +813,10 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     rina_buf_free(rb);
 
     /* Send the skb to the device for transmission. */
-    dev_queue_xmit(skb);
+    ret = dev_queue_xmit(skb);
+    if (unlikely(ret != NET_XMIT_SUCCESS)) {
+        RPD(5, "%s: dev_queue_xmit() error %d\n", __func__, ret);
+    }
 
     return 0;
 }
