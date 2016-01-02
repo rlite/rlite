@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 no_cmake() {
@@ -12,10 +12,12 @@ which cmake || no_cmake
 
 # Configure CMake for out-of-tree build
 rm -rf build &> /dev/null
-mkdir build
+mkdir build || exit 1
+
+(
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=Debug
-cd ..
+)
 
 # Generate the Makefile (just a trivial copy)
 cp Makefile.in Makefile
