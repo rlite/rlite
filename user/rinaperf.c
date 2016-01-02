@@ -489,6 +489,7 @@ main(int argc, char **argv)
 
             case 'P':
                 ipcp_api = optarg;
+                break;
 
             case 'c':
                 cnt = atoi(optarg);
