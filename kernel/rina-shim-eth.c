@@ -60,6 +60,7 @@ struct rina_shim_eth {
     struct list_head arp_table;
     spinlock_t arpt_lock;
     struct timer_list arp_resolver_tmr;
+    bool arp_tmr_shutdown;
 };
 
 static void arp_resolver_cb(unsigned long arg);
@@ -82,6 +83,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     init_timer(&priv->arp_resolver_tmr);
     priv->arp_resolver_tmr.function = arp_resolver_cb;
     priv->arp_resolver_tmr.data = (unsigned long)priv;
+    priv->arp_tmr_shutdown = false;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -101,7 +103,10 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
         kfree(entry->tpa);
         kfree(entry);
     }
+    priv->arp_tmr_shutdown = true;
     spin_unlock_irq(&priv->arpt_lock);
+
+    del_timer_sync(&priv->arp_resolver_tmr);
 
     if (priv->netdev) {
         rtnl_lock();
@@ -252,6 +257,8 @@ arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
     return skb;
 }
 
+#define ARP_TMR_INT_MS  2000
+
 static void
 arp_resolver_cb(unsigned long arg)
 {
@@ -263,6 +270,12 @@ arp_resolver_cb(unsigned long arg)
     skb_queue_head_init(&skbq);
 
     spin_lock_irq(&priv->arpt_lock);
+
+    /* Scan the ARP table looking for incomplete entries. For each
+     * incomplete entry found, generate a corresponding ARP request message.
+     * The generated messages are put into a temporary list, since
+     * dev_queue_xmit() cannot be called with irq disabled or in hard
+     * interrupt context. */
     list_for_each_entry(entry, &priv->arp_table, node) {
         if (!entry->complete) {
             struct sk_buff *skb;
@@ -282,12 +295,16 @@ arp_resolver_cb(unsigned long arg)
         }
     }
 
-    if (some_incomplete) {
-        mod_timer(&priv->arp_resolver_tmr, jiffies + msecs_to_jiffies(2000));
+    if (some_incomplete && !priv->arp_tmr_shutdown) {
+        /* Reschedule itself only if necessary, and never when the IPCP process
+         * is going to be destroyed. */
+        mod_timer(&priv->arp_resolver_tmr, jiffies +
+                  msecs_to_jiffies(ARP_TMR_INT_MS));
     }
 
     spin_unlock_irq(&priv->arpt_lock);
 
+    /* Send all the generated requests. */
     for (;;) {
         struct sk_buff *skb;
 
@@ -363,7 +380,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
 
     spin_lock_irq(&priv->arpt_lock);
     if (!timer_pending(&priv->arp_resolver_tmr)) {
-        mod_timer(&priv->arp_resolver_tmr, jiffies + msecs_to_jiffies(2000));
+        mod_timer(&priv->arp_resolver_tmr, jiffies +
+                  msecs_to_jiffies(ARP_TMR_INT_MS));
     }
     spin_unlock_irq(&priv->arpt_lock);
 
