@@ -125,7 +125,12 @@ for i in vms:
             'sudo mkdir -p /var/rina\n'\
             'sudo chmod -R a+rw /var/rina\n'\
             '\n'\
-                % {'name': vm['name'], 'ssh': vm['ssh']}
+            'uipcp-server &> uipcp.log &\n'\
+            'rina-config ipcp-create normal n.IPCP %(id)s\n'\
+            'rina-config ipcp-config n.IPCP %(id)s dif n.DIF\n'\
+            'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\
+            '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
+                   'id': vm['id']}
 
     for port in vm['ports']:
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
@@ -133,7 +138,9 @@ for i in vms:
                 'rina-config ipcp-create shim-eth e.IPCP %(idx)s\n'\
                 'rina-config ipcp-config e.IPCP %(idx)s netdev $PORT\n'\
                 'rina-config ipcp-config e.IPCP %(idx)s dif e.%(idx)s.DIF\n'\
-                    % {'mac': port['mac'], 'idx': port['idx']}
+                'rina-config ipcp-register e.%(idx)s.DIF n.IPCP %(id)s\n'\
+                    % {'mac': port['mac'], 'idx': port['idx'],
+                       'id': vm['id']}
 
     outs += 'ENDSSH\n'\
             '   DONE=$?\n'\
