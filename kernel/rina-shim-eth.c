@@ -66,6 +66,11 @@ struct arpt_entry {
 struct rina_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
+
+    unsigned int ntp;
+    unsigned int ntu;
+    bool tx_notify_enable;
+
     struct rina_name upper_name;
     char *upper_name_s;
     struct list_head arp_table;
@@ -88,6 +93,8 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     priv->netdev = NULL;
+    priv->ntu = priv->ntp = 0;
+    priv->tx_notify_enable = false;
     priv->upper_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
@@ -773,6 +780,24 @@ shim_eth_rx_handler(struct sk_buff **skbp)
     return RX_HANDLER_CONSUMED;
 }
 
+static void
+shim_eth_skb_destructor(struct sk_buff *skb)
+{
+    struct flow_entry *flow = (struct flow_entry *)
+                              (skb_shinfo(skb)->destructor_arg);
+    struct rina_shim_eth *priv = flow->txrx.ipcp->priv;
+
+    rmb();
+
+    priv->ntp++;
+
+    wmb();
+
+    if (priv->tx_notify_enable) {
+        rina_write_restart_flow(flow);
+    }
+}
+
 static int
 rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
                         struct flow_entry *flow,
@@ -786,6 +811,24 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     int ret;
 
     BUG_ON(!entry);
+
+    rmb();
+
+    if (unlikely(priv->ntu == priv->ntp)) {
+        priv->tx_notify_enable = true;
+        mb();
+        /* Double-check. */
+        if (priv->ntu == priv->ntp) {
+            /* Backpressure: We will be called again. */
+            return -EAGAIN;
+        }
+        /* Wow, we won the race condition! Let's go ahead. */
+    }
+
+    priv->tx_notify_enable = false;
+    priv->ntu++;
+
+    wmb();
 
     skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
                     GFP_KERNEL);
@@ -806,6 +849,9 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
         return ret;
     }
+
+    skb->destructor = &shim_eth_skb_destructor;
+    skb_shinfo(skb)->destructor_arg = (void *)flow;
 
     /* Copy data into the skb. */
     memcpy(skb_put(skb, rb->len), RINA_BUF_DATA(rb), rb->len);
@@ -841,6 +887,15 @@ rina_shim_eth_config(struct ipcp_entry *ipcp,
                                              priv);
             rtnl_unlock();
             if (ret == 0) {
+                priv->ntu = 0;
+                if (priv->netdev->tx_queue_len) {
+                    priv->ntp = priv->ntu + priv->netdev->tx_queue_len;
+                } else {
+                    priv->ntp = -2;
+                }
+
+                wmb();
+
                 PD("%s: netdev set to %p\n", __func__, priv->netdev);
             } else {
                 dev_put(priv->netdev);
