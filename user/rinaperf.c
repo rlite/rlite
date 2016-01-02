@@ -363,7 +363,7 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.sending_rate") == 0) {
-        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.fc.fc_type = RINA_FC_T_RATE;
         flowcfg->dtcp.flow_control = 1;
         flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.r.sending_rate = field_int;
@@ -371,7 +371,7 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.time_period") == 0) {
-        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_RATE_BASED;
+        flowcfg->dtcp.fc.fc_type = RINA_FC_T_RATE;
         flowcfg->dtcp.flow_control = 1;
         flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.r.time_period = field_int;
@@ -379,7 +379,7 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.max_cwq_len") == 0) {
-        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.fc.fc_type = RINA_FC_T_WIN;
         flowcfg->dtcp.flow_control = 1;
         flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.w.max_cwq_len = field_int;
@@ -387,7 +387,7 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
     }
 
     if (parse_flowcfg_int(arg, &field_int, "dtcp.fc.initial_credit") == 0) {
-        flowcfg->dtcp.fc.fc_type = RINA_FC_TYPE_WINDOW_BASED;
+        flowcfg->dtcp.fc.fc_type = RINA_FC_T_WIN;
         flowcfg->dtcp.flow_control = 1;
         flowcfg->dtcp_present = 1;
         flowcfg->dtcp.fc.cfg.w.initial_credit = field_int;

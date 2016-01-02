@@ -502,12 +502,12 @@ flow_config_dump(const struct rina_flow_config *c)
                 c->dtcp.flow_control,
                 c->dtcp.rtx_control);
 
-    if (c->dtcp.fc.fc_type == RINA_FC_TYPE_WINDOW_BASED) {
+    if (c->dtcp.fc.fc_type == RINA_FC_T_WIN) {
         COMMON_PRINT("   dtcp.fc.max_cwq_len=%lu\n"
                     "   dtcp.fc.inital_credit=%lu\n",
                     (long unsigned)c->dtcp.fc.cfg.w.max_cwq_len,
                     (long unsigned)c->dtcp.fc.cfg.w.initial_credit);
-    } else if (c->dtcp.fc.fc_type == RINA_FC_TYPE_RATE_BASED) {
+    } else if (c->dtcp.fc.fc_type == RINA_FC_T_RATE) {
         COMMON_PRINT("   dtcp.fc.sending_rate=%lu\n"
                     "   dtcp.fc.time_period=%lu\n",
                     (long unsigned)c->dtcp.fc.cfg.r.sending_rate,
