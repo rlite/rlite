@@ -2307,6 +2307,14 @@ rlite_write_restart_port(uint32_t local_port)
 }
 EXPORT_SYMBOL_GPL(rlite_write_restart_port);
 
+/* Share the same tx_wqh with other flows supported by the same IPCP. */
+void
+rlite_flow_share_tx_wqh(struct flow_entry *flow)
+{
+    flow->txrx.tx_wqh = &flow->txrx.ipcp->tx_wqh;
+}
+EXPORT_SYMBOL_GPL(rlite_flow_share_tx_wqh);
+
 /* The table containing all the message handlers. */
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_IPCP_CREATE] = rlite_ipcp_create,

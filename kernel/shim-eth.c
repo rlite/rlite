@@ -355,8 +355,7 @@ arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
     entry->flow = flow;
     flow->priv = entry;
 
-    /* Use the tx_wqh shared among all flows supported by the same IPCP. */
-    flow->txrx.tx_wqh = &flow->txrx.ipcp->tx_wqh;
+    rlite_flow_share_tx_wqh(flow);
 }
 
 static int

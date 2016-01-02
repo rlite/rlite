@@ -178,8 +178,7 @@ rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    /* Share the same tx_wqh with other flows supported by the same IPCP. */
-    flow->txrx.tx_wqh = &ipcp->tx_wqh;
+    rlite_flow_share_tx_wqh(flow);
 
     rina_name_copy(&faw->remote_appl, &flow->local_appl);
     rina_name_copy(&faw->local_appl, &flow->remote_appl);
@@ -228,8 +227,7 @@ rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    /* Share the same tx_wqh with other flows supported by the same IPCP. */
-    flow->txrx.tx_wqh = &ipcp->tx_wqh;
+    rlite_flow_share_tx_wqh(flow);
 
     farw->ipcp = ipcp;
     farw->local_port = flow->remote_port;

@@ -186,6 +186,8 @@ rlite_shim_hv_fa_req(struct ipcp_entry *ipcp,
 {
     struct rlite_hmsg_fa_req req;
 
+    rlite_flow_share_tx_wqh(flow);
+
     req.msg_type = RLITE_SHIM_HV_FA_REQ;
     req.event_id = 0;
     rina_name_copy(&req.local_appl, &flow->local_appl);
@@ -201,6 +203,8 @@ rlite_shim_hv_fa_resp(struct ipcp_entry *ipcp,
                                    uint8_t response)
 {
     struct rlite_hmsg_fa_resp resp;
+
+    rlite_flow_share_tx_wqh(flow);
 
     resp.msg_type = RLITE_SHIM_HV_FA_RESP;
     resp.event_id = 0;

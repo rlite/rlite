@@ -227,6 +227,8 @@ void rlite_write_restart_flow(struct flow_entry *flow);
 
 void rlite_write_restart_flows(struct ipcp_entry *ipcp);
 
+void rlite_flow_share_tx_wqh(struct flow_entry *flow);
+
 struct flow_entry *flow_lookup(unsigned int port_id);
 
 struct flow_entry *flow_put(struct flow_entry *flow);
@@ -246,7 +248,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->__tx_wqh);
-    txrx->tx_wqh = &txrx->__tx_wqh;
+    txrx->tx_wqh = &txrx->__tx_wqh; /* Use per-flow tx_wqh by default. */
     txrx->mgmt = mgmt;
     if (mgmt) {
         txrx->state = FLOW_STATE_ALLOCATED;
