@@ -58,7 +58,7 @@ uipcps_connect(int verbose)
     int ret;
     int sfd;
 
-    /* Open a Unix domain socket towards the IPCM. */
+    /* Open a Unix domain socket towards the uipcps. */
     sfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sfd < 0) {
         if (verbose) {
@@ -68,7 +68,7 @@ uipcps_connect(int verbose)
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RINA_IPCM_UNIX_NAME,
+    strncpy(server_address.sun_path, RINA_UIPCPS_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
     ret = connect(sfd, (struct sockaddr *)&server_address,
                     sizeof(server_address));
@@ -115,7 +115,7 @@ read_response(int sfd)
     resp = (struct rina_msg_base_resp *)msgbuf;
     ret = (resp->result) == 0 ? 0 : -1;
 
-    PI("IPCM response [type=%u] --> %d\n", resp->msg_type, ret);
+    PI("uipcps response [type=%u] --> %d\n", resp->msg_type, ret);
 
     return ret;
 }
@@ -666,7 +666,7 @@ int main(int argc, char **argv)
     }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
-     * the Unix domain socket used to access the IPCM server. */
+     * the Unix domain socket used to access the uipcp server. */
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;

@@ -276,7 +276,7 @@ evloop_function(void *arg)
 
         PD("Message type %d received from kernel\n", resp->msg_type);
 
-        /* Invoke the right response handler, without holding the IPCM lock. */
+        /* Invoke the right response handler, without holding the loop lock. */
         ret = loop->handlers[resp->msg_type](loop, resp, req_entry->msg);
         if (ret) {
             PE("%s: Error while handling message type [%d]\n", __func__,

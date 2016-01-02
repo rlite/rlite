@@ -42,7 +42,7 @@ enum {
 
 extern struct rina_msg_layout rina_kernel_numtables[RINA_KERN_MSG_MAX+1];
 
-/* IPCM --> kernel message to create a new IPC process. */
+/* application --> kernel message to create a new IPC process. */
 struct rina_kmsg_ipcp_create {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -51,8 +51,8 @@ struct rina_kmsg_ipcp_create {
     struct rina_name name;
 } __attribute__((packed));
 
-/* IPCM <-- kernel message to inform the IPCM about the ID of a new
- * IPC process. */
+/* application <-- kernel message to inform the application about the
+ * ID of a new IPC process. */
 struct rina_kmsg_ipcp_create_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -60,7 +60,7 @@ struct rina_kmsg_ipcp_create_resp {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
-/* IPCM --> kernel message to destroy an IPC process. */
+/* application --> kernel message to destroy an IPC process. */
 struct rina_kmsg_ipcp_destroy {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -68,7 +68,7 @@ struct rina_kmsg_ipcp_destroy {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
-/* IPCM <-- kernel message to fetch IPC process information. */
+/* application <-- kernel message to fetch IPC process information. */
 struct rina_kmsg_fetch_ipcp_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -136,7 +136,7 @@ struct rina_kmsg_fa_resp {
     uint64_t remote_addr; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
-/* IPCM --> kernel to configure and IPC process. */
+/* application --> kernel to configure and IPC process. */
 struct rina_kmsg_ipcp_config {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -146,7 +146,7 @@ struct rina_kmsg_ipcp_config {
     char *value;
 } __attribute__((packed));
 
-/* IPCM --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
+/* application --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
 struct rina_kmsg_ipcp_pduft_set {
     rina_msg_t msg_type;
     uint32_t event_id;

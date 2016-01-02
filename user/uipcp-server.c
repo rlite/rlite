@@ -31,7 +31,7 @@ struct registered_ipcp {
     struct list_head node;
 };
 
-/* Global variable containing the main struct of the IPCM. This variable
+/* Global variable containing the main struct of the uipcps. This variable
  * should be accessed directly only by signal handlers (because I don't know
  * how to do it differently). The rest of the program should access it
  * through pointers.
@@ -422,7 +422,7 @@ sigint_handler(int signum)
     /* TODO Here we should free all the dynamically allocated memory
      * referenced by uipcps. */
 
-    unlink(RINA_IPCM_UNIX_NAME);
+    unlink(RINA_UIPCPS_UNIX_NAME);
     exit(EXIT_SUCCESS);
 }
 
@@ -448,9 +448,9 @@ int main(int argc, char **argv)
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RINA_IPCM_UNIX_NAME,
+    strncpy(server_address.sun_path, RINA_UIPCPS_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
-    if (unlink(RINA_IPCM_UNIX_NAME) == 0) {
+    if (unlink(RINA_UIPCPS_UNIX_NAME) == 0) {
         /* This should not happen if everything behaves correctly.
          * However, if something goes wrong, the Unix domain socket
          * could still exist and so the following bind() would fail.
@@ -473,7 +473,7 @@ int main(int argc, char **argv)
     list_init(&uipcps->ipcps_registrations);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
-     * the Unix domain socket used to access the IPCM server. */
+     * the Unix domain socket used to access the uipcp server. */
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
