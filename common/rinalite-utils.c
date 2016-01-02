@@ -54,14 +54,14 @@ string_prlen(const char *s)
 
     slen = s ? strlen(s) : 0;
 
-    return slen > 255 ? 255 : slen;
+    return slen > 65535 ? 65535 : slen;
 }
 
 /* Size of a serialized RINA name. */
 unsigned int
 rina_name_serlen(const struct rina_name *name)
 {
-    unsigned int ret = 4 * sizeof(uint8_t);
+    unsigned int ret = 4 * sizeof(uint16_t);
 
     if (!name) {
         return ret;
@@ -75,10 +75,10 @@ rina_name_serlen(const struct rina_name *name)
 void
 serialize_string(void **pptr, const char *s)
 {
-    uint8_t slen;
+    uint16_t slen;
 
     slen = string_prlen(s);
-    serialize_obj(*pptr, uint8_t, slen);
+    serialize_obj(*pptr, uint16_t, slen);
 
     memcpy(*pptr, s, slen);
     *pptr += slen;
@@ -88,9 +88,9 @@ serialize_string(void **pptr, const char *s)
 int
 deserialize_string(const void **pptr, char **s)
 {
-    uint8_t slen;
+    uint16_t slen;
 
-    deserialize_obj(*pptr, uint8_t, &slen);
+    deserialize_obj(*pptr, uint16_t, &slen);
     if (slen) {
         *s = COMMON_ALLOC(slen + 1, 1);
         if (!(*s)) {
@@ -161,7 +161,7 @@ rina_msg_serlen(struct rina_msg_layout *numtables,
 
     str = (string_t *)name;
     for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
-        ret += sizeof(uint8_t) + string_prlen(*str);
+        ret += sizeof(uint16_t) + string_prlen(*str);
     }
 
     return ret;
