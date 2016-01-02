@@ -2261,11 +2261,13 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         case RLITE_KER_UIPCP_FA_REQ_ARRIVED:
         case RLITE_KER_UIPCP_FA_RESP_ARRIVED:
         case RLITE_KER_FLOW_DEALLOC:
-            if (0) {
-                /* TODO check euid == 0 */
+        case RLITE_KER_FLOW_FETCH:
+#if 0
+            if (!capable(CAP_SYS_ADMIN)) {
                 kfree(kbuf);
-                return -EINVAL;
+                return -EPERM;
             }
+#endif
             break;
     }
 

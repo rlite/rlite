@@ -1,6 +1,3 @@
-- implementare l'event kernel --> user RLITE_KER_CONFIG_CHANGED, per avvisare
-  le applicazioni che è necessario rifare un ipcps_fetch()
-
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 
 - flow entry in stato ALLOCATED ma mai associate ad un file descriptor con
@@ -22,10 +19,6 @@
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
 
 - addr size non consistente (PCI/resto dello stack)
-
-- implementare un semplice livello di protezione, ad esempio distinguendo
-  quelle operazioni che possono essere effettuate solo da UIPCP, ed altre
-  che possono essere fatte da tutte le applicazioni
 
 - implementare list_for_each_entry_safe()
 
