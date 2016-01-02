@@ -22,3 +22,9 @@
 
 - [NOT VERIFIED] remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
+
+- port nginx to rlite
+
+- support RIB M_READ (and M_WRITE)
+
+- collect per-flow statistics

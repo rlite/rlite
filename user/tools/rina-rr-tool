@@ -27,7 +27,10 @@ class RinaRRTool:
 
     def __init__(self):
         self.rc = rlite_ctrl()
-        rl_ctrl_init(self.rc, None)
+        ret = rl_ctrl_init(self.rc, None)
+        if ret:
+            raise Exception("Could not open rlite ctrl device")
+
         self.client_name = rina_name()
         self.server_name = rina_name()
         self.dif = rina_name()
