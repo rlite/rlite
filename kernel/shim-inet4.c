@@ -78,7 +78,10 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rina_buf *rb, bool maysleep)
 {
-    return -ENOBUFS;
+    rina_buf_free(rb);
+    PI("Just dropping packet\n");
+
+    return 0;
 }
 
 static int
