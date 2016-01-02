@@ -49,6 +49,11 @@ struct shim_inet4_flow {
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
 
+    struct rina_buf *cur_rx_rb;
+    uint16_t cur_rx_rblen;
+    int cur_rx_buflen;
+    bool cur_rx_hdr;
+
     struct mutex rxw_lock;
 };
 
@@ -86,9 +91,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
     struct msghdr msghdr;
-    struct rina_buf *rb;
     struct iovec iov;
-    uint16_t lenhdr;
     int ret;
 
     mutex_lock(&priv->rxw_lock);
@@ -97,51 +100,60 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         memset(&msghdr, 0, sizeof(msghdr));
         msghdr.msg_flags = MSG_DONTWAIT;
 
-        lenhdr = 0;
-        iov.iov_base = &lenhdr;
-        iov.iov_len = sizeof(lenhdr);
+        if (priv->cur_rx_hdr) {
+            /* We're reading the 2-bytes header containing the SDU length. */
+            iov.iov_base = &priv->cur_rx_rblen;
+            iov.iov_len = sizeof(priv->cur_rx_rblen);
+
+        } else {
+            /* We're reading the SDU. */
+            iov.iov_base = RINA_BUF_DATA(priv->cur_rx_rb);
+            iov.iov_len = priv->cur_rx_rblen;
+        }
+
+        iov.iov_base += priv->cur_rx_buflen;
+        iov.iov_len -= priv->cur_rx_buflen;
 
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
-                             sizeof(lenhdr), msghdr.msg_flags);
-        if (ret != sizeof(lenhdr)) {
-            if (unlikely(ret && ret != -EAGAIN)) {
-                PE("recvmsg(2): %d\n", ret);
+                             iov.iov_len, msghdr.msg_flags);
+        if (ret == -EAGAIN) {
+            break;
+        } else if (unlikely(ret < 0)) {
+            PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
+            break;
+        }
+
+        PD("read %d bytes\n", ret);
+
+        priv->cur_rx_buflen += ret;
+
+        if (priv->cur_rx_hdr && priv->cur_rx_buflen ==
+                                    sizeof(priv->cur_rx_rblen)) {
+            /* We have completely read the 2-bytes header. */
+            priv->cur_rx_rblen = ntohs(priv->cur_rx_rblen);
+            if (unlikely(!priv->cur_rx_rblen)) {
+                PE("Warning: zero lenght packet\n");
+            } else {
+                priv->cur_rx_hdr = false;
+                priv->cur_rx_rb = rina_buf_alloc(priv->cur_rx_rblen, 3, GFP_ATOMIC);
+                if (unlikely(!priv->cur_rx_rb)) {
+                    PE("Out of memory\n");
+                    break;
+                }
             }
-            break;
+
+            priv->cur_rx_buflen = 0;
+
+        } else if (!priv->cur_rx_hdr && priv->cur_rx_buflen ==
+                                            priv->cur_rx_rblen) {
+            /* We have completely read the SDU. */
+            rina_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
+            priv->cur_rx_rb = NULL;
+            priv->cur_rx_hdr = true;
+            priv->cur_rx_rblen = 0;
+
+            priv->cur_rx_buflen = 0;
         }
-
-        lenhdr = ntohs(lenhdr);
-        NPD("lenhdr %d, ret = %d\n", lenhdr, ret);
-
-        if (!lenhdr) {
-            PE("Warning: zero lenght packet\n");
-            continue;
-        }
-
-        rb = rina_buf_alloc(lenhdr, 3, GFP_ATOMIC);
-        if (!rb) {
-            PE("Out of memory\n");
-            break;
-        }
-
-        memset(&msghdr, 0, sizeof(msghdr));
-        msghdr.msg_flags = MSG_DONTWAIT;
-
-        iov.iov_base = RINA_BUF_DATA(rb);
-        iov.iov_len = lenhdr;
-
-        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
-                             lenhdr, msghdr.msg_flags);
-        if (unlikely(ret != lenhdr)) {
-            if (ret && ret != -EAGAIN) {
-                PE("recvmsg(%d): %d\n", lenhdr, ret);
-            }
-            rina_buf_free(rb);
-            break;
-        }
-
-        NPD("read %d bytes\n", ret);
-        rina_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
     }
 
     mutex_unlock(&priv->rxw_lock);
@@ -209,6 +221,13 @@ rina_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     priv->sock = sock;
     INIT_WORK(&priv->rxw, inet4_rx_worker);
     mutex_init(&priv->rxw_lock);
+
+    /* Initialize TCP reader state machine. */
+    priv->cur_rx_rb = NULL;
+    priv->cur_rx_rblen = 0;
+    priv->cur_rx_buflen = 0;
+    priv->cur_rx_hdr = true;
+
     priv->flow = flow;
     flow->priv = priv;
 
