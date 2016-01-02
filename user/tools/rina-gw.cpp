@@ -147,6 +147,9 @@ struct Worker {
     int repoll();
     int drain_syncfd();
     void run();
+
+private:
+    int forward_data(int ifd, int ofd, char *buf);
 };
 
 #define NUM_WORKERS     1
@@ -170,7 +173,7 @@ struct Gateway {
      * fa_req_event_id --> tcp_client_fd */
     map<unsigned int, int> pending_fa_reqs;
 
-    Worker *workers;
+    vector<Worker*> workers;
 
     Gateway();
     ~Gateway();
@@ -245,6 +248,36 @@ Worker::drain_syncfd()
 #define MAX_FDS         16
 #define MAX_BUF_SIZE    4096
 
+int
+Worker::forward_data(int ifd, int ofd, char *buf)
+{
+    int n = read(ifd, buf, MAX_BUF_SIZE);
+    int m;
+
+    if (n > 0) {
+        m = write(ofd, buf, n);
+        if (m != n) {
+            if (m < 0) {
+                perror("write()");
+                return m;
+
+            } else {
+                PE("Partial write %d/%d\n", m, n);
+                return -1;
+            }
+        }
+
+    } else if (n < 0) {
+        perror("read()");
+        return n;
+
+    } else {
+        PI("Read 0 bytes from %d\n", ifd);
+    }
+
+    return 0;
+}
+
 void
 Worker::run()
 {
@@ -287,26 +320,7 @@ Worker::run()
         for (int i=1, j=0; j<ret; i++) {
             if (pollfds[i].revents) {
                 if (pollfds[i].revents & POLLIN) {
-                    int n = read(pollfds[i].fd, buf, MAX_BUF_SIZE);
-                    int m;
-
-                    if (n > 0) {
-                        m = write(fdmap[pollfds[i].fd], buf, n);
-                        if (m != n) {
-                            if (m < 0) {
-                                perror("write()");
-
-                            } else {
-                                PE("Partial write %d/%d\n", m, n);
-                            }
-                        }
-
-                    } else if (n < 0) {
-                        perror("read()");
-
-                    } else {
-                        PI("Read 0 bytes from %d\n", pollfds[i].fd);
-                    }
+                    forward_data(pollfds[i].fd, fdmap[pollfds[i].fd], buf);
                 }
                 j++;
             }
@@ -317,7 +331,9 @@ Worker::run()
 
 Gateway::Gateway()
 {
-    workers = new Worker[NUM_WORKERS];
+    for (int i=0; i<NUM_WORKERS; i++) {
+        workers.push_back(new Worker());
+    }
 
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
@@ -337,7 +353,9 @@ Gateway::~Gateway()
 
     rlite_appl_fini(&appl);
 
-    delete [] workers;
+    for (unsigned int i=0; i<workers.size(); i++) {
+        delete workers[i];
+    }
 }
 
 Gateway gw;
@@ -434,7 +452,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     struct rina_kmsg_fa_resp_arrived *resp =
             (struct rina_kmsg_fa_resp_arrived *)b_resp;
     map<unsigned int, int>::iterator mit;
-    Worker *w = &gw->workers[0];
+    Worker *w = gw->workers[0];
     int cfd;
     int rfd;
 
