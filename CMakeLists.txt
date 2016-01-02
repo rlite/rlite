@@ -12,7 +12,7 @@ message(STATUS "RINA HEADERS: ${RINA_HEADERS}")
 
 include_directories(${INCLUDE_DIR})
 
-add_library(rinalite SHARED user/rina-utils.c user/rina-kernel-numtables.c user/rina-conf-numtables.c user/helpers.c user/rinalite_evloop.c user/pending_queue.c user/rinalite_appl.c)
+add_library(rinalite SHARED user/rina-utils.c user/rina-kernel-numtables.c user/rina-conf-numtables.c user/rinalite_evloop.c user/pending_queue.c user/rinalite_appl.c)
 
 target_link_libraries(rinalite pthread)
 

@@ -45,7 +45,7 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
     resp->msg_type = RINA_CONF_BASE_RESP;
     resp->event_id = req->event_id;
 
-    return rina_msg_write(sfd, RINALITE_RMB(resp));
+    return rina_msg_write_fd(sfd, RINALITE_RMB(resp));
 }
 
 static void
@@ -301,7 +301,7 @@ unix_server(void *arg)
             resp.msg_type = RINA_CONF_BASE_RESP;
             resp.event_id = req->event_id;
             resp.result = 1;
-            rina_msg_write(cfd, (struct rina_msg_base *)&resp);
+            rina_msg_write_fd(cfd, (struct rina_msg_base *)&resp);
         } else {
             /* Valid message type: handle the request. */
             ret = rina_config_handlers[req->msg_type](uipcps, cfd, req);

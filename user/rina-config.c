@@ -131,7 +131,7 @@ request_response(struct rina_msg_base *req, int verbose)
         return fd;
     }
 
-    ret = rina_msg_write(fd, req);
+    ret = rina_msg_write_fd(fd, req);
     if (ret) {
         return ret;
     }
