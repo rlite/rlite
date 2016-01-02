@@ -717,12 +717,13 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 }
 
 int
-CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
+CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
+                  char **buf, size_t *len)
 {
     gpb::CDAPMessage gm;
-    size_t serlen;
-    char *serbuf;
-    int n;
+
+    *buf = NULL;
+    *len = 0;
 
     m->version = version;
 
@@ -750,14 +751,30 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 
     gm = static_cast<gpb::CDAPMessage>(*m);
 
-    serlen = gm.ByteSize();
-    serbuf = (char *)malloc(serlen);
+    *len = gm.ByteSize();
+    *buf = (char *)malloc(*len);
 
-    if (!serbuf) {
-        return -ENOMEM;
+    if (!(*buf)) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
     }
 
-    gm.SerializeToArray(serbuf, serlen);
+    gm.SerializeToArray(*buf, *len);
+
+    return 0;
+}
+
+int
+CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
+{
+    size_t serlen;
+    char *serbuf;
+    int n;
+
+    n = msg_ser(m, invoke_id, &serbuf, &serlen);
+    if (n) {
+        return 0;
+    }
 
     n = write(fd, serbuf, serlen);
     if (n != serlen) {

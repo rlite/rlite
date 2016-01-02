@@ -44,6 +44,8 @@ public:
 
     /* @invoke_id is not meaningful for request messages. */
     int msg_send(struct CDAPMessage *m, int invoke_id);
+    int msg_ser(struct CDAPMessage *m, int invoke_id,
+                char **buf, size_t *len);
 
     struct CDAPMessage * msg_recv();
 
