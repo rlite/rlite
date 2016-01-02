@@ -28,3 +28,5 @@
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
 
 - serialize/unserialize: controllare boundary delle numtables
+
+- addr size non consistente (PCI/resto dello stack)

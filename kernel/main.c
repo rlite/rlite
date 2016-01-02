@@ -1811,6 +1811,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     int ret = 0;
 
     if (flow->upper.ipcp) {
+        /* The flow on which the PDU is received is used by an IPCP. */
         if (unlikely(rb->len < sizeof(struct rina_pci))) {
             RPD(5, "Dropping SDU shorter [%u] than PCI\n",
                     (unsigned int)rb->len);
@@ -1819,14 +1820,20 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             goto out;
         }
 
-        if (likely(RINA_BUF_PCI(rb)->pdu_type != PDU_T_MGMT)) {
-            ret = flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
-            goto out;
-
-        } else if (flow->upper.ipcp->mgmt_txrx) {
+        if (unlikely(RINA_BUF_PCI(rb)->pdu_type == PDU_T_MGMT &&
+                     (RINA_BUF_PCI(rb)->dst_addr == flow->upper.ipcp->addr ||
+                      RINA_BUF_PCI(rb)->dst_addr == 0))) {
+            /* Management PDU for this IPC process. Post it to the userspace
+             * IPCP. */
             struct rina_mgmt_hdr *mhdr;
             uint64_t src_addr = RINA_BUF_PCI(rb)->src_addr;
 
+            if (!flow->upper.ipcp->mgmt_txrx) {
+                PE("Missing mgmt_txrx\n");
+                rina_buf_free(rb);
+                ret = -EINVAL;
+                goto out;
+            }
             txrx = flow->upper.ipcp->mgmt_txrx;
             rina_buf_pci_pop(rb);
             /* Push a management header using the room made available
@@ -1838,12 +1845,14 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             mhdr->remote_addr = src_addr;
 
         } else {
-            PE("Missing mgmt_txrx\n");
-            rina_buf_free(rb);
-            ret = -EINVAL;
+            /* PDU which is not PDU_T_MGMT or it is to be forwarded. */
+            ret = flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
             goto out;
         }
+
     } else {
+        /* The flow on which the PDU is received is used by an application
+         * different from an IPCP. */
         txrx = &flow->txrx;
     }
 
