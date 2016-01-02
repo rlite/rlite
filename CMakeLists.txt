@@ -32,6 +32,10 @@ include_directories(${INCLUDE_DIR})
 find_package(Threads REQUIRED)
 find_package(Protobuf REQUIRED)
 
+if(PROTOBUF_PROTOC_EXECUTABLE STREQUAL "PROTOBUF_PROTOC_EXECUTABLE-NOTFOUND")
+	message(FATAL_ERROR "Cannot find protocol buffer compiler")
+endif()
+
 # Protocol buffer processing
 protobuf_generate_cpp(CDAP_GPB_SRC CDAP_GPB_HDR user/CDAP.proto)
 protobuf_generate_cpp(UIPCP_GPB_SRC UIPCP_GPB_HDR ${UIPCP_GPB_PROTOFILES})
