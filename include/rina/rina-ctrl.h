@@ -40,6 +40,8 @@ enum {
 enum {
     RINA_CTRL_CREATE_IPCP = 1,
     RINA_CTRL_CREATE_IPCP_RESP,
+    RINA_CTRL_DESTROY_IPCP,
+    RINA_CTRL_DESTROY_IPCP_RESP,
     RINA_CTRL_ASSIGN_TO_DIF,
     RINA_CTRL_ASSIGN_TO_DIF_RESP,
 
@@ -70,6 +72,23 @@ struct rina_ctrl_create_ipcp_resp {
     uint32_t event_id;
 
     uint16_t ipcp_id;
+};
+
+/* IPCM --> kernel message to destroy an IPC process. */
+struct rina_ctrl_destroy_ipcp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+};
+
+/* IPCM <-- kernel message to inform the IPCM about the destruction
+ * of an IPC process. */
+struct rina_ctrl_destroy_ipcp_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t result;
 };
 
 struct rina_ctrl_assign_to_dif {

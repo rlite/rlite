@@ -157,6 +157,60 @@ err1:
 }
 
 static ssize_t
+rina_ipcp_destroy(struct rina_ctrl *rc, const char __user *buf, size_t len)
+{
+    const struct rina_ctrl_destroy_ipcp *umsg =
+                    (const struct rina_ctrl_destroy_ipcp *)buf;
+    struct rina_ctrl_destroy_ipcp kmsg;
+    struct rina_ctrl_destroy_ipcp_resp *rmsg;
+    struct upqueue_entry *entry;
+    int ret;
+
+    if (len != sizeof(*umsg)) {
+        return -EINVAL;
+    }
+
+    if (unlikely(copy_from_user(&kmsg, umsg, len))) {
+        return -EFAULT;
+    }
+
+    /* Create the response message. */
+    rmsg = kmalloc(sizeof(*rmsg), GFP_KERNEL);
+    if (!rmsg) {
+        return -ENOMEM;
+    }
+    rmsg->msg_type = RINA_CTRL_DESTROY_IPCP_RESP;
+    rmsg->event_id = kmsg.event_id;
+    rmsg->result = 0;
+
+    /* Alloc an entry for the response. */
+    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    if (!entry) {
+        ret = -ENOMEM;
+        goto err1;
+    }
+    entry->msg = rmsg;
+    entry->msg_len = sizeof(*rmsg);
+
+    /* Release the IPC process ID. */
+    ipcp_id_release(kmsg.ipcp_id);
+
+    /* Enqueue the response into the upqueue. */
+    mutex_lock(&rc->upqueue_lock);
+    list_add(&entry->node, &rc->upqueue);
+    mutex_unlock(&rc->upqueue_lock);
+
+    printk("IPC process %u destroyed\n", kmsg.ipcp_id);
+
+    return len;
+
+err1:
+    kfree(rmsg);
+
+    return ret;
+}
+
+static ssize_t
 rina_assign_to_dif(struct rina_ctrl *rc, const char __user *buf, size_t len)
 {
     return len;
@@ -169,6 +223,7 @@ typedef ssize_t (*rina_msg_handler_t)(struct rina_ctrl *rc,
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
     [RINA_CTRL_CREATE_IPCP] = rina_ipcp_create,
+    [RINA_CTRL_DESTROY_IPCP] = rina_ipcp_destroy,
     [RINA_CTRL_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_CTRL_MSG_MAX] = NULL,
 };
