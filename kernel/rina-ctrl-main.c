@@ -440,6 +440,7 @@ flow_get(unsigned int port_id)
     head = &rina_dm.flow_table[hash_min(port_id, HASH_BITS(rina_dm.flow_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->local_port == port_id) {
+            entry->refcnt++;
             FUNLOCK();
             return entry;
         }
@@ -528,7 +529,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->state = FLOW_STATE_NULL;
         entry->upper = upper;
         entry->event_id = event_id;
-        entry->refcnt = 0;
+        entry->refcnt = 1;
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         INIT_LIST_HEAD(&entry->rmtq);
@@ -559,24 +560,27 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     return ret;
 }
 
-int
+struct flow_entry *
 flow_put(struct flow_entry *entry, int locked)
 {
     struct ipcp_entry *ipcp = NULL;
-    struct dtp *dtp = &entry->dtp;
     struct rina_buf *rb;
     struct rina_buf *tmp;
-    int ret = 0;
+    struct dtp *dtp;
+    struct flow_entry *ret = entry;
+
+    if (unlikely(!entry)) {
+        return NULL;
+    }
+
+    dtp = &entry->dtp;
 
     if (locked)
         mutex_lock(&rina_dm.lock);
 
     FLOCK();
 
-    if (entry->refcnt) {
-        entry->refcnt--;
-    }
-
+    entry->refcnt--;
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
         goto out;
@@ -608,6 +612,8 @@ flow_put(struct flow_entry *entry, int locked)
             goto out;
         }
     }
+
+    ret = NULL;
 
     ipcp = entry->txrx.ipcp;
 
@@ -642,6 +648,7 @@ out:
 
     return ret;
 }
+EXPORT_SYMBOL_GPL(flow_put);
 
 /* Must be called under global lock. */
 static void
@@ -929,13 +936,16 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     struct flow_entry *flow;
     int ret = -EINVAL;  /* Report failure by default. */
 
+    flow = flow_get(req->local_port);
+
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
-    flow = flow_get(req->local_port);
     if (ipcp && flow && ipcp->ops.pduft_set) {
         ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
     }
     mutex_unlock(&rina_dm.lock);
+
+    flow_put(flow, 1);
 
     if (ret == 0) {
         printk("%s: Set IPC process %u PDUFT entry: %llu --> %u\n", __func__,
@@ -1245,10 +1255,8 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_fa_resp *req =
                     (struct rina_kmsg_fa_resp *)bmsg;
-    struct flow_entry *flow_entry = NULL;
+    struct flow_entry *flow_entry;
     int ret = -EINVAL;
-
-    mutex_lock(&rina_dm.lock);
 
     /* Lookup the flow corresponding to the port-id specified
      * by the request. */
@@ -1256,12 +1264,19 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (!flow_entry) {
         printk("%s: no pending flow corresponding to port-id %u\n",
                 __func__, req->port_id);
-        goto out;
+        return ret;
     }
 
+    mutex_lock(&rina_dm.lock);
     ret = rina_fa_resp_internal(flow_entry, req->response, req);
-out:
     mutex_unlock(&rina_dm.lock);
+
+    flow_entry = flow_put(flow_entry, 1);
+    if (flow_entry) {
+        FLOCK();
+        flow_entry->refcnt--;
+        FUNLOCK();
+    }
 
     return ret;
 }
@@ -1339,13 +1354,13 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
 
-    if (locked) {
-        mutex_lock(&rina_dm.lock);
-    }
-
     flow_entry = flow_get(local_port);
     if (!flow_entry) {
-        goto out;
+        return ret;
+    }
+
+    if (locked) {
+        mutex_lock(&rina_dm.lock);
     }
 
     if (flow_entry->state != FLOW_STATE_PENDING) {
@@ -1370,6 +1385,13 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     }
 
 out:
+    flow_entry = flow_put(flow_entry, 0);
+    if (flow_entry) {
+        FLOCK();
+        flow_entry->refcnt--;
+        FUNLOCK();
+    }
+
     if (locked) {
         mutex_unlock(&rina_dm.lock);
     }
@@ -1384,8 +1406,6 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
     struct flow_entry *flow;
     struct txrx *txrx;
     int ret = 0;
-
-    mutex_lock(&rina_dm.lock);  /* Here we should use ipcp mutex! */
 
     flow = flow_get(local_port);
     if (!flow) {
@@ -1404,9 +1424,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         }
 
         if (likely(RINA_BUF_PCI(rb)->pdu_type != PDU_T_MGMT)) {
-            mutex_unlock(&rina_dm.lock);
+            ret = flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
+            goto out;
 
-            return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
         } else if (flow->upper.ipcp->mgmt_txrx) {
             struct rina_mgmt_hdr *mhdr;
             uint64_t src_addr = RINA_BUF_PCI(rb)->src_addr;
@@ -1420,6 +1440,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             mhdr->type = RINA_MGMT_HDR_T_IN;
             mhdr->local_port = local_port;
             mhdr->remote_addr = src_addr;
+
         } else {
             PE("%s: Missing mgmt_txrx\n", __func__);
             rina_buf_free(rb);
@@ -1436,7 +1457,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
-    mutex_unlock(&rina_dm.lock);
+    flow_put(flow, 1);
 
     return ret;
 }
@@ -1446,8 +1467,6 @@ void
 rina_write_restart(uint32_t local_port)
 {
     struct flow_entry *flow;
-
-    mutex_lock(&rina_dm.lock);
 
     flow = flow_get(local_port);
     if (flow) {
@@ -1463,9 +1482,9 @@ rina_write_restart(uint32_t local_port)
                 POLLWRBAND | POLLWRNORM);
         }
         spin_unlock(&flow->rmtq_lock);
-    }
 
-    mutex_unlock(&rina_dm.lock);
+        flow_put(flow, 1);
+    }
 }
 EXPORT_SYMBOL_GPL(rina_write_restart);
 
@@ -1872,7 +1891,6 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 
     /* Bind the flow to this file descriptor. */
     rio->flow = flow;
-    rio->flow->refcnt++;
     rio->txrx = &flow->txrx;
 
     if (info->mode == RINA_IO_MODE_IPCP_BIND) {
@@ -1884,6 +1902,8 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         ipcp = ipcp_table_find(info->ipcp_id);
         if (!ipcp) {
             printk("%s: Error: No such ipcp\n", __func__);
+            flow_put(flow, 0);
+
             return -ENXIO;
         }
         rio->flow->upper.ipcp = ipcp;

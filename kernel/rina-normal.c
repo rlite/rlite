@@ -341,8 +341,13 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
                     mhdr->local_port);
             rina_buf_free(rb);
 
+            if (lower_flow) {
+                flow_put(lower_flow, 1);
+            }
+
             return 0;
         }
+        flow_put(lower_flow, 1);
     } else {
         rina_buf_free(rb);
 
@@ -653,7 +658,7 @@ static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
     struct rina_pci *pci = RINA_BUF_PCI(rb);
-    struct flow_entry *flow = flow_get(pci->conn_id.dst_cep);
+    struct flow_entry *flow;
     uint64_t seqnum = pci->seqnum;
     struct rina_buf *crb = NULL;
     unsigned int a = 0;
@@ -662,6 +667,12 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     bool drop;
     int ret = 0;
 
+    if (pci->dst_addr != ipcp->addr) {
+        /* The PDU is not for this IPCP, forward it. */
+        return rmt_tx(ipcp, pci->dst_addr, rb, false);
+    }
+
+    flow = flow_get(pci->conn_id.dst_cep);
     if (!flow) {
         PI("%s: No flow for port-id %u: dropping PDU\n",
                 __func__, pci->conn_id.dst_cep);
@@ -669,14 +680,12 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         return 0;
     }
 
-    if (pci->dst_addr != ipcp->addr) {
-        /* The PDU is not for this IPCP, forward it. */
-        return rmt_tx(ipcp, pci->dst_addr, rb, false);
-    }
-
     if (pci->pdu_type != PDU_T_DT) {
         /* This is a control PDU. */
-        return sdu_rx_ctrl(ipcp, flow, rb);
+        ret = sdu_rx_ctrl(ipcp, flow, rb);
+        flow_put(flow, 1);
+
+        return ret;
     }
 
     /* This is data transfer PDU. */
@@ -826,6 +835,8 @@ snd_crb:
     if (crb) {
         rmt_tx(ipcp, flow->remote_addr, crb, false);
     }
+
+    flow_put(flow, 1);
 
     return ret;
 }
