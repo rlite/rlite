@@ -301,6 +301,53 @@ open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
     return open_port_common(port_id, 0, ipcp_id);
 }
 
+/* flow_allocate() + open_port_appl() */
+int
+flow_allocate_open(struct application *application,
+                   struct rina_name *dif_name,
+                   int dif_fallback,
+                   const struct rina_name *local_application,
+                   const struct rina_name *remote_application,
+                   unsigned int wait_ms)
+{
+    unsigned int port_id;
+    int ret;
+
+    ret = flow_allocate(application, dif_name, dif_fallback,
+                        local_application, remote_application,
+                        &port_id, wait_ms);
+    if (ret) {
+        return -1;
+    }
+
+    return open_port_appl(port_id);
+}
+
+/* flow_request_wait() + open_port_appl() */
+int
+flow_request_wait_open(struct application *application)
+{
+    struct pending_flow_req *pfr;
+    unsigned int port_id;
+    int result;
+
+    pfr = flow_request_wait(application);
+    printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+            __func__, pfr->ipcp_id, pfr->port_id);
+
+    /* Always accept incoming connection, for now. */
+    result = flow_allocate_resp(application, pfr->ipcp_id,
+            pfr->port_id, 0);
+    port_id = pfr->port_id;
+    free(pfr);
+
+    if (result) {
+        return -1;
+    }
+
+    return open_port_appl(port_id);
+}
+
 int
 rina_application_init(struct application *application)
 {

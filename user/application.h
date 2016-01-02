@@ -48,4 +48,13 @@ int open_port_appl(uint32_t port_id);
 
 int open_port_ipcp(uint32_t port_id, uint16_t ipcp_id);
 
+int flow_allocate_open(struct application *application,
+                       struct rina_name *dif_name,
+                       int dif_fallback,
+                       const struct rina_name *local_application,
+                       const struct rina_name *remote_application,
+                       unsigned int wait_ms);
+
+int flow_request_wait_open(struct application *application);
+
 #endif  /* __RINA_APPLICATION_H__ */

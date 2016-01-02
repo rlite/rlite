@@ -27,7 +27,6 @@ struct rinaperf {
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
     struct rina_name dif_name;
-    unsigned int data_port_id;
     int dfd;
 
     struct rinaperf_test_config test_config;
@@ -247,28 +246,11 @@ static struct perf_function_desc descs[] = {
 static int
 server(struct rinaperf *rp)
 {
-    struct pending_flow_req *pfr = NULL;
-
     for (;;) {
         perf_function_t perf_function = NULL;
-        int result;
         int ret;
 
-        pfr = flow_request_wait(&rp->application);
-        rp->data_port_id = pfr->port_id;
-        printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-                __func__, pfr->ipcp_id, pfr->port_id);
-
-        /* Always accept incoming connection, for now. */
-        result = flow_allocate_resp(&rp->application, pfr->ipcp_id,
-                                    pfr->port_id, 0);
-        free(pfr);
-
-        if (result) {
-            continue;
-        }
-
-        rp->dfd = open_port_appl(rp->data_port_id);
+        rp->dfd = flow_request_wait_open(&rp->application);
         if (rp->dfd < 0) {
             continue;
         }
@@ -417,14 +399,8 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        ret = flow_allocate(&rp.application, &rp.dif_name, 1,
-                &rp.client_appl_name, &rp.server_appl_name,
-                &rp.data_port_id, 1500);
-        if (ret) {
-            return ret;
-        }
-
-        rp.dfd = open_port_appl(rp.data_port_id);
+        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1,
+                &rp.client_appl_name, &rp.server_appl_name, 1500);
         if (rp.dfd < 0) {
             return rp.dfd;
         }
