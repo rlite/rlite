@@ -1967,10 +1967,12 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 goto out;
             }
             txrx = flow->upper.ipcp->mgmt_txrx;
-            rlite_buf_pci_pop(rb);
+            ret = rlite_buf_pci_pop(rb);
+            BUG_ON(ret); /* We already check bounds above. */
             /* Push a management header using the room made available
              * by rlite_buf_pci_pop(). */
-            rlite_buf_custom_push(rb, sizeof(*mhdr));
+            ret = rlite_buf_custom_push(rb, sizeof(*mhdr));
+            BUG_ON(ret);
             mhdr = (struct rina_mgmt_hdr *)RLITE_BUF_DATA(rb);
             mhdr->type = RINA_MGMT_HDR_T_IN;
             mhdr->local_port = flow->local_port;
@@ -2410,7 +2412,8 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         }
 
         if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-            rlite_buf_pci_push(rb);
+            ret = rlite_buf_pci_push(rb);
+            BUG_ON(ret);
             rio->flow->sdu_rx_consumed(rio->flow, rb);
         }
 

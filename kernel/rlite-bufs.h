@@ -5,6 +5,8 @@
 #include <linux/list.h>
 #include <asm/atomic.h>
 
+#include "rlite/common.h"
+
 
 #define RLITE_MAX_LAYERS    3
 
@@ -56,7 +58,7 @@ struct rina_rawbuf {
 
 struct rlite_buf {
     struct rina_rawbuf  *raw;
-    struct rlite_pci     *pci;
+    struct rlite_pci    *pci;
     size_t              len;
 
     unsigned long       rtx_jiffies;
@@ -72,22 +74,45 @@ struct rlite_buf * rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp);
 
 void rlite_buf_free(struct rlite_buf *rb);
 
-static inline void rlite_buf_pci_pop(struct rlite_buf *rb)
+static inline int
+rlite_buf_pci_pop(struct rlite_buf *rb)
 {
+    if (unlikely(rb->len < sizeof(struct rlite_pci))) {
+        RPD(5, "No enough data to pop another PCI\n");
+        return -1;
+    }
+
     rb->pci++;
     rb->len -= sizeof(struct rlite_pci);
+
+    return 0;
 }
 
-static inline void rlite_buf_pci_push(struct rlite_buf *rb)
+static inline int
+rlite_buf_pci_push(struct rlite_buf *rb)
 {
+    if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
+        RPD(5, "No space to push another PCI\n");
+        return -1;
+    }
+
     rb->pci--;
     rb->len += sizeof(struct rlite_pci);
+
+    return 0;
 }
 
-static inline void rlite_buf_custom_push(struct rlite_buf *rb, size_t len)
+static inline int rlite_buf_custom_push(struct rlite_buf *rb, size_t len)
 {
-    rb->pci = (struct rlite_pci *)(((void *)rb->pci) - len);
+    if (unlikely((uint8_t *)(rb->pci) - len < &rb->raw->buf[0])) {
+        RPD(5, "No space to push custom header\n");
+        return -1;
+    }
+
+    rb->pci = (struct rlite_pci *)(((uint8_t *)rb->pci) - len);
     rb->len += len;
+
+    return 0;
 }
 
 void rlite_pci_dump(struct rlite_pci *pci);

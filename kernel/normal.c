@@ -428,7 +428,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         return -EAGAIN;
     }
 
-    rlite_buf_pci_push(rb);
+    if (unlikely(rlite_buf_pci_push(rb))) {
+        spin_unlock_bh(&dtp->lock);
+        rlite_buf_free(rb);
+
+        return -ENOSPC;
+    }
 
     pci = RLITE_BUF_PCI(rb);
     pci->dst_addr = flow->remote_addr;
@@ -534,7 +539,11 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     lower_ipcp = lower_flow->txrx.ipcp;
     BUG_ON(!lower_ipcp);
 
-    rlite_buf_pci_push(rb);
+    if (unlikely(rlite_buf_pci_push(rb))) {
+        rlite_buf_free(rb);
+
+        return -ENOSPC;
+    }
 
     pci = RLITE_BUF_PCI(rb);
     pci->dst_addr = dst_addr;
@@ -990,7 +999,12 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 
         spin_unlock_bh(&dtp->lock);
 
-        rlite_buf_pci_pop(rb);
+        ret = rlite_buf_pci_pop(rb);
+        if (unlikely(ret)) {
+            rlite_buf_free(rb);
+            goto snd_crb;
+        }
+
         ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         goto snd_crb;
@@ -1086,7 +1100,11 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 
         spin_unlock_bh(&dtp->lock);
 
-        rlite_buf_pci_pop(rb);
+        ret = rlite_buf_pci_pop(rb);
+        if (unlikely(ret)) {
+            rlite_buf_free(rb);
+            goto snd_crb;
+        }
         ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         /* Also deliver PDUs just extracted from the seqq. Note
@@ -1094,7 +1112,10 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
          * rina_sdu_rx_flow() will modify qrb->node. */
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
             list_del(&qrb->node);
-            rlite_buf_pci_pop(qrb);
+            if (unlikely(rlite_buf_pci_pop(qrb))) {
+                rlite_buf_free(qrb);
+                continue;
+            }
             ret |= rina_sdu_rx_flow(ipcp, flow, qrb, qlimit);
         }
 
