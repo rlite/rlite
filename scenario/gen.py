@@ -19,6 +19,9 @@ argparser.add_argument('-i', '--image',
 argparser.add_argument('-l', '--levels',
                        help = "Number of stacked normal DIFs [>0]",
                        type = int, default = 1)
+argparser.add_argument('-t', '--type',
+                       help = "",
+                       choices = ['eth', 'inet4'], default = 'eth')
 
 args = argparser.parse_args()
 
@@ -146,6 +149,8 @@ for i in vms:
 
     vmid += 1
 
+inet4_dir = []
+
 for i in vms:
     vm = vms[i]
 
@@ -156,7 +161,7 @@ for i in vms:
             'sudo hostname %(name)s\n'\
             '\n'\
             'sudo modprobe rlite\n'\
-            'sudo modprobe rlite-shim-eth\n'\
+            'sudo modprobe rlite-shim-%(shimtype)s\n'\
             'sudo modprobe rlite-normal\n'\
             'sudo chmod a+rwx /dev/rlite\n'\
             'sudo chmod a+rwx /dev/rlite-io\n'\
@@ -170,17 +175,25 @@ for i in vms:
             '   rina-config ipcp-config n.${i}.IPCP %(id)s address %(id)d\n'\
             'done\n'\
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
-                   'id': vm['id'], 'levels': args.levels}
+                   'id': vm['id'], 'levels': args.levels,
+                   'shimtype': args.type}
 
     for port in vm['ports']:
+        vars_dict = {'mac': port['mac'], 'idx': port['idx'],
+                     'id': vm['id'], 'brid': bridges[port['br']]['id'],
+                     'shimtype': args.type}
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
-                'rina-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-eth e.%(brid)s.DIF\n'\
-                'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n'\
-                'rina-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
-                '\n'\
-                    % {'mac': port['mac'], 'idx': port['idx'],
-                       'id': vm['id'], 'brid': bridges[port['br']]['id']}
+                'rina-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
+        if args.type == 'eth':
+                outs += 'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n' % vars_dict
+        elif args.type == 'inet4':
+                outs += 'sudo ip addr add 10.71.%(brid)s.%(id)s/24 dev $PORT\n' % vars_dict
+                entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.IPCP/%(idx)s//' % vars_dict
+                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
+                inet4_dir.append(entry)
+        outs += 'rina-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
+                '\n' % vars_dict
 
     outs += 'for i in $(seq 2 %(levels)s); do\n'\
             '   rina-config ipcp-register n.$(($i-1)).DIF n.$i.IPCP %(id)s\n'\
@@ -193,6 +206,27 @@ for i in vms:
             '   fi\n'\
             'done\n\n' % {'id': vm['id'], 'levels': args.levels}
 
+if args.type == 'inet4':
+    print(inet4_dir)
+
+    for i in vms:
+        vm = vms[i]
+
+        outs += ''\
+                'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+
+        for entry in inet4_dir:
+                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
+
+        outs += 'true\n'\
+                'ENDSSH\n'\
+                '   DONE=$?\n'\
+                '   if [ $DONE != "0" ]; then\n'\
+                '       sleep 1\n'\
+                '   fi\n'\
+                'done\n\n'
 
 for br_name in bridges:
     b = bridges[br_name]
