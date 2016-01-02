@@ -84,12 +84,6 @@ struct uipcp {
     struct list_head node;
 };
 
-enum {
-    IPCP_MGMT_ENROLL = 5,
-    IPCP_MGMT_FA_REQ = 6,
-    IPCP_MGMT_FA_RESP = 7,
-};
-
 void *uipcp_server(void *arg);
 
 int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
@@ -114,6 +108,7 @@ int uipcp_issue_fa_req_arrived(struct uipcp *uipcp,
                      const struct rina_name *local_application,
                      const struct rina_name *remote_application,
                      const struct rina_flow_config *flowcfg);
+
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                           uint32_t remote_port, uint64_t remote_addr,
                           uint8_t response,
