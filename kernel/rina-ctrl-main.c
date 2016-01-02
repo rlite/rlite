@@ -1702,21 +1702,11 @@ rina_io_poll(struct file *f, poll_table *wait)
     return 0;
 }
 
-static long
-rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+static long rina_io_ioctl_bind(struct rina_io *rio,
+                               struct rina_ioctl_info *info)
 {
-    struct rina_io *rio = (struct rina_io *)f->private_data;
     struct flow_entry *flow = NULL;
-    void __user *argp = (void __user *)arg;
-    struct rina_ioctl_info info;
     long ret = 0;
-
-    /* We have only one command. This should be used and checked. */
-    (void) cmd;
-
-    if (copy_from_user(&info, argp, sizeof(info))) {
-        return -EFAULT;
-    }
 
     mutex_lock(&rina_dm.lock);
 
@@ -1730,7 +1720,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         rio->flow = NULL;
     }
 
-    flow = flow_table_find(info.port_id);
+    flow = flow_table_find(info->port_id);
     if (!flow) {
         printk("%s: Error: No such flow\n", __func__);
         ret = -ENXIO;
@@ -1741,11 +1731,11 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     rio->flow = flow;
     rio->flow->refcnt++;
 
-    if (info.is_upper_ipcp) {
+    if (info->cmd == RINA_IOCTL_CMD_IPCP_BIND) {
         struct ipcp_entry *ipcp;
 
         /* Lookup the IPCP user of 'flow'. */
-        ipcp = ipcp_table_find(info.ipcp_id);
+        ipcp = ipcp_table_find(info->ipcp_id);
         if (!ipcp) {
             printk("%s: Error: No such ipcp\n", __func__);
             ret = -ENXIO;
@@ -1759,6 +1749,33 @@ out:
     mutex_unlock(&rina_dm.lock);
 
     return ret;
+}
+
+static long
+rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    void __user *argp = (void __user *)arg;
+    struct rina_ioctl_info info;
+
+    /* We have only one command. This should be used and checked. */
+    (void) cmd;
+
+    if (copy_from_user(&info, argp, sizeof(info))) {
+        return -EFAULT;
+    }
+
+    switch (info.cmd) {
+        case RINA_IOCTL_CMD_APPL_BIND:
+        case RINA_IOCTL_CMD_IPCP_BIND:
+            return rina_io_ioctl_bind(rio, &info);
+            break;
+
+        default:
+            break;
+    }
+
+    return -EINVAL;
 }
 
 static const struct file_operations rina_ipcm_ctrl_fops = {
