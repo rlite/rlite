@@ -868,7 +868,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
         struct rlite_ipcp *ipcp;
 
         ipcp = rlite_select_ipcp_by_dif(&rib->uipcp->appl.loop,
-                                        supp_dif_name, 0);
+                                        supp_dif_name);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->ipcp_id;
         } else {
@@ -878,7 +878,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     }
 
     /* Allocate a flow for the enrollment. */
-    ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, 0, NULL,
+    ret = rlite_flow_allocate(&rib->uipcp->appl, supp_dif_name, NULL,
                               &info->ipcp_name, &neigh_name, NULL,
                               &port_id_, 2000, info->ipcp_id);
     rina_name_free(&neigh_name);

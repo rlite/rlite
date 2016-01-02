@@ -134,8 +134,7 @@ rlite_ipcps_fetch(struct rlite_evloop *loop);
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
-                         const struct rina_name *dif_name,
-                         int fallback);
+                         const struct rina_name *dif_name);
 
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_name(struct rlite_evloop *loop,

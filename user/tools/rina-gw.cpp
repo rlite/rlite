@@ -291,7 +291,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     strcpy(flowspec.cubename, "rel");
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rlite_flow_allocate(appl, &mit->second.dif_name_r, 0, NULL,
+    ret = rlite_flow_allocate(appl, &mit->second.dif_name_r, NULL,
                               &gw->appl_name, &mit->second.name_r, &flowspec,
                               &unused, 0, 0);
     if (ret) {
@@ -370,7 +370,7 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rlite_appl_register_wait(&gw.appl, 1, &mit->first.dif_name_r, 0, NULL,
+        rlite_appl_register_wait(&gw.appl, 1, &mit->first.dif_name_r, NULL,
                                  &mit->first.name_r, 3000);
         if (ret) {
             PE("Registration of application '%s'\n",

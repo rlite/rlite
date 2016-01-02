@@ -804,8 +804,7 @@ rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
-                         const struct rina_name *dif_name,
-                         int fallback)
+                         const struct rina_name *dif_name)
 {
     struct rlite_ipcp *cur;
 
@@ -820,7 +819,7 @@ rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
                 return cur;
             }
         }
-    } else if (fallback) {
+    } else if (dif_name == NULL) {
         struct rlite_ipcp *rlite_ipcp = NULL;
 
         /* The request does not specify a DIF: select any DIF,

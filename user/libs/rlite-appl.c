@@ -256,7 +256,7 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
 struct rina_kmsg_appl_register_resp *
 rlite_appl_register(struct rlite_appl *application,
                     unsigned int wait_for_completion, int reg,
-                    const struct rina_name *dif_name, int fallback,
+                    const struct rina_name *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name)
 {
@@ -264,7 +264,7 @@ rlite_appl_register(struct rlite_appl *application,
 
     rlite_ipcp = rlite_lookup_ipcp_by_name(&application->loop, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name, fallback);
+        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name);
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
@@ -278,7 +278,7 @@ rlite_appl_register(struct rlite_appl *application,
 
 int
 rlite_appl_register_wait(struct rlite_appl *application, int reg,
-                         const struct rina_name *dif_name, int fallback,
+                         const struct rina_name *dif_name,
                          const struct rina_name *ipcp_name,
                          const struct rina_name *appl_name,
                          unsigned int wait_ms)
@@ -286,7 +286,7 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
     struct rina_kmsg_appl_register_resp *resp;
     int ret = 0;
 
-    resp = rlite_appl_register(application, wait_ms, reg, dif_name, fallback,
+    resp = rlite_appl_register(application, wait_ms, reg, dif_name,
                                ipcp_name, appl_name);
 
     if (!resp) {
@@ -306,8 +306,8 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
 
 int
 rlite_flow_allocate(struct rlite_appl *application,
-              struct rina_name *dif_name, int dif_fallback,
-              struct rina_name *ipcp_name,
+              const struct rina_name *dif_name,
+              const struct rina_name *ipcp_name,
               const struct rina_name *local_appl,
               const struct rina_name *remote_appl,
               const struct rina_flow_spec *flowspec,
@@ -320,8 +320,7 @@ rlite_flow_allocate(struct rlite_appl *application,
 
     rlite_ipcp = rlite_lookup_ipcp_by_name(&application->loop, ipcp_name);
     if (!rlite_ipcp) {
-        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name,
-                                              dif_fallback);
+        rlite_ipcp = rlite_select_ipcp_by_dif(&application->loop, dif_name);
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
@@ -405,8 +404,8 @@ int rlite_open_mgmt_port(uint16_t ipcp_id)
 /* rlite_flow_allocate() + rlite_open_appl_port() */
 int
 rlite_flow_allocate_open(struct rlite_appl *application,
-                   struct rina_name *dif_name, int dif_fallback,
-                   struct rina_name *ipcp_name,
+                   const struct rina_name *dif_name,
+                   const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
                    const struct rina_flow_spec *flowspec,
@@ -415,7 +414,7 @@ rlite_flow_allocate_open(struct rlite_appl *application,
     unsigned int port_id;
     int ret;
 
-    ret = rlite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
+    ret = rlite_flow_allocate(application, dif_name, ipcp_name,
                         local_appl, remote_appl, flowspec,
                         &port_id, wait_ms, 0xffff);
     if (ret) {

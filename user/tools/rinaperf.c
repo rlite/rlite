@@ -594,6 +594,7 @@ main(int argc, char **argv)
     struct rinaperf rp;
     const char *type = "echo";
     const char *dif_name = NULL;
+    const struct rina_name *dif_name_ptr = NULL;
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
     const char *cli_appl_apn = "rinaperf-data", *cli_appl_api = "client";
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
@@ -761,21 +762,25 @@ main(int argc, char **argv)
     }
     rina_name_fill(&rp.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
+    if (dif_name) {
+        dif_name_ptr = &rp.dif_name;
+    }
+
     if (listen) {
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rlite_appl_register_wait(&rp.application, 1, &rp.dif_name,
-                                           1, &rp.ipcp_name, &server_ctrl_name,
+            ret = rlite_appl_register_wait(&rp.application, 1, dif_name_ptr,
+                                           &rp.ipcp_name, &server_ctrl_name,
                                            3000);
             if (ret) {
                 return ret;
             }
         }
 
-        ret = rlite_appl_register_wait(&rp.application, 1, &rp.dif_name,
-                                       1, &rp.ipcp_name, &rp.server_appl_name,
+        ret = rlite_appl_register_wait(&rp.application, 1, dif_name_ptr,
+                                       &rp.ipcp_name, &rp.server_appl_name,
                                        3000);
         if (ret) {
             return ret;
@@ -785,7 +790,7 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rlite_flow_allocate_open(&rp.application, &rp.dif_name, 1,
+        rp.dfd = rlite_flow_allocate_open(&rp.application, dif_name_ptr,
                                     &rp.ipcp_name, &rp.client_appl_name,
                                     &rp.server_appl_name, &flowspec, 1500);
         if (rp.dfd < 0) {
