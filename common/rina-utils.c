@@ -208,6 +208,24 @@ deserialize_rina_msg(struct rina_msg_layout *numtables,
     return 0;
 }
 
+unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
+                                     unsigned int n)
+{
+    unsigned int max = 0;
+    int i = 0;
+
+    for (i = 0; i < n; i++) {
+        unsigned int cur = numtables[i].copylen +
+                           numtables[i].names * sizeof(struct rina_name);
+
+        if (cur > max) {
+            max = cur;
+        }
+    }
+
+    return max;
+}
+
 void
 rina_name_free(struct rina_name *name)
 {

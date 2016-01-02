@@ -31,6 +31,8 @@ int deserialize_rina_msg(struct rina_msg_layout *numtables,
                          void *msgbuf, unsigned int msgbuf_len);
 unsigned int rina_msg_serlen(struct rina_msg_layout *numtables,
                              const struct rina_msg_base *msg);
+unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
+                                unsigned int n);
 void rina_name_free(struct rina_name *name);
 void rina_msg_free(struct rina_msg_layout *numtables,
                    struct rina_msg_base *msg);

@@ -201,10 +201,12 @@ evloop_function(void *arg)
     struct ipcm *ipcm = (struct ipcm *)arg;
     struct pending_entry *req_entry;
     char serbuf[4096];
+    unsigned int max_resp_size = rina_numtables_max_size(
+                rina_kernel_numtables,
+                sizeof(rina_kernel_numtables)/sizeof(struct rina_msg_layout));
 
     for (;;) {
         struct rina_msg_base_resp *resp;
-        char *msgbuf;
         fd_set rdfs;
         int ret;
 
@@ -229,16 +231,20 @@ evloop_function(void *arg)
             continue;
         }
 
-        msgbuf = malloc(4096);
+        /* Here we can malloc the maximum kernel message size. */
+        resp = (struct rina_msg_base_resp *)malloc(max_resp_size);
+        if (!resp) {
+            printf("%s: Out of memory\n", __func__);
+            continue;
+        }
 
-        /* Deserialize the message from serbuf into msgbuf. */
-        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret, msgbuf, 4096);
+        /* Deserialize the message from serbuf into resp. */
+        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret,
+                                   (void *)resp, max_resp_size);
         if (ret) {
             printf("%s: Problems during deserialization [%d]\n",
                     __func__, ret);
         }
-
-        resp = (struct rina_msg_base_resp *)msgbuf;
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
@@ -262,7 +268,7 @@ evloop_function(void *arg)
             printf("%s: Response message mismatch: expected %u, got %u\n",
                     __func__, req_entry->msg->msg_type + 1,
                     resp->msg_type);
-            goto free_entry;
+            goto notify_requestor;
         }
 
         printf("Message type %d received from kernel\n", resp->msg_type);
@@ -274,7 +280,9 @@ evloop_function(void *arg)
                     resp->msg_type);
         }
 
-free_entry:
+notify_requestor:
+        /* Signal the issue_request() caller that the operation is
+         * complete, reporting the response in the 'resp' pointer field. */
         pthread_mutex_lock(&ipcm->lock);
         req_entry->op_complete = 1;
         req_entry->resp = (struct rina_msg_base *)resp;
