@@ -768,13 +768,12 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Create and start the unix server thread. */
-    ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
-    if (ret) {
-        perror("pthread_create(unix)");
-        exit(EXIT_FAILURE);
-    }
-
+    /* Fetch kernel state and create userspace IPCPs as needed. This
+     * must be done before launching the unix server in order to
+     * avoid race conditions between main thread fetching and unix
+     * server thread serving a client. That is, a client could see
+     * incomplete state and its operation may fail or behave
+     * unexpectedly.*/
     ipcps_fetch(&ipcm.loop);
     ret = uipcps_update(&ipcm);
     if (ret) {
@@ -784,6 +783,13 @@ int main(int argc, char **argv)
     if (enable_testing) {
         /* Run the hardwired test script. */
         test(&ipcm);
+    }
+
+    /* Create and start the unix server thread. */
+    ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
+    if (ret) {
+        perror("pthread_create(unix)");
+        exit(EXIT_FAILURE);
     }
 
     ret = pthread_join(unix_th, NULL);
