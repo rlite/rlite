@@ -98,6 +98,19 @@ rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
 }
 
 extern "C" int
+rib_cdap_connect(struct uipcp_rib *rib, struct enrolled_neighbor *neigh,
+                 unsigned int port_id)
+{
+    /*
+    CDAPAuthValue av;
+    CDAPMessage m;
+
+    m.m_connect(gpb::AUTH_NONE, &av, &local_appl, &neigh->ipcp_name);
+    */
+    return 0;
+}
+
+extern "C" int
 rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
 {

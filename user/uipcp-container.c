@@ -138,9 +138,17 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
 
     /* Request an enrollment. */
 
+    ret = rib_cdap_connect(uipcp->rib, neigh, port_id);
+    if (ret) {
+        goto err2;
+    }
+
     return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
 
+err2:
+    close(neigh->flow_fd);
 err:
+    list_del(&neigh->node);
     rina_name_free(&neigh->ipcp_name);
     free(neigh);
 

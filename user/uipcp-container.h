@@ -78,6 +78,9 @@ void rib_destroy(struct uipcp_rib *rib);
 int rib_application_register(struct uipcp_rib *rib, int reg,
                              const struct rina_name *appl_name);
 
+int rib_cdap_connect(struct uipcp_rib *rib, struct enrolled_neighbor *neigh,
+                     unsigned int port_id);
+
 #ifdef __cplusplus
 }
 #endif
