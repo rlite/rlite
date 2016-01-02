@@ -3,8 +3,6 @@
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 
-- migliorare il sistema di build
-
 - limitare la lunghezza delle code nel kernel
 
 - vmpi_provider_find_instance non dovrebbe essere bloccante
