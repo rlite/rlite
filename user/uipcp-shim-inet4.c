@@ -321,6 +321,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
         PE("Out of memory\n");
         return -1;
     }
+    memset(ep, 0, sizeof(*ep));
 
     ep->port_id = req->local_port;
 
@@ -417,6 +418,7 @@ accept_conn(struct rlite_evloop *loop, int lfd)
         PE("Out of memory\n");
         return;
     }
+    memset(ep, 0, sizeof(*ep));
 
     ep->fd = sfd;
     memcpy(&ep->addr, &remote_addr, sizeof(remote_addr));
@@ -424,7 +426,9 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     /* Lookup the remote IP address and port. */
     if (sock_addr_to_appl_name(&ep->addr, &remote_appl)) {
         PE("Failed to get appl_name from remote address\n");
-        goto err1;
+        rina_name_free(&local_appl);
+        free(ep);
+        return;
     }
 
     ep->kevent_id = shim->kevent_id_cnt++;
@@ -435,10 +439,8 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     cfg.fd = ep->fd;
     uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0,
                                &local_appl, &remote_appl, &cfg);
-    return;
-
-err1:
-    free(ep);
+    rina_name_free(&local_appl);
+    rina_name_free(&remote_appl);
 }
 
 static struct inet4_endpoint *
