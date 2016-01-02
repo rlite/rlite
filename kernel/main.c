@@ -88,8 +88,9 @@ struct registered_appl {
 #define IPCP_ID_BITMAP_SIZE     1024
 #define PORT_ID_BITMAP_SIZE     1024
 #define CEP_ID_BITMAP_SIZE      1024
-#define PORT_ID_HASHTABLE_BITS  7
 #define IPCP_HASHTABLE_BITS     7
+#define PORT_ID_HASHTABLE_BITS  7
+#define CEP_ID_HASHTABLE_BITS  7
 
 struct rina_dm {
     /* Bitmap to manage IPC process ids. */
@@ -101,8 +102,9 @@ struct rina_dm {
     /* Bitmap to manage port ids. */
     DECLARE_BITMAP(port_id_bitmap, PORT_ID_BITMAP_SIZE);
 
-    /* Hash table to store information about each flow. */
+    /* Hash tables to store information about each flow. */
     DECLARE_HASHTABLE(flow_table, PORT_ID_HASHTABLE_BITS);
+    DECLARE_HASHTABLE(flow_table_by_cep, CEP_ID_HASHTABLE_BITS);
 
     /* Bitmap to manage connection endpoint ids. */
     DECLARE_BITMAP(cep_id_bitmap, CEP_ID_BITMAP_SIZE);
@@ -674,6 +676,30 @@ flow_get(unsigned int port_id)
 }
 EXPORT_SYMBOL_GPL(flow_get);
 
+struct flow_entry *
+flow_get_by_cep(unsigned int cep_id)
+{
+    struct flow_entry *entry;
+    struct hlist_head *head;
+
+    FLOCK();
+
+    head = &rina_dm.flow_table_by_cep[hash_min(cep_id,
+                                      HASH_BITS(rina_dm.flow_table_by_cep))];
+    hlist_for_each_entry(entry, head, node) {
+        if (entry->local_cep == cep_id) {
+            entry->refcnt++;
+            FUNLOCK();
+            return entry;
+        }
+    }
+
+    FUNLOCK();
+
+    return NULL;
+}
+EXPORT_SYMBOL_GPL(flow_get_by_cep);
+
 static void
 tx_completion_func(unsigned long arg)
 {
@@ -799,6 +825,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
+        hash_add(rina_dm.flow_table_by_cep, &entry->node, entry->local_cep);
         INIT_LIST_HEAD(&entry->rmtq);
         entry->rmtq_len = 0;
         spin_lock_init(&entry->rmtq_lock);

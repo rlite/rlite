@@ -434,8 +434,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->dst_addr = flow->remote_addr;
     pci->src_addr = ipcp->addr;
     pci->conn_id.qos_id = 0;
-    pci->conn_id.dst_cep = flow->remote_port;
-    pci->conn_id.src_cep = flow->local_port;
+    pci->conn_id.dst_cep = flow->remote_cep;
+    pci->conn_id.src_cep = flow->local_cep;
     pci->pdu_type = PDU_T_DT;
     pci->pdu_flags = dtp->set_drf ? 1 : 0;
     pci->pdu_len = rb->len;
@@ -653,8 +653,8 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;
         pcic->base.conn_id.qos_id = 0;
-        pcic->base.conn_id.dst_cep = flow->remote_port;
-        pcic->base.conn_id.src_cep = flow->local_port;
+        pcic->base.conn_id.dst_cep = flow->remote_cep;
+        pcic->base.conn_id.src_cep = flow->local_cep;
         pcic->base.pdu_type = pdu_type;
         pcic->base.pdu_flags = 0;
         pcic->base.pdu_len = rb->len;
@@ -947,9 +947,9 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
         return rmt_tx(ipcp, pci->dst_addr, rb, false);
     }
 
-    flow = flow_get(pci->conn_id.dst_cep);
+    flow = flow_get_by_cep(pci->conn_id.dst_cep);
     if (!flow) {
-        RPD(5, "No flow for port-id %u: dropping PDU\n",
+        RPD(5, "No flow for cep-id %u: dropping PDU\n",
                 pci->conn_id.dst_cep);
         rlite_buf_free(rb);
         return 0;
