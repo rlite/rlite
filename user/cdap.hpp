@@ -99,6 +99,15 @@ public:
                  const std::string& obj_name, long obj_inst,
                  int result, const std::string& result_reason);
 
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter);
+
+    int m_write_r(const struct CDAPMessage *req,
+                  gpb::flagValues_t flags, int result,
+                  const std::string& result_reason);
+
     struct rina_name local_appl;
     struct rina_name remote_appl;
     int fd;

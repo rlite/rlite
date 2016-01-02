@@ -714,3 +714,29 @@ CDAPConn::m_read_r(const struct CDAPMessage *req,
     return m_common_r(req, flags, obj_class, obj_name, obj_inst,
                       result, result_reason, gpb::M_READ_R);
 }
+
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter)
+{
+    return m_common(invoke_id, flags, obj_class, obj_name,
+                    obj_inst, scope, filter, gpb::M_WRITE);
+}
+
+
+int
+CDAPConn::m_write_r(const struct CDAPMessage *req,
+                    gpb::flagValues_t flags, int result,
+                    const std::string& result_reason)
+{
+    struct CDAPMessage m(gpb::M_WRITE_R);
+
+    m.flags = flags;
+
+    m.result = result;
+    m.result_reason = result_reason;
+
+    return msg_send(&m, req->invoke_id);
+}
