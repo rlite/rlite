@@ -144,37 +144,49 @@ struct rina_flow_spec {
 #define PI_ON  /* Enable info print. */
 
 #ifdef __KERNEL__
+
+#define K_DEBUG KERN_DEBUG
+#define K_INFO  KERN_INFO
+#define K_ERR   KERN_ERR
+
 #define DOPRINT(FMT, ...) printk(FMT, ##__VA_ARGS__)
+
 #else  /* ! __KERNEL__ */
+
+#define K_DEBUG
+#define K_INFO
+#define K_ERR
+
 #define DOPRINT(FMT, ...)               \
     do {                                \
         printf(FMT, ##__VA_ARGS__);     \
         fflush(stdout);                 \
     } while (0)
+
 #endif /* ! __KERNEL__ */
 
-#define PRINTFUN1(FMT, ...)                 \
-                DOPRINT(FMT, ##__VA_ARGS__)
-#define PRINTFUN2(LEV, FMT, ...)            \
-                DOPRINT("[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
+#define PRINTFUN1(KLEV, FMT, ...)                 \
+                DOPRINT(KLEV FMT, ##__VA_ARGS__)
+#define PRINTFUN2(KLEV, LEV, FMT, ...)            \
+                DOPRINT(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
 #ifdef PD_ON
-#define PD(FMT, ...) PRINTFUN2("DBG", FMT, ##__VA_ARGS__)
-#define PD_S(FMT, ...) PRINTFUN1(FMT, ##__VA_ARGS__)
+#define PD(FMT, ...) PRINTFUN2(K_DEBUG, "DBG", FMT, ##__VA_ARGS__)
+#define PD_S(FMT, ...) PRINTFUN1(K_DEBUG, FMT, ##__VA_ARGS__)
 #else
 #define PD(FMT, ...)
 #define PD_S(FMT, ...)
 #endif
 
 #ifdef PI_ON
-#define PI(FMT, ...) PRINTFUN2("INF", FMT, ##__VA_ARGS__)
-#define PI_S(FMT, ...) PRINTFUN1(FMT, ##__VA_ARGS__)
+#define PI(FMT, ...) PRINTFUN2(K_INFO, "INF", FMT, ##__VA_ARGS__)
+#define PI_S(FMT, ...) PRINTFUN1(K_INFO, FMT, ##__VA_ARGS__)
 #else
 #define PI(formt, ...)
 #define PI_S(FMT, ...)
 #endif
 
-#define PE(FMT, ...) PRINTFUN2("ERR", FMT, ##__VA_ARGS__)
+#define PE(FMT, ...) PRINTFUN2(K_ERR, "ERR", FMT, ##__VA_ARGS__)
 
 #define NPD(FMT, ...)
 
