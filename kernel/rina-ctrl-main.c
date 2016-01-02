@@ -333,6 +333,141 @@ out:
     return ret;
 }
 
+static struct registered_application *
+ipcp_application_lookup(struct ipcp_entry *ipcp,
+                        struct rina_name *application_name)
+{
+    struct registered_application *app;
+
+    list_for_each_entry(app, &ipcp->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            return app;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+ipcp_application_add(struct ipcp_entry *ipcp,
+                     struct rina_name *application_name,
+                     struct rina_ctrl *rc, struct ipcp_entry *reg_ipcp)
+{
+    struct registered_application *app;
+    char *name_s;
+
+    mutex_lock(&ipcp->lock);
+
+    app = ipcp_application_lookup(ipcp, application_name);
+    if (app) {
+            /* Application is already registered. */
+            mutex_unlock(&ipcp->lock);
+            return -EINVAL;
+    }
+
+    app = kzalloc(sizeof(*app), GFP_KERNEL);
+    if (!app) {
+        mutex_unlock(&ipcp->lock);
+        return -ENOMEM;
+    }
+    rina_name_copy(&app->name, application_name);
+    if (rc) {
+        /* An application is registering. */
+        app->p.rc = rc;
+        app->userspace = 1;
+    } else if (ipcp) {
+        /* An IPC process is registering. */
+        app->p.ipcp = reg_ipcp;
+        app->userspace = 0;
+    } else {
+        mutex_unlock(&ipcp->lock);
+        kfree(app);
+        return -EINVAL;
+    }
+    ipcp->refcnt++;
+
+    list_add_tail(&app->node, &ipcp->registered_applications);
+
+    mutex_unlock(&ipcp->lock);
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s registered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+}
+
+static void
+ipcp_application_del_entry(struct ipcp_entry *ipcp,
+                           struct registered_application *app)
+{
+    list_del(&app->node);
+    ipcp->refcnt--;
+    rina_name_free(&app->name);
+    kfree(app);
+}
+
+static int
+ipcp_application_del(struct ipcp_entry *ipcp,
+                     struct rina_name *application_name)
+{
+    struct registered_application *app;
+    char *name_s;
+
+    mutex_lock(&ipcp->lock);
+
+    app = ipcp_application_lookup(ipcp, application_name);
+    if (app) {
+        ipcp_application_del_entry(ipcp, app);
+    }
+
+    mutex_unlock(&ipcp->lock);
+
+    if (!app) {
+        return -EINVAL;
+    }
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s unregistered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+}
+
+/* Must be called under global lock. */
+static void
+application_del_by_rc_or_ipcp(struct rina_ctrl *rc,
+                              struct ipcp_entry *reg_ipcp)
+{
+    struct ipcp_entry *ipcp;
+    int bucket;
+    struct registered_application *app;
+    struct registered_application *tmp;
+    const char *s;
+
+    BUG_ON(rc && reg_ipcp);
+
+    /* For each IPC processes. */
+    hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
+        /* For each application registered to this IPC process. */
+        list_for_each_entry_safe(app, tmp,
+                &ipcp->registered_applications, node) {
+            if ((app->userspace && rc && app->p.rc == rc) ||
+                 (!app->userspace && reg_ipcp && app->p.ipcp == reg_ipcp)) {
+                s = rina_name_to_string(&app->name);
+                printk("%s: Application %s automatically unregistered\n",
+                        __func__, s);
+                kfree(s);
+                ipcp_application_del_entry(ipcp, app);
+            }
+        }
+    }
+}
+
 static int
 ipcp_del_entry(struct ipcp_entry *entry, int locked)
 {
@@ -341,6 +476,11 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
     if (locked) {
         mutex_lock(&rina_dm.lock);
     }
+
+    /* Before actually removing @entry, we have to
+     * unregister the IPCP from all the IPC process
+     * where it is registered. */
+    application_del_by_rc_or_ipcp(NULL, entry);
 
     if (entry->refcnt) {
         ret = -EBUSY;
@@ -582,103 +722,6 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
-static struct registered_application *
-ipcp_application_lookup(struct ipcp_entry *ipcp,
-                        struct rina_name *application_name)
-{
-    struct registered_application *app;
-
-    list_for_each_entry(app, &ipcp->registered_applications, node) {
-        if (rina_name_cmp(&app->name, application_name) == 0) {
-            return app;
-        }
-    }
-
-    return NULL;
-}
-
-static int
-ipcp_application_add(struct ipcp_entry *ipcp,
-                     struct rina_name *application_name,
-                     struct rina_ctrl *rc, struct ipcp_entry *reg_ipcp)
-{
-    struct registered_application *app;
-    char *name_s;
-
-    mutex_lock(&ipcp->lock);
-
-    app = ipcp_application_lookup(ipcp, application_name);
-    if (app) {
-            /* Application is already registered. */
-            mutex_unlock(&ipcp->lock);
-            return -EINVAL;
-    }
-
-    app = kzalloc(sizeof(*app), GFP_KERNEL);
-    if (!app) {
-        mutex_unlock(&ipcp->lock);
-        return -ENOMEM;
-    }
-    rina_name_copy(&app->name, application_name);
-    if (rc) {
-        /* An application is registering. */
-        app->p.rc = rc;
-        app->userspace = 1;
-    } else if (ipcp) {
-        /* An IPC process is registering. */
-        app->p.ipcp = ipcp;
-        app->userspace = 0;
-    } else {
-        mutex_unlock(&ipcp->lock);
-        kfree(app);
-        return -EINVAL;
-    }
-
-    list_add_tail(&app->node, &ipcp->registered_applications);
-
-    mutex_unlock(&ipcp->lock);
-
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s registered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
-    }
-
-    return 0;
-}
-
-static int
-ipcp_application_del(struct ipcp_entry *ipcp,
-                     struct rina_name *application_name)
-{
-    struct registered_application *app;
-    char *name_s;
-
-    mutex_lock(&ipcp->lock);
-
-    app = ipcp_application_lookup(ipcp, application_name);
-    if (app) {
-        list_del(&app->node);
-    }
-
-    mutex_unlock(&ipcp->lock);
-
-    if (!app) {
-        return -EINVAL;
-    }
-
-    rina_name_free(&app->name);
-    kfree(app);
-
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s unregistered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
-    }
-
-    return 0;
-}
-
 /* To be called under global lock. */
 static int
 rina_common_register(int reg, int16_t ipcp_id, struct rina_name *appl_name,
@@ -779,35 +822,6 @@ out:
     mutex_unlock(&rina_dm.lock);
 
     return ret;
-}
-
-static void
-application_del_by_rc(struct rina_ctrl *rc)
-{
-    struct ipcp_entry *ipcp;
-    int bucket;
-    struct registered_application *app;
-    struct registered_application *tmp;
-    const char *s;
-
-    mutex_lock(&rina_dm.lock);
-    /* For each IPC processes. */
-    hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
-        /* For each application registered to this IPC process. */
-        list_for_each_entry_safe(app, tmp,
-                &ipcp->registered_applications, node) {
-            if (app->userspace && app->p.rc == rc) {
-                s = rina_name_to_string(&app->name);
-                printk("%s: Application %s automatically unregistered\n",
-                        __func__, s);
-                kfree(s);
-                list_del(&app->node);
-                rina_name_free(&app->name);
-                kfree(app);
-            }
-        }
-    }
-    mutex_unlock(&rina_dm.lock);
 }
 
 static int
@@ -927,6 +941,7 @@ out:
     return ret;
 }
 
+/* Must be called under global lock. */
 static void
 flow_del_by_rc(struct rina_ctrl *rc)
 {
@@ -934,13 +949,11 @@ flow_del_by_rc(struct rina_ctrl *rc)
     struct hlist_node *tmp;
     int bucket;
 
-    mutex_lock(&rina_dm.lock);
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->rc == rc) {
             flow_del_entry(flow, 0);
         }
     }
-    mutex_unlock(&rina_dm.lock);
 }
 
 static int
@@ -1412,11 +1425,13 @@ rina_ctrl_release(struct inode *inode, struct file *f)
         rina_dm.ctrl = NULL;
         mutex_unlock(&rina_dm.lock);
     } else {
+        mutex_lock(&rina_dm.lock);
         /* This is a ctrl device opened by an application.
          * We must invalidate (e.g. unregister) all the
          * application names registered with this device. */
-        application_del_by_rc(rc);
+        application_del_by_rc_or_ipcp(rc, NULL);
         flow_del_by_rc(rc);
+        mutex_unlock(&rina_dm.lock);
     }
 
     kfree(rc);

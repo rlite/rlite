@@ -3,7 +3,9 @@
 source tests/prologue.sh
 source tests/env.sh
 
-$RINACONF ipcp-unregister d.DIF n.IPCP 1
+# it's not necessary to unregister, we can rely on
+# auto-unregistration
+#$RINACONF ipcp-unregister d.DIF n.IPCP 1
 $RINACONF ipcp-destroy n.IPCP 1
 $RINACONF ipcp-destroy d.IPCP 1
 
