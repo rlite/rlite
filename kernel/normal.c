@@ -147,14 +147,14 @@ rtx_tmr_cb(long unsigned arg)
 
                 crb = rina_buf_clone(rb, GFP_ATOMIC);
                 if (unlikely(!crb)) {
-                    PD("Out of memory\n");
+                    PE("Out of memory\n");
                 } else {
                     list_add_tail(&crb->node, &rrbq);
                 }
 
             } else {
                 if (rb != dtp->rtx_tmr_next) {
-                    PD("Forward rtx timer by %u\n",
+                    NPD("Forward rtx timer by %u\n",
                             jiffies_to_msecs(rb->rtx_jiffies - jiffies));
                     dtp->rtx_tmr_next = rb;
                     mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
@@ -414,7 +414,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                  * that dtp->cwq_len < dtp->max_cwq_len. */
                 list_add_tail(&rb->node, &dtp->cwq);
                 dtp->cwq_len++;
-                PD("push [%lu] into cwq\n",
+                NPD("push [%lu] into cwq\n",
                         (long unsigned)pci->seqnum);
                 rb = NULL; /* Ownership passed. */
             } else {
@@ -422,7 +422,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 /* POL: TxControl. */
                 dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
                 dtp->last_seq_num_sent = pci->seqnum;
-                PD("sending [%lu] through sender window\n",
+                NPD("sending [%lu] through sender window\n",
                         (long unsigned)pci->seqnum);
             }
         }
@@ -445,12 +445,12 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             list_add_tail(&crb->node, &dtp->rtxq);
             dtp->rtxq_len++;
             if (!timer_pending(&dtp->rtx_tmr)) {
-                PD("Forward rtx timer by %u\n",
+                NPD("Forward rtx timer by %u\n",
                         jiffies_to_msecs(crb->rtx_jiffies - jiffies));
                 dtp->rtx_tmr_next = crb;
                 mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
             }
-            PD("cloning [%lu] into rtxq\n",
+            NPD("cloning [%lu] into rtxq\n",
                     (long unsigned)RINA_BUF_PCI(crb)->seqnum);
         }
     }
@@ -657,7 +657,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         if (cfg->fc.fc_type == RINA_FC_T_WIN) {
-            PD("rcv_rwe [%lu] --> [%lu]\n",
+            NPD("rcv_rwe [%lu] --> [%lu]\n",
                     (long unsigned)flow->dtp.rcv_rwe,
                     (long unsigned)(flow->dtp.rcv_lwe +
                         flow->cfg.dtcp.fc.cfg.w.initial_credit));
@@ -802,7 +802,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     (long unsigned)pcic->new_rwe);
 
         } else {
-            PD("snd_rwe [%lu] --> [%lu]\n",
+            NPD("snd_rwe [%lu] --> [%lu]\n",
                     (long unsigned)dtp->snd_rwe,
                     (long unsigned)pcic->new_rwe);
 
@@ -832,7 +832,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     struct rina_pci *pci = RINA_BUF_PCI(cur);
 
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
-                        PD("Remove [%lu] from rtxq\n",
+                        NPD("Remove [%lu] from rtxq\n",
                                 (long unsigned)pci->seqnum);
                         list_del(&cur->node);
                         dtp->rtxq_len--;
@@ -850,7 +850,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                          * stop here. Let's update the rtx timer
                          * expiration time, if necessary. */
                         if (likely(!dtp->rtx_tmr_next)) {
-                            PD("Forward rtx timer by %u\n",
+                            NPD("Forward rtx timer by %u\n",
                                     jiffies_to_msecs(cur->rtx_jiffies - jiffies));
                             dtp->rtx_tmr_next = cur;
                             mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
@@ -869,7 +869,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
             case PDU_T_NACK:
             case PDU_T_SACK:
             case PDU_T_SNACK:
-                PD("Missing support for PDU type [%X]\n",
+                PI("Missing support for PDU type [%X]\n",
                         pcic->base.pdu_type);
                 break;
         }
@@ -884,7 +884,7 @@ out:
     list_for_each_entry(qrb, &qrbs, node) {
         struct rina_pci *pci = RINA_BUF_PCI(qrb);
 
-        PD("sending [%lu] from cwq\n",
+        NPD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
         rmt_tx(ipcp, pci->dst_addr, qrb, false);
     }
@@ -990,7 +990,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         /* This may go in a gap or be a duplicate
          * amongst the gaps. */
 
-        PD("Possible gap fill, RLWE would jump %lu --> %lu\n",
+        NPD("Possible gap fill, RLWE would jump %lu --> %lu\n",
                 (long unsigned)dtp->rcv_lwe,
                 (unsigned long)seqnum + 1);
 
