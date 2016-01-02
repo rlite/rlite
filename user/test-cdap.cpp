@@ -79,6 +79,8 @@ CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
     op_code = op_code_arg;
     obj_value.ty = NONE;
     flags = gpb::F_NO_FLAGS;
+    memset(&src_appl, 0, sizeof(src_appl));
+    memset(&dst_appl, 0, sizeof(dst_appl));
 }
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
@@ -161,6 +163,8 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
     version = gm.version();
 }
 
+#define safe_c_string(_s) ((_s) ? (_s) : "")
+
 CDAPMessage::operator gpb::CDAPMessage() const
 {
     gpb::CDAPMessage gm;
@@ -228,15 +232,15 @@ CDAPMessage::operator gpb::CDAPMessage() const
     authvalue->set_authother(auth_value.other);
     gm.set_allocated_authvalue(authvalue);
 
-    gm.set_destapname(std::string(dst_appl.apn));
-    gm.set_destapinst(std::string(dst_appl.api));
-    gm.set_destaename(std::string(dst_appl.aen));
-    gm.set_destaeinst(std::string(dst_appl.aei));
+    gm.set_destapname(std::string(safe_c_string(dst_appl.apn)));
+    gm.set_destapinst(std::string(safe_c_string(dst_appl.api)));
+    gm.set_destaename(std::string(safe_c_string(dst_appl.aen)));
+    gm.set_destaeinst(std::string(safe_c_string(dst_appl.aei)));
 
-    gm.set_srcapname(std::string(src_appl.apn));
-    gm.set_srcapinst(std::string(src_appl.api));
-    gm.set_srcaename(std::string(src_appl.aen));
-    gm.set_srcaeinst(std::string(src_appl.aei));
+    gm.set_srcapname(std::string(safe_c_string(src_appl.apn)));
+    gm.set_srcapinst(std::string(safe_c_string(src_appl.api)));
+    gm.set_srcaename(std::string(safe_c_string(src_appl.aen)));
+    gm.set_srcaeinst(std::string(safe_c_string(src_appl.aei)));
 
     gm.set_resultreason(result_reason);
     gm.set_version(version);
