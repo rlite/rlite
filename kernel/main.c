@@ -237,14 +237,14 @@ rina_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rlite_msg_serlen(rina_kernel_numtables, RLITE_KER_MSG_MAX, rmsg);
+    serlen = rlite_msg_serlen(rlite_ker_numtables, RLITE_KER_MSG_MAX, rmsg);
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    serlen = serialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+    serlen = serialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, rmsg);
 
     entry->sermsg = serbuf;
@@ -1313,7 +1313,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
         ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
-        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       (struct rlite_msg_base *)&fqe->resp);
         kfree(fqe);
     }
@@ -1871,7 +1871,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     if (ret) {
         flow_put(flow_entry);
     }
-    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                    (struct rlite_msg_base *)&req);
 out:
     ipcp_application_put(app);
@@ -2105,7 +2105,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EFAULT;
     }
 
-    ret = deserialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+    ret = deserialize_rina_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                                kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);

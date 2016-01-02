@@ -304,7 +304,7 @@ rlite_appl_register_wait(struct rlite_appl *appl, int reg,
         ret = -1;
     }
 
-    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                   RLITE_RMB(resp));
     free(resp);
 
@@ -354,7 +354,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
                 kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
-    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                   RLITE_RMB(kresp));
     free(kresp);
 

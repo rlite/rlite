@@ -229,7 +229,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
     kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
-        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       RLITE_RMB(kresp));
         free(kresp);
     }
@@ -542,7 +542,7 @@ test(struct rinaconf *rc)
                               "test-shim-loopback.DIF", &result);
     assert(icresp);
     if (icresp) {
-        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                       RLITE_RMB(icresp));
     }
     icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",

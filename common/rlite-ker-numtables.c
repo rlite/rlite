@@ -2,7 +2,7 @@
 #include "rlite/kernel-msg.h"
 
 
-struct rlite_msg_layout rina_kernel_numtables[] = {
+struct rlite_msg_layout rlite_ker_numtables[] = {
     [RLITE_KER_IPCP_CREATE] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_create) -
                    sizeof(struct rina_name) - 2 * sizeof(char *),

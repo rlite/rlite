@@ -43,7 +43,7 @@ enum {
 
 /* Numtables for kernel <==> uipcps messages exchange. */
 
-extern struct rlite_msg_layout rina_kernel_numtables[RLITE_KER_MSG_MAX+1];
+extern struct rlite_msg_layout rlite_ker_numtables[RLITE_KER_MSG_MAX+1];
 
 /* All the messages MUST follow a common format and attribute ordering:
  *   - the first field must be 'rlite_msg_t msg_type'
