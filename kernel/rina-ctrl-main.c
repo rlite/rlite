@@ -20,6 +20,7 @@
 
 #include <linux/types.h>
 #include <rina/rina-ctrl.h>
+#include "rina-utils.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -27,11 +28,38 @@
 #include <linux/poll.h>
 #include <linux/moduleparam.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 
 
 static ssize_t
 rina_ipcp_create(const char __user *buf, size_t len)
 {
+    const struct rina_ctrl_create_ipcp *umsg =
+                    (const struct rina_ctrl_create_ipcp *)buf;
+    struct rina_ctrl_create_ipcp kmsg;
+    int ret;
+    char *name_s;
+
+    if (len != sizeof(struct rina_ctrl_create_ipcp)) {
+        return -EINVAL;
+    }
+
+    /* Copy the message onto the kernel stack, temporarily including
+     * (kernelspace-invalid) pointers to userspace strings. */
+    if (unlikely(copy_from_user(&kmsg, umsg, len))) {
+        return -EFAULT;
+    }
+
+    /* Copy in the userspace strings. */
+    ret = copy_name_from_user(&kmsg.name, &umsg->name);
+    if (ret) {
+        return ret;
+    }
+
+    name_s = rina_name_to_string(&kmsg.name);
+    printk("IPC process %s created\n", name_s);
+    kfree(name_s);
+
     return len;
 }
 

@@ -42,8 +42,11 @@ test(int rfd)
 
     /* Create an IPC process of type shim-dummy. */
     ipcp_name.apn = "prova.IPCP";
+    ipcp_name.apn_len = strlen(ipcp_name.apn);
     ipcp_name.api = "1";
+    ipcp_name.api_len = strlen(ipcp_name.api);
     ipcp_name.aen = ipcp_name.aei = NULL;
+    ipcp_name.aen_len = ipcp_name.aei_len = 0;
     ret = create_ipcp(rfd, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
 
     return ret;
