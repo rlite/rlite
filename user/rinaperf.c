@@ -95,7 +95,7 @@ server_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("read(buf");
         } else {
-            PE("partial write %d/%lu\n", ret,
+            PE("partial read %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;

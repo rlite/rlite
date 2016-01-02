@@ -2424,8 +2424,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         }
 
         if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-            ret = rlite_buf_pci_push(rb);
-            BUG_ON(ret);
+            if (unlikely(rlite_buf_pci_push(rb))) {
+                BUG_ON(1);
+            }
             rio->flow->sdu_rx_consumed(rio->flow, rb);
         }
 
