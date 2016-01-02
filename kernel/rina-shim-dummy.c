@@ -34,13 +34,7 @@
 
 
 struct rina_shim_dummy {
-    struct mutex lock;
-    struct list_head registered_applications;
-};
-
-struct registered_application {
-    struct rina_name name;
-    struct list_head node;
+    int fake;
 };
 
 static void *
@@ -54,8 +48,6 @@ rina_shim_dummy_create(void)
     }
 
     memset(priv, 0, sizeof(*priv));
-    INIT_LIST_HEAD(&priv->registered_applications);
-    mutex_init(&priv->lock);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -75,72 +67,12 @@ rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
 static int
 rina_shim_dummy_application_register(struct ipcp_entry *ipcp, struct rina_name *application_name)
 {
-    struct registered_application *app;
-    struct rina_shim_dummy *priv = ipcp->priv;
-    char *name_s;
-
-    mutex_lock(&priv->lock);
-
-    list_for_each_entry(app, &priv->registered_applications, node) {
-        if (rina_name_cmp(&app->name, application_name) == 0) {
-            mutex_unlock(&priv->lock);
-            return -EINVAL;
-        }
-    }
-
-    app = kmalloc(sizeof(*app), GFP_KERNEL);
-    if (!app) {
-        return -ENOMEM;
-    }
-    memset(app, 0, sizeof(*app));
-    rina_name_copy(&app->name, application_name);
-
-    list_add_tail(&app->node, &priv->registered_applications);
-
-    mutex_unlock(&priv->lock);
-
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s registered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
-    }
-
     return 0;
 }
 
 static int
 rina_shim_dummy_application_unregister(struct ipcp_entry *ipcp, struct rina_name *application_name)
 {
-    struct registered_application *app;
-    struct rina_shim_dummy *priv = ipcp->priv;
-    int found = 0;
-    char *name_s;
-
-    mutex_lock(&priv->lock);
-
-    list_for_each_entry(app, &priv->registered_applications, node) {
-        if (rina_name_cmp(&app->name, application_name) == 0) {
-            found = 1;
-            break;
-        }
-    }
-
-    if (found) {
-        list_del(&app->node);
-    }
-
-    mutex_unlock(&priv->lock);
-
-    if (!found) {
-        return -EINVAL;
-    }
-
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s unregistered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
-    }
-
     return 0;
 }
 

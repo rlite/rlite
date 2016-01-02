@@ -2,6 +2,7 @@
 #define __RINA_IPCP_H__
 
 #include <rina/rina-utils.h>
+#include <linux/mutex.h>
 
 
 struct ipcp_entry;
@@ -22,6 +23,8 @@ struct ipcp_entry {
     struct ipcp_ops     ops;
     void                *priv;
     struct hlist_node   node;
+    struct mutex        lock;
+    struct list_head    registered_applications;
 };
 
 struct ipcp_factory {

@@ -43,6 +43,11 @@ struct upqueue_entry {
     struct list_head node;
 };
 
+struct registered_application {
+    struct rina_name name;
+    struct list_head node;
+};
+
 #define IPCP_ID_BITMAP_SIZE 1024
 #define IPCP_HASHTABLE_BITS  7
 
@@ -225,6 +230,8 @@ ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
         entry->dif_type = req->dif_type;
         entry->priv = ipcp_priv;
         entry->ops = factory->ops;
+        mutex_init(&entry->lock);
+        INIT_LIST_HEAD(&entry->registered_applications);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
     } else {
         if (factory->ops.destroy) {
@@ -462,6 +469,78 @@ err3:
 }
 
 static int
+ipcp_application_add(struct ipcp_entry *ipcp,
+                     struct rina_name *application_name)
+{
+    struct registered_application *app;
+    char *name_s;
+
+    mutex_lock(&ipcp->lock);
+
+    list_for_each_entry(app, &ipcp->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            mutex_unlock(&ipcp->lock);
+            return -EINVAL;
+        }
+    }
+
+    app = kmalloc(sizeof(*app), GFP_KERNEL);
+    if (!app) {
+        return -ENOMEM;
+    }
+    memset(app, 0, sizeof(*app));
+    rina_name_copy(&app->name, application_name);
+
+    list_add_tail(&app->node, &ipcp->registered_applications);
+
+    mutex_unlock(&ipcp->lock);
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s registered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+}
+
+static int
+ipcp_application_del(struct ipcp_entry *ipcp,
+                     struct rina_name *application_name)
+{
+    struct registered_application *app;
+    int found = 0;
+    char *name_s;
+
+    mutex_lock(&ipcp->lock);
+
+    list_for_each_entry(app, &ipcp->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            found = 1;
+            break;
+        }
+    }
+
+    if (found) {
+        list_del(&app->node);
+    }
+
+    mutex_unlock(&ipcp->lock);
+
+    if (!found) {
+        return -EINVAL;
+    }
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s unregistered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
+}
+
+static int
 rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_msg_application_register *req =
@@ -486,12 +565,14 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (entry) {
         ret = 0;
         if (reg) {
-            if (entry->ops.application_register) {
+            ret = ipcp_application_add(entry, &req->application_name);
+            if (ret == 0 && entry->ops.application_register) {
                 ret = entry->ops.application_register(entry,
                                             &req->application_name);
             }
         } else {
-            if (entry->ops.application_unregister) {
+            ret = ipcp_application_del(entry, &req->application_name);
+            if (ret == 0 && entry->ops.application_unregister) {
                 ret = entry->ops.application_unregister(entry,
                                             &req->application_name);
             }
