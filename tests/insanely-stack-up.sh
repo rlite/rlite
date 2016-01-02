@@ -8,7 +8,7 @@ rina-config ipcp-config d.IPCP 1 queued 1
 
 NM1DIF="d.DIF"
 
-for i in $(seq 1 3); do
+for i in $(seq 1 30); do
     rina-config ipcp-create n.1.IPCP $i normal n.${i}.DIF
     rina-config ipcp-create n.2.IPCP $i normal n.${i}.DIF
     rina-config ipcp-config n.1.IPCP $i address 21
