@@ -758,7 +758,7 @@ tx_completion_func(unsigned long arg)
             PD("Pushing [%lu] back to rmtq\n",
                     (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
             spin_lock_bh(&ipcp->rmtq_lock);
-            list_add(&rb->node, &ipcp->rmtq);
+            list_add_tail(&rb->node, &ipcp->rmtq);
             ipcp->rmtq_len++;
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
