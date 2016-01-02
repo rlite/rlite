@@ -197,21 +197,25 @@ test(struct ipcm *ipcm)
     /* Create an IPC process of type shim-dummy. */
     rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
     icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
-    if (icresp) {
-        rina_msg_free(rina_kernel_numtables, RMB(icresp));
-    }
+    assert(!icresp);
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
-    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    icresp = ipcp_create(ipcm, 1, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    assert(icresp);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
+    icresp = ipcp_create(ipcm, 1, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    assert(!icresp);
     rina_name_free(&name);
 
     /* Assign to DIF. */
     rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
-    result = assign_to_dif(ipcm, 0, &name);
+    ret = assign_to_dif(ipcm, 0, &name);
+    assert(!ret);
+    ret = assign_to_dif(ipcm, 0, &name);
+    assert(!ret);
     rina_name_free(&name);
 
     /* Fetch IPC processes table. */

@@ -224,6 +224,8 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
                struct ipcp_entry **pentry)
 {
     struct ipcp_entry *entry;
+    struct ipcp_entry *cur;
+    int bucket;
     int ret = 0;
 
     *pentry = NULL;
@@ -234,6 +236,17 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
     }
 
     mutex_lock(&rina_dm.lock);
+
+    /* Check if an IPC process with that name already exists.
+     * We could also skip this check here, since it's a check
+     * already performed by userspace. */
+    hash_for_each(rina_dm.ipcp_table, bucket, cur, node) {
+        if (rina_name_cmp(&cur->name, &req->name) == 0) {
+            mutex_unlock(&rina_dm.lock);
+            kfree(entry);
+            return -EINVAL;
+        }
+    }
 
     /* Try to alloc an IPC process id from the bitmap. */
     entry->id = bitmap_find_next_zero_area(rina_dm.ipcp_id_bitmap,

@@ -341,9 +341,8 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
                     ret, serlen);
             *result = EINVAL;
         }
-    }
 
-    if (has_response && entry->wait_for_completion) {
+    } else if (has_response && entry->wait_for_completion) {
         while (!entry->op_complete) {
             pthread_cond_wait(&entry->op_complete_cond, &loop->lock);
         }
