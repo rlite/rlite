@@ -337,6 +337,34 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     return 0;
 }
 
+static struct rina_buf *
+ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                uint8_t pdu_type, uint64_t ack_nack_seq_num)
+{
+    struct rina_buf *rb = rina_buf_alloc_ctrl(2, GFP_ATOMIC);
+    struct rina_pci_ctrl *pcic;
+
+    if (rb) {
+        pcic = (struct rina_pci_ctrl *)RINA_BUF_DATA(rb);
+        pcic->base.dst_addr = flow->remote_addr;
+        pcic->base.src_addr = ipcp->addr;
+        pcic->base.conn_id.qos_id = 0;
+        pcic->base.conn_id.dst_cep = flow->remote_port;
+        pcic->base.conn_id.src_cep = flow->local_port;
+        pcic->base.pdu_type = pdu_type;
+        pcic->base.pdu_flags = 0;
+        pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
+        pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
+        pcic->ack_nack_seq_num = ack_nack_seq_num;
+        pcic->new_rwe = flow->dtp.rcv_rwe;
+        pcic->new_lwe = flow->dtp.rcv_lwe;
+        pcic->my_rwe = flow->dtp.snd_rwe;
+        pcic->my_lwe = flow->dtp.snd_lwe;
+    }
+
+    return rb;
+}
+
 static void
 sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
                  uint64_t seqnum)
@@ -354,26 +382,10 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
             /* POL: ReceivingFlowControl */
             if (cfg->fc.fc_type == RINA_FC_T_WIN) {
                 /* Send a flow control only control PDU. */
-                struct rina_buf *rb = rina_buf_alloc_ctrl(2, GFP_ATOMIC);
-                struct rina_pci_ctrl *pcic;
+                struct rina_buf *rb;
 
+                rb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_FC, 0);
                 if (rb) {
-                    pcic = (struct rina_pci_ctrl *)RINA_BUF_DATA(rb);
-                    pcic->base.dst_addr = flow->remote_addr;
-                    pcic->base.src_addr = ipcp->addr;
-                    pcic->base.conn_id.qos_id = 0;
-                    pcic->base.conn_id.dst_cep = flow->remote_port;
-                    pcic->base.conn_id.src_cep = flow->local_port;
-                    pcic->base.pdu_type = PDU_TYPE_FC;
-                    pcic->base.pdu_flags = 0;
-                    pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
-                    pcic->last_ctrl_seq_num_rcvd =
-                            flow->dtp.last_ctrl_seq_num_rcvd;
-                    pcic->ack_nack_seq_num = 0;
-                    pcic->new_rwe = flow->dtp.rcv_rwe;
-                    pcic->new_lwe = flow->dtp.rcv_lwe;
-                    pcic->my_rwe = flow->dtp.snd_rwe;
-                    pcic->my_lwe = flow->dtp.snd_lwe;
                     rmt_tx(ipcp, flow, rb);
                 }
             }
@@ -439,29 +451,10 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             if (flow->cfg.dtcp.flow_control &&
                     dtp->rcv_lwe >= dtp->last_snd_data_ack) {
                 /* Send ACK flow control PDU */
-                rb = rina_buf_alloc_ctrl(2, GFP_ATOMIC);
-                if (rb) {
-                    struct rina_pci_ctrl *pcic;
-
-                    pcic = (struct rina_pci_ctrl *)RINA_BUF_DATA(rb);
-                    pcic->base.dst_addr = flow->remote_addr;
-                    pcic->base.src_addr = ipcp->addr;
-                    pcic->base.conn_id.qos_id = 0;
-                    pcic->base.conn_id.dst_cep = flow->remote_port;
-                    pcic->base.conn_id.src_cep = flow->local_port;
-                    pcic->base.pdu_type = PDU_TYPE_ACK_AND_FC;
-                    pcic->base.pdu_flags = 0;
-                    pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
-                    pcic->last_ctrl_seq_num_rcvd =
-                        flow->dtp.last_ctrl_seq_num_rcvd;
-                    pcic->ack_nack_seq_num = dtp->rcv_lwe;
-                    pcic->new_rwe = flow->dtp.rcv_rwe;
-                    pcic->new_lwe = flow->dtp.rcv_lwe;
-                    pcic->my_rwe = flow->dtp.snd_rwe;
-                    pcic->my_lwe = flow->dtp.snd_lwe;
-                    if (!rmt_tx(ipcp, flow, rb)) {
-                        dtp->last_snd_data_ack = dtp->rcv_lwe;
-                    }
+                rb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_ACK_AND_FC,
+                                    dtp->rcv_lwe);
+                if (rb && rmt_tx(ipcp, flow, rb) == 0) {
+                    dtp->last_snd_data_ack = dtp->rcv_lwe;
                 }
             }
 
