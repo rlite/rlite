@@ -88,6 +88,15 @@ struct Neighbor {
     void abort();
 };
 
+/* Shortest Path First algorithm. */
+class SPFEngine {
+public:
+    SPFEngine() {};
+    int run(const map<string, LowerFlow >& db);
+
+private:
+};
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
@@ -107,6 +116,8 @@ struct uipcp_rib {
 
     /* Lower Flow Database. */
     map< string, LowerFlow > lfdb;
+
+    SPFEngine spf;
 
     uipcp_rib(struct uipcp *_u);
 
@@ -367,6 +378,7 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
     LowerFlow lf;
     RinaName neigh_name = RinaName(&neigh.ipcp_name);
     uint64_t remote_addr = lookup_neighbor_address(neigh_name);
+    int ret;
 
     if (remote_addr == 0) {
         PE("Cannot find address for neighbor %s\n",
@@ -391,8 +403,13 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
         lfl.flows.push_back(mit->second);
     }
 
-    return remote_sync_neigh(neigh, true, obj_class::lfdb,
-                             obj_name::lfdb, &lfl);
+    ret = remote_sync_neigh(neigh, true, obj_class::lfdb,
+                            obj_name::lfdb, &lfl);
+
+    /* Update the routing table. */
+    spf.run(lfdb);
+
+    return ret;
 }
 
 int
@@ -568,6 +585,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
     LowerFlowList lfl(objbuf, objlen);
     RinaName my_name = RinaName(&ipcp->ipcp_name);
+    bool modified = false;
 
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
                                 f != lfl.flows.end(); f++) {
@@ -577,6 +595,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
         if (add) {
             if (mit == lfdb.end() || f->seqnum > mit->second.seqnum) {
                 lfdb[key] = *f;
+                modified = true;
             }
             PD("Lower flow %s added remotely\n", key.c_str());
 
@@ -586,12 +605,24 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
             } else {
                 lfdb.erase(mit);
+                modified = true;
                 PD("Lower flow %s removed remotely\n", key.c_str());
             }
 
         }
     }
 
+    if (modified) {
+        /* Update the routing table. */
+        spf.run(lfdb);
+    }
+
+    return 0;
+}
+
+int
+SPFEngine::run(const map<string, LowerFlow >& db)
+{
     return 0;
 }
 
