@@ -271,6 +271,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
 uipcp_rib::~uipcp_rib()
 {
+    for (map<string, Neighbor*>::iterator mit = neighbors.begin();
+                                    mit != neighbors.end(); mit++) {
+        delete mit->second;
+    }
+
     rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
@@ -570,19 +575,19 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
                                  const string& obj_name,
                                  const UipcpObject *obj_value) const
 {
-    for (map<string, Neighbor>::const_iterator neigh = neighbors.begin();
+    for (map<string, Neighbor*>::const_iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
-        if (exclude && neigh->second == *exclude) {
+        if (exclude && neigh->second == exclude) {
             continue;
         }
 
-        if (const_cast<Neighbor &>(neigh->second).
+        if (const_cast<Neighbor*>(neigh->second)->
                         mgmt_conn()->enrollment_state != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }
 
-        neigh->second.remote_sync_obj(NULL, create, obj_class,
+        neigh->second->remote_sync_obj(NULL, create, obj_class,
                                       obj_name, obj_value);
     }
 

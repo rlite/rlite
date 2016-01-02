@@ -72,15 +72,15 @@ struct NeighFlow {
     int keepalive_timeout_id;
     enum state_t enrollment_state;
 
-    NeighFlow() : neigh(NULL), conn(NULL) { }
     NeighFlow(Neighbor *n, unsigned int pid, int ffd,
-              unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
-                                  lower_ipcp_id(lid), conn(NULL),
-                                  enroll_timeout_id(0),
-                                  keepalive_timeout_id(0),
-                                  enrollment_state(NEIGH_NONE) { }
+              unsigned int lid);
+    ~NeighFlow();
 
     bool enrollment_starting(const CDAPMessage *m) const;
+    void enroll_tmr_start();
+    void enroll_tmr_stop();
+    void keepalive_tmr_start();
+    void keepalive_tmr_stop();
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -88,17 +88,14 @@ struct Neighbor {
     struct uipcp_rib *rib;
     RinaName ipcp_name;
 
-    std::map<unsigned int, NeighFlow> flows;
+    std::map<unsigned int, NeighFlow *> flows;
     unsigned int mgmt_port_id;
 
     typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
                                                   const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
-    /* Required to use the map. */
-    Neighbor() : rib(NULL) { }
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name);
-    Neighbor(const Neighbor& other);
     bool operator==(const Neighbor& other) const { return ipcp_name == other.ipcp_name; }
     bool operator!=(const Neighbor& other) const { return !(*this == other); }
     ~Neighbor();
@@ -124,8 +121,6 @@ struct Neighbor {
     int enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
     void abort(NeighFlow *nf);
-    void enroll_tmr_start(NeighFlow *nf);
-    void enroll_tmr_stop(NeighFlow *nf);
 
     int remote_sync_obj(NeighFlow *nf, bool create,
                         const std::string& obj_class,
@@ -192,7 +187,7 @@ struct uipcp_rib {
     std::list< std::string > lower_difs;
 
     /* Neighbors. */
-    std::map< std::string, Neighbor > neighbors;
+    std::map< std::string, Neighbor* > neighbors;
     std::map< std::string, NeighborCandidate > cand_neighbors;
 
     /* Directory Forwarding Table. */

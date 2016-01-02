@@ -376,11 +376,11 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         return 0;
     }
 
+    uipcp->ops.fini(uipcp);
+
     ret = rl_evloop_fini(&uipcp->loop);
 
     list_del(&uipcp->node);
-
-    uipcp->ops.fini(uipcp);
 
     free(uipcp);
 

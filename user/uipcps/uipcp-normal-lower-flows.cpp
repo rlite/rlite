@@ -232,7 +232,7 @@ uipcp_rib::pduft_sync()
      * next-hops. */
     for (map<uint64_t, uint64_t>::iterator r = spe.next_hops.begin();
                                         r !=  spe.next_hops.end(); r++) {
-        map<string, Neighbor>::iterator neigh;
+        map<string, Neighbor*>::iterator neigh;
         string neigh_name;
 
         if (next_hop_to_port_id.count(r->second)) {
@@ -256,7 +256,7 @@ uipcp_rib::pduft_sync()
         }
 
         /* Just take one for now. */
-        next_hop_to_port_id[r->second] = neigh->second.mgmt_conn()->port_id;
+        next_hop_to_port_id[r->second] = neigh->second->mgmt_conn()->port_id;
     }
 
     /* Generate PDUFT entries. */

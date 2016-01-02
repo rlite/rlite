@@ -1,9 +1,51 @@
 #include <unistd.h>
+#include <cassert>
 
 #include "uipcp-normal.hpp"
 
 using namespace std;
 
+
+NeighFlow::NeighFlow(Neighbor *n, unsigned int pid, int ffd,
+                     unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
+                                  lower_ipcp_id(lid), conn(NULL),
+                                  enroll_timeout_id(0),
+                                  keepalive_timeout_id(0),
+                                  enrollment_state(NEIGH_NONE)
+{
+    assert(neigh);
+}
+
+NeighFlow::~NeighFlow()
+{
+    int ret;
+
+    if (!neigh) {
+        /* This is an empty instance. */
+        return;
+    }
+
+    enroll_tmr_stop();
+    keepalive_tmr_stop();
+
+    if (conn) {
+        delete conn;
+    }
+
+    ret = close(flow_fd);
+
+    if (ret) {
+        UPE(neigh->rib->uipcp, "Error deallocating N-1 flow fd %d\n",
+                flow_fd);
+    } else {
+        UPD(neigh->rib->uipcp, "N-1 flow deallocated [fd=%d]\n",
+                flow_fd);
+    }
+
+    uipcps_lower_flow_removed(neigh->rib->uipcp->uipcps,
+                              neigh->rib->uipcp->ipcp_id,
+                              lower_ipcp_id);
+}
 
 bool
 NeighFlow::enrollment_starting(const CDAPMessage *rm) const
@@ -12,6 +54,77 @@ NeighFlow::enrollment_starting(const CDAPMessage *rm) const
            rm->op_code == gpb::M_START &&
            rm->obj_name == obj_name::enrollment &&
            rm->obj_class == obj_class::enrollment;
+}
+
+#define NEIGH_KEEPALIVE_INTVAL  5000
+#define NEIGH_ENROLL_TO         1500
+
+static void
+keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
+{
+    NeighFlow *nf = static_cast<NeighFlow *>(arg);
+    ScopeLock(nf->neigh->rib->lock);
+    CDAPMessage m;
+    int ret;
+
+    UPI(nf->neigh->rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+        static_cast<string>(nf->neigh->ipcp_name).c_str());
+
+    m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
+             0, 0, string());
+
+    ret = nf->neigh->send_to_port_id(nf, &m, 0, NULL);
+    if (ret) {
+        UPE(nf->neigh->rib->uipcp, "send_to_port_id() failed\n");
+    }
+
+    nf->keepalive_tmr_start();
+}
+
+static void
+enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
+{
+    NeighFlow *nf = static_cast<NeighFlow *>(arg);
+    ScopeLock(nf->neigh->rib->lock);
+
+    UPI(nf->neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
+        static_cast<string>(nf->neigh->ipcp_name).c_str());
+
+    nf->neigh->abort(nf);
+}
+
+void
+NeighFlow::enroll_tmr_start()
+{
+    enroll_timeout_id = rl_evloop_schedule(&neigh->rib->uipcp->loop,
+                                           NEIGH_ENROLL_TO,
+                                           enroll_timeout_cb, this);
+}
+
+void
+NeighFlow::enroll_tmr_stop()
+{
+    if (enroll_timeout_id > 0) {
+        rl_evloop_schedule_canc(&neigh->rib->uipcp->loop, enroll_timeout_id);
+        enroll_timeout_id = 0;
+    }
+}
+
+void
+NeighFlow::keepalive_tmr_start()
+{
+    keepalive_timeout_id = rl_evloop_schedule(&neigh->rib->uipcp->loop,
+                                              NEIGH_KEEPALIVE_INTVAL,
+                                              keepalive_timeout_cb, this);
+}
+
+void
+NeighFlow::keepalive_tmr_stop()
+{
+    if (keepalive_timeout_id > 0) {
+        rl_evloop_schedule_canc(&neigh->rib->uipcp->loop, keepalive_timeout_id);
+        keepalive_timeout_id = 0;
+    }
 }
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
@@ -30,40 +143,11 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name)
     enroll_fsm_handlers[NEIGH_ENROLLED] = &Neighbor::enrolled;
 }
 
-Neighbor::Neighbor(const Neighbor& other)
-{
-    rib = other.rib;
-    ipcp_name = other.ipcp_name;
-    flows = other.flows;
-    mgmt_port_id = other.mgmt_port_id;
-    memcpy(enroll_fsm_handlers, other.enroll_fsm_handlers,
-           sizeof(enroll_fsm_handlers));
-}
-
 Neighbor::~Neighbor()
 {
-    for (map<unsigned int, NeighFlow>::iterator fit = flows.begin();
-                                        fit != flows.end(); fit++) {
-        NeighFlow& flow = fit->second;
-
-        if (flow.conn) {
-            delete flow.conn;
-        }
-
-        if (flow.flow_fd != -1) {
-            int ret = close(flow.flow_fd);
-
-            if (ret) {
-                UPE(rib->uipcp, "Error deallocating N-1 flow fd %d\n",
-                    flow.flow_fd);
-            } else {
-                UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n",
-                    flow.flow_fd);
-            }
-
-            uipcps_lower_flow_removed(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
-                                      flow.lower_ipcp_id);
-        }
+    for (map<unsigned int, NeighFlow *>::iterator mit = flows.begin();
+                                            mit != flows.end(); mit++) {
+        delete mit->second;
     }
 }
 
@@ -105,12 +189,12 @@ Neighbor::enrollment_state_repr(state_t s) const
 NeighFlow *
 Neighbor::mgmt_conn()
 {
-    map<unsigned int, NeighFlow>::iterator mit;
+    map<unsigned int, NeighFlow*>::iterator mit;
 
     mit = flows.find(mgmt_port_id);
     assert(mit != flows.end());
 
-    return &mit->second;
+    return mit->second;
 }
 
 int
@@ -182,58 +266,6 @@ Neighbor::abort(NeighFlow *nf)
     }
 }
 
-#define NEIGH_KEEPALIVE_INTVAL  5000
-#define NEIGH_ENROLL_TO         1500
-
-static void
-keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
-{
-    NeighFlow *nf = static_cast<NeighFlow *>(arg);
-    ScopeLock(nf->neigh->rib->lock);
-    CDAPMessage m;
-    int ret;
-
-    UPI(nf->neigh->rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
-        static_cast<string>(nf->neigh->ipcp_name).c_str());
-
-    m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
-             0, 0, string());
-
-    ret = nf->neigh->send_to_port_id(nf, &m, 0, NULL);
-    if (ret) {
-        UPE(nf->neigh->rib->uipcp, "send_to_port_id() failed\n");
-    }
-
-    nf->keepalive_timeout_id = rl_evloop_schedule(loop, NEIGH_KEEPALIVE_INTVAL,
-                                                  keepalive_timeout_cb, nf);
-}
-
-static void
-enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
-{
-    NeighFlow *nf = static_cast<NeighFlow *>(arg);
-    ScopeLock(nf->neigh->rib->lock);
-
-    UPI(nf->neigh->rib->uipcp, "Enrollment timeout with neighbor '%s'\n",
-        static_cast<string>(nf->neigh->ipcp_name).c_str());
-
-    nf->neigh->abort(nf);
-}
-
-void
-Neighbor::enroll_tmr_start(NeighFlow *nf)
-{
-    nf->enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
-                                               NEIGH_ENROLL_TO,
-                                               enroll_timeout_cb, nf);
-}
-
-void
-Neighbor::enroll_tmr_stop(NeighFlow *nf)
-{
-    rl_evloop_schedule_canc(&rib->uipcp->loop, nf->enroll_timeout_id);
-}
-
 int
 Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
 {
@@ -297,7 +329,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
-    enroll_tmr_start(nf);
+    nf->enroll_tmr_start();
     nf->enrollment_state = next_state;
 
     return 0;
@@ -337,8 +369,8 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
-    enroll_tmr_stop(nf);
-    enroll_tmr_start(nf);
+    nf->enroll_tmr_stop();
+    nf->enroll_tmr_start();
     nf->enrollment_state = NEIGH_I_WAIT_START_R;
 
     return 0;
@@ -443,8 +475,8 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         return 0;
     }
 
-    enroll_tmr_stop(nf);
-    enroll_tmr_start(nf);
+    nf->enroll_tmr_stop();
+    nf->enroll_tmr_start();
     nf->enrollment_state = NEIGH_S_WAIT_STOP_R;
 
     return 0;
@@ -492,8 +524,8 @@ Neighbor::i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
         rib->set_address(enr_info.address);
     }
 
-    enroll_tmr_stop(nf);
-    enroll_tmr_start(nf);
+    nf->enroll_tmr_stop();
+    nf->enroll_tmr_start();
     nf->enrollment_state = NEIGH_I_WAIT_STOP;
 
     return 0;
@@ -562,10 +594,8 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 
     if (enr_info.start_early) {
         UPI(rib->uipcp, "Initiator is allowed to start early\n");
-        enroll_tmr_stop(nf);
-        nf->keepalive_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
-                                                      NEIGH_KEEPALIVE_INTVAL,
-                                                      keepalive_timeout_cb, nf);
+        nf->enroll_tmr_stop();
+        nf->keepalive_tmr_start();
         nf->enrollment_state = NEIGH_ENROLLED;
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -576,8 +606,8 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 
     } else {
         UPI(rib->uipcp, "Initiator is not allowed to start early\n");
-        enroll_tmr_stop(nf);
-        enroll_tmr_start(nf);
+        nf->enroll_tmr_stop();
+        nf->enroll_tmr_start();
         nf->enrollment_state = NEIGH_I_WAIT_START;
     }
 
@@ -618,10 +648,8 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
         return ret;
     }
 
-    enroll_tmr_stop(nf);
-    nf->keepalive_timeout_id = rl_evloop_schedule(&rib->uipcp->loop,
-                                                  NEIGH_KEEPALIVE_INTVAL,
-                                                  keepalive_timeout_cb, nf);
+    nf->enroll_tmr_stop();
+    nf->keepalive_tmr_start();
     nf->enrollment_state = NEIGH_ENROLLED;
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -797,17 +825,16 @@ uipcp_rib::get_neighbor(const struct rina_name *neigh_name)
     string neigh_name_s = static_cast<string>(_neigh_name_);
 
     if (!neighbors.count(neigh_name_s)) {
-        neighbors[neigh_name_s] =
-                Neighbor(this, neigh_name);
+        neighbors[neigh_name_s] = new Neighbor(this, neigh_name);
     }
 
-    return &neighbors[neigh_name_s];
+    return neighbors[neigh_name_s];
 }
 
 int
 uipcp_rib::del_neighbor(const RinaName& neigh_name)
 {
-    map<string, Neighbor>::iterator mit =
+    map<string, Neighbor*>::iterator mit =
                     neighbors.find(static_cast<string>(neigh_name));
 
     if (mit == neighbors.end()) {
@@ -964,12 +991,12 @@ uipcp_rib::lookup_neigh_flow_by_port_id(unsigned int port_id,
 {
     *nfp = NULL;
 
-    for (map<string, Neighbor>::iterator nit = neighbors.begin();
+    for (map<string, Neighbor*>::iterator nit = neighbors.begin();
                         nit != neighbors.end(); nit++) {
-        Neighbor& neigh = nit->second;
+        Neighbor *neigh = nit->second;
 
-        if (neigh.flows.count(port_id)) {
-            *nfp = &neigh.flows[port_id];
+        if (neigh->flows.count(port_id)) {
+            *nfp = neigh->flows[port_id];
             assert((*nfp)->neigh);
 
             return 0;
@@ -1033,10 +1060,10 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         mgmt_port_id = port_id_;
     }
 
-    flows[port_id_] = NeighFlow(this, port_id_, flow_fd_, lower_ipcp_id_);
+    flows[port_id_] = new NeighFlow(this, port_id_, flow_fd_, lower_ipcp_id_);
 
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
-                    flows[port_id_].flow_fd, flows[port_id_].port_id);
+                    flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
     uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
                             lower_ipcp_id_);
@@ -1103,8 +1130,8 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
         neigh->mgmt_port_id = neigh_port_id;
     }
 
-    neigh->flows[neigh_port_id] = NeighFlow(neigh, neigh_port_id, 0,
-                                            lower_ipcp_id);
+    neigh->flows[neigh_port_id] = new NeighFlow(neigh, neigh_port_id, 0,
+                                                lower_ipcp_id);
 
     return 0;
 }
@@ -1126,11 +1153,11 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
         return -1;
     }
 
-    neigh->flows[neigh_port_id].flow_fd = neigh_fd;
+    neigh->flows[neigh_port_id]->flow_fd = neigh_fd;
 
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
-                    neigh->flows[neigh_port_id].flow_fd,
-                    neigh->flows[neigh_port_id].port_id);
+                    neigh->flows[neigh_port_id]->flow_fd,
+                    neigh->flows[neigh_port_id]->port_id);
 
     return 0;
 }
