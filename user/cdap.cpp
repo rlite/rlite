@@ -164,6 +164,7 @@ CDAPValidationTable::CDAPValidationTable()
     ENTRY_FILL(ObjValue, M_CONNECT_R, MUST_NOT_EXIST);
     ENTRY_FILL(ObjValue, M_RELEASE, MUST_NOT_EXIST);
     ENTRY_FILL(ObjValue, M_RELEASE_R, MUST_NOT_EXIST);
+    ENTRY_FILL(ObjValue, M_WRITE, MUST_EXIST);
     ENTRY_FILL(ObjValue, M_DELETE_R, MUST_NOT_EXIST);
     ENTRY_FILL(ObjValue, M_CANCELREAD, MUST_NOT_EXIST);
     ENTRY_FILL(ObjValue, M_CANCELREAD_R, MUST_NOT_EXIST);
@@ -992,15 +993,105 @@ CDAPConn::m_read_r(const struct CDAPMessage *req,
 }
 
 int
+CDAPConn::__m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter,
+                  struct CDAPMessage *m)
+{
+    m->flags = flags;
+    m->obj_class = obj_class;
+    m->obj_name = obj_name;
+    m->obj_inst = obj_inst;
+    m->scope = scope;
+    m->filter = filter;
+
+    return msg_send(m, 0);
+}
+
+int
 CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
                   const std::string& obj_class,
                   const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter)
+                  int scope, const std::string& filter, int32_t v)
 {
-    return m_common(invoke_id, flags, obj_class, obj_name,
-                    obj_inst, scope, filter, gpb::M_WRITE);
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
 }
 
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, int64_t v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
+
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, float v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
+
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, double v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
+
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, bool v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
+
+int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, const string& v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(v);
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
 
 int
 CDAPConn::m_write_r(const struct CDAPMessage *req,

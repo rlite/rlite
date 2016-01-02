@@ -51,6 +51,13 @@ class CDAPConn {
                    const std::string& obj_name, long obj_inst,
                    int result, const std::string& result_reason,
                    gpb::opCode_t op_code);
+
+    int __m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter,
+                  struct CDAPMessage *m);
+
 public:
     CDAPConn(int fd, long version);
 
@@ -106,7 +113,32 @@ public:
     int m_write(int *invoke_id, gpb::flagValues_t flags,
                 const std::string& obj_class,
                 const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter);
+                int scope, const std::string& filter, int32_t v);
+
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, int64_t v);
+
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, float v);
+
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, double v);
+
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, bool v);
+
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, const std::string& v);
 
     int m_write_r(const struct CDAPMessage *req,
                   gpb::flagValues_t flags, int result,
@@ -185,6 +217,42 @@ struct CDAPMessage {
     operator gpb::CDAPMessage() const;
 
     bool valid(bool check_invoke_id) const;
+
+    void set_obj_value(int32_t v)
+    {
+        obj_value.ty = I32;
+        obj_value.u.i32 = v;
+    }
+
+    void set_obj_value(int64_t v)
+    {
+        obj_value.ty = I64;
+        obj_value.u.i64 = v;
+    }
+
+    void set_obj_value(float v)
+    {
+        obj_value.ty = FLOAT;
+        obj_value.u.fp_single = v;
+    }
+
+    void set_obj_value(double v)
+    {
+        obj_value.ty = DOUBLE;
+        obj_value.u.fp_double = v;
+    }
+
+    void set_obj_value(bool v)
+    {
+        obj_value.ty = BOOL;
+        obj_value.u.boolean = v;
+    }
+
+    void set_obj_value(const std::string& v)
+    {
+        obj_value.ty = STRING;
+        obj_value.str = v;
+    }
 
 private:
     /* Representation of the object value. */

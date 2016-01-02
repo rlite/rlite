@@ -210,7 +210,7 @@ client_write_some(CDAPConn *conn)
     int invoke_id;
 
     if (conn->m_write(&invoke_id, gpb::F_NO_FLAGS,
-                      "class_A", "x", 0, 0, string())) {
+                      "class_A", "x", 0, 0, string(), 18)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
