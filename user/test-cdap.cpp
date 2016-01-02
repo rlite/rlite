@@ -1,5 +1,8 @@
 #include <iostream>
 #include <string>
+#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
 
 #include "rinalite/rinalite-common.h"
 #include "rinalite/rinalite-utils.h"
@@ -159,7 +162,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gpb::authValue_t *authvalue = new gpb::authValue_t();
 
     if (!objvalue || !authvalue) {
-        PD("%s: Out of memory\n", __func__);
+        PE("%s: Out of memory\n", __func__);
         if (objvalue) delete objvalue;
         if (authvalue) delete authvalue;
 
@@ -233,6 +236,33 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gm.set_version(version);
 
     return gm;
+}
+
+int
+cdap_msg_send(const struct CDAPMessage& m, int fd)
+{
+    gpb::CDAPMessage gm = static_cast<gpb::CDAPMessage>(m);
+    size_t serlen = gm.ByteSize();
+    char *serbuf = (char *)malloc(serlen);
+    int n;
+
+    if (!serbuf) {
+        return -ENOMEM;
+    }
+
+    gm.SerializeToArray(serbuf, serlen);
+
+    n = write(fd, serbuf, serlen);
+    if (n != serlen) {
+        if (n < 0) {
+            perror("write(cdap_msg)");
+        } else {
+            PE("%s: Partial write %d/%d\n", __func__, n, serlen);
+        }
+        return -1;
+    }
+
+    return 0;
 }
 
 int main()
