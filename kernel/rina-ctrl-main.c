@@ -363,6 +363,21 @@ ipcp_application_lookup(struct ipcp_entry *ipcp,
     return NULL;
 }
 
+static void
+ipcp_application_del_entry(struct ipcp_entry *ipcp,
+                           struct registered_application *app)
+{
+    if (ipcp->ops.application_register) {
+        ipcp->ops.application_register(ipcp, &app->name, 0);
+    }
+
+    list_del(&app->node);
+    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
+    ipcp_del_entry(ipcp);
+    rina_name_free(&app->name);
+    kfree(app);
+}
+
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *application_name,
@@ -370,6 +385,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 {
     struct registered_application *app;
     char *name_s;
+    int ret = 0;
 
     mutex_lock(&ipcp->lock);
 
@@ -400,18 +416,14 @@ ipcp_application_add(struct ipcp_entry *ipcp,
         kfree(name_s);
     }
 
-    return 0;
-}
+    if (ipcp->ops.application_register) {
+        ret = ipcp->ops.application_register(ipcp, application_name, 1);
+        if (ret) {
+            ipcp_application_del_entry(ipcp, app);
+        }
+    }
 
-static void
-ipcp_application_del_entry(struct ipcp_entry *ipcp,
-                           struct registered_application *app)
-{
-    list_del(&app->node);
-    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_del_entry(ipcp);
-    rina_name_free(&app->name);
-    kfree(app);
+    return ret;
 }
 
 static int

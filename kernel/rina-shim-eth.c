@@ -50,6 +50,7 @@ struct arpt_entry {
 struct rina_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
+    char *reg_app_name_s;
     struct list_head arp_table;
 };
 
@@ -65,6 +66,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     priv->netdev = NULL;
+    priv->reg_app_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
@@ -90,9 +92,60 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
         dev_put(priv->netdev);
     }
 
+    if (priv->reg_app_name_s) {
+        kfree(priv->reg_app_name_s);
+    }
+
     kfree(priv);
 
     printk("%s: IPC [%p] destroyed\n", __func__, priv);
+}
+
+static int
+rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
+                       int reg)
+{
+    struct rina_shim_eth *priv = ipcp->priv;
+    char *tmp;
+
+    if (reg) {
+        if (priv->reg_app_name_s) {
+            /* Only one application can be currently registered. */
+            return -EBUSY;
+        }
+
+        priv->reg_app_name_s = rina_name_to_string(appl);
+
+        if (priv->reg_app_name_s) {
+            PD("%s: Application %s registered\n", __func__, priv->reg_app_name_s);
+        }
+
+        return priv->reg_app_name_s ? 0 : -ENOMEM;
+    }
+
+    if (!priv->reg_app_name_s) {
+        /* Nothing to do. */
+        return 0;
+    }
+
+    tmp = rina_name_to_string(appl);
+    if (!tmp) {
+        PE("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    if (strcmp(tmp, priv->reg_app_name_s) == 0) {
+        PD("%s: Application %s unregistered\n", __func__, priv->reg_app_name_s);
+        kfree(priv->reg_app_name_s);
+        priv->reg_app_name_s = NULL;
+    } else {
+        /* Nothing to do. Main module may be trying to clean up a
+         * failed registration, so don't report an error. */
+    }
+
+    kfree(tmp);
+
+    return 0;
 }
 
 static struct arpt_entry *
@@ -356,6 +409,7 @@ rina_shim_eth_init(void)
     factory.ops.flow_allocate_resp = rina_shim_eth_fa_resp;
     factory.ops.sdu_write = rina_shim_eth_sdu_write;
     factory.ops.config = rina_shim_eth_config;
+    factory.ops.application_register = rina_shim_eth_register;
 
     ret = rina_ipcp_factory_register(&factory);
 

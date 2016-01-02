@@ -21,6 +21,9 @@ struct pduft_entry;
 struct ipcp_ops {
     void (*destroy)(struct ipcp_entry *ipcp);
 
+    int (*application_register)(struct ipcp_entry *ipcp,
+                                struct rina_name *appl, int reg);
+
     /* Invoked by the core to notify the IPCP about a new
      * flow allocation request from the upper layer. */
     int (*flow_allocate_req)(struct ipcp_entry *ipcp,
