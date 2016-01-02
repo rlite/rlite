@@ -226,8 +226,6 @@ rina_normal_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
                                        struct flow_entry *flow,
                                        uint8_t response)
 {
-    PI("%s, response %u\n", __func__, response);
-
     return 0;
 }
 

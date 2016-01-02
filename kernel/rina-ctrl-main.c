@@ -1226,9 +1226,17 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
             PE("%s: Out of memory\n", __func__);
             ret = -ENOMEM;
         } else {
+            char *name_s = rina_name_to_string(&flow_entry->remote_application);
+
             resp->msg_type = RINA_KERN_IPCP_ENROLL_RESP;
             resp->event_id = flow_entry->event_id;
             resp->result = response;
+
+            PI("%s: Enrollment completed [%u] with IPCP %s\n", __func__,
+                    response, name_s);
+            if (name_s) {
+                kfree(name_s);
+            }
 
             /* Enqueue the response into the upqueue. */
             BUG_ON(!flow_entry->upper.rc);
