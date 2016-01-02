@@ -1085,7 +1085,7 @@ int
 Neighbor::alloc_flow(const char *supp_dif)
 {
     struct rina_name neigh_name;
-    struct rl_ipcp *info;
+    struct rl_ipcp *ipcp;
     rl_ipcp_id_t lower_ipcp_id_ = -1;
     rl_port_t port_id_;
     unsigned int event_id;
@@ -1096,7 +1096,7 @@ Neighbor::alloc_flow(const char *supp_dif)
         UPI(rib->uipcp, "Trying to allocate additional N-1 flow\n");
     }
 
-    info = rib->ipcp_info();
+    ipcp = rib->ipcp_info();
     ipcp_name.rina_name_fill(&neigh_name);
 
     {
@@ -1116,8 +1116,8 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     /* Allocate a flow for the enrollment. */
     ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif, NULL,
-                               &info->name, &neigh_name, NULL,
-                               info->id, &port_id_, 2000);
+                               &ipcp->name, &neigh_name, NULL,
+                               ipcp->id, &port_id_, 2000);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
