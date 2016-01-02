@@ -16,8 +16,6 @@
 #include "helpers.h"
 
 
-static void usage(void);
-
 static int
 ipcm_connect()
 {
@@ -321,9 +319,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
 #define NUM_COMMANDS    (sizeof(cmd_descriptors)/sizeof(struct cmd_descriptor))
 
 static void
-usage(void)
+usage(int i)
 {
-    int i;
+    if (i >= 0 && i < NUM_COMMANDS) {
+        printf("    %s %s\n", cmd_descriptors[i].name, cmd_descriptors[i].usage);
+        return;
+    }
 
     printf("\nAvailable commands:\n");
 
@@ -340,7 +341,7 @@ process_args(int argc, char **argv)
 
     if (argc < 2) {
         /* No command. */
-        usage();
+        usage(-1);
         return -1;
     }
 
@@ -353,7 +354,7 @@ process_args(int argc, char **argv)
             if (argc - 2 < cmd_descriptors[i].num_args) {
                 /* Not enough arguments. */
                 PE("Not enough arguments\n");
-                usage();
+                usage(i);
                 return -1;
             }
 
@@ -362,7 +363,7 @@ process_args(int argc, char **argv)
     }
 
     PE("Unknown command '%s'\n", cmd);
-    usage();
+    usage(-1);
 
     return -1;
 }
