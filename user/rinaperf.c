@@ -575,6 +575,10 @@ usage(void)
         "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
+        "   -a APNAME : application process name of the rinaperf client\n"
+        "   -A APNAME : application process instance of the rinaperf client\n"
+        "   -z APNAME : application process name of the rinaperf server\n"
+        "   -Z APNAME : application process instance of the rinaperf server\n"
         "   -x : use a separate control connection\n"
           );
 }
@@ -587,6 +591,8 @@ main(int argc, char **argv)
     const char *type = "echo";
     const char *dif_name = NULL;
     const char *ipcp_apn = NULL, *ipcp_api = NULL;
+    const char *cli_appl_apn = "rinaperf-data", *cli_appl_api = "client";
+    const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
     struct rina_flow_spec flowspec;
@@ -603,7 +609,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rlite_flow_spec_default(&flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:x")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:a:A:z:Z:x")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -667,6 +673,22 @@ main(int argc, char **argv)
                 }
                 break;
 
+            case 'a':
+                cli_appl_apn = optarg;
+                break;
+
+            case 'A':
+                cli_appl_api = optarg;
+                break;
+
+            case 'z':
+                srv_appl_apn = optarg;
+                break;
+
+            case 'Z':
+                srv_appl_api = optarg;
+                break;
+
             case 'x':
                 have_ctrl = 1;
                 PI("Warning: Control connection support is incomplete\n");
@@ -728,8 +750,8 @@ main(int argc, char **argv)
     rina_name_fill(&rp.dif_name, dif_name, NULL, NULL, NULL);
     rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", NULL, NULL);
     rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", NULL, NULL);
-    rina_name_fill(&rp.client_appl_name, "rinaperf-data", "client", NULL, NULL);
-    rina_name_fill(&rp.server_appl_name, "rinaperf-data", "server", NULL, NULL);
+    rina_name_fill(&rp.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
+    rina_name_fill(&rp.server_appl_name, srv_appl_apn, srv_appl_api, NULL, NULL);
     if (!ipcp_apn) {
         ipcp_api = NULL;
     }
