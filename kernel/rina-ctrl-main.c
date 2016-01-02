@@ -146,7 +146,7 @@ struct rina_ctrl {
 };
 
 static int
-rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg)
+rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -178,7 +178,7 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_ctrl_base_msg *rmsg)
 }
 
 static unsigned int
-ipcp_add(struct rina_ctrl_create_ipcp *req)
+ipcp_add(struct rina_msg_ipcp_create *req)
 {
     struct ipcp_entry *entry;
 
@@ -238,10 +238,10 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
-rina_ipcp_create(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
+rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_ctrl_create_ipcp *req = (struct rina_ctrl_create_ipcp *)bmsg;
-    struct rina_ctrl_create_ipcp_resp *resp;
+    struct rina_msg_ipcp_create *req = (struct rina_msg_ipcp_create *)bmsg;
+    struct rina_msg_ipcp_create_resp *resp;
     char *name_s = rina_name_to_string(&req->name);
     unsigned int ipcp_id;
     int ret;
@@ -262,7 +262,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     resp->ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
     if (ret) {
         goto err3;
     }
@@ -273,7 +273,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     return 0;
 
 err3:
-    rina_msg_free((struct rina_ctrl_base_msg *)resp);
+    rina_msg_free((struct rina_msg_base *)resp);
 err2:
     ipcp_del(ipcp_id);
 
@@ -281,11 +281,11 @@ err2:
 }
 
 static int
-rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
+rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_ctrl_destroy_ipcp *req =
-                        (struct rina_ctrl_destroy_ipcp *)bmsg;
-    struct rina_ctrl_destroy_ipcp_resp *resp;
+    struct rina_msg_ipcp_destroy *req =
+                        (struct rina_msg_ipcp_destroy *)bmsg;
+    struct rina_msg_ipcp_destroy_resp *resp;
     int ret;
 
     /* Create the response message. */
@@ -300,7 +300,7 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     /* Release the IPC process ID. */
     ipcp_del(req->ipcp_id);
 
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
     if (ret) {
         goto err1;
     }
@@ -310,15 +310,15 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     return 0;
 
 err1:
-    rina_msg_free((struct rina_ctrl_base_msg *)resp);
+    rina_msg_free((struct rina_msg_base *)resp);
 
     return ret;
 }
 
 static int
-rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_ctrl_base_msg *req)
+rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 {
-    struct rina_ctrl_fetch_ipcp_resp *resp;
+    struct rina_msg_fetch_ipcp_resp *resp;
     struct ipcp_entry *entry;
     bool stop_next;
     bool no_next = true;
@@ -356,7 +356,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_ctrl_base_msg *req)
     }
     mutex_unlock(&rina_dm.lock);
 
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
     if (ret) {
         goto err1;
     }
@@ -364,17 +364,17 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_ctrl_base_msg *req)
     return 0;
 
 err1:
-    rina_msg_free((struct rina_ctrl_base_msg *)resp);
+    rina_msg_free((struct rina_msg_base *)resp);
 
     return ret;
 }
 
 static int
-rina_assign_to_dif(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
+rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_ctrl_assign_to_dif *req =
-                    (struct rina_ctrl_assign_to_dif *)bmsg;
-    struct rina_ctrl_assign_to_dif_resp *resp;
+    struct rina_msg_assign_to_dif *req =
+                    (struct rina_msg_assign_to_dif *)bmsg;
+    struct rina_msg_assign_to_dif_resp *resp;
     char *name_s = rina_name_to_string(&req->dif_name);
     struct ipcp_entry *entry;
     struct hlist_head *head;
@@ -406,7 +406,7 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     resp->event_id = req->event_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_ctrl_base_msg *)resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
     if (ret) {
         goto err3;
     }
@@ -417,14 +417,14 @@ rina_assign_to_dif(struct rina_ctrl *rc, struct rina_ctrl_base_msg *bmsg)
     return 0;
 
 err3:
-    rina_msg_free((struct rina_ctrl_base_msg *)resp);
+    rina_msg_free((struct rina_msg_base *)resp);
 
     return ret;
 }
 
 /* The signature of a message handler. */
 typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
-                                  struct rina_ctrl_base_msg *bmsg);
+                                  struct rina_msg_base *bmsg);
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
@@ -439,7 +439,7 @@ static ssize_t
 rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
-    struct rina_ctrl_base_msg *bmsg;
+    struct rina_msg_base *bmsg;
     char *kbuf;
     ssize_t ret;
 
@@ -466,7 +466,7 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
         return -EINVAL;
     }
 
-    bmsg = (struct rina_ctrl_base_msg *)rc->msgbuf;
+    bmsg = (struct rina_msg_base *)rc->msgbuf;
 
     /* Demultiplex the message to the right message handler. */
     if (bmsg->msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[bmsg->msg_type]) {

@@ -6,7 +6,7 @@
 
 struct pending_entry {
     struct pending_entry *next;
-    struct rina_ctrl_base_msg *msg;
+    struct rina_msg_base *msg;
     size_t msg_len;
 };
 
