@@ -40,12 +40,14 @@ struct upqueue_entry {
     struct list_head node;
 };
 
-static LIST_HEAD(upqueue);
-static DEFINE_MUTEX(upqueue_lock);
-static DECLARE_WAIT_QUEUE_HEAD(upqueue_wqh);
+struct rina_ctrl {
+    struct list_head upqueue;
+    struct mutex upqueue_lock;
+    wait_queue_head_t upqueue_wqh;
+};
 
 static ssize_t
-rina_ipcp_create(const char __user *buf, size_t len)
+rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
 {
     const struct rina_ctrl_create_ipcp *umsg =
                     (const struct rina_ctrl_create_ipcp *)buf;
@@ -87,9 +89,9 @@ rina_ipcp_create(const char __user *buf, size_t len)
     }
     entry->msg = rmsg;
     entry->msg_len = sizeof(*rmsg);
-    mutex_lock(&upqueue_lock);
-    list_add(&entry->node, &upqueue);
-    mutex_unlock(&upqueue_lock);
+    mutex_lock(&rc->upqueue_lock);
+    list_add(&entry->node, &rc->upqueue);
+    mutex_unlock(&rc->upqueue_lock);
 
     name_s = rina_name_to_string(&kmsg.name);
     printk("IPC process %s created\n", name_s);
@@ -99,13 +101,14 @@ rina_ipcp_create(const char __user *buf, size_t len)
 }
 
 static ssize_t
-rina_assign_to_dif(const char __user *buf, size_t len)
+rina_assign_to_dif(struct rina_ctrl *rc, const char __user *buf, size_t len)
 {
     return len;
 }
 
 /* The signature of a message handler. */
-typedef ssize_t (*rina_msg_handler_t)(const char __user *buf, size_t len);
+typedef ssize_t (*rina_msg_handler_t)(struct rina_ctrl *rc,
+                                      const char __user *buf, size_t len);
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_handlers[] = {
@@ -115,13 +118,11 @@ static rina_msg_handler_t rina_handlers[] = {
 };
 
 static ssize_t
-rina_ctrl_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
+rina_ctrl_write(struct file *f, const char __user *buf, size_t len, loff_t *ppos)
 {
+    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
     rina_msg_t msg_type;
     ssize_t ret;
-
-    // filp->private_data;
-    (void)filp;
 
     if (len < sizeof(rina_msg_t)) {
         /* This message doesn't even contain a message type. */
@@ -133,7 +134,7 @@ rina_ctrl_write(struct file *filp, const char __user *buf, size_t len, loff_t *p
     if (msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[msg_type]) {
         return -EINVAL;
     }
-    ret = rina_handlers[msg_type](buf, len);
+    ret = rina_handlers[msg_type](rc, buf, len);
 
     if (ret >= 0) {
         *ppos += ret;
@@ -143,21 +144,20 @@ rina_ctrl_write(struct file *filp, const char __user *buf, size_t len, loff_t *p
 }
 
 static ssize_t
-rina_ctrl_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
+rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 {
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
+    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
     int ret = 0;
 
-    (void)filp;
-
-    add_wait_queue(&upqueue_wqh, &wait);
+    add_wait_queue(&rc->upqueue_wqh, &wait);
     while (len) {
         current->state = TASK_INTERRUPTIBLE;
 
-        mutex_lock(&upqueue_lock);
-        if (list_empty(&upqueue)) {
-            mutex_unlock(&upqueue_lock);
+        mutex_lock(&rc->upqueue_lock);
+        if (list_empty(&rc->upqueue)) {
+            mutex_unlock(&rc->upqueue_lock);
 
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
@@ -168,7 +168,7 @@ rina_ctrl_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
             continue;
         }
 
-        entry = list_first_entry(&upqueue, struct upqueue_entry, node);
+        entry = list_first_entry(&rc->upqueue, struct upqueue_entry, node);
         if (len < entry->msg_len) {
             /* Not enough space. Don't pop the entry from the upqueue. */
             ret = -ENOBUFS;
@@ -182,12 +182,12 @@ rina_ctrl_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
             }
         }
 
-        mutex_unlock(&upqueue_lock);
+        mutex_unlock(&rc->upqueue_lock);
         break;
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&upqueue_wqh, &wait);
+    remove_wait_queue(&rc->upqueue_wqh, &wait);
 
     return ret;
 }
@@ -195,7 +195,17 @@ rina_ctrl_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
 static int
 rina_ctrl_open(struct inode *inode, struct file *f)
 {
-    f->private_data = NULL;
+    struct rina_ctrl *rc;
+
+    rc = kmalloc(sizeof(*rc), GFP_KERNEL);
+    if (!rc) {
+        return -ENOMEM;
+    }
+
+    f->private_data = rc;
+    INIT_LIST_HEAD(&rc->upqueue);
+    mutex_init(&rc->upqueue_lock);
+    init_waitqueue_head(&rc->upqueue_wqh);
 
     return 0;
 }
@@ -203,6 +213,9 @@ rina_ctrl_open(struct inode *inode, struct file *f)
 static int
 rina_ctrl_release(struct inode *inode, struct file *f)
 {
+    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+
+    kfree(rc);
     f->private_data = NULL;
 
     return 0;
