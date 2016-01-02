@@ -13,7 +13,7 @@
 #include <assert.h>
 
 #include "rlite/conf-msg.h"
-#include "helpers.h"
+#include "../helpers.h"
 #include "rlite/evloop.h"
 #include "rlite/conf.h"
 
