@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cassert>
+#include <climits>
 
 #include "rinalite/rinalite-common.h"
 #include "rinalite/rinalite-utils.h"
@@ -92,9 +93,25 @@ struct Neighbor {
 class SPFEngine {
 public:
     SPFEngine() {};
-    int run(const map<string, LowerFlow >& db);
+    int run(uint64_t, const map<string, LowerFlow >& db);
 
 private:
+    struct Edge {
+        uint64_t to;
+        unsigned int cost;
+
+        Edge(uint64_t to_, unsigned int cost_) :
+                            to(to_), cost(cost_) { }
+    };
+
+    struct Info {
+        unsigned int dist;
+        uint64_t prev;
+        bool visited;
+    };
+
+    map<uint64_t, list<Edge> > graph;
+    map<uint64_t, Info> info;
 };
 
 struct uipcp_rib {
@@ -407,7 +424,7 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
                             obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
-    spf.run(lfdb);
+    spf.run(ipcp_info()->ipcp_addr, lfdb);
 
     return ret;
 }
@@ -614,15 +631,106 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 
     if (modified) {
         /* Update the routing table. */
-        spf.run(lfdb);
+        spf.run(ipcp_info()->ipcp_addr, lfdb);
     }
 
     return 0;
 }
 
 int
-SPFEngine::run(const map<string, LowerFlow >& db)
+SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 {
+    graph.clear();
+    info.clear();
+
+    /* Build the graph from the Lower Flow Database. */
+    for (map<string, LowerFlow>::const_iterator f = db.begin();
+                                            f != db.end(); f++) {
+        LowerFlow rev;
+        map<string, LowerFlow>::const_iterator revit;
+
+        rev.local_addr = f->second.remote_addr;
+        rev.remote_addr = f->second.local_addr;
+        revit = db.find(static_cast<string>(rev));
+
+        if (revit == db.end() || revit->second.cost != f->second.cost) {
+            /* Something is wrong, this could be malicious or erroneous. */
+            continue;
+        }
+
+        graph[f->second.local_addr].push_back(Edge(f->second.remote_addr,
+                                                   f->second.cost));
+    }
+
+#if 1
+    PD_S("Graph:\n");
+    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
+                                            g != graph.end(); g++) {
+        PD_S("%lu: {", (long unsigned)g->first);
+        for (list<Edge>::iterator l = g->second.begin();
+                                    l != g->second.end(); l++) {
+            PD_S("(%lu, %u), ", l->to, l->cost);
+        }
+        PD_S("}\n");
+    }
+#endif
+
+    /* Initialize the per-node info map. */
+    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
+                                            g != graph.end(); g++) {
+        struct Info inf;
+
+        inf.dist = UINT_MAX;
+        inf.prev = ~((uint64_t) 0);
+        inf.visited = false;
+
+        info[g->first] = inf;
+    }
+    info[local_addr].dist = 0;
+
+    for (;;) {
+        uint64_t min;
+        unsigned int min_dist = UINT_MAX;
+
+        /* Select the closest node from the ones in the frontier. */
+        for (map<uint64_t, Info>::iterator i = info.begin();
+                                        i != info.end(); i++) {
+            if (!i->second.visited && i->second.dist < min_dist) {
+                min = i->first;
+                min_dist = i->second.dist;
+            }
+        }
+
+        if (min_dist == UINT_MAX) {
+            break;
+        }
+
+        PD("Selecting node %lu\n", (long unsigned)min);
+
+        list<Edge>& edges = graph[min];
+        Info& info_min = info[min];
+
+        info_min.visited = true;
+
+        for (list<Edge>::iterator edge = edges.begin();
+                                edge != edges.end(); edge++) {
+            Info& info_to = info[edge->to];
+
+            if (info_to.dist > info_min.dist + edge->cost) {
+                info_to.dist = info_min.dist + edge->cost;
+                info_to.prev = min;
+            }
+        }
+    }
+
+    PD_S("Dijkstra result:\n");
+    for (map<uint64_t, Info>::iterator i = info.begin();
+                                    i != info.end(); i++) {
+        PD_S("    Address: %lu, Dist: %u, Prev: %lu, Visited %u\n",
+                (long unsigned)i->first, i->second.dist,
+                (long unsigned)i->second.prev, i->second.visited);
+    }
+
     return 0;
 }
 
