@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
+#include <assert.h>
+#include <sys/eventfd.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
 #include <rina/rina-utils.h>
@@ -137,6 +139,8 @@ ipcps_fetch(struct rina_evloop *loop)
     return 0;
 }
 
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
+
 /* The event loop function for kernel responses management. */
 static void *
 evloop_function(void *arg)
@@ -155,14 +159,34 @@ evloop_function(void *arg)
 
         FD_ZERO(&rdfs);
         FD_SET(loop->rfd, &rdfs);
+        FD_SET(loop->eventfd, &rdfs);
 
-        ret = select(loop->rfd + 1, &rdfs, NULL, NULL, NULL);
+        ret = select(MAX(loop->rfd, loop->eventfd) + 1, &rdfs,
+                     NULL, NULL, NULL);
         if (ret == -1) {
+            /* Error. */
             perror("select()");
             continue;
-        } else if (ret == 0 || !FD_ISSET(loop->rfd, &rdfs)) {
-            /* Timeout or loop->rfd is not ready. */
+
+        } else if (ret == 0) {
+            /* Timeout. */
             continue;
+
+        } else if (FD_ISSET(loop->eventfd, &rdfs)) {
+            /* Stop request arrived. */
+            uint64_t x;
+            int n;
+
+            n = read(loop->eventfd, &x, sizeof(x));
+            if (n != sizeof(x)) {
+                perror("read(eventfd)");
+            }
+
+            /* Stop the event loop. */
+            break;
+
+        } else if (!FD_ISSET(loop->rfd, &rdfs)) {
+            assert(0);
         }
 
         pthread_mutex_lock(&loop->lock);
@@ -254,6 +278,24 @@ notify_requestor:
     }
 
     return NULL;
+}
+
+int
+evloop_stop(struct rina_evloop *loop)
+{
+    uint64_t x = 1;
+    int n;
+
+    n = write(loop->eventfd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("write(eventfd)");
+        if (n < 0) {
+            return n;
+        }
+        return -1;
+    }
+
+    return 0;
 }
 
 /* Issue a request message to the kernel. Takes the ownership of
@@ -371,7 +413,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
 
     if (!handlers) {
         printf("NULL handlers\n");
-        exit(EXIT_FAILURE);
+        return EINVAL;
     }
 
     /* Open the RINA control device. */
@@ -379,7 +421,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     if (loop->rfd < 0) {
         printf("Cannot open '%s'\n", dev);
         perror("open(ctrldev)");
-        exit(EXIT_FAILURE);
+        return loop->rfd;
     }
 
     /* Set non-blocking operation for the RINA control device, so that
@@ -387,7 +429,13 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     ret = fcntl(loop->rfd, F_SETFL, O_NONBLOCK);
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
-        exit(EXIT_FAILURE);
+        return ret;
+    }
+
+    loop->eventfd = eventfd(0, 0);
+    if (loop->eventfd < 0) {
+        perror("eventfd()");
+        return loop->eventfd;
     }
 
     pthread_mutex_init(&loop->lock, NULL);
@@ -406,7 +454,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
     if (ret) {
         perror("pthread_create(event-loop)");
-        exit(EXIT_FAILURE);
+        return ret;
     }
 
     return 0;
@@ -419,8 +467,12 @@ rina_evloop_fini(struct rina_evloop *loop)
 
     if (ret < 0) {
         perror("pthread_join(event-loop)");
-        exit(EXIT_FAILURE);
+        return ret;
     }
+
+    /* Clean up all the data structures. To be completed. */
+    close(loop->eventfd);
+    close(loop->rfd);
 
     return 0;
 }

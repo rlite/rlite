@@ -211,7 +211,11 @@ main(int argc, char **argv)
         return ret;
     }
 
+    /* Run the perf function. */
     perf_function(&application);
+
+    /* Stop the event loop. */
+    evloop_stop(&application.loop);
 
     return rina_application_fini(&application);
 }

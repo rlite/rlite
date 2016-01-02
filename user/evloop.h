@@ -1,18 +1,9 @@
 #ifndef __RINA_EVLOOP_H__
 #define __RINA_EVLOOP_H__
 
-#include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
-#include <errno.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <signal.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
 #include <rina/rina-utils.h>
@@ -61,6 +52,9 @@ struct rina_evloop {
      * event-loop thread and the script thead. */
     pthread_mutex_t lock;
 
+    /* Used to stop the event-loop. */
+    int eventfd;
+
     struct list_head ipcps;
 };
 
@@ -70,6 +64,8 @@ struct rina_msg_base *
 issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
               size_t msg_len, int has_response, int wait_for_completion,
               int *result);
+
+int evloop_stop(struct rina_evloop *loop);
 
 int
 rina_evloop_init(struct rina_evloop *loop, const char *dev,
