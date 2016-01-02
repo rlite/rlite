@@ -78,6 +78,7 @@ struct NeighFlow {
     ~NeighFlow();
 
     bool enrollment_starting(const CDAPMessage *m) const;
+    void abort_enrollment();
     void enroll_tmr_start();
     void enroll_tmr_stop();
     void keepalive_tmr_start();
@@ -120,8 +121,6 @@ struct Neighbor {
     int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
     int enrolled(NeighFlow *nf, const CDAPMessage *rm);
-
-    void abort(NeighFlow *nf);
 
     int remote_sync_obj(NeighFlow *nf, bool create,
                         const std::string& obj_class,
