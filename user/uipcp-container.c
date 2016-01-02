@@ -431,6 +431,52 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     return result;
 }
 
+static int
+normal_ipcp_register(struct uipcp *uipcp, int reg,
+                     const struct rina_name *dif_name,
+                     unsigned int ipcp_id,
+                     const struct rina_name *ipcp_name)
+{
+    int result;
+
+    /* Perform the registration. */
+    result = rlite_appl_register_wait(&uipcp->appl, reg, dif_name,
+                                      0, NULL, ipcp_name);
+
+    if (result == 0) {
+        rib_ipcp_register(uipcp->rib, reg, dif_name);
+    }
+
+    return result;
+}
+
+static int
+normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
+{
+    /* Perform enrollment in userspace. */
+    return rib_enroll(uipcp->rib, req);
+}
+
+static int
+normal_ipcp_dft_set(struct uipcp *uipcp, struct rina_cmsg_ipcp_dft_set *req)
+{
+    return rib_dft_set(uipcp->rib, &req->appl_name, req->remote_addr);
+}
+
+static char *
+normal_ipcp_rib_show(struct uipcp *uipcp)
+{
+    return rib_dump(uipcp->rib);
+}
+
+static struct uipcp_ops normal_ops = {
+    .dif_type = "normal",
+    .ipcp_register = normal_ipcp_register,
+    .ipcp_enroll = normal_ipcp_enroll,
+    .ipcp_dft_set = normal_ipcp_dft_set,
+    .ipcp_rib_show = normal_ipcp_rib_show,
+};
+
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
 {
@@ -460,6 +506,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
+    uipcp->ops = normal_ops;
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 

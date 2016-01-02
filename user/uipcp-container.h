@@ -28,12 +28,29 @@ struct uipcps {
 
 #define RINA_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
 
+struct uipcp;
+
+struct uipcp_ops {
+    const char *dif_type;
+    int (*ipcp_register)(struct uipcp *uipcp, int reg,
+                         const struct rina_name *dif_name,
+                         unsigned int ipcp_id,
+                         const struct rina_name *ipcp_name);
+    int (*ipcp_enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
+    int (*ipcp_dft_set)(struct uipcp *, struct rina_cmsg_ipcp_dft_set *);
+    char * (*ipcp_rib_show)(struct uipcp *);
+};
+
+
 struct uipcp {
     struct rlite_appl appl;
     struct uipcps *uipcps;
     unsigned int ipcp_id;
-    int mgmtfd;
 
+    struct uipcp_ops ops;
+
+    /* Data used by normal IPCP only. */
+    int mgmtfd;
     struct uipcp_rib *rib;
 
     struct list_head node;

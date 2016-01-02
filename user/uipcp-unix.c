@@ -108,7 +108,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
                    const struct rina_name *ipcp_name)
 {
     struct uipcp *uipcp;
-    uint8_t result;
+    uint8_t result = 1;
 
     /* Grab the corresponding userspace IPCP. */
     uipcp = uipcp_lookup(uipcps, ipcp_id);
@@ -117,18 +117,19 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
         return -1;
     }
 
-    /* Perform a fetch to find out if shim IPCPs have been created,
-     * deleted or configured from the last fetch. */
-    rlite_ipcps_fetch(&uipcp->appl.loop);
+    if (uipcp->ops.ipcp_register) {
+        /* Perform a fetch to find out if shim IPCPs have been created,
+         * deleted or configured from the last fetch. */
+        rlite_ipcps_fetch(&uipcp->appl.loop);
 
-    /* Perform the registration. */
-    result = rlite_appl_register_wait(&uipcp->appl, reg, dif_name,
-                                  0, NULL, ipcp_name);
+        result = uipcp->ops.ipcp_register(uipcp, reg, dif_name, ipcp_id,
+                                          ipcp_name);
 
-    if (result == 0) {
-        /* Track the (un)registration in the persistent registration list. */
-        track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
-        rib_ipcp_register(uipcp->rib, reg, dif_name);
+        if (result == 0) {
+            /* Track the (un)registration in the persistent registration
+             * list. */
+            track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
+        }
     }
 
     return result;
@@ -136,7 +137,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
 
 static int
 rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
-                       const struct rina_msg_base *b_req)
+                        const struct rina_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_register *req = (struct rina_cmsg_ipcp_register *)b_req;
     struct rina_msg_base_resp resp;
@@ -154,7 +155,6 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
     struct uipcp *uipcp;
-    int ret;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -166,17 +166,13 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    /* Perform a fetch to find out if shim IPCPs have been created,
-     * deleted or configured from the last fetch. */
-    rlite_ipcps_fetch(&uipcp->appl.loop);
+    if (uipcp->ops.ipcp_enroll) {
+        /* Perform a fetch to find out if shim IPCPs have been created,
+         * deleted or configured from the last fetch. */
+        rlite_ipcps_fetch(&uipcp->appl.loop);
 
-    /* Perform enrollment in userspace. */
-    ret = rib_enroll(uipcp->rib, req);
-    if (ret) {
-        goto out;
+        resp.result = uipcp->ops.ipcp_enroll(uipcp, req);
     }
-
-    resp.result = 0;
 
 out:
     return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
@@ -189,7 +185,6 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
     struct rina_msg_base_resp resp;
     struct uipcp *uipcp;
-    int ret;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -200,12 +195,9 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    ret = rib_dft_set(uipcp->rib, &req->appl_name, req->remote_addr);
-    if (ret) {
-        goto out;
+    if (uipcp->ops.ipcp_dft_set) {
+        resp.result = uipcp->ops.ipcp_dft_set(uipcp, req);
     }
-
-    resp.result = 0;
 
 out:
     return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
@@ -267,12 +259,12 @@ rina_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    resp.dump = rib_dump(uipcp->rib);
-    if (!resp.dump) {
-        goto out;
+    if (uipcp->ops.ipcp_rib_show) {
+        resp.dump = uipcp->ops.ipcp_rib_show(uipcp);
+        if (resp.dump) {
+            resp.result = 0;
+        }
     }
-
-    resp.result = 0;
 
 out:
     resp.msg_type = RINA_CONF_IPCP_RIB_SHOW_RESP;
