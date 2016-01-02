@@ -462,6 +462,9 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         }
 
     } else {
+        bool drop = false;
+        unsigned int a = 0;
+
         if (unlikely(dtp->rcv_lwe < pci->seqnum &&
                     pci->seqnum <= dtp->max_seq_num_rcvd)) {
             /* This may go in a gap or be a duplicate
@@ -484,9 +487,39 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         if (pci->seqnum > dtp->max_seq_num_rcvd) {
             dtp->max_seq_num_rcvd = pci->seqnum;
         }
-        dtp->rcv_lwe = dtp->max_seq_num_rcvd + 1;
 
-        ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        /* Here we may have received a PDU that it's not the next expected
+         * sequence number or generally that does no meet the max_sdu_gap
+         * constraint.
+         * This can happen because of lost PDUs and/or out of order PDUs
+         * arrival. In this case we never drop it when:
+         *
+         * - The flow does not require in order delivery and DTCP is
+         *   not present, simply because in this case the flow is
+         *   completely unreliable. Note that in this case the
+         *   max_sdu_gap constraint is ignored.
+         *
+         * - There is RTX control, because the gaps could be filled by
+         *   future retransmissions.
+         *
+         * - The A timeout is more than zero, because gaps could be
+         *   filled by PDUs arriving out of order or retransmitted
+         *   __before__ the A timer expires.
+         */
+        drop = ((flow->cfg.in_order_delivery || flow->cfg.dtcp_present) &&
+                !a && !flow->cfg.dtcp.rtx_control &&
+                pci->seqnum - dtp->rcv_lwe > flow->cfg.max_sdu_gap);
+        if (!drop) {
+            dtp->rcv_lwe = dtp->max_seq_num_rcvd + 1;
+        }
+
+        sdu_rx_sv_update(ipcp, flow, pci->seqnum);
+
+        if (!drop) {
+            ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+        } else {
+            rina_buf_free(rb);
+        }
     }
 
 out:
