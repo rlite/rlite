@@ -5,8 +5,8 @@
 - rlite-utils: deserialization routines should check lengths
 
 - if we lose initial PDU containing the DRF, it's a mess, even in presence
-  of retransmissions. From an EFCP point of view, in facto, how to I manage
-  subsequent packets (that comes before the transmitter realizes it needs
+  of retransmissions. From an EFCP point of view, in facto, how do I manage
+  subsequent packets (that come before the transmitter realizes it needs
   to retransmit the first PDU with the DRF set)? It would be silly dropping
   all these packets. To solve this problem, it could be convenient to
   introduce in the DTP a state flag "waitingForDRF", that forces the DRF

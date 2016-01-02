@@ -134,7 +134,6 @@ struct upper_ref {
 struct dtp {
     spinlock_t lock;
 
-    bool set_drf;
     rl_seq_t snd_lwe;
     rl_seq_t snd_rwe;
     rl_seq_t next_seq_num_to_send;
@@ -160,6 +159,9 @@ struct dtp {
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
     struct rlite_buf *rtx_tmr_next;
+#define DTP_F_DRF_SET		(1<<0)
+#define DTP_F_DRF_EXPECTED	(1<<1)
+    uint8_t flags;
 };
 
 struct flow_entry {

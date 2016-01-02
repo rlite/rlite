@@ -83,7 +83,7 @@ dtp_snd_reset(struct flow_entry *flow)
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     struct dtp *dtp = &flow->dtp;
 
-    dtp->set_drf = true;
+    dtp->flags = DTP_F_DRF_SET | DTP_F_DRF_EXPECTED;
     /* InitialSeqNumPolicy */
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
@@ -498,14 +498,14 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.dst_cep = flow->remote_cep;
     pci->conn_id.src_cep = flow->local_cep;
     pci->pdu_type = PDU_T_DT;
-    pci->pdu_flags = dtp->set_drf ? 1 : 0;
+    pci->pdu_flags = dtp->flags & DTP_F_DRF_SET;
     pci->pdu_len = rb->len;
     pci->seqnum = dtp->next_seq_num_to_send++;
 
     flow->stats.tx_pkt++;
     flow->stats.tx_byte += rb->len;
 
-    dtp->set_drf = false;
+    dtp->flags &= ~DTP_F_DRF_SET;
     if (!dtcp_present) {
         /* DTCP not present */
         dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
