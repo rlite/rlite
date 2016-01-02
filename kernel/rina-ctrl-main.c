@@ -533,8 +533,6 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
-/* Code improvement: we may merge ipcp_get() and flow_get()
- * into a template (a macro). */
 struct flow_entry *
 flow_get(unsigned int port_id)
 {

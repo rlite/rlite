@@ -48,7 +48,11 @@ struct arpt_entry {
     /* Sender Protocol Address, represented as a serialized string. */
     char *spa;
 
+    /* Whether Target Hardware Address (tha) has been filled in or not. */
     bool complete;
+
+    /* The flow entry associated to the remote THA. */
+    struct flow_entry *flow;
 
     struct list_head node;
 };
@@ -341,22 +345,37 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
 
     entry = arp_lookup_direct_b(priv, tpa, strlen(tpa));
     if (entry) {
-        /* ARP entry already exist for remote application. Nothing
-         * to do here. */
+        /* ARP entry already exist for remote application. */
+        int ret;
+
+        if (entry->flow) {
+            ret = -EBUSY;
+        } else {
+            entry->flow = flow;
+            ret = 0;
+        }
+
         spin_unlock_irq(&priv->arpt_lock);
         kfree(spa);
         kfree(tpa);
-        return 0;
+
+        if (ret == 0) {
+            rina_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0);
+        }
+
+        return ret;
     }
 
     entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
     if (!entry) {
+        spin_unlock_irq(&priv->arpt_lock);
         goto nomem;
     }
 
     entry->tpa = tpa; tpa = NULL;  /* Pass ownership. */
     entry->spa = spa; spa = NULL;  /* Pass ownership. */
     entry->complete = false;
+    entry->flow = flow;  /* XXX flow_get() ? */
     list_add_tail(&entry->node, &priv->arp_table);
 
     spin_unlock_irq(&priv->arpt_lock);
@@ -417,6 +436,8 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
     const char *spa = (const char *)(arp) + sizeof(*arp) + arp->ar_hln;
     const char *tpa = (const char *)(arp) + sizeof(*arp) +
                       2 * arp->ar_hln + arp->ar_pln;
+    struct flow_entry *flow = NULL;
+    struct sk_buff *skb = NULL;
 
     if (len < sizeof(*arp) + 2*(arp->ar_pln + arp->ar_hln)) {
         PI("%s: Dropping truncated ARP message\n", __func__);
@@ -427,7 +448,6 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         int upper_name_len;
-        struct sk_buff *skb;
 
         if (!priv->upper_name_s) {
             /* No application registered here, there's nothing to do. */
@@ -449,9 +469,6 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         skb = arp_create(priv, ARPOP_REPLY, priv->upper_name_s,
                          strlen(priv->upper_name_s),
                          spa, arp->ar_pln, sha, GFP_ATOMIC);
-        if (skb) {
-            dev_queue_xmit(skb);
-        }
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
         /* Update the ARP table with an entry SPA --> SHA. */
@@ -473,6 +490,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
         memcpy(entry->tha, sha, arp->ar_hln);
         entry->complete = true;
+        flow = entry->flow;
 
         PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
            __func__, entry->tpa, entry->tha[0], entry->tha[1],
@@ -485,6 +503,17 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
 out:
     spin_unlock_irq(&priv->arpt_lock);
+
+    if (flow) {
+        /* This ARP reply is interpreted as a positive flow allocation
+         * response message. */
+        rina_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0);
+    }
+
+    if (skb) {
+        /* Send an ARP response. */
+        dev_queue_xmit(skb);
+    }
 }
 
 static rx_handler_result_t
