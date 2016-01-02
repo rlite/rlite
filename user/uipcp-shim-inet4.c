@@ -149,27 +149,27 @@ sock_addr_to_appl_name(const struct sockaddr_in *addr,
 
 /* ep->addr must be filled in before calling this function */
 static int
-open_bound_socket(int fd, struct sockaddr_in *addr)
+open_bound_socket(int *fd, struct sockaddr_in *addr)
 {
     int enable = 1;
 
-    fd = socket(PF_INET, SOCK_STREAM, 0);
+    *fd = socket(PF_INET, SOCK_STREAM, 0);
 
-    if (fd < 0) {
+    if (*fd < 0) {
         PE("socket() failed [%d]\n", errno);
         return -1;
     }
 
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable,
+    if (setsockopt(*fd, SOL_SOCKET, SO_REUSEADDR, &enable,
                    sizeof(enable))) {
         PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
-        close(fd);
+        close(*fd);
         return -1;
     }
 
-    if (bind(fd, (struct sockaddr *)addr, sizeof(*addr))) {
+    if (bind(*fd, (struct sockaddr *)addr, sizeof(*addr))) {
         PE("bind() failed [%d]\n", errno);
-        close(fd);
+        close(*fd);
         return -1;
     }
 
@@ -257,7 +257,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     }
 
     /* Open a listening socket, bind() and listen(). */
-    ret = open_bound_socket(bp->fd, &bp->addr);
+    ret = open_bound_socket(&bp->fd, &bp->addr);
     if (ret) {
         goto err2;
     }
@@ -328,7 +328,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     }
 
     /* Open a client-side socket, bind() and connect(). */
-    ret = open_bound_socket(ep->fd, &ep->addr);
+    ret = open_bound_socket(&ep->fd, &ep->addr);
     if (ret) {
         goto err1;
     }
