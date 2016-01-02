@@ -34,7 +34,7 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
                                         mit != lfdb.end(); mit++) {
         lfl.flows.push_back(mit->second);
     }
-    ret = remote_sync_neigh(neigh, true, obj_class::lfdb,
+    ret = neigh.remote_sync(true, obj_class::lfdb,
                             obj_name::lfdb, &lfl);
 
     /* Send the new lower flow to the other neighbors. */

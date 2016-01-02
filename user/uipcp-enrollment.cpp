@@ -625,6 +625,35 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
     return ret;
 }
 
+int Neighbor::remote_sync(bool create, const string& obj_class,
+                          const string& obj_name,
+                          const UipcpObject *obj_value) const
+{
+    CDAPMessage m;
+    int ret;
+
+    if (enrollment_state != ENROLLED) {
+        /* Skip this one since it's not enrolled yet. */
+        return 0;
+    }
+
+    if (create) {
+        m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
+                0, 0, "");
+
+    } else {
+        m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
+                0, 0, "");
+    }
+
+    ret = send_to_port_id(&m, 0, obj_value);
+    if (ret) {
+        PE("send_to_port_id() failed\n");
+    }
+
+    return ret;
+}
+
 Neighbor *
 uipcp_rib::get_neighbor(const struct rina_name *neigh_name)
 {

@@ -533,36 +533,6 @@ uipcp_rib::address_allocate() const
 }
 
 int
-uipcp_rib::remote_sync_neigh(const Neighbor& neigh, bool create,
-                             const string& obj_class, const string& obj_name,
-                             const UipcpObject *obj_value) const
-{
-    CDAPMessage m;
-    int ret;
-
-    if (neigh.enrollment_state != Neighbor::ENROLLED) {
-        /* Skip this one since it's not enrolled yet. */
-        return 0;
-    }
-
-    if (create) {
-        m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
-                0, 0, "");
-
-    } else {
-        m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
-                0, 0, "");
-    }
-
-    ret = neigh.send_to_port_id(&m, 0, obj_value);
-    if (ret) {
-        PE("send_to_port_id() failed\n");
-    }
-
-    return ret;
-}
-
-int
 uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
                                  bool create, const string& obj_class,
                                  const string& obj_name,
@@ -573,7 +543,7 @@ uipcp_rib::remote_sync_excluding(const Neighbor *exclude,
         if (exclude && neigh->second == *exclude) {
             continue;
         }
-        remote_sync_neigh(neigh->second, create, obj_class, obj_name, obj_value);
+        neigh->second.remote_sync(create, obj_class, obj_name, obj_value);
     }
 
     return 0;
