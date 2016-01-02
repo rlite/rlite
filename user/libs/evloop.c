@@ -17,9 +17,9 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
 #include "rlite/utils.h"
-
-#include "pending_queue.h"
 #include "rlite/evloop.h"
+
+#include "ctrl-utils.h"
 
 
 struct rl_evloop_fdcb {

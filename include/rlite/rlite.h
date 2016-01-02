@@ -67,27 +67,6 @@ rlite_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
 
-int
-rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
-                    const struct rl_kmsg_ipcp_update *upd);
-int
-rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     unsigned int ipcp_id, int reg,
-                     const struct rina_name *appl_name);
-int
-rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-               uint32_t event_id, unsigned int ipcp_id,
-               const char *dif_name,
-               const struct rina_name *ipcp_name,
-               const struct rina_name *local_appl,
-               const struct rina_name *remote_appl,
-               const struct rlite_flow_spec *flowspec,
-               uint16_t upper_ipcp_id);
-
-int rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
-                    uint16_t ipcp_id, uint16_t upper_ipcp_id,
-                    uint32_t port_id, uint8_t response);
-
 void
 rlite_flow_spec_default(struct rlite_flow_spec *spec);
 
@@ -99,9 +78,6 @@ rlite_open_appl_port(uint32_t port_id);
 
 int
 rlite_open_mgmt_port(uint16_t ipcp_id);
-
-struct rlite_msg_base *
-read_next_msg(int rfd);
 
 int
 write_msg(int rfd, struct rlite_msg_base *msg);

@@ -17,9 +17,9 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
 #include "rlite/utils.h"
-
-#include "pending_queue.h"
 #include "rlite/rlite.h"
+
+#include "ctrl-utils.h"
 
 
 static void
@@ -389,6 +389,62 @@ int rlite_open_mgmt_port(uint16_t ipcp_id)
     return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
+struct pending_entry *
+pending_queue_remove_by_event_id(struct list_head *list, uint32_t event_id)
+{
+    struct pending_entry *cur;
+    struct pending_entry *found = NULL;
+
+    list_for_each_entry(cur, list, node) {
+        if (cur->msg->event_id == event_id) {
+            found = cur;
+            break;
+        }
+    }
+
+    if (found) {
+        list_del(&found->node);
+    }
+
+    return found;
+}
+
+struct pending_entry *
+pending_queue_remove_by_msg_type(struct list_head *list, unsigned int msg_type)
+{
+    struct pending_entry *cur;
+    struct pending_entry *found = NULL;
+
+    list_for_each_entry(cur, list, node) {
+        if (cur->msg->msg_type == msg_type) {
+            found = cur;
+            break;
+        }
+    }
+
+    if (found) {
+        list_del(&found->node);
+    }
+
+    return found;
+}
+
+void
+pending_queue_fini(struct list_head *list)
+{
+    struct pending_entry *e, *tmp;
+
+    list_for_each_entry_safe(e, tmp, list, node) {
+        list_del(&e->node);
+        if (e->msg) {
+            free(e->msg);
+        }
+        if (e->resp) {
+            free(e->resp);
+        }
+        free(e);
+    }
+}
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      unsigned int ipcp_id, int reg,
