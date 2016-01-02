@@ -945,6 +945,8 @@ flow_put(struct flow_entry *entry)
         goto out;
     }
 
+    tasklet_kill(&entry->tx_completion);
+
     ret = NULL;
 
     ipcp = entry->txrx.ipcp;
