@@ -1402,6 +1402,10 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             "port-id %u\n", __func__, response, flow_entry->txrx.ipcp->id,
             flow_entry->local_port);
 
+    if (!response && resp->upper_ipcp_id != 0xffff) {
+        ret = upper_ipcp_flow_bind(resp->upper_ipcp_id, flow_entry);
+    }
+
     /* Notify the involved IPC process about the response. */
     ipcp = flow_entry->txrx.ipcp;
     if (ipcp->ops.flow_allocate_resp) {
@@ -1433,10 +1437,6 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
             ret = rina_upqueue_append(ipcp->uipcp,
                     (const struct rina_msg_base *)resp);
         }
-    }
-
-    if (!ret && !response && resp->upper_ipcp_id != 0xffff) {
-        ret = upper_ipcp_flow_bind(resp->upper_ipcp_id, flow_entry);
     }
 
     if (ret || response) {
