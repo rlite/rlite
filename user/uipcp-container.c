@@ -421,7 +421,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     PD("Requesting IPCP uipcp set...\n");
 
     resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
-                         0, 0, &result);
+                               0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
 

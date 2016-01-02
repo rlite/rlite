@@ -519,6 +519,9 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
     /* Issue the request to the kernel. */
     ret = write(loop->rfd, serbuf, serlen);
     if (ret != serlen) {
+        /* System call reports an error (incomplete write is not acceptable)
+         * for a rina control device. */
+
         if (has_response) {
             /* Remove the entry from the pending queue and free it. */
             pending_queue_remove_by_event_id(&loop->pqueue, msg->event_id);
@@ -537,6 +540,9 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         free(msg);
 
     } else if (has_response && entry->wait_for_completion) {
+        /* This request requires a response, and we have been asked to
+         * wait for the response to come. */
+
         while (!entry->op_complete && *result == 0) {
             if (entry->wait_for_completion == ~0U) {
                 *result = pthread_cond_wait(&entry->op_complete_cond,
@@ -567,6 +573,12 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         free(entry->msg);
         resp = entry->resp;
         free(entry);
+
+    } else if (!has_response) {
+        /* This request does not require a response, we can free the request
+         * message immediately. */
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        free(msg);
     }
 
     pthread_mutex_unlock(&loop->lock);
