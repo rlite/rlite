@@ -37,9 +37,17 @@
 #include <linux/hashtable.h>
 
 
+struct rina_ctrl;
+
+/* The signature of a message handler. */
+typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
+                                  struct rina_msg_base *bmsg);
+
 /* Data structure associated to the /dev/rina-ctrl file descriptor. */
 struct rina_ctrl {
     char msgbuf[1024];
+
+    rina_msg_handler_t *handlers;
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -869,18 +877,18 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
 }
 EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
 
-/* The signature of a message handler. */
-typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
-                                  struct rina_msg_base *bmsg);
-
 /* The table containing all the message handlers. */
-static rina_msg_handler_t rina_handlers[] = {
+static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
+    [RINA_KERN_MSG_MAX] = NULL,
+};
+
+static rina_msg_handler_t rina_flow_ctrl_handlers[] = {
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_MSG_MAX] = NULL,
 };
@@ -919,12 +927,12 @@ rina_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppo
     bmsg = (struct rina_msg_base *)rc->msgbuf;
 
     /* Demultiplex the message to the right message handler. */
-    if (bmsg->msg_type > RINA_KERN_MSG_MAX || !rina_handlers[bmsg->msg_type]) {
+    if (bmsg->msg_type > RINA_KERN_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
         kfree(kbuf);
         return -EINVAL;
     }
 
-    ret = rina_handlers[bmsg->msg_type](rc, bmsg);
+    ret = rc->handlers[bmsg->msg_type](rc, bmsg);
     if (ret) {
         kfree(kbuf);
         return ret;
@@ -1019,14 +1027,14 @@ rina_ctrl_poll(struct file *f, poll_table *wait)
     return mask;
 }
 
-static int
-rina_ctrl_open(struct inode *inode, struct file *f)
+static struct rina_ctrl *
+rina_ctrl_open_common(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc;
 
     rc = kmalloc(sizeof(*rc), GFP_KERNEL);
     if (!rc) {
-        return -ENOMEM;
+        return NULL;
     }
 
     f->private_data = rc;
@@ -1034,11 +1042,47 @@ rina_ctrl_open(struct inode *inode, struct file *f)
     mutex_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
+    return rc;
+}
+
+static int
+rina_ctrl_open(struct inode *inode, struct file *f)
+{
+    struct rina_ctrl *rc;
+
     mutex_lock(&rina_dm.lock);
-    if (!rina_dm.ctrl) {
-        rina_dm.ctrl = rc;
+    if (rina_dm.ctrl) {
+        /* The control device has already been opened. Don't allow to open it
+         * more than once. */
+        mutex_unlock(&rina_dm.lock);
+        return -EBUSY;
     }
+
+    /* The control device can be opened. Try to set the
+     * global rina_dm.ctrl pointer. */
+    rina_dm.ctrl = rc = rina_ctrl_open_common(inode, f);
+    if (!rc) {
+        mutex_unlock(&rina_dm.lock);
+        return -ENOMEM;
+    }
+
+    rc->handlers = rina_ctrl_handlers;
+
     mutex_unlock(&rina_dm.lock);
+
+    return 0;
+}
+
+static int
+rina_flow_ctrl_open(struct inode *inode, struct file *f)
+{
+    struct rina_ctrl *rc = rina_ctrl_open_common(inode, f);
+
+    if (!rc) {
+        return -ENOMEM;
+    }
+
+    rc->handlers = rina_flow_ctrl_handlers;
 
     return 0;
 }
@@ -1048,14 +1092,17 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
 
+    if (rc->handlers == rina_ctrl_handlers) {
+        /* The rina ctrl device is being closed. Unset the
+         * global rina_dm.ctrl pointer. */
+        mutex_lock(&rina_dm.lock);
+        BUG_ON(rc != rina_dm.ctrl);
+        rina_dm.ctrl = NULL;
+        mutex_unlock(&rina_dm.lock);
+    }
+
     kfree(rc);
     f->private_data = NULL;
-
-    mutex_lock(&rina_dm.lock);
-    if (rc == rina_dm.ctrl) {
-        rina_dm.ctrl = NULL;
-    }
-    mutex_unlock(&rina_dm.lock);
 
     return 0;
 }
@@ -1070,12 +1117,26 @@ static const struct file_operations rina_ctrl_fops = {
     .llseek         = noop_llseek,
 };
 
-#define RINA_KERN_MINOR     247
-
 static struct miscdevice rina_ctrl_misc = {
-    .minor = RINA_KERN_MINOR,
+    .minor = MISC_DYNAMIC_MINOR,
     .name = "rina-ctrl",
     .fops = &rina_ctrl_fops,
+};
+
+static const struct file_operations rina_flow_ctrl_fops = {
+    .owner          = THIS_MODULE,
+    .release        = rina_ctrl_release,
+    .open           = rina_flow_ctrl_open,
+    .write          = rina_ctrl_write,
+    .read           = rina_ctrl_read,
+    .poll           = rina_ctrl_poll,
+    .llseek         = noop_llseek,
+};
+
+static struct miscdevice rina_flow_ctrl_misc = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = "rina-flow-ctrl",
+    .fops = &rina_flow_ctrl_fops,
 };
 
 static int __init
@@ -1096,6 +1157,13 @@ rina_ctrl_init(void)
         return ret;
     }
 
+    ret = misc_register(&rina_flow_ctrl_misc);
+    if (ret) {
+        misc_deregister(&rina_ctrl_misc);
+        printk("%s: Failed to register rina-flow-ctrl misc device\n", __func__);
+        return ret;
+    }
+
     return 0;
 }
 
@@ -1103,10 +1171,10 @@ static void __exit
 rina_ctrl_fini(void)
 {
     misc_deregister(&rina_ctrl_misc);
+    misc_deregister(&rina_flow_ctrl_misc);
 }
 
 module_init(rina_ctrl_init);
 module_exit(rina_ctrl_fini);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS_MISCDEV(RINA_KERN_MINOR);
 MODULE_ALIAS("devname: rina-ctrl");

@@ -3,5 +3,4 @@
 - implement pending_queue using list.h
 - testare cosa succede se si crea più volte un IPC process con lo stesso
   nome
-- impedire aperture multiple di /dev/rinactrl
 - fare il cleanup delle tabelle kernel quando si scarica il modulo principale
