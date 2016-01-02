@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cerrno>
+#include <cassert>
 #include <unistd.h>
 
 #include <sys/types.h>
@@ -277,7 +278,7 @@ Worker::forward_data(int ifd, int ofd, char *buf)
         PI("Read 0 bytes from %d\n", ifd);
     }
 
-    return 0;
+    return n;
 }
 
 void
@@ -289,33 +290,35 @@ Worker::run()
     PD("w%d starts\n", idx);
 
     for (;;) {
-        int ret;
+        int nrdy;
         int nfds = 1;
 
         pollfds[0].fd = syncfd;
         pollfds[0].events = POLLIN;
 
+        /* Load the poll array with the active fd mappings. */
         pthread_mutex_lock(&lock);
         for (map<int, int>::iterator mit = fdmap.begin();
                                 mit != fdmap.end(); mit++, nfds++) {
             pollfds[nfds].fd = mit->first;
-            pollfds[nfds].events = POLLIN | POLLOUT;
+            pollfds[nfds].events = POLLIN; /* | POLLOUT; */
         }
         pthread_mutex_unlock(&lock);
 
         PD("w%d polls %d file descriptors\n", idx, nfds);
-        ret = poll(pollfds, nfds, -1);
-        if (ret < 0) {
+        nrdy = poll(pollfds, nfds, -1);
+        if (nrdy < 0) {
             perror("poll()");
             break;
 
-        } else if (ret == 0) {
+        } else if (nrdy == 0) {
             PI("w%d: poll() timeout\n", idx);
             continue;
         }
 
         if (pollfds[0].revents) {
-            ret--;
+            /* We've been requested to repoll the queue. */
+            nrdy--;
             if (pollfds[0].revents & POLLIN) {
                 PD("w%d: Mappings changed, rebuliding poll array\n", idx);
                 pthread_mutex_lock(&lock);
@@ -330,17 +333,63 @@ Worker::run()
             continue;
         }
 
-        for (int i=1, j=0; j<ret; i++) {
-            if (pollfds[i].revents) {
-                PD("w%d: fd %d ready, events %d\n", idx,
-                   pollfds[i].fd, pollfds[i].revents);
+        pthread_mutex_lock(&lock);
 
-                if (pollfds[i].revents & POLLIN) {
-                    forward_data(pollfds[i].fd, fdmap[pollfds[i].fd], buf);
+        for (int i=1, j=0; j<nrdy; i++) {
+            int ifd = pollfds[i].fd;
+            map<int, int>::iterator mit;
+            int ofd, ret;
+
+            if (!pollfds[i].revents) {
+                /* No events on this fd, let's skip it. */
+                continue;
+            }
+
+            /* Consume the events on this fd. */
+            j++;
+
+            PD("w%d: fd %d ready, events %d\n", idx,
+               pollfds[i].fd, pollfds[i].revents);
+
+            if (!pollfds[i].revents & POLLIN) {
+                /* No read event, so forwarding cannot happen, let's
+                 * skip it. */
+                continue;
+            }
+
+            /* A safe lookup is necessary, since the mapping could have
+             * disappeared in a previous iteration of this loop. */
+            mit = fdmap.find(ifd);
+            if (mit == fdmap.end()) {
+                PD("w%d: fd %d just disappeared from the map\n", idx, ifd);
+                continue;
+            }
+
+            ofd = mit->second;
+
+            ret = forward_data(ifd, ofd, buf);
+            if (ret <= 0) {
+                /* Forwarding failed for some season, we have to close
+                 * the session. */
+                if (ret == 0 || errno == EPIPE) {
+                    PI("w%d: Session %d <--> %d closed normally\n",
+                            idx, ifd, ofd);
+
+                } else {
+                    PI("w%d: Session %d <--> %d closed with errors\n",
+                            idx, ifd, ofd);
                 }
-                j++;
+
+                close(ifd);
+                close(ofd);
+                fdmap.erase(mit);
+                mit = fdmap.find(ofd);
+                assert(mit != fdmap.end());
+                fdmap.erase(mit);
             }
         }
+
+        pthread_mutex_unlock(&lock);
     }
 
     PD("w%d stops\n", idx);
