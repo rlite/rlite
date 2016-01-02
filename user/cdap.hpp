@@ -140,6 +140,11 @@ public:
                 const std::string& obj_name, long obj_inst,
                 int scope, const std::string& filter, const std::string& v);
 
+    int m_write(int *invoke_id, gpb::flagValues_t flags,
+                const std::string& obj_class,
+                const std::string& obj_name, long obj_inst,
+                int scope, const std::string& filter, const char *v);
+
     int m_write_r(const struct CDAPMessage *req,
                   gpb::flagValues_t flags, int result,
                   const std::string& result_reason);

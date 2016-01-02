@@ -1100,6 +1100,20 @@ CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
 }
 
 int
+CDAPConn::m_write(int *invoke_id, gpb::flagValues_t flags,
+                  const std::string& obj_class,
+                  const std::string& obj_name, long obj_inst,
+                  int scope, const std::string& filter, const char *v)
+{
+    struct CDAPMessage m(gpb::M_WRITE);
+
+    m.set_obj_value(string(v));
+
+    return __m_write(invoke_id, flags, obj_class, obj_name,
+                     obj_inst, scope, filter, &m);
+}
+
+int
 CDAPConn::m_write_r(const struct CDAPMessage *req,
                     gpb::flagValues_t flags, int result,
                     const std::string& result_reason)

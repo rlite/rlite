@@ -214,6 +214,19 @@ client_write_some(CDAPConn *conn)
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
+    if (conn->m_write(&invoke_id, gpb::F_NO_FLAGS,
+                      "class_A", "x", 0, 0, string(), "ciccio")) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
     m = conn->msg_recv();
     if (!m) {
         PE("%s: Error receiving CDAP response\n", __func__);
