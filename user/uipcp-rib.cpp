@@ -115,6 +115,7 @@ struct uipcp_rib {
     uint64_t dft_lookup(const RinaName& appl_name) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int ipcp_register(int reg, string lower_dif);
+    int application_register(int reg, const RinaName& appl_name);
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
@@ -253,6 +254,63 @@ uipcp_rib::ipcp_register(int reg, string lower_dif)
         }
         lower_difs.erase(lit);
     }
+
+    return 0;
+}
+
+int
+uipcp_rib::application_register(int reg, const RinaName& appl_name)
+{
+    map< string, DFTEntry >::iterator mit;
+    uint64_t local_addr;
+    string name_str;
+    int ret;
+    bool create = true;
+    DFTSlice dft_slice;
+    DFTEntry dft_entry;
+
+    ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
+                                          uipcp->ipcp_id,
+                                          &local_addr);
+    assert(!ret);
+
+    dft_entry.address = local_addr;
+    dft_entry.appl_name = appl_name;
+    name_str = static_cast<string>(dft_entry.appl_name);
+
+    mit = dft.find(name_str);
+
+    if (reg) {
+        if (mit != dft.end()) {
+            PE("Application %s already registered on uipcp with address "
+                    "[%llu], my address being [%llu]\n", name_str.c_str(),
+                    (long long unsigned)mit->second.address,
+                    (long long unsigned)local_addr);
+            return -1;
+        }
+
+        /* Insert the object into the RIB. */
+        dft.insert(make_pair(name_str, dft_entry));
+
+    } else {
+        if (mit == dft.end()) {
+            PE("Application %s was not registered here\n",
+                name_str.c_str());
+            return -1;
+        }
+
+        /* Remove the object from the RIB. */
+        dft.erase(mit);
+        create = false;
+    }
+
+    dft_slice.entries.push_back(dft_entry);
+
+    remote_sync(create, obj_class::dft, obj_name::dft, &dft_slice);
+
+    PD("Application %s %sregistered %s uipcp %d\n",
+            name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
+            uipcp->ipcp_id);
 
     return 0;
 }
@@ -1132,67 +1190,7 @@ extern "C" int
 rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
 {
-    char *name_s = rina_name_to_string(appl_name);
-    map< string, DFTEntry >::iterator mit;
-    struct uipcp *uipcp = rib->uipcp;
-    uint64_t local_addr;
-    string name_str;
-    int ret;
-    bool create = true;
-    DFTSlice dft_slice;
-    DFTEntry dft_entry;
-
-    ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
-                                          uipcp->ipcp_id,
-                                          &local_addr);
-    assert(!ret);
-
-    if (!name_s) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    name_str = name_s;
-    free(name_s);
-
-    dft_entry.address = local_addr;
-    dft_entry.appl_name = RinaName(appl_name);
-
-    mit = rib->dft.find(name_str);
-
-    if (reg) {
-        if (mit != rib->dft.end()) {
-            PE("Application %s already registered on uipcp with address "
-                    "[%llu], my address being [%llu]\n", name_str.c_str(),
-                    (long long unsigned)mit->second.address,
-                    (long long unsigned)local_addr);
-            return -1;
-        }
-
-        /* Insert the object into the RIB. */
-        rib->dft.insert(make_pair(name_str, dft_entry));
-
-    } else {
-        if (mit == rib->dft.end()) {
-            PE("Application %s was not registered here\n",
-                name_str.c_str());
-            return -1;
-        }
-
-        /* Remove the object from the RIB. */
-        rib->dft.erase(mit);
-        create = false;
-    }
-
-    dft_slice.entries.push_back(dft_entry);
-
-    rib->remote_sync(create, obj_class::dft, obj_name::dft, &dft_slice);
-
-    PD("Application %s %sregistered %s uipcp %d\n",
-            name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
-            uipcp->ipcp_id);
-
-    return 0;
+    return rib->application_register(reg, RinaName(appl_name));
 }
 
 extern "C" int
