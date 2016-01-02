@@ -32,7 +32,7 @@ ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,
 
 uint8_t
 rina_ipcp_register(struct ipcm *ipcm, int reg,
-                   const struct rina_name *dif_name,
+                   const struct rina_name *dif_name, unsigned int ipcp_id,
                    const struct rina_name *ipcp_name);
 
 struct uipcp {

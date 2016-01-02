@@ -441,21 +441,31 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
 }
 
 static int
-ipcp_register_common(int argc, char **argv, unsigned int reg)
+ipcp_register_common(int argc, char **argv, unsigned int reg,
+                     struct rinaconf *rc)
 {
     struct rina_cmsg_ipcp_register req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
+    struct ipcp *ipcp;
 
     assert(argc >= 3);
     dif_name = argv[0];
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    /* Lookup the id of the registering IPCP. */
+    ipcp = lookup_ipcp_by_name(&rc->loop, &req.ipcp_name);
+    if (!ipcp) {
+        PE("%s: Could not find the IPC process to register\n", __func__);
+        return -1;
+    }
+
     req.msg_type = RINA_CONF_IPCP_REGISTER;
     req.event_id = 0;
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    req.ipcp_id = ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     req.reg = reg;
 
@@ -465,13 +475,13 @@ ipcp_register_common(int argc, char **argv, unsigned int reg)
 static int
 ipcp_register(int argc, char **argv, struct rinaconf *rc)
 {
-    return ipcp_register_common(argc, argv, 1);
+    return ipcp_register_common(argc, argv, 1, rc);
 }
 
 static int
 ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
 {
-    return ipcp_register_common(argc, argv, 0);
+    return ipcp_register_common(argc, argv, 0, rc);
 }
 
 static int

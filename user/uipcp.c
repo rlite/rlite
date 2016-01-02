@@ -790,8 +790,10 @@ uipcps_update(struct ipcm *ipcm)
             while (fgets(line, sizeof(line), fpreg)) {
                 char *s1 = NULL;
                 char *s2 = NULL;
+                char *s3 = NULL;
                 struct rina_name dif_name;
                 struct rina_name ipcp_name;
+                unsigned int ipcp_id;
                 uint8_t reg_result;
 
                 s1 = strchr(line, '\n');
@@ -801,13 +803,15 @@ uipcps_update(struct ipcm *ipcm)
 
                 s1 = strtok(line, " ");
                 s2 = strtok(0, " ");
+                s3 = strtok(0, " ");
 
-                if (s1 && s2 && rina_name_from_string(s1, &dif_name) == 0
-                        && rina_name_from_string(s2, &ipcp_name) == 0) {
+                if (s1 && s2 && s3 && rina_name_from_string(s1, &dif_name) == 0
+                        && rina_name_from_string(s3, &ipcp_name) == 0) {
+                    ipcp_id = atoi(s2);
                     reg_result = rina_ipcp_register(ipcm, 1, &dif_name,
-                                                    &ipcp_name);
+                                                    ipcp_id, &ipcp_name);
                     PI("%s: Automatic re-registration for %s --> %s\n",
-                        __func__, s2, (reg_result == 0) ? "DONE" : "FAILED");
+                        __func__, s3, (reg_result == 0) ? "DONE" : "FAILED");
                 }
             }
 

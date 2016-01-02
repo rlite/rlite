@@ -25,6 +25,7 @@
 
 struct registered_ipcp {
     struct rina_name dif_name;
+    unsigned int ipcp_id;
     struct rina_name ipcp_name;
 
     struct list_head node;
@@ -55,22 +56,18 @@ rina_conf_response(int sfd, struct rina_msg_base *req,
 uint8_t
 rina_ipcp_register(struct ipcm *ipcm, int reg,
                    const struct rina_name *dif_name,
+                   unsigned int ipcp_id,
                    const struct rina_name *ipcp_name)
 {
     struct uipcp *uipcp;
-    struct ipcp *ipcp;
     uint8_t result;
 
-    /* Lookup the id of the registering IPCP. */
-    ipcp = lookup_ipcp_by_name(&ipcm->loop, ipcp_name);
-    if (!ipcp) {
-        PE("%s: Could not find who IPC process\n", __func__);
-        return 1;
-    }
-
     /* Grab the corresponding userspace IPCP. */
-    uipcp = uipcp_lookup(ipcm, ipcp->ipcp_id);
-    assert(uipcp);
+    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    if (!uipcp) {
+        PE("%s: No such uipcp [%u]\n", __func__, ipcp_id);
+        return -1;
+    }
 
     /* Perform the registration. */
     result = application_register(&uipcp->appl, reg, dif_name,
@@ -88,6 +85,7 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
             } else {
                 memset(ripcp, 0, sizeof(*ripcp));
                 rina_name_copy(&ripcp->dif_name, dif_name);
+                ripcp->ipcp_id = ipcp_id;
                 rina_name_copy(&ripcp->ipcp_name, ipcp_name);
                 list_add_tail(&ripcp->node, &ipcm->ipcps_registrations);
             }
@@ -117,7 +115,7 @@ rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
     struct rina_msg_base_resp resp;
 
     resp.result = rina_ipcp_register(ipcm, req->reg, &req->dif_name,
-                                     &req->ipcp_name);
+                                     req->ipcp_id, &req->ipcp_name);
 
     return rina_conf_response(sfd, RMB(req), &resp);
 }
@@ -321,7 +319,7 @@ persistent_ipcp_reg_dump(struct ipcm *ipcm)
             dif_s = rina_name_to_string(&ripcp->dif_name);
             ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
             if (dif_s && ipcp_s) {
-                fprintf(fpreg, "%s %s\n", dif_s, ipcp_s);
+                fprintf(fpreg, "%s %u %s\n", dif_s, ripcp->ipcp_id, ipcp_s);
             } else {
                 PE("%s: Error in rina_name_to_string()\n", __func__);
             }
