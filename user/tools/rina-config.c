@@ -102,7 +102,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    ret = deserialize_rina_msg(rina_conf_numtables, RLITE_CFG_MSG_MAX,
+    ret = deserialize_rina_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
                                serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("error while deserializing response [%d]\n",

@@ -25,7 +25,7 @@ enum {
 
 /* Numtables for rina-config <==> uipcp-server messages exchange. */
 
-extern struct rlite_msg_layout rina_conf_numtables[RLITE_CFG_MSG_MAX + 1];
+extern struct rlite_msg_layout rlite_conf_numtables[RLITE_CFG_MSG_MAX + 1];
 
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
