@@ -21,3 +21,5 @@
 - rina-utils: routine di deserializzazione devono gestire errori di lunghezza
 
 - fix permissions to /var/rina/ directory
+
+- struct pfr: aggiungere remote_appl_name field

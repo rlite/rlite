@@ -45,6 +45,9 @@ struct uipcp {
     /* Implementation of the Directory Forwarding Table (DFT). */
     struct list_head dft;
 
+    /* List of neighbor IPCP process we are enrolled to. */
+    struct list_head enrolled_neighbors;
+
     struct list_head node;
 };
 

@@ -10,6 +10,7 @@
 struct pending_flow_req {
     uint16_t ipcp_id;
     uint32_t port_id;
+
     struct list_head node;
 };
 
