@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -g
+CFLAGS=-Wall -Werror -g -O2
 CFLAGS += -I$(PWD)/include
 LDFLAGS += -lpthread
 EXES=user/ipcm user/rina-config user/rinaperf

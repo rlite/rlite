@@ -333,7 +333,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
               unsigned int wait_for_completion, int *result)
 {
     struct rina_msg_base *resp = NULL;
-    struct pending_entry *entry;
+    struct pending_entry *entry = NULL;
     char serbuf[4096];
     unsigned int serlen;
     int ret;

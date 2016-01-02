@@ -93,7 +93,7 @@ echo_client(struct rinaperf *rp)
 {
     struct timeval t_start, t_end;
     unsigned long us;
-    int ret;
+    int ret = 0;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
     unsigned int i = 0;
