@@ -106,7 +106,6 @@ private:
 
     struct Info {
         unsigned int dist;
-        uint64_t prev;
         bool visited;
     };
 
@@ -640,6 +639,8 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm)
 int
 SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 {
+    map<uint64_t, uint64_t> next_hops;
+
     graph.clear();
     info.clear();
 
@@ -681,7 +682,6 @@ SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
         struct Info inf;
 
         inf.dist = UINT_MAX;
-        inf.prev = ~((uint64_t) 0);
         inf.visited = false;
 
         info[g->first] = inf;
@@ -718,7 +718,8 @@ SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
 
             if (info_to.dist > info_min.dist + edge->cost) {
                 info_to.dist = info_min.dist + edge->cost;
-                info_to.prev = min;
+                next_hops[edge->to] = (min == local_addr) ? edge->to :
+                                                    next_hops[min];
             }
         }
     }
@@ -726,45 +727,9 @@ SPFEngine::run(uint64_t local_addr, const map<string, LowerFlow >& db)
     PD_S("Dijkstra result:\n");
     for (map<uint64_t, Info>::iterator i = info.begin();
                                     i != info.end(); i++) {
-        PD_S("    Address: %lu, Dist: %u, Prev: %lu, Visited %u\n",
+        PD_S("    Address: %lu, Dist: %u, Visited %u\n",
                 (long unsigned)i->first, i->second.dist,
-                (long unsigned)i->second.prev, i->second.visited);
-    }
-
-    set<uint64_t> unassociated;
-    map<uint64_t, uint64_t> next_hops;
-
-    for (map<uint64_t, list<Edge> >::iterator g = graph.begin();
-                                            g != graph.end(); g++) {
-        if (g->first != local_addr) {
-            unassociated.insert(g->first);
-        }
-    }
-
-    while (unassociated.size()) {
-        list<uint64_t> associated;
-        uint64_t addr = *(unassociated.begin());
-        uint64_t next_hop;
-        uint64_t last = UINT_MAX;
-
-        do {
-            associated.push_back(addr);
-            unassociated.erase(addr);
-            last = addr;
-            addr = info[addr].prev;
-        } while (addr != local_addr && unassociated.count(addr)
-                 && unassociated.size());
-
-        if (addr == local_addr) {
-            next_hop = last;
-        } else {
-            next_hop = next_hops[addr];
-        }
-
-        for (list<uint64_t>::iterator l = associated.begin();
-                                    l != associated.end(); l++) {
-            next_hops[*l] = next_hop;
-        }
+                (i->second.visited));
     }
 
     PD_S("Routing table:\n");
