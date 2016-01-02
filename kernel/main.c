@@ -337,7 +337,7 @@ dif_put(struct dif *dif)
         goto out;
     }
 
-    PD("DIF %s [type '%s' destroyed\n", dif->name, dif->ty);
+    PD("DIF %s [type '%s'] destroyed\n", dif->name, dif->ty);
 
     list_del(&dif->node);
     kfree(dif->name);

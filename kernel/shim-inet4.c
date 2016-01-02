@@ -96,7 +96,7 @@ rina_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
     return ret;
 }
 
-#define SHIM_DIF_TYPE   "shim_inet4"
+#define SHIM_DIF_TYPE   "shim-inet4"
 
 static struct ipcp_factory shim_inet4_factory = {
     .owner = THIS_MODULE,
