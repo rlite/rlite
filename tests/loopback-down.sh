@@ -3,6 +3,6 @@
 source tests/prologue.sh
 source tests/env.sh
 
-$RINACONF ipcp-destroy d.IPCP 1
+rina-config ipcp-destroy d.IPCP 1
 
 source tests/epilogue.sh

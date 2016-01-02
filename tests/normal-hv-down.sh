@@ -18,7 +18,7 @@ fi
 
 # it's not necessary to unregister, we can rely on
 # auto-unregistration
-$RINACONF ipcp-destroy $NORMIPCP 1
-$RINACONF ipcp-destroy $SHIPCP 1
+rina-config ipcp-destroy $NORMIPCP 1
+rina-config ipcp-destroy $SHIPCP 1
 
 source tests/epilogue.sh

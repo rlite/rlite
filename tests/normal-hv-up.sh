@@ -24,14 +24,14 @@ else
     ADDR=22
 fi
 
-$RINACONF ipcp-create $SHIPCP 1 shim-hv d.DIF
-$RINACONF ipcp-config $SHIPCP 1 vmpi-id ${vmpi_id}
-$RINACONF ipcp-create $NORMIPCP 1 normal n.DIF
-$RINACONF ipcp-config $NORMIPCP 1 address $ADDR
-$RINACONF ipcp-register d.DIF $NORMIPCP 1
+rina-config ipcp-create $SHIPCP 1 shim-hv d.DIF
+rina-config ipcp-config $SHIPCP 1 vmpi-id ${vmpi_id}
+rina-config ipcp-create $NORMIPCP 1 normal n.DIF
+rina-config ipcp-config $NORMIPCP 1 address $ADDR
+rina-config ipcp-register d.DIF $NORMIPCP 1
 if [ "$1" == "h" ]; then
     # Host enroll to the guest --> guest up script must be run first
-    $RINACONF ipcp-enroll n.DIF $NORMIPCP 1 ng.IPCP 1 d.DIF
+    rina-config ipcp-enroll n.DIF $NORMIPCP 1 ng.IPCP 1 d.DIF
 fi
 
 source tests/epilogue.sh

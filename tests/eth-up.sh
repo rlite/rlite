@@ -8,7 +8,7 @@ if [ -n "$1" ]; then
     IF=$1
 fi
 
-$RINACONF ipcp-create e.IPCP 1 shim-eth e.DIF
-$RINACONF ipcp-config e.IPCP 1 netdev $IF
+rina-config ipcp-create e.IPCP 1 shim-eth e.DIF
+rina-config ipcp-config e.IPCP 1 netdev $IF
 
 source tests/epilogue.sh

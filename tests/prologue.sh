@@ -3,7 +3,7 @@ if [ -z "$batch" ]; then
 fi
 
 if [ "$batch" != "0" ]; then
-    user/uipcp-server &
+    rlite-uipcps &
     while [ ! -e "/var/rina/uipcp-server" ] ; do
         true
     done
