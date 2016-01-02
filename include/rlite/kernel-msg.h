@@ -152,7 +152,7 @@ struct rl_kmsg_fa_resp_arrived {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
-    uint8_t result;
+    uint8_t response;
     uint32_t port_id;
 } __attribute__((packed));
 

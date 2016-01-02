@@ -1340,11 +1340,11 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
 }
 
 uint32_t
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec)
+rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
+               const struct rina_name *ipcp_name,
+               const struct rina_name *local_appl,
+               const struct rina_name *remote_appl,
+               const struct rlite_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     struct rlite_ipcp *rlite_ipcp;
@@ -1383,10 +1383,10 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
 }
 
 uint32_t
-rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
-                 const char *dif_name,
-                 const struct rina_name *ipcp_name,
-                 const struct rina_name *appl_name)
+rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
+                const char *dif_name,
+                const struct rina_name *ipcp_name,
+                const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register req;
     struct rlite_ipcp *rlite_ipcp;
@@ -1443,7 +1443,10 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
     pthread_mutex_unlock(&ctrl->lock);
 
     if (entry) {
-        return RLITE_MBR(entry->msg);
+        resp = RLITE_MBR(entry->msg);
+        free(entry);
+
+        return resp;
     }
 
     for (;;) {
@@ -1470,18 +1473,20 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
         }
 
         if (msg_type && resp->msg_type == msg_type) {
-            /* We found it. */
+            /* We found the requested match against msg_type. */
             return resp;
         }
 
         if (resp->event_id == event_id) {
-            /* We found it. */
+            /* We found the requested match against event_id. */
             return resp;
         }
 
         /* Filter out certain types of message. */
         switch (resp->msg_type) {
             case RLITE_KER_IPCP_UPDATE:
+                rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                               RLITE_MB(resp));
                 free(resp);
                 continue;
 
@@ -1517,4 +1522,76 @@ struct rlite_msg_base_resp *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
 {
     return rl_ctrl_wait_common(ctrl, msg_type, 0);
+}
+
+int
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
+                   const struct rlite_flow_spec *flowspec)
+{
+    struct rl_kmsg_fa_resp_arrived *resp;
+    uint32_t event_id;
+    int ret;
+
+    event_id = rl_ctrl_fa_req(ctrl, dif_name, ipcp_name, local_appl,
+                              remote_appl, flowspec);
+
+    if (!event_id) {
+        return -1;
+    }
+
+    resp = (struct rl_kmsg_fa_resp_arrived *)rl_ctrl_wait(ctrl, event_id);
+    if (!resp) {
+        return -1;
+    }
+
+    if (resp->response) {
+        PE("Flow allocation request denied by remote peer\n");
+        ret = -1;
+    } else {
+        ret = 0;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(resp));
+    free(resp);
+
+    return ret;
+}
+
+int
+rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
+                 const char *dif_name,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name)
+{
+    struct rl_kmsg_appl_register_resp *resp;
+    uint32_t event_id;
+    int ret;
+
+    event_id = rl_ctrl_reg_req(ctrl, reg, dif_name, ipcp_name, appl_name);
+
+    if (!event_id) {
+        return -1;
+    }
+
+    resp = (struct rl_kmsg_appl_register_resp *)rl_ctrl_wait(ctrl, event_id);
+    if (!resp) {
+        return -1;
+    }
+
+    if (resp->response) {
+        PE("Registration request denied\n");
+        ret = -1;
+    } else {
+        ret = 0;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(resp));
+    free(resp);
+
+    return ret;
 }

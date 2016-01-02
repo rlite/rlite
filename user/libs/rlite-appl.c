@@ -35,7 +35,7 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
     local_s = rina_name_to_string(&req->local_appl);
     remote_s = rina_name_to_string(&req->remote_appl);
 
-    if (resp->result) {
+    if (resp->response) {
         PE("Failed to allocate a flow between local appl "
                "'%s' and remote appl '%s'\n",
                 local_s, remote_s);
@@ -290,8 +290,8 @@ rl_appl_flow_alloc(struct rlite_appl *appl, uint32_t event_id,
     }
 
     PI("Flow allocation response: ret = %u, port-id = %u\n",
-                kresp->result, kresp->port_id);
-    result = kresp->result;
+                kresp->response, kresp->port_id);
+    result = kresp->response;
     *port_id = kresp->port_id;
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(kresp));

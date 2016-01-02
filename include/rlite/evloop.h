@@ -209,23 +209,36 @@ int
 rl_ctrl_fini(struct rlite_ctrl *ctrl);
 
 uint32_t
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec);
+rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
+               const struct rina_name *ipcp_name,
+               const struct rina_name *local_appl,
+               const struct rina_name *remote_appl,
+               const struct rlite_flow_spec *flowspec);
 
 uint32_t
-rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
-                 const char *dif_name,
-                 const struct rina_name *ipcp_name,
-                 const struct rina_name *appl_name);
+rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
+                const char *dif_name,
+                const struct rina_name *ipcp_name,
+                const struct rina_name *appl_name);
 
 struct rlite_msg_base_resp *
 rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id);
 
 struct rlite_msg_base_resp *
 rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
+
+int
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
+                   const struct rlite_flow_spec *flowspec);
+
+int
+rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
+                 const char *dif_name,
+                 const struct rina_name *ipcp_name,
+                 const struct rina_name *appl_name);
 
 #ifdef __cplusplus
 }

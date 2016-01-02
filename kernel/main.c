@@ -1781,7 +1781,7 @@ rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
 static int
 rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
-                                       uint32_t port_id, uint8_t result)
+                                       uint32_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp_arrived resp;
 
@@ -1789,7 +1789,7 @@ rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id
     resp.msg_type = RLITE_KER_FA_RESP_ARRIVED;
     resp.event_id = event_id;
     resp.port_id = port_id;
-    resp.result = result;
+    resp.response = response;
 
     /* Enqueue the response into the upqueue. */
     return rlite_upqueue_append(rc, RLITE_MB(&resp));

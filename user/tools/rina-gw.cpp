@@ -599,7 +599,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     cfd = mit->second;
     gw->pending_fa_reqs.erase(mit);
 
-    if (resp->result) {
+    if (resp->response) {
         /* Negative response. */
         PD("Negative flow allocation response received\n");
         close(cfd);
