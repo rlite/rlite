@@ -148,9 +148,10 @@ flow_config_default(struct rina_flow_config *cfg)
 
 static struct rina_kmsg_fa_resp_arrived *
 flow_allocate_req(struct application *application,
-                  unsigned int wait_for_completion,
-                  uint16_t ipcp_id, const struct rina_name *local_application,
-                  const struct rina_name *remote_application, int *result)
+                  unsigned int wait_for_completion, uint16_t ipcp_id,
+                  const struct rina_name *local_application,
+                  const struct rina_name *remote_application,
+                  const struct rina_flow_config *flowcfg, int *result)
 {
     struct rina_kmsg_fa_req *req;
 
@@ -164,7 +165,11 @@ flow_allocate_req(struct application *application,
     memset(req, 0, sizeof(*req));
     req->msg_type = RINA_KERN_FA_REQ;
     req->ipcp_id = ipcp_id;
-    flow_config_default(&req->flowcfg);
+    if (flowcfg) {
+        memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+    } else {
+        flow_config_default(&req->flowcfg);
+    }
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
@@ -233,6 +238,7 @@ flow_allocate(struct application *application,
               struct rina_name *ipcp_name,
               const struct rina_name *local_application,
               const struct rina_name *remote_application,
+              const struct rina_flow_config *flowcfg,
               unsigned int *port_id, unsigned int wait_ms)
 {
     unsigned int ipcp_id;
@@ -251,7 +257,7 @@ flow_allocate(struct application *application,
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
                               ipcp_id, local_application,
-                              remote_application, &result);
+                              remote_application, flowcfg, &result);
     if (!kresp) {
         PE("%s: Flow allocation request failed\n", __func__);
         return -1;
@@ -333,13 +339,14 @@ flow_allocate_open(struct application *application,
                    struct rina_name *ipcp_name,
                    const struct rina_name *local_application,
                    const struct rina_name *remote_application,
+                   const struct rina_flow_config *flowcfg,
                    unsigned int wait_ms)
 {
     unsigned int port_id;
     int ret;
 
     ret = flow_allocate(application, dif_name, dif_fallback, ipcp_name,
-                        local_application, remote_application,
+                        local_application, remote_application, flowcfg,
                         &port_id, wait_ms);
     if (ret) {
         return -1;

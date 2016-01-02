@@ -432,7 +432,7 @@ main(int argc, char **argv)
         /* We're the client: allocate a flow and run the perf function. */
         rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1,
                                     &rp.ipcp_name, &rp.client_appl_name,
-                                    &rp.server_appl_name, 1500);
+                                    &rp.server_appl_name, NULL, 1500);
         if (rp.dfd < 0) {
             return rp.dfd;
         }

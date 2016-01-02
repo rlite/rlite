@@ -129,7 +129,7 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
 
     /* Allocate a flow for the enrollment. */
     ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
-                         &req->ipcp_name, &req->neigh_ipcp_name,
+                         &req->ipcp_name, &req->neigh_ipcp_name, NULL,
                          &port_id, 2000);
     if (ret) {
         goto err;

@@ -45,6 +45,7 @@ int flow_allocate(struct application *application,
                   struct rina_name *ipcp_name,
                   const struct rina_name *local_application,
                   const struct rina_name *remote_application,
+                  const struct rina_flow_config *flowcfg,
                   unsigned int *port_id, unsigned int wait_ms);
 
 struct pending_flow_req *flow_request_wait(struct application *application);
@@ -64,6 +65,7 @@ int flow_allocate_open(struct application *application,
                        struct rina_name *ipcp_name,
                        const struct rina_name *local_application,
                        const struct rina_name *remote_application,
+                       const struct rina_flow_config *flowcfg,
                        unsigned int wait_ms);
 
 int flow_request_wait_open(struct application *application);
