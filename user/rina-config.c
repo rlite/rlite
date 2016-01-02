@@ -264,6 +264,36 @@ static int ipcp_enroll(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int ipcp_dft_set(int argc, char **argv)
+{
+    struct rina_amsg_ipcp_dft_set req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+    const char *appl_apn;
+    const char *appl_api;
+    unsigned long remote_addr;
+
+    assert(argc >= 5);
+    ipcp_apn = argv[0];
+    ipcp_api = argv[1];
+    appl_apn = argv[2];
+    appl_api = argv[3];
+    errno = 0;
+    remote_addr = strtoul(argv[4], NULL, 10);
+    if (errno) {
+        PE("%s: Invalid address %s\n", __func__, argv[4]);
+        return -1;
+    }
+
+    req.msg_type = RINA_CONF_IPCP_DFT_SET;
+    req.event_id = 0;
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
+    req.remote_addr = remote_addr;
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -313,6 +343,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
         .num_args = 6,
         .func = ipcp_enroll,
+    },
+    {
+        .name = "ipcp-dft-set",
+        .usage = "IPCP_APN IPCP_API APPL_APN APPL_API REMOTE_ADDR",
+        .num_args = 5,
+        .func = ipcp_dft_set,
     },
 };
 

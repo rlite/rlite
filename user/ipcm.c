@@ -531,6 +531,60 @@ out:
     return rina_conf_response(sfd, RMB(req), &resp);
 }
 
+static int
+rina_ipcp_dft_set(struct ipcm *ipcm, unsigned int ipcp_id,
+                  const struct rina_name *appl_name, uint64_t remote_addr)
+{
+    struct rina_kmsg_ipcp_dft_set *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_DFT_SET;
+    req->ipcp_id = ipcp_id;
+    rina_name_copy(&req->appl_name, appl_name);
+    req->remote_addr = remote_addr;
+
+    PD("Requesting IPCP DFT set...\n");
+
+    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
+static int
+rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
+                       const struct rina_msg_base *b_req)
+{
+    struct rina_amsg_ipcp_dft_set *req = (struct rina_amsg_ipcp_dft_set *)b_req;
+    struct rina_msg_base_resp resp;
+    unsigned int ipcp_id;
+
+    resp.result = 1; /* Report failure by default. */
+
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
+    if (ipcp_id == ~0U) {
+        PE("%s: Could not find IPC process\n", __func__);
+        goto out;
+    }
+
+    resp.result = rina_ipcp_dft_set(ipcm, ipcp_id, &req->appl_name,
+                                    req->remote_addr);
+
+out:
+    return rina_conf_response(sfd, RMB(req), &resp);
+}
+
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -542,6 +596,7 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_CONF_IPCP_CONFIG] = rina_conf_ipcp_config,
     [RINA_CONF_IPCP_REGISTER] = rina_conf_ipcp_register,
     [RINA_CONF_IPCP_ENROLL] = rina_conf_ipcp_enroll,
+    [RINA_CONF_IPCP_DFT_SET] = rina_conf_ipcp_dft_set,
     [RINA_CONF_MSG_MAX] = NULL,
 };
 

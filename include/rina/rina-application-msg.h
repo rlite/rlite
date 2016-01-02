@@ -20,7 +20,8 @@ enum {
     RINA_CONF_IPCP_CONFIG,        /* 7 */
     RINA_CONF_IPCP_REGISTER,      /* 8 */
     RINA_CONF_IPCP_ENROLL,        /* 9 */
-    RINA_CONF_BASE_RESP,          /* 10 */
+    RINA_CONF_IPCP_DFT_SET,       /* 10 */
+    RINA_CONF_BASE_RESP,          /* 11 */
 
     RINA_CONF_MSG_MAX,
 };
@@ -87,6 +88,16 @@ struct rina_amsg_ipcp_enroll {
     struct rina_name ipcp_name;
     struct rina_name neigh_ipcp_name;
     struct rina_name supp_dif_name;
+} __attribute__((packed));
+
+/* Application --> IPCM message to set an IPC process DFT entry */
+struct rina_amsg_ipcp_dft_set {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint64_t remote_addr;
+    struct rina_name ipcp_name;
+    struct rina_name appl_name;
 } __attribute__((packed));
 
 #endif  /* __RINA_CONF_MSG_H__ */
