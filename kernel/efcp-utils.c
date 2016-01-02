@@ -44,30 +44,35 @@ EXPORT_SYMBOL_GPL(dtp_init);
 void
 dtp_fini(struct dtp *dtp)
 {
-    struct rlite_buf *rb, *next;
+    struct rlite_buf *rb, *tmp;
 
     spin_lock_bh(&dtp->lock);
+
     del_timer(&dtp->snd_inact_tmr);
     del_timer(&dtp->rcv_inact_tmr);
     del_timer(&dtp->rtx_tmr);
 
-    /* XXX Are those duplicated ? */
-    list_for_each_entry_safe(rb, next, &dtp->cwq, node) {
+    PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del(&rb->node);
         rlite_buf_free(rb);
     }
     dtp->cwq_len = 0;
 
-    list_for_each_entry_safe(rb, next, &dtp->seqq, node) {
+    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->seqq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
         list_del(&rb->node);
         rlite_buf_free(rb);
     }
     dtp->seqq_len = 0;
 
-    list_for_each_entry_safe(rb, next, &dtp->rtxq, node) {
+    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del(&rb->node);
         rlite_buf_free(rb);
     }
+    dtp->rtxq_len = 0;
+
     spin_unlock_bh(&dtp->lock);
 }
 EXPORT_SYMBOL(dtp_fini);
