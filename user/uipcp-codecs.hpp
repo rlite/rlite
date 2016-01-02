@@ -237,4 +237,26 @@ struct ConnId {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct FlowRequest {
+    RinaName src_app;
+    RinaName dst_app;
+    uint64_t src_port;
+    uint64_t dst_port;
+    uint64_t src_addr;
+    uint64_t dst_addr;
+    std::list<ConnId> connections;
+    uint32_t cur_conn_idx;
+    uint32_t state;
+    QosSpec qos;
+    ConnPolicies policies;
+    void *access_ctrl;
+    uint32_t max_create_flow_retries;
+    uint32_t create_flow_retries;
+    uint32_t hop_cnt;
+
+    FlowRequest() { }
+    FlowRequest(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

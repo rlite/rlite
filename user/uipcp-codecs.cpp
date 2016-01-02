@@ -408,25 +408,51 @@ Property::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2QosSpec(QosSpec& q, const gpb::qosSpecification_t &gm)
+{
+    q.name = gm.name();
+    q.qos_id = gm.qosid();
+    q.avg_bw = gm.averagebandwidth();
+    q.avg_sdu_bw = gm.averagesdubandwidth();
+    q.peak_bw_duration = gm.peakbandwidthduration();
+    q.peak_sdu_bw_duration = gm.peaksdubandwidthduration();
+    q.undetected_bit_error_rate = gm.undetectedbiterrorrate();
+    q.partial_delivery = gm.partialdelivery();
+    q.in_order_delivery = gm.order();
+    q.max_sdu_gap = gm.maxallowablegapsdu();
+    q.delay = gm.delay();
+    q.jitter = gm.jitter();
+    /* missing extra_parameters */
+}
+
+static int
+QosSpec2gpb(const QosSpec& q, gpb::qosSpecification_t &gm)
+{
+    gm.set_name(q.name);
+    gm.set_qosid(q.qos_id);
+    gm.set_averagebandwidth(q.avg_bw);
+    gm.set_averagesdubandwidth(q.avg_sdu_bw);
+    gm.set_peakbandwidthduration(q.peak_bw_duration);
+    gm.set_peaksdubandwidthduration(q.peak_sdu_bw_duration);
+    gm.set_undetectedbiterrorrate(q.undetected_bit_error_rate);
+    gm.set_partialdelivery(q.partial_delivery);
+    gm.set_order(q.in_order_delivery);
+    gm.set_maxallowablegapsdu(q.max_sdu_gap);
+    gm.set_delay(q.delay);
+    gm.set_jitter(q.jitter);
+    /* missing extra_parameters */
+
+    return 0;
+}
+
 QosSpec::QosSpec(const char *buf, unsigned int size)
 {
     gpb::qosSpecification_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    name = gm.name();
-    qos_id = gm.qosid();
-    avg_bw = gm.averagebandwidth();
-    avg_sdu_bw = gm.averagesdubandwidth();
-    peak_bw_duration = gm.peakbandwidthduration();
-    peak_sdu_bw_duration = gm.peaksdubandwidthduration();
-    undetected_bit_error_rate = gm.undetectedbiterrorrate();
-    partial_delivery = gm.partialdelivery();
-    in_order_delivery = gm.order();
-    max_sdu_gap = gm.maxallowablegapsdu();
-    delay = gm.delay();
-    jitter = gm.jitter();
-    /* missing extra_parameters */
+    gpb2QosSpec(*this, gm);
 }
 
 int
@@ -434,19 +460,7 @@ QosSpec::serialize(char *buf, unsigned int size) const
 {
     gpb::qosSpecification_t gm;
 
-    gm.set_name(name);
-    gm.set_qosid(qos_id);
-    gm.set_averagebandwidth(avg_bw);
-    gm.set_averagesdubandwidth(avg_sdu_bw);
-    gm.set_peakbandwidthduration(peak_bw_duration);
-    gm.set_peaksdubandwidthduration(peak_sdu_bw_duration);
-    gm.set_undetectedbiterrorrate(undetected_bit_error_rate);
-    gm.set_partialdelivery(partial_delivery);
-    gm.set_order(in_order_delivery);
-    gm.set_maxallowablegapsdu(max_sdu_gap);
-    gm.set_delay(delay);
-    gm.set_jitter(jitter);
-    /* missing extra_parameters */
+    QosSpec2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
@@ -924,3 +938,89 @@ ConnId::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2FlowRequest(FlowRequest& fr,
+                const gpb::Flow &gm)
+{
+    gpb2RinaName(fr.src_app, gm.sourcenaminginfo());
+    gpb2RinaName(fr.dst_app, gm.destinationnaminginfo());
+    fr.src_port = gm.sourceportid();
+    fr.dst_port = gm.destinationportid();
+    fr.src_addr = gm.sourceaddress();
+    fr.dst_addr = gm.destinationaddress();
+    for (int i = 0; i < gm.connectionids_size(); i++) {
+        fr.connections.push_back(ConnId());
+        gpb2ConnId(fr.connections.back(), gm.connectionids(i));
+    }
+    fr.cur_conn_idx = gm.currentconnectionidindex();
+    fr.state = gm.state();
+    gpb2QosSpec(fr.qos, gm.qosparameters());
+    gpb2ConnPolicies(fr.policies, gm.connectionpolicies());
+    fr.access_ctrl = NULL;
+    fr.max_create_flow_retries = gm.maxcreateflowretries();
+    fr.create_flow_retries = gm.createflowretries();
+    fr.hop_cnt = gm.hopcount();
+}
+
+static int
+FlowRequest2gpb(const FlowRequest& fr,
+                gpb::Flow &gm)
+{
+    gpb::applicationProcessNamingInfo_t *name;
+    gpb::qosSpecification_t *q;
+    gpb::connectionPolicies_t *p;
+
+    name = RinaName2gpb(fr.src_app);
+    gm.set_allocated_sourcenaminginfo(name);
+
+    name = RinaName2gpb(fr.dst_app);
+    gm.set_allocated_destinationnaminginfo(name);
+
+    gm.set_sourceportid(fr.src_port);
+    gm.set_destinationportid(fr.dst_port);
+    gm.set_sourceaddress(fr.src_addr);
+    gm.set_destinationaddress(fr.dst_addr);
+    for (list<ConnId>::const_iterator lit = fr.connections.begin();
+                        lit != fr.connections.end(); lit++) {
+        gpb::connectionId_t *c = gm.add_connectionids();
+
+        ConnId2gpb(*lit, *c);
+    }
+    gm.set_currentconnectionidindex(fr.cur_conn_idx);
+    gm.set_state(fr.state);
+
+    q = new gpb::qosSpecification_t;
+    QosSpec2gpb(fr.qos, *q);
+    gm.set_allocated_qosparameters(q);
+
+    p = new gpb::connectionPolicies_t;
+    ConnPolicies2gpb(fr.policies, *p);
+    gm.set_allocated_connectionpolicies(p);
+
+    /* access_ctrl not considered --> it will be empty */
+
+    gm.set_maxcreateflowretries(fr.max_create_flow_retries);
+    gm.set_createflowretries(fr.create_flow_retries);
+    gm.set_hopcount(fr.hop_cnt);
+
+    return 0;
+}
+
+FlowRequest::FlowRequest(const char *buf, unsigned int size)
+{
+    gpb::Flow gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2FlowRequest(*this, gm);
+}
+
+int
+FlowRequest::serialize(char *buf, unsigned int size) const
+{
+    gpb::Flow gm;
+
+    FlowRequest2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
