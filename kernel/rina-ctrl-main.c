@@ -384,7 +384,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_ctrl *rc)
 {
     struct registered_application *app;
-    char *name_s;
     int ret = 0;
 
     mutex_lock(&ipcp->lock);
@@ -410,12 +409,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
     mutex_unlock(&ipcp->lock);
 
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s registered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
-    }
-
     if (ipcp->ops.application_register) {
         ret = ipcp->ops.application_register(ipcp, application_name, 1);
         if (ret) {
@@ -431,7 +424,6 @@ ipcp_application_del(struct ipcp_entry *ipcp,
                      struct rina_name *application_name)
 {
     struct registered_application *app;
-    char *name_s;
 
     mutex_lock(&ipcp->lock);
 
@@ -444,12 +436,6 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 
     if (!app) {
         return -EINVAL;
-    }
-
-    name_s = rina_name_to_string(application_name);
-    printk("%s: Application %s unregistered\n", __func__, name_s);
-    if (name_s) {
-        kfree(name_s);
     }
 
     return 0;
@@ -717,8 +703,8 @@ application_del_by_rc(struct rina_ctrl *rc)
                 &ipcp->registered_applications, node) {
             if (app->rc == rc) {
                 s = rina_name_to_string(&app->name);
-                printk("%s: Application %s automatically unregistered\n",
-                        __func__, s);
+                printk("%s: Application %s will be automatically "
+                       "unregistered\n",  __func__, s);
                 kfree(s);
                 ipcp_application_del_entry(ipcp, app);
             }

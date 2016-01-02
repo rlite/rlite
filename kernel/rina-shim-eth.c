@@ -50,7 +50,7 @@ struct arpt_entry {
 struct rina_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
-    char *reg_app_name_s;
+    char *upper_name_s;
     struct list_head arp_table;
 };
 
@@ -66,7 +66,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     priv->netdev = NULL;
-    priv->reg_app_name_s = NULL;
+    priv->upper_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
@@ -92,8 +92,8 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
         dev_put(priv->netdev);
     }
 
-    if (priv->reg_app_name_s) {
-        kfree(priv->reg_app_name_s);
+    if (priv->upper_name_s) {
+        kfree(priv->upper_name_s);
     }
 
     kfree(priv);
@@ -109,21 +109,21 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
     char *tmp;
 
     if (reg) {
-        if (priv->reg_app_name_s) {
+        if (priv->upper_name_s) {
             /* Only one application can be currently registered. */
             return -EBUSY;
         }
 
-        priv->reg_app_name_s = rina_name_to_string(appl);
+        priv->upper_name_s = rina_name_to_string(appl);
 
-        if (priv->reg_app_name_s) {
-            PD("%s: Application %s registered\n", __func__, priv->reg_app_name_s);
+        if (priv->upper_name_s) {
+            PD("%s: Application %s registered\n", __func__, priv->upper_name_s);
         }
 
-        return priv->reg_app_name_s ? 0 : -ENOMEM;
+        return priv->upper_name_s ? 0 : -ENOMEM;
     }
 
-    if (!priv->reg_app_name_s) {
+    if (!priv->upper_name_s) {
         /* Nothing to do. */
         return 0;
     }
@@ -134,10 +134,10 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
         return -ENOMEM;
     }
 
-    if (strcmp(tmp, priv->reg_app_name_s) == 0) {
-        PD("%s: Application %s unregistered\n", __func__, priv->reg_app_name_s);
-        kfree(priv->reg_app_name_s);
-        priv->reg_app_name_s = NULL;
+    if (strcmp(tmp, priv->upper_name_s) == 0) {
+        PD("%s: Application %s unregistered\n", __func__, priv->upper_name_s);
+        kfree(priv->upper_name_s);
+        priv->upper_name_s = NULL;
     } else {
         /* Nothing to do. Main module may be trying to clean up a
          * failed registration, so don't report an error. */
