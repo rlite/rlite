@@ -815,7 +815,13 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
      * fill the DIF name field. */
     entry = ipcp_table_find(req->ipcp_id);
     if (entry) {
-        ret = entry->ops.config(entry, req->name, req->value);
+        if (strcmp(req->name, "dif") == 0) {
+            rina_name_free(&entry->dif_name);
+            rina_name_fill(&entry->dif_name, req->value, NULL, NULL, NULL);
+            ret = 0; /* Report success. */
+        } else {
+            ret = entry->ops.config(entry, req->name, req->value);
+        }
     }
     mutex_unlock(&rina_dm.lock);
 

@@ -25,10 +25,10 @@ else
 fi
 
 $RINACONF ipcp-create shim-hv $SHIPCP 1
-$RINACONF assign-to-dif d.DIF $SHIPCP 1
+$RINACONF ipcp-config $SHIPCP 1 dif d.DIF
 $RINACONF ipcp-config $SHIPCP 1 vmpi-id ${vmpi_id}
 $RINACONF ipcp-create normal $NORMIPCP 1
-$RINACONF assign-to-dif n.DIF $NORMIPCP 1
+$RINACONF ipcp-config $NORMIPCP 1 dif n.DIF
 $RINACONF ipcp-config $NORMIPCP 1 address $ADDR
 $RINACONF ipcp-register d.DIF $NORMIPCP 1
 if [ "$1" == "h" ]; then

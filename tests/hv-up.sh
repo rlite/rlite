@@ -15,7 +15,7 @@ if [ -z ${vmpi_id} ]; then
 fi
 
 $RINACONF ipcp-create shim-hv ${1}.IPCP 1
-$RINACONF assign-to-dif d.DIF ${1}.IPCP 1
+$RINACONF ipcp-config ${1}.IPCP 1 dif d.DIF
 $RINACONF ipcp-config ${1}.IPCP 1 vmpi-id ${vmpi_id}
 
 source tests/epilogue.sh
