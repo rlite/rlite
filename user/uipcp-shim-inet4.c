@@ -116,7 +116,7 @@ parse_directory(struct shim_inet4 *shim, int addr2sock,
 
         } else { /* sock2addr */
             if (addr->sin_family == cur_addr.sin_family &&
-                    addr->sin_port == cur_addr.sin_port &&
+                    /* addr->sin_port == cur_addr.sin_port && */
                     memcmp(&addr->sin_addr, &cur_addr.sin_addr,
                     sizeof(cur_addr.sin_addr)) == 0) {
                 ret = rina_name_from_string(nm, appl_name);
@@ -158,7 +158,6 @@ sock_addr_to_appl_name(struct shim_inet4 *shim, const struct sockaddr_in *addr,
     return parse_directory(shim, 0, (struct sockaddr_in *)addr, appl_name);
 }
 
-/* ep->addr must be filled in before calling this function */
 static int
 open_bound_socket(struct shim_inet4 *shim, int *fd, struct sockaddr_in *addr)
 {
@@ -178,7 +177,7 @@ open_bound_socket(struct shim_inet4 *shim, int *fd, struct sockaddr_in *addr)
         return -1;
     }
 
-    if (bind(*fd, (struct sockaddr *)addr, sizeof(*addr))) {
+    if (addr && bind(*fd, (struct sockaddr *)addr, sizeof(*addr))) {
         UPE(shim->uipcp, "bind() failed [%d]\n", errno);
         close(*fd);
         return -1;
@@ -339,8 +338,8 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
         goto err1;
     }
 
-    /* Open a client-side socket, bind() and connect(). */
-    ret = open_bound_socket(shim, &ep->fd, &ep->addr);
+    /* Open a client-side socket and connect(), no need to bind. */
+    ret = open_bound_socket(shim, &ep->fd, NULL);
     if (ret) {
         goto err1;
     }
@@ -425,7 +424,9 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     ep->fd = sfd;
     memcpy(&ep->addr, &remote_addr, sizeof(remote_addr));
 
-    /* Lookup the remote IP address and port. */
+    /* Lookup the remote IP address, but not the port, otherwise
+     * the remote user IPCP couldn't allocate more than one flow as
+     * TCP client. */
     if (sock_addr_to_appl_name(shim, &ep->addr, &remote_appl)) {
         UPE(uipcp, "Failed to get appl_name from remote address\n");
         rina_name_free(&local_appl);
