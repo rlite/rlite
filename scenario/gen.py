@@ -1,7 +1,23 @@
 #!/usr/bin/env python
 
 import re
+import argparse
 import subprocess
+
+
+description = "Python script to launch a scenario"
+epilog = "2015 Vincenzo Maffione <v.maffione@gmail.com>"
+
+argparser = argparse.ArgumentParser(description = description,
+                                    epilog = epilog)
+argparser.add_argument('-p', '--base-port',
+                       help = "Base port for VMs",
+                       type = int, default = 2222)
+argparser.add_argument('-i', '--image',
+                       help = "Path to the VM image", type = str,
+                       default = '/home/vmaffione/git/vm/arch.qcow2')
+
+args = argparser.parse_args()
 
 
 fin = open('gen.conf', 'r')
@@ -84,13 +100,13 @@ for i in vms:
 
     vm['id'] = vmid
 
-    fwdp = 2222 + vmid
+    fwdp = args.base_port + vmid
     mac = '00:0a:0a:0a:%02x:%02x' % (vmid, 99)
 
     vm['ssh'] = fwdp
 
-    outs += ''                                                  \
-            'qemu-system-x86_64 "/home/vmaffione/git/vm/arch.qcow2" '   \
+    outs += ''                                                          \
+            'qemu-system-x86_64 "%(img)s" '                             \
             '-snapshot '                                                \
             '--enable-kvm '                                             \
             '-smp 2 '                                                   \
@@ -101,7 +117,8 @@ for i in vms:
             '-pidfile rina-%(id)s.pid '                                 \
             '-display none '                                            \
             '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '\
-             % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000}
+             % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000,
+                'img': args.image}
 
     for port in vm['ports']:
         tap = port['tap']
@@ -193,9 +210,7 @@ for br_name in bridges:
                           'pvid': pvm['id'], 'brid': b['id']}
 
 fout.write(outs)
-
 fout.close()
-
 subprocess.call(['chmod', '+x', 'up.sh'])
 
 print(vms)
@@ -245,7 +260,26 @@ for b in bridges:
             '\n' % {'br': b}
 
 fout.write(outs)
-
 fout.close()
-
 subprocess.call(['chmod', '+x', 'down.sh'])
+
+
+################### GENERATE PROGRAM SCRIPT #####################
+
+fout = open('program.sh', 'w')
+
+outs =  '#!/bin/bash\n'                                             \
+        '\n'                                                        \
+        'set -x\n'                                                  \
+        'qemu-system-x86_64 "%(img)s" '                             \
+        '--enable-kvm '                                             \
+        '-smp 2 '                                                   \
+        '-m 1G '                                                    \
+        '-device e1000,mac=00:0a:0a:0a:0a:99,netdev=mgmt '          \
+        '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
+        '-vga std  &\n'                                             \
+                % {'img': args.image, 'fwdp': args.base_port}
+
+fout.write(outs)
+fout.close()
+subprocess.call(['chmod', '+x', 'program.sh'])
