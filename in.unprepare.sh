@@ -4,6 +4,7 @@ set -x
 
 sudo rm -rf /var/rlite
 
+sudo rmmod rlite-shim-inet4.ko
 sudo rmmod rlite-normal.ko
 sudo rmmod rlite-shim-loopback.ko
 if [ HAVE_VMPI == "y" ]; then

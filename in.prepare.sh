@@ -18,6 +18,7 @@ if [ HAVE_VMPI == "y" ]; then
 fi
 sudo insmod kernel/rlite-shim-eth.ko
 sudo insmod kernel/rlite-normal.ko
+sudo insmod kernel/rlite-shim-inet4.ko
 sudo chmod a+rwx /dev/rlite
 sudo chmod a+rwx /dev/rlite-io
 

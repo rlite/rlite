@@ -76,6 +76,7 @@ rina_shim_inet4_destroy(struct ipcp_entry *ipcp)
     PD("IPCP [%p] destroyed\n", priv);
 }
 
+#if 0
 static int
 peek_head_len(struct sock *sk)
 {
@@ -87,15 +88,14 @@ peek_head_len(struct sock *sk)
     head = skb_peek(&sk->sk_receive_queue);
     if (likely(head)) {
         len = head->len;
-#if 0
         if (vlan_tx_tag_present(head))
             len += VLAN_HLEN;
-#endif
     }
     spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
 
     return len;
 }
+#endif
 
 static void
 inet4_rx_worker(struct work_struct *w)
@@ -107,32 +107,24 @@ inet4_rx_worker(struct work_struct *w)
     struct msghdr msghdr;
     struct rina_buf *rb;
     struct iovec iov;
-    int ret, peek_len;
+    uint16_t lenhdr;
+    int ret;
 
-    while ((peek_len = peek_head_len(sock->sk))) {
+    for (;;) {
         memset(&msghdr, 0, sizeof(msghdr));
         msghdr.msg_flags = MSG_DONTWAIT;
 
-        PD("peek_len %d\n", peek_len);
+        lenhdr = 0;
+        iov.iov_base = &lenhdr;
+        iov.iov_len = sizeof(lenhdr);
 
-        rb = rina_buf_alloc(peek_len, 3, GFP_ATOMIC);
-        if (!rb) {
-            PE("Out of memory\n");
-            return;
-        }
-
-        iov.iov_base = RINA_BUF_DATA(rb);
-        iov.iov_len = rb->len;
-        msghdr.msg_iov = &iov;
-        msghdr.msg_iovlen = 1;
-
-        ret = sock->ops->recvmsg(NULL, sock, &msghdr, rb->len,
-                                 MSG_DONTWAIT | MSG_TRUNC);
-        /*    ret = kernel_recvmsg(sk->sk_socket, &msghdr, (struct kvec *)&iov, 1,
-              rb->len, msghdr.msg_flags); */
-        if (unlikely(ret != peek_len)) {
+        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
+                             sizeof(lenhdr), msghdr.msg_flags);
+        /* ret = sock->ops->recvmsg(NULL, sock, &msghdr, sizeof(lenhdr),
+                                 MSG_DONTWAIT | MSG_TRUNC); */
+        if (unlikely(ret != sizeof(lenhdr))) {
             if (ret >= 0) {
-                PE("Partial read %d/%d\n", ret, peek_len);
+                PE("Partial read %d/%d\n", ret, 2);
 
             } else if (ret == -EAGAIN) {
                 PD("recvmsg(): got EAGAIN\n");
@@ -140,6 +132,45 @@ inet4_rx_worker(struct work_struct *w)
             } else {
                 PE("recvmsg(): %d\n", ret);
             }
+
+            break;
+        }
+
+        lenhdr = ntohs(lenhdr);
+        PD("lenhdr %d, ret = %d\n", lenhdr, ret);
+
+        if (!lenhdr) {
+            PI("Warning: zero lenght packet\n");
+            continue;
+        }
+
+        rb = rina_buf_alloc(lenhdr, 3, GFP_ATOMIC);
+        if (!rb) {
+            PE("Out of memory\n");
+            return;
+        }
+
+        memset(&msghdr, 0, sizeof(msghdr));
+        msghdr.msg_flags = MSG_DONTWAIT;
+
+        iov.iov_base = RINA_BUF_DATA(rb);
+        iov.iov_len = lenhdr;
+
+        /*ret = sock->ops->recvmsg(NULL, sock, &msghdr, lenhdr,
+                                 MSG_DONTWAIT | MSG_TRUNC); */
+        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
+                             lenhdr, msghdr.msg_flags);
+        if (unlikely(ret != lenhdr)) {
+            if (ret >= 0) {
+                PE("Partial read %d/%d\n", ret, lenhdr);
+
+            } else if (ret == -EAGAIN) {
+                PD("recvmsg(): got EAGAIN\n");
+
+            } else {
+                PE("recvmsg(): %d\n", ret);
+            }
+            break;
         }
 
         PD("read %d bytes\n", ret);
@@ -228,27 +259,40 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
 {
     struct shim_inet4_flow *priv= flow->priv;
     struct msghdr msghdr;
-    struct iovec iov;
+    struct iovec iov[2];
+    uint16_t lenhdr = htons(rb->len);
+    int totlen = rb->len + sizeof(lenhdr);
     int ret;
 
     memset(&msghdr, 0, sizeof(msghdr));
-    iov.iov_base = RINA_BUF_DATA(rb);
-    iov.iov_len = rb->len;
+    iov[0].iov_base = &lenhdr;
+    iov[0].iov_len = sizeof(lenhdr);
+    iov[1].iov_base = RINA_BUF_DATA(rb);
+    iov[1].iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
-    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 1, rb->len);
-    ret = sock_sendmsg(priv->sock, &msghdr, rb->len);
+    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 2,
+                  totlen);
+    ret = sock_sendmsg(priv->sock, &msghdr, totlen);
 #else
-    msghdr.msg_iov = &iov;
-    msghdr.msg_iovlen = 1;
-    ret = kernel_sendmsg(priv->sock, &msghdr, (struct kvec *)&iov, 1, rb->len);
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = 2;
+    ret = kernel_sendmsg(priv->sock, &msghdr, (struct kvec *)iov, 2,
+                         totlen);
 #endif
 
-    if (unlikely(ret < 0)) {
-        PE("sock_sendmsg() failed [%d]\n", ret);
+    if (unlikely(ret != totlen)) {
+        if (ret < 0) {
+            PE("sock_sendmsg(): failed [%d]\n", ret);
+
+        } else {
+            PI("sock_sendmsg(): partial write %d/%d\n",
+               ret, (int)rb->len);
+        }
+
     } else {
-        PI("successfully sent %d/%d bytes\n", ret, (int)rb->len);
+        PD("sock_sendmsg(): %d, %d\n", (int)rb->len, ret);
     }
 
     rina_buf_free(rb);
