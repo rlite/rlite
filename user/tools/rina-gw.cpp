@@ -54,9 +54,10 @@ InetName::operator std::string() const
 struct RinaName {
     string name_s;
     struct rina_name name_r;
+    string dif_name;
 
     RinaName() { memset(&name_r, 0, sizeof(name_r)); }
-    RinaName(const string& n);
+    RinaName(const string& n, const string& d);
     RinaName(const RinaName& other);
     RinaName& operator=(const RinaName& other);
     ~RinaName() { rina_name_free(&name_r); }
@@ -65,10 +66,10 @@ struct RinaName {
         return name_s < other.name_s;
     }
 
-    operator std::string() const { return name_s; }
+    operator std::string() const { return dif_name + ":" + name_s; }
 };
 
-RinaName::RinaName(const string& n) : name_s(n)
+RinaName::RinaName(const string& n, const string& d) : name_s(n), dif_name(d)
 {
     memset(&name_r, 0, sizeof(name_r));
 
@@ -82,6 +83,7 @@ RinaName::RinaName(const RinaName& other)
     memset(&name_r, 0, sizeof(name_r));
 
     name_s = other.name_s;
+    dif_name = other.dif_name;
     if (rina_name_copy(&name_r, &other.name_r)) {
         throw std::bad_alloc();
     }
@@ -163,7 +165,7 @@ parse_conf(const char *confname)
                 tokens.push_back(token);
             }
 
-            if (tokens.size() < 4) {
+            if (tokens.size() < 5) {
                 if (tokens.size()) {
                     PI("Invalid configuration entry at line %d\n", lines_cnt);
                 }
@@ -173,23 +175,23 @@ parse_conf(const char *confname)
             try {
                 memset(&inet_addr, 0, sizeof(inet_addr));
                 inet_addr.sin_family = AF_INET;
-                inet_addr.sin_port = atoi(tokens[3].c_str());
+                inet_addr.sin_port = atoi(tokens[4].c_str());
                 if (inet_addr.sin_port >= 65536) {
                     PI("Invalid configuration entry at line %d: "
                        "invalid port number '%s'\n", lines_cnt,
-                       tokens[3].c_str());
+                       tokens[4].c_str());
                 }
-                ret = inet_pton(AF_INET, tokens[2].c_str(),
+                ret = inet_pton(AF_INET, tokens[3].c_str(),
                                 &inet_addr.sin_addr);
                 if (ret != 1) {
                     PI("Invalid configuration entry at line %d: "
                        "invalid IP address '%s'\n", lines_cnt,
-                       tokens[2].c_str());
+                       tokens[3].c_str());
                     continue;
                 }
 
                 InetName inet_name(inet_addr);
-                RinaName rina_name(tokens[1]);
+                RinaName rina_name(tokens[2], tokens[1]);
 
                 if (tokens[0] == "SRV") {
                     gw.srv_map.insert(make_pair(inet_name, rina_name));
