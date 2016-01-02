@@ -1,27 +1,31 @@
 KER=`uname -r`
 
-all: userspace kernelspace
+all: usr ker
 
-userspace:
+usr:
 	cd build && make
 
-kernelspace:
+ker:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
 count:
 	find kernel user include -type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" \) | grep -v vmpi | xargs wc -l
 
-clean:
+clean: usr_clean ker_clean
+
+usr_clean:
 	cd build && make clean
+
+ker_clean:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel clean
 
-install: userspace_install kernelspace_install
+install: usr_install ker_install
 
-userspace_install:
+usr_install:
 	cd build && make install
 
 # Install kernelspace parts using a script, instead of placing the command
 # directly in the target, since 'sudo' seems to interact badly with
 # 'make modules_install'
-kernelspace_install:
+ker_install:
 	./install-kernelspace
