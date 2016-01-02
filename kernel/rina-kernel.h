@@ -63,10 +63,20 @@ struct txrx {
     wait_queue_head_t   tx_wqh;
 };
 
+struct dif {
+    char *              name;
+    uint8_t             ty;
+    unsigned int        max_pdu_life;
+    unsigned int        max_pdu_size;
+
+    int refcnt;
+    struct list_head node;
+};
+
 struct ipcp_entry {
     uint16_t            id;    /* Key */
     struct rina_name    name;
-    struct rina_name    dif_name;
+    struct dif          *dif;
     uint8_t             dif_type;
     uint64_t            addr;
     struct ipcp_ops     ops;

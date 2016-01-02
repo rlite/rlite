@@ -95,13 +95,15 @@ struct rina_dm {
 
     struct list_head ipcp_factories;
 
+    struct list_head difs;
+
     /* Lock for flows table. */
     spinlock_t flows_lock;
 
     /* Lock for IPCPs table. */
     spinlock_t ipcps_lock;
 
-    /* Lock for ipcp_factories list. */
+    /* Lock for ipcp_factories list and DIFs. */
     struct mutex factories_lock;
 };
 
@@ -246,6 +248,81 @@ ipcp_remove_work(struct work_struct *w)
     ipcp_put(ipcp);
 }
 
+static struct dif *
+dif_get(const char *dif_name, uint8_t dif_type, int *err)
+{
+    struct dif *cur;
+
+    *err = 0;
+
+    mutex_lock(&rina_dm.factories_lock);
+
+    list_for_each_entry(cur, &rina_dm.difs, node) {
+        if (strcmp(cur->name, dif_name) == 0) {
+            /* A DIF called 'dif_name' already exists. */
+            if (cur->ty == dif_type) {
+                cur->refcnt++;
+            } else {
+                /* DIF type mismatch: report error. */
+                cur = NULL;
+                *err = -EINVAL;
+            }
+            goto out;
+        }
+    }
+
+    /* A DIF called 'dif_name' does not exist yet. */
+    cur = kzalloc(sizeof(*cur), GFP_KERNEL);
+    if (!cur) {
+        *err = -ENOMEM;
+        goto out;
+    }
+
+    cur->name = kstrdup(dif_name, GFP_KERNEL);
+    if (!cur->name) {
+        kfree(cur);
+        cur = NULL;
+        *err = -ENOMEM;
+        goto out;
+    }
+
+    cur->ty = dif_type;
+    cur->max_pdu_size = 8000;
+    cur->max_pdu_life = 10000; /* ms */
+    cur->refcnt = 1;
+    list_add_tail(&cur->node, &rina_dm.difs);
+
+    PD("%s: DIF %s [type %u] created\n", __func__, cur->name, cur->ty);
+
+out:
+    mutex_unlock(&rina_dm.factories_lock);
+
+    return cur;
+}
+
+static void
+dif_put(struct dif *dif)
+{
+    if (!dif) {
+        return;
+    }
+
+    mutex_lock(&rina_dm.factories_lock);
+    dif->refcnt--;
+    if (dif->refcnt) {
+        goto out;
+    }
+
+    PD("%s: DIF %s [type %u] destroyed\n", __func__, dif->name, dif->ty);
+
+    list_del(&dif->node);
+    kfree(dif->name);
+    kfree(dif);
+
+out:
+    mutex_unlock(&rina_dm.factories_lock);
+}
+
 static struct ipcp_entry *
 ipcp_get(unsigned int ipcp_id)
 {
@@ -305,6 +382,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
         entry->dif_type = req->dif_type;
+        entry->dif = NULL;
         entry->addr = 0;
         entry->priv = NULL;
         entry->owner = NULL;
@@ -938,7 +1016,7 @@ ipcp_put(struct ipcp_entry *entry)
     }
 
     rina_name_free(&entry->name);
-    rina_name_free(&entry->dif_name);
+    dif_put(entry->dif);
 
     kfree(entry);
 
@@ -1041,12 +1119,17 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     stop_next = (rina_dm.ipcp_fetch_last == NULL);
     hash_for_each(rina_dm.ipcp_table, bucket, entry, node) {
         if (stop_next) {
+            const char *dif_name = NULL;
+
             resp.end = 0;
             resp.ipcp_id = entry->id;
             resp.dif_type = entry->dif_type;
             resp.ipcp_addr = entry->addr;
             rina_name_copy(&resp.ipcp_name, &entry->name);
-            rina_name_copy(&resp.dif_name, &entry->dif_name);
+            if (entry->dif) {
+                dif_name = entry->dif->name;
+            }
+            rina_name_fill(&resp.dif_name, dif_name, NULL, NULL, NULL);
             rina_dm.ipcp_fetch_last = entry;
             no_next = false;
             break;
@@ -1089,9 +1172,8 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (entry) {
         mutex_lock(&entry->lock);
         if (strcmp(req->name, "dif") == 0) {
-            rina_name_free(&entry->dif_name);
-            rina_name_fill(&entry->dif_name, req->value, NULL, NULL, NULL);
-            ret = 0; /* Report success. */
+            dif_put(entry->dif);
+            entry->dif = dif_get(req->value, entry->dif_type, &ret);
         } else {
             ret = entry->ops.config(entry, req->name, req->value);
         }
@@ -2244,6 +2326,7 @@ rina_ctrl_init(void)
     spin_lock_init(&rina_dm.ipcps_lock);
     rina_dm.ipcp_fetch_last = NULL;
     INIT_LIST_HEAD(&rina_dm.ipcp_factories);
+    INIT_LIST_HEAD(&rina_dm.difs);
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {
