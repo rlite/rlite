@@ -1555,6 +1555,7 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 }
 
 struct rina_io {
+    uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
 };
@@ -1700,30 +1701,17 @@ rina_io_poll(struct file *f, poll_table *wait)
     return 0;
 }
 
+/* To be called under global lock. */
 static long
 rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
     long ret = 0;
 
-    mutex_lock(&rina_dm.lock);
-
-    if (rio->flow) {
-        /* A previous flow was bound to this file descriptor,
-         * so let's unbind from it. */
-        rio->flow->refcnt--;
-        if (rio->flow->upper.ipcp) {
-            rio->flow->upper.ipcp->refcnt--;
-        }
-        rio->flow = NULL;
-        rio->txrx = NULL;
-    }
-
     flow = flow_table_find(info->port_id);
     if (!flow) {
         printk("%s: Error: No such flow\n", __func__);
-        ret = -ENXIO;
-        goto out;
+        return -ENXIO;
     }
 
     /* Bind the flow to this file descriptor. */
@@ -1740,34 +1728,37 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
         ipcp = ipcp_table_find(info->ipcp_id);
         if (!ipcp) {
             printk("%s: Error: No such ipcp\n", __func__);
-            ret = -ENXIO;
-            goto out;
+            return -ENXIO;
         }
         rio->flow->upper.ipcp = ipcp;
         rio->flow->upper.ipcp->refcnt++;
     }
 
-out:
-    mutex_unlock(&rina_dm.lock);
-
     return ret;
 }
 
+/* To be called under global lock. */
 static long
 rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 {
     struct ipcp_entry *ipcp;
     long ret = 0;
 
-    mutex_lock(&rina_dm.lock);
-
     /* Lookup the IPCP to manage. */
     ipcp = ipcp_table_find(info->ipcp_id);
     if (!ipcp) {
-        printk("%s: Error: No such ipcp\n", __func__);
-        ret = -ENXIO;
+        PE("%s: Error: No such ipcp\n", __func__);
+        return -ENXIO;
     }
-    mutex_unlock(&rina_dm.lock);
+
+    rio->txrx = kzalloc(sizeof(*(rio->txrx)), GFP_KERNEL);
+    if (!rio->txrx) {
+        PE("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    txrx_init(rio->txrx, ipcp);
+    ipcp->refcnt++;
 
     return ret;
 }
@@ -1778,6 +1769,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     struct rina_io *rio = (struct rina_io *)f->private_data;
     void __user *argp = (void __user *)arg;
     struct rina_ioctl_info info;
+    long ret = -EINVAL;
 
     /* We have only one command. This should be used and checked. */
     (void) cmd;
@@ -1786,21 +1778,50 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         return -EFAULT;
     }
 
-    switch (info.cmd) {
+    mutex_lock(&rina_dm.lock);
+
+    switch (rio->mode) {
         case RINA_IOCTL_CMD_APPL_BIND:
         case RINA_IOCTL_CMD_IPCP_BIND:
-            return rina_io_ioctl_bind(rio, &info);
+            /* A previous flow was bound to this file descriptor,
+             * so let's unbind from it. */
+            rio->flow->refcnt--;
+            if (rio->flow->upper.ipcp) {
+                rio->flow->upper.ipcp->refcnt--;
+            }
+            rio->flow = NULL;
+            rio->txrx = NULL;
             break;
 
         case RINA_IOCTL_CMD_IPCP_MGMT:
-            return rina_io_ioctl_mgmt(rio, &info);
+            /* A previous IPCP was bound to this management file
+             * descriptor, so let's unbind from it. */
+            rio->txrx->ipcp->refcnt--;
+            kfree(rio->txrx);
+            rio->txrx = NULL;
             break;
 
         default:
+            /* No previous mode, nothing to undo. */
             break;
     }
 
-    return -EINVAL;
+    switch (info.cmd) {
+        case RINA_IOCTL_CMD_APPL_BIND:
+        case RINA_IOCTL_CMD_IPCP_BIND:
+            ret = rina_io_ioctl_bind(rio, &info);
+            break;
+
+        case RINA_IOCTL_CMD_IPCP_MGMT:
+            ret = rina_io_ioctl_mgmt(rio, &info);
+            break;
+    }
+
+    rio->mode = info.cmd;
+
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
 }
 
 static const struct file_operations rina_ipcm_ctrl_fops = {
