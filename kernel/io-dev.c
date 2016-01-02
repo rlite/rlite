@@ -39,6 +39,49 @@
 #include <linux/spinlock.h>
 
 
+void
+tx_completion_func(unsigned long arg)
+{
+    struct ipcp_entry *ipcp= (struct ipcp_entry *)arg;
+
+    for (;;) {
+        struct rlite_buf *rb;
+        int ret;
+
+        spin_lock_bh(&ipcp->rmtq_lock);
+        if (ipcp->rmtq_len == 0) {
+            spin_unlock_bh(&ipcp->rmtq_lock);
+            break;
+        }
+
+        rb = list_first_entry(&ipcp->rmtq, struct rlite_buf, node);
+        list_del(&rb->node);
+        ipcp->rmtq_len--;
+        spin_unlock_bh(&ipcp->rmtq_lock);
+
+        PD("Sending [%lu] from rmtq\n",
+                (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
+
+        BUG_ON(!rb->tx_compl_flow);
+        ret = ipcp->ops.sdu_write(ipcp, rb->tx_compl_flow, rb, false);
+        if (unlikely(ret == -EAGAIN)) {
+            PD("Pushing [%lu] back to rmtq\n",
+                    (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
+            spin_lock_bh(&ipcp->rmtq_lock);
+            list_add_tail(&rb->node, &ipcp->rmtq);
+            ipcp->rmtq_len++;
+            spin_unlock_bh(&ipcp->rmtq_lock);
+            break;
+        }
+    }
+#if 0
+    if (drained) {
+        wake_up_interruptible_poll(flow->txrx.tx_wqh, POLLOUT |
+                                   POLLWRBAND | POLLWRNORM);
+    }
+#endif
+}
+
 /* Userspace queue threshold. */
 #define USR_Q_TH        128
 
