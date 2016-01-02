@@ -1,7 +1,7 @@
 #ifndef __RINA_SERDES_H__
 #define __RINA_SERDES_H__
 
-#include <rinalite/rinalite-common.h>
+#include <rinalite/common.h>
 
 #ifdef __cplusplus
 extern "C" {

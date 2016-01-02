@@ -12,9 +12,9 @@
 #include <signal.h>
 #include <assert.h>
 #include <sys/eventfd.h>
-#include "rinalite/rina-kernel-msg.h"
-#include "rinalite/rina-conf-msg.h"
-#include "rinalite/rinalite-utils.h"
+#include "rinalite/kernel-msg.h"
+#include "rinalite/conf-msg.h"
+#include "rinalite/utils.h"
 
 #include "pending_queue.h"
 #include "rinalite-evloop.h"

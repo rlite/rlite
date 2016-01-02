@@ -1,7 +1,7 @@
 #ifndef __RINALITE_KERNEL_H__
 #define __RINALITE_KERNEL_H__
 
-#include <rinalite/rinalite-utils.h>
+#include <rinalite/utils.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>

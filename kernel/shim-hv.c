@@ -20,7 +20,7 @@
 
 #include <linux/types.h>
 #include <linux/string.h>
-#include <rinalite/rinalite-utils.h>
+#include <rinalite/utils.h>
 #include <vmpi-provider.h>
 #include "rinalite-kernel.h"
 #include "shim-hv-msg.h"

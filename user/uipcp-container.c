@@ -4,8 +4,8 @@
 #include <errno.h>
 #include <string.h>
 
-#include "rinalite/rinalite-utils.h"
-#include "rinalite/rina-conf-msg.h"
+#include "rinalite/utils.h"
+#include "rinalite/conf-msg.h"
 
 #include "uipcp-container.h"
 

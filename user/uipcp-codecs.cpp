@@ -3,8 +3,8 @@
 #include <string>
 #include <sstream>
 
-#include "rinalite/rinalite-common.h"
-#include "rinalite/rinalite-utils.h"
+#include "rinalite/common.h"
+#include "rinalite/utils.h"
 
 #include "uipcp-codecs.hpp"
 

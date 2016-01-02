@@ -19,8 +19,8 @@
  */
 
 #include <linux/types.h>
-#include <rinalite/rina-kernel-msg.h>
-#include <rinalite/rinalite-utils.h>
+#include <rinalite/kernel-msg.h>
+#include <rinalite/utils.h>
 #include "rinalite-kernel.h"
 #include "rinalite-bufs.h"
 

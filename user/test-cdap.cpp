@@ -10,7 +10,7 @@
 #include <arpa/inet.h>  /* IP address conversion stuff */
 
 #include "cdap.hpp"
-#include "rinalite/rinalite-utils.h"
+#include "rinalite/utils.h"
 
 using namespace std;
 

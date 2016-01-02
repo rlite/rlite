@@ -1,4 +1,4 @@
-#include "rinalite/rinalite-utils.h"
+#include "rinalite/utils.h"
 
 #ifdef __KERNEL__
 

@@ -1,7 +1,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include "rinalite-bufs.h"
-#include <rinalite/rinalite-common.h>
+#include <rinalite/common.h>
 
 
 struct rina_buf *

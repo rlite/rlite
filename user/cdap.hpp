@@ -4,7 +4,7 @@
 #include <string>
 #include <set>
 
-#include "rinalite/rinalite-common.h"
+#include "rinalite/common.h"
 #include "CDAP.pb.h"
 
 

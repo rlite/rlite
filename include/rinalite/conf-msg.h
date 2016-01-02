@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include <rinalite/rinalite-common.h>
-#include <rinalite/rinalite-utils.h>
+#include <rinalite/common.h>
+#include <rinalite/utils.h>
 
 
 /* Message types. They **must** be listed alternating requests with
@@ -27,7 +27,7 @@ enum {
 
 extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX];
 
-/* The same message layout restrictions reported in rina-kernel-msg.h
+/* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
 
 /* rinaconf --> uipcps message to register an IPC process

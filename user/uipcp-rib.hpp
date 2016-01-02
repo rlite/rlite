@@ -5,9 +5,9 @@
 #include <map>
 #include <list>
 
-#include "rinalite/rinalite-common.h"
-#include "rinalite/rinalite-utils.h"
-#include "rinalite/rina-conf-msg.h"
+#include "rinalite/common.h"
+#include "rinalite/utils.h"
+#include "rinalite/conf-msg.h"
 #include "rinalite-appl.h"
 #include "rinalite-conf.h"
 
