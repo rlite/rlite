@@ -11,7 +11,7 @@
 #include <poll.h>
 
 #include "rlite/utils.h"
-#include "rlite/evloop.h"
+#include "rlite/rlite.h"
 
 
 #define SDU_SIZE_MAX    65535

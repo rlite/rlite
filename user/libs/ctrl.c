@@ -19,7 +19,7 @@
 #include "rlite/utils.h"
 
 #include "pending_queue.h"
-#include "rlite/ctrl.h"
+#include "rlite/rlite.h"
 
 
 static void

@@ -9,7 +9,7 @@
 #include "rlite/utils.h"
 
 #include "list.h"
-#include "ctrl.h"
+#include "rlite.h"
 
 
 #ifdef __cplusplus
