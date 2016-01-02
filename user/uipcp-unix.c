@@ -126,6 +126,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
     if (result == 0) {
         /* Track the (un)registration in the persistent registration list. */
         track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
+        rib_ipcp_register(uipcp->rib, reg, dif_name);
     }
 
     return result;

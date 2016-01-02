@@ -48,7 +48,7 @@ struct Neighbor {
     enum {
         NONE = 0,
         I_CONNECT_SENT,
-        S_CONNECT_RCVD,
+        S_CONNECT_R_SENT,
         ENROLLMENT_STATE_LAST,
     } enrollment_state;
 
@@ -66,6 +66,7 @@ struct Neighbor {
     /* Enrollment state machine handlers. */
     int none(const CDAPMessage *rm);
     int i_connect_sent(const CDAPMessage *rm);
+    int s_connect_r_sent(const CDAPMessage *rm);
 };
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
@@ -108,6 +109,9 @@ struct uipcp_rib {
     struct uipcp *uipcp;
 
     map< string, rib_handler_t > handlers;
+
+    /* Lower DIFs. */
+    list< string > lower_difs;
 
     /* Neighbors. */
     list< Neighbor > neighbors;
@@ -274,7 +278,7 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
-        enrollment_state = S_CONNECT_RCVD;
+        enrollment_state = S_CONNECT_R_SENT;
     }
 
     return send_to_port_id(&m, NULL);
@@ -291,7 +295,20 @@ Neighbor::i_connect_sent(const CDAPMessage *rm)
     m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
               0, 0, string());
 
+    enr_info.lower_difs = rib->lower_difs;
+
     return send_to_port_id(&m, &enr_info);
+}
+
+int
+Neighbor::s_connect_r_sent(const CDAPMessage *rm)
+{
+    if (rm->op_code != gpb::M_START) {
+        PE("%s: M_START expected\n", __func__);
+        return 0;
+    }
+
+    //TODO decode EnrollmentInfo
 }
 
 int
@@ -481,3 +498,42 @@ rib_application_register(struct uipcp_rib *rib, int reg,
 
     return 0;
 }
+
+extern "C" int
+rib_ipcp_register(struct uipcp_rib *rib, int reg,
+                  const struct rina_name *lower_dif)
+{
+    list<string>::iterator lit;
+    string name;
+
+    if (!rina_name_valid(lower_dif)) {
+        PE("%s: lower_dif name is not valid\n", __func__);
+        return -1;
+    }
+
+    name = string(lower_dif->apn);
+    for (lit = rib->lower_difs.begin(); lit != rib->lower_difs.end(); lit++) {
+        if (*lit == name) {
+            break;
+        }
+    }
+
+    if (reg) {
+        if (lit != rib->lower_difs.end()) {
+            PE("%s: DIF %s already registered\n", __func__, name.c_str());
+            return -1;
+        }
+
+        rib->lower_difs.push_back(name);
+
+    } else {
+        if (lit == rib->lower_difs.end()) {
+            PE("%s: DIF %s not registered\n", __func__, name.c_str());
+            return -1;
+        }
+        rib->lower_difs.erase(lit);
+    }
+
+    return 0;
+}
+

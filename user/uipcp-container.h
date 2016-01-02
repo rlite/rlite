@@ -85,6 +85,9 @@ int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req);
 int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                   char *serbuf, int serlen);
 
+int rib_ipcp_register(struct uipcp_rib *rib, int reg,
+                      const struct rina_name *lower_dif);
+
 #ifdef __cplusplus
 }
 #endif
