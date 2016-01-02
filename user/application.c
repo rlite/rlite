@@ -11,8 +11,27 @@
 #include <sys/un.h>
 #include <signal.h>
 
+#include <rina/rina-application-msg.h>
+
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
+
+static int application_register(int sfd)
+{
+    struct rina_amsg_register msg;
+
+    msg.msg_type = RINA_APPL_REGISTER;
+    msg.event_id = 0;
+
+    (void) msg;
+
+    return 0;
+}
+
+static int application_unregister(int sfd)
+{
+    return 0;
+}
 
 static void
 sigint_handler(int signum)
@@ -61,6 +80,9 @@ int main()
     }
 
     printf("Connected\n");
+
+    application_register(sfd);
+    application_unregister(sfd);
 
     close(sfd);
 

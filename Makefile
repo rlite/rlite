@@ -18,7 +18,7 @@ user/ipcm.o:  $(HEADERS) user/pending_queue.h
 
 user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
-user/application: user/application.o
+user/application: user/application.o user/rina-application-numtables.o user/rina-utils.o
 
 user/rina-utils.o: $(HEADERS)
 

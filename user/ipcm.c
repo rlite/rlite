@@ -278,16 +278,6 @@ free_entry:
     return NULL;
 }
 
-static void
-rina_name_fill(struct rina_name *name, char *apn,
-               char *api, char *aen, char *aei)
-{
-    name->apn = apn ? strdup(apn) : NULL;
-    name->api = api ? strdup(api) : NULL;
-    name->aen = aen ? strdup(aen) : NULL;
-    name->aei = aei ? strdup(aei) : NULL;
-}
-
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 static int
