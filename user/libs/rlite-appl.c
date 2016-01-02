@@ -232,7 +232,7 @@ rl_appl_register_wait(struct rlite_appl *appl, int reg,
                          unsigned int wait_ms)
 {
     struct rl_kmsg_appl_register_resp *resp;
-    uint32_t event_id = rl_evloop_get_id(&appl->loop);
+    uint32_t event_id = rl_ctrl_get_id(&appl->loop.ctrl);
     int ret = 0;
 
     resp = rl_appl_register(appl, event_id, wait_ms, reg, dif_name,
@@ -391,7 +391,7 @@ rl_appl_flow_alloc_open(struct rlite_appl *appl,
         return -1;
     }
 
-    event_id = rl_evloop_get_id(&appl->loop);
+    event_id = rl_ctrl_get_id(&appl->loop.ctrl);
 
     ret = rl_appl_flow_alloc(appl, event_id, dif_name, ipcp_name,
                               local_appl, remote_appl, flowspec, 0xffff,

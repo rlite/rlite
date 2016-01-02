@@ -53,6 +53,8 @@ struct rlite_ctrl {
     /* Lock to be used with ipcps list. */
     pthread_mutex_t lock;
 
+    /* What event-id to use for the next request issued to the kernel. */
+    uint32_t event_id_counter;
 };
 
 struct rlite_evloop;
@@ -82,9 +84,6 @@ struct rlite_evloop {
 
     /* Table containing the kernel handlers. */
     rlite_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
-
-    /* What event-id to use for the next request issued to the kernel. */
-    uint32_t event_id_counter;
 
     /* Synchronization variables used to implement mutual exclusion between the
      * event-loop thread and the user thead. */
@@ -163,7 +162,7 @@ int
 rlite_flows_fetch(struct rlite_evloop *loop);
 
 uint32_t
-rl_evloop_get_id(struct rlite_evloop *loop);
+rl_ctrl_get_id(struct rlite_ctrl *loop);
 
 int
 rlite_ipcps_print(struct rlite_ctrl *ctrl);

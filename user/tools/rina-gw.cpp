@@ -653,7 +653,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     }
 
     strcpy(flowspec.cubename, "rel");
-    event_id = rl_evloop_get_id(loop);
+    event_id = rl_ctrl_get_id(&loop->ctrl);
 
     /* Issue a non-blocking flow allocation request. */
     ret = rl_appl_flow_alloc(appl, event_id, mit->second.dif_name_s.c_str(),

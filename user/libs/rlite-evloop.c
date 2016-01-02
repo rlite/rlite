@@ -214,16 +214,16 @@ barrier_resp(struct rlite_evloop *loop,
 }
 
 uint32_t
-rl_evloop_get_id(struct rlite_evloop *loop)
+rl_ctrl_get_id(struct rlite_ctrl *ctrl)
 {
     uint32_t ret;
 
-    pthread_mutex_lock(&loop->lock);
-    if (++loop->event_id_counter == (1 << 30)) {
-        loop->event_id_counter = 1;
+    pthread_mutex_lock(&ctrl->lock);
+    if (++ctrl->event_id_counter == (1 << 30)) {
+        ctrl->event_id_counter = 1;
     }
-    ret = loop->event_id_counter;
-    pthread_mutex_unlock(&loop->lock);
+    ret = ctrl->event_id_counter;
+    pthread_mutex_unlock(&ctrl->lock);
 
     return ret;
 }
@@ -243,7 +243,7 @@ flow_fetch(struct rlite_evloop *loop, int *result)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RLITE_KER_FLOW_FETCH;
-    msg->event_id = rl_evloop_get_id(loop);
+    msg->event_id = rl_ctrl_get_id(&loop->ctrl);
 
     NPD("Requesting IPC processes fetch...\n");
 
@@ -773,7 +773,7 @@ rl_evloop_barrier(struct rlite_evloop *loop)
     memset(msg, 0, sizeof(*msg));
 
     msg->msg_type = RLITE_KER_BARRIER;
-    msg->event_id = rl_evloop_get_id(loop);
+    msg->event_id = rl_ctrl_get_id(&loop->ctrl);
 
     msg = rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, &result);
 
@@ -803,7 +803,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
         memset(loop->handlers, 0, sizeof(loop->handlers));
     }
     pthread_mutex_init(&loop->lock, NULL);
-    loop->event_id_counter = 1;
     loop->flows= &loop->flows_lists[0];
     loop->flows_next = &loop->flows_lists[1];
     list_init(loop->flows);
@@ -1270,6 +1269,7 @@ rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
     list_init(&ctrl->pqueue);
     list_init(&ctrl->ipcps);
     pthread_mutex_init(&ctrl->lock, NULL);
+    ctrl->event_id_counter = 1;
 
     /* Open the RLITE control device. */
     ctrl->rfd = open(dev, O_RDWR);
@@ -1324,8 +1324,9 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
         return -1;
     }
 
-    ret = rl_fa_req_fill(&req, 0, rlite_ipcp->ipcp_id, dif_name, ipcp_name,
-                         local_appl, remote_appl, flowspec, 0xffff);
+    ret = rl_fa_req_fill(&req, rl_ctrl_get_id(ctrl), rlite_ipcp->ipcp_id,
+                         dif_name, ipcp_name, local_appl, remote_appl,
+                         flowspec, 0xffff);
     if (ret) {
         PE("Failed to fill flow allocation request\n");
         return -1;

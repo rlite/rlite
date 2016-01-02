@@ -164,7 +164,7 @@ rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RLITE_KER_IPCP_CREATE;
-    msg->event_id = rl_evloop_get_id(&rc->loop);
+    msg->event_id = rl_ctrl_get_id(&rc->loop.ctrl);
     rina_name_copy(&msg->name, name);
     msg->dif_type = strdup(dif_type);
     msg->dif_name = strdup(dif_name);

@@ -878,7 +878,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         }
     }
 
-    event_id = rl_evloop_get_id(&rib->uipcp->appl.loop);
+    event_id = rl_ctrl_get_id(&rib->uipcp->appl.loop.ctrl);
 
     /* Allocate a flow for the enrollment. */
     ret = rl_appl_flow_alloc(&rib->uipcp->appl, event_id, supp_dif_name, NULL,
