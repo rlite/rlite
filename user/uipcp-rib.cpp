@@ -326,6 +326,7 @@ Neighbor::abort()
 
     if (conn) {
         delete conn;
+        conn = NULL;
     }
 
     return;
@@ -429,6 +430,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
      * (4) S --> I: M_START_R
      * (5) S --> I: M_CREATE
      * (6) S --> I: M_STOP */
+    struct rinalite_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool has_address;
@@ -472,11 +474,48 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         /* Send DIF static information. */
     }
 
-    /* Send DIF dynamic information.
-     * (1) Neighbors
-     * (2) DFT
-     */
+    /* Send my neighbors, including a neighbor representing
+     * myself. */
+    NeighborCandidateList ncl;
+    NeighborCandidate cand;
+    RinaName cand_name;
 
+    for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
+                        neigh != rib->neighbors.end(); neigh++) {
+        cand = NeighborCandidate();
+        cand_name = RinaName(&neigh->ipcp_name);
+
+        cand.apn = cand_name.apn;
+        cand.api = cand_name.api;
+        cand.address = neigh->address;
+        cand.lower_difs = neigh->lower_difs;
+
+        ncl.candidates.push_back(cand);
+    }
+
+    ipcp = rinalite_lookup_ipcp_by_id(&rib->uipcp->appl.loop, rib->uipcp->ipcp_id);
+    assert(ipcp);
+    cand = NeighborCandidate();
+    cand_name = RinaName(&ipcp->ipcp_name);
+    cand.apn = cand_name.apn;
+    cand.api = cand_name.api;
+    cand.address = ipcp->ipcp_addr;
+    cand.lower_difs = rib->lower_difs;
+    ncl.candidates.push_back(cand);
+
+    m = CDAPMessage();
+    m.m_create(gpb::F_NO_FLAGS, obj_class::neighbors, obj_name::neighbors,
+               0, 0, string());
+    ret = send_to_port_id(&m, 0, &ncl);
+    if (ret) {
+        PE("send_to_port_id() failed\n");
+        abort();
+        return 0;
+    }
+
+    /* Send my DFT. */
+
+    /* Stop the enrollment. */
     enr_info.start_early = true;
 
     m = CDAPMessage();
@@ -536,6 +575,12 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     size_t objlen;
     CDAPMessage m;
     int ret;
+
+    /* Here M_CREATE messages from the slave are accepted and
+     * dispatched to the rib. */
+    if (rm->op_code == gpb::M_CREATE) {
+        return rib->cdap_dispatch(rm);
+    }
 
     if (rm->op_code != gpb::M_STOP) {
         PE("M_STOP expected\n");
