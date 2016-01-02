@@ -1145,7 +1145,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 
     pthread_mutex_lock(&rib->lock);
 
-    neigh = rib->get_neighbor(&req->neigh_ipcp_name, true);
+    neigh = rib->get_neighbor(&req->neigh_name, true);
     if (!neigh) {
         UPE(uipcp, "Failed to add neighbor\n");
         pthread_mutex_unlock(&rib->lock);

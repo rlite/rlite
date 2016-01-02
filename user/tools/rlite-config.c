@@ -282,7 +282,7 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
     req.msg_type = RLITE_CFG_IPCP_ENROLL;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
-    rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
+    rina_name_fill(&req.neigh_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     req.supp_dif_name = strdup(supp_dif_name);
 
     return request_response(RLITE_MB(&req), NULL);

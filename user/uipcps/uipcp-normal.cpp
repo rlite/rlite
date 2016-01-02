@@ -761,29 +761,28 @@ normal_fini(struct uipcp *uipcp)
 }
 
 static int
-normal_register_to_lower(struct uipcp *uipcp, int reg,
-                         const char *lower_dif,
-                         const struct rina_name *ipcp_name)
+normal_register_to_lower(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_register *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int ret;
 
     /* Perform the registration. */
-    ret = rl_evloop_register(&uipcp->loop, reg, lower_dif,
-                             NULL, ipcp_name, 2000);
+    ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
+                             NULL, &req->ipcp_name, 2000);
 
     if (ret) {
         return ret;
     }
 
-    if (!lower_dif) {
-        UPE(uipcp, "lower_dif name is not specified\n");
+    if (!req->dif_name) {
+        UPE(uipcp, "lower DIF name is not specified\n");
         return -1;
     }
 
     ScopeLock(rib->lock);
 
-    ret = rib->register_to_lower(reg, string(lower_dif));
+    ret = rib->register_to_lower(req->reg, string(req->dif_name));
 
     return ret;
 }

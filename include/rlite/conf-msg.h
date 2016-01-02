@@ -45,7 +45,7 @@ struct rl_cmsg_ipcp_enroll {
     uint32_t event_id;
 
     struct rina_name ipcp_name;
-    struct rina_name neigh_ipcp_name;
+    struct rina_name neigh_name;
     char *dif_name;
     char *supp_dif_name;
 } __attribute__((packed));
