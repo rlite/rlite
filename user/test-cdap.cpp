@@ -52,6 +52,8 @@ struct CDAPMessage {
 
     bool is(obj_value_t tt) const { return obj_value.ty == tt; }
 
+    void print() const;
+
     CDAPMessage(gpb::opCode_t);
 
     CDAPMessage(const gpb::CDAPMessage& gm);
@@ -248,6 +250,77 @@ CDAPMessage::operator gpb::CDAPMessage() const
     return gm;
 }
 
+void CDAPMessage::print() const
+{
+    char *name;
+
+    PD("CDAP Message {\n");
+    PD("    abs_syntax: %d\n", abs_syntax);
+    PD("    op_code: %d\n", op_code);
+    PD("    invoke_id: %d\n", invoke_id);
+    PD("    flags: %04x\n", flags);
+    PD("    obj_class: %s\n", obj_class.c_str());
+    PD("    obj_name: %s\n", obj_name.c_str());
+    PD("    obj_inst: %ld\n", obj_inst);
+
+    /* Print object value. */
+    switch (obj_value.ty) {
+        case I32:
+            PD("    obj_value: %d\n", obj_value.u.i32);
+            break;
+
+        case I64:
+            PD("    obj_value: %lld\n", (long long)obj_value.u.i64);
+            break;
+
+        case STRING:
+            PD("    obj_value: %s\n", obj_value.str.c_str());
+            break;
+
+        case FLOAT:
+            PD("    obj_value: %f\n", obj_value.u.fp_single);
+            break;
+
+        case DOUBLE:
+            PD("    obj_value: %f\n", obj_value.u.fp_double);
+            break;
+
+        case BOOL:
+            PD("    obj_value: %s\n", (obj_value.u.boolean ? "true" : "false"));
+            break;
+
+        case BYTES:
+            PD("    obj_value: %s\n", obj_value.str.c_str());
+            break;
+    }
+
+
+    PD("    result: %d\n", result);
+    PD("    scope: %d\n", scope);
+    PD("    filter: %s\n", filter.c_str());
+
+    PD("    auth_mech: %d\n", auth_mech);
+
+    PD("    auth_value: name='%s' pwd='%s' other='%s'\n",
+                auth_value.name.c_str(), auth_value.password.c_str(),
+                auth_value.other.c_str());
+
+    name = rina_name_to_string(&dst_appl);
+    PD("    dst_appl: %s\n", name);
+    if (name) {
+        free(name);
+    }
+
+    name = rina_name_to_string(&src_appl);
+    PD("    src_appl: %s\n", name);
+    if (name) {
+        free(name);
+    }
+
+    PD("    result_reason: %s\n", result_reason.c_str());
+    PD("    version: %ld\n", version);
+}
+
 int
 cdap_msg_send(const struct CDAPMessage *m, int fd)
 {
@@ -362,6 +435,7 @@ test_cdap_server(int port)
         }
 
         PD("%s: CDAP message received\n", __func__);
+        m->print();
     }
 
     return 0;
@@ -393,6 +467,9 @@ test_cdap_client(int port)
     if (cdap_msg_send(&m, sk)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
+
+    PD("CDAP message sent\n");
+    m.print();
 
     close(sk);
 
