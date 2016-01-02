@@ -278,15 +278,24 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
                          const struct rina_name *appl_name)
 {
     struct rina_kmsg_appl_register_resp *resp;
+    int ret = 0;
 
     resp = rlite_appl_register(application, ~0U, reg, dif_name, fallback,
                                ipcp_name, appl_name);
 
-    if (!resp || resp->response != RLITE_SUCC) {
+    if (!resp) {
         return -1;
     }
 
-    return 0;
+    if (resp->response != RLITE_SUCC) {
+        ret = -1;
+    }
+
+    rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                  RINALITE_RMB(resp));
+    free(resp);
+
+    return ret;
 }
 
 int
@@ -328,6 +337,7 @@ rlite_flow_allocate(struct rlite_appl *application,
     *port_id = kresp->port_id;
     rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                   RINALITE_RMB(kresp));
+    free(kresp);
 
     return result;
 }

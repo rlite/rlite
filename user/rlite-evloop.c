@@ -145,6 +145,7 @@ rlite_ipcps_fetch(struct rlite_evloop *loop)
             end = resp->end;
             rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                           RINALITE_RMB(resp));
+            free(resp);
         }
     }
 
@@ -348,6 +349,9 @@ evloop_function(void *arg)
                 !loop->handlers[resp->msg_type]) {
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                          RINALITE_RMB(resp));
+            free(resp);
             continue;
         }
 
@@ -359,6 +363,9 @@ evloop_function(void *arg)
                 PE("Error while handling message type [%d]\n",
                                         resp->msg_type);
             }
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                          RINALITE_RMB(resp));
+            free(resp);
             continue;
         }
 
@@ -371,6 +378,9 @@ evloop_function(void *arg)
         if (!req_entry) {
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                          RINALITE_RMB(resp));
+            free(resp);
             continue;
         }
 
@@ -403,9 +413,11 @@ notify_requestor:
              * and the response message. */
             rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                           req_entry->msg);
+            free(req_entry->msg);
             free(req_entry);
             rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                           RINALITE_RMB(resp));
+            free(resp);
         }
         pthread_mutex_unlock(&loop->lock);
     }

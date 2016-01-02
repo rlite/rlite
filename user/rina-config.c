@@ -226,6 +226,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
     if (kresp) {
         rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                       RINALITE_RMB(kresp));
+        free(kresp);
     }
 
     return result;
