@@ -48,10 +48,6 @@ struct Neighbor {
     CDAPConn *conn;
     struct uipcp_rib *rib;
 
-    /* Information about the neighbor. */
-    list< string > lower_difs; // XXX deprecated
-    uint64_t address; // XXX deprecated
-
     enum state_t {
         NONE = 0,
         I_WAIT_CONNECT_R,
@@ -536,7 +532,6 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     enroll_fsm_handlers[I_WAIT_STOP] = &Neighbor::i_wait_stop;
     enroll_fsm_handlers[I_WAIT_START] = &Neighbor::i_wait_start;
     enroll_fsm_handlers[ENROLLED] = &Neighbor::enrolled;
-    address = 0;
 }
 
 Neighbor::Neighbor(const Neighbor& other)
@@ -549,7 +544,6 @@ Neighbor::Neighbor(const Neighbor& other)
     conn = NULL;
     memcpy(enroll_fsm_handlers, other.enroll_fsm_handlers,
            sizeof(enroll_fsm_handlers));
-    address = other.address;
 }
 
 Neighbor::~Neighbor()
@@ -783,13 +777,11 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     EnrollmentInfo enr_info(objbuf, objlen);
     CDAPMessage m;
 
-    lower_difs = enr_info.lower_difs;
-
     has_address = (enr_info.address != 0);
 
     if (!has_address) {
         /* Assign an address to the initiator. */
-        enr_info.address = address = rib->address_allocate();
+        enr_info.address = rib->address_allocate();
     }
 
     /* Add the initiator to the set of candidate neighbors. */
@@ -819,17 +811,10 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
      * myself. */
     NeighborCandidateList ncl;
 
-    for (list<Neighbor>::iterator neigh = rib->neighbors.begin();
-                        neigh != rib->neighbors.end(); neigh++) {
-        cand = NeighborCandidate();
-        cand_name = RinaName(&neigh->ipcp_name);
-
-        cand.apn = cand_name.apn;
-        cand.api = cand_name.api;
-        cand.address = neigh->address;
-        cand.lower_difs = neigh->lower_difs;
-
-        ncl.candidates.push_back(cand);
+    for (map<string, NeighborCandidate>::iterator cit =
+                rib->cand_neighbors.begin();
+                        cit != rib->cand_neighbors.end(); cit++) {
+        ncl.candidates.push_back(cit->second);
     }
 
     ipcp = rib->ipcp_info();
@@ -911,7 +896,7 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     /* The slave may have specified an address for us. */
     if (enr_info.address) {
-        address = enr_info.address;
+        // TODO push address to kernel
     }
 
     enrollment_state = I_WAIT_STOP;

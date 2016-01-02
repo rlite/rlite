@@ -24,3 +24,8 @@
 
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
 
+- CDAP: supportare un semplice meccanismo di ritrasmissione, in caso la
+  connessione CDAP sia supportata da un flusso non affidabile
+
+- enrollment: gestire tutti i casi in cui una risposta CDAP riporti un
+  risultato negativo
