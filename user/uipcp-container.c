@@ -5,7 +5,7 @@
 #include <string.h>
 #include "rina/rina-utils.h"
 #include "rina/rina-conf-msg.h"
-#include "uipcp-server.h"
+#include "uipcp-container.h"
 
 
 #define MGMTBUF_SIZE_MAX 2048

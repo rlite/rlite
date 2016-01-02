@@ -125,7 +125,7 @@ for i in vms:
             'sudo mkdir -p /var/rina\n'\
             'sudo chmod -R a+rw /var/rina\n'\
             '\n'\
-            'uipcp-server &> uipcp.log &\n'\
+            'uipcps &> uipcp.log &\n'\
             'rina-config ipcp-create normal n.IPCP %(id)s\n'\
             'rina-config ipcp-config n.IPCP %(id)s dif n.DIF\n'\
             'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\

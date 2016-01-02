@@ -20,7 +20,7 @@
 #include "helpers.h"
 #include "evloop.h"
 #include "application.h"
-#include "uipcp-server.h"
+#include "uipcp-container.h"
 
 
 struct registered_ipcp {

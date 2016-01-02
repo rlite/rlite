@@ -6,7 +6,7 @@
 #include "application.h"
 
 
-/* IPC Manager data model. */
+/* User IPCP data model. */
 struct uipcps {
     /* Unix domain socket file descriptor used to accept request from
      * applications. */

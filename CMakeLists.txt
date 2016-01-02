@@ -17,13 +17,13 @@ add_library(rinalite SHARED user/rina-utils.c user/rina-kernel-numtables.c user/
 target_link_libraries(rinalite pthread)
 
 add_executable(rinaperf user/rinaperf.c)
-add_executable(uipcp-server user/uipcp.c user/uipcp-server.c)
+add_executable(uipcps user/uipcp-container.c user/uipcp-unix.c)
 add_executable(rina-config user/rina-config.c)
 
 target_link_libraries(rinaperf rinalite)
-target_link_libraries(uipcp-server rinalite)
+target_link_libraries(uipcps rinalite)
 target_link_libraries(rina-config rinalite)
 
-install(TARGETS rinaperf uipcp-server rina-config DESTINATION usr/bin)
+install(TARGETS rinaperf uipcps rina-config DESTINATION usr/bin)
 install(TARGETS rinalite DESTINATION usr/lib)
 install(FILES ${RINA_HEADERS} DESTINATION include/rina)
