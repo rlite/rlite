@@ -8,7 +8,6 @@
 #include "rinalite/rina-conf-msg.h"
 
 #include "uipcp-container.h"
-#include "uipcp-rib.h"
 
 
 #define MGMTBUF_SIZE_MAX 2048
@@ -84,7 +83,7 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
 
     /* Exchange IPCP addresses. */
     ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
+                                          &local_addr);
     assert(!ret);
     local_addr = htole64(local_addr);
 
@@ -552,14 +551,8 @@ uipcp_application_register(struct rinalite_evloop *loop,
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_application_register *req =
                 (struct rina_kmsg_application_register *)b_resp;
-    char *name_s = rina_name_to_string(&req->application_name);
 
-    PD("%s: Application %s %sregistered from IPCP %d\n", __func__, name_s,
-            req->reg ? "" : "un", req->ipcp_id);
-
-    if (name_s) {
-        free(name_s);
-    }
+    rib_application_register(uipcp->rib, req->reg, &req->application_name);
 
     return 0;
 }
@@ -679,7 +672,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     list_init(&uipcp->dft);
     list_init(&uipcp->enrolled_neighbors);
 
-    uipcp->rib = rib_create();
+    uipcp->rib = rib_create(uipcp);
     if (!uipcp->rib) {
         goto err0;
     }

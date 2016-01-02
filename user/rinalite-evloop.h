@@ -11,6 +11,10 @@
 #include "rinalite-list.h"
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct rinalite_ipcp {
     /* IPCP attributes. */
     unsigned int ipcp_id;
@@ -116,6 +120,10 @@ rinalite_lookup_ipcp_by_name(struct rinalite_evloop *loop,
 
 int
 rinalite_lookup_ipcp_addr_by_id(struct rinalite_evloop *loop, unsigned int id,
-                       uint64_t *addr);
+                                uint64_t *addr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* __RINALITE_EVLOOP_H__ */

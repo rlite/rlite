@@ -5,8 +5,9 @@
 #include "rinalite-list.h"
 #include "rinalite-appl.h"
 
-#include "uipcp-rib.h"
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* User IPCP data model. */
 struct uipcps {
@@ -62,5 +63,16 @@ int uipcps_fetch(struct uipcps *uipcps);
 int uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
                   uint64_t remote_addr);
 int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
+
+/* uipcp RIB definitions */
+struct uipcp_rib *rib_create(struct uipcp *uipcp);
+void rib_destroy(struct uipcp_rib *rib);
+
+int rib_application_register(struct uipcp_rib *rib, int reg,
+                             const struct rina_name *appl_name);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __RINA_UIPCP_H__ */
