@@ -74,6 +74,7 @@ struct rlite_shim_eth {
     char *upper_name_s;
     struct list_head arp_table;
     spinlock_t arpt_lock;
+    spinlock_t tx_lock;
     struct timer_list arp_resolver_tmr;
     bool arp_tmr_shutdown;
 };
@@ -97,6 +98,7 @@ rlite_shim_eth_create(struct ipcp_entry *ipcp)
     priv->upper_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
+    spin_lock_init(&priv->tx_lock);
     init_timer(&priv->arp_resolver_tmr);
     priv->arp_resolver_tmr.function = arp_resolver_cb;
     priv->arp_resolver_tmr.data = (unsigned long)priv;
@@ -787,14 +789,14 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     struct flow_entry *flow = (struct flow_entry *)
                               (skb_shinfo(skb)->destructor_arg);
     struct rlite_shim_eth *priv = flow->txrx.ipcp->priv;
+    bool notify;
 
-    rmb();
-
+    spin_lock(&priv->tx_lock);
     priv->ntp++;
+    notify = priv->tx_notify_enable;
+    spin_unlock(&priv->tx_lock);
 
-    wmb();
-
-    if (priv->tx_notify_enable) {
+    if (notify) {
         rlite_write_restart_flow(flow);
     }
 }
@@ -818,23 +820,22 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         return -EINVAL;
     }
 
-    rmb();
+    spin_lock(&priv->tx_lock);
 
     if (unlikely(priv->ntu == priv->ntp)) {
         priv->tx_notify_enable = true;
-        mb();
-        /* Double-check. */
-        if (priv->ntu == priv->ntp) {
-            /* Backpressure: We will be called again. */
-            return -EAGAIN;
-        }
-        /* Wow, we won the race condition! Let's go ahead. */
+        /* Double-check not necessary here, we are using locks,
+         * not memory barriers. */
+        spin_unlock(&priv->tx_lock);
+
+        /* Backpressure: We will be called again. */
+        return -EAGAIN;
     }
 
     priv->tx_notify_enable = false;
     priv->ntu++;
 
-    wmb();
+    spin_unlock(&priv->tx_lock);
 
     skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
                     GFP_KERNEL);
@@ -893,6 +894,8 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
                                              priv);
             rtnl_unlock();
             if (ret == 0) {
+                spin_lock(&priv->tx_lock);
+
                 priv->ntu = 0;
                 if (priv->netdev->tx_queue_len) {
                     priv->ntp = priv->ntu + priv->netdev->tx_queue_len;
@@ -900,9 +903,10 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
                     priv->ntp = -2;
                 }
 
-                wmb();
+                spin_unlock(&priv->tx_lock);
 
                 PD("netdev set to %p\n", priv->netdev);
+
             } else {
                 dev_put(priv->netdev);
                 priv->netdev = NULL;
