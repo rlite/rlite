@@ -156,6 +156,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
+    int ret;
 
     if (mhdr->type == RINA_MGMT_HDR_TYPE_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->u.dst_addr);
@@ -197,7 +198,12 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_flags = 0; /* Not valid. */
     pci->seqnum = 0; /* Not valid. */
 
-    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    if (ret >= sizeof(*pci)) {
+        ret -= sizeof(*pci);
+    }
+
+    return ret;
 }
 
 static int

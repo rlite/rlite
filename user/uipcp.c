@@ -94,12 +94,9 @@ uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
 
 int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
 {
-    uint64_t remote_addr, local_addr;
     unsigned int port_id;
-    uint8_t cmd;
     int fd = -1;
     int ret;
-    ssize_t n;
 
     /* Allocate a flow for the enrollment. */
     ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
@@ -115,84 +112,8 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
     }
 
     /* Request an enrollment. */
-    PD("%s: Enrollment phase (client)\n", __func__);
 
-if (0) {
-    // TODO new mgmt to be enabled
     return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-}
-    // TODO the following to be removed
-    cmd = IPCP_MGMT_ENROLL;
-    if (write(fd, &cmd, sizeof(cmd)) != 1) {
-        PE("%s: write(cmd) failed\n", __func__);
-        return -1;
-    }
-
-    /* Exchange IPCP addresses. */
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-    n = write(fd, &local_addr, sizeof(local_addr));
-    if (n != sizeof(local_addr)) {
-        PE("%s: write(localaddr) failed\n", __func__);
-        return -1;
-    }
-
-    n = read(fd, &remote_addr, sizeof(remote_addr));
-    if (n != sizeof(remote_addr)) {
-        PE("%s: read(remoteaddr) failed\n", __func__);
-        return -1;
-    }
-    remote_addr = le64toh(remote_addr);
-
-    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
-
-    /* Don't dellocate the flow. */
-
-    return 0;
-}
-
-// TODO to be removed
-static int
-uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
-{
-    uint64_t remote_addr, local_addr;
-    ssize_t n;
-    int ret;
-
-    /* Do enrollment here. */
-    PD("%s: Enrollment phase (server)\n", __func__);
-
-    (void)uipcp;
-    (void)fd;
-
-    /* Exchange IPCP addresses. */
-    n = read(fd, &remote_addr, sizeof(remote_addr));
-    if (n != sizeof(remote_addr)) {
-        goto fail;
-    }
-
-    remote_addr = le64toh(remote_addr);
-
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-    n = write(fd, &local_addr, sizeof(local_addr));
-    if (n != sizeof(local_addr)) {
-        goto fail;
-    }
-
-    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
-
-    /* Do not deallocate the flow. */
-
-    return 0;
-fail:
-    PE("%s: Enrollment failed\n", __func__);
-
-    return -1;
 }
 
 static int
@@ -201,9 +122,10 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
 {
     uint64_t remote_addr;
 
-    PD("%s: Enrollment phase (server)\n", __func__);
-
     remote_addr = le64toh(*((uint64_t *)(buf)));
+
+    PD("%s: Received enrollment management SDU from IPCP addr %lu\n",
+            __func__, (long unsigned)remote_addr);
 
     assert(mhdr->type == RINA_MGMT_HDR_TYPE_LOCAL_PORT);
     ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
@@ -221,8 +143,6 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
     struct rina_mgmt_hdr *mhdr;
     uint8_t cmd;
     int n;
-
-    PD("%s: fd %d ready!\n", __func__, fd);
 
     assert(fd == uipcp->mgmtfd);
 
@@ -420,7 +340,6 @@ uipcp_server(void *arg)
         struct pending_flow_req *pfr;
         unsigned int port_id;
         int result, fd;
-        uint8_t cmd;
 
         pfr = flow_request_wait(&uipcp->appl);
         port_id = pfr->port_id;
@@ -440,27 +359,12 @@ uipcp_server(void *arg)
             continue;
         }
 
-        if (0) {
-            /* TODO enable */
-            uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-            continue;
-        }
-
-        /* TODO remove the following */
-        if (read(fd, &cmd, 1) != 1) {
-            PE("%s: read(cmd) failed\n", __func__);
-            close(fd);
-            continue;
-        }
-
-        switch (cmd) {
-            case IPCP_MGMT_ENROLL:
-                uipcp_server_enroll(uipcp, port_id, fd);
-                break;
-            default:
-                PI("%s: Unknown cmd %u received\n", __func__, cmd);
-                break;
-        }
+        /* XXX This usleep() is a temporary hack to make sure that the
+         * flow allocation response has the time to be processed by the neighbor,
+         * so that the flow 'port_id' is setup properly and can receive the
+         * enrollment management sdu. */
+        usleep(100000);
+        uipcp_enroll_send_mgmtsdu(uipcp, port_id);
     }
 
     return NULL;

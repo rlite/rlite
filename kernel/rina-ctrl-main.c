@@ -1304,10 +1304,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             mutex_unlock(&rina_dm.lock);
 
             return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
-        } else if (0 && flow->upper.ipcp->mgmt_txrx) {
+        } else if (flow->upper.ipcp->mgmt_txrx) {
             struct rina_mgmt_hdr *mhdr;
 
-            /* TODO new managament, to be enabled. */
             txrx = flow->upper.ipcp->mgmt_txrx;
             rina_buf_pci_pop(rb);
             /* Push a management header using the room made available
@@ -1317,9 +1316,10 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             mhdr->type = RINA_MGMT_HDR_TYPE_LOCAL_PORT;
             mhdr->u.local_port = local_port;
         } else {
-            /* TODO old management, to be deleted */
-            txrx = &flow->txrx;
-            rina_buf_pci_pop(rb);
+            PE("%s: Missing mgmt_txrx\n", __func__);
+            rina_buf_free(rb);
+            ret = -EINVAL;
+            goto out;
         }
     } else {
         txrx = &flow->txrx;
@@ -1621,20 +1621,19 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
     ipcp = rio->txrx->ipcp;
 
-    rb = rina_buf_alloc(ulen, 3, GFP_KERNEL);
-    if (!rb) {
-        return -ENOMEM;
-    }
-
     if (unlikely(rio->mode == RINA_IOCTL_CMD_IPCP_MGMT)) {
         /* Copy in the management header. */
         if (copy_from_user(&mhdr, ubuf, sizeof(mhdr))) {
             PE("%s: copy_from_user(mgmthdr)\n", __func__);
-            rina_buf_free(rb);
             return -EFAULT;
         }
         ubuf += sizeof(mhdr);
         ulen -= sizeof(mhdr);
+    }
+
+    rb = rina_buf_alloc(ulen, 3, GFP_KERNEL);
+    if (!rb) {
+        return -ENOMEM;
     }
 
     /* Copy in the userspace SDU. */
@@ -1657,6 +1656,9 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         } else if (rio->mode == RINA_IOCTL_CMD_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr,
                                            rb);
+            if (ret >= sizeof(mhdr)) {
+                ret += sizeof(mhdr);
+            }
         } else {
             PE("%s: Unknown mode, this should not happen\n", __func__);
             ret = -EINVAL;
@@ -1728,7 +1730,24 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 static unsigned int
 rina_io_poll(struct file *f, poll_table *wait)
 {
-    return 0;
+    struct rina_io *rio = (struct rina_io *)f->private_data;
+    unsigned int mask = 0;
+
+    if (unlikely(!rio->txrx)) {
+        return mask;
+    }
+
+    poll_wait(f, &rio->txrx->wqh, wait);
+
+    spin_lock(&rio->txrx->lock);
+    if (!list_empty(&rio->txrx->queue)) {
+        mask |= POLLIN | POLLRDNORM;
+    }
+    spin_unlock(&rio->txrx->lock);
+
+    mask |= POLLOUT | POLLWRNORM;
+
+    return mask;
 }
 
 /* To be called under global lock. */

@@ -24,3 +24,5 @@
 - FLOW_ALLOCATOR_ ==> FA_
 
 - RINA_IOCTL_CMD_ ==> RINA_IOCTL_MODE_
+
+- remove usleep() hack in uipcp_server

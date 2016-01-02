@@ -161,15 +161,17 @@ evloop_function(void *arg)
         struct rina_evloop_fdcb *fdcb;
         fd_set rdfs;
         int ret;
+        int maxfd = MAX(loop->rfd, loop->eventfd);
 
         FD_ZERO(&rdfs);
         FD_SET(loop->rfd, &rdfs);
         FD_SET(loop->eventfd, &rdfs);
         list_for_each_entry(fdcb, &loop->fdcbs, node) {
             FD_SET(fdcb->fd, &rdfs);
+            maxfd = MAX(maxfd, fdcb->fd);
         }
 
-        ret = select(MAX(loop->rfd, loop->eventfd) + 1, &rdfs,
+        ret = select(maxfd + 1, &rdfs,
                      NULL, NULL, NULL);
         if (ret == -1) {
             /* Error. */
@@ -193,21 +195,21 @@ evloop_function(void *arg)
             /* Stop the event loop. */
             break;
         } else {
-            int found = 0;
+            int fdcb_done = 0;
 
-            /* Look for fdcb events. */
+            /* First look for fdcb events. */
             list_for_each_entry(fdcb, &loop->fdcbs, node) {
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
-                    found = 1;
+                    fdcb_done = 1;
                     fdcb->cb(loop, fdcb->fd);
                 }
             }
 
-            /* If no event is found make sure that we have an
-             * event from the kernel through the RINA control device,
-             * otherwise who would wake up us? */
-            if (!found && !FD_ISSET(loop->rfd, &rdfs)) {
-                assert(0);
+            if (!FD_ISSET(loop->rfd, &rdfs)) {
+                assert(fdcb_done);
+                /* We did some fdcb processing, but no events are
+                 * available on the rina control device. */
+                continue;
             }
         }
 
