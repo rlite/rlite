@@ -11,7 +11,31 @@ static int
 mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
            void *buf, size_t buflen)
 {
-    return 0;
+    void *mgmtbuf = malloc(sizeof(*mhdr) + buflen);
+    int n;
+    int ret = 0;
+
+    if (!mgmtbuf) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memcpy(mgmtbuf, mhdr, sizeof(*mhdr));
+    memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
+    buflen += sizeof(*mhdr);
+
+    n = write(uipcp->mgmtfd, mgmtbuf, buflen);
+    if (n < 0) {
+        PE("%s: write(): %d\n", __func__, n);
+        ret = n;
+    } else if (n != buflen) {
+        PE("%s: partial write %d/%d\n", __func__, n, (int)buflen);
+        ret = -1;
+    }
+
+    free(mgmtbuf);
+
+    return ret;
 }
 
 /*static */int
