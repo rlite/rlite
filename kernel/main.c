@@ -379,7 +379,7 @@ __ipcp_get(unsigned int ipcp_id)
 }
 
 static int
-ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
+ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
                struct ipcp_entry **pentry)
 {
     struct ipcp_entry *entry;
@@ -447,7 +447,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
 }
 
 static int
-ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
+ipcp_add(struct rl_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 {
     struct ipcp_factory *factory;
     struct ipcp_entry *entry = NULL;
@@ -964,7 +964,7 @@ flow_put(struct flow_entry *entry)
     }
 
     if (ipcp->uipcp) {
-        struct rina_kmsg_flow_deallocated ntfy;
+        struct rl_kmsg_flow_deallocated ntfy;
 
         /* Notify the uipcp about flow deallocation. */
         ntfy.msg_type = RLITE_KER_FLOW_DEALLOCATED;
@@ -1061,7 +1061,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
 
         /* Notify userspace IPCP if required. */
         if (app->ipcp->uipcp) {
-            struct rina_kmsg_appl_register ntfy;
+            struct rl_kmsg_appl_register ntfy;
 
             ntfy.msg_type = RLITE_KER_APPL_REGISTER;
             ntfy.event_id = 0;
@@ -1204,8 +1204,8 @@ ipcp_del(unsigned int ipcp_id)
 static int
 rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_create *req = (struct rina_kmsg_ipcp_create *)bmsg;
-    struct rina_kmsg_ipcp_create_resp resp;
+    struct rl_kmsg_ipcp_create *req = (struct rl_kmsg_ipcp_create *)bmsg;
+    struct rl_kmsg_ipcp_create_resp resp;
     char *name_s = rina_name_to_string(&req->name);
     unsigned int ipcp_id;
     int ret;
@@ -1242,8 +1242,8 @@ err:
 static int
 rina_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_destroy *req =
-                        (struct rina_kmsg_ipcp_destroy *)bmsg;
+    struct rl_kmsg_ipcp_destroy *req =
+                        (struct rl_kmsg_ipcp_destroy *)bmsg;
     int ret;
 
     /* Release the IPC process ID. */
@@ -1257,7 +1257,7 @@ rina_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 struct ipcps_fetch_q_entry {
-    struct rina_kmsg_fetch_ipcp_resp resp;
+    struct rl_kmsg_fetch_ipcp_resp resp;
     struct list_head node;
 };
 
@@ -1327,8 +1327,8 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 static int
 rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_config *req =
-                    (struct rina_kmsg_ipcp_config *)bmsg;
+    struct rl_kmsg_ipcp_config *req =
+                    (struct rl_kmsg_ipcp_config *)bmsg;
     struct ipcp_entry *entry;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -1369,8 +1369,8 @@ rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 static int
 rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_pduft_set *req =
-                    (struct rina_kmsg_ipcp_pduft_set *)bmsg;
+    struct rl_kmsg_ipcp_pduft_set *req =
+                    (struct rl_kmsg_ipcp_pduft_set *)bmsg;
     struct ipcp_entry *ipcp;
     struct flow_entry *flow;
     int ret = -EINVAL;  /* Report failure by default. */
@@ -1403,8 +1403,8 @@ rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 static int
 rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_pduft_flush *req =
-                    (struct rina_kmsg_ipcp_pduft_flush *)bmsg;
+    struct rl_kmsg_ipcp_pduft_flush *req =
+                    (struct rl_kmsg_ipcp_pduft_flush *)bmsg;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -1428,8 +1428,8 @@ rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 static int
 rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_ipcp_uipcp_set *req =
-                    (struct rina_kmsg_ipcp_uipcp_set *)bmsg;
+    struct rl_kmsg_ipcp_uipcp_set *req =
+                    (struct rl_kmsg_ipcp_uipcp_set *)bmsg;
     struct ipcp_entry *entry;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -1455,8 +1455,8 @@ rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 static int
 rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_uipcp_fa_req_arrived *req =
-                    (struct rina_kmsg_uipcp_fa_req_arrived *)bmsg;
+    struct rl_kmsg_uipcp_fa_req_arrived *req =
+                    (struct rl_kmsg_uipcp_fa_req_arrived *)bmsg;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -1477,8 +1477,8 @@ static int
 rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
                                       struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_uipcp_fa_resp_arrived *req =
-                    (struct rina_kmsg_uipcp_fa_resp_arrived *)bmsg;
+    struct rl_kmsg_uipcp_fa_resp_arrived *req =
+                    (struct rl_kmsg_uipcp_fa_resp_arrived *)bmsg;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -1526,8 +1526,8 @@ upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
 static int
 rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_appl_register *req =
-                    (struct rina_kmsg_appl_register *)bmsg;
+    struct rl_kmsg_appl_register *req =
+                    (struct rl_kmsg_appl_register *)bmsg;
     struct rina_name *appl_name = &req->appl_name;
     char *name_s = rina_name_to_string(appl_name);
     struct ipcp_entry *ipcp;
@@ -1555,7 +1555,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         if (ret || !ipcp->uipcp || !req->reg) {
             /* Complete the (un)registration immediately notifying the
              * requesting application. */
-            struct rina_kmsg_appl_register_resp resp;
+            struct rl_kmsg_appl_register_resp resp;
 
             resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
             resp.event_id = req->event_id;
@@ -1589,8 +1589,8 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 static int
 rina_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_appl_register_resp *resp =
-                    (struct rina_kmsg_appl_register_resp *)bmsg;
+    struct rl_kmsg_appl_register_resp *resp =
+                    (struct rl_kmsg_appl_register_resp *)bmsg;
     struct rina_name *appl_name = &resp->appl_name;
     char *name_s = rina_name_to_string(appl_name);
     struct ipcp_entry *ipcp;
@@ -1638,7 +1638,7 @@ static int
 rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
 {
-    struct rina_kmsg_fa_resp_arrived resp;
+    struct rl_kmsg_fa_resp_arrived resp;
 
     memset(&resp, 0, sizeof(resp));
     resp.msg_type = RLITE_KER_FA_RESP_ARRIVED;
@@ -1653,8 +1653,8 @@ rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
 static int
 rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_fa_req *req =
-                    (struct rina_kmsg_fa_req *)bmsg;
+    struct rl_kmsg_fa_req *req =
+                    (struct rl_kmsg_fa_req *)bmsg;
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
     struct upper_ref upper = {
@@ -1724,8 +1724,8 @@ out:
 static int
 rina_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
-    struct rina_kmsg_fa_resp *resp =
-                    (struct rina_kmsg_fa_resp *)bmsg;
+    struct rl_kmsg_fa_resp *resp =
+                    (struct rl_kmsg_fa_resp *)bmsg;
     struct flow_entry *flow_entry;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;
@@ -1800,7 +1800,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_appl *app;
-    struct rina_kmsg_fa_req_arrived req;
+    struct rl_kmsg_fa_req_arrived req;
     struct upper_ref upper;
     int ret = -EINVAL;
 

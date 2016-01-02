@@ -32,7 +32,7 @@ extern struct rlite_msg_layout rlite_conf_numtables[RLITE_CFG_MSG_MAX + 1];
 
 /* rinaconf --> uipcps message to register an IPC process
  * to another IPC process */
-struct rina_cmsg_ipcp_register {
+struct rl_cmsg_ipcp_register {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -44,7 +44,7 @@ struct rina_cmsg_ipcp_register {
 
 /* rinaconf --> uipcps message to enroll an IPC process
  * to another IPC process */
-struct rina_cmsg_ipcp_enroll {
+struct rl_cmsg_ipcp_enroll {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -56,7 +56,7 @@ struct rina_cmsg_ipcp_enroll {
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to set an IPC process DFT entry */
-struct rina_cmsg_ipcp_dft_set {
+struct rl_cmsg_ipcp_dft_set {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -66,7 +66,7 @@ struct rina_cmsg_ipcp_dft_set {
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to update the uipcps */
-struct rina_cmsg_uipcp_update {
+struct rl_cmsg_uipcp_update {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -74,10 +74,10 @@ struct rina_cmsg_uipcp_update {
     char *dif_type;
 } __attribute__((packed));
 
-#define rina_cmsg_ipcp_rib_show_req rina_cmsg_uipcp_update
+#define rl_cmsg_ipcp_rib_show_req rl_cmsg_uipcp_update
 
 /* rinaconf <-- uipcps message to report a RIB dump */
-struct rina_cmsg_ipcp_rib_show_resp {
+struct rl_cmsg_ipcp_rib_show_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 

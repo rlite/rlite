@@ -56,7 +56,7 @@ extern struct rlite_msg_layout rina_kernel_numtables[RLITE_KER_MSG_MAX+1];
  */
 
 /* application --> kernel message to create a new IPC process. */
-struct rina_kmsg_ipcp_create {
+struct rl_kmsg_ipcp_create {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -67,7 +67,7 @@ struct rina_kmsg_ipcp_create {
 
 /* application <-- kernel message to inform the application about the
  * ID of a new IPC process. */
-struct rina_kmsg_ipcp_create_resp {
+struct rl_kmsg_ipcp_create_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -75,10 +75,10 @@ struct rina_kmsg_ipcp_create_resp {
 } __attribute__((packed));
 
 /* application --> kernel message to destroy an IPC process. */
-#define rina_kmsg_ipcp_destroy rina_kmsg_ipcp_create_resp
+#define rl_kmsg_ipcp_destroy rl_kmsg_ipcp_create_resp
 
 /* application <-- kernel message to fetch IPC process information. */
-struct rina_kmsg_fetch_ipcp_resp {
+struct rl_kmsg_fetch_ipcp_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -92,7 +92,7 @@ struct rina_kmsg_fetch_ipcp_resp {
 } __attribute__((packed));
 
 /* application --> kernel to register a RLITE name. */
-struct rina_kmsg_appl_register {
+struct rl_kmsg_appl_register {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -102,7 +102,7 @@ struct rina_kmsg_appl_register {
 } __attribute__((packed));
 
 /* application <-- kernel report the result of (un)registration. */
-struct rina_kmsg_appl_register_resp {
+struct rl_kmsg_appl_register_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -113,7 +113,7 @@ struct rina_kmsg_appl_register_resp {
 } __attribute__((packed));
 
 /* application --> kernel to initiate a flow allocation. */
-struct rina_kmsg_fa_req {
+struct rl_kmsg_fa_req {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -127,7 +127,7 @@ struct rina_kmsg_fa_req {
 } __attribute__((packed));
 
 /* application <-- kernel to notify about an incoming flow response. */
-struct rina_kmsg_fa_resp_arrived {
+struct rl_kmsg_fa_resp_arrived {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -136,7 +136,7 @@ struct rina_kmsg_fa_resp_arrived {
 } __attribute__((packed));
 
 /* application <-- kernel to notify an incoming flow request. */
-struct rina_kmsg_fa_req_arrived {
+struct rl_kmsg_fa_req_arrived {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -147,7 +147,7 @@ struct rina_kmsg_fa_req_arrived {
 } __attribute__((packed));
 
 /* application --> kernel to respond to an incoming flow request. */
-struct rina_kmsg_fa_resp {
+struct rl_kmsg_fa_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -165,7 +165,7 @@ struct rina_kmsg_fa_resp {
 } __attribute__((packed));
 
 /* application --> kernel to configure and IPC process. */
-struct rina_kmsg_ipcp_config {
+struct rl_kmsg_ipcp_config {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -175,7 +175,7 @@ struct rina_kmsg_ipcp_config {
 } __attribute__((packed));
 
 /* application --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
-struct rina_kmsg_ipcp_pduft_set {
+struct rl_kmsg_ipcp_pduft_set {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -189,11 +189,11 @@ struct rina_kmsg_ipcp_pduft_set {
 } __attribute__((packed));
 
 /* application --> kernel message to flush the PDUFT of an IPC Process. */
-#define rina_kmsg_ipcp_pduft_flush rina_kmsg_ipcp_create_resp
+#define rl_kmsg_ipcp_pduft_flush rl_kmsg_ipcp_create_resp
 
 /* uipcp (application) --> kernel to tell the kernel that this event
  * loop corresponds to an uipcp. */
-struct rina_kmsg_ipcp_uipcp_set {
+struct rl_kmsg_ipcp_uipcp_set {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -202,7 +202,7 @@ struct rina_kmsg_ipcp_uipcp_set {
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation request has arrived. */
-struct rina_kmsg_uipcp_fa_req_arrived {
+struct rl_kmsg_uipcp_fa_req_arrived {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -220,7 +220,7 @@ struct rina_kmsg_uipcp_fa_req_arrived {
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation response has arrived. */
-struct rina_kmsg_uipcp_fa_resp_arrived {
+struct rl_kmsg_uipcp_fa_resp_arrived {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
@@ -234,7 +234,7 @@ struct rina_kmsg_uipcp_fa_resp_arrived {
 } __attribute__((packed));
 
 /* uipcp (application) <-- kernel */
-struct rina_kmsg_flow_deallocated {
+struct rl_kmsg_flow_deallocated {
     rlite_msg_t msg_type;
     uint32_t event_id;
 

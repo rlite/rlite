@@ -141,7 +141,7 @@ static int
 rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
                         const struct rlite_msg_base *b_req)
 {
-    struct rina_cmsg_ipcp_register *req = (struct rina_cmsg_ipcp_register *)b_req;
+    struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rlite_msg_base_resp resp;
 
     resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
@@ -154,7 +154,7 @@ static int
 rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
                       const struct rlite_msg_base *b_req)
 {
-    struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
+    struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
@@ -184,7 +184,7 @@ static int
 rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
                        const struct rlite_msg_base *b_req)
 {
-    struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
+    struct rl_cmsg_ipcp_dft_set *req = (struct rl_cmsg_ipcp_dft_set *)b_req;
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
@@ -209,7 +209,7 @@ static int
 rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
                        const struct rlite_msg_base *b_req)
 {
-    struct rina_cmsg_uipcp_update *req = (struct rina_cmsg_uipcp_update *)b_req;
+    struct rl_cmsg_uipcp_update *req = (struct rl_cmsg_uipcp_update *)b_req;
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
@@ -245,9 +245,9 @@ static int
 rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                         const struct rlite_msg_base *b_req)
 {
-    struct rina_cmsg_ipcp_rib_show_req *req =
-                    (struct rina_cmsg_ipcp_rib_show_req *)b_req;
-    struct rina_cmsg_ipcp_rib_show_resp resp;
+    struct rl_cmsg_ipcp_rib_show_req *req =
+                    (struct rl_cmsg_ipcp_rib_show_req *)b_req;
+    struct rl_cmsg_ipcp_rib_show_resp resp;
     struct uipcp *uipcp;
     int ret;
 

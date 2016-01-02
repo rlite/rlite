@@ -53,7 +53,7 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 }
 
 int
-uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
+uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 {
     RinaName appl_name(&req->appl_name);
     map< string, DFTEntry >::iterator mit;

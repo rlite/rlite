@@ -14,9 +14,9 @@
 int
 uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
                          uint8_t response,
-                         const struct rina_kmsg_appl_register *req)
+                         const struct rl_kmsg_appl_register *req)
 {
-    struct rina_kmsg_appl_register_resp *resp;
+    struct rl_kmsg_appl_register_resp *resp;
     struct rlite_msg_base *fkresp;
     int result;
 
@@ -49,7 +49,7 @@ int
 uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
                 uint64_t dest_addr, uint32_t local_port)
 {
-    struct rina_kmsg_ipcp_pduft_set *req;
+    struct rl_kmsg_ipcp_pduft_set *req;
     struct rlite_msg_base *resp;
     int result;
 
@@ -80,7 +80,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 int
 uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 {
-    struct rina_kmsg_ipcp_pduft_flush *req;
+    struct rl_kmsg_ipcp_pduft_flush *req;
     struct rlite_msg_base *resp;
     int result;
 
@@ -114,7 +114,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            const struct rina_name *remote_appl,
                            const struct rina_flow_config *flowcfg)
 {
-    struct rina_kmsg_uipcp_fa_req_arrived *req;
+    struct rl_kmsg_uipcp_fa_req_arrived *req;
     struct rlite_msg_base *resp;
     int result;
 
@@ -157,7 +157,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                             uint64_t remote_addr,
                             uint8_t response, const struct rina_flow_config *flowcfg)
 {
-    struct rina_kmsg_uipcp_fa_resp_arrived *req;
+    struct rl_kmsg_uipcp_fa_resp_arrived *req;
     struct rlite_msg_base *resp;
     int result;
 
@@ -196,7 +196,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 static int
 uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 {
-    struct rina_kmsg_ipcp_uipcp_set *req;
+    struct rl_kmsg_ipcp_uipcp_set *req;
     struct rlite_msg_base *resp;
     int result;
 

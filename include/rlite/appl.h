@@ -40,7 +40,7 @@ int rlite_appl_init(struct rlite_appl *appl);
 
 int rlite_appl_fini(struct rlite_appl *appl);
 
-struct rina_kmsg_appl_register_resp *
+struct rl_kmsg_appl_register_resp *
 rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
                     unsigned int wait_ms,
                     int reg, const struct rina_name *dif_name,

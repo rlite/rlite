@@ -25,10 +25,10 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
                            const struct rlite_msg_base_resp *b_resp,
                            const struct rlite_msg_base *b_req)
 {
-    struct rina_kmsg_fa_req *req =
-            (struct rina_kmsg_fa_req *)b_req;
-    struct rina_kmsg_fa_resp_arrived *resp =
-            (struct rina_kmsg_fa_resp_arrived *)b_resp;
+    struct rl_kmsg_fa_req *req =
+            (struct rl_kmsg_fa_req *)b_req;
+    struct rl_kmsg_fa_resp_arrived *resp =
+            (struct rl_kmsg_fa_resp_arrived *)b_resp;
     char *local_s = NULL;
     char *remote_s = NULL;
 
@@ -63,8 +63,8 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
 {
     struct rlite_appl *appl = container_of(loop,
                                        struct rlite_appl, loop);
-    struct rina_kmsg_fa_req_arrived *req =
-            (struct rina_kmsg_fa_req_arrived *)b_resp;
+    struct rl_kmsg_fa_req_arrived *req =
+            (struct rl_kmsg_fa_req_arrived *)b_resp;
     struct rlite_pending_flow_req *pfr = NULL;
 
     assert(b_req == NULL);
@@ -97,8 +97,8 @@ appl_register_resp(struct rlite_evloop *loop,
                    const struct rlite_msg_base_resp *b_resp,
                    const struct rlite_msg_base *b_req)
 {
-    struct rina_kmsg_appl_register_resp *resp =
-            (struct rina_kmsg_appl_register_resp *)b_resp;
+    struct rl_kmsg_appl_register_resp *resp =
+            (struct rl_kmsg_appl_register_resp *)b_resp;
     char *appl_name_s = NULL;
 
     (void)b_req;
@@ -135,13 +135,13 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
-struct rina_kmsg_appl_register_resp *
+struct rl_kmsg_appl_register_resp *
 rlite_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
                         unsigned int wait_ms,
                         int reg, unsigned int ipcp_id,
                         const struct rina_name *appl_name)
 {
-    struct rina_kmsg_appl_register *req;
+    struct rl_kmsg_appl_register *req;
     int result;
 
     /* Allocate and create a request message. */
@@ -160,7 +160,7 @@ rlite_appl_register_req(struct rlite_appl *appl, uint32_t event_id,
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
 
-    return (struct rina_kmsg_appl_register_resp *)
+    return (struct rl_kmsg_appl_register_resp *)
            rlite_issue_request(&appl->loop, RLITE_RMB(req),
                                sizeof(*req), 1, wait_ms, &result);
 }
@@ -185,7 +185,7 @@ rlite_flow_cfg_default(struct rina_flow_config *cfg)
     cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
 }
 
-static struct rina_kmsg_fa_resp_arrived *
+static struct rl_kmsg_fa_resp_arrived *
 flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
                   unsigned int wait_ms, uint16_t ipcp_id,
                   uint16_t upper_ipcp_id,
@@ -193,7 +193,7 @@ flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
                   const struct rina_name *remote_appl,
                   const struct rina_flow_spec *flowspec, int *result)
 {
-    struct rina_kmsg_fa_req *req;
+    struct rl_kmsg_fa_req *req;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -218,7 +218,7 @@ flow_allocate_req(struct rlite_appl *appl, uint32_t event_id,
 
     PD("Requesting flow allocation...\n");
 
-    return (struct rina_kmsg_fa_resp_arrived *)
+    return (struct rl_kmsg_fa_resp_arrived *)
            rlite_issue_request(&appl->loop, RLITE_RMB(req),
                          sizeof(*req), 1, wait_ms, result);
 }
@@ -228,7 +228,7 @@ rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
                          uint16_t ipcp_id, uint16_t upper_ipcp_id,
                          uint32_t port_id, uint8_t response)
 {
-    struct rina_kmsg_fa_resp *req;
+    struct rl_kmsg_fa_resp *req;
     struct rlite_msg_base *resp;
     int result;
 
@@ -257,7 +257,7 @@ rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
     return result;
 }
 
-struct rina_kmsg_appl_register_resp *
+struct rl_kmsg_appl_register_resp *
 rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
                     unsigned int wait_ms, int reg,
                     const struct rina_name *dif_name,
@@ -287,7 +287,7 @@ rlite_appl_register_wait(struct rlite_appl *appl, int reg,
                          const struct rina_name *appl_name,
                          unsigned int wait_ms)
 {
-    struct rina_kmsg_appl_register_resp *resp;
+    struct rl_kmsg_appl_register_resp *resp;
     uint32_t event_id = rlite_evloop_get_id(&appl->loop);
     int ret = 0;
 
@@ -319,7 +319,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
                     unsigned int *port_id, unsigned int wait_ms,
                     uint16_t upper_ipcp_id)
 {
-    struct rina_kmsg_fa_resp_arrived *kresp;
+    struct rl_kmsg_fa_resp_arrived *kresp;
     struct rlite_ipcp *rlite_ipcp;
     int result;
 

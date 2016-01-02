@@ -11,7 +11,7 @@ int
 rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
-    struct rina_kmsg_ipcp_config *req;
+    struct rl_kmsg_ipcp_config *req;
     struct rlite_msg_base *resp;
     int result;
 

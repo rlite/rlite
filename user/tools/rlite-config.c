@@ -28,10 +28,10 @@ ipcp_create_resp(struct rlite_evloop *loop,
                  const struct rlite_msg_base_resp *b_resp,
                  const struct rlite_msg_base *b_req)
 {
-    struct rina_kmsg_ipcp_create_resp *resp =
-            (struct rina_kmsg_ipcp_create_resp *)b_resp;
-    struct rina_kmsg_ipcp_create *req =
-            (struct rina_kmsg_ipcp_create *)b_req;
+    struct rl_kmsg_ipcp_create_resp *resp =
+            (struct rl_kmsg_ipcp_create_resp *)b_resp;
+    struct rl_kmsg_ipcp_create *req =
+            (struct rl_kmsg_ipcp_create *)b_req;
 
     PI("Assigned id %d\n", resp->ipcp_id);
     (void)req;
@@ -150,7 +150,7 @@ static int
 uipcp_update(struct rinaconf *rc, rlite_msg_t update_type, uint16_t ipcp_id,
              const char *dif_type)
 {
-    struct rina_cmsg_uipcp_update req;
+    struct rl_cmsg_uipcp_update req;
 
     req.msg_type = update_type;
     req.event_id = 0;
@@ -169,13 +169,13 @@ uipcp_update(struct rinaconf *rc, rlite_msg_t update_type, uint16_t ipcp_id,
 }
 
 /* Create an IPC process. */
-static struct rina_kmsg_ipcp_create_resp *
+static struct rl_kmsg_ipcp_create_resp *
 rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
                  const struct rina_name *name, const char *dif_type,
                  const char *dif_name, int *result)
 {
-    struct rina_kmsg_ipcp_create *msg;
-    struct rina_kmsg_ipcp_create_resp *resp;
+    struct rl_kmsg_ipcp_create *msg;
+    struct rl_kmsg_ipcp_create_resp *resp;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -193,7 +193,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
 
     PD("Requesting IPC process creation...\n");
 
-    resp = (struct rina_kmsg_ipcp_create_resp *)
+    resp = (struct rl_kmsg_ipcp_create_resp *)
            rlite_issue_request(&rc->loop, RLITE_RMB(msg),
                          sizeof(*msg), 1, wait_ms, result);
 
@@ -211,7 +211,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
 static int
 ipcp_create(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_kmsg_ipcp_create_resp *kresp;
+    struct rl_kmsg_ipcp_create_resp *kresp;
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
@@ -242,7 +242,7 @@ static int
 rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
                   const char *dif_type)
 {
-    struct rina_kmsg_ipcp_destroy *msg;
+    struct rl_kmsg_ipcp_destroy *msg;
     struct rlite_msg_base *resp;
     int result;
 
@@ -354,7 +354,7 @@ static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
                      struct rinaconf *rc)
 {
-    struct rina_cmsg_ipcp_register req;
+    struct rl_cmsg_ipcp_register req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
@@ -397,7 +397,7 @@ ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_cmsg_ipcp_enroll req;
+    struct rl_cmsg_ipcp_enroll req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *neigh_ipcp_apn;
@@ -434,7 +434,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_cmsg_ipcp_dft_set req;
+    struct rl_cmsg_ipcp_dft_set req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *appl_apn;
@@ -483,8 +483,8 @@ ipcps_show(int argc, char **argv, struct rinaconf *rc)
 static int
 ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
 {
-    struct rina_cmsg_ipcp_rib_show_resp *resp =
-        (struct rina_cmsg_ipcp_rib_show_resp *)b_resp;
+    struct rl_cmsg_ipcp_rib_show_resp *resp =
+        (struct rl_cmsg_ipcp_rib_show_resp *)b_resp;
 
     if (resp->dump) {
         printf("%s\n", resp->dump);
@@ -496,7 +496,7 @@ ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
 static int
 ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_cmsg_ipcp_rib_show_req req;
+    struct rl_cmsg_ipcp_rib_show_req req;
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
@@ -526,7 +526,7 @@ static int
 test(struct rinaconf *rc)
 {
     struct rina_name name;
-    struct rina_kmsg_ipcp_create_resp *icresp;
+    struct rl_kmsg_ipcp_create_resp *icresp;
     int result;
     int ret;
 

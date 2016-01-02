@@ -910,7 +910,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 }
 
 int
-normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
+normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;

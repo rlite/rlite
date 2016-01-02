@@ -191,8 +191,8 @@ struct uipcp_rib {
     int dft_lookup(const RinaName& appl_name, uint64_t& dstaddr) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int register_to_lower(int reg, std::string lower_dif);
-    int appl_register(const struct rina_kmsg_appl_register *req);
-    int flow_deallocated(struct rina_kmsg_flow_deallocated *req);
+    int appl_register(const struct rl_kmsg_appl_register *req);
+    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
     std::map<std::string, Neighbor>::iterator
@@ -200,8 +200,8 @@ struct uipcp_rib {
     std::map<std::string, Neighbor>::iterator
                 lookup_neigh_by_name(const RinaName& name);
     int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
-    int fa_req(struct rina_kmsg_fa_req *req);
-    int fa_resp(struct rina_kmsg_fa_resp *resp);
+    int fa_req(struct rl_kmsg_fa_req *req);
+    int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
     uint64_t address_allocate() const;
 
@@ -236,7 +236,7 @@ private:
     uint32_t kevent_id_cnt;
 };
 
-int normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
+int normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req);
 
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);

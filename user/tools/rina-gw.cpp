@@ -525,8 +525,8 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
     Gateway * gw = container_of(appl, struct Gateway, appl);
-    struct rina_kmsg_fa_resp_arrived *resp =
-            (struct rina_kmsg_fa_resp_arrived *)b_resp;
+    struct rl_kmsg_fa_resp_arrived *resp =
+            (struct rl_kmsg_fa_resp_arrived *)b_resp;
     map<unsigned int, int>::iterator mit;
     Worker *w = gw->workers[0];
     int cfd;

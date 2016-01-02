@@ -584,8 +584,8 @@ normal_appl_register(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    struct rina_kmsg_appl_register *req =
-                (struct rina_kmsg_appl_register *)b_resp;
+    struct rl_kmsg_appl_register *req =
+                (struct rl_kmsg_appl_register *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
@@ -602,7 +602,7 @@ normal_fa_req(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
@@ -622,8 +622,8 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    struct rina_kmsg_fa_req_arrived *req =
-                    (struct rina_kmsg_fa_req_arrived *)b_resp;
+    struct rl_kmsg_fa_req_arrived *req =
+                    (struct rl_kmsg_fa_req_arrived *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int flow_fd;
     int result = 0;
@@ -682,8 +682,8 @@ normal_fa_resp(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    struct rina_kmsg_fa_resp *resp =
-                (struct rina_kmsg_fa_resp *)b_resp;
+    struct rl_kmsg_fa_resp *resp =
+                (struct rl_kmsg_fa_resp *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
@@ -703,8 +703,8 @@ normal_flow_deallocated(struct rlite_evloop *loop,
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    struct rina_kmsg_flow_deallocated *req =
-                (struct rina_kmsg_flow_deallocated *)b_resp;
+    struct rl_kmsg_flow_deallocated *req =
+                (struct rl_kmsg_flow_deallocated *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
@@ -774,7 +774,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 }
 
 static int
-normal_ipcp_dft_set(struct uipcp *uipcp, struct rina_cmsg_ipcp_dft_set *req)
+normal_ipcp_dft_set(struct uipcp *uipcp, struct rl_cmsg_ipcp_dft_set *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);

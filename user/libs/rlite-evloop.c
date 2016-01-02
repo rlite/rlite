@@ -54,8 +54,8 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
                 const struct rlite_msg_base_resp *b_resp,
                 const struct rlite_msg_base *b_req)
 {
-    const struct rina_kmsg_fetch_ipcp_resp *resp =
-        (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
+    const struct rl_kmsg_fetch_ipcp_resp *resp =
+        (const struct rl_kmsg_fetch_ipcp_resp *)b_resp;
     struct rlite_ipcp *rlite_ipcp;
 
     (void)b_req;
@@ -116,7 +116,7 @@ rlite_evloop_get_id(struct rlite_evloop *loop)
 }
 
 /* Fetch information about a single IPC process. */
-static struct rina_kmsg_fetch_ipcp_resp *
+static struct rl_kmsg_fetch_ipcp_resp *
 ipcp_fetch(struct rlite_evloop *loop, int *result)
 {
     struct rlite_msg_base *msg;
@@ -134,7 +134,7 @@ ipcp_fetch(struct rlite_evloop *loop, int *result)
 
     NPD("Requesting IPC processes fetch...\n");
 
-    return (struct rina_kmsg_fetch_ipcp_resp *)
+    return (struct rl_kmsg_fetch_ipcp_resp *)
            rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
 }
 
@@ -177,7 +177,7 @@ rlite_ipcps_print(struct rlite_evloop *loop)
 int
 rlite_ipcps_fetch(struct rlite_evloop *loop)
 {
-    struct rina_kmsg_fetch_ipcp_resp *resp;
+    struct rl_kmsg_fetch_ipcp_resp *resp;
     int end = 0;
 
     /* Reload the IPCPs list. */

@@ -6,7 +6,7 @@ using namespace std;
 
 
 int
-uipcp_rib::flow_deallocated(struct rina_kmsg_flow_deallocated *req)
+uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     stringstream obj_name;
     map<string, FlowRequest>::iterator f;
@@ -114,7 +114,7 @@ policies2flowcfg(struct rina_flow_config *cfg,
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
+uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_appl);
     uint64_t remote_addr;
@@ -192,7 +192,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
 int
-uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
+uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
     map<unsigned int, FlowRequest>::iterator f;

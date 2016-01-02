@@ -42,9 +42,9 @@ struct uipcp_ops {
                              unsigned int ipcp_id,
                              const struct rina_name *ipcp_name);
 
-    int (*enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
+    int (*enroll)(struct uipcp *, struct rl_cmsg_ipcp_enroll *);
 
-    int (*dft_set)(struct uipcp *, struct rina_cmsg_ipcp_dft_set *);
+    int (*dft_set)(struct uipcp *, struct rl_cmsg_ipcp_dft_set *);
 
     char * (*rib_show)(struct uipcp *);
 
@@ -113,7 +113,7 @@ int uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
 
 int uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
                              uint8_t response,
-                             const struct rina_kmsg_appl_register *req);
+                             const struct rl_kmsg_appl_register *req);
 
 int uipcp_pduft_set(struct uipcp *uipcs, uint16_t ipcp_id,
                     uint64_t dest_addr, uint32_t local_port);
