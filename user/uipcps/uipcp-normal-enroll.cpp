@@ -52,6 +52,50 @@ NeighFlow::~NeighFlow()
                               lower_ipcp_id);
 }
 
+int
+NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
+                          const UipcpObject *obj) const
+{
+    char objbuf[4096];
+    int objlen;
+    char *serbuf = NULL;
+    size_t serlen = 0;
+    int ret;
+
+    if (obj) {
+        objlen = obj->serialize(objbuf, sizeof(objbuf));
+        if (objlen < 0) {
+            UPE(neigh->rib->uipcp, "serialization failed\n");
+            return objlen;
+        }
+
+        m->set_obj_value(objbuf, objlen);
+    }
+
+    try {
+        ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
+    } catch (std::bad_alloc) {
+        ret = -1;
+    }
+
+    if (ret) {
+        UPE(neigh->rib->uipcp, "message serialization failed\n");
+        if (serbuf) {
+            delete [] serbuf;
+        }
+        return -1;
+    }
+
+    ret = mgmt_write_to_local_port(neigh->rib->uipcp, port_id,
+                                   serbuf, serlen);
+
+    if (serbuf) {
+        delete [] serbuf;
+    }
+
+    return ret;
+}
+
 bool
 NeighFlow::enrollment_starting(const CDAPMessage *rm) const
 {
@@ -77,7 +121,7 @@ NeighFlow::abort_enrollment()
 
     m.m_release(gpb::F_NO_FLAGS);
 
-    ret = neigh->send_to_port_id(this, &m, 0, NULL);
+    ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
         UPE(neigh->rib->uipcp, "send_to_port_id() failed\n");
     }
@@ -103,7 +147,7 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
              0, 0, string());
 
-    ret = nf->neigh->send_to_port_id(nf, &m, 0, NULL);
+    ret = nf->send_to_port_id(&m, 0, NULL);
     if (ret) {
         UPE(nf->neigh->rib->uipcp, "send_to_port_id() failed\n");
 
@@ -255,49 +299,6 @@ Neighbor::mgmt_conn()
 }
 
 int
-Neighbor::send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,
-                          const UipcpObject *obj) const
-{
-    char objbuf[4096];
-    int objlen;
-    char *serbuf = NULL;
-    size_t serlen = 0;
-    int ret;
-
-    if (obj) {
-        objlen = obj->serialize(objbuf, sizeof(objbuf));
-        if (objlen < 0) {
-            UPE(rib->uipcp, "serialization failed\n");
-            return objlen;
-        }
-
-        m->set_obj_value(objbuf, objlen);
-    }
-
-    try {
-        ret = nf->conn->msg_ser(m, invoke_id, &serbuf, &serlen);
-    } catch (std::bad_alloc) {
-        ret = -1;
-    }
-
-    if (ret) {
-        UPE(rib->uipcp, "message serialization failed\n");
-        if (serbuf) {
-            delete [] serbuf;
-        }
-        return -1;
-    }
-
-    ret = mgmt_write_to_local_port(rib->uipcp, nf->port_id, serbuf, serlen);
-
-    if (serbuf) {
-        delete [] serbuf;
-    }
-
-    return ret;
-}
-
-int
 Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
 {
     CDAPMessage m;
@@ -353,7 +354,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
         next_state = NEIGH_S_WAIT_START;
     }
 
-    ret = send_to_port_id(nf, &m, invoke_id, NULL);
+    ret = nf->send_to_port_id(&m, invoke_id, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
         nf->abort_enrollment();
@@ -393,7 +394,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
     enr_info.address = ipcp->ipcp_addr;
     enr_info.lower_difs = rib->lower_difs;
 
-    ret = send_to_port_id(nf, &m, 0, &enr_info);
+    ret = nf->send_to_port_id(&m, 0, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
         nf->abort_enrollment();
@@ -464,7 +465,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     m.obj_class = obj_class::enrollment;
     m.obj_name = obj_name::enrollment;
 
-    ret = send_to_port_id(nf, &m, rm->invoke_id, &enr_info);
+    ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
         nf->abort_enrollment();
@@ -499,7 +500,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
              0, 0, string());
 
-    ret = send_to_port_id(nf, &m, 0, &enr_info);
+    ret = nf->send_to_port_id(&m, 0, &enr_info);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
         nf->abort_enrollment();
@@ -616,7 +617,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
     m.obj_class = obj_class::enrollment;
     m.obj_name = obj_name::enrollment;
 
-    ret = send_to_port_id(nf, &m, rm->invoke_id, NULL);
+    ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
         nf->abort_enrollment();
@@ -672,7 +673,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
               0, 0, string());
 
-    ret = send_to_port_id(nf, &m, 0, NULL);
+    ret = nf->send_to_port_id(&m, 0, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id failed\n");
         nf->abort_enrollment();
@@ -778,7 +779,7 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
                    0, 0, "");
     }
 
-    ret = send_to_port_id(nf, &m, 0, obj_value);
+    ret = nf->send_to_port_id(&m, 0, obj_value);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
@@ -1012,7 +1013,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
     m.m_read_r(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
                0, 0, string());
 
-    ret = nf->neigh->send_to_port_id(nf, &m, rm->invoke_id, NULL);
+    ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
         UPE(uipcp, "send_to_port_id() failed\n");
     }

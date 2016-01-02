@@ -83,6 +83,9 @@ struct NeighFlow {
     void enroll_tmr_stop();
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
+
+    int send_to_port_id(CDAPMessage *m, int invoke_id,
+                        const UipcpObject *obj) const;
 };
 
 /* Holds the information about a neighbor IPCP. */
@@ -109,8 +112,6 @@ struct Neighbor {
     bool is_enrolled();
     int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
     int alloc_flow(const char *supp_dif_name);
-    int send_to_port_id(NeighFlow *nf, CDAPMessage *m, int invoke_id,
-                        const UipcpObject *obj) const;
 
     /* Enrollment state machine handlers. */
     int none(NeighFlow *nf, const CDAPMessage *rm);
