@@ -101,7 +101,7 @@ flow_allocate_req_work(struct work_struct *w)
                         struct flow_allocate_req_work, w);
     int ret;
 
-    ret = rina_flow_allocate_req_arrived(faw->ipcp, faw->remote_port,
+    ret = rina_fa_req_arrived(faw->ipcp, faw->remote_port,
                                          &faw->local_application,
                                          &faw->remote_application);
     if (ret) {
@@ -113,7 +113,7 @@ flow_allocate_req_work(struct work_struct *w)
 }
 
 static int
-rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
+rina_shim_dummy_fa_req(struct ipcp_entry *ipcp,
                                   struct flow_entry *flow)
 {
     struct flow_allocate_req_work *faw;
@@ -149,7 +149,7 @@ flow_allocate_resp_work(struct work_struct *w)
                         struct flow_allocate_resp_work, w);
     int ret;
 
-    ret = rina_flow_allocate_resp_arrived(farw->ipcp, farw->local_port,
+    ret = rina_fa_resp_arrived(farw->ipcp, farw->local_port,
                                           farw->remote_port, farw->response);
     if (ret) {
         printk("%s: failed to report flow allocation response\n",
@@ -160,7 +160,7 @@ flow_allocate_resp_work(struct work_struct *w)
 }
 
 static int
-rina_shim_dummy_flow_allocate_resp(struct ipcp_entry *ipcp,
+rina_shim_dummy_fa_resp(struct ipcp_entry *ipcp,
                                    struct flow_entry *flow,
                                    uint8_t response)
 {
@@ -219,8 +219,8 @@ rina_shim_dummy_init(void)
     factory.ops.application_register = rina_shim_dummy_application_register;
     factory.ops.application_unregister = rina_shim_dummy_application_unregister;
     factory.ops.assign_to_dif = rina_shim_dummy_assign_to_dif;
-    factory.ops.flow_allocate_req = rina_shim_dummy_flow_allocate_req;
-    factory.ops.flow_allocate_resp = rina_shim_dummy_flow_allocate_resp;
+    factory.ops.flow_allocate_req = rina_shim_dummy_fa_req;
+    factory.ops.flow_allocate_resp = rina_shim_dummy_fa_resp;
     factory.ops.sdu_write = rina_shim_dummy_sdu_write;
     factory.ops.config = rina_shim_dummy_config;
 

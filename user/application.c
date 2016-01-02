@@ -25,10 +25,10 @@ flow_allocate_resp_arrived(struct rina_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
 {
-    struct rina_kmsg_flow_allocate_req *req =
-            (struct rina_kmsg_flow_allocate_req *)b_req;
-    struct rina_kmsg_flow_allocate_resp_arrived *resp =
-            (struct rina_kmsg_flow_allocate_resp_arrived *)b_resp;
+    struct rina_kmsg_fa_req *req =
+            (struct rina_kmsg_fa_req *)b_req;
+    struct rina_kmsg_fa_resp_arrived *resp =
+            (struct rina_kmsg_fa_resp_arrived *)b_resp;
     char *local_s = NULL;
     char *remote_s = NULL;
 
@@ -63,8 +63,8 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
 {
     struct application *application = container_of(loop,
                                        struct application, loop);
-    struct rina_kmsg_flow_allocate_req_arrived *req =
-            (struct rina_kmsg_flow_allocate_req_arrived *)b_resp;
+    struct rina_kmsg_fa_req_arrived *req =
+            (struct rina_kmsg_fa_req_arrived *)b_resp;
     struct pending_flow_req *pfr = NULL;
 
     assert(b_req == NULL);
@@ -97,8 +97,8 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED] = flow_allocate_req_arrived,
-    [RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED] = flow_allocate_resp_arrived,
+    [RINA_KERN_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
+    [RINA_KERN_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -134,13 +134,13 @@ application_register_req(struct application *application,
     return result;
 }
 
-static struct rina_kmsg_flow_allocate_resp_arrived *
+static struct rina_kmsg_fa_resp_arrived *
 flow_allocate_req(struct application *application,
                   unsigned int wait_for_completion,
                   uint16_t ipcp_id, const struct rina_name *local_application,
                   const struct rina_name *remote_application, int *result)
 {
-    struct rina_kmsg_flow_allocate_req *req;
+    struct rina_kmsg_fa_req *req;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -150,7 +150,7 @@ flow_allocate_req(struct application *application,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ;
+    req->msg_type = RINA_KERN_FA_REQ;
     req->ipcp_id = ipcp_id;
     req->qos = 0;  /* Not currently used. */
     rina_name_copy(&req->local_application, local_application);
@@ -158,7 +158,7 @@ flow_allocate_req(struct application *application,
 
     PD("Requesting flow allocation...\n");
 
-    return (struct rina_kmsg_flow_allocate_resp_arrived *)
+    return (struct rina_kmsg_fa_resp_arrived *)
            issue_request(&application->loop, RMB(req),
                          sizeof(*req), 1, wait_for_completion, result);
 }
@@ -167,7 +167,7 @@ int
 flow_allocate_resp(struct application *application, uint16_t ipcp_id,
                    uint32_t port_id, uint8_t response)
 {
-    struct rina_kmsg_flow_allocate_resp *req;
+    struct rina_kmsg_fa_resp *req;
     struct rina_msg_base *resp;
     int result;
 
@@ -178,7 +178,7 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
     }
     memset(req, 0, sizeof(*req));
 
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP;
+    req->msg_type = RINA_KERN_FA_RESP;
     req->ipcp_id = ipcp_id;
     req->port_id = port_id;
     req->response = response;
@@ -220,7 +220,7 @@ flow_allocate(struct application *application,
               unsigned int *port_id, unsigned int wait_ms)
 {
     unsigned int ipcp_id;
-    struct rina_kmsg_flow_allocate_resp_arrived *kresp;
+    struct rina_kmsg_fa_resp_arrived *kresp;
     int result;
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name,
@@ -264,7 +264,7 @@ flow_request_wait(struct application *application)
 }
 
 static int
-open_port_common(uint32_t port_id, unsigned int cmd, uint32_t ipcp_id)
+open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 {
     struct rina_ioctl_info info;
     int fd;
@@ -278,7 +278,7 @@ open_port_common(uint32_t port_id, unsigned int cmd, uint32_t ipcp_id)
 
     info.port_id = port_id;
     info.ipcp_id = ipcp_id;
-    info.cmd = cmd;
+    info.mode = mode;
 
     ret = ioctl(fd, 73, &info);
     if (ret) {
@@ -292,20 +292,20 @@ open_port_common(uint32_t port_id, unsigned int cmd, uint32_t ipcp_id)
 int
 open_port_appl(uint32_t port_id)
 {
-    return open_port_common(port_id, RINA_IOCTL_CMD_APPL_BIND, 0);
+    return open_port_common(port_id, RINA_IO_MODE_APPL_BIND, 0);
 }
 
 int
 open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
 {
-    return open_port_common(port_id, RINA_IOCTL_CMD_IPCP_BIND, ipcp_id);
+    return open_port_common(port_id, RINA_IO_MODE_IPCP_BIND, ipcp_id);
 }
 
 int open_ipcp_mgmt(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
-    return open_port_common(~0U, RINA_IOCTL_CMD_IPCP_MGMT, ipcp_id);
+    return open_port_common(~0U, RINA_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
 /* flow_allocate() + open_port_appl() */

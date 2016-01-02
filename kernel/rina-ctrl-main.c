@@ -890,11 +890,11 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
+rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
                                      struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_uipcp_flow_allocate_req_arrived *req =
-                    (struct rina_kmsg_uipcp_flow_allocate_req_arrived *)bmsg;
+    struct rina_kmsg_uipcp_fa_req_arrived *req =
+                    (struct rina_kmsg_uipcp_fa_req_arrived *)bmsg;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -903,7 +903,7 @@ rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
     mutex_unlock(&rina_dm.lock);
 
     if (ipcp) {
-        ret = rina_flow_allocate_req_arrived(ipcp, req->remote_port,
+        ret = rina_fa_req_arrived(ipcp, req->remote_port,
                                              &req->local_application,
                                              &req->remote_application);
     }
@@ -912,11 +912,11 @@ rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
 }
 
 static int
-rina_uipcp_flow_allocate_resp_arrived(struct rina_ctrl *rc,
+rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
                                       struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_uipcp_flow_allocate_resp_arrived *req =
-                    (struct rina_kmsg_uipcp_flow_allocate_resp_arrived *)bmsg;
+    struct rina_kmsg_uipcp_fa_resp_arrived *req =
+                    (struct rina_kmsg_uipcp_fa_resp_arrived *)bmsg;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
@@ -925,7 +925,7 @@ rina_uipcp_flow_allocate_resp_arrived(struct rina_ctrl *rc,
     mutex_unlock(&rina_dm.lock);
 
     if (ipcp) {
-        ret = rina_flow_allocate_resp_arrived(ipcp, req->local_port,
+        ret = rina_fa_resp_arrived(ipcp, req->local_port,
                                               req->remote_port,
                                               req->response);
     }
@@ -974,11 +974,11 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
 
 /* To be called under global lock. */
 static int
-rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
+rina_fa_internal(uint16_t ipcp_id, struct upper_ref upper,
                             uint32_t event_id,
                             const struct rina_name *local_application,
                             const struct rina_name *remote_application,
-                            const struct rina_kmsg_flow_allocate_req *req)
+                            const struct rina_kmsg_fa_req *req)
 {
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
@@ -1048,7 +1048,7 @@ static int
 rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
                                        uint32_t port_id, uint8_t result)
 {
-    struct rina_kmsg_flow_allocate_resp_arrived *resp;
+    struct rina_kmsg_fa_resp_arrived *resp;
     int ret;
 
     resp = kzalloc(sizeof(*resp), GFP_KERNEL);
@@ -1056,7 +1056,7 @@ rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
         return -ENOMEM;
     }
 
-    resp->msg_type = RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED;
+    resp->msg_type = RINA_KERN_FA_RESP_ARRIVED;
     resp->event_id = event_id;
     resp->port_id = port_id;
     resp->result = result;
@@ -1072,10 +1072,10 @@ rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
 }
 
 static int
-rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_flow_allocate_req *req =
-                    (struct rina_kmsg_flow_allocate_req *)bmsg;
+    struct rina_kmsg_fa_req *req =
+                    (struct rina_kmsg_fa_req *)bmsg;
     int ret;
     struct upper_ref upper = {
             .userspace = 1,
@@ -1084,7 +1084,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_lock(&rina_dm.lock);
 
-    ret = rina_flow_allocate_internal(req->ipcp_id, upper,
+    ret = rina_fa_internal(req->ipcp_id, upper,
                                       req->event_id, &req->local_application,
                                       &req->remote_application, req);
     mutex_unlock(&rina_dm.lock);
@@ -1099,9 +1099,9 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
 /* To be called under global lock. */
 static int
-rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
+rina_fa_resp_internal(struct flow_entry *flow_entry,
                                  uint8_t response,
-                                 struct rina_kmsg_flow_allocate_resp *resp)
+                                 struct rina_kmsg_fa_resp *resp)
 {
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;
@@ -1147,10 +1147,10 @@ out:
 }
 
 static int
-rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_kmsg_flow_allocate_resp *req =
-                    (struct rina_kmsg_flow_allocate_resp *)bmsg;
+    struct rina_kmsg_fa_resp *req =
+                    (struct rina_kmsg_fa_resp *)bmsg;
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
 
@@ -1165,7 +1165,7 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto out;
     }
 
-    ret = rina_flow_allocate_resp_internal(flow_entry, req->response,
+    ret = rina_fa_resp_internal(flow_entry, req->response,
                                            req);
 out:
     mutex_unlock(&rina_dm.lock);
@@ -1174,14 +1174,14 @@ out:
 }
 
 int
-rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
+rina_fa_req_arrived(struct ipcp_entry *ipcp,
                                uint32_t remote_port,
                                const struct rina_name *local_application,
                                const struct rina_name *remote_application)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
-    struct rina_kmsg_flow_allocate_req_arrived *req;
+    struct rina_kmsg_fa_req_arrived *req;
     struct upper_ref upper;
     int ret = -EINVAL;
 
@@ -1216,7 +1216,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     PI("%s: Flow allocation request arrived to IPC process %u, "
         "port-id %u\n", __func__, ipcp->id, flow_entry->local_port);
 
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
+    req->msg_type = RINA_KERN_FA_REQ_ARRIVED;
     req->event_id = 0;
     req->ipcp_id = ipcp->id;
     req->port_id = flow_entry->local_port;
@@ -1231,10 +1231,10 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
+EXPORT_SYMBOL_GPL(rina_fa_req_arrived);
 
 int
-rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
+rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                                 uint32_t local_port,
                                 uint32_t remote_port,
                                 uint8_t response)
@@ -1273,7 +1273,7 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL_GPL(rina_flow_allocate_resp_arrived);
+EXPORT_SYMBOL_GPL(rina_fa_resp_arrived);
 
 int
 rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
@@ -1351,11 +1351,11 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
 static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
-    [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
-    [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,
+    [RINA_KERN_FA_REQ] = rina_fa_req,
+    [RINA_KERN_FA_RESP] = rina_fa_resp,
     [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
-    [RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED] = rina_uipcp_flow_allocate_req_arrived,
-    [RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED] = rina_uipcp_flow_allocate_resp_arrived,
+    [RINA_KERN_UIPCP_FA_REQ_ARRIVED] = rina_uipcp_fa_req_arrived,
+    [RINA_KERN_UIPCP_FA_RESP_ARRIVED] = rina_uipcp_fa_resp_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
@@ -1621,7 +1621,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
     ipcp = rio->txrx->ipcp;
 
-    if (unlikely(rio->mode == RINA_IOCTL_CMD_IPCP_MGMT)) {
+    if (unlikely(rio->mode == RINA_IO_MODE_IPCP_MGMT)) {
         /* Copy in the management header. */
         if (copy_from_user(&mhdr, ubuf, sizeof(mhdr))) {
             PE("%s: copy_from_user(mgmthdr)\n", __func__);
@@ -1643,8 +1643,8 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         return -EFAULT;
     }
 
-    if (unlikely(rio->mode != RINA_IOCTL_CMD_APPL_BIND)) {
-        if (rio->mode == RINA_IOCTL_CMD_IPCP_BIND) {
+    if (unlikely(rio->mode != RINA_IO_MODE_APPL_BIND)) {
+        if (rio->mode == RINA_IO_MODE_IPCP_BIND) {
             /* Fill the PCI for a management PDU. */
             rina_buf_pci_push(rb);
             memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
@@ -1653,7 +1653,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
             if (ret > sizeof(struct rina_pci)) {
                 ret -= sizeof(struct rina_pci);
             }
-        } else if (rio->mode == RINA_IOCTL_CMD_IPCP_MGMT) {
+        } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr,
                                            rb);
             if (ret >= sizeof(mhdr)) {
@@ -1768,7 +1768,7 @@ rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
     rio->flow->refcnt++;
     rio->txrx = &flow->txrx;
 
-    if (info->cmd == RINA_IOCTL_CMD_IPCP_BIND) {
+    if (info->mode == RINA_IO_MODE_IPCP_BIND) {
         /* Connect the upper IPCP which is using this flow
          * so that rina_sdu_rx() can deliver SDU to the IPCP. */
         struct ipcp_entry *ipcp;
@@ -1818,8 +1818,8 @@ static int
 rina_io_release_internal(struct rina_io *rio)
 {
     switch (rio->mode) {
-        case RINA_IOCTL_CMD_APPL_BIND:
-        case RINA_IOCTL_CMD_IPCP_BIND:
+        case RINA_IO_MODE_APPL_BIND:
+        case RINA_IO_MODE_IPCP_BIND:
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
             rio->flow->refcnt--;
@@ -1831,7 +1831,7 @@ rina_io_release_internal(struct rina_io *rio)
             rio->txrx = NULL;
             break;
 
-        case RINA_IOCTL_CMD_IPCP_MGMT:
+        case RINA_IO_MODE_IPCP_MGMT:
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
@@ -1867,18 +1867,18 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
     rina_io_release_internal(rio);
 
-    switch (info.cmd) {
-        case RINA_IOCTL_CMD_APPL_BIND:
-        case RINA_IOCTL_CMD_IPCP_BIND:
+    switch (info.mode) {
+        case RINA_IO_MODE_APPL_BIND:
+        case RINA_IO_MODE_IPCP_BIND:
             ret = rina_io_ioctl_bind(rio, &info);
             break;
 
-        case RINA_IOCTL_CMD_IPCP_MGMT:
+        case RINA_IO_MODE_IPCP_MGMT:
             ret = rina_io_ioctl_mgmt(rio, &info);
             break;
     }
 
-    rio->mode = info.cmd;
+    rio->mode = info.mode;
 
     mutex_unlock(&rina_dm.lock);
 

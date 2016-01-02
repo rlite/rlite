@@ -177,11 +177,11 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
 }
 
 /*static */int
-uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
+uipcp_fa_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
                                 const struct rina_name *local_application,
                                 const struct rina_name *remote_application)
 {
-    struct rina_kmsg_uipcp_flow_allocate_req_arrived *req;
+    struct rina_kmsg_uipcp_fa_req_arrived *req;
     struct rina_msg_base *resp;
     int result;
 
@@ -193,13 +193,13 @@ uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED;
+    req->msg_type = RINA_KERN_UIPCP_FA_REQ_ARRIVED;
     req->ipcp_id = uipcp->ipcp_id;
     req->remote_port = remote_port;
     rina_name_copy(&req->local_application, local_application);
     rina_name_copy(&req->remote_application, remote_application);
 
-    PD("Issuing UIPCP_FLOW_ALLOCATE_REQ_ARRIVED message...\n");
+    PD("Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
     resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
@@ -210,10 +210,10 @@ uipcp_flow_allocate_req_arrived(struct uipcp *uipcp, uint32_t remote_port,
 }
 
 /*static */int
-uipcp_flow_allocate_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
+uipcp_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                                  uint32_t remote_port, uint8_t response)
 {
-    struct rina_kmsg_uipcp_flow_allocate_resp_arrived *req;
+    struct rina_kmsg_uipcp_fa_resp_arrived *req;
     struct rina_msg_base *resp;
     int result;
 
@@ -225,13 +225,13 @@ uipcp_flow_allocate_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED;
+    req->msg_type = RINA_KERN_UIPCP_FA_RESP_ARRIVED;
     req->ipcp_id = uipcp->ipcp_id;
     req->local_port = local_port;
     req->remote_port = remote_port;
     req->response = response;
 
-    PD("Issuing UIPCP_FLOW_ALLOCATE_RESP_ARRIVED message...\n");
+    PD("Issuing UIPCP_FA_RESP_ARRIVED message...\n");
 
     resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
                          0, 0, &result);
@@ -292,15 +292,15 @@ uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
 }
 
 static int
-uipcp_flow_allocate_req(struct rina_evloop *loop,
+uipcp_fa_req(struct rina_evloop *loop,
                         const struct rina_msg_base_resp *b_resp,
                         const struct rina_msg_base *b_req)
 {
     struct application *application = container_of(loop, struct application,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
-    struct rina_kmsg_flow_allocate_req *req =
-                (struct rina_kmsg_flow_allocate_req *)b_resp;
+    struct rina_kmsg_fa_req *req =
+                (struct rina_kmsg_fa_req *)b_resp;
 
     PD("%s: Got reflected message\n", __func__);
 
@@ -312,15 +312,15 @@ uipcp_flow_allocate_req(struct rina_evloop *loop,
 }
 
 static int
-uipcp_flow_allocate_resp(struct rina_evloop *loop,
+uipcp_fa_resp(struct rina_evloop *loop,
                          const struct rina_msg_base_resp *b_resp,
                          const struct rina_msg_base *b_req)
 {
     struct application *application = container_of(loop, struct application,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
-    struct rina_kmsg_flow_allocate_resp *resp =
-                (struct rina_kmsg_flow_allocate_resp *)b_resp;
+    struct rina_kmsg_fa_resp *resp =
+                (struct rina_kmsg_fa_resp *)b_resp;
 
     PD("%s: Got reflected message\n", __func__);
 
@@ -439,15 +439,15 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
     /* Set the evloop handlers for flow allocation request/response
      * reflected messages. */
     ret = rina_evloop_set_handler(&uipcp->appl.loop,
-                                  RINA_KERN_FLOW_ALLOCATE_REQ,
-                                  uipcp_flow_allocate_req);
+                                  RINA_KERN_FA_REQ,
+                                  uipcp_fa_req);
     if (ret) {
         goto err2;
     }
 
     ret = rina_evloop_set_handler(&uipcp->appl.loop,
-                                  RINA_KERN_FLOW_ALLOCATE_RESP,
-                                  uipcp_flow_allocate_resp);
+                                  RINA_KERN_FA_RESP,
+                                  uipcp_fa_resp);
     if (ret) {
         goto err2;
     }

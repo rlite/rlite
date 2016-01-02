@@ -26,15 +26,15 @@ enum {
     RINA_KERN_IPCP_FETCH_RESP, /* 5 */
     RINA_KERN_ASSIGN_TO_DIF, /* 6 */
     RINA_KERN_APPLICATION_REGISTER, /* 7 */
-    RINA_KERN_FLOW_ALLOCATE_REQ, /* 8 */
-    RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 9 */
-    RINA_KERN_FLOW_ALLOCATE_RESP, /* 10 */
-    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 11 */
+    RINA_KERN_FA_REQ, /* 8 */
+    RINA_KERN_FA_RESP_ARRIVED, /* 9 */
+    RINA_KERN_FA_RESP, /* 10 */
+    RINA_KERN_FA_REQ_ARRIVED, /* 11 */
     RINA_KERN_IPCP_CONFIG, /* 12 */
     RINA_KERN_IPCP_PDUFT_SET, /* 13 */
     RINA_KERN_IPCP_UIPCP_SET, /* 14 */
-    RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED, /* 15 */
-    RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED, /* 16 */
+    RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 15 */
+    RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 16 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -100,7 +100,7 @@ struct rina_kmsg_application_register {
 } __attribute__((packed));
 
 /* application --> kernel to initiate a flow allocation. */
-struct rina_kmsg_flow_allocate_req {
+struct rina_kmsg_fa_req {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -111,7 +111,7 @@ struct rina_kmsg_flow_allocate_req {
 } __attribute__((packed));
 
 /* application <-- kernel to notify about an incoming flow response. */
-struct rina_kmsg_flow_allocate_resp_arrived {
+struct rina_kmsg_fa_resp_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -120,7 +120,7 @@ struct rina_kmsg_flow_allocate_resp_arrived {
 } __attribute__((packed));
 
 /* application <-- kernel to notify an incoming flow request. */
-struct rina_kmsg_flow_allocate_req_arrived {
+struct rina_kmsg_fa_req_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -129,7 +129,7 @@ struct rina_kmsg_flow_allocate_req_arrived {
 } __attribute__((packed));
 
 /* application --> kernel to respond to an incoming flow request. */
-struct rina_kmsg_flow_allocate_resp {
+struct rina_kmsg_fa_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -176,7 +176,7 @@ struct rina_kmsg_ipcp_uipcp_set {
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation request has arrived. */
-struct rina_kmsg_uipcp_flow_allocate_req_arrived {
+struct rina_kmsg_uipcp_fa_req_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -190,7 +190,7 @@ struct rina_kmsg_uipcp_flow_allocate_req_arrived {
 
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation response has arrived. */
-struct rina_kmsg_uipcp_flow_allocate_resp_arrived {
+struct rina_kmsg_uipcp_fa_resp_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 

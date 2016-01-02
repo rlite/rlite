@@ -36,16 +36,16 @@ struct rina_msg_base_resp {
 
 /* Bind the flow identified by port_id to
  * this rina_io device. */
-#define RINA_IOCTL_CMD_APPL_BIND    86
+#define RINA_IO_MODE_APPL_BIND    86
 /* The same as APPL_BIND, but also enable the IPCP identified
  * by ipcp_id to receive SDUs (in kernel) from lower layers. */
-#define RINA_IOCTL_CMD_IPCP_BIND    87
+#define RINA_IO_MODE_IPCP_BIND    87
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
-#define RINA_IOCTL_CMD_IPCP_MGMT    88
+#define RINA_IO_MODE_IPCP_MGMT    88
 
 struct rina_ioctl_info {
-    uint8_t cmd;
+    uint8_t mode;
     uint32_t port_id;
     uint16_t ipcp_id;
 } __attribute__((packed));

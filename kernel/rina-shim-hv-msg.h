@@ -17,8 +17,8 @@
 
 
 enum {
-    RINA_SHIM_HV_FLOW_ALLOCATE_REQ = 1,
-    RINA_SHIM_HV_FLOW_ALLOCATE_RESP, /* 2 */
+    RINA_SHIM_HV_FA_REQ = 1,
+    RINA_SHIM_HV_FA_RESP, /* 2 */
 
     RINA_SHIM_HV_MSG_MAX,
 };
@@ -28,7 +28,7 @@ enum {
 extern struct rina_msg_layout rina_shim_hv_numtables[RINA_SHIM_HV_MSG_MAX+1];
 
 /* Message to allocate a new flow. */
-struct rina_hmsg_flow_allocate_req {
+struct rina_hmsg_fa_req {
     rina_msg_t msg_type;
     uint32_t event_id;
 
@@ -38,7 +38,7 @@ struct rina_hmsg_flow_allocate_req {
 } __attribute__((packed));
 
 /* Message to respond to a flow allocation request. */
-struct rina_hmsg_flow_allocate_resp {
+struct rina_hmsg_fa_resp {
     rina_msg_t msg_type;
     uint32_t event_id;
 

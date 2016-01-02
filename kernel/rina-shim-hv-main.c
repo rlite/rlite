@@ -83,8 +83,8 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
 
     rina_msg_t ty = *((const rina_msg_t *)serbuf);
 
-    if (ty == RINA_SHIM_HV_FLOW_ALLOCATE_REQ) {
-        struct rina_hmsg_flow_allocate_req req;
+    if (ty == RINA_SHIM_HV_FA_REQ) {
+        struct rina_hmsg_fa_req req;
 
         ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
                                    &req, sizeof(req));
@@ -92,14 +92,14 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
             goto des_fail;
         }
 
-        ret = rina_flow_allocate_req_arrived(priv->ipcp, req.local_port,
+        ret = rina_fa_req_arrived(priv->ipcp, req.local_port,
                     &req.remote_application, &req.local_application);
         if (ret) {
             printk("%s: failed to report flow allocation request\n",
                     __func__);
         }
-    } else if (ty == RINA_SHIM_HV_FLOW_ALLOCATE_RESP) {
-        struct rina_hmsg_flow_allocate_resp resp;
+    } else if (ty == RINA_SHIM_HV_FA_RESP) {
+        struct rina_hmsg_fa_resp resp;
 
         ret = deserialize_rina_msg(rina_shim_hv_numtables, serbuf, serlen,
                                    &resp, sizeof(resp));
@@ -107,7 +107,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
             goto des_fail;
         }
 
-        ret = rina_flow_allocate_resp_arrived(priv->ipcp, resp.remote_port,
+        ret = rina_fa_resp_arrived(priv->ipcp, resp.remote_port,
                 resp.local_port, resp.response);
         if (ret) {
             printk("%s: failed to report flow allocation response\n",
@@ -199,12 +199,12 @@ rina_shim_hv_assign_to_dif(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_hv_flow_allocate_req(struct ipcp_entry *ipcp,
+rina_shim_hv_fa_req(struct ipcp_entry *ipcp,
                                struct flow_entry *flow)
 {
-    struct rina_hmsg_flow_allocate_req req;
+    struct rina_hmsg_fa_req req;
 
-    req.msg_type = RINA_SHIM_HV_FLOW_ALLOCATE_REQ;
+    req.msg_type = RINA_SHIM_HV_FA_REQ;
     req.event_id = 0;
     rina_name_copy(&req.local_application, &flow->local_application);
     rina_name_copy(&req.remote_application, &flow->remote_application);
@@ -214,13 +214,13 @@ rina_shim_hv_flow_allocate_req(struct ipcp_entry *ipcp,
 }
 
 static int
-rina_shim_hv_flow_allocate_resp(struct ipcp_entry *ipcp,
+rina_shim_hv_fa_resp(struct ipcp_entry *ipcp,
                                    struct flow_entry *flow,
                                    uint8_t response)
 {
-    struct rina_hmsg_flow_allocate_resp resp;
+    struct rina_hmsg_fa_resp resp;
 
-    resp.msg_type = RINA_SHIM_HV_FLOW_ALLOCATE_RESP;
+    resp.msg_type = RINA_SHIM_HV_FA_RESP;
     resp.event_id = 0;
     resp.local_port = flow->local_port;
     resp.remote_port = flow->remote_port;
@@ -300,8 +300,8 @@ rina_shim_hv_init(void)
     factory.ops.application_register = rina_shim_hv_application_register;
     factory.ops.application_unregister = rina_shim_hv_application_unregister;
     factory.ops.assign_to_dif = rina_shim_hv_assign_to_dif;
-    factory.ops.flow_allocate_req = rina_shim_hv_flow_allocate_req;
-    factory.ops.flow_allocate_resp = rina_shim_hv_flow_allocate_resp;
+    factory.ops.flow_allocate_req = rina_shim_hv_fa_req;
+    factory.ops.flow_allocate_resp = rina_shim_hv_fa_resp;
     factory.ops.sdu_write = rina_shim_hv_sdu_write;
     factory.ops.config = rina_shim_hv_config;
 

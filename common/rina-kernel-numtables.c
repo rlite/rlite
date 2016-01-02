@@ -32,19 +32,19 @@ struct rina_msg_layout rina_kernel_numtables[] = {
                     sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_FLOW_ALLOCATE_REQ] = {
-        .copylen = sizeof(struct rina_kmsg_flow_allocate_req) -
+    [RINA_KERN_FA_REQ] = {
+        .copylen = sizeof(struct rina_kmsg_fa_req) -
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED] = {
-        .copylen = sizeof(struct rina_kmsg_flow_allocate_resp_arrived),
+    [RINA_KERN_FA_RESP_ARRIVED] = {
+        .copylen = sizeof(struct rina_kmsg_fa_resp_arrived),
     },
-    [RINA_KERN_FLOW_ALLOCATE_RESP] = {
-        .copylen = sizeof(struct rina_kmsg_flow_allocate_resp),
+    [RINA_KERN_FA_RESP] = {
+        .copylen = sizeof(struct rina_kmsg_fa_resp),
     },
-    [RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED] = {
-        .copylen = sizeof(struct rina_kmsg_flow_allocate_req_arrived),
+    [RINA_KERN_FA_REQ_ARRIVED] = {
+        .copylen = sizeof(struct rina_kmsg_fa_req_arrived),
     },
     [RINA_KERN_IPCP_CONFIG] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_config) -
@@ -57,13 +57,13 @@ struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_KERN_IPCP_UIPCP_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_uipcp_set),
     },
-    [RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED] = {
-        .copylen = sizeof(struct rina_kmsg_uipcp_flow_allocate_req_arrived) -
+    [RINA_KERN_UIPCP_FA_REQ_ARRIVED] = {
+        .copylen = sizeof(struct rina_kmsg_uipcp_fa_req_arrived) -
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_KERN_UIPCP_FLOW_ALLOCATE_RESP_ARRIVED] = {
-        .copylen = sizeof(struct rina_kmsg_uipcp_flow_allocate_resp_arrived),
+    [RINA_KERN_UIPCP_FA_RESP_ARRIVED] = {
+        .copylen = sizeof(struct rina_kmsg_uipcp_fa_resp_arrived),
     },
     [RINA_KERN_MSG_MAX] = {
         .copylen = 0,

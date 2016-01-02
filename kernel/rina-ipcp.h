@@ -128,12 +128,12 @@ struct flow_entry {
 int rina_ipcp_factory_register(struct ipcp_factory *factory);
 int rina_ipcp_factory_unregister(uint8_t dif_type);
 
-int rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
+int rina_fa_req_arrived(struct ipcp_entry *ipcp,
                                    uint32_t remote_port,
                                    const struct rina_name *local_application,
                                    const struct rina_name *remote_application);
 
-int rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
+int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                                     uint32_t local_port,
                                     uint32_t remote_port,
                                     uint8_t response);

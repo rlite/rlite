@@ -3,13 +3,13 @@
 
 
 struct rina_msg_layout rina_shim_hv_numtables[] = {
-    [RINA_SHIM_HV_FLOW_ALLOCATE_REQ] = {
-        .copylen = sizeof(struct rina_hmsg_flow_allocate_req) -
+    [RINA_SHIM_HV_FA_REQ] = {
+        .copylen = sizeof(struct rina_hmsg_fa_req) -
                    2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_SHIM_HV_FLOW_ALLOCATE_RESP] = {
-        .copylen = sizeof(struct rina_hmsg_flow_allocate_resp),
+    [RINA_SHIM_HV_FA_RESP] = {
+        .copylen = sizeof(struct rina_hmsg_fa_resp),
         .names = 0,
     },
     [RINA_SHIM_HV_MSG_MAX] = {
