@@ -7,6 +7,23 @@ no_cmake() {
 }
 
 
+VMPI="n"
+
+# Option parsing
+while [[ $# > 0 ]]
+do
+    key="$1"
+    case $key in
+        "--with-vmpi")
+        VMPI="y"
+        ;;
+        *)
+        echo "Unknown option '$key'"
+        ;;
+    esac
+    shift
+done
+
 # Check if kernel headers are there for out-of-tree build
 if [ ! -d /lib/modules/`uname -r`/build ]; then
     echo "Cannot find '/lib/modules/$(uname -r)/build' directory"
@@ -26,5 +43,19 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=Debug
 )
 
-# Generate the Makefile (just a trivial copy)
+# Generate the main Makefile (just a trivial copy)
 cp Makefile.in Makefile
+
+# Generate the kernel Makfile
+cp kernel/Makefile.in kernel/Makefile
+if [ $VMPI == "y" ]; then
+    cat << EOS >> kernel/Makefile
+
+obj-m += rinalite-shim-hv.o
+rinalite-shim-hv-y := shim-hv.o shim-hv-numtables.o
+
+EXTRA_CFLAGS += -I\$(PWD)/kernel/vmpi
+
+obj-y += vmpi/
+EOS
+fi
