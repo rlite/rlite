@@ -30,7 +30,8 @@ struct rinaperf {
     struct rina_name ipcp_name;
     int dfd;
 
-    int interval;
+    unsigned int interval;
+    unsigned int burst;
 
     struct rinaperf_test_config test_config;
 };
@@ -98,7 +99,7 @@ echo_client(struct rinaperf *rp)
     int ret = 0;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
-    int interval = rp->interval;
+    unsigned int interval = rp->interval;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
@@ -181,8 +182,10 @@ perf_client(struct rinaperf *rp)
     int ret;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
-    int interval = rp->interval;
+    unsigned int interval = rp->interval;
     unsigned int i = 0;
+    unsigned int burst = rp->burst;
+    unsigned int cdown = burst;
 
     if (size > sizeof(buf)) {
         PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
@@ -203,7 +206,7 @@ perf_client(struct rinaperf *rp)
             }
         }
 
-        if (interval) {
+        if (interval && --cdown == 0) {
             gettimeofday(&w1, NULL);
             for (;;) {
                 gettimeofday(&w2, NULL);
@@ -213,6 +216,7 @@ perf_client(struct rinaperf *rp)
                     break;
                 }
             }
+            cdown = burst;
         }
     }
 
@@ -472,6 +476,7 @@ main(int argc, char **argv)
     int cnt = 1;
     int size = 1;
     int interval = 0;
+    int burst = 1;
     int ret;
     int opt;
     int i;
@@ -479,7 +484,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     flow_config_default(&flowcfg);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -538,6 +543,14 @@ main(int argc, char **argv)
                 fconfigured = 1;
                 break;
 
+            case 'b':
+                burst = atoi(optarg);
+                if (burst <= 0) {
+                    printf("    Invalid 'burst' %d\n", burst);
+                    return -1;
+                }
+                break;
+
             default:
                 printf("    Unrecognized option %c\n", opt);
                 usage();
@@ -568,6 +581,7 @@ main(int argc, char **argv)
     }
 
     rp.interval = interval;
+    rp.burst = burst;
 
     /* Set some signal handler */
     sa.sa_handler = sigint_handler;

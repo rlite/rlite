@@ -1,0 +1,1 @@
+user/rinaperf -tperf -c 20 -s 4000 -i 200000 -f dtcp.flow_control -f dtcp.fc.max_cwq_len=3 -f dtcp.fc.initial_credit=5
