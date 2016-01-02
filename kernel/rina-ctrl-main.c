@@ -308,7 +308,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
         INIT_WORK(&entry->remove, ipcp_remove_work);
-        spin_lock_init(&entry->lock);
+        mutex_init(&entry->lock);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
     } else {
@@ -782,6 +782,10 @@ flow_orphan(struct flow_entry *flow)
 static int
 ipcp_put(struct ipcp_entry *entry)
 {
+    if (!entry) {
+        return 0;
+    }
+
     PLOCK();
 
     entry->refcnt--;
@@ -804,6 +808,10 @@ ipcp_put(struct ipcp_entry *entry)
      * was called. */
     if (entry->priv) {
         BUG_ON(entry->ops.destroy == NULL);
+        /* No locking (entry->lock) is necessary here, because the current
+         * thread has already removed the last reference to this IPCP,
+         * and so it cannot be referenced anymore. This also means no
+         * concurrent access is possible. */
         entry->ops.destroy(entry);
     }
 
@@ -838,13 +846,11 @@ ipcp_del(unsigned int ipcp_id)
      * to the given ipcp_id. */
     entry = ipcp_get(ipcp_id);
     if (!entry) {
-        ret = -ENXIO;
-        goto out;
+        return -ENXIO;
     }
 
-    ret = ipcp_put(entry);
-out:
     ret = ipcp_put(entry); /* To match the ipcp_get(). */
+    ret = ipcp_put(entry); /* To remove the ipcp. */
 
     return ret;
 }
@@ -965,7 +971,9 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
     entry = ipcp_get(req->ipcp_id);
+
     if (entry) {
+        mutex_lock(&entry->lock);
         if (strcmp(req->name, "dif") == 0) {
             rina_name_free(&entry->dif_name);
             rina_name_fill(&entry->dif_name, req->value, NULL, NULL, NULL);
@@ -973,7 +981,9 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         } else {
             ret = entry->ops.config(entry, req->name, req->value);
         }
+        mutex_unlock(&entry->lock);
     }
+
     ipcp_put(entry);
 
     if (ret == 0) {
@@ -997,12 +1007,14 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     ipcp = ipcp_get(req->ipcp_id);
 
     if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set) {
+        mutex_lock(&ipcp->lock);
         /* We allow this operation only if the requesting IPCP (req->ipcp_id)
          * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
          * In this situation we are sure that 'ipcp' will not be deleted before
          * 'flow' is deleted, so it we can work outside the global lock and
          * rely on the internal pduft lock. */
         ret = ipcp->ops.pduft_set(ipcp, req->dest_addr, flow);
+        mutex_unlock(&ipcp->lock);
     }
 
     flow_put(flow);
@@ -1029,7 +1041,9 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
      * fill the DIF name field. */
     entry = ipcp_get(req->ipcp_id);
     if (entry) {
+        mutex_lock(&entry->lock);
         entry->uipcp = rc;
+        mutex_unlock(&entry->lock);
         ret = 0;
     }
     ipcp_put(entry);

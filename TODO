@@ -32,5 +32,4 @@
 - shim-eth: implementare la funzionalità di unpadding per estrarre rina_name
   serializzati dai messaggi ARP.
 
-- proteggere l'accesso agli IPCP con ipcp_entry::lock (e.g. ipcp_config): questo
-  lock potrebbe essere un mutex
+- proteggere l'accesso alla lista di applicazioni registrate

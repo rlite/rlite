@@ -78,7 +78,7 @@ struct ipcp_entry {
     struct module       *owner;
     struct work_struct  remove;
     unsigned int        refcnt;
-    spinlock_t          lock;
+    struct mutex        lock;
     struct hlist_node   node;
 };
 
