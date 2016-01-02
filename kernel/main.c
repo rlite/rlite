@@ -1713,12 +1713,22 @@ out:
 }
 
 static int
-rina_fa_resp_internal(struct flow_entry *flow_entry,
-                      uint8_t response,
-                      struct rina_kmsg_fa_resp *resp)
+rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
+    struct rina_kmsg_fa_resp *resp =
+                    (struct rina_kmsg_fa_resp *)bmsg;
+    struct flow_entry *flow_entry;
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;
+
+    /* Lookup the flow corresponding to the port-id specified
+     * by the request. */
+    flow_entry = flow_get(resp->port_id);
+    if (!flow_entry) {
+        PE("no pending flow corresponding to port-id %u\n",
+                resp->port_id);
+        return ret;
+    }
 
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
@@ -1727,14 +1737,14 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
                 flow_entry->local_port, flow_entry->state);
         goto out;
     }
-    flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
+    flow_entry->state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
                                         : FLOW_STATE_NULL;
 
     PI("Flow allocation response [%u] issued to IPC process %u, "
-            "port-id %u\n", response, flow_entry->txrx.ipcp->id,
+            "port-id %u\n", resp->response, flow_entry->txrx.ipcp->id,
             flow_entry->local_port);
 
-    if (!response && resp->upper_ipcp_id != 0xffff) {
+    if (!resp->response && resp->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(resp->upper_ipcp_id, flow_entry);
     }
 
@@ -1743,7 +1753,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
     if (ipcp->ops.flow_allocate_resp) {
         /* This IPCP handles the flow allocation in kernel-space. This is
          * currently true for shim IPCPs. */
-        ret = ipcp->ops.flow_allocate_resp(ipcp, flow_entry, response);
+        ret = ipcp->ops.flow_allocate_resp(ipcp, flow_entry, resp->response);
     } else {
         if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
@@ -1760,32 +1770,10 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
         }
     }
 
-    if (ret || response) {
+    if (ret || resp->response) {
         flow_put(flow_entry);
     }
 out:
-
-    return ret;
-}
-
-static int
-rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
-{
-    struct rina_kmsg_fa_resp *req =
-                    (struct rina_kmsg_fa_resp *)bmsg;
-    struct flow_entry *flow_entry;
-    int ret = -EINVAL;
-
-    /* Lookup the flow corresponding to the port-id specified
-     * by the request. */
-    flow_entry = flow_get(req->port_id);
-    if (!flow_entry) {
-        PE("no pending flow corresponding to port-id %u\n",
-                req->port_id);
-        return ret;
-    }
-
-    ret = rina_fa_resp_internal(flow_entry, req->response, req);
 
     flow_entry = flow_put(flow_entry);
 
