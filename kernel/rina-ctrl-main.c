@@ -580,15 +580,15 @@ application_del_by_rc(struct rina_ctrl *rc)
 
 /* Must be called under global lock. */
 static void
-flow_del_by_upper(struct upper_ref upper)
+flow_rc_unbind(struct rina_ctrl *rc)
 {
     struct flow_entry *flow;
     struct hlist_node *tmp;
     int bucket;
 
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
-        if (flow->upper.rc == upper.rc) {
-            flow_del_entry(flow, 0);
+        if (flow->upper.rc == rc) {
+            flow->upper.rc = NULL;
         }
     }
 }
@@ -1527,16 +1527,13 @@ static int
 rina_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
-    struct upper_ref upper = {
-        .rc = rc,
-    };
 
     mutex_lock(&rina_dm.lock);
     /* This is a ctrl device opened by an application.
      * We must invalidate (e.g. unregister) all the
      * application names registered with this device. */
     application_del_by_rc(rc);
-    flow_del_by_upper(upper);
+    flow_rc_unbind(rc);
     mutex_unlock(&rina_dm.lock);
 
     kfree(rc);
