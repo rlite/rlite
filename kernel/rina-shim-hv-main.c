@@ -93,7 +93,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         }
 
         ret = rina_fa_req_arrived(priv->ipcp, req.local_port, 0,
-                    &req.remote_application, &req.local_application);
+                    &req.remote_application, &req.local_application, 1);
         if (ret) {
             printk("%s: failed to report flow allocation request\n",
                     __func__);
@@ -108,7 +108,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         }
 
         ret = rina_fa_resp_arrived(priv->ipcp, resp.remote_port,
-                                   resp.local_port, 0, resp.response);
+                                   resp.local_port, 0, resp.response, 1);
         if (ret) {
             printk("%s: failed to report flow allocation response\n",
                     __func__);

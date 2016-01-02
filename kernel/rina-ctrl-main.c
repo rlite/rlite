@@ -901,13 +901,13 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc,
 
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
-    mutex_unlock(&rina_dm.lock);
-
     if (ipcp) {
         ret = rina_fa_req_arrived(ipcp, req->remote_port, req->remote_addr,
                                   &req->local_application,
-                                  &req->remote_application);
+                                  &req->remote_application, 0);
     }
+
+    mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -923,13 +923,13 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
 
     mutex_lock(&rina_dm.lock);
     ipcp = ipcp_table_find(req->ipcp_id);
-    mutex_unlock(&rina_dm.lock);
-
     if (ipcp) {
         ret = rina_fa_resp_arrived(ipcp, req->local_port,
                                    req->remote_port, req->remote_addr,
-                                   req->response);
+                                   req->response, 0);
     }
+    mutex_unlock(&rina_dm.lock);
+
 
     return ret;
 }
@@ -1009,11 +1009,20 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
         if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this should not happen. */
         } else {
-            /* Reflect the flow allocation request message to userspace. */
-            req->event_id = 0;
-            req->local_port = flow_entry->local_port;
-            ret = rina_upqueue_append(ipcp_entry->uipcp,
-                                      (const struct rina_msg_base *)req);
+            struct registered_application *app;
+
+            app = ipcp_application_lookup(ipcp_entry, remote_application);
+            if (app) {
+                ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
+                                          ipcp_entry->addr, remote_application,
+                                          local_application, 0);
+            } else {
+                /* Reflect the flow allocation request message to userspace. */
+                req->event_id = 0;
+                req->local_port = flow_entry->local_port;
+                ret = rina_upqueue_append(ipcp_entry->uipcp,
+                        (const struct rina_msg_base *)req);
+            }
         }
     }
 
@@ -1135,12 +1144,19 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
         if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this should not happen. */
         } else {
-            /* Reflect the flow allocation response message to userspace. */
-            resp->event_id = 0;
-            resp->remote_port = flow_entry->remote_port;
-            resp->remote_addr = flow_entry->remote_addr;
-            ret = rina_upqueue_append(ipcp->uipcp,
-                                      (const struct rina_msg_base *)resp);
+            if (flow_entry->remote_addr == ipcp->addr) {
+                ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
+                                           flow_entry->local_port,
+                                           ipcp->addr,
+                                           response, 0);
+            } else {
+                /* Reflect the flow allocation response message to userspace. */
+                resp->event_id = 0;
+                resp->remote_port = flow_entry->remote_port;
+                resp->remote_addr = flow_entry->remote_addr;
+                ret = rina_upqueue_append(ipcp->uipcp,
+                                          (const struct rina_msg_base *)resp);
+            }
         }
     }
 
@@ -1182,7 +1198,8 @@ int
 rina_fa_req_arrived(struct ipcp_entry *ipcp,
                     uint32_t remote_port, uint64_t remote_addr,
                     const struct rina_name *local_application,
-                    const struct rina_name *remote_application)
+                    const struct rina_name *remote_application,
+                    bool locked)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
@@ -1195,14 +1212,15 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    mutex_lock(&rina_dm.lock);
+    if (locked) {
+        mutex_lock(&rina_dm.lock);
+    }
 
     /* See whether the local application is registered to this
      * IPC process. */
     app = ipcp_application_lookup(ipcp, local_application);
     if (!app) {
-        mutex_unlock(&rina_dm.lock);
-        return -EINVAL;
+        goto out;
     }
 
     /* Allocate a port id and the associated flow entry. */
@@ -1212,8 +1230,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     ret = flow_add(ipcp, upper, 0, local_application,
                    remote_application, &flow_entry, 0);
     if (ret) {
-        mutex_unlock(&rina_dm.lock);
-        return ret;
+        goto out;
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_addr = remote_addr;
@@ -1233,7 +1250,10 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
         rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
         flow_del_entry(flow_entry, 0);
     }
-    mutex_unlock(&rina_dm.lock);
+out:
+    if (locked) {
+        mutex_unlock(&rina_dm.lock);
+    }
 
     return ret;
 }
@@ -1244,12 +1264,15 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
                      uint64_t remote_addr,
-                     uint8_t response)
+                     uint8_t response,
+                     bool locked)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
 
-    mutex_lock(&rina_dm.lock);
+    if (locked) {
+        mutex_lock(&rina_dm.lock);
+    }
 
     flow_entry = flow_table_find(local_port);
     if (!flow_entry) {
@@ -1278,7 +1301,9 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     }
 
 out:
-    mutex_unlock(&rina_dm.lock);
+    if (locked) {
+        mutex_unlock(&rina_dm.lock);
+    }
 
     return ret;
 }

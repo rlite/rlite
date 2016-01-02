@@ -132,13 +132,15 @@ int rina_ipcp_factory_unregister(uint8_t dif_type);
 int rina_fa_req_arrived(struct ipcp_entry *ipcp,
                         uint32_t remote_port, uint64_t remote_addr,
                         const struct rina_name *local_application,
-                        const struct rina_name *remote_application);
+                        const struct rina_name *remote_application,
+                        bool locked);
 
 int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                          uint32_t local_port,
                          uint32_t remote_port,
                          uint64_t remote_addr,
-                         uint8_t response);
+                         uint8_t response,
+                         bool locked);
 
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);
