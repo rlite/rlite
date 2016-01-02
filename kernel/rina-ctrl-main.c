@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <rina/rina-ctrl.h>
 #include <rina/rina-utils.h>
+#include "rina-ipcp.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -39,21 +40,6 @@
 struct upqueue_entry {
     void *sermsg;
     size_t serlen;
-    struct list_head node;
-};
-
-struct ipcp_ops {
-    int (*assign_to_dif)(void *data, struct rina_name *dif_name);
-    int (*application_register)(void *data, struct rina_name *app_name);
-    int (*application_unregister)(void *data, struct rina_name *app_name);
-    int (*sdu_write)(void *data, void *sdu, unsigned int sdu_len);
-};
-
-struct ipcp_factory {
-    uint8_t dif_type;
-    void *(*create)(void);
-    void (*destroy)(void *data);
-    struct ipcp_ops ops;
     struct list_head node;
 };
 
@@ -123,6 +109,9 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 
     list_add_tail(&f->node, &rina_dm.ipcp_factories);
 
+    printk("%s: IPC processes factory %u registered\n",
+            __func__, factory->dif_type);
+
     return 0;
 }
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_register);
@@ -138,6 +127,9 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 
     list_del(&factory->node);
     kfree(factory);
+
+    printk("%s: IPC processes factory %u unregistered\n",
+            __func__, dif_type);
 
     return 0;
 }
@@ -603,6 +595,7 @@ rina_ctrl_init(void)
     hash_init(rina_dm.ipcp_table);
     mutex_init(&rina_dm.lock);
     rina_dm.ipcp_fetch_last = NULL;
+    INIT_LIST_HEAD(&rina_dm.ipcp_factories);
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {

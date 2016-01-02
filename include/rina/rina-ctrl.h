@@ -11,6 +11,7 @@
 #include <stdint.h>
 #endif
 
+#include <rina/rina-ipcp-types.h>
 
 /* Application naming information:
  *   - Application Process Name
@@ -24,12 +25,6 @@ struct rina_name {
     char *aen;
     char *aei;
 } __attribute__((packed));
-
-/* DIF types */
-enum {
-    DIF_TYPE_NORMAL = 1,
-    DIF_TYPE_SHIM_DUMMY,
-};
 
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
