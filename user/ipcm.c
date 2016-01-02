@@ -146,11 +146,16 @@ rina_name_fill(struct rina_name *name, char *apn,
 }
 
 static int
-store_pending_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
+issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
                       size_t msg_len)
 {
     struct pending_entry *entry;
+    int ret;
 
+    /* Store the request in the pending queue before issuing the request
+     * itself to the kernel. This is necessary in order to avoid race
+     * conditions between the event loop and this thread, resulting in
+     * the event loop not being able to find the pending request. */
     entry = malloc(sizeof(*entry));
     if (!entry) {
         return ENOMEM;
@@ -160,6 +165,17 @@ store_pending_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
     entry->msg = msg;
     entry->msg_len = msg_len;
     pending_queue_enqueue(&ipcm->pqueue, entry);
+
+    /* Issue the request to the kernel. */
+    ret = write(ipcm->rfd, msg, msg_len);
+    if (ret != msg_len) {
+        if (ret < 0) {
+            perror("write(rfd)");
+        } else {
+            printf("%s: Error: partial write [%u/%lu]\n", __func__,
+                    ret, msg_len);
+        }
+    }
 
     return 0;
 }
@@ -183,28 +199,13 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
     msg->name = *name;
     msg->dif_type = dif_type;
 
-    /* Store the request in the pending queue before issuing the request
-     * itself to the kernel. This is necessary in order to avoid race
-     * conditions between the event loop and this thread, resulting in
-     * the event loop not being able to find the pending request. */
-    ret = store_pending_request(ipcm, (struct rina_ctrl_base_msg *)msg,
+    printf("Requesting IPC process creation...\n");
+
+    ret = issue_request(ipcm, (struct rina_ctrl_base_msg *)msg,
                                 sizeof(*msg));
     if (ret < 0) {
         free(msg);
         return ret;
-    }
-
-    printf("Requesting IPC process creation...\n");
-
-    /* Issue the request to the kernel. */
-    ret = write(ipcm->rfd, msg, sizeof(*msg));
-    if (ret != sizeof(*msg)) {
-        if (ret < 0) {
-            perror("write(create_ipcp)");
-        } else {
-            printf("%s: Error: partial write [%u/%lu]\n", __func__,
-                    ret, sizeof(*msg));
-        }
     }
 
     return ret;
@@ -228,28 +229,13 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
     msg->event_id = ipcm->event_id_counter++;
     msg->ipcp_id = ipcp_id;
 
-    /* Store the request in the pending queue before issuing the request
-     * itself to the kernel. This is necessary in order to avoid race
-     * conditions between the event loop and this thread, resulting in
-     * the event loop not being able to find the pending request. */
-    ret = store_pending_request(ipcm, (struct rina_ctrl_base_msg *)msg,
+    printf("Requesting IPC process destruction...\n");
+
+    ret = issue_request(ipcm, (struct rina_ctrl_base_msg *)msg,
                                 sizeof(*msg));
     if (ret < 0) {
         free(msg);
         return ret;
-    }
-
-    printf("Requesting IPC process destruction...\n");
-
-    /* Issue the request to the kernel. */
-    ret = write(ipcm->rfd, msg, sizeof(*msg));
-    if (ret != sizeof(*msg)) {
-        if (ret < 0) {
-            perror("write(create_ipcp)");
-        } else {
-            printf("%s: Error: partial write [%u/%lu]\n", __func__,
-                    ret, sizeof(*msg));
-        }
     }
 
     return ret;
