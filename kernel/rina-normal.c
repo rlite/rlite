@@ -379,19 +379,24 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return rb;
 }
 
+/* This must be called under DTP lock and after rcv_lwe has been
+ * updated.
+ */
 static struct rina_buf *
-sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                 uint64_t seqnum)
+sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
     struct rina_buf *crb = NULL;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
-        /* We should not unconditionally increment the receiver RWE,
-         * but instead use some logic related to buffer management
-         * (e.g. see the amount of receiver buffer available). */
-        flow->dtp.rcv_rwe++;
+        if (cfg->fc.fc_type == RINA_FC_T_WIN) {
+            /* We should not unconditionally increment the receiver RWE,
+             * but instead use some logic related to buffer management
+             * (e.g. see the amount of receiver buffer available). */
+            flow->dtp.rcv_rwe = flow->dtp.rcv_lwe +
+                            flow->cfg.dtcp.fc.cfg.w.initial_credit;
+        }
 
         if (!cfg->rtx_control) {
             /* POL: ReceivingFlowControl */
@@ -433,6 +438,25 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
     /* Insert the rb right before 'pos'. */
     list_add_tail(&rb->node, pos);
     PD("%s: [%lu] inserted\n", __func__, (long unsigned)seqnum);
+}
+
+static void
+seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
+{
+    struct rina_buf *qrb, *tmp;
+
+    INIT_LIST_HEAD(qrbs);
+    list_for_each_entry_safe(qrb, tmp, &dtp->seqq, node) {
+        struct rina_pci *pci = RINA_BUF_PCI(qrb);
+
+        if (pci->seqnum - dtp->rcv_lwe <= max_sdu_gap) {
+            list_del(&qrb->node);
+            list_add_tail(&qrb->node, qrbs);
+            dtp->rcv_lwe = pci->seqnum;
+            PD("%s: [%lu] popped out from seqq\n", __func__,
+                    (long unsigned)pci->seqnum);
+        }
+    }
 }
 
 static int
@@ -488,7 +512,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         dtp->rcv_lwe = pci->seqnum + 1;
         dtp->max_seq_num_rcvd = pci->seqnum;
 
-        crb = sdu_rx_sv_update(ipcp, flow, pci->seqnum);
+        crb = sdu_rx_sv_update(ipcp, flow);
 
         spin_unlock(&dtp->lock);
 
@@ -577,13 +601,21 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             dtp->rcv_lwe = seqnum + 1;
         }
 
-        crb = sdu_rx_sv_update(ipcp, flow, seqnum);
-
         if (deliver) {
+            struct list_head qrbs;
+            struct rina_buf *qrb;
+
+            seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
+
+            crb = sdu_rx_sv_update(ipcp, flow);
 
             spin_unlock(&dtp->lock);
 
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+
+            list_for_each_entry(qrb, &qrbs, node) {
+                ret |= rina_sdu_rx(ipcp, qrb, pci->conn_id.dst_cep);
+            }
 
             goto snd_crb;
         }
@@ -599,6 +631,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
              */
             seqq_push(dtp, rb);
         }
+
+        crb = sdu_rx_sv_update(ipcp, flow);
 
         spin_unlock(&dtp->lock);
     }
