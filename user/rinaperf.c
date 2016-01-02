@@ -27,6 +27,7 @@ struct rinaperf {
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
     struct rina_name dif_name;
+    struct rina_name ipcp_name;
     int dfd;
 
     struct rinaperf_test_config test_config;
@@ -290,6 +291,7 @@ main(int argc, char **argv)
     struct rinaperf rp;
     const char *type = "echo";
     const char *dif_name = "d.DIF";
+    const char *ipcp_apn = NULL, *ipcp_api = NULL;
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
@@ -299,7 +301,7 @@ main(int argc, char **argv)
     int opt;
     int i;
 
-    while ((opt = getopt(argc, argv, "lt:d:c:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "lt:d:c:s:p:P:")) != -1) {
         switch (opt) {
             case 'l':
                 listen = 1;
@@ -312,6 +314,13 @@ main(int argc, char **argv)
             case 'd':
                 dif_name = optarg;
                 break;
+
+            case 'p':
+                ipcp_apn = optarg;
+                break;
+
+            case 'P':
+                ipcp_api = optarg;
 
             case 'c':
                 cnt = atoi(optarg);
@@ -381,18 +390,22 @@ main(int argc, char **argv)
     rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", "", "");
     rina_name_fill(&rp.client_appl_name, "rinaperf-data", "client", NULL, NULL);
     rina_name_fill(&rp.server_appl_name, "rinaperf-data", "server", NULL, NULL);
+    if (!ipcp_apn) {
+        ipcp_api = NULL;
+    }
+    rina_name_fill(&rp.ipcp_name, ipcp_apn, ipcp_api, "", "");
 
     if (listen) {
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
         ret = application_register(&rp.application, 1, &rp.dif_name,
-                                   1, NULL, &server_ctrl_name);
+                                   1, &rp.ipcp_name, &server_ctrl_name);
         if (ret) {
             return ret;
         }
         ret = application_register(&rp.application, 1, &rp.dif_name,
-                                   1, NULL, &rp.server_appl_name);
+                                   1, &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
             return ret;
         }
@@ -401,8 +414,9 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1, NULL,
-                        &rp.client_appl_name, &rp.server_appl_name, 1500);
+        rp.dfd = flow_allocate_open(&rp.application, &rp.dif_name, 1,
+                                    &rp.ipcp_name, &rp.client_appl_name,
+                                    &rp.server_appl_name, 1500);
         if (rp.dfd < 0) {
             return rp.dfd;
         }
