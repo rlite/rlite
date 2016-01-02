@@ -53,7 +53,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-uipcps_connect(int verbose)
+uipcps_connect(void)
 {
     struct sockaddr_un server_address;
     int ret;
@@ -62,9 +62,7 @@ uipcps_connect(int verbose)
     /* Open a Unix domain socket towards the uipcps. */
     sfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sfd < 0) {
-        if (verbose) {
-            perror("socket(AF_UNIX)");
-        }
+        perror("socket(AF_UNIX)");
         return -1;
     }
     memset(&server_address, 0, sizeof(server_address));
@@ -74,11 +72,8 @@ uipcps_connect(int verbose)
     ret = connect(sfd, (struct sockaddr *)&server_address,
                     sizeof(server_address));
     if (ret) {
-        if (verbose) {
-            perror("connect(AF_UNIX, path)");
-        } else {
-            PI("Warning: uipcps are not running\n");
-        }
+        perror("connect(AF_UNIX, path)");
+        PI("Warning: maybe uipcps are not running?\n");
         return -1;
     }
 
@@ -128,13 +123,12 @@ read_response(int sfd, response_handler_t handler)
 }
 
 static int
-request_response(struct rina_msg_base *req, int verbose,
-                 response_handler_t handler)
+request_response(struct rina_msg_base *req, response_handler_t handler)
 {
     int fd;
     int ret;
 
-    fd = uipcps_connect(verbose);
+    fd = uipcps_connect();
     if (fd < 0) {
         return fd;
     }
@@ -171,7 +165,7 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
         req.dif_type = NULL;
     }
 
-    return request_response((struct rina_msg_base *)&req, 1, NULL);
+    return request_response((struct rina_msg_base *)&req, NULL);
 }
 
 /* Create an IPC process. */
@@ -385,7 +379,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     req.reg = reg;
 
-    return request_response((struct rina_msg_base *)&req, 1, NULL);
+    return request_response((struct rina_msg_base *)&req, NULL);
 }
 
 static int
@@ -434,7 +428,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req, 1, NULL);
+    return request_response((struct rina_msg_base *)&req, NULL);
 }
 
 static int
@@ -475,7 +469,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
-    return request_response((struct rina_msg_base *)&req, 1, NULL);
+    return request_response((struct rina_msg_base *)&req, NULL);
 }
 
 static int
@@ -524,7 +518,7 @@ ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
 
-    return request_response((struct rina_msg_base *)&req, 1,
+    return request_response((struct rina_msg_base *)&req,
                             ipcp_rib_show_handler);
 }
 
