@@ -1207,7 +1207,8 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
-ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd)
+ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
+                 int update_type)
 {
     const char *dif_name = NULL;
     int ret = 0;
@@ -1215,7 +1216,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd)
     memset(upd, 0, sizeof(*upd));
 
     upd->msg_type = RLITE_KER_IPCP_UPDATE;
-    upd->update_type = RLITE_UPDATE_ADD;
+    upd->update_type = update_type;
     upd->ipcp_id = ipcp->id;
     upd->ipcp_addr = ipcp->addr;
     upd->depth = ipcp->depth;
@@ -1235,6 +1236,39 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd)
             ret = -ENOMEM;
         }
     }
+
+    return ret;
+}
+
+static int
+ipcp_update_all(uint16_t ipcp_id, int update_type)
+{
+    struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
+    struct rl_kmsg_ipcp_update upd;
+    struct rlite_ctrl *rcur;
+    int ret = 0;
+
+    if (!ipcp) {
+        PE("IPCP %u unexpectedly disappeared\n", ipcp_id);
+        return -ENXIO;
+    }
+
+    if (ipcp_update_fill(ipcp, &upd, update_type)) {
+        PE("Out of memory\n");
+        ret = -ENOMEM;
+        goto out;
+    }
+
+    mutex_lock(&rlite_dm.general_lock);
+    list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
+        rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
+    }
+    mutex_unlock(&rlite_dm.general_lock);
+
+out:
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            (struct rlite_msg_base *)&upd);
+    ipcp_put(ipcp);
 
     return ret;
 }
@@ -1269,30 +1303,9 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         kfree(name_s);
     }
 
-    {
-        /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
-         * opened ctrl device. */
-        struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
-        struct rl_kmsg_ipcp_update upd;
-        struct rlite_ctrl *rcur;
-
-        BUG_ON(!ipcp);
-
-        if (ipcp_update_fill(ipcp, &upd)) {
-            PE("Out of memory\n");
-
-        } else {
-            mutex_lock(&rlite_dm.general_lock);
-            list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
-                rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
-            }
-            mutex_unlock(&rlite_dm.general_lock);
-        }
-
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                (struct rlite_msg_base *)&upd);
-        ipcp_put(ipcp);
-    }
+    /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+     * opened ctrl device. */
+    ipcp_update_all(ipcp_id, RLITE_UPDATE_ADD);
 
     return 0;
 
@@ -1449,6 +1462,12 @@ rlite_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     if (ret == 0) {
         PI("Configured IPC process %u: %s <= %s\n",
                 req->ipcp_id, req->name, req->value);
+
+        if (strcmp(req->name, "address") == 0) {
+            /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+             * opened ctrl device. */
+            ipcp_update_all(req->ipcp_id, RLITE_UPDATE_UPD);
+        }
     }
 
     return ret;
@@ -2351,7 +2370,7 @@ initial_ipcp_update(struct rlite_ctrl *rc)
     hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
         struct rl_kmsg_ipcp_update upd;
 
-        ret = ipcp_update_fill(entry, &upd);
+        ret = ipcp_update_fill(entry, &upd, RLITE_UPDATE_ADD);
 
         rlite_upqueue_append(rc, (const struct rlite_msg_base *)&upd);
 
