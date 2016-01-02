@@ -57,6 +57,8 @@ struct rlite_ctrl {
     wait_queue_head_t upqueue_wqh;
 
     struct list_head ipcps_fetch_q;
+
+    struct list_head node;
 };
 
 struct upqueue_entry {
@@ -122,7 +124,11 @@ struct rlite_dm {
     /* Lock for DIFs list. */
     spinlock_t difs_lock;
 
-    /* Lock for ipcp_factories list. */
+    /* List that contains all the rlite ctrl devices that
+     * are currently opened. */
+    struct list_head ctrl_devs;
+
+    /* Lock for ipcp_factories and ctrl_devs list */
     struct mutex general_lock;
 };
 
@@ -2252,14 +2258,14 @@ rlite_ctrl_poll(struct file *f, poll_table *wait)
     return mask;
 }
 
-static struct rlite_ctrl *
-rlite_ctrl_open_common(struct inode *inode, struct file *f)
+static int
+rlite_ctrl_open(struct inode *inode, struct file *f)
 {
     struct rlite_ctrl *rc;
 
     rc = kzalloc(sizeof(*rc), GFP_KERNEL);
     if (!rc) {
-        return NULL;
+        return -ENOMEM;
     }
 
     f->private_data = rc;
@@ -2269,19 +2275,11 @@ rlite_ctrl_open_common(struct inode *inode, struct file *f)
 
     INIT_LIST_HEAD(&rc->ipcps_fetch_q);
 
-    return rc;
-}
-
-static int
-rlite_ctrl_open(struct inode *inode, struct file *f)
-{
-    struct rlite_ctrl *rc = rlite_ctrl_open_common(inode, f);
-
-    if (!rc) {
-        return -ENOMEM;
-    }
-
     rc->handlers = rlite_ctrl_handlers;
+
+    mutex_lock(&rlite_dm.general_lock);
+    list_add_tail(&rc->node, &rlite_dm.ctrl_devs);
+    mutex_unlock(&rlite_dm.general_lock);
 
     return 0;
 }
@@ -2291,9 +2289,12 @@ rlite_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
 
-    /* This is a ctrl device opened by an application.
-     * We must invalidate (e.g. unregister) all the
-     * application names registered with this device. */
+    mutex_lock(&rlite_dm.general_lock);
+    list_del(&rc->node);
+    mutex_unlock(&rlite_dm.general_lock);
+
+    /* We must invalidate (e.g. unregister) all the
+     * application names registered with this ctrl device. */
     application_del_by_rc(rc);
     flow_rc_unbind(rc);
 
@@ -2685,6 +2686,7 @@ rlite_ctrl_init(void)
     spin_lock_init(&rlite_dm.difs_lock);
     INIT_LIST_HEAD(&rlite_dm.ipcp_factories);
     INIT_LIST_HEAD(&rlite_dm.difs);
+    INIT_LIST_HEAD(&rlite_dm.ctrl_devs);
 
     ret = misc_register(&rlite_ctrl_misc);
     if (ret) {
