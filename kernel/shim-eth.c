@@ -971,6 +971,28 @@ rlite_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow
     return 0;
 }
 
+static int
+rlite_shim_eth_flow_get_stats(struct flow_entry *flow,
+                              struct rl_kmsg_flow_stats_resp *resp)
+{
+    struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
+    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp;
+
+    spin_lock_bh(&priv->tx_lock);
+    resp->tx_pkt = flow_priv->tx_pkt;
+    resp->tx_byte = flow_priv->tx_byte;
+    resp->tx_err = flow_priv->tx_err;
+    spin_unlock_bh(&priv->tx_lock);
+
+    spin_lock_bh(&priv->arpt_lock);
+    resp->rx_pkt = flow_priv->rx_pkt;
+    resp->rx_byte = flow_priv->rx_byte;
+    resp->rx_err = flow_priv->rx_err;
+    spin_unlock_bh(&priv->arpt_lock);
+
+    return 0;
+}
+
 #define SHIM_DIF_TYPE   "shim-eth"
 
 static struct ipcp_factory shim_eth_factory = {
@@ -985,6 +1007,7 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.config = rlite_shim_eth_config,
     .ops.appl_register = rlite_shim_eth_register,
     .ops.flow_deallocated = rlite_shim_eth_flow_deallocated,
+    .ops.flow_get_stats = rlite_shim_eth_flow_get_stats,
 };
 
 static int __init
