@@ -24,6 +24,7 @@
 struct uipcp {
     struct application appl;
     unsigned int ipcp_id;
+    pthread_t server_th;
 
     struct list_head node;
 };
@@ -83,6 +84,43 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
+static void *
+uipcp_server(void *arg)
+{
+    struct uipcp *uipcp = arg;
+
+    for (;;) {
+        struct pending_flow_req *pfr;
+        unsigned int port_id;
+        int result, fd;
+
+        pfr = flow_request_wait(&uipcp->appl);
+        port_id = pfr->port_id;
+        PD("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+                __func__, pfr->ipcp_id, pfr->port_id);
+
+        result = flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
+                                    pfr->port_id, 0);
+        free(pfr);
+
+        if (result) {
+            continue;
+        }
+
+        fd = open_port(port_id);
+        if (fd < 0) {
+            continue;
+        }
+
+        /* Do enrollment here. */
+        PD("%s: Enrollment phase (server)\n", __func__);
+
+        close(fd);
+    }
+
+    return NULL;
+}
+
 static struct uipcp *
 uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id)
 {
@@ -118,6 +156,12 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
     if (ret) {
         list_del(&uipcp->node);
         return ret;
+    }
+
+    ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
+    if (ret) {
+        list_del(&uipcp->node);
+        rina_application_fini(&uipcp->appl);
     }
 
     PD("userspace IPCP %u created\n", ipcp_id);
@@ -592,6 +636,7 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     fd = open_port(port_id);
 
     /* Do enrollment here. */
+    PD("%s: Enrollment phase (client)\n", __func__);
 
     /* Deallocate the flow. */
     close(fd);
