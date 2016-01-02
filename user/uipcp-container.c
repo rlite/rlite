@@ -6,6 +6,7 @@
 #include "rinalite/rinalite-utils.h"
 #include "rinalite/rina-conf-msg.h"
 #include "uipcp-container.h"
+#include "uipcp-rib.h"
 
 
 #define MGMTBUF_SIZE_MAX 2048
