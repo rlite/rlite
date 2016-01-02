@@ -114,11 +114,12 @@ test_cdap_server(int port)
 static int
 client_connect(int sfd)
 {
-    struct AuthValue av;
+    struct CDAPAuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
     CDAPManager mgr;
     struct CDAPMessage *m;
+    int invoke_id;
 
     av.name = "George";
     av.password = "Washington";
@@ -126,8 +127,8 @@ client_connect(int sfd)
     rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
     rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
 
-    if (cdap_m_connect_send(&mgr, sfd, gpb::AUTH_NONE, &av, &local_appl,
-                            &remote_appl)) {
+    if (cdap_m_connect_send(&mgr, sfd, &invoke_id, gpb::AUTH_NONE,
+                            &av, &local_appl, &remote_appl)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 

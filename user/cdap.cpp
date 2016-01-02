@@ -18,6 +18,20 @@ CDAPManager::CDAPManager()
 }
 
 int
+CDAPManager::__put_invoke_id(set<int>& pending, int invoke_id)
+{
+    if (!pending.count(invoke_id)) {
+        return -1;
+    }
+
+    pending.erase(invoke_id);
+
+    PD("%s: put %d\n", __func__, invoke_id);
+
+    return 0;
+}
+
+int
 CDAPManager::get_invoke_id()
 {
     int ret;
@@ -29,7 +43,35 @@ CDAPManager::get_invoke_id()
     ret = invoke_id_next++;
     pending_invoke_ids.insert(ret);
 
+    PD("%s: got %d\n", __func__, ret);
+
     return ret;
+}
+
+int
+CDAPManager::put_invoke_id(int invoke_id)
+{
+    return __put_invoke_id(pending_invoke_ids, invoke_id);
+}
+
+int
+CDAPManager::get_invoke_id_remote(int invoke_id)
+{
+    if (pending_invoke_ids_remote.count(invoke_id)) {
+        return -1;
+    }
+
+    pending_invoke_ids_remote.insert(invoke_id);
+
+    PD("%s: got %d\n", __func__, invoke_id);
+
+    return 0;
+}
+
+int
+CDAPManager::put_invoke_id_remote(int invoke_id)
+{
+    return __put_invoke_id(pending_invoke_ids_remote, invoke_id);
 }
 
 CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
@@ -285,12 +327,31 @@ CDAPMessage::print() const
 }
 
 int
-cdap_msg_send(const struct CDAPMessage *m, int fd)
+cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
+              int invoke_id)
 {
-    gpb::CDAPMessage gm = static_cast<gpb::CDAPMessage>(*m);
-    size_t serlen = gm.ByteSize();
-    char *serbuf = (char *)malloc(serlen);
+    gpb::CDAPMessage gm;
+    size_t serlen;
+    char *serbuf;
     int n;
+
+    if (m->is_request()) {
+        /* CDAP request message (M_*). */
+        m->invoke_id = mgr->get_invoke_id();
+
+    } else {
+        /* CDAP response message (M_*_R). */
+        m->invoke_id = invoke_id;
+        if (mgr->put_invoke_id_remote(m->invoke_id)) {
+           PE("%s: Invoke id %s does not match any pending request\n",
+                __func__, m->invoke_id);
+        }
+    }
+
+    gm = static_cast<gpb::CDAPMessage>(*m);
+
+    serlen = gm.ByteSize();
+    serbuf = (char *)malloc(serlen);
 
     if (!serbuf) {
         return -ENOMEM;
@@ -332,20 +393,36 @@ cdap_msg_recv(CDAPManager *mgr, int fd)
         PE("%s: Out of memory\n", __func__);
     }
 
+    if (m->is_response()) {
+        /* CDAP request message (M_*). */
+        if (mgr->put_invoke_id(m->invoke_id)) {
+            PE("%s: Invoke id %d does not match any pending request\n",
+                __func__);
+            delete m;
+            m = NULL;
+        }
+
+    } else {
+        /* CDAP response message (M_*_R). */
+        if (mgr->get_invoke_id_remote(m->invoke_id)) {
+            PE("%s: Invoke id %d already used remotely\n");
+            delete m;
+            m = NULL;
+        }
+    }
+
     return m;
 }
 
 int
-cdap_m_connect_send(CDAPManager *mgr, int fd,
+cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
                     gpb::authTypes_t auth_mech,
-                    const struct AuthValue *auth_value,
+                    const struct CDAPAuthValue *auth_value,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl)
 {
     struct CDAPMessage m(gpb::M_CONNECT);
     int ret;
-
-    m.invoke_id = mgr->get_invoke_id();
 
     m.auth_mech = auth_mech;
     m.auth_value = *auth_value;
@@ -357,7 +434,7 @@ cdap_m_connect_send(CDAPManager *mgr, int fd,
         return ret;
     }
 
-    return cdap_msg_send(&m, fd);
+    return cdap_msg_send(mgr, &m, fd, 0);
 }
 
 int
@@ -365,8 +442,6 @@ cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
 {
     struct CDAPMessage m(gpb::M_CONNECT_R);
     int ret;
-
-    m.invoke_id = req->invoke_id;
 
     m.auth_mech = req->auth_mech;
     m.auth_value = req->auth_value;
@@ -378,5 +453,5 @@ cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
         return ret;
     }
 
-    return cdap_msg_send(&m, fd);
+    return cdap_msg_send(mgr, &m, fd, req->invoke_id);
 }

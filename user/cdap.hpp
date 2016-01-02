@@ -7,7 +7,7 @@
 #include "rinalite/rinalite-common.h"
 #include "CDAP.pb.h"
 
-struct AuthValue {
+struct CDAPAuthValue {
     std::string name;
     std::string password;
     std::string other;
@@ -17,28 +17,34 @@ class CDAPManager {
     std::set<int> pending_invoke_ids;
     int invoke_id_next;
     int max_pending_ops;
+    std::set<int> pending_invoke_ids_remote;
+
+    int __put_invoke_id(std::set<int> &pending, int invoke_id);
 
 public:
     CDAPManager();
     int get_invoke_id();
+    int put_invoke_id(int invoke_id);
+    int get_invoke_id_remote(int invoke_id);
+    int put_invoke_id_remote(int invoke_id);
 };
 
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
     int                 abs_syntax;
     gpb::authTypes_t    auth_mech;
-    struct AuthValue    auth_value;
+    CDAPAuthValue       auth_value;
     struct rina_name    src_appl;
     struct rina_name    dst_appl;
-    std::string              filter;
+    std::string         filter;
     gpb::flagValues_t   flags;
     int                 invoke_id;
-    std::string              obj_class;
+    std::string         obj_class;
     long                obj_inst;
-    std::string              obj_name;
+    std::string         obj_name;
     gpb::opCode_t       op_code;
     int                 result;
-    std::string              result_reason;
+    std::string         result_reason;
     int                 scope;
     long                version;
 
@@ -54,6 +60,8 @@ struct CDAPMessage {
     };
 
     bool is(obj_value_t tt) const { return obj_value.ty == tt; }
+    bool is_request() const { return !is_response(); }
+    bool is_response() const { return op_code & 0x1; }
 
     void print() const;
 
@@ -80,12 +88,15 @@ private:
     CDAPMessage() { } /* This cannot be called. */
 };
 
-int cdap_msg_send(const struct CDAPMessage *m, int fd);
+/* @invoke_id is not meaningful for request messages. */
+int cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
+                  int invoke_id);
+
 struct CDAPMessage * cdap_msg_recv(CDAPManager *mgr, int fd);
 
-int cdap_m_connect_send(CDAPManager *mgr, int fd,
+int cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
                         gpb::authTypes_t auth_mech,
-                        const struct AuthValue *auth_value,
+                        const struct CDAPAuthValue *auth_value,
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl);
 
