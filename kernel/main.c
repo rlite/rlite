@@ -936,6 +936,22 @@ application_del_by_rc(struct rina_ctrl *rc)
         printk("%s: Application %s will be automatically "
                 "unregistered\n",  __func__, s);
         kfree(s);
+
+        /* Notify userspace IPCP if required. */
+        if (app->ipcp->uipcp) {
+            struct rina_kmsg_application_register ntfy;
+
+            ntfy.msg_type = RINA_KERN_APPLICATION_REGISTER;
+            ntfy.event_id = 0;
+            ntfy.ipcp_id = app->ipcp->id;
+            ntfy.reg = false;
+            rina_name_move(&ntfy.application_name, &app->name);
+            rina_upqueue_append(app->ipcp->uipcp,
+                                (const struct rina_msg_base *)&ntfy);
+            rina_name_move(&app->name, &ntfy.application_name);
+        }
+
+        /* Remove. */
         ipcp_application_put(app);
     }
 }
@@ -950,7 +966,7 @@ flow_rc_unbind(struct rina_ctrl *rc)
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
             /* Since this 'rc' is going to disappear, we have to remove
-             * the its reference in this flow. */
+             * the reference stored into this flow. */
             flow->upper.rc = NULL;
             if (flow->state != FLOW_STATE_ALLOCATED) {
                 /* This flow is still pending. Since this rina_ctrl
