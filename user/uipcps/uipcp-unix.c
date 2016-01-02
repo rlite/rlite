@@ -340,7 +340,7 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
         list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
             ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
             if (ipcp_s) {
-                fprintf(fpreg, "%s %u %s\n", ripcp->dif_name, ripcp->ipcp_id, ipcp_s);
+                fprintf(fpreg, "REG %s %u %s\n", ripcp->dif_name, ripcp->ipcp_id, ipcp_s);
             } else {
                 PE("Error in rina_name_to_string()\n");
             }
@@ -439,7 +439,9 @@ uipcps_update(struct uipcps *uipcps)
         char line[4096];
 
         if (fpreg) {
+            PD("Persistence file %s opened\n", RLITE_PERSISTENT_REG_FILE);
             while (fgets(line, sizeof(line), fpreg)) {
+                char *s0 = NULL;
                 char *s1 = NULL;
                 char *s2 = NULL;
                 char *s3 = NULL;
@@ -447,26 +449,34 @@ uipcps_update(struct uipcps *uipcps)
                 unsigned int ipcp_id;
                 uint8_t reg_result;
 
-                s1 = strchr(line, '\n');
-                if (s1) {
-                    *s1 = '\0';
+                s0 = strchr(line, '\n');
+                if (s0) {
+                    *s0 = '\0';
                 }
 
-                s1 = strtok(line, " ");
+                s0 = strtok(line, " ");
+                s1 = strtok(0, " ");
                 s2 = strtok(0, " ");
                 s3 = strtok(0, " ");
 
-                if (s1 && s2 && s3 == 0
-                        && rina_name_from_string(s3, &ipcp_name) == 0) {
-                    ipcp_id = atoi(s2);
-                    reg_result = rlite_ipcp_register(uipcps, 1, s3,
-                                                    ipcp_id, &ipcp_name);
-                    PI("Automatic re-registration for %s --> %s\n",
-                        s3, (reg_result == 0) ? "DONE" : "FAILED");
+                if (strncmp(s0, "REG", 3) == 0) {
+                    if (s1 && s2 && s3
+                            && rina_name_from_string(s3, &ipcp_name) == 0) {
+                        ipcp_id = atoi(s2);
+                        reg_result = rlite_ipcp_register(uipcps, 1, s3,
+                                                         ipcp_id, &ipcp_name);
+                        PI("Automatic re-registration for %s --> %s\n",
+                                s3, (reg_result == 0) ? "DONE" : "FAILED");
+                    }
+
+                } else if (strncmp(s0, "ENR", 3) == 0) {
                 }
             }
 
             fclose(fpreg);
+
+        } else {
+            PD("Persistence file %s not found\n", RLITE_PERSISTENT_REG_FILE);
         }
     }
 
@@ -485,12 +495,6 @@ sigint_handler(int signum)
 
     unlink(RLITE_UIPCPS_UNIX_NAME);
     exit(EXIT_SUCCESS);
-}
-
-static void
-sigpipe_handler(int signum)
-{
-    PI("SIGPIPE received\n");
 }
 
 int main(int argc, char **argv)
@@ -574,13 +578,14 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
-
+    ret = sigaction(SIGSEGV, &sa, NULL);
+    if (ret) {
+        perror("sigaction(SIGINT)");
+        exit(EXIT_FAILURE);
+    }
     /* Handle the SIGPIPE signal, which is received when
      * trying to read/write from/to a Unix domain socket
      * that has been closed by the other end. */
-    sa.sa_handler = sigpipe_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
     ret = sigaction(SIGPIPE, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGPIPE)");
