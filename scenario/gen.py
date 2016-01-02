@@ -16,9 +16,18 @@ argparser.add_argument('-p', '--base-port',
 argparser.add_argument('-i', '--image',
                        help = "Path to the VM image", type = str,
                        default = '/home/vmaffione/git/vm/arch.qcow2')
+argparser.add_argument('-l', '--levels',
+                       help = "Number of stacked normal DIFs [>0]",
+                       type = int, default = 1)
 
 args = argparser.parse_args()
 
+
+if args.levels < 1:
+    args.levels = 1
+    print("Warning: levels set to %d" % (args.levels))
+
+print("LEVELS %d" % args.levels)
 
 fin = open('gen.conf', 'r')
 
@@ -152,27 +161,34 @@ for i in vms:
             'sudo chmod -R a+rw /var/rlite\n'\
             '\n'\
             'rlite-uipcps &> uipcp.log &\n'\
-            'rina-config ipcp-create n.IPCP %(id)s normal n.DIF\n'\
-            'rina-config ipcp-config n.IPCP %(id)s address %(id)d\n'\
+            '\n'\
+            'for i in $(seq 1 %(levels)s); do\n'\
+            '   rina-config ipcp-create n.${i}.IPCP %(id)s normal n.${i}.DIF\n'\
+            '   rina-config ipcp-config n.${i}.IPCP %(id)s address %(id)d\n'\
+            'done\n'\
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'],
-                   'id': vm['id']}
+                   'id': vm['id'], 'levels': args.levels}
 
     for port in vm['ports']:
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
                 'rina-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-eth e.%(brid)s.DIF\n'\
                 'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n'\
-                'rina-config ipcp-register e.%(brid)s.DIF n.IPCP %(id)s\n'\
-                'true\n'\
+                'rina-config ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
+                '\n'\
                     % {'mac': port['mac'], 'idx': port['idx'],
                        'id': vm['id'], 'brid': bridges[port['br']]['id']}
 
-    outs += 'ENDSSH\n'\
+    outs += 'for i in $(seq 2 %(levels)s); do\n'\
+            '   rina-config ipcp-register n.$(($i-1)).DIF n.$i.IPCP %(id)s\n'\
+            'done\n'\
+            'true\n'\
+            'ENDSSH\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
-            'done\n\n'
+            'done\n\n' % {'id': vm['id'], 'levels': args.levels}
 
 
 for br_name in bridges:
@@ -199,8 +215,10 @@ for br_name in bridges:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
-            'rina-config ipcp-enroll n.DIF n.IPCP %(id)s '\
-                                    'n.IPCP %(pvid)s e.%(brid)s.DIF\n'\
+            'rina-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
+                                    'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
+            'sleep 1\n'\
+            'true\n'\
             'ENDSSH\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
@@ -208,6 +226,37 @@ for br_name in bridges:
             '   fi\n'\
             'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
                           'pvid': pvm['id'], 'brid': b['id']}
+
+
+# Select the pivot VM ad libitum
+for i in vms:
+    pvm = vms[i]
+
+for level in range(2, args.levels + 1):
+    for vm_name in vms:
+        if vm_name == pvm['name']:
+            continue
+
+        vm = vms[vm_name]
+
+        # Enroll against the pivot
+
+        outs += ''\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'rina-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
+                            'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
+            'sleep 1\n'\
+            'true\n'\
+            'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
+                          'pvid': pvm['id'], 'level': level,
+                          'lm1': level - 1}
 
 fout.write(outs)
 fout.close()
