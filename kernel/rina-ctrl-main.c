@@ -790,6 +790,7 @@ flow_del_entry(struct flow_entry *entry, int locked)
     rina_name_free(&entry->local_application);
     rina_name_free(&entry->remote_application);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
+    printk("%s: flow entry %u removed\n", __func__, entry->local_port);
     kfree(entry);
 out:
     if (locked)
@@ -808,7 +809,6 @@ flow_del_by_rc(struct rina_ctrl *rc)
     mutex_lock(&rina_dm.lock);
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->rc == rc) {
-            printk("%s: Removing flow %u\n", __func__, flow->local_port);
             flow_del_entry(flow, 0);
         }
     }
@@ -1321,6 +1321,7 @@ rina_io_release(struct inode *inode, struct file *f)
     if (rio->flow) {
         mutex_lock(&rina_dm.lock);
         rio->flow->refcnt--;
+        flow_del_entry(rio->flow, 0);
         mutex_unlock(&rina_dm.lock);
     }
 
@@ -1429,6 +1430,14 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
     (void) cmd;
 
     mutex_lock(&rina_dm.lock);
+
+    if (rio->flow) {
+        /* A previous flow was bound to this file descriptor,
+         * so let's unbind from it. */
+        rio->flow->refcnt--;
+        rio->flow = NULL;
+    }
+
     flow = flow_table_find(port_id);
     if (!flow) {
         printk("%s: Error: No such flow\n", __func__);
@@ -1436,7 +1445,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
         goto out;
     }
 
-    /* Associate a flow to this file descriptor. */
+    /* Bind the flow to this file descriptor. */
     rio->flow = flow;
     rio->flow->refcnt++;
 out:
