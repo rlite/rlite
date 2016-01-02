@@ -354,7 +354,7 @@ rl_flow_cfg_default(struct rlite_flow_config *cfg)
 }
 
 static int
-open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
+open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
 {
     struct rlite_ioctl_info info;
     int fd;
@@ -380,7 +380,7 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 }
 
 int
-rl_open_appl_port(uint32_t port_id)
+rl_open_appl_port(rl_port_t port_id)
 {
     return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
 }
@@ -492,7 +492,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
 int
 rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
                 rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-                uint32_t port_id, uint8_t response)
+                rl_port_t port_id, uint8_t response)
 {
     memset(resp, 0, sizeof(*resp));
 

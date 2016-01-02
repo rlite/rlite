@@ -670,7 +670,7 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 }
 
 struct flow_entry *
-flow_get(unsigned int port_id)
+flow_get(rl_port_t port_id)
 {
     struct flow_entry *entry;
     struct hlist_head *head;
@@ -1864,7 +1864,7 @@ rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
 static int
 rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
-                                       uint32_t port_id, uint8_t response)
+                                       rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp_arrived resp;
 
@@ -2026,7 +2026,7 @@ out:
 /* This may be called from softirq context. */
 int
 rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                    uint32_t remote_port, uint32_t remote_cep,
+                    rl_port_t remote_port, uint32_t remote_cep,
                     rl_addr_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
@@ -2089,8 +2089,8 @@ EXPORT_SYMBOL_GPL(rlite_fa_req_arrived);
 
 int
 rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
-                     uint32_t local_port,
-                     uint32_t remote_port,
+                     rl_port_t local_port,
+                     rl_port_t remote_port,
                      uint32_t remote_cep,
                      rl_addr_t remote_addr,
                      uint8_t response,
@@ -2222,7 +2222,7 @@ out:
 EXPORT_SYMBOL_GPL(rlite_sdu_rx_flow);
 
 int
-rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
+rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, rl_port_t local_port)
 {
     struct flow_entry *flow = flow_get(local_port);
     int ret;
@@ -2272,7 +2272,7 @@ rlite_write_restart_flows(struct ipcp_entry *ipcp)
 EXPORT_SYMBOL_GPL(rlite_write_restart_flows);
 
 void
-rlite_write_restart_port(uint32_t local_port)
+rlite_write_restart_port(rl_port_t local_port)
 {
     struct flow_entry *flow;
 

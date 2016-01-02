@@ -375,7 +375,7 @@ int
 uipcp_rib::flows_handler_delete(const CDAPMessage *rm)
 {
     map<string, FlowRequest>::iterator f;
-    uint32_t local_port;
+    rl_port_t local_port;
     int ret;
 
     f = flow_reqs.find(rm->obj_name + string("L"));

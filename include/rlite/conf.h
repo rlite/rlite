@@ -12,8 +12,8 @@ extern "C" {
 struct rlite_flow {
     /* Flow attributes. */
     rl_ipcp_id_t ipcp_id;
-    unsigned int local_port;
-    unsigned int remote_port;
+    rl_port_t local_port;
+    rl_port_t remote_port;
     rl_addr_t local_addr;
     rl_addr_t remote_addr;
 

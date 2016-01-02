@@ -55,7 +55,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
 
 int rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
                     rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-                    uint32_t port_id, uint8_t response);
+                    rl_port_t port_id, uint8_t response);
 
 int
 rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,

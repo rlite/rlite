@@ -31,7 +31,7 @@ struct rlite_hmsg_fa_req {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint32_t src_port;
+    rl_port_t src_port;
     struct rina_name src_appl;
     struct rina_name dst_appl;
 } __attribute__((packed));
@@ -41,8 +41,8 @@ struct rlite_hmsg_fa_resp {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint32_t src_port;
-    uint32_t dst_port;
+    rl_port_t src_port;
+    rl_port_t dst_port;
     uint8_t response;
 } __attribute__((packed));
 

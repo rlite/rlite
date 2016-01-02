@@ -85,7 +85,7 @@ mgmt_write(struct uipcp *uipcp, const struct rlite_mgmt_hdr *mhdr,
 }
 
 int
-mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                          void *buf, size_t buflen)
 {
     struct rlite_mgmt_hdr mhdr;

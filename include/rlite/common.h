@@ -33,6 +33,7 @@ struct rina_name {
 } __attribute__((packed));
 
 typedef uint64_t rl_addr_t;
+typedef uint32_t rl_port_t;
 typedef uint16_t rl_ipcp_id_t;
 typedef uint16_t rl_msg_t;
 
@@ -67,7 +68,7 @@ struct rlite_msg_base_resp {
 
 struct rlite_ioctl_info {
     uint8_t mode;
-    uint32_t port_id;
+    rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
 
@@ -89,7 +90,7 @@ struct rlite_ioctl_info {
  */
 struct rlite_mgmt_hdr {
     uint8_t type;
-    uint32_t local_port;
+    rl_port_t local_port;
     rl_addr_t remote_addr;
 } __attribute__((packed));
 

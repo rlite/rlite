@@ -202,27 +202,27 @@ int rlite_ipcp_factory_register(struct ipcp_factory *factory);
 int rlite_ipcp_factory_unregister(const char *dif_type);
 
 int rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                        uint32_t remote_port, uint32_t remote_cep,
+                        rl_port_t remote_port, uint32_t remote_cep,
                         rl_addr_t remote_addr,
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
                         const struct rlite_flow_config *flowcfg);
 
 int rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
-                         uint32_t local_port,
-                         uint32_t remote_port,
+                         rl_port_t local_port,
+                         rl_port_t remote_port,
                          uint32_t remote_cep,
                          rl_addr_t remote_addr,
                          uint8_t response,
                          struct rlite_flow_config *flowcfg);
 
 int rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb,
-                uint32_t local_port);
+                rl_port_t local_port);
 
 int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rlite_buf *rb, bool qlimit);
 
-void rlite_write_restart_port(uint32_t local_port);
+void rlite_write_restart_port(rl_port_t local_port);
 
 void rlite_write_restart_flow(struct flow_entry *flow);
 
@@ -230,11 +230,11 @@ void rlite_write_restart_flows(struct ipcp_entry *ipcp);
 
 void rlite_flow_share_tx_wqh(struct flow_entry *flow);
 
-struct flow_entry *flow_lookup(unsigned int port_id);
+struct flow_entry *flow_lookup(rl_port_t port_id);
 
 struct flow_entry *flow_put(struct flow_entry *flow);
 
-struct flow_entry *flow_get(unsigned int port_id);
+struct flow_entry *flow_get(rl_port_t port_id);
 
 struct flow_entry *flow_get_by_cep(unsigned int cep_id);
 

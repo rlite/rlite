@@ -206,7 +206,7 @@ rl_conf_flows_purge(struct list_head *flows)
 }
 
 int
-rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, unsigned int port_id,
+rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, rl_port_t port_id,
                        struct rl_flow_stats *stats)
 {
     struct rl_kmsg_flow_stats_req msg;

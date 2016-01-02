@@ -64,7 +64,7 @@ struct Neighbor;
 struct NeighFlow {
     Neighbor *neigh;
     std::string supp_dif;
-    unsigned int port_id;
+    rl_port_t port_id;
     int flow_fd;
     rl_ipcp_id_t lower_ipcp_id;
     CDAPConn *conn;
@@ -104,8 +104,8 @@ struct Neighbor {
 
     int enroll_attempts;
 
-    std::map<unsigned int, NeighFlow *> flows;
-    unsigned int mgmt_port_id;
+    std::map<rl_port_t, NeighFlow *> flows;
+    rl_port_t mgmt_port_id;
 
     typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
                                                   const CDAPMessage *rm);
@@ -242,7 +242,7 @@ struct uipcp_rib {
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     rl_addr_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(rl_addr_t address);
-    int lookup_neigh_flow_by_port_id(unsigned int port_id,
+    int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
     int commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh);
     int fa_req(struct rl_kmsg_fa_req *req);
@@ -290,18 +290,18 @@ int normal_ipcp_enroll(struct uipcp *uipcp,
 int normal_get_enrollment_targets(struct uipcp *uipcp,
                                   struct list_head *neighs);
 
-int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
+int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
 int rib_neigh_set_port_id(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           const char *supp_dif,
-                          unsigned int neigh_port_id,
+                          rl_port_t neigh_port_id,
                           rl_ipcp_id_t lower_ipcp_id);
 
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
-                          unsigned int neigh_port_id, int neigh_fd);
+                          rl_port_t neigh_port_id, int neigh_fd);
 
 void age_incr_cb(struct rlite_evloop *loop, void *arg);
 

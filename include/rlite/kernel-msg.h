@@ -93,8 +93,8 @@ struct rl_kmsg_flow_fetch_resp {
 
     uint8_t end;
     rl_ipcp_id_t ipcp_id;
-    uint32_t local_port;
-    uint32_t remote_port;
+    rl_port_t local_port;
+    rl_port_t remote_port;
     rl_addr_t local_addr;
     rl_addr_t remote_addr;
 } __attribute__((packed));
@@ -146,7 +146,7 @@ struct rl_kmsg_fa_req {
     rl_ipcp_id_t ipcp_id;
     rl_ipcp_id_t upper_ipcp_id;
     struct rlite_flow_spec flowspec;
-    uint32_t local_port; /* Filled by kernel before reflection to userspace. */
+    rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
     struct rina_name local_appl;
     struct rina_name remote_appl;
@@ -158,7 +158,7 @@ struct rl_kmsg_fa_resp_arrived {
     uint32_t event_id;
 
     uint8_t response;
-    uint32_t port_id;
+    rl_port_t port_id;
 } __attribute__((packed));
 
 /* application <-- kernel to notify an incoming flow request. */
@@ -167,7 +167,7 @@ struct rl_kmsg_fa_req_arrived {
     uint32_t event_id;
 
     uint32_t kevent_id;
-    uint32_t port_id;
+    rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
     struct rina_name local_appl;
     struct rina_name remote_appl;
@@ -188,7 +188,7 @@ struct rl_kmsg_fa_resp {
      * flow to the specified upper IPCP. */
     rl_ipcp_id_t upper_ipcp_id;
     uint8_t response;
-    uint32_t port_id;
+    rl_port_t port_id;
     uint32_t cep_id;     /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
@@ -238,7 +238,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
 
     uint32_t kevent_id;
     rl_ipcp_id_t ipcp_id;
-    uint32_t remote_port;
+    rl_port_t remote_port;
     uint32_t remote_cep;
     rl_addr_t remote_addr;
     struct rlite_flow_config flowcfg;
@@ -255,8 +255,8 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     uint32_t event_id;
 
     rl_ipcp_id_t ipcp_id;
-    uint32_t local_port;
-    uint32_t remote_port;
+    rl_port_t local_port;
+    rl_port_t remote_port;
     uint32_t remote_cep;
     rl_addr_t remote_addr;
     uint8_t response;
@@ -270,8 +270,8 @@ struct rl_kmsg_flow_deallocated {
     uint32_t event_id;
 
     rl_ipcp_id_t ipcp_id;
-    uint32_t local_port_id;
-    uint32_t remote_port_id;
+    rl_port_t local_port_id;
+    rl_port_t remote_port_id;
     rl_addr_t remote_addr;
 } __attribute__((packed));
 
@@ -282,14 +282,14 @@ struct rl_kmsg_flow_dealloc {
     uint32_t event_id;
 
     rl_ipcp_id_t ipcp_id;
-    uint32_t port_id;
+    rl_port_t port_id;
 } __attribute__((packed));
 
 struct rl_kmsg_flow_stats_req {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    uint32_t port_id;
+    rl_port_t port_id;
 } __attribute__((packed));
 
 struct rl_kmsg_flow_stats_resp {

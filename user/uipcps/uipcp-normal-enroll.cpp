@@ -268,7 +268,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     enroll_attempts = 0;
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
-    mgmt_port_id = ~0U;
+    mgmt_port_id = -1;
     enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
     enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
     enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
@@ -281,7 +281,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
 
 Neighbor::~Neighbor()
 {
-    for (map<unsigned int, NeighFlow *>::iterator mit = flows.begin();
+    for (map<rl_port_t, NeighFlow *>::iterator mit = flows.begin();
                                             mit != flows.end(); mit++) {
         delete mit->second;
     }
@@ -325,7 +325,7 @@ Neighbor::enrollment_state_repr(state_t s) const
 NeighFlow *
 Neighbor::mgmt_conn()
 {
-    map<unsigned int, NeighFlow*>::iterator mit;
+    map<rl_port_t, NeighFlow*>::iterator mit;
 
     mit = flows.find(mgmt_port_id);
     assert(mit != flows.end());
@@ -1061,7 +1061,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 int
-uipcp_rib::lookup_neigh_flow_by_port_id(unsigned int port_id,
+uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                         NeighFlow **nfp)
 {
     *nfp = NULL;
@@ -1087,7 +1087,7 @@ Neighbor::alloc_flow(const char *supp_dif)
     struct rina_name neigh_name;
     struct rl_ipcp *info;
     rl_ipcp_id_t lower_ipcp_id_ = -1;
-    unsigned int port_id_;
+    rl_port_t port_id_;
     unsigned int event_id;
     int flow_fd_;
     int ret;
@@ -1212,7 +1212,7 @@ int
 rib_neigh_set_port_id(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       const char *supp_dif,
-                      unsigned int neigh_port_id,
+                      rl_port_t neigh_port_id,
                       rl_ipcp_id_t lower_ipcp_id)
 {
     Neighbor *neigh = rib->get_neighbor(neigh_name, false);
@@ -1243,7 +1243,7 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
 int
 rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
-                      unsigned int neigh_port_id, int neigh_fd)
+                      rl_port_t neigh_port_id, int neigh_fd)
 {
     Neighbor *neigh = rib->get_neighbor(neigh_name, false);
 

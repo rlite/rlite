@@ -74,7 +74,7 @@ void
 rl_flow_cfg_default(struct rlite_flow_config *cfg);
 
 int
-rl_open_appl_port(uint32_t port_id);
+rl_open_appl_port(rl_port_t port_id);
 
 int
 rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);

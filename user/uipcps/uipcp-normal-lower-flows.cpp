@@ -223,7 +223,7 @@ SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
 int
 uipcp_rib::pduft_sync()
 {
-    map<rl_addr_t, unsigned int> next_hop_to_port_id;
+    map<rl_addr_t, rl_port_t> next_hop_to_port_id;
 
     /* Flush previous entries. */
     uipcp_pduft_flush(uipcp, uipcp->ipcp_id);
@@ -263,7 +263,7 @@ uipcp_rib::pduft_sync()
     /* Generate PDUFT entries. */
     for (map<rl_addr_t, rl_addr_t>::iterator r = spe.next_hops.begin();
                                         r !=  spe.next_hops.end(); r++) {
-            unsigned int port_id = next_hop_to_port_id[r->second];
+            rl_port_t port_id = next_hop_to_port_id[r->second];
             int ret = uipcp_pduft_set(uipcp, uipcp->ipcp_id, r->first,
                                       port_id);
             if (ret) {

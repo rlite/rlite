@@ -805,7 +805,7 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
 int
 rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
                   rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-                  uint32_t port_id, uint8_t response)
+                  rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp *req;
     struct rlite_msg_base *resp;
@@ -902,7 +902,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
                    const struct rina_name *remote_appl,
                    const struct rlite_flow_spec *flowspec,
                    rl_ipcp_id_t upper_ipcp_id,
-                   unsigned int *port_id, unsigned int wait_ms)
+                   rl_port_t *port_id, unsigned int wait_ms)
 {
     struct rl_kmsg_fa_req *req;
     struct rl_kmsg_fa_resp_arrived *kresp;

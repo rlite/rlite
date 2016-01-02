@@ -22,7 +22,7 @@ struct inet4_bindpoint {
 struct inet4_endpoint {
     int fd;
     struct sockaddr_in addr;
-    unsigned int port_id;
+    rl_port_t port_id;
     uint32_t kevent_id;
 
     struct list_head node;
@@ -462,7 +462,7 @@ get_endpoint_by_kevent_id(struct shim_inet4 *shim, uint32_t kevent_id)
 }
 
 static int
-remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
+remove_endpoint_by_port_id(struct shim_inet4 *shim, rl_port_t port_id)
 {
     struct inet4_endpoint *ep;
 
