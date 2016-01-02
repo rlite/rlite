@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <rina/rina-ctrl.h>
 #include "pending_queue.h"
+#include <rina/serdes.h>
 
 
 /* IPC Manager data model. */
@@ -70,6 +71,7 @@ static rina_resp_handler_t rina_handlers[] = {
     [RINA_CTRL_MSG_MAX] = NULL,
 };
 
+/* The event loop function. */
 void *evloop_function(void *arg)
 {
     struct ipcm *ipcm = (struct ipcm *)arg;
@@ -145,6 +147,7 @@ rina_name_fill(struct rina_name *name, char *apn,
     name->aei_len = aei ? strlen(aei) : 0;
 }
 
+/* Issue a request message to the kernel. */
 static int
 issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
                       size_t msg_len)
@@ -179,6 +182,34 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
 
     return 0;
 }
+
+static void
+serialize_create_ipcp(struct rina_ctrl_base_msg *bmsg, char **buf, size_t *len)
+{
+    struct rina_ctrl_create_ipcp *msg = (struct rina_ctrl_create_ipcp *)bmsg;
+    void *ptr;
+
+    *len = sizeof(msg->msg_type) + sizeof(msg->event_id) +
+            rina_name_serlen(&msg->name) + sizeof(msg->dif_type);
+    ptr = *buf = malloc(*len);
+    if (!(ptr)) {
+        return;
+    }
+
+    serialize_obj(ptr, rina_msg_t, msg->msg_type);
+    serialize_obj(ptr, uint32_t, msg->event_id);
+    serialize_rina_name(&ptr, &msg->name);
+    serialize_obj(ptr, uint8_t, msg->dif_type);
+}
+
+typedef void (*rina_serializer_t)(struct rina_ctrl_base_msg *bmsg, char **buf,
+                                   size_t *len);
+
+/* Table of RINA message serializers. */
+static rina_serializer_t rina_serializers[] = {
+    [RINA_CTRL_CREATE_IPCP] = serialize_create_ipcp,
+    [RINA_CTRL_MSG_MAX] = NULL,
+};
 
 /* Create an IPC process. */
 static int
@@ -291,6 +322,8 @@ int main()
         perror("pthread_join()");
         exit(EXIT_FAILURE);
     }
+
+    (void)rina_serializers;
 
     return 0;
 }
