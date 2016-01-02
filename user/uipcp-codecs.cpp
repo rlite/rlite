@@ -16,6 +16,7 @@
 #include "FlowStateMessage.pb.h"
 #include "FlowStateGroupMessage.pb.h"
 #include "CommonMessages.pb.h"
+#include "QoSSpecification.pb.h"
 
 using namespace std;
 
@@ -386,6 +387,49 @@ Property::serialize(char *buf, unsigned int size) const
 
     gm.set_name(name);
     gm.set_value(value);
+
+    return ser_common(gm, buf, size);
+}
+
+QosSpec::QosSpec(const char *buf, unsigned int size)
+{
+    gpb::qosSpecification_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    name = gm.name();
+    qos_id = gm.qosid();
+    avg_bw = gm.averagebandwidth();
+    avg_sdu_bw = gm.averagesdubandwidth();
+    peak_bw_duration = gm.peakbandwidthduration();
+    peak_sdu_bw_duration = gm.peaksdubandwidthduration();
+    undetected_bit_error_rate = gm.undetectedbiterrorrate();
+    partial_delivery = gm.partialdelivery();
+    in_order_delivery = gm.order();
+    max_sdu_gap = gm.maxallowablegapsdu();
+    delay = gm.delay();
+    jitter = gm.jitter();
+    /* missing extra_parameters */
+}
+
+int
+QosSpec::serialize(char *buf, unsigned int size) const
+{
+    gpb::qosSpecification_t gm;
+
+    gm.set_name(name);
+    gm.set_qosid(qos_id);
+    gm.set_averagebandwidth(avg_bw);
+    gm.set_averagesdubandwidth(avg_sdu_bw);
+    gm.set_peakbandwidthduration(peak_bw_duration);
+    gm.set_peaksdubandwidthduration(peak_sdu_bw_duration);
+    gm.set_undetectedbiterrorrate(undetected_bit_error_rate);
+    gm.set_partialdelivery(partial_delivery);
+    gm.set_order(in_order_delivery);
+    gm.set_maxallowablegapsdu(max_sdu_gap);
+    gm.set_delay(delay);
+    gm.set_jitter(jitter);
+    /* missing extra_parameters */
 
     return ser_common(gm, buf, size);
 }

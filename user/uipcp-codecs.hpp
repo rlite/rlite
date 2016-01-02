@@ -109,4 +109,24 @@ struct Property : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct QosSpec : public UipcpObject {
+    std::string name;
+    uint32_t qos_id;
+    uint64_t avg_bw;
+    uint64_t avg_sdu_bw;
+    uint64_t peak_bw_duration;
+    uint64_t peak_sdu_bw_duration;
+    double undetected_bit_error_rate;
+    bool partial_delivery;
+    bool in_order_delivery;
+    int32_t max_sdu_gap;
+    uint32_t delay;
+    uint32_t jitter;
+    std::list<Property> extra_parameters;
+
+    QosSpec() { }
+    QosSpec(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
