@@ -845,6 +845,34 @@ rina_ipcp_pduft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
+static int
+rina_ipcp_dft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_dft_set *req =
+                    (struct rina_kmsg_ipcp_dft_set *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    ipcp = ipcp_table_find(req->ipcp_id);
+    if (ipcp && ipcp->ops.dft_set) {
+        ret = ipcp->ops.dft_set(ipcp, &req->appl_name, req->remote_addr);
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    if (ret == 0) {
+        char *appl_s = rina_name_to_string(&req->appl_name);
+
+        printk("%s: Set IPC process %u DFT entry: %s --> %llu\n", __func__,
+                req->ipcp_id, appl_s, (unsigned long long)req->remote_addr);
+        if (appl_s) {
+            kfree(appl_s);
+        }
+    }
+
+    return ret;
+}
+
 /* To be called under global lock. */
 static int
 rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
@@ -1209,6 +1237,7 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_ASSIGN_TO_DIF] = rina_assign_to_dif,
     [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
     [RINA_KERN_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
+    [RINA_KERN_IPCP_DFT_SET] = rina_ipcp_dft_set,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 

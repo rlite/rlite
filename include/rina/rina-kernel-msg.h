@@ -32,6 +32,7 @@ enum {
     RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 11 */
     RINA_KERN_IPCP_CONFIG, /* 12 */
     RINA_KERN_IPCP_PDUFT_SET, /* 13 */
+    RINA_KERN_IPCP_DFT_SET, /* 14 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -148,7 +149,7 @@ struct rina_kmsg_ipcp_config {
     char *value;
 } __attribute__((packed));
 
-/* IPCM --> kernel to set an IPCP PDUFT entry. */
+/* IPCM --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
 struct rina_kmsg_ipcp_pduft_set {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -162,5 +163,18 @@ struct rina_kmsg_ipcp_pduft_set {
     uint16_t local_port;
 } __attribute__((packed));
 
+/* IPCM --> kernel to set an IPCP DFT (Directory Forwarding Table) entry. */
+struct rina_kmsg_ipcp_dft_set {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    /* The IPCP whose DFT is to be modified. */
+    uint16_t ipcp_id;
+    /* The address of a remote IPCP through which
+     * an application can be reached. */
+    uint64_t remote_addr;
+    /* The application that can be reached. */
+    struct rina_name appl_name;
+} __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

@@ -37,6 +37,8 @@ struct ipcp_ops {
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
                      struct flow_entry *flow);
+    int (*dft_set)(struct ipcp_entry *ipcp, const struct rina_name *appl_name,
+                   uint64_t remote_addr);
 };
 
 struct ipcp_entry {

@@ -54,6 +54,11 @@ struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_KERN_IPCP_PDUFT_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_pduft_set),
     },
+    [RINA_KERN_IPCP_DFT_SET] = {
+        .copylen = sizeof(struct rina_kmsg_ipcp_dft_set) -
+                    1 * sizeof(struct rina_name),
+        .names = 1,
+    },
     [RINA_KERN_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
