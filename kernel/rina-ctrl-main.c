@@ -1039,6 +1039,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 
     flow = flow_table_find(local_port);
     if (!flow) {
+        rina_buf_free(rb);
         ret = -ENXIO;
         goto out;
     }
@@ -1350,6 +1351,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 
     if (copy_from_user(rb->ptr, ubuf, rb->size)) {
         printk("%s: copy_from_user()\n", __func__);
+        rina_buf_free(rb);
         return -EFAULT;
     }
 
