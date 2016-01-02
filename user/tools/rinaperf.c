@@ -627,15 +627,26 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rl_ctrl_register(&rp.ctrl, dif_name,
-                                   &rp.ipcp_name, &server_ctrl_name);
+            if (rina_name_valid(&rp.ipcp_name)) {
+                ret = rl_ctrl_register2(&rp.ctrl, &rp.ipcp_name,
+                                        &server_ctrl_name);
+            } else {
+                ret = rl_ctrl_register(&rp.ctrl, dif_name, &server_ctrl_name);
+            }
+
             if (ret) {
                 return ret;
             }
         }
 
-        ret = rl_ctrl_register(&rp.ctrl, dif_name,
-                               &rp.ipcp_name, &rp.server_appl_name);
+        if (rina_name_valid(&rp.ipcp_name)) {
+            ret = rl_ctrl_register2(&rp.ctrl, &rp.ipcp_name,
+                                    &rp.server_appl_name);
+        } else {
+            ret = rl_ctrl_register(&rp.ctrl, dif_name,
+                                   &rp.server_appl_name);
+        }
+
         if (ret) {
             return ret;
         }
@@ -644,9 +655,16 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rl_ctrl_flow_alloc(&rp.ctrl, dif_name,
-                                    &rp.ipcp_name, &rp.client_appl_name,
-                                    &rp.server_appl_name, &flowspec);
+        if (rina_name_valid(&rp.ipcp_name)) {
+            rp.dfd = rl_ctrl_flow_alloc2(&rp.ctrl, &rp.ipcp_name,
+                                         &rp.client_appl_name,
+                                         &rp.server_appl_name, &flowspec);
+        } else {
+            rp.dfd = rl_ctrl_flow_alloc(&rp.ctrl, dif_name,
+                                        &rp.client_appl_name,
+                                        &rp.server_appl_name, &flowspec);
+        }
+
         if (rp.dfd < 0) {
             return rp.dfd;
         }

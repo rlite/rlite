@@ -614,8 +614,10 @@ rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
     uint32_t event_id;
     int ret;
 
-    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
-    if (!rl_ipcp) {
+    assert(!ipcp_name || !dif_name);
+    if (ipcp_name) {
+        rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
+    } else {
         rl_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
     if (!rl_ipcp) {
@@ -656,10 +658,13 @@ rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
     uint32_t event_id;
     int ret;
 
-    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
-    if (!rl_ipcp) {
+    assert(!ipcp_name || !dif_name);
+    if (ipcp_name) {
+        rl_ipcp = rl_ctrl_lookup_ipcp_by_name(ctrl, ipcp_name);
+    } else {
         rl_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
     }
+
     if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return 0;
@@ -788,12 +793,12 @@ rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
     return rl_ctrl_wait_common(ctrl, msg_type, 0);
 }
 
-int
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec)
+static int
+rl_ctrl_flow_alloc_common(struct rlite_ctrl *ctrl, const char *dif_name,
+                          const struct rina_name *ipcp_name,
+                          const struct rina_name *local_appl,
+                          const struct rina_name *remote_appl,
+                          const struct rlite_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_resp_arrived *resp;
     uint32_t event_id;
@@ -824,6 +829,27 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
     free(resp);
 
     return fd;
+}
+
+int
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
+                   const struct rlite_flow_spec *flowspec)
+{
+    return rl_ctrl_flow_alloc_common(ctrl, dif_name, NULL, local_appl,
+                                     remote_appl, flowspec);
+}
+
+int
+rl_ctrl_flow_alloc2(struct rlite_ctrl *ctrl,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl,
+                    const struct rlite_flow_spec *flowspec)
+{
+    return rl_ctrl_flow_alloc_common(ctrl, NULL, ipcp_name, local_appl,
+                                     remote_appl, flowspec);
 }
 
 static int
@@ -863,18 +889,30 @@ rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
 
 int
 rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
-                 const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name)
 {
-    return rl_ctrl_register_common(ctrl, 1, dif_name, ipcp_name, appl_name);
+    return rl_ctrl_register_common(ctrl, 1, dif_name, NULL, appl_name);
 }
 
 int
 rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
                    const struct rina_name *appl_name)
 {
-    return rl_ctrl_register_common(ctrl, 0, dif_name, ipcp_name, appl_name);
+    return rl_ctrl_register_common(ctrl, 0, dif_name, NULL, appl_name);
+}
+
+int
+rl_ctrl_register2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+                  const struct rina_name *appl_name)
+{
+    return rl_ctrl_register_common(ctrl, 1, NULL, ipcp_name, appl_name);
+}
+
+int
+rl_ctrl_unregister2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+                    const struct rina_name *appl_name)
+{
+    return rl_ctrl_register_common(ctrl, 0, NULL, ipcp_name, appl_name);
 }
 
 int

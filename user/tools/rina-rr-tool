@@ -44,9 +44,14 @@ class RinaRRTool:
 
 
     def client(self, args):
-        fd = rl_ctrl_flow_alloc(self.rc, self.dif, self.ipcp_name,
-                                self.client_name, self.server_name,
-                                self.flow_spec)
+        if rina_name_valid(self.ipcp_name):
+            fd = rl_ctrl_flow_alloc2(self.rc, self.ipcp_name,
+                                     self.client_name, self.server_name,
+                                     self.flow_spec)
+        else:
+            fd = rl_ctrl_flow_alloc(self.rc, self.dif, self.client_name,
+                                    self.server_name, self.flow_spec)
+
         if fd < 0:
             return fd
 
@@ -69,8 +74,11 @@ class RinaRRTool:
 
 
     def server(self, args):
-        ret = rl_ctrl_register(self.rc, True, self.dif, self.ipcp_name,
-                               self.server_name)
+        if rina_name_valid(self.ipcp_name):
+            ret = rl_ctrl_register2(self.rc, self.ipcp_name, self.server_name)
+        else:
+            ret = rl_ctrl_register(self.rc, self.dif, self.server_name)
+
         if ret:
             return ret
 

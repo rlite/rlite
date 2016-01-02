@@ -37,9 +37,15 @@ client(struct rlite_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
-                             &rr->ipcp_name, &rr->client_appl_name,
-                             &rr->server_appl_name, &rr->flowspec);
+    if (rina_name_valid(&rr->ipcp_name)) {
+        dfd = rl_ctrl_flow_alloc2(&rr->ctrl, &rr->ipcp_name,
+                                  &rr->client_appl_name,
+                                  &rr->server_appl_name, &rr->flowspec);
+    } else {
+        dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
+                                 &rr->client_appl_name,
+                                 &rr->server_appl_name, &rr->flowspec);
+    }
     if (dfd < 0) {
         return dfd;
     }
@@ -92,8 +98,14 @@ server(struct rlite_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
-                           &rr->ipcp_name, &rr->server_appl_name);
+    if (rina_name_valid(&rr->ipcp_name)) {
+        ret = rl_ctrl_register2(&rr->ctrl, &rr->ipcp_name,
+                                &rr->server_appl_name);
+    } else {
+        ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
+                               &rr->server_appl_name);
+    }
+
     if (ret) {
         return ret;
     }

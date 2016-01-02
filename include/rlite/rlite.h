@@ -113,23 +113,39 @@ rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
  * asynchronous API. */
 int
 rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
                    const struct rlite_flow_spec *flowspec);
 
 int
 rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
-                 const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name);
 
 int
 rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *ipcp_name,
                    const struct rina_name *appl_name);
 
 int
 rl_ctrl_flow_accept(struct rlite_ctrl *ctrl);
+
+/* Variant of the synchronous API, mostly for testing purposes.
+ * The IPCP name can be specified in place of the DIF name. */
+int
+rl_ctrl_flow_alloc2(struct rlite_ctrl *ctrl,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *local_appl,
+                    const struct rina_name *remote_appl,
+                    const struct rlite_flow_spec *flowspec);
+
+int
+rl_ctrl_register2(struct rlite_ctrl *ctrl,
+                  const struct rina_name *ipcp_name,
+                  const struct rina_name *appl_name);
+
+int
+rl_ctrl_unregister2(struct rlite_ctrl *ctrl,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *appl_name);
 
 #ifdef __cplusplus
 }
