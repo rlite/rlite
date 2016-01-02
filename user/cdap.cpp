@@ -11,12 +11,12 @@
 using namespace std;
 
 
-CDAPManager::CDAPManager(int fd)
+CDAPManager::CDAPManager(int arg_fd)
 {
     invoke_id_next = 1;
     max_pending_ops = 5;
 
-    fd = 0;
+    fd = arg_fd;
     memset(&local_appl, 0, sizeof(local_appl));
     memset(&remote_appl, 0, sizeof(remote_appl));
     connected = 0;
@@ -332,8 +332,7 @@ CDAPMessage::print() const
 }
 
 int
-cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
-              int invoke_id)
+CDAPManager::msg_send(struct CDAPMessage *m, int invoke_id)
 {
     gpb::CDAPMessage gm;
     size_t serlen;
@@ -342,18 +341,18 @@ cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
 
     if (m->is_request()) {
         /* CDAP request message (M_*). */
-        m->invoke_id = mgr->get_invoke_id();
+        m->invoke_id = get_invoke_id();
 
     } else {
         /* CDAP response message (M_*_R). */
         m->invoke_id = invoke_id;
-        if (mgr->put_invoke_id_remote(m->invoke_id)) {
+        if (put_invoke_id_remote(m->invoke_id)) {
            PE("%s: Invoke id %s does not match any pending request\n",
                 __func__, m->invoke_id);
         }
 
         if (m->op_code == gpb::M_CONNECT_R) {
-            mgr->connected = 1;
+            connected = 1;
         }
     }
 
@@ -382,7 +381,7 @@ cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
 }
 
 struct CDAPMessage *
-cdap_msg_recv(CDAPManager *mgr, int fd)
+CDAPManager::msg_recv()
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;
@@ -404,7 +403,7 @@ cdap_msg_recv(CDAPManager *mgr, int fd)
 
     if (m->is_response()) {
         /* CDAP request message (M_*). */
-        if (mgr->put_invoke_id(m->invoke_id)) {
+        if (put_invoke_id(m->invoke_id)) {
             PE("%s: Invoke id %d does not match any pending request\n",
                 __func__);
             delete m;
@@ -412,12 +411,12 @@ cdap_msg_recv(CDAPManager *mgr, int fd)
         }
 
         if (m->op_code == gpb::M_CONNECT_R) {
-            mgr->connected = 1;
+            connected = 1;
         }
 
     } else {
         /* CDAP response message (M_*_R). */
-        if (mgr->get_invoke_id_remote(m->invoke_id)) {
+        if (get_invoke_id_remote(m->invoke_id)) {
             PE("%s: Invoke id %d already used remotely\n");
             delete m;
             m = NULL;
@@ -447,7 +446,7 @@ cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
         return ret;
     }
 
-    return cdap_msg_send(mgr, &m, fd, 0);
+    return mgr->msg_send(&m, 0);
 }
 
 int
@@ -466,5 +465,5 @@ cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
         return ret;
     }
 
-    return cdap_msg_send(mgr, &m, fd, req->invoke_id);
+    return mgr->msg_send(&m, req->invoke_id);
 }

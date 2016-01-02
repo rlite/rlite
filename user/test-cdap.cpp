@@ -33,12 +33,12 @@ test_cdap_server(int port)
         return -1;
     }
 
+    CDAPManager mgr(pipefds[0]);
+
     if ((ld = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket()");
         return -1;
     }
-
-    CDAPManager mgr(ld);
 
     if (setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
         perror("setsockopt()");
@@ -72,15 +72,18 @@ test_cdap_server(int port)
 
         write(pipefds[1], bufin, n);
 
-        m = cdap_msg_recv(&mgr, pipefds[0]);
+        mgr.fd = pipefds[0]; /* This is just a trick. */
+        m = mgr.msg_recv();
 
         if (!m) {
-            PE("%s: cdap_msg_recv()");
+            PE("%s: msg_recv()");
             continue;
         }
 
         PD("%s: CDAP message received\n", __func__);
         m->print();
+
+        mgr.fd = pipefds[1];  /* This is just a trick. */
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
@@ -133,7 +136,7 @@ client_connect(int sfd)
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    m = cdap_msg_recv(&mgr, sfd);
+    m = mgr.msg_recv();
     if (!m) {
         PE("%s: Error receiving CDAP response\n", __func__);
         return -1;

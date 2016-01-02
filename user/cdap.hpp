@@ -19,18 +19,24 @@ class CDAPManager {
     int max_pending_ops;
     std::set<int> pending_invoke_ids_remote;
 
-    int __put_invoke_id(std::set<int> &pending, int invoke_id);
+    int connected;
 
-public:
-    CDAPManager(int fd);
+    int __put_invoke_id(std::set<int> &pending, int invoke_id);
     int get_invoke_id();
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
     int put_invoke_id_remote(int invoke_id);
 
+public:
+    CDAPManager(int fd);
+
+    /* @invoke_id is not meaningful for request messages. */
+    int msg_send(struct CDAPMessage *m, int invoke_id);
+
+    struct CDAPMessage * msg_recv();
+
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    int connected;
     int fd;
 };
 
@@ -92,12 +98,6 @@ private:
 
     CDAPMessage() { } /* This cannot be called. */
 };
-
-/* @invoke_id is not meaningful for request messages. */
-int cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
-                  int invoke_id);
-
-struct CDAPMessage * cdap_msg_recv(CDAPManager *mgr, int fd);
 
 int cdap_m_connect_send(CDAPManager *mgr, int fd, int *invoke_id,
                         gpb::authTypes_t auth_mech,
