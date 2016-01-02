@@ -139,6 +139,7 @@ struct dtp {
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
+    unsigned long rtx_tmr_int;
     struct rina_buf *rtx_tmr_next;
 };
 

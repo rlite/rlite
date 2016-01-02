@@ -109,8 +109,6 @@ rcv_inact_tmr_cb(long unsigned arg)
     PD("%s\n", __func__);
 }
 
-#define RTX_MSECS   1000
-
 static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
                   struct rina_buf *rb, bool maysleep);
 
@@ -146,7 +144,7 @@ rtx_tmr_cb(long unsigned arg)
 
             if (jiffies >= rb->rtx_jiffies) {
                 /* This rb should be retransmitted. */
-                rb->rtx_jiffies += msecs_to_jiffies(RTX_MSECS);
+                rb->rtx_jiffies += dtp->rtx_tmr_int;
 
                 crb = rina_buf_clone(rb, GFP_ATOMIC);
                 if (unlikely(!crb)) {
@@ -185,6 +183,8 @@ rtx_tmr_cb(long unsigned arg)
     }
 }
 
+#define RTX_MSECS_DEFAULT   1000
+
 static int
 rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
@@ -207,6 +207,13 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr_next = NULL;
+    dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
+
+    if (flow->cfg.dtcp.rtx_control && ! dtp->rtx_tmr_int) {
+        PI("%s: fixing initial_tr parameter to %u ms\n",
+                __func__, RTX_MSECS_DEFAULT);
+        dtp->rtx_tmr_int = msecs_to_jiffies(RTX_MSECS_DEFAULT);
+    }
 
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -398,7 +405,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             }
 
             /* Record the rtx expiration time. */
-            crb->rtx_jiffies = jiffies + msecs_to_jiffies(RTX_MSECS) - 1;
+            crb->rtx_jiffies = jiffies + dtp->rtx_tmr_int;
 
             /* Add to the rtx queue and start the rtx timer if not already
              * started. */
