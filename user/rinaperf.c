@@ -126,8 +126,10 @@ echo_client(struct rinaperf *rp)
     us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
             (t_end.tv_usec - t_start.tv_usec);
 
-    printf("SDU size: %d bytes, latency: %lu us\n", ret,
-            us/rp->test_config.cnt);
+    if (rp->test_config.cnt) {
+        printf("SDU size: %d bytes, latency: %lu us\n", ret,
+                us/rp->test_config.cnt);
+    }
 
     close(rp->dfd);
 
@@ -313,7 +315,7 @@ main(int argc, char **argv)
 
             case 'c':
                 cnt = atoi(optarg);
-                if (cnt <= 0) {
+                if (cnt < 0) {
                     printf("    Invalid 'cnt' %d\n", cnt);
                     return -1;
                 }
