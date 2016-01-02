@@ -83,7 +83,7 @@ struct ipcp_entry {
     uint64_t            addr;
     struct ipcp_ops     ops;
     void                *priv;
-    struct list_head    registered_applications;
+    struct list_head    registered_appls;
     spinlock_t          regapp_lock;
     struct rina_ctrl    *uipcp;
     struct txrx         *mgmt_txrx;

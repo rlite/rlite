@@ -95,7 +95,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
     resp->ipcp_id = ipcp_id;
     resp->reg = 1;
     resp->response = response;
-    rina_name_copy(&resp->application_name, &req->application_name);
+    rina_name_copy(&resp->appl_name, &req->appl_name);
 
     PD("Issuing application register response ...\n");
 

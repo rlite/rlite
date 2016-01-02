@@ -97,7 +97,7 @@ struct rina_kmsg_appl_register {
 
     uint16_t ipcp_id;
     uint8_t reg;
-    struct rina_name application_name;
+    struct rina_name appl_name;
 } __attribute__((packed));
 
 /* application <-- kernel report the result of (un)registration. */
@@ -108,7 +108,7 @@ struct rina_kmsg_appl_register_resp {
     uint16_t ipcp_id;
     uint8_t reg;
     uint8_t response;
-    struct rina_name application_name;
+    struct rina_name appl_name;
 } __attribute__((packed));
 
 /* application --> kernel to initiate a flow allocation. */
