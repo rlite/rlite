@@ -3,6 +3,7 @@
 import re
 import argparse
 import subprocess
+import common
 
 
 description = "Python script to launch a scenario"
@@ -25,6 +26,8 @@ argparser.add_argument('-t', '--type',
 argparser.add_argument('-c', '--conf',
                        help = "Path to the topology configuration file", type = str,
                        default = 'gen.conf')
+argparser.add_argument('--no-program-script', dest='program_script',
+                       action='store_false', help = "Don't generate program script")
 
 args = argparser.parse_args()
 
@@ -359,26 +362,8 @@ subprocess.call(['chmod', '+x', 'down.sh'])
 
 
 ################### GENERATE PROGRAM SCRIPT #####################
-
-fout = open('program.sh', 'w')
-
-outs =  '#!/bin/bash\n'                                             \
-        '\n'                                                        \
-        'set -x\n'                                                  \
-        'qemu-system-x86_64 "%(img)s" '                             \
-        '--enable-kvm '                                             \
-        '-smp 2 '                                                   \
-        '-m 1G '                                                    \
-        '-device e1000,mac=00:0a:0a:0a:0a:99,netdev=mgmt '          \
-        '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
-        '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '             \
-        '-vga std  &\n'                                             \
-                % {'img': args.image, 'fwdp': args.base_port,
-                   'fwdc': 10000 + args.base_port}
-
-fout.write(outs)
-fout.close()
-subprocess.call(['chmod', '+x', 'program.sh'])
+if args.program_script:
+    common.gen_program_script(args.image, args.base_port)
 
 
 ################### GENERATE TEST SCRIPT #####################
