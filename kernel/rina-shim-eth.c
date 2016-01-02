@@ -179,9 +179,9 @@ arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
 /* This function is taken after net/ipv4/arp.c:arp_create() */
 static struct sk_buff *
 arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
-           const char *tpa, const void *tha, gfp_t gfp)
+           int spa_len, const char *tpa, int tpa_len, const void *tha,
+           gfp_t gfp)
 {
-    int spa_len, tpa_len;
     int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
     struct sk_buff *skb = NULL;
     struct arphdr *arp;
@@ -189,8 +189,6 @@ arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
     int pa_len;
     uint8_t *ptr;
 
-    spa_len = strlen(spa);
-    tpa_len = strlen(tpa);
     pa_len = (tpa_len > spa_len) ? tpa_len : spa_len;
 
     arp_msg_len = sizeof(*arp) + 2 * (pa_len + priv->netdev->addr_len);
@@ -298,7 +296,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         goto nomem;
     }
 
-    skb = arp_create(priv, ARPOP_REQUEST, spa, tpa, NULL, GFP_KERNEL);
+    skb = arp_create(priv, ARPOP_REQUEST, spa, strlen(spa),
+                     tpa, strlen(tpa), NULL, GFP_KERNEL);
     if (!skb) {
         goto nomem;
     }
@@ -368,7 +367,8 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 
         /* Send an ARP reply. */
         skb = arp_create(priv, ARPOP_REPLY, priv->upper_name_s,
-                         spa, sha, GFP_ATOMIC);
+                         strlen(priv->upper_name_s),
+                         spa, arp->ar_pln, sha, GFP_ATOMIC);
         if (skb) {
             dev_queue_xmit(skb);
         }
