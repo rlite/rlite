@@ -264,8 +264,9 @@ flow_request_wait(struct application *application)
 }
 
 int
-open_port(unsigned port_id)
+open_port(uint32_t port_id)
 {
+    long int val = (long int)port_id;
     int fd;
     int ret;
 
@@ -275,13 +276,26 @@ open_port(unsigned port_id)
         return -1;
     }
 
-    ret = ioctl(fd, 73, port_id);
+    ret = ioctl(fd, 73, val);
     if (ret) {
         perror("ioctl(/dev/rina-io)");
         return -1;
     }
 
     return fd;
+}
+
+int
+unbind_port(int fd)
+{
+    long int val = -1;
+    int ret = ioctl(fd, 73, val);
+
+    if (ret) {
+        perror("ioctl(/dev/rina-io)");
+    }
+
+    return ret;
 }
 
 int

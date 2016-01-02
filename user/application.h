@@ -2,6 +2,7 @@
 #define __RINA_APPLICATION_H__
 
 #include <rina/rina-common.h>
+#include <stdint.h>
 #include "list.h"
 #include "evloop.h"
 
@@ -43,6 +44,7 @@ int flow_allocate_resp(struct application *application,
                        uint16_t ipcp_id, uint32_t port_id,
                        uint8_t response);
 
-int open_port(unsigned port_id);
+int open_port(uint32_t port_id);
+int unbind_port(int fd);
 
 #endif  /* __RINA_APPLICATION_H__ */

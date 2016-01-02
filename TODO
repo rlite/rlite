@@ -8,3 +8,4 @@
 - limitare la lunghezza delle code nel kernel
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 - b_req in response handlers seems to be always null
+- fondi flow_allocate() + open_port()

@@ -1595,10 +1595,10 @@ rina_io_poll(struct file *f, poll_table *wait)
 }
 
 static long
-rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
+rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long d)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
-    uint32_t port_id = (uint32_t)data;
+    long int data = (long int)d;
     struct flow_entry *flow = NULL;
     long ret = 0;
 
@@ -1614,16 +1614,20 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long data)
         rio->flow = NULL;
     }
 
-    flow = flow_table_find(port_id);
-    if (!flow) {
-        printk("%s: Error: No such flow\n", __func__);
-        ret = -ENXIO;
-        goto out;
-    }
+    if (data != -1) {
+        uint32_t port_id = (uint32_t)data;
 
-    /* Bind the flow to this file descriptor. */
-    rio->flow = flow;
-    rio->flow->refcnt++;
+        flow = flow_table_find(port_id);
+        if (!flow) {
+            printk("%s: Error: No such flow\n", __func__);
+            ret = -ENXIO;
+            goto out;
+        }
+
+        /* Bind the flow to this file descriptor. */
+        rio->flow = flow;
+        rio->flow->refcnt++;
+    }
 out:
     mutex_unlock(&rina_dm.lock);
 
