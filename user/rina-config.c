@@ -226,21 +226,72 @@ static int ipcp_create(int argc, char **argv, struct rinaconf *rc)
     return result;
 }
 
+/* Destroy an IPC process. */
+static int
+rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
+{
+    struct rina_kmsg_ipcp_destroy *msg;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* TODO notify uipcp manager
+    result = uipcp_del(rc, ipcp_id);
+    if (result) {
+        return result;
+    }
+    */
+
+    /* Allocate and create a request message. */
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_KERN_IPCP_DESTROY;
+    msg->ipcp_id = ipcp_id;
+
+    PD("Requesting IPC process destruction...\n");
+
+    resp = issue_request(&rc->loop, RMB(msg),
+                         sizeof(*msg), 0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    ipcps_fetch(&rc->loop);
+
+    /* TODO see above
+    uipcps_fetch(ipcm);
+    */
+
+    return result;
+}
+
 static int ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_amsg_ipcp_destroy req;
     const char *ipcp_apn;
     const char *ipcp_api;
+    struct rina_name ipcp_name;
+    unsigned int ipcp_id;
+    int ret = 1;
 
     assert(argc >= 2);
     ipcp_apn = argv[0];
     ipcp_api = argv[1];
 
-    req.msg_type = RINA_CONF_IPCP_DESTROY;
-    req.event_id = 0;
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req);
+    /* Does the request specifies an existing IPC process ? */
+    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (ipcp_id == ~0U) {
+        PE("%s: No such IPCP process\n", __func__);
+    } else {
+        /* Valid IPCP id. Forward the request to the kernel. */
+        ret = rina_ipcp_destroy(rc, ipcp_id);
+    }
+
+    return ret;
 }
 
 static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
