@@ -55,7 +55,8 @@ struct uipcp_ops {
     int (*register_to_lower)(struct uipcp *uipcp,
                              const struct rl_cmsg_ipcp_register *req);
 
-    int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *);
+    int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *,
+                  int wait_for_completion);
 
     int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
 

@@ -23,3 +23,6 @@
 - support RIB M_READ (and M_WRITE)
 
 - fix inactivity timer callbacks
+
+- ipcp_enroll() takes uipcps lock, but normal_ipcp_enroll() blocks with
+  this lock held.

@@ -256,6 +256,7 @@ uipcp_rib::pduft_sync()
         }
 
         /* Just take one for now. */
+        assert(neigh->second->has_mgmt_flow());
         next_hop_to_port_id[r->second] = neigh->second->mgmt_conn()->port_id;
     }
 

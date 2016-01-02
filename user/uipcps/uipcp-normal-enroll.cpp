@@ -247,8 +247,8 @@ void
 NeighFlow::keepalive_tmr_start()
 {
     keepalive_tmrid = rl_evloop_schedule(&neigh->rib->uipcp->loop,
-                                              NEIGH_KEEPALIVE_INTVAL,
-                                              keepalive_timeout_cb, this);
+                                         NEIGH_KEEPALIVE_INTVAL,
+                                         keepalive_timeout_cb, this);
 }
 
 void
@@ -806,6 +806,7 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
     int ret;
 
     if (!nf) {
+        assert(const_cast<Neighbor*>(this)->has_mgmt_flow());
         nf = const_cast<Neighbor*>(this)->mgmt_conn();
     }
 
@@ -908,9 +909,7 @@ uipcp_rib::del_neighbor(const RinaName& neigh_name)
     map<string, Neighbor*>::iterator mit =
                     neighbors.find(static_cast<string>(neigh_name));
 
-    if (mit == neighbors.end()) {
-        return -1;
-    }
+    assert(mit != neighbors.end());
 
     delete mit->second;
     neighbors.erase(mit);
@@ -1149,7 +1148,8 @@ Neighbor::alloc_flow(const char *supp_dif)
 }
 
 int
-normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req)
+normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
+                   int wait_for_completion)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
@@ -1187,16 +1187,21 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req)
         neigh->enroll_fsm_run(nf, NULL);
     }
 
-    /* Wait for the enrollment procedure to stop, either because of
-     * successful completion (NEIGH_ENROLLED), or because of an abort
-     * (NEIGH_NONE).
-     */
-    while (nf->enrollment_state != NEIGH_NONE &&
-            nf->enrollment_state != NEIGH_ENROLLED) {
-        pthread_cond_wait(&nf->enrollment_stopped, &rib->lock);
-    }
+    if (wait_for_completion) {
+        /* Wait for the enrollment procedure to stop, either because of
+         * successful completion (NEIGH_ENROLLED), or because of an abort
+         * (NEIGH_NONE).
+         */
+        while (nf->enrollment_state != NEIGH_NONE &&
+                nf->enrollment_state != NEIGH_ENROLLED) {
+            pthread_cond_wait(&nf->enrollment_stopped, &rib->lock);
+        }
 
-    ret = nf->enrollment_state == NEIGH_ENROLLED ? 0 : -1;
+        ret = nf->enrollment_state == NEIGH_ENROLLED ? 0 : -1;
+
+    } else {
+        ret = 0;
+    }
 
     pthread_mutex_unlock(&rib->lock);
 
@@ -1286,6 +1291,7 @@ normal_get_enrollment_targets(struct uipcp *uipcp, struct list_head *neighs)
         }
 
         assert(rl_ipcp->dif_name);
+        assert(neigh->has_mgmt_flow());
 
         if (neigh->ipcp_name.rina_name_fill(&ni->neigh_name) ||
                 rina_name_copy(&ni->ipcp_name, &rl_ipcp->ipcp_name) ||

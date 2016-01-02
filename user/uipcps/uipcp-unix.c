@@ -157,7 +157,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
     /* Find the userspace part of the enrolling IPCP. */
     uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
     if (uipcp && uipcp->ops.enroll) {
-        ret = uipcp->ops.enroll(uipcp, req);
+        ret = uipcp->ops.enroll(uipcp, req, 1);
     }
 
     pthread_mutex_unlock(&uipcps->lock);

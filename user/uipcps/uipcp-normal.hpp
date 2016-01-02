@@ -284,7 +284,8 @@ private:
 };
 
 int normal_ipcp_enroll(struct uipcp *uipcp,
-                       const struct rl_cmsg_ipcp_enroll *req);
+                       const struct rl_cmsg_ipcp_enroll *req,
+                       int wait_for_completion);
 
 int normal_get_enrollment_targets(struct uipcp *uipcp,
                                   struct list_head *neighs);

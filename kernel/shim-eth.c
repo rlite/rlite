@@ -715,7 +715,7 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
         /* The first PDU is interpreted as a flow allocation request. */
 
         if (!priv->upper_name_s) {
-            PD("Flow allocation request arrived but no application "
+            RPD(3, "Flow allocation request arrived but no application "
                "registered\n");
             goto drop;
         }

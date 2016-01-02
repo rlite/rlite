@@ -78,10 +78,8 @@ bool RinaName::operator!=(const RinaName& other) const
 int
 RinaName::rina_name_fill(struct rina_name *rn)
 {
-    ::rina_name_fill(rn, apn.c_str(), api.c_str(),
-                     aen.c_str(), aei.c_str());
-
-    return 0;
+    return ::rina_name_fill(rn, apn.c_str(), api.c_str(),
+                            aen.c_str(), aei.c_str());
 }
 
 static void
