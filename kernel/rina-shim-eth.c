@@ -32,8 +32,21 @@
 #include <linux/sched.h>
 
 
+#define ETH_P_RINA  0xD1F0
+
+struct arpt_entry {
+    /* Targed Hardware Address. */
+    uint8_t tha[6];
+    /* Targed Protocol Address. */
+    struct rina_name tpa;
+
+    struct list_head node;
+};
+
 struct rina_shim_eth {
     struct ipcp_entry *ipcp;
+
+    struct list_head arp_table;
 };
 
 static void *
@@ -47,6 +60,7 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
+    INIT_LIST_HEAD(&priv->arp_table);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -57,16 +71,44 @@ static void
 rina_shim_eth_destroy(struct ipcp_entry *ipcp)
 {
     struct rina_shim_eth *priv = ipcp->priv;
+    struct arpt_entry *entry, *tmp;
+
+    list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
+        list_del(&entry->node);
+        rina_name_free(&entry->tpa);
+        kfree(entry);
+    }
 
     kfree(priv);
 
     printk("%s: IPC [%p] destroyed\n", __func__, priv);
 }
 
+static struct arpt_entry *
+arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app)
+{
+    struct arpt_entry *entry;
+
+    list_for_each_entry(entry, &priv->arp_table, node) {
+        if (rina_name_cmp(&entry->tpa, dst_app) == 0) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static int
 rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
-                                  struct flow_entry *flow)
+                     struct flow_entry *flow)
 {
+    struct rina_shim_eth *priv = ipcp->priv;
+    struct arpt_entry *entry = arp_lookup_direct(priv, &flow->remote_application);
+
+    if (!entry) {
+        return -EINVAL;
+    }
+
     return -EINVAL;
 }
 
