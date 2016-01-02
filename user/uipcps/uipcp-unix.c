@@ -101,12 +101,12 @@ track_ipcp_unregistration(struct uipcps *uipcps,
     }
 }
 
-static uint8_t
-rl_ipcp_register(struct uipcps *uipcps,
-                 const struct rl_cmsg_ipcp_register *req)
+static int
+ipcp_register(struct uipcps *uipcps,
+              const struct rl_cmsg_ipcp_register *req)
 {
     struct uipcp *uipcp;
-    uint8_t result = RLITE_ERR;
+    int result = RLITE_ERR;
 
     /* Grab the corresponding userspace IPCP. */
     pthread_mutex_lock(&uipcps->lock);
@@ -141,9 +141,28 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rlite_msg_base_resp resp;
 
-    resp.result = rl_ipcp_register(uipcps, req);
+    resp.result = ipcp_register(uipcps, req);
 
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
+}
+
+static int
+ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
+{
+    int ret = RLITE_ERR; /* Report failure by default. */
+    struct uipcp *uipcp;
+
+    pthread_mutex_lock(&uipcps->lock);
+
+    /* Find the userspace part of the enrolling IPCP. */
+    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
+    if (uipcp && uipcp->ops.enroll) {
+        ret = uipcp->ops.enroll(uipcp, req);
+    }
+
+    pthread_mutex_unlock(&uipcps->lock);
+
+    return ret;
 }
 
 static int
@@ -152,23 +171,8 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
 {
     struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
     struct rlite_msg_base_resp resp;
-    struct uipcp *uipcp;
 
-    resp.result = RLITE_ERR; /* Report failure by default. */
-
-    /* Find the userspace part of the enrolling IPCP. */
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
-    if (!uipcp) {
-        goto out;
-    }
-
-    if (uipcp->ops.enroll) {
-        resp.result = uipcp->ops.enroll(uipcp, req);
-    }
-
-out:
-    pthread_mutex_unlock(&uipcps->lock);
+    resp.result = ipcp_enroll(uipcps, req);
 
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
@@ -366,17 +370,17 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
 static void
 process_persistence_file(struct uipcps *uipcps)
 {
-        /* Read the persistent IPCP registration file into
-         * the ipcps_registrations list. */
-        FILE *fpreg = fopen(RLITE_PERSISTENT_REG_FILE, "r");
-        char line[4096];
+    /* Read the persistent IPCP registration file into
+     * the ipcps_registrations list. */
+    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "r");
+    char line[4096];
 
     if (!fpreg) {
-        PD("Persistence file %s not found\n", RLITE_PERSISTENT_REG_FILE);
+        PD("Persistence file %s not found\n", RLITE_PERSISTENCE_FILE);
         return;
     }
 
-    PD("Persistence file %s opened\n", RLITE_PERSISTENT_REG_FILE);
+    PD("Persistence file %s opened\n", RLITE_PERSISTENCE_FILE);
 
     while (fgets(line, sizeof(line), fpreg)) {
         char *s0 = NULL;
@@ -398,8 +402,7 @@ process_persistence_file(struct uipcps *uipcps)
 
         if (strncmp(s0, "REG", 3) == 0) {
             struct rl_cmsg_ipcp_register msg;
-            uint8_t reg_result;
-            int ret;
+            int ret = 0;
 
             if (!s1 || !s2) {
                 PE("Invalid REG line");
@@ -407,7 +410,7 @@ process_persistence_file(struct uipcps *uipcps)
             }
 
             msg.reg = 1;
-            ret = rina_name_from_string(s2, &msg.ipcp_name);
+            ret |= rina_name_from_string(s2, &msg.ipcp_name);
             msg.dif_name = strdup(s1);
             if (ret || !msg.dif_name) {
                 PE("Out of memory\n");
@@ -416,13 +419,37 @@ process_persistence_file(struct uipcps *uipcps)
                 continue;
             }
 
-            reg_result = rl_ipcp_register(uipcps, &msg);
+            ret = ipcp_register(uipcps, &msg);
             PI("Automatic re-registration for %s --> %s\n",
-                    s2, (reg_result == 0) ? "DONE" : "FAILED");
+                    s2, (ret == RLITE_SUCC) ? "DONE" : "FAILED");
             rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
                            RLITE_MB(&msg));
 
         } else if (strncmp(s0, "ENR", 3) == 0) {
+            struct rl_cmsg_ipcp_enroll msg;
+            int ret = 0;
+
+            if (!s1 || !s2 || !s3 || !s4) {
+                PE("Invalid ENR line");
+                continue;
+            }
+
+            ret |= rina_name_from_string(s2, &msg.ipcp_name);
+            ret |= rina_name_from_string(s3, &msg.neigh_name);
+            msg.dif_name = strdup(s1);
+            msg.supp_dif_name = strdup(s4);
+            if (ret || !msg.dif_name || !msg.supp_dif_name) {
+                PE("Out of memory\n");
+                rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+                               RLITE_MB(&msg));
+                continue;
+            }
+
+            ret = ipcp_enroll(uipcps, &msg);
+            PI("Automatic re-enrollment for %s in DIF %s --> %s\n", s2, s1,
+               (ret == RLITE_SUCC) ? "DONE" : "FAILED");
+            rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+                           RLITE_MB(&msg));
         }
     }
 
@@ -471,13 +498,13 @@ uipcps_update(struct uipcps *uipcps)
 static void
 persistent_ipcp_reg_dump(struct uipcps *uipcps)
 {
-    FILE *fpreg = fopen(RLITE_PERSISTENT_REG_FILE, "w");
+    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "w");
     char *ipcp_s;
     struct registered_ipcp *ripcp;
 
     if (!fpreg) {
         PE("Cannot open persistence file (%s)\n",
-                RLITE_PERSISTENT_REG_FILE);
+                RLITE_PERSISTENCE_FILE);
         return;
     }
 
@@ -498,12 +525,12 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
 static void
 persistent_ipcp_enroll_dump(struct uipcps *uipcps)
 {
-    FILE *fpreg = fopen(RLITE_PERSISTENT_REG_FILE, "a");
+    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "a");
     struct uipcp *uipcp;
 
     if (!fpreg) {
         PE("Cannot open persistence file (%s)\n",
-                RLITE_PERSISTENT_REG_FILE);
+                RLITE_PERSISTENCE_FILE);
         return;
     }
 

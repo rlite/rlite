@@ -788,7 +788,8 @@ normal_register_to_lower(struct uipcp *uipcp,
 }
 
 static int
-normal_ipcp_dft_set(struct uipcp *uipcp, struct rl_cmsg_ipcp_dft_set *req)
+normal_ipcp_dft_set(struct uipcp *uipcp,
+                    const struct rl_cmsg_ipcp_dft_set *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);

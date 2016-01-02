@@ -33,7 +33,7 @@ struct uipcps {
     struct rlite_evloop loop;
 };
 
-#define RLITE_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
+#define RLITE_PERSISTENCE_FILE   "/var/rlite/uipcps-persist"
 
 struct enrolled_neigh {
     // TODO these can be serialized names
@@ -55,9 +55,9 @@ struct uipcp_ops {
     int (*register_to_lower)(struct uipcp *uipcp,
                              const struct rl_cmsg_ipcp_register *req);
 
-    int (*enroll)(struct uipcp *, struct rl_cmsg_ipcp_enroll *);
+    int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *);
 
-    int (*dft_set)(struct uipcp *, struct rl_cmsg_ipcp_dft_set *);
+    int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
 
     char * (*rib_show)(struct uipcp *);
 

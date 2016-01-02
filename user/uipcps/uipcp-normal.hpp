@@ -281,7 +281,8 @@ private:
     uint32_t kevent_id_cnt;
 };
 
-int normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req);
+int normal_ipcp_enroll(struct uipcp *uipcp,
+                       const struct rl_cmsg_ipcp_enroll *req);
 
 int normal_get_enrollment_targets(struct uipcp *uipcp,
                                   struct list_head *neighs);

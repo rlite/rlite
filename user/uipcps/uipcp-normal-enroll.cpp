@@ -1136,7 +1136,7 @@ Neighbor::alloc_flow(const char *supp_dif)
 }
 
 int
-normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
+normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
