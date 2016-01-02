@@ -42,11 +42,27 @@ struct upqueue_entry {
     struct list_head node;
 };
 
+struct ipcp_ops {
+    int (*assign_to_dif)(void *data, struct rina_name *dif_name);
+    int (*application_register)(void *data, struct rina_name *app_name);
+    int (*application_unregister)(void *data, struct rina_name *app_name);
+    int (*sdu_write)(void *data, void *sdu, unsigned int sdu_len);
+};
+
+struct ipcp_factory {
+    uint8_t dif_type;
+    void *(*create)(void);
+    void (*destroy)(void *data);
+    struct ipcp_ops ops;
+    struct list_head node;
+};
+
 struct ipcp_entry {
     uint16_t            id;    /* Key */
     struct rina_name    name;
     struct rina_name    dif_name;
     uint8_t             dif_type;
+    struct ipcp_ops     ops;
     struct hlist_node   node;
 };
 
@@ -60,13 +76,74 @@ struct rina_dm {
     /* Hash table to store information about each IPC process. */
     DECLARE_HASHTABLE(ipcp_table, IPCP_HASHTABLE_BITS);
 
+    /* Pointer used to implement the IPC processes fetch operations. */
     struct ipcp_entry *ipcp_fetch_last;
+
+    struct list_head ipcp_factories;
 
     struct mutex lock;
 };
 
 static struct rina_dm rina_dm;
 
+static struct ipcp_factory *
+ipcp_factories_find(uint8_t dif_type)
+{
+    struct ipcp_factory *factory;
+
+    list_for_each_entry(factory, &rina_dm.ipcp_factories, node) {
+        if (factory->dif_type == dif_type) {
+            return factory;
+        }
+    }
+
+    return NULL;
+}
+
+int
+rina_ipcp_factory_register(struct ipcp_factory *factory)
+{
+    struct ipcp_factory *f;
+
+    if (!factory) {
+        return -EINVAL;
+    }
+
+    if (ipcp_factories_find(factory->dif_type)) {
+        return -EBUSY;
+    }
+
+    /* Build a copy and insert it into the IPC process factories
+     * list. */
+    f = kmalloc(sizeof(*f), GFP_KERNEL);
+    if (!f) {
+        return -ENOMEM;
+    }
+    memcpy(f, factory, sizeof(*f));
+
+    list_add_tail(&f->node, &rina_dm.ipcp_factories);
+
+    return 0;
+}
+EXPORT_SYMBOL_GPL(rina_ipcp_factory_register);
+
+int
+rina_ipcp_factory_unregister(uint8_t dif_type)
+{
+    struct ipcp_factory *factory = ipcp_factories_find(dif_type);
+
+    if (!factory) {
+        return -EINVAL;
+    }
+
+    list_del(&factory->node);
+    kfree(factory);
+
+    return 0;
+}
+EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
+
+/* Data structure associated to the /dev/rina-ctrl file descriptor. */
 struct rina_ctrl {
     char msgbuf[1024];
 
