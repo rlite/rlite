@@ -851,7 +851,7 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
 {
     struct rina_name neigh_name;
     struct rlite_ipcp *info;
-    unsigned int lower_ipcp_id_;
+    unsigned int lower_ipcp_id_ = ~0U;
     unsigned int port_id_;
     int flow_fd_;
     int ret;
@@ -871,6 +871,9 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
                                         supp_dif_name, 0);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->ipcp_id;
+        } else {
+            UPI(rib->uipcp, "Failed to get lower ipcp id\n");
+            return -1;
         }
     }
 
