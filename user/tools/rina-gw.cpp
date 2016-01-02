@@ -515,6 +515,71 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
                   const struct rlite_msg_base_resp *b_resp,
                   const struct rlite_msg_base *b_req)
 {
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
+    Gateway * gw = container_of(appl, struct Gateway, appl);
+    struct rl_kmsg_fa_req_arrived *req =
+            (struct rl_kmsg_fa_req_arrived *)b_resp;
+    map<RinaName, InetName>::iterator mit;
+    Worker *w = gw->workers[0];
+    RinaName dst_name;
+    char *dst_name_s;
+    int cfd;
+    int rfd;
+    int ret;
+
+    dst_name_s = rina_name_to_string(&req->remote_appl);
+    if (!dst_name_s) {
+        PE("rina_name_to_string() failed\n");
+        return 0;
+    }
+
+    dst_name = RinaName(string(dst_name_s), string());
+    free(dst_name_s);
+
+    mit = gw->dst_map.find(dst_name);
+    if (mit == gw->dst_map.end()) {
+        PE("Internal error: Failed to lookup '%s' into dst_map\n",
+            static_cast<string>(dst_name).c_str());
+        return 0;
+    }
+
+    cfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (cfd < 0) {
+        perror("socket()");
+        return 0;
+    }
+
+    cfd = connect(cfd, (struct sockaddr *)&mit->second.addr,
+                  sizeof(mit->second.addr));
+    if (cfd) {
+        perror("connect()");
+        return 0;
+    }
+
+    ret = rlite_flow_allocate_resp(&gw->appl, req->kevent_id,
+                                   req->ipcp_id, 0xffff,
+                                   req->port_id, RLITE_SUCC);
+    if (ret != RLITE_SUCC) {
+        PE("rlite_flow_allocate_resp() failed\n");
+        close(cfd);
+        return 0;
+    }
+
+    rfd = rlite_open_appl_port(req->port_id);
+    if (rfd) {
+        PE("rlite_open_appl_port() failed\n");
+        close(cfd);
+        return 0;
+    }
+
+    pthread_mutex_lock(&w->lock);
+    w->fdmap[cfd] = rfd;
+    w->fdmap[rfd] = cfd;
+    w->repoll();
+    pthread_mutex_unlock(&w->lock);
+
+    PI("New mapping created %d <--> %d\n", cfd, rfd);
+
     return 0;
 }
 
