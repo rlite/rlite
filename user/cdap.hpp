@@ -133,6 +133,12 @@ struct CDAPMessage {
         obj_value.str = v;
     }
 
+    void set_obj_value(const char *v)
+    {
+        obj_value.ty = STRING;
+        obj_value.str = std::string(v);
+    }
+
     int m_connect(gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value,
                   const struct rina_name *local_appl,
@@ -180,37 +186,7 @@ struct CDAPMessage {
     int m_write(gpb::flagValues_t flags,
                 const std::string& obj_class,
                 const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, int32_t v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, int64_t v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, float v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, double v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, bool v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, const std::string& v);
-
-    int m_write(gpb::flagValues_t flags,
-                const std::string& obj_class,
-                const std::string& obj_name, long obj_inst,
-                int scope, const std::string& filter, const char *v);
+                int scope, const std::string& filter);
 
     int m_write_r(const struct CDAPMessage *req,
                   gpb::flagValues_t flags, int result,

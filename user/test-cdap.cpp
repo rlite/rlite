@@ -218,15 +218,15 @@ client_write_some(CDAPConn *conn)
     struct CDAPMessage *m;
     int invoke_id;
 
-    if (req.m_write(gpb::F_NO_FLAGS,
-                    "class_A", "x", 0, 0, string(), 18) ||
-            conn->msg_send(&req, 0)) {
+    req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
+    req.set_obj_value(18);
+    if(conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    if (req.m_write(gpb::F_NO_FLAGS,
-                    "class_A", "x", 0, 0, string(), "ciccio") ||
-            conn->msg_send(&req, 0)) {
+    req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
+    req.set_obj_value("ciccio");
+    if (conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 

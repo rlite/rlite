@@ -994,10 +994,10 @@ CDAPMessage::m_read_r(const struct CDAPMessage *req,
 }
 
 int
-CDAPMessage::__m_write(gpb::flagValues_t flags_,
-                       const std::string& obj_class_,
-                       const std::string& obj_name_, long obj_inst_,
-                       int scope_, const std::string& filter_)
+CDAPMessage::m_write(gpb::flagValues_t flags_,
+                     const std::string& obj_class_,
+                     const std::string& obj_name_, long obj_inst_,
+                     int scope_, const std::string& filter_)
 {
     op_code = gpb::M_WRITE;
     flags = flags_;
@@ -1008,90 +1008,6 @@ CDAPMessage::__m_write(gpb::flagValues_t flags_,
     filter = filter_;
 
     return 0;
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, int32_t v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, int64_t v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, float v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, double v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, bool v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, const string& v)
-{
-    set_obj_value(v);
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
-}
-
-int
-CDAPMessage::m_write(gpb::flagValues_t flags,
-                  const std::string& obj_class,
-                  const std::string& obj_name, long obj_inst,
-                  int scope, const std::string& filter, const char *v)
-{
-    set_obj_value(string(v));
-
-    return __m_write(flags, obj_class, obj_name,
-                     obj_inst, scope, filter);
 }
 
 int
