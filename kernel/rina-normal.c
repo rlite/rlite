@@ -914,7 +914,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     if (deliver) {
         struct list_head qrbs;
-        struct rina_buf *qrb;
+        struct rina_buf *qrb, *tmp;
 
         /* Update rcv_lwe only if this PDU is going to be
          * delivered. */
@@ -929,7 +929,11 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         rina_buf_pci_pop(rb);
         ret = rina_sdu_rx_flow(ipcp, flow, rb);
 
-        list_for_each_entry(qrb, &qrbs, node) {
+        /* Also deliver PDUs just extracted from the seqq. Note
+         * that we must use the safe version of list scanning, since
+         * rina_sdu_rx_flow() will modify qrb->node. */
+        list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
+            list_del(&qrb->node);
             rina_buf_pci_pop(qrb);
             ret |= rina_sdu_rx_flow(ipcp, flow, qrb);
         }
