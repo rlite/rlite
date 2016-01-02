@@ -144,7 +144,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     conn_id.src_cep = req->local_port;
     conn_id.src_cep = 0;
 
-    freq.src_app = RinaName(&ipcp->ipcp_name);
+    freq.src_app = RinaName(&req->local_appl);;
     freq.dst_app = dest_appl;
     freq.src_port = req->local_port;
     freq.dst_port = 0;
