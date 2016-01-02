@@ -137,7 +137,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 
     /* Build a copy and insert it into the IPC process factories
      * list. */
-    f = kmalloc(sizeof(*f), GFP_KERNEL);
+    f = kzalloc(sizeof(*f), GFP_KERNEL);
     if (!f) {
         return -ENOMEM;
     }
@@ -178,14 +178,14 @@ rina_upqueue_append(struct rina_ctrl *rc, struct rina_msg_base *rmsg)
     unsigned int serlen;
     void *serbuf;
 
-    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
         return -ENOMEM;
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
     serlen = rina_msg_serlen(rina_kernel_numtables, rmsg);
-    serbuf = kmalloc(serlen, GFP_KERNEL);
+    serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         return -ENOMEM;
@@ -228,11 +228,10 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
 
     *pentry = NULL;
 
-    entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
         return -ENOMEM;
     }
-    memset(entry, 0, sizeof(*entry));
 
     mutex_lock(&rina_dm.lock);
 
@@ -358,7 +357,7 @@ rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Create the response message. */
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
     if (!resp) {
         ret = -ENOMEM;
         goto err2;
@@ -416,7 +415,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     int ret;
 
     /* Create the response message. */
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
     if (!resp) {
         return -ENOMEM;
     }
@@ -522,11 +521,10 @@ ipcp_application_add(struct ipcp_entry *ipcp,
             return -EINVAL;
     }
 
-    app = kmalloc(sizeof(*app), GFP_KERNEL);
+    app = kzalloc(sizeof(*app), GFP_KERNEL);
     if (!app) {
         return -ENOMEM;
     }
-    memset(app, 0, sizeof(*app));
     rina_name_copy(&app->name, application_name);
     app->rc = rc;
 
@@ -674,11 +672,10 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
     struct flow_entry *entry;
     int ret = 0;
 
-    *pentry = entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+    *pentry = entry = kzalloc(sizeof(*entry), GFP_KERNEL);
     if (!entry) {
         return -ENOMEM;
     }
-    memset(entry, 0, sizeof(*entry));
 
     if (locked)
         mutex_lock(&rina_dm.lock);
@@ -781,7 +778,7 @@ rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
     struct rina_kmsg_flow_allocate_resp_arrived *resp;
     int ret;
 
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
+    resp = kzalloc(sizeof(*resp), GFP_KERNEL);
     if (!resp) {
         return -ENOMEM;
     }
@@ -901,7 +898,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     struct rina_kmsg_flow_allocate_req_arrived *req;
     int ret;
 
-    req = kmalloc(sizeof(*req), GFP_KERNEL);
+    req = kzalloc(sizeof(*req), GFP_KERNEL);
     if (!req) {
         return -ENOMEM;
     }
@@ -1173,7 +1170,7 @@ rina_ctrl_open_common(struct inode *inode, struct file *f)
 {
     struct rina_ctrl *rc;
 
-    rc = kmalloc(sizeof(*rc), GFP_KERNEL);
+    rc = kzalloc(sizeof(*rc), GFP_KERNEL);
     if (!rc) {
         return NULL;
     }

@@ -43,12 +43,11 @@ rina_shim_dummy_create(struct ipcp_entry *ipcp)
 {
     struct rina_shim_dummy *priv;
 
-    priv = kmalloc(sizeof(*priv), GFP_KERNEL);
+    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
         return NULL;
     }
 
-    memset(priv, 0, sizeof(*priv));
     priv->ipcp = ipcp;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
@@ -119,7 +118,7 @@ rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
 {
     struct flow_allocate_req_work *faw;
 
-    faw = kmalloc(sizeof(*faw), GFP_KERNEL);
+    faw = kzalloc(sizeof(*faw), GFP_KERNEL);
     if (!faw) {
         printk("%s: Out of memory\n", __func__);
         return -ENOMEM;
@@ -167,7 +166,7 @@ rina_shim_dummy_flow_allocate_resp(struct ipcp_entry *ipcp,
 {
     struct flow_allocate_resp_work *farw;
 
-    farw = kmalloc(sizeof(*farw), GFP_KERNEL);
+    farw = kzalloc(sizeof(*farw), GFP_KERNEL);
     if (!farw) {
         printk("%s: Out of memory\n", __func__);
         return -ENOMEM;
