@@ -1,1 +1,1 @@
-RINACONF=/home/vmaffione/git/rina/user/rina-config
+RINACONF=/home/vmaffione/rina/user/rina-config

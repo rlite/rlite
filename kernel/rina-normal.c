@@ -154,6 +154,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
     struct dtp *dtp = &flow->dtp;
+    struct fc_config *fc = &flow->cfg.dtcp.fc;
+    int len = rb->len;
     int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
@@ -186,9 +188,35 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->seqnum = dtp->next_seq_num_to_send++;
 
     dtp->set_drf = false;
-    /* DTCP not present */
-    dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
-    dtp->last_seq_num_sent = pci->seqnum;
+    if (fc->fc_type == RINA_FC_T_WIN) {
+        if (pci->seqnum > dtp->snd_rwe) {
+            /* PDU not in the sender window, let's try to
+             * insert it into the Closed Window Queue. */
+            if (dtp->cwq_len < dtp->max_cwq_len) {
+                /* There's room in the queue. */
+                list_add_tail(&rb->node, &dtp->cwq);
+                dtp->cwq_len++;
+            } else {
+                /* POL: FlowControlOverrun */
+
+                /* TODO Set blocking write (backpressure) ? */
+                PD("%s: Dropping overrun PDU [%lu]", __func__,
+                        (long unsigned)pci->seqnum);
+                rina_buf_free(rb);
+
+                return len;
+            }
+        } else {
+            /* PDU in the sender window. */
+            /* POL: TxControl. */
+            dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
+            dtp->last_seq_num_sent = pci->seqnum;
+        }
+    } else {
+        /* DTCP not present */
+        dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
+        dtp->last_seq_num_sent = pci->seqnum;
+    }
 
     if (lower_flow) {
         /* Directly call the underlying IPCP for now. RMT component
@@ -200,7 +228,6 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     } else {
         /* This SDU gets loopbacked to this IPCP, since this is a
          * self flow (flow->remote_addr == ipcp->addr). */
-        int len = rb->len - sizeof(struct rina_pci);
 
         ret = ipcp->ops.sdu_rx(ipcp, rb);
         ret = (ret == 0) ? len : ret;
