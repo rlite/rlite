@@ -658,6 +658,7 @@ flow_table_find(unsigned int port_id)
 
 static int
 flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
+         uint32_t event_id,
          struct rina_name *local_application,
          struct rina_name *remote_application,
          struct flow_entry **pentry, int locked)
@@ -686,6 +687,7 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
         entry->state = FLOW_STATE_NULL;
         entry->ipcp = ipcp;
         entry->rc = rc;
+        entry->event_id = event_id;
         mutex_init(&entry->lock);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
     } else {
@@ -793,7 +795,7 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, rc, &req->local_application,
+    ret = flow_add(ipcp_entry, rc, req->event_id, &req->local_application,
                    &req->remote_application, &flow_entry, 0);
     if (ret) {
         goto negative;
@@ -890,7 +892,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp, app->rc, local_application, remote_application,
+    ret = flow_add(ipcp, app->rc, 0, local_application, remote_application,
                    &flow_entry, 0);
     if (ret) {
         mutex_unlock(&rina_dm.lock);
@@ -918,6 +920,42 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     return ret;
 }
 EXPORT_SYMBOL_GPL(rina_flow_allocate_req_arrived);
+
+int
+rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
+                                uint16_t local_port,
+                                uint8_t response)
+{
+    struct flow_entry *flow_entry = NULL;
+    int ret = -EINVAL;
+
+    mutex_lock(&rina_dm.lock);
+
+    flow_entry = flow_table_find(local_port);
+    if (!flow_entry) {
+        goto out;
+    }
+
+    if (flow_entry->state != FLOW_STATE_PENDING) {
+        goto out;
+    }
+    flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
+                                          : FLOW_STATE_NULL;
+
+    ret = rina_append_allocate_flow_resp_arrived(flow_entry->rc,
+                                                 flow_entry->event_id,
+                                                 local_port, response);
+    if (response) {
+        /* Negative response --> delete the flow. */
+        flow_del(local_port, 0);
+    }
+
+out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+EXPORT_SYMBOL_GPL(rina_flow_allocate_resp_arrived);
 
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_ctrl_handlers[] = {

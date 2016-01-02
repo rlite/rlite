@@ -53,6 +53,7 @@ struct flow_entry {
     struct rina_name    remote_application;
     struct ipcp_entry   *ipcp;
     struct rina_ctrl    *rc;
+    uint32_t            event_id; /* requestor event id */
 
     struct mutex        lock;
     struct hlist_node   node;
@@ -65,5 +66,9 @@ int rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
                                    uint16_t remote_port,
                                    struct rina_name *local_application,
                                    struct rina_name *remote_application);
+
+int rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
+                                    uint16_t local_port,
+                                    uint8_t response);
 
 #endif  /* __RINA_IPCP_H__ */
