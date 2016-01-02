@@ -620,7 +620,7 @@ Neighbor::enroll_fsm_run(const CDAPMessage *rm)
 }
 
 Neighbor *
-uipcp_rib::add_neighbor(const struct rina_name *neigh_name)
+uipcp_rib::get_neighbor(const struct rina_name *neigh_name)
 {
     RinaName _neigh_name_(neigh_name);
     string neigh_name_s = static_cast<string>(_neigh_name_);
@@ -814,27 +814,13 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     return 0;
 }
 
-int
-Neighbor::add_flow(int flow_fd_, unsigned int port_id_)
-{
-    if (has_mgmt_flow()) {
-        PI("Management flow already allocated\n");
-        return 0;
-    }
-
-    flow_fd = flow_fd_;
-    port_id = port_id_;
-
-    return 0;
-}
-
 extern "C"
 int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
 {
     Neighbor *neigh;
     int ret;
 
-    neigh = rib->add_neighbor(&req->neigh_ipcp_name);
+    neigh = rib->get_neighbor(&req->neigh_ipcp_name);
     if (!neigh) {
         PE("Failed to add neighbor\n");
         return -1;
@@ -854,20 +840,36 @@ int rib_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
 }
 
 extern "C" int
-rib_neighbor_flow(struct uipcp_rib *rib,
-                  const struct rina_name *neigh_name,
-                  int neigh_fd, unsigned int neigh_port_id)
+rib_neigh_set_port_id(struct uipcp_rib *rib,
+                      const struct rina_name *neigh_name,
+                      unsigned int neigh_port_id)
 {
-    Neighbor *neigh;
+    Neighbor *neigh = rib->get_neighbor(neigh_name);
 
-    /* Start the enrollment procedure as slave. */
-    neigh = rib->add_neighbor(neigh_name);
     if (!neigh) {
-        PE("Failed to add neighbor\n");
+        PE("Failed to get neighbor\n");
         return -1;
     }
 
-    return neigh->add_flow(neigh_fd, neigh_port_id);
+    neigh->port_id = neigh_port_id;
+
+    return 0;
+}
+
+extern "C" int
+rib_neigh_set_flow_fd(struct uipcp_rib *rib,
+                      const struct rina_name *neigh_name,
+                      int neigh_fd)
+{
+    Neighbor *neigh = rib->get_neighbor(neigh_name);
+
+    if (!neigh) {
+        PE("Failed to get neighbor\n");
+    }
+
+    neigh->flow_fd = neigh_fd;
+
+    return 0;
 }
 
 extern "C" int

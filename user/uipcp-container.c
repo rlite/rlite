@@ -365,11 +365,11 @@ uipcp_server(void *arg)
          * must be done before invoking rlite_flow_allocate_resp,
          * otherwise a race condition would exist (us receiving
          * an M_CONNECT from the neighbor before having the
-         * chance to call rib_neighbor_flow()). */
-        ret = rib_neighbor_flow(uipcp->rib, &pfr->remote_appl,
-                                flow_fd, port_id);
+         * chance to call rib_neigh_set_port_id()). */
+        ret = rib_neigh_set_port_id(uipcp->rib, &pfr->remote_appl,
+                                port_id);
         if (ret) {
-            PE("rib_neighbor_flow() failed\n");
+            PE("rib_neigh_set_port_id() failed\n");
             result = 1;
         }
 
@@ -383,6 +383,12 @@ uipcp_server(void *arg)
 
         flow_fd = rlite_open_appl_port(port_id);
         if (flow_fd < 0) {
+            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
+            goto out;
+        }
+
+        ret = rib_neigh_set_flow_fd(uipcp->rib, &pfr->remote_appl, flow_fd);
+        if (ret) {
             rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
             goto out;
         }

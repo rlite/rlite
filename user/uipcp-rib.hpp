@@ -74,7 +74,6 @@ struct Neighbor {
     const char *enrollment_state_repr(state_t s) const;
     bool has_mgmt_flow() const { return flow_fd != -1; }
     int alloc_flow(struct rina_name *supp_dif_name);
-    int add_flow(int flow_fd_, unsigned int port_id_);
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;
@@ -177,7 +176,7 @@ struct uipcp_rib {
     char *dump() const;
 
     int set_address(uint64_t address);
-    Neighbor *add_neighbor(const struct rina_name *neigh_name);
+    Neighbor *get_neighbor(const struct rina_name *neigh_name);
     int del_neighbor(const RinaName& neigh_name);
     uint64_t dft_lookup(const RinaName& appl_name) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);

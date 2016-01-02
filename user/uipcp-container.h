@@ -91,9 +91,13 @@ int rib_appl_register(struct uipcp_rib *rib,
 int rib_flow_deallocated(struct uipcp_rib *rib,
                          struct rina_kmsg_flow_deallocated *req);
 
-int rib_neighbor_flow(struct uipcp_rib *rib,
-                      const struct rina_name *neigh_name,
-                      int neigh_fd, unsigned int neigh_port_id);
+int rib_neigh_set_port_id(struct uipcp_rib *rib,
+                          const struct rina_name *neigh_name,
+                          unsigned int neigh_port_id);
+
+int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
+                          const struct rina_name *neigh_name,
+                          int neigh_fd);
 
 int rib_del_neighbor(struct uipcp_rib *rib,
                      const struct rina_name *neigh_name);
