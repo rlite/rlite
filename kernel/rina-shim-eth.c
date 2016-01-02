@@ -45,6 +45,9 @@ struct arpt_entry {
     /* Targed Protocol Address, represented as a serialized string. */
     char *tpa;
 
+    /* Sender Protocol Address, represented as a serialized string. */
+    char *spa;
+
     bool complete;
 
     struct list_head node;
@@ -88,6 +91,8 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     spin_lock(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del(&entry->node);
+        kfree(entry->spa);
+        kfree(entry->tpa);
         kfree(entry);
     }
     spin_unlock(&priv->arpt_lock);
@@ -171,26 +176,6 @@ arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
     return NULL;
 }
 
-/* To be called under arpt_lock. */
-/* XXX remove this one */
-static int
-arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app,
-                  struct arpt_entry **ret)
-{
-    char *name_s = __rina_name_to_string(dst_app, 0);
-
-    *ret = NULL;
-
-    if (!name_s) {
-        PE("%s: Out of memory\n", __func__);
-        return -ENOMEM;
-    }
-
-    *ret = arp_lookup_direct_b(priv, name_s, strlen(name_s));
-
-    return 0;
-}
-
 /* This function is taken after net/ipv4/arp.c:arp_create() */
 static struct sk_buff *
 arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
@@ -268,26 +253,30 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
                      struct flow_entry *flow)
 {
     struct rina_shim_eth *priv = ipcp->priv;
-    struct arpt_entry *entry;
+    struct arpt_entry *entry = NULL;
     struct sk_buff *skb;
     char *spa = NULL; /* Sender Protocol Address. */
     char *tpa = NULL; /* Target Protocol Address. */
-    int ret;
 
     if (!priv->netdev) {
         return -ENXIO;
     }
 
-    spin_lock(&priv->arpt_lock);
-    ret = arp_lookup_direct(priv, &flow->remote_application, &entry);
-    if (ret) {
-        return ret;
+    tpa = rina_name_to_string(&flow->remote_application);
+    spa = rina_name_to_string(&flow->local_application);
+    if (!tpa || !spa) {
+        goto nomem;
     }
 
+    spin_lock(&priv->arpt_lock);
+
+    entry = arp_lookup_direct_b(priv, tpa, strlen(tpa));
     if (entry) {
-        spin_unlock(&priv->arpt_lock);
         /* ARP entry already exist for remote application. Nothing
          * to do here. */
+        spin_unlock(&priv->arpt_lock);
+        kfree(spa);
+        kfree(tpa);
         return 0;
     }
 
@@ -296,10 +285,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         goto nomem;
     }
 
-    entry->tpa = __rina_name_to_string(&flow->remote_application, 0);
-    if (!entry->tpa) {
-        goto nomem;
-    }
+    entry->tpa = tpa; tpa = NULL;  /* Pass ownership. */
+    entry->spa = spa; spa = NULL;  /* Pass ownership. */
     entry->complete = false;
     list_add_tail(&entry->node, &priv->arp_table);
 
@@ -315,6 +302,9 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     if (!skb) {
         goto nomem;
     }
+
+    kfree(spa);
+    kfree(tpa);
 
     dev_queue_xmit(skb);
 
