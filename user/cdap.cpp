@@ -13,7 +13,7 @@ using namespace std;
 
 #define CDAP_ABS_SYNTAX    73
 
-CDAPManager::CDAPManager(int arg_fd)
+CDAPConn::CDAPConn(int arg_fd)
 {
     invoke_id_next = 1;
     max_pending_ops = 5;
@@ -25,7 +25,7 @@ CDAPManager::CDAPManager(int arg_fd)
 }
 
 int
-CDAPManager::__put_invoke_id(set<int>& pending, int invoke_id)
+CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 {
     if (!pending.count(invoke_id)) {
         return -1;
@@ -39,7 +39,7 @@ CDAPManager::__put_invoke_id(set<int>& pending, int invoke_id)
 }
 
 int
-CDAPManager::get_invoke_id()
+CDAPConn::get_invoke_id()
 {
     int ret;
 
@@ -56,13 +56,13 @@ CDAPManager::get_invoke_id()
 }
 
 int
-CDAPManager::put_invoke_id(int invoke_id)
+CDAPConn::put_invoke_id(int invoke_id)
 {
     return __put_invoke_id(pending_invoke_ids, invoke_id);
 }
 
 int
-CDAPManager::get_invoke_id_remote(int invoke_id)
+CDAPConn::get_invoke_id_remote(int invoke_id)
 {
     if (pending_invoke_ids_remote.count(invoke_id)) {
         return -1;
@@ -76,7 +76,7 @@ CDAPManager::get_invoke_id_remote(int invoke_id)
 }
 
 int
-CDAPManager::put_invoke_id_remote(int invoke_id)
+CDAPConn::put_invoke_id_remote(int invoke_id)
 {
     return __put_invoke_id(pending_invoke_ids_remote, invoke_id);
 }
@@ -340,7 +340,7 @@ CDAPMessage::print() const
 }
 
 int
-CDAPManager::msg_send(struct CDAPMessage *m, int invoke_id)
+CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 {
     gpb::CDAPMessage gm;
     size_t serlen;
@@ -389,7 +389,7 @@ CDAPManager::msg_send(struct CDAPMessage *m, int invoke_id)
 }
 
 struct CDAPMessage *
-CDAPManager::msg_recv()
+CDAPConn::msg_recv()
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;
@@ -435,7 +435,7 @@ CDAPManager::msg_recv()
 }
 
 int
-CDAPManager::m_connect_send(int *invoke_id,
+CDAPConn::m_connect_send(int *invoke_id,
                     gpb::authTypes_t auth_mech,
                     const struct CDAPAuthValue *auth_value,
                     const struct rina_name *local_appl,
@@ -458,7 +458,7 @@ CDAPManager::m_connect_send(int *invoke_id,
 }
 
 int
-CDAPManager::m_connect_r_send(const struct CDAPMessage *req)
+CDAPConn::m_connect_r_send(const struct CDAPMessage *req)
 {
     struct CDAPMessage m(gpb::M_CONNECT_R);
     int ret;

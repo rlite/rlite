@@ -13,7 +13,7 @@ struct CDAPAuthValue {
     std::string other;
 };
 
-class CDAPManager {
+class CDAPConn {
     std::set<int> pending_invoke_ids;
     int invoke_id_next;
     int max_pending_ops;
@@ -28,7 +28,7 @@ class CDAPManager {
     int put_invoke_id_remote(int invoke_id);
 
 public:
-    CDAPManager(int fd);
+    CDAPConn(int fd);
 
     /* @invoke_id is not meaningful for request messages. */
     int msg_send(struct CDAPMessage *m, int invoke_id);

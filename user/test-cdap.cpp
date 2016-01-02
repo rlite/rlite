@@ -33,7 +33,7 @@ test_cdap_server(int port)
         return -1;
     }
 
-    CDAPManager mgr(pipefds[0]);
+    CDAPConn mgr(pipefds[0]);
 
     if ((ld = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket()");
@@ -121,7 +121,7 @@ client_connect(int sfd)
     struct CDAPAuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    CDAPManager mgr(sfd);
+    CDAPConn mgr(sfd);
     struct CDAPMessage *m;
     int invoke_id;
 
