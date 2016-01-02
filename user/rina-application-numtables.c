@@ -17,39 +17,9 @@ struct rina_msg_layout rina_application_numtables[] = {
                    sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_APPL_IPCP_DESTROY_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
     [RINA_APPL_ASSIGN_TO_DIF] = {
-        .copylen = sizeof(struct rina_amsg_register) -
+        .copylen = sizeof(struct rina_amsg_assign_to_dif) -
                    2*sizeof(struct rina_name),
         .names = 2,
-    },
-    [RINA_APPL_ASSIGN_TO_DIF_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_APPL_REGISTER] = {
-        .copylen = sizeof(struct rina_amsg_register) -
-                   2*sizeof(struct rina_name),
-        .names = 2,
-    },
-    [RINA_APPL_REGISTER_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_APPL_UNREGISTER] = {
-        .copylen = sizeof(struct rina_amsg_register) -
-                   2*sizeof(struct rina_name),
-        .names = 2,
-    },
-    [RINA_APPL_UNREGISTER_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_APPL_BASE_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
     },
 };

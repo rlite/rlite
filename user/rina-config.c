@@ -166,7 +166,7 @@ static int ipcp_destroy(int argc, char **argv)
 
 static int assign_to_dif(int argc, char **argv)
 {
-    struct rina_amsg_register req;
+    struct rina_amsg_assign_to_dif req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *dif_name;
@@ -184,65 +184,6 @@ static int assign_to_dif(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int application_register_common(const struct rina_name *app_name,
-                                       const char *dif_name, int reg)
-{
-    struct rina_amsg_register msg;
-
-    msg.msg_type = reg ? RINA_APPL_REGISTER : RINA_APPL_UNREGISTER;
-    msg.event_id = 0;
-    rina_name_copy(&msg.application_name, app_name);
-    rina_name_fill(&msg.dif_name, dif_name, NULL, NULL, NULL);
-
-    if (!rina_name_valid(&msg.application_name)) {
-        printf("%s: Invalid application name\n", __func__);
-        return -1;
-    }
-
-    if (!rina_name_valid(&msg.dif_name)) {
-        printf("%s: Invalid dif name\n", __func__);
-        return -1;
-    }
-
-    return request_response((struct rina_msg_base *)&msg);
-}
-
-static int
-application_register(int argc, char **argv)
-{
-    struct rina_name application_name;
-    const char *dif_name;
-    const char *apn;
-    const char *api;
-
-    assert(argc >= 3);
-    dif_name = argv[0];
-    apn = argv[1];
-    api = argv[2];
-
-    rina_name_fill(&application_name, apn, api, NULL, NULL);
-
-    return application_register_common(&application_name, dif_name, 1);
-}
-
-static int
-application_unregister(int argc, char **argv)
-{
-    struct rina_name application_name;
-    const char *dif_name;
-    const char *apn;
-    const char *api;
-
-    assert(argc >= 3);
-    dif_name = argv[0];
-    apn = argv[1];
-    api = argv[2];
-
-    rina_name_fill(&application_name, apn, api, NULL, NULL);
-
-    return application_register_common(&application_name, dif_name, 0);
-}
-
 struct cmd_descriptor {
     const char *name;
     const char *usage;
@@ -251,18 +192,6 @@ struct cmd_descriptor {
 };
 
 static struct cmd_descriptor cmd_descriptors[] = {
-    {
-        .name = "application-register",
-        .usage = "DIF_NAME APN API",
-        .num_args = 3,
-        .func = application_register,
-    },
-    {
-        .name = "application-unregister",
-        .usage = "DIF_NAME APN API",
-        .num_args = 3,
-        .func = application_unregister,
-    },
     {
         .name = "ipcp-create",
         .usage = "DIF_TYPE IPCP_APN IPCP_API",

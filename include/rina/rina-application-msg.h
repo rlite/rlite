@@ -17,11 +17,7 @@ enum {
     RINA_APPL_IPCP_DESTROY_RESP,  /* 4 */
     RINA_APPL_ASSIGN_TO_DIF,      /* 5 */
     RINA_APPL_ASSIGN_TO_DIF_RESP, /* 6 */
-    RINA_APPL_REGISTER,           /* 7 */
-    RINA_APPL_REGISTER_RESP,      /* 8 */
-    RINA_APPL_UNREGISTER,         /* 9 */
-    RINA_APPL_UNREGISTER_RESP,    /* 10 */
-    RINA_APPL_BASE_RESP,          /* 13 */
+    RINA_APPL_BASE_RESP,          /* 7 */
 
     RINA_APPL_MSG_MAX,
 };
@@ -47,10 +43,9 @@ struct rina_amsg_ipcp_destroy {
     struct rina_name ipcp_name;
 } __attribute__((packed));
 
-/* Application --> IPCM message to register/unregister an
- * an application to/from a DIF or to assign an IPC process
+/* Application --> IPCM message to assign an IPC process
  * to a DIF. */
-struct rina_amsg_register {
+struct rina_amsg_assign_to_dif {
     rina_msg_t msg_type;
     uint32_t event_id;
 

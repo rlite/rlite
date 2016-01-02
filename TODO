@@ -5,3 +5,4 @@
   le applicazioni che è necessario rifare un ipcps_fetch()
 - flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
 - passare ad autotools
+- limitare la lunghezza delle code nel kernel

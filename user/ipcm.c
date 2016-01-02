@@ -154,39 +154,6 @@ assign_to_dif(struct ipcm *ipcm,
 }
 
 static int
-application_register(struct ipcm *ipcm,
-                     int reg, unsigned int ipcp_id,
-                     struct rina_name *application_name)
-{
-    struct rina_kmsg_application_register *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        printf("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER
-                        : RINA_KERN_APPLICATION_UNREGISTER;
-    req->ipcp_id = ipcp_id;
-    rina_name_copy(&req->application_name, application_name);
-
-    printf("Requesting application %sregistration...\n", (reg ? "": "un"));
-
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    printf("%s: result: %d\n", __func__, result);
-
-    return result;
-}
-
-static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -220,32 +187,6 @@ test(struct ipcm *ipcm)
 
     /* Fetch IPC processes table. */
     ipcps_fetch(&ipcm->loop);
-
-    /* Register some applications. */
-    rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    ret = application_register(ipcm, 1, 0, &name);
-    assert(!ret);
-    ret = application_register(ipcm, 1, 0, &name);
-    assert(ret);
-    rina_name_free(&name);
-
-    rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    ret = application_register(ipcm, 1, 1, &name);
-    assert(!ret);
-    rina_name_free(&name);
-
-    /* Unregister the applications. */
-    rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    ret = application_register(ipcm, 0, 0, &name);
-    assert(!ret);
-    rina_name_free(&name);
-
-    rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    application_register(ipcm, 0, 1, &name);
-    assert(!ret);
-    ret = application_register(ipcm, 0, 1, &name);
-    assert(ret);
-    rina_name_free(&name);
 
     /* Destroy the IPCPs. */
     ret = ipcp_destroy(ipcm, 0);
@@ -331,7 +272,7 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
                         const struct rina_msg_base *b_req)
 {
     unsigned int ipcp_id;
-    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+    struct rina_amsg_assign_to_dif *req = (struct rina_amsg_assign_to_dif *)b_req;
     struct rina_msg_base_resp resp;
 
     resp.result = 1;  /* Report failure by default. */
@@ -348,50 +289,6 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     return rina_appl_response(sfd, RMB(req), &resp);
 }
 
-static int
-rina_appl_register(struct ipcm *ipcm, int sfd,
-                   const struct rina_msg_base *b_req)
-{
-    unsigned int ipcp_id;
-    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
-    struct rina_msg_base_resp resp;
-
-    resp.result = 1;
-
-    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 1);
-    if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        resp.result = application_register(ipcm, 1, ipcp_id,
-                                      &req->application_name);
-    }
-
-    return rina_appl_response(sfd, RMB(req), &resp);
-}
-
-static int
-rina_appl_unregister(struct ipcm *ipcm, int sfd,
-                     const struct rina_msg_base *b_req)
-{
-    unsigned int ipcp_id;
-    struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
-    struct rina_msg_base_resp resp;
-
-    resp.result = 1;
-
-    ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
-    if (ipcp_id == ~0U) {
-        printf("%s: Could not find a suitable IPC process\n", __func__);
-    } else {
-        /* Forward the request to the kernel. */
-        resp.result = application_register(ipcm, 0, ipcp_id,
-                                     &req->application_name);
-    }
-
-    return rina_appl_response(sfd, RMB(req), &resp);
-}
-
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
@@ -400,8 +297,6 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_IPCP_CREATE] = rina_appl_ipcp_create,
     [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
     [RINA_APPL_ASSIGN_TO_DIF] = rina_appl_assign_to_dif,
-    [RINA_APPL_REGISTER] = rina_appl_register,
-    [RINA_APPL_UNREGISTER] = rina_appl_unregister,
     [RINA_APPL_MSG_MAX] = NULL,
 };
 
