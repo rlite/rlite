@@ -874,6 +874,9 @@ out:
     return 0;
 }
 
+/* Userspace queue threshold. */
+#define USR_Q_TH        128
+
 static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
@@ -1009,6 +1012,14 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             gap > flow->cfg.max_sdu_gap);
 
     deliver = !drop && (gap <= flow->cfg.max_sdu_gap);
+
+    if (unlikely(deliver && !flow->upper.ipcp &&
+                 flow->txrx.rx_qlen >= USR_Q_TH)) {
+        RPD(5, "%s: early dropping [%lu] to avoid userspace rx queue "
+                "overrun\n", __func__, (long unsigned)seqnum);
+        deliver = false;
+        drop = true;
+    }
 
     if (deliver) {
         struct list_head qrbs;

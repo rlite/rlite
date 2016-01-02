@@ -841,6 +841,7 @@ flow_put(struct flow_entry *entry)
         list_del(&rb->node);
         rina_buf_free(rb);
     }
+    entry->txrx.rx_qlen = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
         int ret;
@@ -1720,6 +1721,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     spin_lock_bh(&txrx->rx_lock);
     list_add_tail(&rb->node, &txrx->rx_q);
+    txrx->rx_qlen++;
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
@@ -2114,6 +2116,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         rb = list_first_entry(&txrx->rx_q, struct rina_buf, node);
         list_del(&rb->node);
+        txrx->rx_qlen--;
         spin_unlock_bh(&txrx->rx_lock);
 
         copylen = rb->len;
