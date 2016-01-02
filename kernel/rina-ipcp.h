@@ -62,6 +62,12 @@ enum {
 
 struct rina_ctrl;
 
+struct upper_ref {
+    unsigned int        userspace;
+    struct rina_ctrl    *rc;
+    struct ipcp_entry   *ipcp;
+};
+
 struct flow_entry {
     uint16_t            local_port;  /* key */
     uint16_t            remote_port;
@@ -69,7 +75,7 @@ struct flow_entry {
     struct rina_name    local_application;
     struct rina_name    remote_application;
     struct ipcp_entry   *ipcp;
-    struct rina_ctrl    *rc;
+    struct upper_ref    upper;
     uint32_t            event_id; /* requestor event id */
     struct list_head    rxq;
     wait_queue_head_t   rxq_wqh;
