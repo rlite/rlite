@@ -297,7 +297,7 @@ rlite_flows_fetch(struct rlite_evloop *loop)
         } else {
             end = resp->end;
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_MB(resp));
+                           RLITE_MB(resp));
             free(resp);
         }
     }
@@ -352,7 +352,7 @@ time_cmp(const struct timespec *t1, const struct timespec *t2)
     return 0;
 }
 
-struct rlite_msg_base_resp *
+static struct rlite_msg_base_resp *
 read_next_msg(int rfd)
 {
     unsigned int max_resp_size = rlite_numtables_max_size(
@@ -518,7 +518,7 @@ evloop_function(void *arg)
 
             if (!FD_ISSET(loop->ctrl.rfd, &rdfs)) {
                 /* We did some fdcb processing, but no events are
-                 * available on the rina control device. */
+                 * available on the rlite control device. */
                 continue;
             }
         }
@@ -634,6 +634,37 @@ rl_evloop_stop(struct rlite_evloop *loop)
     return 0;
 }
 
+static int
+write_msg(int rfd, struct rlite_msg_base *msg)
+{
+    char serbuf[4096];
+    unsigned int serlen;
+    int ret;
+
+    /* Serialize the message. */
+    serlen = rlite_msg_serlen(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+    if (serlen > sizeof(serbuf)) {
+        PE("Serialized message would be too long [%u]\n",
+                    serlen);
+        return -1;
+    }
+    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                                 serbuf, msg);
+
+    ret = write(rfd, serbuf, serlen);
+    if (ret < 0) {
+        perror("write(rfd)");
+
+    } else if (ret != serlen) {
+        /* This should never happen if kernel code is correct. */
+        PE("Error: partial write [%d/%u]\n",
+                ret, serlen);
+        ret = -1;
+    }
+
+    return ret;
+}
+
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rlite_msg_base *
@@ -643,8 +674,6 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
 {
     struct rlite_msg_base *resp = NULL;
     struct pending_entry *entry = NULL;
-    char serbuf[4096];
-    unsigned int serlen;
     int ret;
 
     *result = 0;
@@ -655,7 +684,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         PE("has_response == 0 --> wait_for_completion == 0\n");
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
-        *result = EINVAL;
+        *result = -1;
         return NULL;
     }
 
@@ -669,7 +698,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
             rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
             free(msg);
             PE("Out of memory\n");
-            *result = ENOMEM;
+            *result = -1;
             return NULL;
         }
     }
@@ -686,26 +715,11 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         list_add_tail(&entry->node, &loop->ctrl.pqueue);
     }
 
-    /* Serialize the message. */
-    serlen = rlite_msg_serlen(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
-    if (serlen > sizeof(serbuf)) {
-        PE("Serialized message would be too long [%u]\n",
-                    serlen);
-        free(entry);
-        pthread_mutex_unlock(&loop->lock);
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
-        free(msg);
-        *result = ENOBUFS;
-        return NULL;
-    }
-    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                                serbuf, msg);
-
     /* Issue the request to the kernel. */
-    ret = write(loop->ctrl.rfd, serbuf, serlen);
-    if (ret != serlen) {
+    ret = write_msg(loop->ctrl.rfd, msg);
+    if (ret < 0) {
         /* System call reports an error (incomplete write is not acceptable)
-         * for a rina control device. */
+         * for a rlite control device. */
 
         if (has_response) {
             /* Remove the entry from the pending queue and free it. */
@@ -713,15 +727,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
                                              msg->event_id);
             free(entry);
         }
-        if (ret < 0) {
-            perror("write(rfd)");
-            *result = ret;
-        } else {
-            /* This should never happen if kernel code is correct. */
-            PE("Error: partial write [%d/%u]\n",
-                    ret, serlen);
-            *result = EINVAL;
-        }
+        *result = ret;
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
 
@@ -999,7 +1005,7 @@ rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rl_evloop_fdcb_t cb)
 
     fdcb = malloc(sizeof(*fdcb));
     if (!fdcb) {
-        return ENOMEM;
+        return -1;
     }
 
 
@@ -1147,13 +1153,13 @@ rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
 
     if (!cb) {
         PE("NULL timer calback\n");
-        return EINVAL;
+        return -1;
     }
 
     e = malloc(sizeof(*e));
     if (!e) {
         PE("Out of memory\n");
-        return ENOMEM;
+        return -1;
     }
     memset(e, 0, sizeof(*e));
 
@@ -1364,7 +1370,14 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
         return 0;
     }
 
-    (void)req;
+    ret = write_msg(ctrl->rfd, RLITE_MB(&req));
+    if (ret < 0) {
+        PE("Failed to issue request to the kernel\n");
+        event_id = 0;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&req));
 
     return event_id;
 }
@@ -1398,7 +1411,14 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
         return 0;
     }
 
-    (void)req;
+    ret = write_msg(ctrl->rfd, RLITE_MB(&req));
+    if (ret < 0) {
+        PE("Failed to issue request to the kernel\n");
+        event_id = 0;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&req));
 
     return event_id;
 }

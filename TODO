@@ -26,3 +26,5 @@
 - add copy constructor to CDAPMessage class
 
 - evloop.h, appl.h --> hide main structs
+
+- RLITE_MBR() is not coveniente --> replace using RLITE_MB()
