@@ -70,6 +70,12 @@ static inline void rina_buf_pci_push(struct rina_buf *rb)
     rb->len += sizeof(struct rina_pci);
 }
 
+static inline void rina_buf_custom_push(struct rina_buf *rb, size_t len)
+{
+    rb->pci = (struct rina_pci *)(((void *)rb->pci) - len);
+    rb->len += len;
+}
+
 #define RINA_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RINA_BUF_PCI(rb) rb->pci
 

@@ -1305,14 +1305,22 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 
             return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
         } else if (0 && flow->upper.ipcp->mgmt_txrx) {
+            struct rina_mgmt_hdr *mhdr;
+
             /* TODO new managament, to be enabled. */
             txrx = flow->upper.ipcp->mgmt_txrx;
+            rina_buf_pci_pop(rb);
+            /* Push a management header using the room made available
+             * by rina_buf_pci_pop(). */
+            rina_buf_custom_push(rb, sizeof(*mhdr));
+            mhdr = (struct rina_mgmt_hdr *)RINA_BUF_DATA(rb);
+            mhdr->type = RINA_MGMT_HDR_TYPE_LOCAL_PORT;
+            mhdr->u.local_port = local_port;
         } else {
             /* TODO old management, to be deleted */
             txrx = &flow->txrx;
+            rina_buf_pci_pop(rb);
         }
-
-        rina_buf_pci_pop(rb);
     } else {
         txrx = &flow->txrx;
     }

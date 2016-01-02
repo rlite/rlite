@@ -70,6 +70,28 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
+static int
+uipcp_enroll_send_mgmtsdu(struct uipcp *uipcp, unsigned int port_id)
+{
+    int ret;
+    uint64_t local_addr;
+    uint8_t cmd = IPCP_MGMT_ENROLL;
+    uint8_t mgmtsdu[sizeof(cmd) + sizeof(local_addr)];
+
+    /* Exchange IPCP addresses. */
+    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+                                 &local_addr);
+    assert(!ret);
+    local_addr = htole64(local_addr);
+
+    mgmtsdu[0] = cmd;
+    memcpy(mgmtsdu + 1, &local_addr, sizeof(local_addr));
+
+    ret = mgmt_write_to_local_port(uipcp, port_id, mgmtsdu, sizeof(mgmtsdu));
+
+    return ret;
+}
+
 int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
 {
     uint64_t remote_addr, local_addr;
@@ -94,6 +116,12 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
 
     /* Request an enrollment. */
     PD("%s: Enrollment phase (client)\n", __func__);
+
+if (0) {
+    // TODO new mgmt to be enabled
+    return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
+}
+    // TODO the following to be removed
     cmd = IPCP_MGMT_ENROLL;
     if (write(fd, &cmd, sizeof(cmd)) != 1) {
         PE("%s: write(cmd) failed\n", __func__);
@@ -125,6 +153,7 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
     return 0;
 }
 
+// TODO to be removed
 static int
 uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
 {
@@ -166,11 +195,30 @@ fail:
     return -1;
 }
 
+static int
+uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
+                      uint8_t *buf, size_t buflen)
+{
+    uint64_t remote_addr;
+
+    PD("%s: Enrollment phase (server)\n", __func__);
+
+    remote_addr = le64toh(*((uint64_t *)(buf)));
+
+    assert(mhdr->type == RINA_MGMT_HDR_TYPE_LOCAL_PORT);
+    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
+                   mhdr->u.local_port);
+
+    return 0;
+}
+
 static void
 mgmt_fd_ready(struct rina_evloop *loop, int fd)
 {
     struct application *appl = container_of(loop, struct application, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    struct rina_mgmt_hdr *mhdr;
     uint8_t cmd;
     int n;
 
@@ -178,31 +226,34 @@ mgmt_fd_ready(struct rina_evloop *loop, int fd)
 
     assert(fd == uipcp->mgmtfd);
 
-    n = read(fd, &cmd, 1);
-    if (n != 1) {
-        PE("%s: read(cmd) failed [ret=%d]\n", __func__, n);
+    /* Read a buffer that contains a management header followed by
+     * a management SDU. */
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        PE("%s: Error: read() failed [%d]\n", __func__, n);
+        return;
+    } else if (n < sizeof(*mhdr)) {
+        PE("%s: Error: read() does not contain mgmt header, %d<%d\n",
+                __func__, n, (int)sizeof(*mhdr));
         return;
     }
 
+    /* Grab the management header. */
+    mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
+
+    /* Grab the management command (this and the following will be replaced
+     * by CDAP). */
+    cmd = *((uint8_t *)(mhdr + 1));
+
     switch (cmd) {
         case IPCP_MGMT_ENROLL:
-            //uipcp_server_enroll(uipcp, port_id, fd);
+            uipcp_mgmt_sdu_enroll(uipcp, mhdr, ((uint8_t *)(mhdr + 1)) + 1,
+                                 n - sizeof(*mhdr) - 1);
             break;
         default:
             PI("%s: Unknown cmd %u received\n", __func__, cmd);
             break;
     }
-
-/*
-    char mgmtbuf[MGMTBUF_SIZE_MAX];
-    int n;
-
-    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
-    if (n < 0) {
-        PE("%s: Error: read() failed [%d]\n", __func__, n);
-        return;
-    }
-*/
 }
 
 /*static */int
@@ -389,6 +440,13 @@ uipcp_server(void *arg)
             continue;
         }
 
+        if (0) {
+            /* TODO enable */
+            uipcp_enroll_send_mgmtsdu(uipcp, port_id);
+            continue;
+        }
+
+        /* TODO remove the following */
         if (read(fd, &cmd, 1) != 1) {
             PE("%s: read(cmd) failed\n", __func__);
             close(fd);
