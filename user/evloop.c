@@ -92,7 +92,8 @@ ipcps_print(struct rina_evloop *loop)
             PI("    id = %d, name = '%s', dif_type ='%d', dif_name = '%s',"
                     " address = %llu\n",
                         ipcp->ipcp_id, ipcp_name_s, ipcp->dif_type,
-                        dif_name_s, ipcp->ipcp_addr);
+                        dif_name_s,
+                        (long long unsigned int)ipcp->ipcp_addr);
 
             if (ipcp_name_s) {
                     free(ipcp_name_s);
