@@ -295,6 +295,63 @@ uipcp_fa_req(struct rlite_evloop *loop,
 }
 
 static int
+uipcp_fa_req_arrived(struct rlite_evloop *loop,
+                     const struct rina_msg_base_resp *b_resp,
+                     const struct rina_msg_base *b_req)
+{
+    struct rlite_appl *application = container_of(loop, struct rlite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_fa_req_arrived *req =
+                    (struct rina_kmsg_fa_req_arrived *)b_resp;
+    int flow_fd;
+    int result = 0;
+    int ret;
+
+    assert(b_req == NULL);
+
+    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+            req->ipcp_id, req->port_id);
+
+    /* First of all we update the neighbors in the RIB. This
+     * must be done before invoking rlite_flow_allocate_resp,
+     * otherwise a race condition would exist (us receiving
+     * an M_CONNECT from the neighbor before having the
+     * chance to call rib_neigh_set_port_id()). */
+    ret = rib_neigh_set_port_id(uipcp->rib, &req->remote_appl,
+                                req->port_id);
+    if (ret) {
+        PE("rib_neigh_set_port_id() failed\n");
+        result = 1;
+    }
+
+    ret = rlite_flow_allocate_resp(&uipcp->appl, req->ipcp_id,
+            uipcp->ipcp_id, req->port_id, result);
+
+    if (ret || result) {
+        PE("rlite_flow_allocate_resp() failed\n");
+        goto err;
+    }
+
+    flow_fd = rlite_open_appl_port(req->port_id);
+    if (flow_fd < 0) {
+        goto err;
+    }
+
+    ret = rib_neigh_set_flow_fd(uipcp->rib, &req->remote_appl, flow_fd);
+    if (ret) {
+        goto err;
+    }
+
+    return 0;
+
+err:
+    rib_del_neighbor(uipcp->rib, &req->remote_appl);
+
+    return 0;
+}
+
+static int
 uipcp_fa_resp(struct rlite_evloop *loop,
               const struct rina_msg_base_resp *b_resp,
               const struct rina_msg_base *b_req)
@@ -342,62 +399,6 @@ uipcp_flow_deallocated(struct rlite_evloop *loop,
     rib_flow_deallocated(uipcp->rib, req);
 
     return 0;
-}
-
-void *
-uipcp_server(void *arg)
-{
-    struct uipcp *uipcp = arg;
-
-    for (;;) {
-        struct rlite_pending_flow_req *pfr;
-        unsigned int port_id;
-        int flow_fd;
-        int result = 0;
-        int ret;
-
-        pfr = rlite_flow_req_wait(&uipcp->appl);
-        port_id = pfr->port_id;
-        PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-                pfr->ipcp_id, pfr->port_id);
-
-        /* First of all we update the neighbors in the RIB. This
-         * must be done before invoking rlite_flow_allocate_resp,
-         * otherwise a race condition would exist (us receiving
-         * an M_CONNECT from the neighbor before having the
-         * chance to call rib_neigh_set_port_id()). */
-        ret = rib_neigh_set_port_id(uipcp->rib, &pfr->remote_appl,
-                                port_id);
-        if (ret) {
-            PE("rib_neigh_set_port_id() failed\n");
-            result = 1;
-        }
-
-        ret = rlite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
-                                       uipcp->ipcp_id, pfr->port_id, result);
-
-        if (ret || result) {
-            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
-            goto out;
-        }
-
-        flow_fd = rlite_open_appl_port(port_id);
-        if (flow_fd < 0) {
-            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
-            goto out;
-        }
-
-        ret = rib_neigh_set_flow_fd(uipcp->rib, &pfr->remote_appl, flow_fd);
-        if (ret) {
-            rib_del_neighbor(uipcp->rib, &pfr->remote_appl);
-            goto out;
-        }
-
-out:
-        rlite_pending_flow_req_free(pfr);
-    }
-
-    return NULL;
 }
 
 static int
@@ -470,30 +471,36 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err1;
     }
 
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                   uipcp_fa_req_arrived);
+    if (ret) {
+        goto err2;
+    }
+
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
     ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
-                                      uipcp_fa_req);
+                                   uipcp_fa_req);
     if (ret) {
         goto err2;
     }
 
     ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
-                                      uipcp_fa_resp);
+                                   uipcp_fa_resp);
     if (ret) {
         goto err2;
     }
 
     ret = rlite_evloop_set_handler(&uipcp->appl.loop,
-                                      RINA_KERN_APPL_REGISTER,
-                                      uipcp_appl_register);
+                                   RINA_KERN_APPL_REGISTER,
+                                   uipcp_appl_register);
     if (ret) {
         goto err2;
     }
 
     ret = rlite_evloop_set_handler(&uipcp->appl.loop,
-                                      RINA_KERN_FLOW_DEALLOCATED,
-                                      uipcp_flow_deallocated);
+                                   RINA_KERN_FLOW_DEALLOCATED,
+                                   uipcp_flow_deallocated);
     if (ret) {
         goto err2;
     }
@@ -514,17 +521,10 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
 
-    ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
-    if (ret) {
-        goto err3;
-    }
-
     PD("userspace IPCP %u created\n", ipcp_id);
 
     return 0;
 
-err3:
-    close(uipcp->mgmtfd);
 err2:
     rib_destroy(uipcp->rib);
 err1:

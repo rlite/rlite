@@ -33,7 +33,6 @@ struct uipcp {
     struct uipcps *uipcps;
     unsigned int ipcp_id;
     int mgmtfd;
-    pthread_t server_th;
 
     struct uipcp_rib *rib;
 
