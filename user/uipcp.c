@@ -106,8 +106,8 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
     int ret;
 
     list_for_each_entry(neigh, &uipcp->enrolled_neighbors, node) {
-        if (rina_name_cmp(&neigh->ipcp_name, &req->ipcp_name) == 0) {
-            char *ipcp_s = rina_name_to_string(&req->ipcp_name);
+        if (rina_name_cmp(&neigh->ipcp_name, &req->neigh_ipcp_name) == 0) {
+            char *ipcp_s = rina_name_to_string(&req->neigh_ipcp_name);
 
             PI("[uipcp %u] Already enrolled to %s", uipcp->ipcp_id, ipcp_s);
             if (ipcp_s) {
@@ -124,7 +124,7 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
         return -1;
     }
     memset(neigh, 0, sizeof(*neigh));
-    rina_name_copy(&neigh->ipcp_name, &req->ipcp_name);
+    rina_name_copy(&neigh->ipcp_name, &req->neigh_ipcp_name);
     list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
 
     /* Allocate a flow for the enrollment. */
@@ -681,6 +681,7 @@ uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
     list_for_each_entry(neigh, &uipcp->enrolled_neighbors, node) {
         close(neigh->flow_fd);
         rina_name_free(&neigh->ipcp_name);
+        // TODO empty the list
     }
 
     rina_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
