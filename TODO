@@ -1,2 +1,1 @@
-- issue_request() takes ownership of the message, so that it can free it when errors happen
 - dif_type had better be a string

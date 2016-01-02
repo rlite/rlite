@@ -254,7 +254,8 @@ rina_name_fill(struct rina_name *name, char *apn,
     name->aei = aei ? strdup(aei) : NULL;
 }
 
-/* Issue a request message to the kernel. */
+/* Issue a request message to the kernel. Takes the ownership of
+ * @msg. */
 static int
 issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
                       size_t msg_len)
@@ -270,6 +271,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
      * the event loop not being able to find the pending request. */
     entry = malloc(sizeof(*entry));
     if (!entry) {
+        rina_msg_free((struct rina_msg_base *)msg);
         return ENOMEM;
     }
 
@@ -289,6 +291,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
                     __func__, serlen);
         free(entry);
         pthread_mutex_unlock(&ipcm->lock);
+        rina_msg_free((struct rina_msg_base *)msg);
         return ENOBUFS;
     }
     serlen = serialize_rina_msg(serbuf, msg);
@@ -314,7 +317,6 @@ static int
 ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 {
     struct rina_msg_ipcp_create *msg;
-    int ret;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -329,14 +331,8 @@ ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 
     printf("Requesting IPC process creation...\n");
 
-    ret = issue_request(ipcm, (struct rina_msg_base *)msg,
+    return issue_request(ipcm, (struct rina_msg_base *)msg,
                                 sizeof(*msg));
-    if (ret < 0) {
-        rina_msg_free((struct rina_msg_base *)msg);
-        return ret;
-    }
-
-    return ret;
 }
 
 /* Destroy an IPC process. */
@@ -344,7 +340,6 @@ static int
 ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 {
     struct rina_msg_ipcp_destroy *msg;
-    int ret;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -358,14 +353,8 @@ ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 
     printf("Requesting IPC process destruction...\n");
 
-    ret = issue_request(ipcm, (struct rina_msg_base *)msg,
+    return issue_request(ipcm, (struct rina_msg_base *)msg,
                                 sizeof(*msg));
-    if (ret < 0) {
-        rina_msg_free((struct rina_msg_base *)msg);
-        return ret;
-    }
-
-    return ret;
 }
 
 /* Fetch information about a single IPC process. */
@@ -373,7 +362,6 @@ static int
 fetch_ipcp(struct ipcm *ipcm)
 {
     struct rina_msg_base *msg;
-    int ret;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -386,13 +374,7 @@ fetch_ipcp(struct ipcm *ipcm)
 
     printf("Requesting IPC processes fetch...\n");
 
-    ret = issue_request(ipcm, msg, sizeof(*msg));
-    if (ret < 0) {
-        rina_msg_free(msg);
-        return ret;
-    }
-
-    return ret;
+    return issue_request(ipcm, msg, sizeof(*msg));
 }
 
 /* Fetch information about all IPC processes. */
@@ -421,7 +403,6 @@ static int
 assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 {
     struct rina_msg_assign_to_dif *req;
-    int ret;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -436,13 +417,7 @@ assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 
     printf("Requesting DIF assignment...\n");
 
-    ret = issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
-    if (ret < 0) {
-        rina_msg_free((struct rina_msg_base *)req);
-        return ret;
-    }
-
-    return ret;
+    return issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
 }
 
 static int
@@ -450,7 +425,6 @@ application_register(struct ipcm *ipcm, unsigned int ipcp_id,
                      struct rina_name *application_name)
 {
     struct rina_msg_application_register *req;
-    int ret;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -465,13 +439,7 @@ application_register(struct ipcm *ipcm, unsigned int ipcp_id,
 
     printf("Requesting application registration...\n");
 
-    ret = issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
-    if (ret < 0) {
-        rina_msg_free((struct rina_msg_base *)req);
-        return ret;
-    }
-
-    return ret;
+    return issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
 }
 
 static int
@@ -499,7 +467,8 @@ test(struct ipcm *ipcm)
 
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
     application_register(ipcm, 0, &name);
-    application_register(ipcm, 0, &name);
+    rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
+    application_register(ipcm, 1, &name);
     rina_name_free(&name);
 
     /* Destroy the IPCP. */
