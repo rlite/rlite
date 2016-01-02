@@ -10,6 +10,8 @@
 #include "ApplicationProcessNamingInfoMessage.pb.h"
 #include "DirectoryForwardingTableEntryArrayMessage.pb.h"
 #include "DirectoryForwardingTableEntryMessage.pb.h"
+#include "NeighborMessage.pb.h"
+#include "NeighborArrayMessage.pb.h"
 
 using namespace std;
 
@@ -174,6 +176,38 @@ DFTSlice::serialize(char *buf, unsigned int size) const
         if (ret) {
             return ret;
         }
+    }
+
+    return ser_common(gm, buf, size);
+}
+
+NeighborCandidate::NeighborCandidate(const char *buf, unsigned int size)
+{
+    gpb::neighbor_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    apn = gm.applicationprocessname();
+    api = gm.applicationprocessinstance();
+    address = gm.address();
+
+    for (int i = 0; i < gm.supportingdifs_size(); i++) {
+        lower_difs.push_back(gm.supportingdifs(i));
+    }
+}
+
+int
+NeighborCandidate::serialize(char *buf, unsigned int size) const
+{
+    gpb::neighbor_t gm;
+
+    gm.set_applicationprocessname(apn);
+    gm.set_applicationprocessinstance(api);
+    gm.set_address(address);
+
+    for (list<string>::const_iterator dif = lower_difs.begin();
+                            dif != lower_difs.end(); dif++) {
+        gm.add_supportingdifs(*dif);
     }
 
     return ser_common(gm, buf, size);

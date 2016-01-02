@@ -472,7 +472,10 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         /* Send DIF static information. */
     }
 
-    /* Send DIF dynamic information. */
+    /* Send DIF dynamic information.
+     * (1) Neighbors
+     * (2) DFT
+     */
 
     enr_info.start_early = true;
 

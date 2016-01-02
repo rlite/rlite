@@ -52,4 +52,15 @@ struct DFTSlice : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct NeighborCandidate : public UipcpObject {
+    std::string apn;
+    std::string api;
+    uint64_t address;
+    std::list<std::string> lower_difs;
+
+    NeighborCandidate() { }
+    NeighborCandidate(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */
