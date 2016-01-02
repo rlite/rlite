@@ -176,10 +176,12 @@ static int
 perf_client(struct rinaperf *rp)
 {
     struct timeval t_start, t_end;
+    struct timeval w1, w2;
     unsigned long us;
     int ret;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
+    int interval = rp->interval;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
@@ -198,6 +200,18 @@ perf_client(struct rinaperf *rp)
                 perror("write(buf)");
             } else {
                 printf("Partial write %d/%d\n", ret, size);
+            }
+        }
+
+        if (interval) {
+            gettimeofday(&w1, NULL);
+            for (;;) {
+                gettimeofday(&w2, NULL);
+                us = 1000000 * (w2.tv_sec - w1.tv_sec) +
+                    (w2.tv_usec - w1.tv_usec);
+                if (us >= interval) {
+                    break;
+                }
             }
         }
     }
@@ -434,8 +448,7 @@ usage(void)
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
         "   -c NUM : number of SDUs to send during the test\n"
         "   -s NUM : size of the SDUs that are sent during the test\n"
-        "   -i NUM : number of microseconds to wait after each SDUs is sent "
-                     "(ping mode)\n"
+        "   -i NUM : number of microseconds to wait after each SDUs is sent\n"
         "   -p APNAME : application process name of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
