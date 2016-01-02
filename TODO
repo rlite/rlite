@@ -38,7 +38,3 @@
 - uniformare l'uso di RLITE_SUCC e RLITE_ERR
 
 - testare normal-over-normal-over-shim e flussi concorrenti
-
-- in shim_inet4_flow_deallocated() dovremmo chiamare cancel_work_sync(),
-  ma questo non è attualmente possibile perchè flow_put() può essere
-  eseguita in atomic-context --> cambiare schema

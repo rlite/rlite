@@ -118,8 +118,12 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
                              iov.iov_len, msghdr.msg_flags);
         if (ret == -EAGAIN) {
             break;
-        } else if (unlikely(ret < 0)) {
-            PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
+        } else if (unlikely(ret <= 0)) {
+            if (ret) {
+                PE("recvmsg(%d): %d\n", (int)iov.iov_len, ret);
+            } else {
+                PI("Exit rx loop\n");
+            }
             break;
         }
 
@@ -253,6 +257,8 @@ rina_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
     if (!priv) {
         return 0;
     }
+
+    cancel_work_sync(&priv->rxw);
 
     sock = priv->sock;
 
