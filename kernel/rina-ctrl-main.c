@@ -782,56 +782,6 @@ out:
     return ret;
 }
 
-static int
-rina_ipcp_enroll(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
-{
-    struct rina_kmsg_ipcp_enroll *req =
-                    (struct rina_kmsg_ipcp_enroll *)bmsg;
-    struct ipcp_entry *entry;
-    struct ipcp_entry *supp_entry;
-    int ret = 0;
-
-    mutex_lock(&rina_dm.lock);
-
-    entry = ipcp_table_find(req->ipcp_id);
-    if (!entry) {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    supp_entry = ipcp_table_find(req->supp_ipcp_id);
-    if (!supp_entry) {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    //TODO
-out:
-    mutex_unlock(&rina_dm.lock);
-
-    return ret;
-}
-
-static int
-rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
-{
-    struct rina_kmsg_application_register *req =
-                    (struct rina_kmsg_application_register *)bmsg;
-    int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
-    int ret;
-    struct upper_ref upper = {
-            .userspace = 1,
-            .rc = rc,
-        };
-
-    mutex_lock(&rina_dm.lock);
-    ret = rina_register_internal(reg, req->ipcp_id, &req->application_name,
-                                 upper);
-    mutex_unlock(&rina_dm.lock);
-
-    return ret;
-}
-
 /* Code improvement: we may merge ipcp_table_find() and flow_table_find()
  * into a template (a macro). */
 static struct flow_entry *
@@ -933,6 +883,101 @@ out:
     return ret;
 }
 
+/* To be called under global lock. */
+static int
+rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
+                            uint32_t event_id,
+                            const struct rina_name *local_application,
+                            const struct rina_name *remote_application)
+{
+    struct ipcp_entry *ipcp_entry = NULL;
+    struct flow_entry *flow_entry = NULL;
+    int ret = -EINVAL;
+
+    /* Find the IPC process entry corresponding to ipcp_id. */
+    ipcp_entry = ipcp_table_find(ipcp_id);
+    if (!ipcp_entry) {
+        goto negative;
+    }
+
+    /* Allocate a port id and the associated flow entry. */
+    ret = flow_add(ipcp_entry, upper, event_id, local_application,
+                   remote_application, &flow_entry, 0);
+    if (ret) {
+        goto negative;
+    }
+    flow_entry->state = FLOW_STATE_PENDING;
+
+    ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+    if (ret) {
+        goto negative;
+    }
+
+    printk("%s: Flow allocation requested to IPC process %u, "
+                "port-id %u\n", __func__, ipcp_id, flow_entry->local_port);
+
+    return 0;
+
+negative:
+    if (flow_entry) {
+        flow_del_entry(flow_entry, 0);
+    }
+
+    return ret;
+}
+
+static int
+rina_ipcp_enroll(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_enroll *req =
+                    (struct rina_kmsg_ipcp_enroll *)bmsg;
+    struct ipcp_entry *entry;
+    int ret = 0;
+    struct upper_ref upper;
+
+    mutex_lock(&rina_dm.lock);
+
+    /* Lookup the IPC process to enroll. */
+    entry = ipcp_table_find(req->ipcp_id);
+    if (!entry) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    /* Try to allocate a flow towards the specified neighbor,
+     * using the specified N-1 IPCP. */
+    upper.userspace = 0;
+    upper.rc = rc;
+    upper.ipcp = entry;
+    ret = rina_flow_allocate_internal(req->supp_ipcp_id, upper,
+                                      req->event_id, &entry->name,
+                                      &req->neigh_ipcp_name);
+out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static int
+rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_application_register *req =
+                    (struct rina_kmsg_application_register *)bmsg;
+    int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
+    int ret;
+    struct upper_ref upper = {
+            .userspace = 1,
+            .rc = rc,
+        };
+
+    mutex_lock(&rina_dm.lock);
+    ret = rina_register_internal(reg, req->ipcp_id, &req->application_name,
+                                 upper);
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
 /* Must be called under global lock. */
 static void
 flow_del_by_rc(struct rina_ctrl *rc)
@@ -973,49 +1018,6 @@ rina_append_allocate_flow_resp_arrived(struct rina_ctrl *rc, uint32_t event_id,
     }
 
     return 0;
-}
-
-/* To be called under global lock. */
-static int
-rina_flow_allocate_internal(uint16_t ipcp_id, struct upper_ref upper,
-                            uint32_t event_id,
-                            const struct rina_name *local_application,
-                            const struct rina_name *remote_application)
-{
-    struct ipcp_entry *ipcp_entry = NULL;
-    struct flow_entry *flow_entry = NULL;
-    int ret;
-
-    /* Find the IPC process entry corresponding to ipcp_id. */
-    ipcp_entry = ipcp_table_find(ipcp_id);
-    if (!ipcp_entry) {
-        goto negative;
-    }
-
-    /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, &flow_entry, 0);
-    if (ret) {
-        goto negative;
-    }
-    flow_entry->state = FLOW_STATE_PENDING;
-
-    ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
-    if (ret) {
-        goto negative;
-    }
-
-    printk("%s: Flow allocation requested to IPC process %u, "
-                "port-id %u\n", __func__, ipcp_id, flow_entry->local_port);
-
-    return 0;
-
-negative:
-    if (flow_entry) {
-        flow_del_entry(flow_entry, 0);
-    }
-
-    return ret;
 }
 
 static int
@@ -1095,7 +1097,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
     struct rina_kmsg_flow_allocate_req_arrived *req;
-    int ret;
+    int ret = -EINVAL;
 
     req = kzalloc(sizeof(*req), GFP_KERNEL);
     if (!req) {
@@ -1122,19 +1124,35 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     flow_entry->remote_port = remote_port;
     flow_entry->state = FLOW_STATE_PENDING;
 
-    req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
-    req->event_id = 0;
-    req->ipcp_id = ipcp->id;
-    req->port_id = flow_entry->local_port;
+    if (app->upper.userspace) {
+        /* The flow allocation request is for a local application. */
+        req->msg_type = RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED;
+        req->event_id = 0;
+        req->ipcp_id = ipcp->id;
+        req->port_id = flow_entry->local_port;
 
-    printk("%s: Flow allocation request arrived to IPC process %u, "
+        printk("%s: Flow allocation request arrived to IPC process %u, "
                 "port-id %u\n", __func__, req->ipcp_id, req->port_id);
 
-    /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(app->upper.rc, (struct rina_msg_base *)req);
+        /* Enqueue the request into the upqueue. */
+        ret = rina_upqueue_append(app->upper.rc, (struct rina_msg_base *)req);
+        if (ret) {
+            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
+        }
+    } else {
+        /* The flow allocation request is for a local IPCP. */
+        struct ipcp_entry *upper_ipcp = app->upper.ipcp;
+
+        if (upper_ipcp->ops.flow_allocate_req_arrived) {
+            /*XXX watch out for double-locking: this cb is going to
+             * call rina_flow_allocate_resp! */
+            ret = upper_ipcp->ops.flow_allocate_req_arrived(upper_ipcp,
+                                    remote_port, remote_application);
+        }
+    }
+
     if (ret) {
         flow_del_entry(flow_entry, 0);
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
     }
 
     mutex_unlock(&rina_dm.lock);

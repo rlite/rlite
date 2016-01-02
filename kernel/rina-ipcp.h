@@ -19,10 +19,24 @@ struct ipcp_ops {
                                 struct rina_name *app_name);
     int (*application_unregister)(struct ipcp_entry *ipcp,
                                   struct rina_name *app_name);
+
+    /* Invoked by the core to notify the IPCP about a new
+     * flow allocation request from the upper layer. */
     int (*flow_allocate_req)(struct ipcp_entry *ipcp,
                              struct flow_entry *flow);
+
+    /* Invoked by the core to notify the IPCP about a
+     * flow allocation response from the upper layer. */
     int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                               uint8_t response);
+
+    /* Invoked by the core to notify the IPCP about a flow allocation
+     * request coming from the lower layer. Not valid for shim IPC
+     * processes. */
+    int (*flow_allocate_req_arrived)(struct ipcp_entry *ipcp,
+                                     uint32_t remote_port,
+                                     const struct rina_name * remote_ipcp_name);
+
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
