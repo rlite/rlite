@@ -42,21 +42,20 @@ int application_register(struct application *application,
 
 int flow_allocate(struct application *application,
                   struct rina_name *dif_name, int dif_fallback,
-                  struct rina_name *ipcp_name,
+                  struct rina_name *ipcp_name, /* Useful for testing. */
                   const struct rina_name *local_application,
                   const struct rina_name *remote_application,
                   const struct rina_flow_config *flowcfg,
-                  unsigned int *port_id, unsigned int wait_ms);
+                  unsigned int *port_id, unsigned int wait_ms,
+                  uint16_t upper_ipcp_id);
 
 struct pending_flow_req *flow_request_wait(struct application *application);
 
-int flow_allocate_resp(struct application *application,
-                       uint16_t ipcp_id, uint32_t port_id,
+int flow_allocate_resp(struct application *application, uint16_t ipcp_id,
+                       uint16_t upper_ipcp_id,uint32_t port_id,
                        uint8_t response);
 
 int open_port_appl(uint32_t port_id);
-
-int open_port_ipcp(uint32_t port_id, uint16_t ipcp_id);
 
 int open_ipcp_mgmt(uint16_t ipcp_id);
 

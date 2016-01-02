@@ -96,6 +96,7 @@ struct rina_kmsg_fa_req {
     uint32_t event_id;
 
     uint16_t ipcp_id;
+    uint16_t upper_ipcp_id;
     struct rina_flow_config flowcfg;
     uint32_t local_port; /* Filled by kernel before reflection to userspace. */
     struct rina_name local_application;
@@ -130,6 +131,9 @@ struct rina_kmsg_fa_resp {
      * global, while the architecture says they should be unique only per
      * IPCP. */
     uint16_t ipcp_id;
+    /* The ipcp_id_bind field tells to bind the kernel datapath for this
+     * flow to the specified upper IPCP. */
+    uint16_t upper_ipcp_id;
     uint8_t response;
     uint32_t port_id;
     uint32_t remote_port; /* Filled by kernel before reflecting to userspace. */

@@ -131,12 +131,12 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
     /* Allocate a flow for the enrollment. */
     ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
                          &req->ipcp_name, &req->neigh_ipcp_name, NULL,
-                         &port_id, 2000);
+                         &port_id, 2000, uipcp->ipcp_id);
     if (ret) {
         goto err;
     }
 
-    neigh->flow_fd = open_port_ipcp(port_id, uipcp->ipcp_id);
+    neigh->flow_fd = open_port_appl(port_id);
     if (neigh->flow_fd < 0) {
         goto err;
     }
@@ -559,7 +559,7 @@ uipcp_server(void *arg)
                 __func__, pfr->ipcp_id, pfr->port_id);
 
         result = flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
-                                    pfr->port_id, 0);
+                                    uipcp->ipcp_id, pfr->port_id, 0);
 
         if (result) {
             pfr_free(pfr);
@@ -567,7 +567,7 @@ uipcp_server(void *arg)
             continue;
         }
 
-        neigh->flow_fd = open_port_ipcp(port_id, uipcp->ipcp_id);
+        neigh->flow_fd = open_port_appl(port_id);
         if (neigh->flow_fd < 0) {
             pfr_free(pfr);
             free(neigh);

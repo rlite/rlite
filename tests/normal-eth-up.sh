@@ -19,9 +19,9 @@ $RINACONF ipcp-create shim-eth e.IPCP 1
 $RINACONF ipcp-config e.IPCP 1 netdev $IF
 $RINACONF ipcp-config e.IPCP 1 dif e.DIF
 
-$RINACONF ipcp-create normal n.${ID}.IPCP 1
-$RINACONF ipcp-config n.${ID}.IPCP 1 dif n.DIF
-$RINACONF ipcp-config n.${ID}.IPCP 1 address $ID
-$RINACONF ipcp-register e.DIF n.${ID}.IPCP 1
+$RINACONF ipcp-create normal n.IPCP ${ID}
+$RINACONF ipcp-config n.IPCP ${ID} dif n.DIF
+$RINACONF ipcp-config n.IPCP ${ID} address $ID
+$RINACONF ipcp-register e.DIF n.IPCP ${ID}
 
 source tests/epilogue.sh
