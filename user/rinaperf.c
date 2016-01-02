@@ -504,6 +504,7 @@ usage(void)
         "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
+        "   -x : use a separate control connection\n"
           );
 }
 
@@ -524,6 +525,7 @@ main(int argc, char **argv)
     int size = 1;
     int interval = 0;
     int burst = 1;
+    int have_ctrl = 0;
     int ret;
     int opt;
     int i;
@@ -531,7 +533,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     flow_config_default(&flowcfg);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:x")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -596,6 +598,11 @@ main(int argc, char **argv)
                     printf("    Invalid 'burst' %d\n", burst);
                     return -1;
                 }
+                break;
+
+            case 'x':
+                have_ctrl = 1;
+                PI("Warning: Control connection support is incomplete\n");
                 break;
 
             default:
@@ -669,11 +676,14 @@ main(int argc, char **argv)
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
-        ret = application_register(&rp.application, 1, &rp.dif_name,
-                                   1, &rp.ipcp_name, &server_ctrl_name);
-        if (ret) {
-            return ret;
+        if (have_ctrl) {
+            ret = application_register(&rp.application, 1, &rp.dif_name,
+                                       1, &rp.ipcp_name, &server_ctrl_name);
+            if (ret) {
+                return ret;
+            }
         }
+
         ret = application_register(&rp.application, 1, &rp.dif_name,
                                    1, &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
