@@ -42,6 +42,13 @@ struct ipcm {
     struct list_head uipcps;
 };
 
+/* Global variable containing the main struct of the IPCM. This variable
+ * should be accessed directly only by signal handlers (because I don't know
+ * how to do it differently). The rest of the program should access it
+ * through pointers.
+ */
+static struct ipcm gipcm;
+
 enum {
     IPCP_MGMT_ENROLL = 5,
 };
@@ -796,7 +803,7 @@ sigpipe_handler(int signum)
 
 int main(int argc, char **argv)
 {
-    struct ipcm ipcm;
+    struct ipcm *ipcm = &gipcm;
     pthread_t unix_th;
     struct sockaddr_un server_address;
     struct sigaction sa;
@@ -809,15 +816,15 @@ int main(int argc, char **argv)
         enable_testing = 1;
     }
 
-    ret = rina_evloop_init(&ipcm.loop, "/dev/rina-ipcm-ctrl",
+    ret = rina_evloop_init(&ipcm->loop, "/dev/rina-ipcm-ctrl",
                      rina_kernel_handlers);
     if (ret) {
         return ret;
     }
 
     /* Open a Unix domain socket to listen to. */
-    ipcm.lfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (ipcm.lfd < 0) {
+    ipcm->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (ipcm->lfd < 0) {
         perror("socket(AF_UNIX)");
         exit(EXIT_FAILURE);
     }
@@ -832,19 +839,19 @@ int main(int argc, char **argv)
          * This unlink() will clean up in this situation. */
         PI("info: cleaned up existing unix domain socket\n");
     }
-    ret = bind(ipcm.lfd, (struct sockaddr *)&server_address,
+    ret = bind(ipcm->lfd, (struct sockaddr *)&server_address,
                 sizeof(server_address));
     if (ret) {
         perror("bind(AF_UNIX, path)");
         exit(EXIT_FAILURE);
     }
-    ret = listen(ipcm.lfd, 50);
+    ret = listen(ipcm->lfd, 50);
     if (ret) {
         perror("listen(AF_UNIX)");
         exit(EXIT_FAILURE);
     }
 
-    list_init(&ipcm.uipcps);
+    list_init(&ipcm->uipcps);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -880,19 +887,19 @@ int main(int argc, char **argv)
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
-    ipcps_fetch(&ipcm.loop);
-    ret = uipcps_update(&ipcm);
+    ipcps_fetch(&ipcm->loop);
+    ret = uipcps_update(ipcm);
     if (ret) {
         PE("Failed to load userspace ipcps\n");
     }
 
     if (enable_testing) {
         /* Run the hardwired test script. */
-        test(&ipcm);
+        test(ipcm);
     }
 
     /* Create and start the unix server thread. */
-    ret = pthread_create(&unix_th, NULL, unix_server, &ipcm);
+    ret = pthread_create(&unix_th, NULL, unix_server, ipcm);
     if (ret) {
         perror("pthread_create(unix)");
         exit(EXIT_FAILURE);
@@ -904,7 +911,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    rina_evloop_fini(&ipcm.loop);
+    rina_evloop_fini(&ipcm->loop);
 
     return 0;
 }
