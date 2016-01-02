@@ -63,4 +63,12 @@ struct NeighborCandidate : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct NeighborCandidateList : public UipcpObject {
+    std::list<NeighborCandidate> candidates;
+
+    NeighborCandidateList() { }
+    NeighborCandidateList(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

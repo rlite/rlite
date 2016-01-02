@@ -109,15 +109,6 @@ gpb2DFTEntry(DFTEntry &entry, const gpb::directoryForwardingTableEntry_t &gm)
     entry.timestamp = gm.timestamp();
 }
 
-DFTEntry::DFTEntry(const char *buf, unsigned int size)
-{
-    gpb::directoryForwardingTableEntry_t gm;
-
-    gm.ParseFromArray(buf, size);
-
-    gpb2DFTEntry(*this, gm);
-}
-
 static int
 DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
 {
@@ -134,6 +125,15 @@ DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
     gm.set_timestamp(entry.timestamp);
 
     return 0;
+}
+
+DFTEntry::DFTEntry(const char *buf, unsigned int size)
+{
+    gpb::directoryForwardingTableEntry_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2DFTEntry(*this, gm);
 }
 
 int
@@ -181,19 +181,40 @@ DFTSlice::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2NeighborCandidate(NeighborCandidate &cand, const gpb::neighbor_t &gm)
+{
+    cand.apn = gm.applicationprocessname();
+    cand.api = gm.applicationprocessinstance();
+    cand.address = gm.address();
+
+    for (int i = 0; i < gm.supportingdifs_size(); i++) {
+        cand.lower_difs.push_back(gm.supportingdifs(i));
+    }
+}
+
+static int
+NeighborCandidate2gpb(const NeighborCandidate &cand, gpb::neighbor_t &gm)
+{
+    gm.set_applicationprocessname(cand.apn);
+    gm.set_applicationprocessinstance(cand.api);
+    gm.set_address(cand.address);
+
+    for (list<string>::const_iterator dif = cand.lower_difs.begin();
+                            dif != cand.lower_difs.end(); dif++) {
+        gm.add_supportingdifs(*dif);
+    }
+
+    return 0;
+}
+
 NeighborCandidate::NeighborCandidate(const char *buf, unsigned int size)
 {
     gpb::neighbor_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    apn = gm.applicationprocessname();
-    api = gm.applicationprocessinstance();
-    address = gm.address();
-
-    for (int i = 0; i < gm.supportingdifs_size(); i++) {
-        lower_difs.push_back(gm.supportingdifs(i));
-    }
+    gpb2NeighborCandidate(*this, gm);
 }
 
 int
@@ -201,13 +222,38 @@ NeighborCandidate::serialize(char *buf, unsigned int size) const
 {
     gpb::neighbor_t gm;
 
-    gm.set_applicationprocessname(apn);
-    gm.set_applicationprocessinstance(api);
-    gm.set_address(address);
+    NeighborCandidate2gpb(*this, gm);
 
-    for (list<string>::const_iterator dif = lower_difs.begin();
-                            dif != lower_difs.end(); dif++) {
-        gm.add_supportingdifs(*dif);
+    return ser_common(gm, buf, size);
+}
+
+NeighborCandidateList::NeighborCandidateList(const char *buf, unsigned int size)
+{
+    gpb::neighbors_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    for (int i = 0; i < gm.neighbor_size(); i++) {
+        candidates.push_back(NeighborCandidate());
+        gpb2NeighborCandidate(candidates.back(), gm.neighbor(i));
+    }
+}
+
+int
+NeighborCandidateList::serialize(char *buf, unsigned int size) const
+{
+    gpb::neighbors_t gm;
+
+    for (list<NeighborCandidate>::const_iterator c = candidates.begin();
+                    c != candidates.end(); c++) {
+        gpb::neighbor_t *neigh;
+        int ret;
+
+        neigh = gm.add_neighbor();
+        ret = NeighborCandidate2gpb(*c, *neigh);
+        if (ret) {
+            return ret;
+        }
     }
 
     return ser_common(gm, buf, size);
