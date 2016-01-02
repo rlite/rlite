@@ -11,7 +11,7 @@
 #include <poll.h>
 #include "rlite/utils.h"
 
-#include "rlite/appl.h"
+#include "rlite/evloop.h"
 
 
 #define SDU_SIZE_MAX    65535
@@ -23,7 +23,7 @@ struct rinaperf_test_config {
 };
 
 struct rinaperf {
-    struct rlite_appl application;
+    struct rlite_ctrl ctrl;
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
@@ -396,7 +396,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rl_appl_flow_accept_open(&rp->application);
+        rp->dfd = rl_ctrl_flow_accept(&rp->ctrl);
         if (rp->dfd < 0) {
             continue;
         }
@@ -606,8 +606,8 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* Initialization of RLITE application. */
-    ret = rl_appl_init(&rp.application, RLITE_EVLOOP_SPAWN);
+    /* Initialization of RLITE ctrl API. */
+    ret = rl_ctrl_init(&rp.ctrl, NULL);
     if (ret) {
         return ret;
     }
@@ -627,17 +627,15 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rl_appl_register_wait(&rp.application, 1, dif_name,
-                                           &rp.ipcp_name, &server_ctrl_name,
-                                           3000);
+            ret = rl_ctrl_register(&rp.ctrl, 1, dif_name,
+                                   &rp.ipcp_name, &server_ctrl_name);
             if (ret) {
                 return ret;
             }
         }
 
-        ret = rl_appl_register_wait(&rp.application, 1, dif_name,
-                                       &rp.ipcp_name, &rp.server_appl_name,
-                                       3000);
+        ret = rl_ctrl_register(&rp.ctrl, 1, dif_name,
+                               &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
             return ret;
         }
@@ -646,9 +644,9 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rl_appl_flow_alloc_open(&rp.application, dif_name,
+        rp.dfd = rl_ctrl_flow_alloc(&rp.ctrl, dif_name,
                                     &rp.ipcp_name, &rp.client_appl_name,
-                                    &rp.server_appl_name, &flowspec, 1500);
+                                    &rp.server_appl_name, &flowspec);
         if (rp.dfd < 0) {
             return rp.dfd;
         }
@@ -661,5 +659,5 @@ main(int argc, char **argv)
         perf_function(&rp);
     }
 
-    return rl_appl_fini(&rp.application);
+    return rl_ctrl_fini(&rp.ctrl);
 }
