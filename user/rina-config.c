@@ -239,10 +239,12 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
 /* Destroy an IPC process. */
 static int
-rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
+rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
+                  unsigned dif_type)
 {
     struct rina_kmsg_ipcp_destroy *msg;
     struct rina_msg_base *resp;
+    rina_msg_t update_type;
     int result;
 
     /* Allocate and create a request message. */
@@ -265,7 +267,11 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
 
     ipcps_fetch(&rc->loop);
 
-    uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id);
+    update_type = RINA_CONF_UIPCP_UPDATE;
+    if (dif_type == DIF_TYPE_NORMAL) {
+        update_type = RINA_CONF_UIPCP_DESTROY;
+    }
+    uipcp_update(rc, update_type, ipcp_id);
 
     return result;
 }
@@ -291,7 +297,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
         PE("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        ret = rina_ipcp_destroy(rc, ipcp->ipcp_id);
+        ret = rina_ipcp_destroy(rc, ipcp->ipcp_id, ipcp->dif_type);
     }
 
     return ret;
@@ -560,11 +566,11 @@ test(struct rinaconf *rc)
     ipcps_fetch(&rc->loop);
 
     /* Destroy the IPCPs. */
-    ret = rina_ipcp_destroy(rc, 0);
+    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_DUMMY);
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 1);
+    ret = rina_ipcp_destroy(rc, 1, DIF_TYPE_SHIM_DUMMY);
     assert(!ret);
-    ret = rina_ipcp_destroy(rc, 0);
+    ret = rina_ipcp_destroy(rc, 0, DIF_TYPE_SHIM_DUMMY);
     assert(ret);
 
     return 0;
