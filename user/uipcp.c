@@ -70,23 +70,139 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
+int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
+{
+    uint64_t remote_addr, local_addr;
+    unsigned int port_id;
+    uint8_t cmd;
+    int fd = -1;
+    int ret;
+    ssize_t n;
+
+    /* Allocate a flow for the enrollment. */
+    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
+                         &req->ipcp_name, &req->neigh_ipcp_name,
+                         &port_id, 2000);
+    if (ret) {
+        return -1;
+    }
+
+    fd = open_port_ipcp(port_id, uipcp->ipcp_id);
+    if (fd < 0) {
+        return -1;
+    }
+
+    /* Request an enrollment. */
+    PD("%s: Enrollment phase (client)\n", __func__);
+    cmd = IPCP_MGMT_ENROLL;
+    if (write(fd, &cmd, sizeof(cmd)) != 1) {
+        PE("%s: write(cmd) failed\n", __func__);
+        return -1;
+    }
+
+    /* Exchange IPCP addresses. */
+    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+                                 &local_addr);
+    assert(!ret);
+    local_addr = htole64(local_addr);
+    n = write(fd, &local_addr, sizeof(local_addr));
+    if (n != sizeof(local_addr)) {
+        PE("%s: write(localaddr) failed\n", __func__);
+        return -1;
+    }
+
+    n = read(fd, &remote_addr, sizeof(remote_addr));
+    if (n != sizeof(remote_addr)) {
+        PE("%s: read(remoteaddr) failed\n", __func__);
+        return -1;
+    }
+    remote_addr = le64toh(remote_addr);
+
+    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
+
+    /* Don't dellocate the flow. */
+
+    return 0;
+}
+
+static int
+uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
+{
+    uint64_t remote_addr, local_addr;
+    ssize_t n;
+    int ret;
+
+    /* Do enrollment here. */
+    PD("%s: Enrollment phase (server)\n", __func__);
+
+    (void)uipcp;
+    (void)fd;
+
+    /* Exchange IPCP addresses. */
+    n = read(fd, &remote_addr, sizeof(remote_addr));
+    if (n != sizeof(remote_addr)) {
+        goto fail;
+    }
+
+    remote_addr = le64toh(remote_addr);
+
+    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+                                 &local_addr);
+    assert(!ret);
+    local_addr = htole64(local_addr);
+    n = write(fd, &local_addr, sizeof(local_addr));
+    if (n != sizeof(local_addr)) {
+        goto fail;
+    }
+
+    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
+
+    /* Do not deallocate the flow. */
+
+    return 0;
+fail:
+    PE("%s: Enrollment failed\n", __func__);
+
+    return -1;
+}
+
 static void
 mgmt_fd_ready(struct rina_evloop *loop, int fd)
 {
     struct application *appl = container_of(loop, struct application, loop);
     struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
-    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    uint8_t cmd;
     int n;
 
     PD("%s: fd %d ready!\n", __func__, fd);
 
     assert(fd == uipcp->mgmtfd);
 
+    n = read(fd, &cmd, 1);
+    if (n != 1) {
+        PE("%s: read(cmd) failed [ret=%d]\n", __func__, n);
+        return;
+    }
+
+    switch (cmd) {
+        case IPCP_MGMT_ENROLL:
+            //uipcp_server_enroll(uipcp, port_id, fd);
+            break;
+        default:
+            PI("%s: Unknown cmd %u received\n", __func__, cmd);
+            break;
+    }
+
+/*
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    int n;
+
     n = read(fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         PE("%s: Error: read() failed [%d]\n", __func__, n);
         return;
     }
+*/
 }
 
 /*static */int
@@ -242,102 +358,6 @@ uipcp_flow_allocate_resp(struct rina_evloop *loop,
     (void)resp;
 
     return 0;
-}
-
-int uipcp_enroll(struct uipcp *uipcp, struct rina_amsg_ipcp_enroll *req)
-{
-    uint64_t remote_addr, local_addr;
-    unsigned int port_id;
-    uint8_t cmd;
-    int fd = -1;
-    int ret;
-    ssize_t n;
-
-    /* Allocate a flow for the enrollment. */
-    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
-                         &req->ipcp_name, &req->neigh_ipcp_name,
-                         &port_id, 2000);
-    if (ret) {
-        return -1;
-    }
-
-    fd = open_port_ipcp(port_id, uipcp->ipcp_id);
-    if (fd < 0) {
-        return -1;
-    }
-
-    /* Request an enrollment. */
-    PD("%s: Enrollment phase (client)\n", __func__);
-    cmd = IPCP_MGMT_ENROLL;
-    if (write(fd, &cmd, sizeof(cmd)) != 1) {
-        PE("%s: write(cmd) failed\n", __func__);
-        return -1;
-    }
-
-    /* Exchange IPCP addresses. */
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-    n = write(fd, &local_addr, sizeof(local_addr));
-    if (n != sizeof(local_addr)) {
-        PE("%s: write(localaddr) failed\n", __func__);
-        return -1;
-    }
-
-    n = read(fd, &remote_addr, sizeof(remote_addr));
-    if (n != sizeof(remote_addr)) {
-        PE("%s: read(remoteaddr) failed\n", __func__);
-        return -1;
-    }
-    remote_addr = le64toh(remote_addr);
-
-    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
-
-    /* Don't dellocate the flow. */
-
-    return 0;
-}
-
-static int
-uipcp_server_enroll(struct uipcp *uipcp, unsigned int port_id,  int fd)
-{
-    uint64_t remote_addr, local_addr;
-    ssize_t n;
-    int ret;
-
-    /* Do enrollment here. */
-    PD("%s: Enrollment phase (server)\n", __func__);
-
-    (void)uipcp;
-    (void)fd;
-
-    /* Exchange IPCP addresses. */
-    n = read(fd, &remote_addr, sizeof(remote_addr));
-    if (n != sizeof(remote_addr)) {
-        goto fail;
-    }
-
-    remote_addr = le64toh(remote_addr);
-
-    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
-                                 &local_addr);
-    assert(!ret);
-    local_addr = htole64(local_addr);
-    n = write(fd, &local_addr, sizeof(local_addr));
-    if (n != sizeof(local_addr)) {
-        goto fail;
-    }
-
-    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr, port_id);
-
-    /* Do not deallocate the flow. */
-
-    return 0;
-fail:
-    PE("%s: Enrollment failed\n", __func__);
-
-    return -1;
 }
 
 void *

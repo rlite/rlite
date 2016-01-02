@@ -531,7 +531,7 @@ typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
                                    const struct rina_msg_base * b_req);
 
 /* The table containing all application request handlers. */
-static rina_req_handler_t rina_application_handlers[] = {
+static rina_req_handler_t rina_config_handlers[] = {
     [RINA_CONF_IPCP_CREATE] = rina_conf_ipcp_create,
     [RINA_CONF_IPCP_DESTROY] = rina_conf_ipcp_destroy,
     [RINA_CONF_ASSIGN_TO_DIF] = rina_conf_assign_to_dif,
@@ -542,7 +542,7 @@ static rina_req_handler_t rina_application_handlers[] = {
     [RINA_CONF_MSG_MAX] = NULL,
 };
 
-/* Unix server thread to manage application requests. */
+/* Unix server thread to manage configuration requests. */
 static void *
 unix_server(void *arg)
 {
@@ -577,7 +577,7 @@ unix_server(void *arg)
 
         /* Lookup the message type. */
         req = RMB(msgbuf);
-        if (rina_application_handlers[req->msg_type] == NULL) {
+        if (rina_config_handlers[req->msg_type] == NULL) {
             struct rina_msg_base_resp resp;
 
             PE("%s: Invalid message received [type=%d]\n", __func__,
@@ -588,7 +588,7 @@ unix_server(void *arg)
             rina_msg_write(cfd, (struct rina_msg_base *)&resp);
         } else {
             /* Valid message type: handle the request. */
-            ret = rina_application_handlers[req->msg_type](ipcm, cfd, req);
+            ret = rina_config_handlers[req->msg_type](ipcm, cfd, req);
             if (ret) {
                 PE("%s: Error while handling message type [%d]\n",
                         __func__, req->msg_type);
