@@ -385,15 +385,15 @@ main(int argc, char **argv)
     ipcps_fetch(&rp.application.loop);
 
     /* Rinaperf-specific initialization. */
-    rina_name_fill(&rp.dif_name, dif_name, "", "", "");
-    rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", "", "");
-    rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", "", "");
+    rina_name_fill(&rp.dif_name, dif_name, NULL, NULL, NULL);
+    rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", NULL, NULL);
+    rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", NULL, NULL);
     rina_name_fill(&rp.client_appl_name, "rinaperf-data", "client", NULL, NULL);
     rina_name_fill(&rp.server_appl_name, "rinaperf-data", "server", NULL, NULL);
     if (!ipcp_apn) {
         ipcp_api = NULL;
     }
-    rina_name_fill(&rp.ipcp_name, ipcp_apn, ipcp_api, "", "");
+    rina_name_fill(&rp.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     if (listen) {
         /* Server-side initializations. */
