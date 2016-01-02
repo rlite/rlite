@@ -845,6 +845,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
     }
 
     DFTSlice dft_slice(objbuf, objlen);
+    DFTSlice prop_dft;
 
     for (list<DFTEntry>::iterator e = dft_slice.entries.begin();
                                 e != dft_slice.entries.end(); e++) {
@@ -861,10 +862,24 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
                 PI("DFT entry does not exist\n");
             } else {
                 dft.erase(mit);
+                prop_dft.entries.push_back(*e);
                 PD("DFT entry %s removed remotely\n", key.c_str());
             }
 
         }
+    }
+
+    if (add) {
+        prop_dft = dft_slice;
+    }
+
+    if (prop_dft.entries.size()) {
+        /* Propagate the DFT entries update to the other neighbors,
+         * except for the one. */
+        /* TODO loops are not managed here! */
+        remote_sync_excluding(neigh, add, obj_class::dft,
+                              obj_name::dft, &prop_dft);
+
     }
 
     return 0;
