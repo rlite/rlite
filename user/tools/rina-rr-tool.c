@@ -258,9 +258,6 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* This fetch is necessary to use rlite_appl_register_wait(). */
-    rlite_ipcps_fetch(&rr.application.loop);
-
     rina_name_fill(&client_ctrl_name, "rlite_rr-ctrl", "client", NULL, NULL);
     rina_name_fill(&server_ctrl_name, "rlite_rr-ctrl", "server", NULL, NULL);
     rina_name_fill(&rr.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);

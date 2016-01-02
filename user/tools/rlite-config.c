@@ -197,8 +197,6 @@ rlconf_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
            rlite_issue_request(&rc->loop, RLITE_RMB(msg),
                          sizeof(*msg), 1, wait_ms, result);
 
-    rlite_ipcps_fetch(&rc->loop);
-
     if (type_has_uipcp(dif_type) && *result == 0 && resp) {
         uipcp_update(rc, RLITE_CFG_UIPCP_CREATE, resp->ipcp_id, dif_type);
     } else {
@@ -269,8 +267,6 @@ rlconf_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
     assert(!resp);
     PD("result: %d\n", result);
 
-    rlite_ipcps_fetch(&rc->loop);
-
     uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
 
     return result;
@@ -311,8 +307,6 @@ rlconf_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
                                       param_name, param_value);
 
     if (result == 0 && strcmp(param_name, "address") == 0) {
-        /* Fetch after a succesfull address setting operation. */
-        rlite_ipcps_fetch(&rc->loop);
         uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
     }
 
@@ -550,9 +544,6 @@ test(struct rinaconf *rc)
     assert(!icresp);
     rina_name_free(&name);
 
-    /* Fetch IPC processes table. */
-    rlite_ipcps_fetch(&rc->loop);
-
     /* Destroy the IPCPs. */
     ret = rlconf_ipcp_destroy(rc, 0, "shim-loopback");
     assert(!ret);
@@ -714,9 +705,6 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
-
-    /* Fetch kernel state. */
-    rlite_ipcps_fetch(&rc.loop);
 
     if (enable_testing) {
         /* Run the hardwired test script. */

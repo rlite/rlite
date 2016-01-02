@@ -191,6 +191,16 @@ out:
     return 0;
 }
 
+static int
+barrier_resp(struct rlite_evloop *loop,
+             const struct rlite_msg_base_resp *b_resp,
+             const struct rlite_msg_base *b_req)
+{
+    PD("Barrier response received\n");
+
+    return 0;
+}
+
 uint32_t
 rlite_evloop_get_id(struct rlite_evloop *loop)
 {
@@ -258,7 +268,8 @@ rlite_ipcps_print(struct rlite_evloop *loop)
     return 0;
 }
 
-/* Fetch information about all IPC processes. */
+/* Fetch information about all IPC processes.
+ * TODO turn into rlite_flows_fetch */
 int
 rlite_ipcps_fetch(struct rlite_evloop *loop)
 {
@@ -707,6 +718,35 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     return resp;
 }
 
+static int
+rlite_evloop_sync(struct rlite_evloop *loop)
+{
+    struct rlite_msg_base *msg;
+    int result;
+
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+
+    msg->msg_type = RLITE_KER_BARRIER;
+    msg->event_id = rlite_evloop_get_id(loop);
+
+    msg = rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, &result);
+
+    if (!msg) {
+        PE("Failed to put a barrier\n");
+        return -1;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+
+    return 0;
+}
+
 int
 rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
                  rlite_resp_handler_t *handlers)
@@ -761,7 +801,8 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         return loop->eventfd;
     }
 
-    /* If not redefined, setup default fetch handler. */
+    /* If not redefined, setup default fetch, ipcp_update and
+     * barrier_resp handlers. */
     if (!loop->handlers[RLITE_KER_IPCP_FETCH_RESP]) {
         NPD("setting default fetch handler\n");
         loop->handlers[RLITE_KER_IPCP_FETCH_RESP] = ipcp_fetch_resp;
@@ -772,6 +813,11 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         loop->handlers[RLITE_KER_IPCP_UPDATE] = ipcp_update;
     }
 
+    if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
+        NPD("setting default barrier handler\n");
+        loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
+    }
+
     /* Create and start the event-loop thread. */
     ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
     if (ret) {
@@ -779,7 +825,9 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         return ret;
     }
 
-    return 0;
+    ret = rlite_evloop_sync(loop);
+
+    return ret;
 }
 
 int

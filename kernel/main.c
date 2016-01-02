@@ -1632,6 +1632,16 @@ rlite_flow_dealloc(struct rlite_ctrl *rc,
     return ret;
 }
 
+static int
+rlite_barrier(struct rlite_ctrl *rc,
+              struct rlite_msg_base *bmsg)
+{
+    bmsg->msg_type = RLITE_KER_BARRIER_RESP;
+
+    /* Just reflect the message. */
+    return rlite_upqueue_append(rc, bmsg);
+}
+
 /* Connect the upper IPCP which is using this flow
  * so that rlite_sdu_rx() can deliver SDU to the IPCP. */
 static int
@@ -2199,6 +2209,7 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rlite_uipcp_fa_req_arrived,
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
+    [RLITE_KER_BARRIER] = rlite_barrier,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 

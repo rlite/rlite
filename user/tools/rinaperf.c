@@ -612,9 +612,6 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* This fetch is necessary to use rlite_appl_register_wait(). */
-    rlite_ipcps_fetch(&rp.application.loop);
-
     /* Rinaperf-specific initialization. */
     rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", NULL, NULL);
     rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", NULL, NULL);

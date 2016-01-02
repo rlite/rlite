@@ -391,23 +391,14 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 }
 
 int
-uipcps_fetch(struct uipcps *uipcps)
+uipcps_print(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
-    int ret;
-    int first = 1;
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        ret = rlite_ipcps_fetch(&uipcp->appl.loop);
-        if (ret) {
-            return ret;
-        }
-
-        if (first) {
-            /* This is just for debugging purposes. */
-            first = 0;
-            rlite_ipcps_print(&uipcp->appl.loop);
-        }
+        /* This is just for debugging purposes. */
+        rlite_ipcps_print(&uipcp->appl.loop);
+        break;
     }
 
     return 0;

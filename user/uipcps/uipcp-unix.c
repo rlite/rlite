@@ -120,10 +120,6 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
     }
 
     if (uipcp->ops.register_to_lower) {
-        /* Perform a fetch to find out if shim IPCPs have been created,
-         * deleted or configured from the last fetch. */
-        rlite_ipcps_fetch(&uipcp->appl.loop);
-
         result = uipcp->ops.register_to_lower(uipcp, reg, dif_name, ipcp_id,
                                               ipcp_name);
 
@@ -169,10 +165,6 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     }
 
     if (uipcp->ops.enroll) {
-        /* Perform a fetch to find out if shim IPCPs have been created,
-         * deleted or configured from the last fetch. */
-        rlite_ipcps_fetch(&uipcp->appl.loop);
-
         resp.result = uipcp->ops.enroll(uipcp, req);
     }
 
@@ -233,7 +225,7 @@ rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
         resp.result = uipcp_del(uipcps, req->ipcp_id);
     }
 
-    uipcps_fetch(uipcps);
+    uipcps_print(uipcps);
 
     resp.result = RLITE_SUCC;
 
@@ -397,8 +389,6 @@ uipcps_update(struct uipcps *uipcps)
         return ret;
     }
 
-    rlite_ipcps_fetch(&loop);
-
     rlite_ipcps_print(&loop);
 
     /* Create an userspace IPCP for each existing IPCP. */
@@ -418,9 +408,7 @@ uipcps_update(struct uipcps *uipcps)
     rlite_evloop_stop(&loop);
     rlite_evloop_fini(&loop);
 
-    /* Perform a fetch operation on the evloops of
-     * all the userspace IPCPs. */
-    uipcps_fetch(uipcps);
+    uipcps_print(uipcps);
 
     if (1) {
         /* Read the persistent IPCP registration file into

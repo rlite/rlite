@@ -85,6 +85,12 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
     [RLITE_KER_FLOW_DEALLOC] = {
         .copylen = sizeof(struct rl_kmsg_flow_dealloc),
     },
+    [RLITE_KER_BARRIER] = {
+        .copylen = sizeof(struct rlite_msg_base),
+    },
+    [RLITE_KER_BARRIER_RESP] = {
+        .copylen = sizeof(struct rlite_msg_base),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

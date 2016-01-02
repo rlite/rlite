@@ -397,8 +397,6 @@ Gateway::Gateway()
     if (rlite_appl_init(&appl)) {
         throw std::exception();
     }
-
-    rlite_ipcps_fetch(&appl.loop);
 }
 
 Gateway::~Gateway()

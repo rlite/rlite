@@ -103,7 +103,7 @@ int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 
-int uipcps_fetch(struct uipcps *uipcps);
+int uipcps_print(struct uipcps *uipcps);
 
 int uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
                             unsigned int lower);
