@@ -110,6 +110,23 @@ rcv_inact_tmr_cb(struct hrtimer *timer)
     return HRTIMER_NORESTART;
 }
 
+static void
+timer_update(struct hrtimer *timer, unsigned long exp_jiffies)
+{
+    unsigned int msecs = jiffies >= exp_jiffies ? 0 :
+                         jiffies_to_msecs(exp_jiffies - jiffies);
+    unsigned int secs = 0;
+
+    if (msecs >= 1000) {
+        secs = msecs / 1000;
+        msecs -= secs * 1000;
+    }
+
+    hrtimer_forward_now(timer, ktime_set(secs, msecs * 1000 * 1000));
+    PD("%s: Forward rtx timer by %u ms\n", __func__,
+            secs * 1000 + msecs);
+}
+
 #define RTX_MSECS   1000
 
 static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
@@ -145,17 +162,7 @@ rtx_tmr_cb(struct hrtimer *timer)
             }
 
         } else {
-            unsigned int msecs = jiffies_to_msecs(rb->rtx_jiffies - jiffies);
-            unsigned int secs = 0;
-
-            if (msecs >= 1000) {
-                secs = msecs / 1000;
-                msecs -= secs * 1000;
-            }
-
-            hrtimer_forward_now(timer, ktime_set(secs, msecs));
-            PD("%s: Forward rtx timer by %u ms\n", __func__,
-                    secs * 1000 + msecs);
+            timer_update(timer, rb->rtx_jiffies);
             ret = HRTIMER_RESTART;
             break;
         }
@@ -739,7 +746,10 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         list_del(&cur->node);
                         rina_buf_free(cur);
                     } else {
-                        /* The rtxq is sorted by seqnum. */
+                        /* The rtxq is sorted by seqnum, so we can safely
+                         * stop here. Let's update the rtx timer
+                         * expiration time. */
+                        timer_update(&dtp->rtx_tmr, cur->rtx_jiffies);
                         break;
                     }
                 }
