@@ -289,13 +289,58 @@ cdap_msg_recv(int fd)
     return m;
 }
 
-int main()
+static void
+test_cdap_server(int port)
 {
-    gpb::CDAPMessage gm;
-    CDAPMessage m(gpb::M_CONNECT);
+}
 
-    (void)gm;
-    (void)m;
+static void
+test_cdap_client(int port)
+{
+}
+
+void
+usage()
+{
+    PI("cdap test program");
+}
+
+int main(int argc, char **argv)
+{
+    int port = 23872;
+    int listen;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hlp:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
+            case 'l':
+                listen = 1;
+                break;
+
+            case 'p':
+                port = atoi(optarg);
+                if (port <= 0 || port >= 65535) {
+                    PE("    Invalid port number\n");
+                    return -1;
+                }
+                break;
+
+            default:
+                PE("    Unrecognized option %c\n", opt);
+                usage();
+                return -1;
+        }
+    }
+
+    if (listen) {
+        test_cdap_server(port);
+    } else {
+        test_cdap_client(port);
+    }
 
     return 0;
 }
