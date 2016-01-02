@@ -563,16 +563,38 @@ rina_appl_register(struct ipcm *ipcm, const struct rina_msg_base *b_req)
     struct ipcp *ipcp = NULL;
     struct ipcp *cur;
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
+    char *s;
 
-    list_for_each_entry(cur, &ipcm->ipcps, node) {
-        if (rina_name_valid(&cur->dif_name) &&
-                rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
-            ipcp = cur;
-            break;
+    if (rina_name_valid(&req->dif_name)) {
+        /* The request specifies a DIF: lookup that. */
+        list_for_each_entry(cur, &ipcm->ipcps, node) {
+            if (rina_name_valid(&cur->dif_name)
+                    && rina_name_cmp(&cur->dif_name, &req->dif_name) == 0) {
+                ipcp = cur;
+                break;
+            }
+        }
+    } else {
+        /* The request does not specify a DIF: select any DIF,
+         * giving priority to normal DIFs. */
+        list_for_each_entry(cur, &ipcm->ipcps, node) {
+            if (rina_name_valid(&cur->dif_name) &&
+                    (cur->dif_type == DIF_TYPE_NORMAL ||
+                        !ipcp)) {
+                ipcp = cur;
+            }
         }
     }
 
-    printf("Received application register request, selected %p\n", ipcp);
+    if (!ipcp) {
+        printf("%s: Could not find a suitable IPC process\n", __func__);
+        return -1;
+    }
+
+    s = rina_name_to_string(&ipcp->ipcp_name);
+    printf("%s: Ok, selected %s\n", __func__, s);
+    if (s) free(s);
+
     return 0;
 }
 
