@@ -7,7 +7,7 @@ import subprocess
 fin = open('gen.conf', 'r')
 
 vms = dict()
-bridges = []
+bridges = dict()
 links = []
 
 while 1:
@@ -26,7 +26,7 @@ while 1:
     m = re.match(r'\s*bridge\s+(\w+)', line)
     if m:
         name = m.group(1)
-        bridges.append(name)
+        bridges[name] = {'name': name, 'vms': []}
         continue
 
     m = re.match(r'\s*link\s+(\w+)\s+(\w+)', line)
@@ -52,10 +52,16 @@ outs =  '#!/bin/bash\n'             \
         'set -x\n'                  \
         '\n';
 
+brid = 1
+
 for b in bridges:
     outs += 'sudo brctl addbr %(br)s\n'         \
             'sudo ip link set %(br)s up\n'      \
             '\n' % {'br': b}
+
+    bridges[b]['id'] = brid
+
+    brid += 1
 
 for l in links:
     b, vm = l
@@ -68,6 +74,7 @@ for l in links:
                 % {'tap': tap, 'br': b}
 
     vms[vm]['ports'].append({'tap': tap, 'br': b, 'idx': idx})
+    bridges[b]['vms'].append(vm)
 
 
 vmid = 1
@@ -134,12 +141,12 @@ for i in vms:
     for port in vm['ports']:
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
-                'rina-config ipcp-create e.IPCP %(idx)s shim-eth e.%(idx)s.DIF\n'\
-                'rina-config ipcp-config e.IPCP %(idx)s netdev $PORT\n'\
-                'rina-config ipcp-register e.%(idx)s.DIF n.IPCP %(id)s\n'\
+                'rina-config ipcp-create e.%(brid)s.IPCP %(idx)s shim-eth e.%(brid)s.%(idx)s.DIF\n'\
+                'rina-config ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n'\
+                'rina-config ipcp-register e.%(brid)s.%(idx)s.DIF n.IPCP %(id)s\n'\
                 'true\n'\
                     % {'mac': port['mac'], 'idx': port['idx'],
-                       'id': vm['id']}
+                       'id': vm['id'], 'brid': bridges[port['br']]['id']}
 
     outs += 'ENDSSH\n'\
             '   DONE=$?\n'\
@@ -149,36 +156,49 @@ for i in vms:
             'done\n\n'
 
 
-# Choose the VM with id 1 as enrollment pivot
-pvm = None
-for i in vms:
-    if vms[i]['id'] == 1:
-        pvm = vms[i]
+for br_name in bridges:
+    b = bridges[br_name]
 
-assert pvm != None
-
-# Enroll everybody against the pivot VM
-for i in vms:
-    vm = vms[i]
-    if vm['id'] == pvm['id']:
-        # Skip the pivot VM
+    if len(b['vms']) == 1:
+        # No enrollment needed
         continue
 
-    # XXX watch out: e.1.DIF is hardcoded here, waiting
-    # for a fix to come
-    outs += ''\
+    # Select the pivot VM ad libitum
+    for vm_name in b['vms']:
+        pvm = vms[vm_name]
+        break
+
+    for vm_name in b['vms']:
+        if vm_name == pvm['name']:
+            continue
+
+        vm = vms[vm_name]
+
+        port = None
+
+        for p in vm['ports']:
+            if p['br'] == b['name']:
+                port = p
+                break
+
+        assert(port != None)
+
+        # Enroll against the pivot
+
+        outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'rina-config ipcp-enroll n.DIF n.IPCP %(id)s '\
-                                    'n.IPCP %(pvid)s e.1.DIF\n'\
+                                    'n.IPCP %(pvid)s e.%(brid)s.%(idx)s.DIF\n'\
             'ENDSSH\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
             'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
-                          'pvid': pvm['id']}
+                          'pvid': pvm['id'], 'brid': b['id'],
+                          'idx': port['idx']}
 
 fout.write(outs)
 
