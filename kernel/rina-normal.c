@@ -218,6 +218,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 /* There's room in the queue. */
                 list_add_tail(&rb->node, &dtp->cwq);
                 dtp->cwq_len++;
+                PD("%s: push [%lu] into cwq\n", __func__,
+                        (long unsigned)pci->seqnum);
             } else {
                 /* POL: FlowControlOverrun */
 
@@ -237,6 +239,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             /* POL: TxControl. */
             dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
             dtp->last_seq_num_sent = pci->seqnum;
+            PD("%s: sending [%lu] through sender window\n", __func__,
+                    (long unsigned)pci->seqnum);
         }
     } else {
         /* DTCP not present */
@@ -391,6 +395,10 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         if (cfg->fc.fc_type == RINA_FC_T_WIN) {
+            PD("%s: rcv_lwe [%lu] --> [%lu]\n", __func__,
+                    (long unsigned)flow->dtp.rcv_lwe,
+                    (long unsigned)(flow->dtp.rcv_lwe +
+                        flow->cfg.dtcp.fc.cfg.w.initial_credit));
             /* We should not unconditionally increment the receiver RWE,
              * but instead use some logic related to buffer management
              * (e.g. see the amount of receiver buffer available). */
