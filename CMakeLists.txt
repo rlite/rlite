@@ -17,7 +17,7 @@ endif()
 # Some globbing and headers include
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-file(GLOB RINA_HEADERS "include/rina/*.h")
+file(GLOB RINA_HEADERS "include/rinalite/*.h")
 file(GLOB UIPCP_GPB_PROTOFILES "user/uipcp-gpb/*.proto")
 
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
@@ -68,4 +68,4 @@ target_link_libraries(test-cdap rinalite-cdap)
 # Installation directives
 install(TARGETS rinaperf rinalite-uipcps rina-config DESTINATION usr/bin)
 install(TARGETS rinalite rinalite-cdap rinalite-conf DESTINATION usr/lib)
-install(FILES ${RINA_HEADERS} DESTINATION include/rina)
+install(FILES ${RINA_HEADERS} DESTINATION usr/include/rinalite)
