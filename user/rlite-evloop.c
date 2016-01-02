@@ -143,7 +143,7 @@ rlite_ipcps_fetch(struct rlite_evloop *loop)
             end = 1;
         } else {
             end = resp->end;
-            rina_msg_free(rina_kernel_numtables,
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                           RINALITE_RMB(resp));
         }
     }
@@ -401,9 +401,11 @@ notify_requestor:
         } else {
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
-            rina_msg_free(rina_kernel_numtables, req_entry->msg);
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                          req_entry->msg);
             free(req_entry);
-            rina_msg_free(rina_kernel_numtables, RINALITE_RMB(resp));
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                          RINALITE_RMB(resp));
         }
         pthread_mutex_unlock(&loop->lock);
     }
@@ -448,7 +450,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
         PE("has_response == 0 --> wait_for_completion == 0\n");
-        rina_msg_free(rina_kernel_numtables, msg);
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
         *result = EINVAL;
         return NULL;
     }
@@ -460,7 +462,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
          * the event loop not being able to find the pending request. */
         entry = malloc(sizeof(*entry));
         if (!entry) {
-            rina_msg_free(rina_kernel_numtables, msg);
+            rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
             PE("Out of memory\n");
             *result = ENOMEM;
             return NULL;
@@ -492,7 +494,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
                     serlen);
         free(entry);
         pthread_mutex_unlock(&loop->lock);
-        rina_msg_free(rina_kernel_numtables, msg);
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
         *result = ENOBUFS;
         return NULL;
     }
@@ -516,7 +518,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
                     ret, serlen);
             *result = EINVAL;
         }
-        rina_msg_free(rina_kernel_numtables, msg);
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
 
     } else if (has_response && entry->wait_for_completion) {
         while (!entry->op_complete && *result == 0) {
@@ -545,7 +547,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
         pthread_cond_destroy(&entry->op_complete_cond);
 
         /* Free the pending queue entry and the associated request message. */
-        rina_msg_free(rina_kernel_numtables, entry->msg);
+        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, entry->msg);
         resp = entry->resp;
         free(entry);
     }

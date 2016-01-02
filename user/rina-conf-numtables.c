@@ -38,4 +38,7 @@ struct rina_msg_layout rina_conf_numtables[] = {
                    1 * sizeof(char *),
         .strings = 1,
     },
+    [RINA_CONF_MSG_MAX] = {
+        .copylen = 0,
+    }
 };

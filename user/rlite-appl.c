@@ -314,7 +314,8 @@ rlite_flow_allocate(struct rlite_appl *application,
     }
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              rlite_ipcp->ipcp_id, upper_ipcp_id, local_application,
+                              rlite_ipcp->ipcp_id, upper_ipcp_id,
+                              local_application,
                               remote_application, flowspec, &result);
     if (!kresp) {
         PE("Flow allocation request failed\n");
@@ -325,7 +326,8 @@ rlite_flow_allocate(struct rlite_appl *application,
                 kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
-    rina_msg_free(rina_kernel_numtables, RINALITE_RMB(kresp));
+    rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                  RINALITE_RMB(kresp));
 
     return result;
 }

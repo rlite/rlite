@@ -31,7 +31,7 @@ unsigned int rina_msg_serlen(struct rina_msg_layout *numtables,
 unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
                                 unsigned int n);
 void rina_name_free(struct rina_name *name);
-void rina_msg_free(struct rina_msg_layout *numtables,
+void rina_msg_free(struct rina_msg_layout *numtables, size_t num_entries,
                    struct rina_msg_base *msg);
 void rina_name_move(struct rina_name *dst, struct rina_name *src);
 int rina_name_copy(struct rina_name *dst, const struct rina_name *src);

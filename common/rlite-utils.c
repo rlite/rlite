@@ -263,6 +263,35 @@ deserialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
 }
 COMMON_EXPORT(deserialize_rina_msg);
 
+void
+rina_msg_free(struct rina_msg_layout *numtables, size_t num_entries,
+              struct rina_msg_base *msg)
+{
+    unsigned int copylen = numtables[msg->msg_type].copylen;
+    struct rina_name *name;
+    string_t *str;
+    int i;
+
+    if (msg->msg_type >= num_entries) {
+        PE("Invalid numtables access [msg_type=%u]\n", msg->msg_type);
+
+        return;
+    }
+
+    /* Skip the copiable part and scan all the RINA names contained in
+     * the message. */
+    name = (struct rina_name *)(((void *)msg) + copylen);
+    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
+        rina_name_free(name);
+    }
+
+    str = (string_t *)(name);
+    for (i = 0; i < numtables[msg->msg_type].strings; i++, str++) {
+        COMMON_FREE(*str);
+    }
+}
+COMMON_EXPORT(rina_msg_free);
+
 unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
                                      unsigned int n)
 {
@@ -271,7 +300,8 @@ unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
 
     for (i = 0; i < n; i++) {
         unsigned int cur = numtables[i].copylen +
-                           numtables[i].names * sizeof(struct rina_name);
+                           numtables[i].names * sizeof(struct rina_name) +
+                           numtables[i].strings * sizeof(char *);
 
         if (cur > max) {
             max = cur;
@@ -305,22 +335,6 @@ rina_name_free(struct rina_name *name)
     }
 }
 COMMON_EXPORT(rina_name_free);
-
-void
-rina_msg_free(struct rina_msg_layout *numtables,
-              struct rina_msg_base *msg)
-{
-    unsigned int copylen = numtables[msg->msg_type].copylen;
-    struct rina_name *name;
-    int i;
-
-    /* Skip the copiable part and scan all the RINA names contained in
-     * the message. */
-    name = (struct rina_name *)(((void *)msg) + copylen);
-    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
-        rina_name_free(name);
-    }
-}
 
 void
 rina_name_move(struct rina_name *dst, struct rina_name *src)
