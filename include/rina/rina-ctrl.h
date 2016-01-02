@@ -35,17 +35,24 @@ enum {
     DIF_TYPE_SHIM_DUMMY,
 };
 
-/* Message types */
+/* Message types. They **must** be listed alternating requests with
+ * the corresponding responses. */
 enum {
     RINA_CTRL_CREATE_IPCP = 1,
-    RINA_CTRL_ASSIGN_TO_DIF,
-
     RINA_CTRL_CREATE_IPCP_RESP,
+    RINA_CTRL_ASSIGN_TO_DIF,
+    RINA_CTRL_ASSIGN_TO_DIF_RESP,
 
     RINA_CTRL_MSG_MAX,
 };
 
 typedef uint16_t rina_msg_t;
+
+/* All the possible messages begin like this. */
+struct rina_ctrl_base_msg {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+};
 
 /* IPCM --> kernel message to create a new IPC process. */
 struct rina_ctrl_create_ipcp {

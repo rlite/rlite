@@ -5,22 +5,43 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <errno.h>
 #include <rina/rina-ctrl.h>
+#include "pending_queue.h"
 
 
 /* IPC Manager data model. */
 struct ipcm {
     int rfd;
+    struct pending_queue pqueue;
+    uint32_t event_id_counter;
 };
 
 static int
-create_ipcp_resp(const char *buf, size_t len)
+create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp, size_t resp_len,
+                 const struct rina_ctrl_base_msg *b_req, size_t req_len)
 {
+    struct rina_ctrl_create_ipcp_resp *resp =
+            (struct rina_ctrl_create_ipcp_resp *)b_resp;
+    struct rina_ctrl_create_ipcp *req =
+            (struct rina_ctrl_create_ipcp *)b_req;
+
+    if (resp_len != sizeof(*resp) || req_len != sizeof(*req)) {
+        printf("%s: Invalid message size\n", __func__);
+        return EINVAL;
+    }
+
+    printf("%s: Assigned id %d\n", __func__, resp->ipcp_id);
+    (void)req;
+
     return 0;
 }
 
 /* The signature of a response handler. */
-typedef int (*rina_resp_handler_t)(const char *buf, size_t len);
+typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
+                                   size_t resp_len,
+                                   const struct rina_ctrl_base_msg *b_req,
+                                   size_t req_len);
 
 /* The table containing all response handlers. */
 static rina_resp_handler_t rina_handlers[] = {
@@ -31,30 +52,59 @@ static rina_resp_handler_t rina_handlers[] = {
 void *evloop_function(void *arg)
 {
     struct ipcm *ipcm = (struct ipcm *)arg;
+    struct pending_entry *req_entry;
     char buffer[1024];
 
     for (;;) {
         int ret;
-        rina_msg_t msg_type;
+        struct rina_ctrl_base_msg *resp;
 
+        /* Read the next message posted by the kernel. */
         ret = read(ipcm->rfd, buffer, sizeof(buffer));
         if (ret < 0) {
             perror("read(rfd)");
             continue;
         }
 
-        msg_type = *((rina_msg_t *)buffer);
-        if (msg_type > RINA_CTRL_MSG_MAX || !rina_handlers[msg_type]) {
-            printf("%s: Invalid message type [%d] received",__func__, msg_type);
+        /* Do we have an handler for this response message? */
+        resp = (struct rina_ctrl_base_msg *)buffer;
+        if (resp->msg_type > RINA_CTRL_MSG_MAX ||
+                !rina_handlers[resp->msg_type]) {
+            printf("%s: Invalid message type [%d] received",__func__,
+                    resp->msg_type);
             continue;
         }
 
-        printf("Message type %d received from kernel\n", msg_type);
-
-        ret = rina_handlers[msg_type](buffer, ret);
-        if (ret) {
-            printf("%s: Error while handling message type [%d]", __func__, msg_type);
+        /* Try to match the event_id in the response to the event_id of
+         * a previous request. */
+        req_entry = pending_queue_remove_by_event_id(&ipcm->pqueue, resp->event_id);
+        if (!req_entry) {
+            printf("%s: No pending request matching event-id [%u]\n", __func__,
+                    resp->event_id);
+            continue;
         }
+
+        if (req_entry->msg->msg_type + 1 != resp->msg_type) {
+            printf("%s: Response message mismatch: expected %u, got %u\n",
+                    __func__, req_entry->msg->msg_type + 1,
+                    resp->msg_type);
+            goto free_entry;
+        }
+
+        printf("Message type %d received from kernel\n", resp->msg_type);
+
+        /* Invoke the right response handler. */
+        ret = rina_handlers[resp->msg_type](resp, ret, req_entry->msg,
+                                            req_entry->msg_len);
+        if (ret) {
+            printf("%s: Error while handling message type [%d]", __func__,
+                    resp->msg_type);
+        }
+
+free_entry:
+        /* Free the pending queue entry and the associated request message. */
+        free(req_entry->msg);
+        free(req_entry);
     }
 
     return NULL;
@@ -74,30 +124,60 @@ rina_name_fill(struct rina_name *name, char *apn,
     name->aei_len = aei ? strlen(aei) : 0;
 }
 
+static int
+store_pending_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
+                      size_t msg_len)
+{
+    struct pending_entry *entry;
+
+    entry = malloc(sizeof(*entry));
+    if (!entry) {
+        return ENOMEM;
+    }
+
+    entry->next = NULL;
+    entry->msg = msg;
+    entry->msg_len = msg_len;
+    pending_queue_enqueue(&ipcm->pqueue, entry);
+
+    return 0;
+}
 
 /* Create an IPC process of type shim-dummy. */
 static int
 create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 {
-    struct rina_ctrl_create_ipcp msg;
+    struct rina_ctrl_create_ipcp *msg;
     int ret;
 
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_type = RINA_CTRL_CREATE_IPCP;
-    msg.name = *name;
-    msg.dif_type = dif_type;
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        return ENOMEM;
+    }
 
-    ret = write(ipcm->rfd, &msg, sizeof(msg));
-    if (ret != sizeof(msg)) {
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_CTRL_CREATE_IPCP;
+    msg->event_id = ipcm->event_id_counter++;
+    msg->name = *name;
+    msg->dif_type = dif_type;
+
+    ret = write(ipcm->rfd, msg, sizeof(*msg));
+    if (ret != sizeof(*msg)) {
         if (ret < 0) {
             perror("write(create_ipcp)");
         } else {
             printf("%s: Error: partial write [%u/%lu]\n", __func__,
-                    ret, sizeof(msg));
+                    ret, sizeof(*msg));
         }
     }
 
-    printf("IPC process successfully created\n");
+    ret = store_pending_request(ipcm, (struct rina_ctrl_base_msg *)msg,
+                                sizeof(*msg));
+    if (ret < 0) {
+        return ret;
+    }
+
+    printf("IPC process creation requested\n");
 
     return ret;
 }
@@ -121,12 +201,15 @@ int main()
     pthread_t evloop_th;
     int ret;
 
-    /* Open the RINA control device. */
+    /* Open the RINA control device and initialize the IPC Manager
+     * data model instance. */
     ipcm.rfd = open("/dev/rina-ctrl", O_RDWR);
     if (ipcm.rfd < 0) {
         perror("open(/dev/rinactrl)");
         exit(EXIT_FAILURE);
     }
+    pending_queue_init(&ipcm.pqueue);
+    ipcm.event_id_counter = 1;
 
     /* Create and start the event-loop thread. */
     ret = pthread_create(&evloop_th, NULL, evloop_function, &ipcm);
