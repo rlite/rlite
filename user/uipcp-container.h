@@ -31,8 +31,6 @@ struct uipcps {
 struct uipcp;
 
 struct uipcp_ops {
-    const char *dif_type;
-
     int (*init)(struct uipcp *);
 
     int (*fini)(struct uipcp *);

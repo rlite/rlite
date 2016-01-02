@@ -210,12 +210,17 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 }
 
 extern struct uipcp_ops normal_ops;
+extern struct uipcp_ops shim_inet4_ops;
 
 static const struct uipcp_ops *
 select_uipcp_ops(const char *dif_type)
 {
     if (strcmp(dif_type, "normal") == 0) {
         return &normal_ops;
+    }
+
+    if (strcmp(dif_type, "shim-inet4") == 0) {
+        return &shim_inet4_ops;
     }
 
     return NULL;

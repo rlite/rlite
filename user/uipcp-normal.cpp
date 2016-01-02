@@ -785,7 +785,6 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 }
 
 struct uipcp_ops normal_ops = {
-    .dif_type = "normal",
     .init = normal_init,
     .fini = normal_fini,
     .register_to_lower = normal_ipcp_register,
