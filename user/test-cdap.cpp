@@ -33,7 +33,7 @@ test_cdap_server(int port)
         return -1;
     }
 
-    CDAPConn mgr(pipefds[0]);
+    CDAPConn conn(pipefds[0]);
 
     if ((ld = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket()");
@@ -72,8 +72,8 @@ test_cdap_server(int port)
 
         write(pipefds[1], bufin, n);
 
-        mgr.fd = pipefds[0]; /* This is just a trick. */
-        m = mgr.msg_recv();
+        conn.fd = pipefds[0]; /* This is just a trick. */
+        m = conn.msg_recv();
 
         if (!m) {
             PE("%s: msg_recv()");
@@ -83,11 +83,15 @@ test_cdap_server(int port)
         PD("%s: CDAP message received\n", __func__);
         m->print();
 
-        mgr.fd = pipefds[1];  /* This is just a trick. */
+        conn.fd = pipefds[1];  /* This is just a trick. */
 
         switch (m->op_code) {
             case gpb::M_CONNECT:
-                mgr.m_connect_r_send(m, 0, string());
+                conn.m_connect_r_send(m, 0, string());
+                break;
+
+            case gpb::M_RELEASE:
+                conn.m_release_r_send(m, gpb::F_NO_FLAGS, 0, string());
                 break;
 
             default:
@@ -116,12 +120,11 @@ test_cdap_server(int port)
 }
 
 static int
-client_connect(int sfd)
+client_connect(CDAPConn *conn)
 {
     struct CDAPAuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    CDAPConn mgr(sfd);
     struct CDAPMessage *m;
     int invoke_id;
 
@@ -131,12 +134,33 @@ client_connect(int sfd)
     rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
     rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
 
-    if (mgr.m_connect_send(&invoke_id, gpb::AUTH_NONE,
+    if (conn->m_connect_send(&invoke_id, gpb::AUTH_NONE,
                             &av, &local_appl, &remote_appl)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    m = mgr.msg_recv();
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
+    return 0;
+}
+
+static int
+client_disconnect(CDAPConn *conn)
+{
+    struct CDAPMessage *m;
+    int invoke_id;
+
+    if (conn->m_release_send(&invoke_id, gpb::F_NO_FLAGS)) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
     if (!m) {
         PE("%s: Error receiving CDAP response\n", __func__);
         return -1;
@@ -169,7 +193,11 @@ test_cdap_client(int port)
         return -1;
     }
 
-    client_connect(sk);
+    CDAPConn conn(sk);
+
+    client_connect(&conn);
+
+    client_disconnect(&conn);
 
     close(sk);
 
