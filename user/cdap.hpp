@@ -35,18 +35,18 @@ class CDAPConn {
 
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
-    int m_create_delete_send(int *invoke_id, gpb::flagValues_t flags,
-                             const std::string& obj_class,
-                             const std::string& obj_name, long obj_inst,
-                             int scope, const std::string& filter,
-                             gpb::opCode_t op_code);
+    int m_create_delete(int *invoke_id, gpb::flagValues_t flags,
+                        const std::string& obj_class,
+                        const std::string& obj_name, long obj_inst,
+                        int scope, const std::string& filter,
+                        gpb::opCode_t op_code);
 
-    int m_create_delete_r_send(const struct CDAPMessage *req,
-                              gpb::flagValues_t flags,
-                              const std::string& obj_class,
-                              const std::string& obj_name, long obj_inst,
-                              int result, const std::string& result_reason,
-                              gpb::opCode_t op_code);
+    int m_create_delete_r(const struct CDAPMessage *req,
+                          gpb::flagValues_t flags,
+                          const std::string& obj_class,
+                          const std::string& obj_name, long obj_inst,
+                          int result, const std::string& result_reason,
+                          gpb::opCode_t op_code);
 public:
     CDAPConn(int fd);
 
@@ -55,39 +55,39 @@ public:
 
     struct CDAPMessage * msg_recv();
 
-    int m_connect_send(int *invoke_id, gpb::authTypes_t auth_mech,
-                        const struct CDAPAuthValue *auth_value,
-                        const struct rina_name *local_appl,
-                        const struct rina_name *remote_appl);
+    int m_connect(int *invoke_id, gpb::authTypes_t auth_mech,
+                  const struct CDAPAuthValue *auth_value,
+                  const struct rina_name *local_appl,
+                  const struct rina_name *remote_appl);
 
-    int m_connect_r_send(const struct CDAPMessage *req, int result,
-                         const std::string& result_reason);
+    int m_connect_r(const struct CDAPMessage *req, int result,
+                    const std::string& result_reason);
 
-    int m_release_send(int *invoke_id, gpb::flagValues_t flags);
+    int m_release(int *invoke_id, gpb::flagValues_t flags);
 
-    int m_release_r_send(const struct CDAPMessage *req,
-                         gpb::flagValues_t flags, int result,
-                         const std::string& result_reason);
+    int m_release_r(const struct CDAPMessage *req,
+                    gpb::flagValues_t flags, int result,
+                    const std::string& result_reason);
 
-    int m_create_send(int *invoke_id, gpb::flagValues_t flags,
-                      const std::string& obj_class,
-                      const std::string& obj_name, long obj_inst,
-                      int scope, const std::string& filter);
+    int m_create(int *invoke_id, gpb::flagValues_t flags,
+                 const std::string& obj_class,
+                 const std::string& obj_name, long obj_inst,
+                 int scope, const std::string& filter);
 
-    int m_create_r_send(const struct CDAPMessage *req,
-                        gpb::flagValues_t flags, const std::string& obj_class,
-                        const std::string& obj_name, long obj_inst,
-                        int result, const std::string& result_reason);
+    int m_create_r(const struct CDAPMessage *req,
+                   gpb::flagValues_t flags, const std::string& obj_class,
+                   const std::string& obj_name, long obj_inst,
+                   int result, const std::string& result_reason);
 
-    int m_delete_send(int *invoke_id, gpb::flagValues_t flags,
-                      const std::string& obj_class,
-                      const std::string& obj_name, long obj_inst,
-                      int scope, const std::string& filter);
+    int m_delete(int *invoke_id, gpb::flagValues_t flags,
+                 const std::string& obj_class,
+                 const std::string& obj_name, long obj_inst,
+                 int scope, const std::string& filter);
 
-    int m_delete_r_send(const struct CDAPMessage *req,
-                        gpb::flagValues_t flags, const std::string& obj_class,
-                        const std::string& obj_name, long obj_inst,
-                        int result, const std::string& result_reason);
+    int m_delete_r(const struct CDAPMessage *req,
+                   gpb::flagValues_t flags, const std::string& obj_class,
+                   const std::string& obj_name, long obj_inst,
+                   int result, const std::string& result_reason);
 
     struct rina_name local_appl;
     struct rina_name remote_appl;
