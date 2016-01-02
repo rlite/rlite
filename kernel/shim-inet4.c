@@ -362,7 +362,7 @@ inet4_xmit(struct shim_inet4_flow *flow_priv,
 
     rlite_buf_free(rb);
 
-    return 0;
+    return ret;
 }
 
 static void
@@ -370,6 +370,7 @@ inet4_tx_worker(struct work_struct *w)
 {
     struct rlite_shim_inet4 *priv =
             container_of(w, struct rlite_shim_inet4, txw);
+    int totlen;
 
     for (;;) {
         struct txq_entry *qe = NULL;
@@ -386,7 +387,15 @@ inet4_tx_worker(struct work_struct *w)
             break;
         }
 
-        inet4_xmit(qe->flow_priv, qe->rb);
+        totlen = qe->rb->len + sizeof(uint16_t);
+
+        if (sk_stream_wspace(qe->flow_priv->sock->sk) < totlen + 2) {
+            /* Cannot backpressure here, we have to drop */
+            RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
+            rlite_buf_free(qe->rb);
+        } else {
+            inet4_xmit(qe->flow_priv, qe->rb);
+        }
 
         flow_put(qe->flow_priv->flow);
         kfree(qe);
