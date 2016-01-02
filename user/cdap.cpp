@@ -21,7 +21,7 @@ CDAPConn::CDAPConn(int arg_fd)
     fd = arg_fd;
     memset(&local_appl, 0, sizeof(local_appl));
     memset(&remote_appl, 0, sizeof(remote_appl));
-    connected = 0;
+    state = NONE;
 }
 
 int
@@ -340,12 +340,66 @@ CDAPMessage::print() const
 }
 
 int
+CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
+{
+    const char *action = sender ? "send" : "receive";
+    int old_state = state;
+
+    switch (m->op_code) {
+        case gpb::M_CONNECT:
+            if (state != NONE) {
+                PE("%s: Cannot %s M_CONNECT message: Invalid state %d\n",
+                                    __func__, action, state);
+                return -1;
+            }
+            state = AWAITCON;
+            break;
+
+        case gpb::M_CONNECT_R:
+            if (state != AWAITCON) {
+                PE("%s: Cannot %s M_CONNECT_R message: Invalid state %d\n",
+                                    __func__, action, state);
+                return -1;
+            }
+            state = CONNECTED;
+            break;
+
+        case gpb::M_RELEASE:
+            if (state != CONNECTED) {
+                PE("%s: Cannot %s M_RELEASE message: Invalid state %d\n",
+                                    __func__, action, state);
+                return -1;
+            }
+            state = AWAITCLOSE;
+            break;
+
+        case gpb::M_RELEASE_R:
+            if (state != AWAITCLOSE) {
+                PE("%s: Cannot %s M_RELEASE message: Invalid state %d\n",
+                                    __func__, action, state);
+                return -1;
+            }
+            state = NONE;
+            break;
+    }
+
+    PD("%s: Connection state %d --> %d\n", __func__, old_state, state);
+
+    return 0;
+}
+
+int
 CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 {
     gpb::CDAPMessage gm;
     size_t serlen;
     char *serbuf;
     int n;
+
+    /* Run CDAP connection state machine (sender side). */
+    if (conn_fsm_run(m, true)) {
+        return -1;
+    }
 
     if (m->is_request()) {
         /* CDAP request message (M_*). */
@@ -357,11 +411,6 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
         if (put_invoke_id_remote(m->invoke_id)) {
            PE("%s: Invoke id %s does not match any pending request\n",
                 __func__, m->invoke_id);
-        }
-
-        if (m->op_code == gpb::M_CONNECT_R && m->result == 0) {
-            connected = 1;
-            PD("%s: Connection completed\n", __func__);
         }
     }
 
@@ -410,6 +459,12 @@ CDAPConn::msg_recv()
         PE("%s: Out of memory\n", __func__);
     }
 
+    /* Run CDAP connection state machine (receiver side). */
+    if (conn_fsm_run(m, false)) {
+        delete m;
+        return NULL;
+    }
+
     if (m->is_response()) {
         /* CDAP request message (M_*). */
         if (put_invoke_id(m->invoke_id)) {
@@ -417,11 +472,6 @@ CDAPConn::msg_recv()
                 __func__);
             delete m;
             m = NULL;
-        }
-
-        if (m->op_code == gpb::M_CONNECT_R && m->result == 0) {
-            connected = 1;
-            PD("%s: Connection completed\n", __func__);
         }
 
     } else {

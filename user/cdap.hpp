@@ -20,13 +20,20 @@ class CDAPConn {
     int max_pending_ops;
     std::set<int> pending_invoke_ids_remote;
 
-    int connected;
+    enum {
+        NONE = 1,
+        AWAITCON,
+        CONNECTED,
+        AWAITCLOSE,
+    } state;
 
     int __put_invoke_id(std::set<int> &pending, int invoke_id);
     int get_invoke_id();
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
     int put_invoke_id_remote(int invoke_id);
+
+    int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
 public:
     CDAPConn(int fd);
