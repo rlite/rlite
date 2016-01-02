@@ -355,7 +355,7 @@ rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
     result = kresp->result;
     *port_id = kresp->port_id;
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                  RLITE_MB(kresp));
+                   RLITE_MB(kresp));
     free(kresp);
 
     return result;

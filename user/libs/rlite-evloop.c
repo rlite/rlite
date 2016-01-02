@@ -195,6 +195,8 @@ ipcp_update(struct rlite_evloop *loop,
 out:
     pthread_mutex_unlock(&loop->lock);
 
+    /* We do handler chaining here, because it's always necessary
+     * to manage the RLITE_KER_IPCP_UPDATE message internally. */
     if (loop->usr_ipcp_update) {
         loop->usr_ipcp_update(loop, b_resp, b_req);
     }
@@ -774,6 +776,7 @@ rlite_evloop_sync(struct rlite_evloop *loop)
     }
 
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+    free(msg);
 
     return 0;
 }
@@ -911,6 +914,8 @@ rlite_evloop_fini(struct rlite_evloop *loop)
         }
         pthread_mutex_unlock(&loop->timer_lock);
     }
+
+    pending_queue_fini(&loop->pqueue);
 
     rlite_evloop_join(loop);
 
