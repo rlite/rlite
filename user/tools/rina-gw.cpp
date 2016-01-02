@@ -144,6 +144,10 @@ struct Gateway {
      * towards the INET world. */
     map<RinaName, InetName> dst_map;
 
+    /* Pending flow allocation requests issued by accept_inet_conn().
+     * fa_req_event_id --> tcp_client_fd */
+    map<unsigned int, int> pending_fa_reqs;
+
     Gateway();
     ~Gateway();
 };
@@ -270,7 +274,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     socklen_t addrlen = sizeof(remote_addr);
     map<int, RinaName>::iterator mit;
     struct rina_flow_spec flowspec;
-    unsigned int unused;
+    unsigned int event_id;
     int cfd;
     int ret;
 
@@ -293,10 +297,15 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     /* Issue a non-blocking flow allocation request. */
     ret = rlite_flow_allocate(appl, &mit->second.dif_name_r, NULL,
                               &gw->appl_name, &mit->second.name_r, &flowspec,
-                              &unused, 0, 0);
+                              &event_id, 0, 0);
     if (ret) {
         PE("Flow allocation failed");
+        return;
     }
+
+    gw->pending_fa_reqs[event_id] = cfd;
+
+    PD("Flow allocation request issued, event id %d\n", event_id);
 }
 
 static int
