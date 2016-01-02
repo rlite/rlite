@@ -246,6 +246,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->dif_type = req->dif_type;
         entry->priv = NULL;
         mutex_init(&entry->lock);
+        entry->refcnt = 0;
         INIT_LIST_HEAD(&entry->registered_applications);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
@@ -259,7 +260,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
     return ret;
 }
 
-static uint8_t ipcp_del(unsigned int ipcp_id);
+static int ipcp_del(unsigned int ipcp_id);
 
 static int
 ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
@@ -300,39 +301,46 @@ out:
     return ret;
 }
 
-static uint8_t
+static int
 ipcp_del(unsigned int ipcp_id)
 {
     struct ipcp_entry *entry;
-    uint8_t result = 1; /* No IPC process found. */
+    int ret = 0;
 
     if (ipcp_id >= IPCP_ID_BITMAP_SIZE) {
-        return result;
+        /* No IPC process found. */
+        return -ENXIO;
     }
 
     mutex_lock(&rina_dm.lock);
     /* Lookup and remove the IPC process entry in the hash table corresponding
      * to the given ipcp_id. */
     entry = ipcp_table_find(ipcp_id);
-    if (entry) {
-        if (entry->priv) {
-            BUG_ON(entry->ops.destroy == NULL);
-            entry->ops.destroy(entry);
-        }
-        hash_del(&entry->node);
-        rina_name_free(&entry->name);
-        rina_name_free(&entry->dif_name);
-        /* Invalid the IPCP fetch pointer, if necessary. */
-        if (entry == rina_dm.ipcp_fetch_last) {
-            rina_dm.ipcp_fetch_last = NULL;
-        }
-        kfree(entry);
-        result = 0;
+    if (!entry) {
+        ret = -ENXIO;
+        goto out;
     }
+    if (entry->refcnt) {
+        ret = -EBUSY;
+        goto out;
+    }
+    if (entry->priv) {
+        BUG_ON(entry->ops.destroy == NULL);
+        entry->ops.destroy(entry);
+    }
+    hash_del(&entry->node);
+    rina_name_free(&entry->name);
+    rina_name_free(&entry->dif_name);
+    /* Invalid the IPCP fetch pointer, if necessary. */
+    if (entry == rina_dm.ipcp_fetch_last) {
+        rina_dm.ipcp_fetch_last = NULL;
+    }
+    kfree(entry);
     bitmap_clear(rina_dm.ipcp_id_bitmap, ipcp_id, 1);
+out:
     mutex_unlock(&rina_dm.lock);
 
-    return result;
+    return ret;
 }
 
 static int
@@ -385,16 +393,16 @@ rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_destroy *req =
                         (struct rina_kmsg_ipcp_destroy *)bmsg;
-    int result;
+    int ret;
 
     /* Release the IPC process ID. */
-    result = ipcp_del(req->ipcp_id);
+    ret = ipcp_del(req->ipcp_id);
 
-    if (result == 0) {
+    if (ret == 0) {
         printk("%s: IPC process %u destroyed\n", __func__, req->ipcp_id);
     }
 
-    return result;
+    return ret;
 }
 
 static int
@@ -689,6 +697,7 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
         entry->rc = rc;
         entry->event_id = event_id;
         mutex_init(&entry->lock);
+        entry->refcnt = 0;
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
     } else {
         kfree(entry);
@@ -706,7 +715,7 @@ static int
 flow_del(unsigned int port_id, int locked)
 {
     struct flow_entry *entry;
-    int ret = -1;  /* No flow found. */
+    int ret = 0;
 
     if (port_id >= PORT_ID_BITMAP_SIZE) {
         return ret;
@@ -717,14 +726,24 @@ flow_del(unsigned int port_id, int locked)
     /* Lookup and remove the flow entry in the hash table corresponding
      * to the given port_id. */
     entry = flow_table_find(port_id);
-    if (entry) {
-        hash_del(&entry->node);
-        rina_name_free(&entry->local_application);
-        rina_name_free(&entry->remote_application);
-        kfree(entry);
-        ret = 0;
+    if (!entry) {
+        /* No such flow. */
+        ret = -ENXIO;
+        goto out;
     }
+
+    if (entry->refcnt) {
+        /* Flow is being used by someone. */
+        ret = -EBUSY;
+        goto out;
+    }
+
+    hash_del(&entry->node);
+    rina_name_free(&entry->local_application);
+    rina_name_free(&entry->remote_application);
+    kfree(entry);
     bitmap_clear(rina_dm.port_id_bitmap, port_id, 1);
+out:
     if (locked)
         mutex_unlock(&rina_dm.lock);
 

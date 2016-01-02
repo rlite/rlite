@@ -34,9 +34,11 @@ struct ipcp_entry {
     uint8_t             dif_type;
     struct ipcp_ops     ops;
     void                *priv;
-    struct hlist_node   node;
-    struct mutex        lock;
     struct list_head    registered_applications;
+
+    struct mutex        lock;  /* Unused */
+    unsigned int        refcnt;
+    struct hlist_node   node;
 };
 
 struct ipcp_factory {
@@ -64,7 +66,8 @@ struct flow_entry {
     struct rina_ctrl    *rc;
     uint32_t            event_id; /* requestor event id */
 
-    struct mutex        lock;
+    struct mutex        lock; /* Unused */
+    unsigned int        refcnt;
     struct hlist_node   node;
 };
 
