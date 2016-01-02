@@ -99,8 +99,8 @@ ipcp_fetch_resp(struct ipcm *ipcm,
     struct ipcp *ipcp;
 
     if (resp->end) {
-        /* Signal ipcps_fetch() that the fetch has been completed. */
         pthread_mutex_lock(&ipcm->lock);
+        /* Signal ipcps_fetch() that the fetch has been completed. */
         ipcm->fetch_complete = 1;
         pthread_cond_signal(&ipcm->fetch_complete_cond);
         pthread_mutex_unlock(&ipcm->lock);
@@ -226,6 +226,8 @@ evloop_function(void *arg)
             continue;
         }
 
+        pthread_mutex_lock(&ipcm->lock);
+
         /* Read the next message posted by the kernel. */
         ret = read(ipcm->rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
@@ -253,6 +255,7 @@ evloop_function(void *arg)
         /* Try to match the event_id in the response to the event_id of
          * a previous request. */
         req_entry = pending_queue_remove_by_event_id(&ipcm->pqueue, resp->event_id);
+        pthread_mutex_unlock(&ipcm->lock);
         if (!req_entry) {
             printf("%s: No pending request matching event-id [%u]\n", __func__,
                     resp->event_id);
