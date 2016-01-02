@@ -12,6 +12,12 @@ list_init(struct list_head *list)
         list->prev = list->succ = list;
 }
 
+static inline int
+list_empty(struct list_head *list)
+{
+    return list == list->prev;
+}
+
 static inline void
 list_add_front(struct list_head *elem, struct list_head *list)
 {

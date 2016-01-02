@@ -37,7 +37,11 @@ typedef int (*rina_resp_handler_t)(struct rlite_evloop *loop,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
+/* The signature of file descriptor callback. */
 typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
+
+/* The signature of timer callback. */
+typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop);
 
 struct rlite_evloop_fdcb {
     int fd;
@@ -69,8 +73,16 @@ struct rlite_evloop {
     /* Used to stop the event-loop. */
     int eventfd;
 
+    /* Used to store the list of file descriptor callbacks registered within
+     * the event-loop. */
     struct list_head fdcbs;
 
+    struct list_head timer_events;
+    pthread_mutex_t timer_lock;
+    int timer_events_cnt;
+    int timer_next_id;
+
+    /* Used to store the list of ipcp entries fetched from kernel. */
     struct list_head ipcps;
 };
 
@@ -101,6 +113,10 @@ rlite_evloop_fdcb_add(struct rlite_evloop *loop, int fd,
 
 int
 rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
+
+int
+rlite_evloop_schedule(struct rlite_evloop *loop,
+                      unsigned long delta_ms, rlite_tmr_cb_t cb);
 
 int
 rlite_ipcps_print(struct rlite_evloop *loop);

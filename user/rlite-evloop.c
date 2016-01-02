@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <signal.h>
 #include <assert.h>
+#include <time.h>
 #include <sys/eventfd.h>
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
@@ -19,6 +20,14 @@
 #include "pending_queue.h"
 #include "rlite-evloop.h"
 
+
+struct rlite_tmr_event {
+    int id;
+    struct timespec exp;
+    rlite_tmr_cb_t cb;
+
+    struct list_head node;
+};
 
 static int
 ipcp_fetch_resp(struct rlite_evloop *loop,
@@ -141,6 +150,31 @@ rlite_ipcps_fetch(struct rlite_evloop *loop)
     return 0;
 }
 
+#define ONEBILLION 1000000000ULL
+#define ONEMILLION 1000000ULL
+
+static int
+time_cmp(const struct timespec *t1, const struct timespec *t2)
+{
+    if (t1->tv_sec > t2->tv_sec) {
+        return 1;
+    }
+
+    if (t1->tv_sec < t2->tv_sec) {
+        return -1;
+    }
+
+    if (t1->tv_nsec > t2->tv_nsec) {
+        return 1;
+    }
+
+    if (t1->tv_nsec < t2->tv_nsec) {
+        return -1;
+    }
+
+    return 0;
+}
+
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
 /* The event loop function for kernel responses management. */
@@ -157,6 +191,8 @@ evloop_function(void *arg)
     for (;;) {
         struct rina_msg_base_resp *resp;
         struct rlite_evloop_fdcb *fdcb;
+        struct timeval to;
+        struct timeval *top = NULL;
         fd_set rdfs;
         int ret;
         int maxfd = MAX(loop->rfd, loop->eventfd);
@@ -169,15 +205,90 @@ evloop_function(void *arg)
             maxfd = MAX(maxfd, fdcb->fd);
         }
 
+        {
+            /* Compute the next timeout. Possible outcomes are:
+             *     1) no timeout
+             *     2) 0, i.e. wake up immediately, because some
+             *        timer has already expired
+             *     3) > 0, i.e. the existing timer still have to
+             *        expire
+             */
+            struct timespec now;
+            struct rlite_tmr_event *cur;
+
+            pthread_mutex_lock(&loop->timer_lock);
+
+            if (loop->timer_events_cnt) {
+                list_for_each_entry(cur, &loop->timer_events, node) {
+                    break;
+                }
+
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if (time_cmp(&now, &cur->exp) > 0) {
+                    to.tv_sec = 0;
+                    to.tv_usec = 0;
+                } else {
+                    unsigned long delta_ns;
+
+                    delta_ns = (cur->exp.tv_sec - now.tv_sec) * ONEBILLION +
+                        (cur->exp.tv_nsec - now.tv_nsec);
+
+                    to.tv_sec = delta_ns / ONEBILLION;
+                    to.tv_usec = (delta_ns % ONEBILLION) / 1000;
+
+                    top = &to;
+                    NPD("Next timeout due in %lu secs and %lu usecs\n",
+                            top->tv_sec, top->tv_usec);
+                }
+            }
+
+            pthread_mutex_unlock(&loop->timer_lock);
+        }
+
         ret = select(maxfd + 1, &rdfs,
-                     NULL, NULL, NULL);
+                     NULL, NULL, top);
         if (ret == -1) {
             /* Error. */
             perror("select()");
             continue;
 
         } else if (ret == 0) {
-            /* Timeout. */
+            /* Timeout. Process expired timers. Timer callbacks
+             * are allowed to call rlite_evloop_schedule(), so
+             * rescheduling is possible. */
+            struct timespec now;
+            struct list_head expired;
+            struct list_head *elem;
+            struct rlite_tmr_event *cur;
+
+            list_init(&expired);
+
+            pthread_mutex_lock(&loop->timer_lock);
+
+            while (loop->timer_events_cnt) {
+                list_for_each_entry(cur, &loop->timer_events, node) {
+                    break;
+                }
+
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if (time_cmp(&cur->exp, &now) > 0) {
+                    break;
+                }
+
+                list_del(&cur->node);
+                loop->timer_events_cnt--;
+                list_add_tail(&cur->node, &expired);
+            }
+
+            pthread_mutex_unlock(&loop->timer_lock);
+
+            while ((elem = list_pop_front(&expired))) {
+                cur = container_of(elem, struct rlite_tmr_event, node);
+                NPD("Exec timer callback [%d]\n", cur->id);
+                cur->cb(loop);
+                free(cur);
+            }
+
             continue;
 
         } else if (FD_ISSET(loop->eventfd, &rdfs)) {
@@ -318,9 +429,6 @@ rlite_evloop_stop(struct rlite_evloop *loop)
 
     return 0;
 }
-
-#define ONEBILLION 1000000000ULL
-#define ONEMILLION 1000000ULL
 
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
@@ -468,6 +576,10 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->event_id_counter = 1;
     list_init(&loop->ipcps);
     list_init(&loop->fdcbs);
+    list_init(&loop->timer_events);
+    pthread_mutex_init(&loop->timer_lock, NULL);
+    loop->timer_events_cnt = 0;
+    loop->timer_next_id = 0;
     loop->rfd = -1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
@@ -514,6 +626,19 @@ int
 rlite_evloop_fini(struct rlite_evloop *loop)
 {
     int ret;
+
+    {
+        /* Clean up the timer_events list. */
+        struct rlite_tmr_event *e;
+        struct list_head *elem;
+
+        pthread_mutex_lock(&loop->timer_lock);
+        while ((elem = list_pop_front(&loop->timer_events))) {
+            e = container_of(elem, struct rlite_tmr_event, node);
+            free(e);
+        }
+        pthread_mutex_unlock(&loop->timer_lock);
+    }
 
     if (loop->evloop_th) {
         ret = pthread_join(loop->evloop_th, NULL);
@@ -665,4 +790,62 @@ rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id)
     }
 
     return NULL;
+}
+
+#define TIMER_EVENTS_MAX    64
+
+int
+rlite_evloop_schedule(struct rlite_evloop *loop,
+                      unsigned long delta_ms, rlite_tmr_cb_t cb)
+{
+    struct rlite_tmr_event *e, *cur;
+
+    if (!cb) {
+        PE("NULL timer calback\n");
+        return EINVAL;
+    }
+
+    e = malloc(sizeof(*e));
+    if (!e) {
+        PE("Out of memory\n");
+        return ENOMEM;
+    }
+    memset(e, 0, sizeof(*e));
+
+    pthread_mutex_lock(&loop->timer_lock);
+
+    if (loop->timer_events_cnt >= TIMER_EVENTS_MAX) {
+        PE("Max number of timers reached [%u]\n",
+           loop->timer_events_cnt);
+    }
+
+    e->id = loop->timer_next_id;
+    e->cb = cb;
+    clock_gettime(CLOCK_MONOTONIC, &e->exp);
+    e->exp.tv_nsec += delta_ms * ONEMILLION;
+    e->exp.tv_sec += e->exp.tv_nsec / ONEBILLION;
+    e->exp.tv_nsec = e->exp.tv_nsec % ONEBILLION;
+
+    list_for_each_entry(cur, &loop->timer_events, node) {
+        if (time_cmp(&e->exp, &cur->exp) < 0) {
+            break;
+        }
+    }
+
+    /* Insert 'e' right before 'cur'. */
+    list_add_tail(&e->node, &cur->node);
+    loop->timer_events_cnt++;
+    if (++loop->timer_next_id >= TIMER_EVENTS_MAX) {
+        loop->timer_next_id = 0;
+    }
+#if 0
+    printf("TIMERLIST: [");
+    list_for_each_entry(cur, &loop->timer_events, node) {
+        printf("[%d] %lu+%lu, ", cur->id, cur->exp.tv_sec, cur->exp.tv_nsec);
+    }
+    printf("]\n");
+#endif
+    pthread_mutex_unlock(&loop->timer_lock);
+
+    return -1;
 }

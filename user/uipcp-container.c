@@ -452,15 +452,15 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
 
-    uipcp->rib = rib_create(uipcp);
-    if (!uipcp->rib) {
-        goto err0;
-    }
-
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
     ret = rlite_appl_init(&uipcp->appl);
     if (ret) {
+        goto err0;
+    }
+
+    uipcp->rib = rib_create(uipcp);
+    if (!uipcp->rib) {
         goto err1;
     }
 
@@ -520,11 +520,11 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 err3:
     close(uipcp->mgmtfd);
 err2:
-    rlite_appl_fini(&uipcp->appl);
-err1:
-    list_del(&uipcp->node);
-err0:
     rib_destroy(uipcp->rib);
+err1:
+    rlite_appl_fini(&uipcp->appl);
+err0:
+    list_del(&uipcp->node);
     free(uipcp);
 
     return ret;
