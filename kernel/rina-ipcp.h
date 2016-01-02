@@ -32,6 +32,7 @@ struct ipcp_ops {
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb);
+    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rina_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,

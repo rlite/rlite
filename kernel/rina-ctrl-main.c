@@ -1181,9 +1181,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         }
 
         if (likely(RINA_BUF_PCI(rb)->pdu_type != PDU_TYPE_MGMT)) {
-            /* TODO Process this in kernel, not putting it in a queue. */
-            rina_buf_free(rb);
-            goto out;
+            mutex_unlock(&rina_dm.lock);
+
+            return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
         }
 
         rina_buf_pci_pop(rb);

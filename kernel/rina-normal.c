@@ -282,6 +282,24 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     return 0;
 }
 
+static int
+rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
+{
+    struct rina_pci *pci = RINA_BUF_PCI(rb);
+
+    rina_buf_pci_pop(rb);
+
+    if (pci->pdu_type == PDU_TYPE_DT) {
+        /* Data transfer PDU. */
+        return rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+    }
+
+    /* Control PDU. TODO */
+    rina_buf_free(rb);
+
+    return 0;
+}
+
 static int __init
 rina_normal_init(void)
 {
@@ -301,6 +319,7 @@ rina_normal_init(void)
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
+    factory.ops.sdu_rx = rina_normal_sdu_rx;
 
     ret = rina_ipcp_factory_register(&factory);
 
