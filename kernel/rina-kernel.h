@@ -6,6 +6,7 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <linux/hrtimer.h>
+#include <linux/workqueue.h>
 
 #include "rina-bufs.h"
 
@@ -111,6 +112,7 @@ struct dtp {
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
+    struct delayed_work remove;
     struct list_head seqq;
 };
 
@@ -156,6 +158,8 @@ int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
 void rina_write_restart(uint32_t local_port);
 
 struct flow_entry *flow_lookup(unsigned int port_id);
+
+int flow_del_entry(struct flow_entry *flow, int locked);
 
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)

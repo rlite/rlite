@@ -24,12 +24,33 @@
 #include "rina-kernel.h"
 
 
+static void
+remove_flow_work(struct work_struct *work)
+{
+    struct dtp *dtp = container_of(work, struct dtp, remove.work);
+    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
+    struct rina_buf *rb, *tmp;
+
+    spin_lock_irq(&dtp->lock);
+    PD("%s: Delayed flow removal, dropping %u PDUs\n",
+            __func__, dtp->cwq_len);
+    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+        dtp->cwq_len--;
+    }
+    spin_unlock_irq(&dtp->lock);
+
+    flow_del_entry(flow, 1);
+}
+
 void
 dtp_init(struct dtp *dtp)
 {
     spin_lock_init(&dtp->lock);
     hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    INIT_DELAYED_WORK(&dtp->remove, remove_flow_work);
     INIT_LIST_HEAD(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
     INIT_LIST_HEAD(&dtp->seqq);

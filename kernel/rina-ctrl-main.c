@@ -512,9 +512,10 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     return ret;
 }
 
-static int
+int
 flow_del_entry(struct flow_entry *entry, int locked)
 {
+    struct dtp *dtp = &entry->dtp;
     struct rina_buf *rb;
     struct rina_buf *tmp;
     int ret = 0;
@@ -525,10 +526,37 @@ flow_del_entry(struct flow_entry *entry, int locked)
     if (entry->refcnt) {
         entry->refcnt--;
     }
+
     if (entry->refcnt) {
-        /* Flow is being used by someone. */
-        ret = 0;
+        /* Flow is still being used by someone. */
         goto out;
+    }
+
+    if (entry->cfg.dtcp_present && !work_busy(&dtp->remove.work)) {
+        /* If DTCP is present, check if we should postopone flow
+         * removal. The work_busy() function is invoked to make sure
+         * that this flow_entry() invocation is not due to a postponed
+         * removal, so that we avoid postponing forever. */
+        bool postpone = false;
+
+        spin_lock_irq(&dtp->lock);
+        if (dtp->cwq_len > 0) {
+            PD("%s: Flow removal postponed since cwq still contains "
+                    "%u PDUs\n", __func__, dtp->cwq_len);
+            postpone = true;
+        }
+        spin_unlock_irq(&dtp->lock);
+
+        if (postpone) {
+            schedule_delayed_work(&dtp->remove, 2 * HZ);
+            /* Reference counter is zero here, but since the delayed
+             * worker is going to use the flow, we reset the reference
+             * counter to 1. The delayed worker will invoke flow_del_entry()
+             * after having performed is work.
+             */
+            entry->refcnt++;
+            goto out;
+        }
     }
 
     dtp_fini(&entry->dtp);
