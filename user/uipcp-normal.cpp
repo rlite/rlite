@@ -543,6 +543,12 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
         if (exclude && neigh->second == *exclude) {
             continue;
         }
+
+        if (neigh->second.enrollment_state != Neighbor::ENROLLED) {
+            /* Skip this one since it's not enrolled yet. */
+            continue;
+        }
+
         neigh->second.remote_sync_obj(create, obj_class, obj_name, obj_value);
     }
 

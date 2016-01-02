@@ -350,16 +350,10 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         /* Send DIF static information. */
     }
 
-    /* Send my neighbors, including a neighbor representing
-     * myself. */
+    /* Send only a neighbor representing myself, because it's
+     * required by the initiator to add_lower_flow(). */
     NeighborCandidateList ncl;
     RinaName cand_name;
-
-    for (map<string, NeighborCandidate>::iterator cit =
-                rib->cand_neighbors.begin();
-                        cit != rib->cand_neighbors.end(); cit++) {
-        ncl.candidates.push_back(cit->second);
-    }
 
     ipcp = rib->ipcp_info();
     cand = NeighborCandidate();
@@ -370,32 +364,8 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     cand.lower_difs = rib->lower_difs;
     ncl.candidates.push_back(cand);
 
-    m = CDAPMessage();
-    m.m_create(gpb::F_NO_FLAGS, obj_class::neighbors, obj_name::neighbors,
-               0, 0, string());
-    ret = send_to_port_id(&m, 0, &ncl);
-    if (ret) {
-        PE("send_to_port_id() failed\n");
-        abort();
-        return 0;
-    }
-
-    /* Send my DFT. */
-    DFTSlice dft_slice;
-    for (map< string, DFTEntry >::iterator e = rib->dft.begin();
-                                            e != rib->dft.end(); e++) {
-        dft_slice.entries.push_back(e->second);
-    }
-
-    m = CDAPMessage();
-    m.m_create(gpb::F_NO_FLAGS, obj_class::dft, obj_name::dft,
-               0, 0, string());
-    ret = send_to_port_id(&m, 0, &dft_slice);
-    if (ret) {
-        PE("send_to_port_id() failed\n");
-        abort();
-        return 0;
-    }
+    remote_sync_obj(true, obj_class::neighbors, obj_name::neighbors,
+                    &ncl);
 
     /* Stop the enrollment. */
     enr_info.start_early = true;
@@ -635,11 +605,6 @@ int Neighbor::remote_sync_obj(bool create, const string& obj_class,
 {
     CDAPMessage m;
     int ret;
-
-    if (enrollment_state != ENROLLED) {
-        /* Skip this one since it's not enrolled yet. */
-        return 0;
-    }
 
     if (create) {
         m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
