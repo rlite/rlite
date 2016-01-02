@@ -383,6 +383,8 @@ __ipcp_get(unsigned int ipcp_id)
     return NULL;
 }
 
+static void tx_completion_func(unsigned long arg);
+
 static int
 ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
                struct ipcp_entry **pentry)
@@ -440,6 +442,12 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
         hash_add(rlite_dm.ipcp_table, &entry->node, entry->id);
+        INIT_LIST_HEAD(&entry->rmtq);
+        entry->rmtq_len = 0;
+        spin_lock_init(&entry->rmtq_lock);
+        tasklet_init(&entry->tx_completion, tx_completion_func,
+                     (unsigned long)entry);
+        init_waitqueue_head(&entry->tx_wqh);
         *pentry = entry;
     } else {
         ret = -ENOSPC;
@@ -724,45 +732,44 @@ EXPORT_SYMBOL_GPL(flow_get_ref);
 static void
 tx_completion_func(unsigned long arg)
 {
-    struct flow_entry *flow = (struct flow_entry *)arg;
-    struct ipcp_entry *ipcp = flow->txrx.ipcp;
-    bool drained = false;
+    struct ipcp_entry *ipcp= (struct ipcp_entry *)arg;
 
     for (;;) {
         struct rlite_buf *rb;
         int ret;
 
-        spin_lock_bh(&flow->rmtq_lock);
-        if (flow->rmtq_len == 0) {
-            drained = true;
-            spin_unlock_bh(&flow->rmtq_lock);
+        spin_lock_bh(&ipcp->rmtq_lock);
+        if (ipcp->rmtq_len == 0) {
+            spin_unlock_bh(&ipcp->rmtq_lock);
             break;
         }
 
-        rb = list_first_entry(&flow->rmtq, struct rlite_buf, node);
+        rb = list_first_entry(&ipcp->rmtq, struct rlite_buf, node);
         list_del(&rb->node);
-        flow->rmtq_len--;
-        spin_unlock_bh(&flow->rmtq_lock);
+        ipcp->rmtq_len--;
+        spin_unlock_bh(&ipcp->rmtq_lock);
 
         PD("Sending [%lu] from rmtq\n",
                 (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
 
-        ret = ipcp->ops.sdu_write(ipcp, flow, rb, false);
+        BUG_ON(!rb->tx_compl_flow);
+        ret = ipcp->ops.sdu_write(ipcp, rb->tx_compl_flow, rb, false);
         if (unlikely(ret == -EAGAIN)) {
             PD("Pushing [%lu] back to rmtq\n",
                     (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
-            spin_lock_bh(&flow->rmtq_lock);
-            list_add(&rb->node, &flow->rmtq);
-            flow->rmtq_len++;
-            spin_unlock_bh(&flow->rmtq_lock);
+            spin_lock_bh(&ipcp->rmtq_lock);
+            list_add(&rb->node, &ipcp->rmtq);
+            ipcp->rmtq_len++;
+            spin_unlock_bh(&ipcp->rmtq_lock);
             break;
         }
     }
-
+#if 0
     if (drained) {
-        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
+        wake_up_interruptible_poll(flow->txrx.tx_wqh, POLLOUT |
                                    POLLWRBAND | POLLWRNORM);
     }
+#endif
 }
 
 static void
@@ -855,11 +862,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
             hash_add(rlite_dm.flow_table_by_cep, &entry->node_cep,
                      entry->local_cep);
         }
-        INIT_LIST_HEAD(&entry->rmtq);
-        entry->rmtq_len = 0;
-        spin_lock_init(&entry->rmtq_lock);
-        tasklet_init(&entry->tx_completion, tx_completion_func,
-                     (unsigned long)entry);
         INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
@@ -945,8 +947,6 @@ flow_put(struct flow_entry *entry)
         goto out;
     }
 
-    tasklet_kill(&entry->tx_completion);
-
     ret = NULL;
 
     ipcp = entry->txrx.ipcp;
@@ -957,11 +957,6 @@ flow_put(struct flow_entry *entry)
 
     dtp_dump(dtp);
     dtp_fini(dtp);
-
-    list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
-        list_del(&rb->node);
-        rlite_buf_free(rb);
-    }
 
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         list_del(&rb->node);
@@ -1158,6 +1153,8 @@ flow_make_mortal(struct flow_entry *flow)
 static int
 __ipcp_put(struct ipcp_entry *entry)
 {
+    struct rlite_buf *rb, *tmp;
+
     if (!entry) {
         return 0;
     }
@@ -1184,6 +1181,13 @@ __ipcp_put(struct ipcp_entry *entry)
          * and so it cannot be referenced anymore. This also means no
          * concurrent access is possible. */
         entry->ops.destroy(entry);
+    }
+
+    tasklet_kill(&entry->tx_completion);
+
+    list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
+        list_del(&rb->node);
+        rlite_buf_free(rb);
     }
 
     /* If the module was refcounted for this IPC process instance,
@@ -2258,28 +2262,40 @@ rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, uint32_t local_port)
 }
 EXPORT_SYMBOL_GPL(rlite_sdu_rx);
 
-void
-rlite_write_restart_flow(struct flow_entry *flow)
+static void
+rlite_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
-    spin_lock_bh(&flow->rmtq_lock);
+    spin_lock_bh(&ipcp->rmtq_lock);
 
-    if (flow->rmtq_len > 0) {
+    if (ipcp->rmtq_len > 0) {
         /* Schedule a tasklet to complete the tx work.
          * If appropriate, the tasklet will wake up
          * waiting process contexts. */
-        tasklet_schedule(&flow->tx_completion);
+        tasklet_schedule(&ipcp->tx_completion);
     } else {
         /* Wake up waiting process contexts directly. */
-        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
-                POLLWRBAND | POLLWRNORM);
+        wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
     }
 
-    spin_unlock_bh(&flow->rmtq_lock);
+    spin_unlock_bh(&ipcp->rmtq_lock);
+}
+
+void
+rlite_write_restart_flow(struct flow_entry *flow)
+{
+    rlite_write_restart_wqh(flow->txrx.ipcp, flow->txrx.tx_wqh);
 }
 EXPORT_SYMBOL_GPL(rlite_write_restart_flow);
 
 void
-rlite_write_restart(uint32_t local_port)
+rlite_write_restart_flows(struct ipcp_entry *ipcp)
+{
+    rlite_write_restart_wqh(ipcp, &ipcp->tx_wqh);
+}
+EXPORT_SYMBOL_GPL(rlite_write_restart_flows);
+
+void
+rlite_write_restart_port(uint32_t local_port)
 {
     struct flow_entry *flow;
 
@@ -2289,7 +2305,7 @@ rlite_write_restart(uint32_t local_port)
         flow_put(flow);
     }
 }
-EXPORT_SYMBOL_GPL(rlite_write_restart);
+EXPORT_SYMBOL_GPL(rlite_write_restart_port);
 
 /* The table containing all the message handlers. */
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
@@ -2621,7 +2637,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         DECLARE_WAITQUEUE(wait, current);
 
         if (blocking) {
-            add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+            add_wait_queue(rio->flow->txrx.tx_wqh, &wait);
         }
 
         for (;;) {
@@ -2649,7 +2665,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 
         current->state = TASK_RUNNING;
         if (blocking) {
-            remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+            remove_wait_queue(rio->flow->txrx.tx_wqh, &wait);
         }
     }
 

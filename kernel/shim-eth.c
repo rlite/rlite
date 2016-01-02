@@ -354,6 +354,9 @@ arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
      * unbind. */
     entry->flow = flow;
     flow->priv = entry;
+
+    /* Use the tx_wqh shared among all flows supported by the same IPCP. */
+    flow->txrx.tx_wqh = &flow->txrx.ipcp->tx_wqh;
 }
 
 static int
@@ -634,7 +637,7 @@ out:
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
         rlite_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0,
-                             0, NULL);
+                              0, NULL);
     }
 
     if (skb) {
@@ -799,7 +802,8 @@ shim_eth_skb_destructor(struct sk_buff *skb)
 {
     struct flow_entry *flow = (struct flow_entry *)
                               (skb_shinfo(skb)->destructor_arg);
-    struct rlite_shim_eth *priv = flow->txrx.ipcp->priv;
+    struct ipcp_entry *ipcp = flow->txrx.ipcp;
+    struct rlite_shim_eth *priv = ipcp->priv;
     bool notify;
 
     spin_lock_bh(&priv->tx_lock);
@@ -808,7 +812,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     spin_unlock_bh(&priv->tx_lock);
 
     if (notify) {
-        rlite_write_restart_flow(flow);
+        rlite_write_restart_flows(ipcp);
     }
 }
 

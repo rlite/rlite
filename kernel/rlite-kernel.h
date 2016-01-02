@@ -64,12 +64,13 @@ struct txrx {
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
-    wait_queue_head_t   tx_wqh;
+    wait_queue_head_t   __tx_wqh;
+    wait_queue_head_t  *tx_wqh;
 };
 
 struct dif {
-    char *              name;
-    char *              ty;
+    char                *name;
+    char                *ty;
     unsigned int        max_pdu_life;
     unsigned int        max_pdu_size;
 
@@ -90,6 +91,13 @@ struct ipcp_entry {
     spinlock_t          regapp_lock;
     struct rlite_ctrl   *uipcp;
     struct txrx         *mgmt_txrx;
+
+    /* TX completion structures. */
+    struct list_head    rmtq;
+    unsigned int        rmtq_len;
+    spinlock_t          rmtq_lock;
+    struct tasklet_struct   tx_completion;
+    wait_queue_head_t   tx_wqh;
 
     /* The module that owns this IPC process. */
     struct module       *owner;
@@ -170,11 +178,6 @@ struct flow_entry {
     int (*sdu_rx_consumed)(struct flow_entry *flow,
                            struct rlite_buf *rb);
 
-    struct list_head    rmtq;
-    unsigned int        rmtq_len;
-    spinlock_t          rmtq_lock;
-    struct tasklet_struct   tx_completion;
-
     struct list_head    pduft_entries;
 
     void                *priv;
@@ -218,9 +221,11 @@ int rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb,
 int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rlite_buf *rb, bool qlimit);
 
-void rlite_write_restart(uint32_t local_port);
+void rlite_write_restart_port(uint32_t local_port);
 
 void rlite_write_restart_flow(struct flow_entry *flow);
+
+void rlite_write_restart_flows(struct ipcp_entry *ipcp);
 
 struct flow_entry *flow_lookup(unsigned int port_id);
 
@@ -240,7 +245,8 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     txrx->rx_qlen = 0;
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
-    init_waitqueue_head(&txrx->tx_wqh);
+    init_waitqueue_head(&txrx->__tx_wqh);
+    txrx->tx_wqh = &txrx->__tx_wqh;
     txrx->mgmt = mgmt;
     if (mgmt) {
         txrx->state = FLOW_STATE_ALLOCATED;

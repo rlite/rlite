@@ -320,7 +320,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
         BUG_ON(!lower_ipcp);
 
         if (maysleep) {
-            add_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+            add_wait_queue(lower_flow->txrx.tx_wqh, &wait);
         }
 
         for (;;) {
@@ -334,15 +334,16 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
                 if (!maysleep) {
                     /* Enqueue in the RMT queue, if possible. */
 
-                    spin_lock_bh(&lower_flow->rmtq_lock);
-                    if (lower_flow->rmtq_len < RMTQ_MAX_LEN) {
-                        list_add_tail(&rb->node, &lower_flow->rmtq);
-                        lower_flow->rmtq_len++;
+                    spin_lock_bh(&lower_ipcp->rmtq_lock);
+                    if (lower_ipcp->rmtq_len < RMTQ_MAX_LEN) {
+                        rb->tx_compl_flow = lower_flow;
+                        list_add_tail(&rb->node, &lower_ipcp->rmtq);
+                        lower_ipcp->rmtq_len++;
                     } else {
                         RPD(5, "rmtq overrun: dropping PDU\n");
                         rlite_buf_free(rb);
                     }
-                    spin_unlock_bh(&lower_flow->rmtq_lock);
+                    spin_unlock_bh(&lower_ipcp->rmtq_lock);
 
                 } else {
                     /* Cannot restart system call from here... */
@@ -358,7 +359,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rlite_buf *rb,
 
         current->state = TASK_RUNNING;
         if (maysleep) {
-            remove_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+            remove_wait_queue(lower_flow->txrx.tx_wqh, &wait);
         }
 
         return ret;

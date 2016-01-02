@@ -97,7 +97,7 @@ rcv_work(struct work_struct *w)
         }
         flow_put(rx_flow);
 
-        rlite_write_restart_flow(tx_flow);
+        rlite_write_restart_flows(priv->ipcp);
         flow_put(tx_flow);
     }
 }
@@ -168,7 +168,7 @@ flow_allocate_req_work(struct work_struct *w)
 
 static int
 rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
-                                  struct flow_entry *flow)
+                           struct flow_entry *flow)
 {
     struct flow_allocate_req_work *faw;
 
@@ -177,6 +177,9 @@ rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
         PE("Out of memory\n");
         return -ENOMEM;
     }
+
+    /* Share the same tx_wqh with other flows supported by the same IPCP. */
+    flow->txrx.tx_wqh = &ipcp->tx_wqh;
 
     rina_name_copy(&faw->remote_appl, &flow->local_appl);
     rina_name_copy(&faw->local_appl, &flow->remote_appl);
@@ -204,7 +207,7 @@ flow_allocate_resp_work(struct work_struct *w)
     int ret;
 
     ret = rlite_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
-                               0, 0, farw->response, NULL);
+                                0, 0, farw->response, NULL);
     if (ret) {
         PE("failed to report flow allocation response\n");
     }
@@ -214,8 +217,8 @@ flow_allocate_resp_work(struct work_struct *w)
 
 static int
 rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
-                                   struct flow_entry *flow,
-                                   uint8_t response)
+                            struct flow_entry *flow,
+                            uint8_t response)
 {
     struct flow_allocate_resp_work *farw;
 
@@ -224,6 +227,9 @@ rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
         PE("Out of memory\n");
         return -ENOMEM;
     }
+
+    /* Share the same tx_wqh with other flows supported by the same IPCP. */
+    flow->txrx.tx_wqh = &ipcp->tx_wqh;
 
     farw->ipcp = ipcp;
     farw->local_port = flow->remote_port;

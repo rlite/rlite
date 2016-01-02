@@ -63,6 +63,7 @@ struct rlite_buf {
 
     unsigned long       rtx_jiffies;
 
+    struct flow_entry   *tx_compl_flow;
     struct list_head    node;
 };
 

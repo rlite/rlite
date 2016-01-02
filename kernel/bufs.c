@@ -29,6 +29,7 @@ rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + num_pci * sizeof(struct rina_pci));
     rb->len = size;
+    rb->tx_compl_flow = NULL;
 
     return rb;
 }
