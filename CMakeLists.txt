@@ -11,6 +11,8 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
 message(STATUS "RINA HEADERS: ${RINA_HEADERS}")
 
+add_definitions("-Wall")
+
 include_directories(${INCLUDE_DIR})
 
 find_package(Protobuf REQUIRED)

@@ -147,7 +147,7 @@ test_cdap_server(int port)
         }
 
         if (k != n) {
-            PE("Partial write %d/%d\n", m, n);
+            PE("Partial write %d/%d\n", (int)k, (int)n);
         }
     }
 
@@ -162,7 +162,6 @@ client_connect(CDAPConn *conn)
     struct rina_name remote_appl;
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     av.name = "George";
     av.password = "Washington";
@@ -192,7 +191,6 @@ client_create_some(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     if (req.m_create(gpb::F_NO_FLAGS,
                      "class_A", "x", 0, 0, string()) ||
@@ -216,7 +214,6 @@ client_write_some(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
     char buf[10];
 
     req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
@@ -258,7 +255,6 @@ client_read_some(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     if (req.m_read(gpb::F_NO_FLAGS,
                     "class_A", "x", 0, 0, string()) ||
@@ -282,7 +278,6 @@ client_startstop_some(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     if (req.m_start(gpb::F_NO_FLAGS,
                     "class_A", "x", 0, 0, string()) ||
@@ -320,7 +315,6 @@ client_delete_some(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     if (req.m_delete(gpb::F_NO_FLAGS,
                      "class_A", "x", 0, 0, string()) ||
@@ -344,7 +338,6 @@ client_disconnect(CDAPConn *conn)
 {
     struct CDAPMessage req;
     struct CDAPMessage *m;
-    int invoke_id;
 
     if (req.m_release(gpb::F_NO_FLAGS) ||
             conn->msg_send(&req, 0)) {
@@ -366,7 +359,6 @@ static int
 test_cdap_client(int port)
 {
     struct sockaddr_in server;
-    int buf_len;
     int sk;
 
     if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {

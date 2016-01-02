@@ -363,7 +363,7 @@ rinalite_flow_req_wait_open(struct rinalite_appl *application)
     int result;
 
     pfr = rinalite_flow_req_wait(application);
-    printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
+    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
             pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */

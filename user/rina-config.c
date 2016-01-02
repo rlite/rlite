@@ -205,7 +205,6 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
     const char *dif_type;
     const char *dif_name;
     int result;
-    int i;
 
     assert(argc >= 4);
     ipcp_apn = argv[0];

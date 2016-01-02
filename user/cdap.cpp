@@ -334,7 +334,6 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 {
     const char *apn, *api, *aen, *aei;
     gpb::objVal_t objvalue = gm.objvalue();
-    int ret;
 
     abs_syntax = gm.abssyntax();
     op_code = gm.opcode();
@@ -471,6 +470,9 @@ CDAPMessage::operator gpb::CDAPMessage() const
 
         case BYTES:
             objvalue->set_byteval(obj_value.u.buf.ptr, obj_value.u.buf.len);
+            break;
+
+        default:
             break;
     }
 
@@ -620,8 +622,11 @@ CDAPMessage::print() const
             break;
 
         case BYTES:
-            PD("obj_value: %d bytes at %p, ", obj_value.u.buf.len,
+            PD("obj_value: %d bytes at %p, ", (int)obj_value.u.buf.len,
                                               obj_value.u.buf.ptr);
+            break;
+
+        default:
             break;
     }
 
@@ -812,7 +817,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 {
     size_t serlen;
     char *serbuf;
-    int n;
+    size_t n;
 
     n = msg_ser(m, invoke_id, &serbuf, &serlen);
     if (n) {
@@ -824,7 +829,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
         if (n < 0) {
             perror("write(cdap_msg)");
         } else {
-            PE("Partial write %d/%d\n", n, serlen);
+            PE("Partial write %d/%d\n", (int)n, (int)serlen);
         }
         return -1;
     }
@@ -861,7 +866,8 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
     if (m->is_response()) {
         /* CDAP request message (M_*). */
         if (put_invoke_id(m->invoke_id)) {
-            PE("Invoke id %d does not match any pending request\n");
+            PE("Invoke id %d does not match any pending request\n",
+               m->invoke_id);
             delete m;
             m = NULL;
         }
@@ -869,7 +875,8 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
     } else {
         /* CDAP response message (M_*_R). */
         if (get_invoke_id_remote(m->invoke_id)) {
-            PE("Invoke id %d already used remotely\n");
+            PE("Invoke id %d already used remotely\n",
+               m->invoke_id);
             delete m;
             m = NULL;
         }

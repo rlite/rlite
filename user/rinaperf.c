@@ -131,7 +131,7 @@ echo_client(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (ret == 0) {
             /* Timeout */
-            printf("%s: timeout occurred\n");
+            PI("timeout occurred\n");
             break;
         }
 

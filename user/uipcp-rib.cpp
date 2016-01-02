@@ -212,9 +212,10 @@ Neighbor::enrollment_state_repr(state_t s) const
 
         case ENROLLED:
             return "ENROLLED";
-    }
 
-    assert(0);
+        default:
+            assert(0);
+    }
 
     return NULL;
 }
@@ -656,10 +657,11 @@ uipcp_rib::remote_sync(bool create, const string& obj_class,
                        const string& obj_name, const UipcpObject *obj_value)
 {
     CDAPMessage m;
-    int ret;
 
     for (list<Neighbor>::iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
+        int ret;
+
         if (neigh->enrollment_state != Neighbor::ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
@@ -675,7 +677,12 @@ uipcp_rib::remote_sync(bool create, const string& obj_class,
         }
 
         ret = neigh->send_to_port_id(&m, 0, obj_value);
+        if (ret) {
+            PE("send_to_port_id() failed\n");
+        }
     }
+
+    return 0;
 }
 
 extern "C"

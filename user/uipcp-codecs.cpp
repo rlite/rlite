@@ -16,7 +16,7 @@ using namespace std;
 
 static int
 ser_common(::google::protobuf::MessageLite &gm, char *buf,
-           unsigned int size)
+           int size)
 {
     if (gm.ByteSize() > size) {
         PE("User buffer too small [%u/%u]\n",
