@@ -154,6 +154,16 @@ char *
 uipcp_rib::dump() const
 {
     stringstream ss;
+    struct rinalite_ipcp *ipcp = ipcp_info();
+
+    ss << "Address: " << ipcp->ipcp_addr << endl << endl;
+
+    ss << "LowerDIFs: {";
+    for (list<string>::const_iterator lit = lower_difs.begin();
+                            lit != lower_difs.end(); lit++) {
+            ss << *lit << ", ";
+    }
+    ss << "}" << endl << endl;
 
     ss << "Candidate Neighbors:" << endl;
     for (map<string, NeighborCandidate>::const_iterator
