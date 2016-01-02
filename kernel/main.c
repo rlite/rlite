@@ -740,6 +740,7 @@ notify_flow_removal(struct work_struct *work)
     struct notify_flow_removal_work *notifier = container_of(work,
                         struct notify_flow_removal_work, work);
     struct ipcp_entry *ipcp = ipcp_get(notifier->ipcp_id);
+    struct rina_kmsg_flow_deallocated ntfy;
 
     if (!ipcp) {
         PI("IPCP %d destroyed before notification of flow %d removal\n",
@@ -748,8 +749,14 @@ notify_flow_removal(struct work_struct *work)
     }
 
     /* Notify the uipcp about flow deallocation. TODO */
+    ntfy.msg_type = RINA_KERN_FLOW_DEALLOCATED;
+    ntfy.event_id = 0;
+    ntfy.ipcp_id = notifier->ipcp_id;
+    ntfy.port_id = notifier->port_id;
 
-PD("WELL, HERE I SHOULD NOTIFY\n");
+    BUG_ON(!ipcp->uipcp);
+
+    rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)&ntfy);
 
     ipcp_put(ipcp);
 

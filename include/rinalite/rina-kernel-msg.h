@@ -34,6 +34,7 @@ enum {
     RINA_KERN_IPCP_UIPCP_SET, /* 14 */
     RINA_KERN_UIPCP_FA_REQ_ARRIVED, /* 15 */
     RINA_KERN_UIPCP_FA_RESP_ARRIVED, /* 16 */
+    RINA_KERN_FLOW_DEALLOCATED, /* 17 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -210,6 +211,15 @@ struct rina_kmsg_uipcp_fa_resp_arrived {
     uint32_t remote_port;
     uint64_t remote_addr;
     uint8_t response;
+} __attribute__((packed));
+
+/* uipcp (application) <-- kernel */
+struct rina_kmsg_flow_deallocated {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+    uint32_t port_id;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

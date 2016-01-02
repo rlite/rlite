@@ -32,3 +32,5 @@
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
 
 - riorganizzare uipcp-rib.cpp in modo da suddividerlo in più files
+
+- serialize/unserialize: controllare boundary delle numtables

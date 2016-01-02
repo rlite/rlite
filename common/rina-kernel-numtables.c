@@ -67,6 +67,9 @@ struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_KERN_UIPCP_FA_RESP_ARRIVED] = {
         .copylen = sizeof(struct rina_kmsg_uipcp_fa_resp_arrived),
     },
+    [RINA_KERN_FLOW_DEALLOCATED] = {
+        .copylen = sizeof(struct rina_kmsg_flow_deallocated),
+    },
     [RINA_KERN_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
