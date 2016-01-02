@@ -11,13 +11,13 @@ all: $(EXES) ker
 ker:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
-user/ipcm: user/ipcm.o user/pending_queue.o user/serdes.o
+user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o
 
 user/ipcm.o: include/rina/rina-ctrl.h user/pending_queue.h
 
 user/pending_queue.o: user/pending_queue.h
 
-user/serdes.o: include/rina/serdes.h include/rina/rina-ctrl.h
+user/rina-utils.o: include/rina/rina-utils.h include/rina/rina-ctrl.h
 
 clean:
 	-rm user/*.o

@@ -1,5 +1,5 @@
 #include <rina/rina-ctrl.h>
-#include <rina/serdes.h>
+#include <rina/rina-utils.h>
 
 #ifdef __KERNEL__
 

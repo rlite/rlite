@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <rina/rina-ctrl.h>
 #include "pending_queue.h"
-#include <rina/serdes.h>
+#include <rina/rina-utils.h>
 
 
 /* IPC Manager data model. */
