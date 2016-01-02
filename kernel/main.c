@@ -252,7 +252,20 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     return 0;
 }
 
-static int ipcp_put(struct ipcp_entry *entry);
+static int __ipcp_put(struct ipcp_entry *entry);
+
+#define ipcp_put(_ie)                                                   \
+        ({                                                            \
+            if (_ie) PD("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt);     \
+            __ipcp_put(_ie);                                            \
+        })
+
+#define ipcp_get(_id)                                                   \
+        ({                                                              \
+            struct ipcp_entry *tmp = __ipcp_get(_id);                   \
+            if (tmp) PD("REFCNT++ %u: %u\n", tmp->id, tmp->refcnt);     \
+            tmp;                                                        \
+        })
 
 static struct dif *
 dif_get(const char *dif_name, const char *dif_type, int *err)
@@ -338,7 +351,7 @@ out:
 }
 
 static struct ipcp_entry *
-ipcp_get(unsigned int ipcp_id)
+__ipcp_get(unsigned int ipcp_id)
 {
     struct ipcp_entry *entry;
     struct hlist_head *head;
@@ -521,7 +534,6 @@ app_remove_work(struct work_struct *w)
         mutex_unlock(&ipcp->lock);
     }
 
-    PD("REFCNT-- %u: %u\n", ipcp->id, ipcp->refcnt);
     ipcp_put(ipcp);
 
     /* From here on registered application cannot be referenced anymore, and so
@@ -605,7 +617,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     PLOCK();
     ipcp->refcnt++;
     PUNLOCK();
-    PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
 
     if (ipcp->ops.appl_register) {
         mutex_lock(&ipcp->lock);
@@ -784,7 +795,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
         PLOCK();
         ipcp->refcnt++;
-        PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
         PUNLOCK();
 
         if (flowcfg) {
@@ -918,12 +928,9 @@ flow_put(struct flow_entry *entry)
      * removal. This is done for either the IPCP which supports
      * the flow (entry->txrx.ipcp) and the IPCP which uses the
      * flow (entry->upper.ipcp). */
-    PD("REFCNT-- %u: %u\n", ipcp->id, ipcp->refcnt);
     ipcp_put(ipcp);
 
     if (entry->upper.ipcp) {
-        PD("REFCNT-- %u: %u\n", entry->upper.ipcp->id,
-                                entry->upper.ipcp->refcnt);
         ipcp_put(entry->upper.ipcp);
     }
 
@@ -1067,7 +1074,7 @@ flow_make_mortal(struct flow_entry *flow)
 }
 
 static int
-ipcp_put(struct ipcp_entry *entry)
+__ipcp_put(struct ipcp_entry *entry)
 {
     if (!entry) {
         return 0;
@@ -1434,8 +1441,6 @@ upper_ipcp_flow_bind(uint16_t upper_ipcp_id, struct flow_entry *flow)
     }
 
     flow->upper.ipcp = upper_ipcp;
-    PD("REFCNT++ %u: %u\n", upper_ipcp->id,
-            upper_ipcp->refcnt);
 
     return 0;
 }
@@ -2421,7 +2426,6 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
     }
 
     txrx_init(rio->txrx, ipcp, true);
-    PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
     ipcp->mgmt_txrx = rio->txrx;
 
     return 0;
@@ -2447,8 +2451,6 @@ rina_io_release_internal(struct rina_io *rio)
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
-            PD("REFCNT-- %u: %u\n", rio->txrx->ipcp->id,
-                    rio->txrx->ipcp->refcnt);
             ipcp_put(rio->txrx->ipcp);
             kfree(rio->txrx);
             rio->txrx = NULL;
