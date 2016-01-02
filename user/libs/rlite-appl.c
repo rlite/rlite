@@ -332,7 +332,7 @@ rlite_flow_allocate(struct rlite_appl *application, uint32_t event_id,
         return -1;
     }
 
-    kresp = flow_allocate_req(application, event_id, wait_ms ? wait_ms : ~0U,
+    kresp = flow_allocate_req(application, event_id, wait_ms,
                               rlite_ipcp->ipcp_id, upper_ipcp_id, local_appl,
                               remote_appl, flowspec, &result);
     if (!kresp) {
