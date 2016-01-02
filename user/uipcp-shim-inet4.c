@@ -296,6 +296,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
+    struct rina_flow_config cfg;
     struct inet4_endpoint *ep;
     int ret;
 
@@ -340,6 +341,11 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
 
     list_add_tail(&ep->node, &shim->endpoints);
 
+    /* Succesfull connect() is interpreted as positive flow allocation response. */
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.fd = ep->fd;
+    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0,
+                                0, &cfg);
     return 0;
 
 err2:
