@@ -328,7 +328,7 @@ inet4_xmit(struct shim_inet4_flow *flow_priv,
     iov[1].iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
     iov_iter_init(&msghdr.msg_iter, WRITE, iov, 2,
                   totlen);
 #else
