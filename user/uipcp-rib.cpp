@@ -698,6 +698,17 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm)
     map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
 
     if (hi == handlers.end()) {
+        size_t pos = rm->obj_name.rfind("/");
+        string container_obj_name;
+
+        if (pos != string::npos) {
+            container_obj_name = rm->obj_name.substr(0, pos);
+            PD("Trying agaoin with container '%s'\n", container_obj_name.c_str());
+            hi = handlers.find(container_obj_name);
+        }
+    }
+
+    if (hi == handlers.end()) {
         PE("Unable to manage CDAP message\n");
         rm->print();
         return -1;
