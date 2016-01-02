@@ -204,6 +204,19 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     return 0;
 }
 
+static int ipcp_del_entry(struct ipcp_entry *entry, int locked);
+
+static void
+ipcp_remove_work(struct work_struct *w)
+{
+    struct ipcp_entry *ipcp = container_of(w, struct ipcp_entry, remove);
+
+    mutex_lock(&rina_dm.lock);
+    PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
+    ipcp_del_entry(ipcp, 0);
+    mutex_unlock(&rina_dm.lock);
+}
+
 static struct ipcp_entry *
 ipcp_table_find(unsigned int ipcp_id)
 {
@@ -265,6 +278,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         mutex_init(&entry->lock);
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
+        INIT_WORK(&entry->remove, ipcp_remove_work);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
     } else {
@@ -276,8 +290,6 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
 
     return ret;
 }
-
-static int ipcp_del_entry(struct ipcp_entry *entry, int locked);
 
 static int
 ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
@@ -563,7 +575,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 struct flow_entry *
 flow_put(struct flow_entry *entry, int locked)
 {
-    struct ipcp_entry *ipcp = NULL;
     struct rina_buf *rb;
     struct rina_buf *tmp;
     struct dtp *dtp;
@@ -574,9 +585,6 @@ flow_put(struct flow_entry *entry, int locked)
     }
 
     dtp = &entry->dtp;
-
-    if (locked)
-        mutex_lock(&rina_dm.lock);
 
     FLOCK();
 
@@ -615,7 +623,9 @@ flow_put(struct flow_entry *entry, int locked)
 
     ret = NULL;
 
-    ipcp = entry->txrx.ipcp;
+    /* We could be in atomic context here, so let's defer the ipcp
+     * removal in a worker process context. */
+    schedule_work(&entry->txrx.ipcp->remove);
 
     dtp_fini(&entry->dtp);
 
@@ -637,14 +647,6 @@ flow_put(struct flow_entry *entry, int locked)
     kfree(entry);
 out:
     FUNLOCK();
-
-    if (ipcp) {
-        PD("%s: REFCNT-- %u: %u\n", __func__, entry->txrx.ipcp->id, entry->txrx.ipcp->refcnt);
-        ipcp_del_entry(entry->txrx.ipcp, 0);
-    }
-
-    if (locked)
-        mutex_unlock(&rina_dm.lock);
 
     return ret;
 }
@@ -1953,9 +1955,11 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
 static int
 rina_io_release_internal(struct rina_io *rio)
 {
+    BUG_ON(!rio);
     switch (rio->mode) {
         case RINA_IO_MODE_APPL_BIND:
         case RINA_IO_MODE_IPCP_BIND:
+            BUG_ON(!rio->flow);
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
             if (rio->flow->upper.ipcp) {
@@ -1968,6 +1972,8 @@ rina_io_release_internal(struct rina_io *rio)
             break;
 
         case RINA_IO_MODE_IPCP_MGMT:
+            BUG_ON(!rio->txrx);
+            BUG_ON(!rio->txrx->ipcp);
             /* A previous IPCP was bound to this management file
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
