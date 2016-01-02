@@ -14,6 +14,7 @@
 #include "rinalite/rinalite-utils.h"
 #include "rinalite/rina-conf-msg.h"
 #include "rinalite-appl.h"
+#include "rinalite-conf.h"
 
 #include "cdap.hpp"
 #include "uipcp-container.h"
@@ -70,7 +71,8 @@ struct Neighbor {
 
     const char *enrollment_state_repr(state_t s) const;
 
-    int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
+    int send_to_port_id(CDAPMessage *m, int invoke_id,
+                        const UipcpObject *obj) const;
     int enroll_fsm_run(const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
@@ -122,8 +124,11 @@ struct uipcp_rib {
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
+    int remote_sync_neigh(const Neighbor& neigh, bool create,
+                          const string& obj_class, const string& obj_name,
+                          const UipcpObject *obj_value) const;
     int remote_sync(bool create, const string& obj_class,
-                    const string& obj_name, const UipcpObject *obj_value);
+                    const string& obj_name, const UipcpObject *obj_value) const;
 
     int cdap_dispatch(const CDAPMessage *rm);
 
@@ -367,16 +372,25 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
         return -1;
     }
 
+    /* Insert the lower flow in the database. */
     lf.local_addr = local_addr;
     lf.remote_addr = remote_addr;
     lf.cost = 1;
     lf.seqnum = 1;
     lf.state = true;
     lf.age = 0;
-
     lfdb[static_cast<string>(lf)] = lf;
 
-    return 0;
+    /* Send our lower flow database to the neighbor. */
+    LowerFlowList lfl;
+
+    for (map<string, LowerFlow>::iterator mit = lfdb.begin();
+                                        mit != lfdb.end(); mit++) {
+        lfl.flows.push_back(mit->second);
+    }
+
+    return remote_sync_neigh(neigh, true, obj_class::lfdb,
+                             obj_name::lfdb, &lfl);
 }
 
 int
@@ -601,7 +615,7 @@ Neighbor::enrollment_state_repr(state_t s) const
 
 int
 Neighbor::send_to_port_id(CDAPMessage *m, int invoke_id,
-                          const UipcpObject *obj)
+                          const UipcpObject *obj) const
 {
     char *serbuf;
     size_t serlen;
@@ -906,7 +920,11 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     /* The slave may have specified an address for us. */
     if (enr_info.address) {
-        // TODO push address to kernel
+        stringstream addr_ss;
+
+        addr_ss << enr_info.address;
+        rinalite_ipcp_config(&rib->uipcp->appl.loop, rib->uipcp->ipcp_id,
+                             "address", addr_ss.str().c_str());
     }
 
     enrollment_state = I_WAIT_STOP;
@@ -1110,33 +1128,43 @@ rib_destroy(struct uipcp_rib *rib)
 }
 
 int
-uipcp_rib::remote_sync(bool create, const string& obj_class,
-                       const string& obj_name, const UipcpObject *obj_value)
+uipcp_rib::remote_sync_neigh(const Neighbor& neigh, bool create,
+                             const string& obj_class, const string& obj_name,
+                             const UipcpObject *obj_value) const
 {
     CDAPMessage m;
+    int ret;
 
-    for (list<Neighbor>::iterator neigh = neighbors.begin();
+    if (neigh.enrollment_state != Neighbor::ENROLLED) {
+        /* Skip this one since it's not enrolled yet. */
+        return 0;
+    }
+
+    if (create) {
+        m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
+                0, 0, "");
+
+    } else {
+        m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
+                0, 0, "");
+    }
+
+    ret = neigh.send_to_port_id(&m, 0, obj_value);
+    if (ret) {
+        PE("send_to_port_id() failed\n");
+    }
+
+    return ret;
+}
+
+int
+uipcp_rib::remote_sync(bool create, const string& obj_class,
+                       const string& obj_name,
+                       const UipcpObject *obj_value) const
+{
+    for (list<Neighbor>::const_iterator neigh = neighbors.begin();
                         neigh != neighbors.end(); neigh++) {
-        int ret;
-
-        if (neigh->enrollment_state != Neighbor::ENROLLED) {
-            /* Skip this one since it's not enrolled yet. */
-            continue;
-        }
-
-        if (create) {
-            m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
-                       0, 0, "");
-
-        } else {
-            m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
-                       0, 0, "");
-        }
-
-        ret = neigh->send_to_port_id(&m, 0, obj_value);
-        if (ret) {
-            PE("send_to_port_id() failed\n");
-        }
+        remote_sync_neigh(*neigh, create, obj_class, obj_name, obj_value);
     }
 
     return 0;
