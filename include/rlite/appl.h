@@ -84,10 +84,6 @@ struct rlite_pending_flow_req *rl_appl_flow_accept(struct rlite_appl *appl);
 
 int rl_appl_flow_accept_open(struct rlite_appl *appl);
 
-int rlite_open_appl_port(uint32_t port_id);
-
-int rlite_open_mgmt_port(uint16_t ipcp_id);
-
 #ifdef __cplusplus
 }
 #endif

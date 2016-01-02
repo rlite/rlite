@@ -9,7 +9,6 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/ioctl.h>
 #include <assert.h>
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
@@ -313,45 +312,6 @@ rl_appl_flow_accept(struct rlite_appl *appl)
     pthread_mutex_unlock(&appl->lock);
 
     return container_of(elem, struct rlite_pending_flow_req, node);
-}
-
-static int
-open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
-{
-    struct rlite_ioctl_info info;
-    int fd;
-    int ret;
-
-    fd = open("/dev/rlite-io", O_RDWR);
-    if (fd < 0) {
-        perror("open(/dev/rlite-io)");
-        return -1;
-    }
-
-    info.port_id = port_id;
-    info.ipcp_id = ipcp_id;
-    info.mode = mode;
-
-    ret = ioctl(fd, 73, &info);
-    if (ret) {
-        perror("ioctl(/dev/rlite-io)");
-        return -1;
-    }
-
-    return fd;
-}
-
-int
-rlite_open_appl_port(uint32_t port_id)
-{
-    return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
-}
-
-int rlite_open_mgmt_port(uint16_t ipcp_id)
-{
-    /* The port_id argument is not valid in this call, it will not
-     * be considered by the kernel. */
-    return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
 /* rl_appl_flow_alloc() + rlite_open_appl_port() */

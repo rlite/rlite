@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <time.h>
+#include <sys/ioctl.h>
 #include <sys/eventfd.h>
 #include "rlite/kernel-msg.h"
 #include "rlite/conf-msg.h"
@@ -1251,6 +1252,45 @@ rlite_flow_cfg_default(struct rlite_flow_config *cfg)
     cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
 }
 
+static int
+open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
+{
+    struct rlite_ioctl_info info;
+    int fd;
+    int ret;
+
+    fd = open("/dev/rlite-io", O_RDWR);
+    if (fd < 0) {
+        perror("open(/dev/rlite-io)");
+        return -1;
+    }
+
+    info.port_id = port_id;
+    info.ipcp_id = ipcp_id;
+    info.mode = mode;
+
+    ret = ioctl(fd, 73, &info);
+    if (ret) {
+        perror("ioctl(/dev/rlite-io)");
+        return -1;
+    }
+
+    return fd;
+}
+
+int
+rlite_open_appl_port(uint32_t port_id)
+{
+    return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
+}
+
+int rlite_open_mgmt_port(uint16_t ipcp_id)
+{
+    /* The port_id argument is not valid in this call, it will not
+     * be considered by the kernel. */
+    return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
+}
+
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      unsigned int ipcp_id, int reg,
@@ -1533,7 +1573,7 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
 {
     struct rl_kmsg_fa_resp_arrived *resp;
     uint32_t event_id;
-    int ret;
+    int fd;
 
     event_id = rl_ctrl_fa_req(ctrl, dif_name, ipcp_name, local_appl,
                               remote_appl, flowspec);
@@ -1547,18 +1587,19 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
         return -1;
     }
 
+
     if (resp->response) {
         PE("Flow allocation request denied by remote peer\n");
-        ret = -1;
+        fd = -1;
     } else {
-        ret = 0;
+        fd = rlite_open_appl_port(resp->port_id);
     }
 
     rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
 
-    return ret;
+    return fd;
 }
 
 int

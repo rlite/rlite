@@ -202,6 +202,10 @@ rlite_flow_spec_default(struct rlite_flow_spec *spec);
 void
 rlite_flow_cfg_default(struct rlite_flow_config *cfg);
 
+int rlite_open_appl_port(uint32_t port_id);
+
+int rlite_open_mgmt_port(uint16_t ipcp_id);
+
 int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);
 
