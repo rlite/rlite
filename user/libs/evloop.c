@@ -159,6 +159,9 @@ time_cmp(const struct timespec *t1, const struct timespec *t2)
 
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
+#define RL_SIGNAL_STOP      1
+#define RL_SIGNAL_REPOLL    2
+
 /* The event loop function for kernel responses management. */
 static void *
 evloop_function(void *arg)
@@ -231,7 +234,7 @@ evloop_function(void *arg)
         }
 
         if (FD_ISSET(loop->eventfd, &rdfs)) {
-            /* Stop request arrived. */
+            /* A signal arrived. */
             uint64_t x;
             int n;
 
@@ -240,8 +243,10 @@ evloop_function(void *arg)
                 perror("read(eventfd)");
             }
 
-            /* Stop the event loop. */
-            break;
+            if (x == RL_SIGNAL_STOP) {
+                /* Stop the event loop. */
+                break;
+            }
         }
 
         {
@@ -287,12 +292,6 @@ evloop_function(void *arg)
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
                     fdcb->cb(loop, fdcb->fd);
                 }
-            }
-
-            if (!FD_ISSET(loop->ctrl.rfd, &rdfs)) {
-                /* We did some fdcb processing, but no events are
-                 * available on the rlite control device. */
-                continue;
             }
         }
 
@@ -388,10 +387,10 @@ notify_requestor:
     return NULL;
 }
 
-int
-rl_evloop_stop(struct rlite_evloop *loop)
+static int
+rl_evloop_signal(struct rlite_evloop *loop, unsigned int code)
 {
-    uint64_t x = 1;
+    uint64_t x = code;
     int n;
 
     n = write(loop->eventfd, &x, sizeof(x));
@@ -404,6 +403,12 @@ rl_evloop_stop(struct rlite_evloop *loop)
     }
 
     return 0;
+}
+
+int
+rl_evloop_stop(struct rlite_evloop *loop)
+{
+    return rl_evloop_signal(loop, RL_SIGNAL_STOP);
 }
 
 /* Issue a request message to the kernel. Takes the ownership of
@@ -681,6 +686,8 @@ rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rl_evloop_fdcb_t cb)
     list_add_tail(&fdcb->node, &loop->fdcbs);
     pthread_mutex_unlock(&loop->lock);
 
+    rl_evloop_signal(loop, RL_SIGNAL_REPOLL);
+
     return 0;
 }
 
@@ -760,6 +767,8 @@ rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
     printf("]\n");
 #endif
     pthread_mutex_unlock(&loop->timer_lock);
+
+    rl_evloop_signal(loop, RL_SIGNAL_REPOLL);
 
     return e->id;
 }
