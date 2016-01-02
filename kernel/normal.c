@@ -281,6 +281,8 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
     return entry ? entry->flow : NULL;
 }
 
+#define RMTQ_MAX_LEN    64
+
 static int
 rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
        bool maysleep)
@@ -318,11 +320,18 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
 
             if (unlikely(ret == -EAGAIN)) {
                 if (!maysleep) {
-                    /* Enqueue in the RMT queue. */
+                    /* Enqueue in the RMT queue, if possible. */
+
                     spin_lock_bh(&lower_flow->rmtq_lock);
-                    list_add_tail(&rb->node, &lower_flow->rmtq);
-                    lower_flow->rmtq_len++;
+                    if (lower_flow->rmtq_len < RMTQ_MAX_LEN) {
+                        list_add_tail(&rb->node, &lower_flow->rmtq);
+                        lower_flow->rmtq_len++;
+                    } else {
+                        RPD(5, "%s: rmtq overrun: dropping PDU\n", __func__);
+                        rina_buf_free(rb);
+                    }
                     spin_unlock_bh(&lower_flow->rmtq_lock);
+
                 } else {
                     /* Cannot restart system call from here... */
 
@@ -663,6 +672,8 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     return NULL;
 }
 
+#define SEQQ_MAX_LEN    64
+
 /* Takes the ownership of the rb. */
 static void
 seqq_push(struct dtp *dtp, struct rina_buf *rb)
@@ -670,6 +681,13 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
     struct rina_buf *cur;
     uint64_t seqnum = RINA_BUF_PCI(rb)->seqnum;
     struct list_head *pos = &dtp->seqq;
+
+    if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
+        RPD(5, "%s: seqq overrun: dropping PDU [%lu]\n",
+                __func__, (long unsigned)seqnum);
+        rina_buf_free(rb);
+        return;
+    }
 
     list_for_each_entry(cur, &dtp->seqq, node) {
         struct rina_pci *pci = RINA_BUF_PCI(cur);
@@ -690,7 +708,8 @@ seqq_push(struct dtp *dtp, struct rina_buf *rb)
 
     /* Insert the rb right before 'pos'. */
     list_add_tail(&rb->node, pos);
-    PD("%s: [%lu] inserted\n", __func__, (long unsigned)seqnum);
+    dtp->seqq_len++;
+    RPD(5, "%s: [%lu] inserted\n", __func__, (long unsigned)seqnum);
 }
 
 static void
@@ -704,9 +723,10 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
 
         if (pci->seqnum - dtp->rcv_lwe <= max_sdu_gap) {
             list_del(&qrb->node);
+            dtp->seqq_len--;
             list_add_tail(&qrb->node, qrbs);
             dtp->rcv_lwe = pci->seqnum + 1;
-            PD("%s: [%lu] popped out from seqq\n", __func__,
+            RPD(5, "%s: [%lu] popped out from seqq\n", __func__,
                     (long unsigned)pci->seqnum);
         }
     }

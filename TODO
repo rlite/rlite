@@ -22,8 +22,6 @@
   di stato "waitingForDRF" che aiuti a "forzare il DRF" quando esso non è
   presente ma dovrebbe
 
-- limitare le dimensioni della seqq
-
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
 
 - kernel: usare i valori di timeout indicati nel flow_config

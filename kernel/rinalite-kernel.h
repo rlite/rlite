@@ -136,6 +136,7 @@ struct dtp {
     unsigned int max_cwq_len;
     struct delayed_work remove;
     struct list_head seqq;
+    unsigned int seqq_len;
     struct list_head rtxq;
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
