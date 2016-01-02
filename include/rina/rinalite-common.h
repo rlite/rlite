@@ -2,7 +2,7 @@
 #define __RINA_COMMON_H__
 
 
-#define RINA_UIPCPS_UNIX_NAME     "/var/rina/uipcp-server"
+#define RINA_UIPCPS_UNIX_NAME     "/var/rinalite/uipcp-server"
 
 /* Application naming information:
  *   - Application Process Name

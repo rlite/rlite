@@ -2,7 +2,7 @@
 
 set -x
 
-sudo rm -rf /var/rina
+sudo rm -rf /var/rinalite
 
 sudo rmmod rina-normal.ko
 sudo rmmod rina-shim-loopback.ko

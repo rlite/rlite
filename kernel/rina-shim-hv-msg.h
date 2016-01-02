@@ -12,7 +12,7 @@
 #endif
 
 #include <rina/rina-ipcp-types.h>
-#include <rina/rina-common.h>
+#include <rina/rinalite-common.h>
 #include <rina/rinalite-utils.h>
 
 

@@ -122,8 +122,8 @@ for i in vms:
             'sudo modprobe rina-normal\n'\
             'sudo chmod a+rwx /dev/rina-ctrl\n'\
             'sudo chmod a+rwx /dev/rina-io\n'\
-            'sudo mkdir -p /var/rina\n'\
-            'sudo chmod -R a+rw /var/rina\n'\
+            'sudo mkdir -p /var/rinalite\n'\
+            'sudo chmod -R a+rw /var/rinalite\n'\
             '\n'\
             'uipcps &> uipcp.log &\n'\
             'rina-config ipcp-create normal n.IPCP %(id)s\n'\

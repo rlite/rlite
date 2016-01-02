@@ -11,7 +11,7 @@
 #include <stdint.h>
 #endif
 
-#include <rina/rina-common.h>
+#include <rina/rinalite-common.h>
 
 struct rina_msg_layout {
     unsigned int copylen;

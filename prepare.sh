@@ -17,5 +17,5 @@ sudo insmod kernel/rina-normal.ko
 sudo chmod a+rwx /dev/rina-ctrl
 sudo chmod a+rwx /dev/rina-io
 
-sudo mkdir -p /var/rina
-sudo chmod -R a+rwx /var/rina
+sudo mkdir -p /var/rinalite
+sudo chmod -R a+rwx /var/rinalite

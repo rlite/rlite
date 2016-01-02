@@ -22,7 +22,7 @@ struct uipcps {
     struct list_head ipcps_registrations;
 };
 
-#define RINA_PERSISTENT_REG_FILE   "/var/rina/uipcps-pers-reg"
+#define RINA_PERSISTENT_REG_FILE   "/var/rinalite/uipcps-pers-reg"
 
 int
 ipcp_pduft_set(struct uipcps *uipcps, uint16_t ipcp_id,
