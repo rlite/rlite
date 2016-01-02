@@ -341,7 +341,7 @@ subprocess.call(['chmod', '+x', 'program.sh'])
 
 ################### GENERATE TEST SCRIPT #####################
 
-fout = open('test.sh', 'w')
+fout = open('test-server.sh', 'w')
 
 outs =  '#!/bin/bash\n'                                             \
         '\n'                                                        \
@@ -364,6 +364,17 @@ outs += 'sleep 1\n'\
         '       sleep 1\n'\
         '   fi\n'\
         'done\n\n'
+
+fout.write(outs)
+fout.close()
+subprocess.call(['chmod', '+x', 'test-server.sh'])
+
+
+fout = open('test-client.sh', 'w')
+
+outs =  '#!/bin/bash\n'                                             \
+        '\n'                                                        \
+        'set -x\n'
 
 # Run rinaperf in client mode on all but the pivot machine, at all layers,
 # towards the server running on the pivot machine
@@ -392,4 +403,4 @@ for vm_name in vms:
 
 fout.write(outs)
 fout.close()
-subprocess.call(['chmod', '+x', 'test.sh'])
+subprocess.call(['chmod', '+x', 'test-client.sh'])
