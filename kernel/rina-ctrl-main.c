@@ -1072,8 +1072,10 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 /* To be called under global lock. */
 static int
 rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
-                                 uint8_t response)
+                                 uint8_t response,
+                                 struct rina_kmsg_flow_allocate_resp *resp)
 {
+    struct ipcp_entry *ipcp;
     int ret = -EINVAL;
 
     /* Check that the flow is in pending state and make the
@@ -1091,9 +1093,24 @@ rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
             flow_entry->local_port);
 
     /* Notify the involved IPC process about the response. */
-    ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
-                                                   flow_entry,
-                                                   response);
+    ipcp = flow_entry->ipcp;
+    if (ipcp->ops.flow_allocate_resp) {
+        /* This IPCP handles the flow allocation in kernel-space. This is
+         * currently true for shim IPCPs. */
+        ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
+                                                       flow_entry, response);
+    } else {
+        /* This IPCP handles the flow allocation in user-space. This is
+         * currently true for normal IPCPs. */
+        if (!ipcp->uipcp) {
+            /* No userspace IPCP to use, this should not happen. */
+        } else {
+            /* Reflect the flow allocation response message to userspace. */
+            ret = rina_upqueue_append(ipcp->uipcp,
+                                      (const struct rina_msg_base *)resp);
+        }
+    }
+
     if (ret || response) {
         flow_del_entry(flow_entry, 0);
     }
@@ -1121,7 +1138,8 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto out;
     }
 
-    ret = rina_flow_allocate_resp_internal(flow_entry, req->response);
+    ret = rina_flow_allocate_resp_internal(flow_entry, req->response,
+                                           req);
 out:
     mutex_unlock(&rina_dm.lock);
 
