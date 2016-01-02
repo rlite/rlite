@@ -211,7 +211,6 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     bool dtcp_present = flow->cfg.dtcp_present;
-    int ret;
 
     spin_lock(&dtp->lock);
 
@@ -255,6 +254,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             dtp->cwq_len++;
             PD("%s: push [%lu] into cwq\n", __func__,
                     (long unsigned)pci->seqnum);
+            rb = NULL; /* Ownership passed. */
         } else {
             /* PDU in the sender window. */
             /* POL: TxControl. */
@@ -277,9 +277,11 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
 
     spin_unlock(&dtp->lock);
 
-    ret = rmt_tx(ipcp, flow->remote_addr, rb);
+    if (unlikely(rb == NULL)) {
+        return 0;
+    }
 
-    return ret;
+    return rmt_tx(ipcp, flow->remote_addr, rb);
 }
 
 static int
@@ -602,7 +604,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     int ret = 0;
 
     if (!flow) {
-        PI("%s: No flow for port-id %u: dropping PDU",
+        PI("%s: No flow for port-id %u: dropping PDU\n",
                 __func__, pci->conn_id.dst_cep);
         rina_buf_free(rb);
         return 0;
