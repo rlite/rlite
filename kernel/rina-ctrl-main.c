@@ -1340,9 +1340,9 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         txrx = &flow->txrx;
     }
 
-    spin_lock(&txrx->rx_lock);
+    spin_lock_irq(&txrx->rx_lock);
     list_add_tail(&rb->node, &txrx->rx_q);
-    spin_unlock(&txrx->rx_lock);
+    spin_unlock_irq(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
@@ -1697,9 +1697,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         current->state = TASK_INTERRUPTIBLE;
 
-        spin_lock(&txrx->rx_lock);
+        spin_lock_irq(&txrx->rx_lock);
         if (list_empty(&txrx->rx_q)) {
-            spin_unlock(&txrx->rx_lock);
+            spin_unlock_irq(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
                 break;
@@ -1712,7 +1712,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         rb = list_first_entry(&txrx->rx_q, struct rina_buf, node);
         list_del(&rb->node);
-        spin_unlock(&txrx->rx_lock);
+        spin_unlock_irq(&txrx->rx_lock);
 
         copylen = rb->len;
         if (copylen > len) {
@@ -1746,11 +1746,11 @@ rina_io_poll(struct file *f, poll_table *wait)
 
     poll_wait(f, &rio->txrx->rx_wqh, wait);
 
-    spin_lock(&rio->txrx->rx_lock);
+    spin_lock_irq(&rio->txrx->rx_lock);
     if (!list_empty(&rio->txrx->rx_q)) {
         mask |= POLLIN | POLLRDNORM;
     }
-    spin_unlock(&rio->txrx->rx_lock);
+    spin_unlock_irq(&rio->txrx->rx_lock);
 
     mask |= POLLOUT | POLLWRNORM;
 

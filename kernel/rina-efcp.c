@@ -41,7 +41,7 @@ dtp_fini(struct dtp *dtp)
 {
     struct rina_buf *rb, *next;
 
-    spin_lock(&dtp->lock);
+    spin_lock_irq(&dtp->lock);
     hrtimer_cancel(&dtp->snd_inact_tmr);
     hrtimer_cancel(&dtp->rcv_inact_tmr);
 
@@ -55,7 +55,7 @@ dtp_fini(struct dtp *dtp)
         list_del(&rb->node);
         rina_buf_free(rb);
     }
-    spin_unlock(&dtp->lock);
+    spin_unlock_irq(&dtp->lock);
 }
 EXPORT_SYMBOL(dtp_fini);
 

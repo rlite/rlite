@@ -78,7 +78,7 @@ snd_inact_tmr_cb(struct hrtimer *timer)
 {
     struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
 
-    spin_lock(&dtp->lock);
+    spin_lock_irq(&dtp->lock);
     PD("%s\n", __func__);
     dtp->set_drf = true;
 
@@ -94,7 +94,7 @@ snd_inact_tmr_cb(struct hrtimer *timer)
     /* Send transfer PDU with zero length. */
 
     /* Notify user flow that there has been no activity for a while */
-    spin_unlock(&dtp->lock);
+    spin_unlock_irq(&dtp->lock);
 
     return HRTIMER_NORESTART;
 }
@@ -212,7 +212,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     bool dtcp_present = flow->cfg.dtcp_present;
 
-    spin_lock(&dtp->lock);
+    spin_lock_irq(&dtp->lock);
 
     if (dtcp_present) {
         /* Stop the sender inactivity timer if it was activated or the callback
@@ -224,7 +224,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             dtp->next_seq_num_to_send > dtp->snd_rwe &&
                 dtp->cwq_len >= dtp->max_cwq_len) {
         /* POL: FlowControlOverrun */
-        spin_unlock(&dtp->lock);
+        spin_unlock_irq(&dtp->lock);
 
         /* Backpressure. Don't drop the PDU, we will be
          * invoked again. */
@@ -275,7 +275,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 HRTIMER_MODE_REL);
     }
 
-    spin_unlock(&dtp->lock);
+    spin_unlock_irq(&dtp->lock);
 
     if (unlikely(rb == NULL)) {
         return 0;
@@ -501,7 +501,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     INIT_LIST_HEAD(&qrbs);
 
-    spin_lock(&dtp->lock);
+    spin_lock_irq(&dtp->lock);
 
     if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
         /* Gap in the control SDU space. */
@@ -571,7 +571,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
 out:
-    spin_unlock(&dtp->lock);
+    spin_unlock_irq(&dtp->lock);
 
     rina_buf_free(rb);
 
@@ -624,7 +624,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     dtp = &flow->dtp;
 
-    spin_lock(&dtp->lock);
+    spin_lock_irq(&dtp->lock);
 
     if (flow->cfg.dtcp_present) {
         hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
@@ -646,7 +646,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
-        spin_unlock(&dtp->lock);
+        spin_unlock_irq(&dtp->lock);
 
         ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
 
@@ -670,7 +670,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             }
         }
 
-        spin_unlock(&dtp->lock);
+        spin_unlock_irq(&dtp->lock);
 
         goto snd_crb;
 
@@ -737,7 +737,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
-        spin_unlock(&dtp->lock);
+        spin_unlock_irq(&dtp->lock);
 
         ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
 
@@ -762,7 +762,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     crb = sdu_rx_sv_update(ipcp, flow);
 
-    spin_unlock(&dtp->lock);
+    spin_unlock_irq(&dtp->lock);
 
 snd_crb:
     if (crb) {
