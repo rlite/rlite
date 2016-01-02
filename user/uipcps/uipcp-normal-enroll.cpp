@@ -849,59 +849,77 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
 
 int Neighbor::remote_sync_rib(NeighFlow *nf) const
 {
+    unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
     int ret = 0;
 
     UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
         static_cast<string>(ipcp_name).c_str());
 
     {
-        LowerFlowList lfl;
-
         for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
-                mit != rib->lfdb.end(); mit++) {
-            lfl.flows.push_back(mit->second);
-        }
+                                              mit != rib->lfdb.end();) {
+            LowerFlowList lfl;
 
-        ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
-                               &lfl);
+            for (unsigned int k = 0; k < limit && mit != rib->lfdb.end();
+                                                            mit++, k++) {
+                    lfl.flows.push_back(mit->second);
+            }
+
+            ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
+                                   &lfl);
+        }
     }
 
     {
-        DFTSlice dft_slice;
-
         for (map< string, DFTEntry >::iterator e = rib->dft.begin();
-                e != rib->dft.end(); e++) {
-            dft_slice.entries.push_back(e->second);
-        }
+                                               e != rib->dft.end();) {
+            DFTSlice dft_slice;
 
-        ret |= remote_sync_obj(nf, true, obj_class::dft, obj_name::dft,
-                               &dft_slice);
+            for (unsigned int k = 0; k < limit && e != rib->dft.end();
+                                                            e++, k++) {
+                dft_slice.entries.push_back(e->second);
+            }
+
+            ret |= remote_sync_obj(nf, true, obj_class::dft, obj_name::dft,
+                                   &dft_slice);
+        }
     }
 
     {
-        NeighborCandidateList ncl;
-        NeighborCandidate cand;
-        RinaName cand_name;
-        struct rl_ipcp *ipcp;
+        bool sent_myself = false;
 
-        /* My neighbors. */
+        /* Scan all my neighbors. */
         for (map<string, NeighborCandidate>::iterator cit =
                 rib->cand_neighbors.begin();
-                cit != rib->cand_neighbors.end(); cit++) {
-            ncl.candidates.push_back(cit->second);
+                cit != rib->cand_neighbors.end();) {
+            NeighborCandidateList ncl;
+            unsigned int k = 0;
+
+            if (!sent_myself) {
+                NeighborCandidate cand;
+                RinaName cand_name;
+                struct rl_ipcp *ipcp;
+
+                /* A neighbor representing myself. */
+                ipcp = rib->ipcp_info();
+                cand_name = RinaName(&ipcp->name);
+                cand.apn = cand_name.apn;
+                cand.api = cand_name.api;
+                cand.address = ipcp->addr;
+                cand.lower_difs = rib->lower_difs;
+                ncl.candidates.push_back(cand);
+
+                sent_myself = true;
+                k++;
+            }
+
+            for (; k < limit && cit != rib->cand_neighbors.end(); cit++, k++) {
+                ncl.candidates.push_back(cit->second);
+            }
+
+            ret |= remote_sync_obj(nf, true, obj_class::neighbors,
+                                   obj_name::neighbors, &ncl);
         }
-
-        /* A neighbor representing myself. */
-        ipcp = rib->ipcp_info();
-        cand_name = RinaName(&ipcp->name);
-        cand.apn = cand_name.apn;
-        cand.api = cand_name.api;
-        cand.address = ipcp->addr;
-        cand.lower_difs = rib->lower_difs;
-        ncl.candidates.push_back(cand);
-
-        ret |= remote_sync_obj(nf, true, obj_class::neighbors,
-                               obj_name::neighbors, &ncl);
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
