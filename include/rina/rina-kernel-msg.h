@@ -106,6 +106,7 @@ struct rina_kmsg_fa_req {
 
     uint16_t ipcp_id;
     uint16_t qos;
+    uint32_t local_port; /* Filled by kernel before reflection to userspace. */
     struct rina_name local_application;
     struct rina_name remote_application;
 } __attribute__((packed));

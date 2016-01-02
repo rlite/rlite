@@ -170,12 +170,16 @@ static int
 uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
                       uint8_t *buf, size_t buflen)
 {
-    int ret;
     struct rina_name local_application, remote_application;
     const void *ptr = buf;
+    uint32_t remote_port;
+    int ret;
 
     PD("%s: Received fa req management SDU from IPCP addr %lu\n",
             __func__, (long unsigned)mhdr->remote_addr);
+
+    remote_port = le32toh(*((uint32_t *)ptr));
+    ptr += sizeof(uint32_t);
 
     ret = deserialize_rina_name(&ptr, &remote_application);
     if (ret) {
@@ -187,7 +191,7 @@ uipcp_mgmt_sdu_fa_req(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
         PE("%s: deserialization error\n", __func__);
     }
 
-    uipcp_fa_req_arrived(uipcp, 2 /* TODO remote_port */, &local_application,
+    uipcp_fa_req_arrived(uipcp, remote_port, &local_application,
                          &remote_application);
 
     return 0;
@@ -351,8 +355,9 @@ uipcp_fa_req(struct rina_evloop *loop,
         return 0;
     }
 
-    len = 1 + rina_name_serlen(&req->local_application)
-            + rina_name_serlen(&req->remote_application);
+    len = 1 + sizeof(req->local_port) +
+            rina_name_serlen(&req->local_application) +
+            rina_name_serlen(&req->remote_application);
     mgmtsdu = malloc(len);
     if (!mgmtsdu) {
         PE("%s: Out of memory\n", __func__);
@@ -361,6 +366,8 @@ uipcp_fa_req(struct rina_evloop *loop,
 
     mgmtsdu[0] = IPCP_MGMT_FA_REQ;
     cur = mgmtsdu + 1;
+    *((uint32_t *)cur) = htole32(req->local_port);
+    cur += sizeof(req->local_port);
     serialize_rina_name(&cur, &req->local_application);
     serialize_rina_name(&cur, &req->remote_application);
 

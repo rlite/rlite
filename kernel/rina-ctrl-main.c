@@ -978,7 +978,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
                      uint32_t event_id,
                      const struct rina_name *local_application,
                      const struct rina_name *remote_application,
-                     const struct rina_kmsg_fa_req *req)
+                     struct rina_kmsg_fa_req *req)
 {
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
@@ -1009,6 +1009,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
             /* No userspace IPCP to use, this should not happen. */
         } else {
             /* Reflect the flow allocation request message to userspace. */
+            req->local_port = flow_entry->local_port;
             ret = rina_upqueue_append(ipcp_entry->uipcp,
                                       (const struct rina_msg_base *)req);
         }
@@ -1165,8 +1166,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         goto out;
     }
 
-    ret = rina_fa_resp_internal(flow_entry, req->response,
-                                           req);
+    ret = rina_fa_resp_internal(flow_entry, req->response, req);
 out:
     mutex_unlock(&rina_dm.lock);
 
