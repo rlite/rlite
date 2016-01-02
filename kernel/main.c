@@ -980,6 +980,8 @@ flow_put(struct flow_entry *entry)
         ntfy.remote_addr = entry->remote_addr;
 
         rlite_upqueue_append(ipcp->uipcp, (const struct rlite_msg_base *)&ntfy);
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                       RLITE_MB(&ntfy));
     }
 
     /* We are in process context here, so we can safely do the
@@ -1076,6 +1078,8 @@ application_del_by_rc(struct rlite_ctrl *rc)
             rlite_upqueue_append(app->ipcp->uipcp,
                                 (const struct rlite_msg_base *)&ntfy);
             rina_name_move(&app->name, &ntfy.appl_name);
+            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                           RLITE_MB(&ntfy));
         }
 
         /* Remove. */
@@ -1294,6 +1298,8 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     /* Enqueue the response into the upqueue. */
     ret = rlite_upqueue_append(rc, RLITE_MB(&resp));
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&resp));
     if (ret) {
         goto err;
     }
@@ -1686,6 +1692,32 @@ rlite_barrier(struct rlite_ctrl *rc,
     return rlite_upqueue_append(rc, bmsg);
 }
 
+static int
+rlite_flow_get_stats(struct rlite_ctrl *rc,
+                     struct rlite_msg_base *bmsg)
+{
+    struct rl_kmsg_flow_stats_req *req =
+                (struct rl_kmsg_flow_stats_req *)bmsg;
+    struct flow_entry *flow;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    flow = flow_get(req->port_id);
+    if (flow && flow->txrx.ipcp->ops.flow_get_stats) {
+        struct rl_kmsg_flow_stats_resp resp;
+
+        ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp);
+        if (ret == 0) {
+            ret = rlite_upqueue_append(rc, (const struct rlite_msg_base *)
+                                           &resp);
+            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                           RLITE_MB(&resp));
+        }
+    }
+    flow_put(flow);
+
+    return ret;
+}
+
 /* Connect the upper IPCP which is using this flow
  * so that rlite_sdu_rx() can deliver SDU to the IPCP. */
 static int
@@ -1758,6 +1790,8 @@ rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             rina_name_move(&resp.appl_name, &req->appl_name);
 
             rlite_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
+            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                           RLITE_MB(&resp));
 
             if (!ret) {
                 PI("Application process %s %sregistered to IPC process %u\n",
@@ -2255,6 +2289,7 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
     [RLITE_KER_BARRIER] = rlite_barrier,
+    [RLITE_KER_FLOW_STATS_REQ] = rlite_flow_get_stats,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 

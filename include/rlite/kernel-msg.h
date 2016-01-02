@@ -41,6 +41,8 @@ enum {
     RLITE_KER_FLOW_FETCH, /* 21 */
     RLITE_KER_FLOW_FETCH_RESP, /* 22 */
     RLITE_KER_IPCP_UIPCP_WAIT, /* 23 */
+    RLITE_KER_FLOW_STATS_REQ, /* 24 */
+    RLITE_KER_FLOW_STATS_RESP, /* 25 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -58,6 +60,8 @@ extern struct rlite_msg_layout rlite_ker_numtables[RLITE_KER_MSG_MAX+1];
  *     whatever order
  *   - then come (if any) all the fields that are strings ('char *'), in
  *     whatever order
+ *   - then come (if any) all the files that are buffer (struct rl_buf_field),
+ *     in whatever order
  */
 
 /* application --> kernel message to create a new IPC process. */
@@ -279,6 +283,26 @@ struct rl_kmsg_flow_dealloc {
 
     uint16_t ipcp_id;
     uint32_t port_id;
-};
+} __attribute__((packed));
+
+struct rl_kmsg_flow_stats_req {
+    rlite_msg_t msg_type;
+    uint32_t event_id;
+
+    uint32_t port_id;
+} __attribute__((packed));
+
+struct rl_kmsg_flow_stats_resp {
+    rlite_msg_t msg_type;
+    uint32_t event_id;
+
+    uint64_t tx_pkt;
+    uint64_t tx_byte;
+    uint64_t tx_err;
+    uint64_t rx_pkt;
+    uint64_t rx_byte;
+    uint64_t rx_err;
+    uint64_t unused[6];
+} __attribute__((packed));
 
 #endif  /* __RLITE_KER_H__ */

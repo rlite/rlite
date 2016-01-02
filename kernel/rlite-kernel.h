@@ -1,6 +1,7 @@
 #ifndef __RLITE_KERNEL_H__
 #define __RLITE_KERNEL_H__
 
+#include "rlite/kernel-msg.h"
 #include "rlite/utils.h"
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
@@ -36,6 +37,8 @@ struct ipcp_ops {
 
     int (*flow_init)(struct ipcp_entry *ipcp, struct flow_entry *flow);
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
+    int (*flow_get_stats)(struct flow_entry *flow,
+                          struct rl_kmsg_flow_stats_resp *msg);
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rlite_buf *rb, bool maysleep);
