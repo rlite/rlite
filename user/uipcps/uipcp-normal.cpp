@@ -199,8 +199,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
 static void
 mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rlite_mgmt_hdr *mhdr;
@@ -244,7 +243,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
         throw std::exception();
     }
 
-    ret = rl_evloop_fdcb_add(&uipcp->appl.loop, mgmtfd, mgmt_fd_ready);
+    ret = rl_evloop_fdcb_add(&uipcp->loop, mgmtfd, mgmt_fd_ready);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
@@ -265,7 +264,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
 uipcp_rib::~uipcp_rib()
 {
-    rl_evloop_fdcb_del(&uipcp->appl.loop, mgmtfd);
+    rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }
@@ -275,7 +274,7 @@ uipcp_rib::ipcp_info() const
 {
     struct rlite_ipcp *ipcp;
 
-    ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop.ctrl, uipcp->ipcp_id);
+    ipcp = rlite_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
     assert(ipcp);
 
     return ipcp;
@@ -414,7 +413,7 @@ uipcp_rib::set_address(uint64_t address)
     stringstream addr_ss;
 
     addr_ss << address;
-    return rlite_ipcp_config(&uipcp->appl.loop, uipcp->ipcp_id,
+    return rlite_ipcp_config(&uipcp->loop, uipcp->ipcp_id,
                                 "address", addr_ss.str().c_str());
 }
 
@@ -594,9 +593,7 @@ normal_appl_register(struct rlite_evloop *loop,
                      const struct rlite_msg_base_resp *b_resp,
                      const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
                 (struct rl_kmsg_appl_register *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -612,9 +609,7 @@ normal_fa_req(struct rlite_evloop *loop,
              const struct rlite_msg_base_resp *b_resp,
              const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
@@ -632,9 +627,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
                      const struct rlite_msg_base_resp *b_resp,
                      const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req_arrived *req =
                     (struct rl_kmsg_fa_req_arrived *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -659,7 +652,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         result = RLITE_ERR;
     }
 
-    ret = rl_appl_fa_resp(&uipcp->appl, req->kevent_id, req->ipcp_id,
+    ret = rl_appl_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
                                    uipcp->ipcp_id, req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
@@ -692,9 +685,7 @@ normal_fa_resp(struct rlite_evloop *loop,
               const struct rlite_msg_base_resp *b_resp,
               const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_resp *resp =
                 (struct rl_kmsg_fa_resp *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -713,9 +704,7 @@ normal_flow_deallocated(struct rlite_evloop *loop,
                        const struct rlite_msg_base_resp *b_resp,
                        const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -740,7 +729,7 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
-    return rl_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ_ARRIVED,
+    return rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ_ARRIVED,
                                     neigh_fa_req_arrived);
 
     return 0;
@@ -764,7 +753,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
     int ret;
 
     /* Perform the registration. */
-    ret = rl_appl_register_wait(&uipcp->appl, reg, lower_dif,
+    ret = rl_evloop_register(&uipcp->loop, reg, lower_dif,
                                       NULL, ipcp_name, 2000);
 
     if (ret) {

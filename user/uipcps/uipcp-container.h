@@ -6,7 +6,7 @@
 #include "rlite/conf-msg.h"
 #include "rlite/kernel-msg.h"
 #include "rlite/list.h"
-#include "rlite/appl.h"
+#include "rlite/evloop.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,7 +90,7 @@ struct flow_edge {
 };
 
 struct uipcp {
-    struct rlite_appl appl;
+    struct rlite_evloop loop;
     struct uipcps *uipcps;
     unsigned int ipcp_id;
 

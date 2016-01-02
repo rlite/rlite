@@ -20,7 +20,7 @@
 #include "rlite/utils.h"
 #include "rlite/list.h"
 #include "rlite/evloop.h"
-#include "rlite/appl.h"
+#include "rlite/evloop.h"
 
 #include "../helpers.h"
 #include "uipcp-container.h"

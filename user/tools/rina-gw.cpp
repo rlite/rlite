@@ -19,7 +19,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
-#include "rlite/appl.h"
+#include "rlite/evloop.h"
 
 using namespace std;
 
@@ -144,7 +144,7 @@ private:
 #define NUM_WORKERS     1
 
 struct Gateway {
-    struct rlite_appl appl;
+    struct rlite_evloop loop;
     struct rina_name appl_name;
 
     /* Used to map IP:PORT --> RLITE_NAME, when
@@ -394,7 +394,7 @@ Gateway::Gateway()
 
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
-    if (rl_appl_init(&appl, RLITE_EVLOOP_SPAWN)) {
+    if (rl_evloop_init(&loop, NULL, NULL, RLITE_EVLOOP_SPAWN)) {
         throw std::exception();
     }
 }
@@ -406,7 +406,7 @@ Gateway::~Gateway()
         close(mit->first);
     }
 
-    rl_appl_fini(&appl);
+    rl_evloop_fini(&loop);
 
     for (unsigned int i=0; i<workers.size(); i++) {
         delete workers[i];
@@ -416,7 +416,7 @@ Gateway::~Gateway()
 int
 Gateway::join()
 {
-    return rl_evloop_join(&appl.loop);
+    return rl_evloop_join(&loop);
 }
 
 Gateway gw;
@@ -500,8 +500,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
                   const struct rlite_msg_base_resp *b_resp,
                   const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
-    Gateway * gw = container_of(appl, struct Gateway, appl);
+    Gateway * gw = container_of(loop, struct Gateway, loop);
     struct rl_kmsg_fa_req_arrived *req =
             (struct rl_kmsg_fa_req_arrived *)b_resp;
     map<RinaName, InetName>::iterator mit;
@@ -549,7 +548,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    ret = rl_appl_fa_resp(&gw->appl, req->kevent_id,
+    ret = rl_appl_fa_resp(&gw->loop, req->kevent_id,
                           req->ipcp_id, 0xffff,
                           req->port_id, RLITE_SUCC);
     if (ret != RLITE_SUCC) {
@@ -581,8 +580,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
                    const struct rlite_msg_base_resp *b_resp,
                    const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
-    Gateway * gw = container_of(appl, struct Gateway, appl);
+    Gateway * gw = container_of(loop, struct Gateway, loop);
     struct rl_kmsg_fa_resp_arrived *resp =
             (struct rl_kmsg_fa_resp_arrived *)b_resp;
     map<unsigned int, int>::iterator mit;
@@ -627,8 +625,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
 static void
 accept_inet_conn(struct rlite_evloop *loop, int lfd)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
-    Gateway * gw = container_of(appl, struct Gateway, appl);
+    Gateway * gw = container_of(loop, struct Gateway, loop);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
     map<int, RinaName>::iterator mit;
@@ -656,7 +653,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     event_id = rl_ctrl_get_id(&loop->ctrl);
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rl_appl_flow_alloc(appl, event_id, mit->second.dif_name_s.c_str(),
+    ret = rl_evloop_flow_alloc(loop, event_id, mit->second.dif_name_s.c_str(),
                              NULL, &gw->appl_name, &mit->second.name_r,
                              &flowspec, 0xffff, &unused, 0);
     if (ret) {
@@ -701,7 +698,7 @@ inet_server_socket(const InetName& inet_name)
         return -1;
     }
 
-    if (rl_evloop_fdcb_add(&gw.appl.loop, fd, accept_inet_conn)) {
+    if (rl_evloop_fdcb_add(&gw.loop, fd, accept_inet_conn)) {
         PE("rl_evloop_fcdb_add() failed [%d]\n", errno);
         close(fd);
         return -1;
@@ -716,11 +713,10 @@ setup()
     int ret;
 
     /* Register the handler for incoming flow allocation requests and
-     * response, since we'll not be using rlite/appl.h functionalities for
-     * that. */
-    ret = rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_REQ_ARRIVED,
+     * response. */
+    ret = rl_evloop_set_handler(&gw.loop, RLITE_KER_FA_REQ_ARRIVED,
                                 gw_fa_req_arrived);
-    ret |= rl_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_RESP_ARRIVED,
+    ret |= rl_evloop_set_handler(&gw.loop, RLITE_KER_FA_RESP_ARRIVED,
                                  gw_fa_resp_arrived);
     if (ret) {
         return -1;
@@ -740,8 +736,8 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rl_appl_register_wait(&gw.appl, 1, mit->first.dif_name_s.c_str(),
-                                 NULL, &mit->first.name_r, 3000);
+        rl_evloop_register(&gw.loop, 1, mit->first.dif_name_s.c_str(),
+                              NULL, &mit->first.name_r, 3000);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());

@@ -216,7 +216,7 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
 
     list_for_each_entry(bp, &shim->bindpoints, node) {
         if (strcmp(appl_name_s, bp->appl_name_s) == 0) {
-            rl_evloop_fdcb_del(&uipcp->appl.loop, bp->fd);
+            rl_evloop_fdcb_del(&uipcp->loop, bp->fd);
             list_del(&bp->node);
             close(bp->fd);
             free(bp->appl_name_s);
@@ -243,9 +243,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
                          const struct rlite_msg_base_resp *b_resp,
                          const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
                 (struct rl_kmsg_appl_register *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
@@ -291,7 +289,7 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
 
     /* The accept_conn() callback will be invoked on new incoming
      * connections. */
-    rl_evloop_fdcb_add(&uipcp->appl.loop, bp->fd, accept_conn);
+    rl_evloop_fdcb_add(&uipcp->loop, bp->fd, accept_conn);
 
     list_add_tail(&bp->node, &shim->bindpoints);
 
@@ -315,9 +313,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
                   const struct rlite_msg_base_resp *b_resp,
                   const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                  loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
@@ -394,9 +390,7 @@ lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
 static void
 accept_conn(struct rlite_evloop *loop, int lfd)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
@@ -491,9 +485,7 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
                    const struct rlite_msg_base_resp *b_resp,
                    const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_inet4 *shim = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
     struct inet4_endpoint *ep;
@@ -530,9 +522,7 @@ shim_inet4_flow_deallocated(struct rlite_evloop *loop,
                        const struct rlite_msg_base_resp *b_resp,
                        const struct rlite_msg_base *b_req)
 {
-    struct rlite_appl *appl = container_of(loop, struct rlite_appl,
-                                                   loop);
-    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
@@ -554,7 +544,7 @@ shim_inet4_init(struct uipcp *uipcp)
     struct rlite_ipcp *rlite_ipcp;
     struct shim_inet4 *shim;
 
-    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->appl.loop.ctrl,
+    rlite_ipcp = rlite_lookup_ipcp_by_id(&uipcp->loop.ctrl,
                                          uipcp->ipcp_id);
     if (!rlite_ipcp) {
         PE("Cannot find kernelspace IPCP %u\n", uipcp->ipcp_id);

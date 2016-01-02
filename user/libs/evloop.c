@@ -116,6 +116,70 @@ flow_fetch_resp(struct rlite_evloop *loop,
 }
 
 static int
+flow_allocate_resp_arrived(struct rlite_evloop *loop,
+                           const struct rlite_msg_base_resp *b_resp,
+                           const struct rlite_msg_base *b_req)
+{
+    struct rl_kmsg_fa_req *req =
+            (struct rl_kmsg_fa_req *)b_req;
+    struct rl_kmsg_fa_resp_arrived *resp =
+            (struct rl_kmsg_fa_resp_arrived *)b_resp;
+    char *local_s = NULL;
+    char *remote_s = NULL;
+
+    local_s = rina_name_to_string(&req->local_appl);
+    remote_s = rina_name_to_string(&req->remote_appl);
+
+    if (resp->response) {
+        PE("Failed to allocate a flow between local appl "
+               "'%s' and remote appl '%s'\n",
+                local_s, remote_s);
+    } else {
+        PI("Allocated flow between local appl "
+               "'%s' and remote appl '%s' [port-id = %u]\n",
+                local_s, remote_s, resp->port_id);
+    }
+
+    if (local_s) {
+        free(local_s);
+    }
+
+    if (remote_s) {
+        free(remote_s);
+    }
+
+    return 0;
+}
+
+static int
+appl_register_resp(struct rlite_evloop *loop,
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
+{
+    struct rl_kmsg_appl_register_resp *resp =
+            (struct rl_kmsg_appl_register_resp *)b_resp;
+    char *appl_name_s = NULL;
+
+    (void)b_req;
+
+    appl_name_s = rina_name_to_string(&resp->appl_name);
+
+    if (resp->response) {
+        PE("Application '%s' %sregistration failed\n", appl_name_s,
+            (resp->reg ? "" : "un"));
+    } else {
+        PD("Application '%s' %sregistration successfully completed\n",
+           appl_name_s, (resp->reg ? "" : "un"));
+    }
+
+    if (appl_name_s) {
+        free(appl_name_s);
+    }
+
+    return 0;
+}
+
+static int
 ctrl_ipcp_update(struct rlite_ctrl *ctrl,
                  const struct rl_kmsg_ipcp_update *upd)
 {
@@ -829,20 +893,26 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
         return loop->eventfd;
     }
 
-    /* If not redefined, setup default fetch, ipcp_update and
-     * barrier_resp handlers. */
+    /* If not redefined, setup default handlers. */
     if (!loop->handlers[RLITE_KER_FLOW_FETCH_RESP]) {
-        NPD("setting default fetch handler\n");
         loop->handlers[RLITE_KER_FLOW_FETCH_RESP] = flow_fetch_resp;
     }
 
+    if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
+        loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
+    }
+
+    if (!loop->handlers[RLITE_KER_FA_RESP_ARRIVED]) {
+         loop->handlers[RLITE_KER_FA_RESP_ARRIVED] = flow_allocate_resp_arrived;
+    }
+    if (!loop->handlers[RLITE_KER_APPL_REGISTER_RESP]) {
+         loop->handlers[RLITE_KER_APPL_REGISTER_RESP] = appl_register_resp;
+    }
+
+    /* Handler for RLITE_KER_IPCP_UPDATE must be chained. */
     loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
     loop->handlers[RLITE_KER_IPCP_UPDATE] = evloop_ipcp_update;
 
-    if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
-        NPD("setting default barrier handler\n");
-        loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
-    }
 
     if (loop->flags & RLITE_EVLOOP_SPAWN) {
         /* Create and start the event-loop thread. */
@@ -1202,6 +1272,161 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
     return ret;
 }
 
+int
+rl_appl_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
+                         uint16_t ipcp_id, uint16_t upper_ipcp_id,
+                         uint32_t port_id, uint8_t response)
+{
+    struct rl_kmsg_fa_resp *req;
+    struct rlite_msg_base *resp;
+    int result;
+
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("Out of memory\n");
+        return ENOMEM;
+    }
+    rl_fa_resp_fill(req, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
+
+    PD("Responding to flow allocation request...\n");
+
+    resp = rlite_issue_request(loop, RLITE_MB(req),
+                         sizeof(*req), 0, 0, &result);
+    assert(!resp);
+    PD("result: %d\n", result);
+
+    return result;
+}
+
+struct rl_kmsg_appl_register_resp *
+rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
+                    unsigned int wait_ms, int reg,
+                    const char *dif_name,
+                    const struct rina_name *ipcp_name,
+                    const struct rina_name *appl_name)
+{
+    struct rl_kmsg_appl_register *req;
+    struct rlite_ipcp *rlite_ipcp;
+    int result;
+
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    }
+    if (!rlite_ipcp) {
+        PE("Could not find a suitable IPC process\n");
+        return NULL;
+    }
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("Out of memory\n");
+        return NULL;
+    }
+
+    rl_register_req_fill(req, event_id, rlite_ipcp->ipcp_id, reg,
+                         appl_name);
+
+    PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
+
+    return (struct rl_kmsg_appl_register_resp *)
+           rlite_issue_request(loop, RLITE_MB(req),
+                               sizeof(*req), 1, wait_ms, &result);
+}
+
+int
+rl_evloop_register(struct rlite_evloop *loop, int reg,
+                         const char *dif_name,
+                         const struct rina_name *ipcp_name,
+                         const struct rina_name *appl_name,
+                         unsigned int wait_ms)
+{
+    struct rl_kmsg_appl_register_resp *resp;
+    uint32_t event_id = rl_ctrl_get_id(&loop->ctrl);
+    int ret = 0;
+
+    resp = rl_evloop_reg_req(loop, event_id, wait_ms, reg, dif_name,
+                            ipcp_name, appl_name);
+
+    if (!resp) {
+        return -1;
+    }
+
+    if (resp->response != RLITE_SUCC) {
+        ret = -1;
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                  RLITE_MB(resp));
+    free(resp);
+
+    return ret;
+}
+
+int
+rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
+                   const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
+                   const struct rlite_flow_spec *flowspec,
+                   uint16_t upper_ipcp_id,
+                   unsigned int *port_id, unsigned int wait_ms)
+{
+    struct rl_kmsg_fa_req *req;
+    struct rl_kmsg_fa_resp_arrived *kresp;
+    struct rlite_ipcp *rlite_ipcp;
+    int result;
+
+    rlite_ipcp = rlite_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    }
+    if (!rlite_ipcp) {
+        PE("No suitable IPCP found\n");
+        return -1;
+    }
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("Out of memory\n");
+        return -1;
+    }
+    rl_fa_req_fill(req, event_id, rlite_ipcp->ipcp_id, dif_name, ipcp_name,
+                   local_appl, remote_appl, flowspec, upper_ipcp_id);
+
+    PD("Requesting flow allocation...\n");
+
+    kresp = (struct rl_kmsg_fa_resp_arrived *)
+            rlite_issue_request(loop, RLITE_MB(req),
+                         sizeof(*req), 1, wait_ms, &result);
+
+    if (!kresp) {
+        if (wait_ms || result) {
+            PE("Flow allocation request failed\n");
+            return -1;
+        }
+
+        /* (wait_ms == 0 && result == 0) means non-blocking invocation, so
+         * it is ok to get NULL. */
+        *port_id = ~0U;
+
+        return 0;
+    }
+
+    PI("Flow allocation response: ret = %u, port-id = %u\n",
+                kresp->response, kresp->port_id);
+    result = kresp->response;
+    *port_id = kresp->port_id;
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(kresp));
+    free(kresp);
+
+    return result;
+}
+
 void
 rlite_flow_spec_default(struct rlite_flow_spec *spec)
 {
@@ -1209,7 +1434,7 @@ rlite_flow_spec_default(struct rlite_flow_spec *spec)
     strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
 }
 
-/* This is used by uipcp, not by appl. */
+/* This is used by uipcp, not by applications. */
 void
 rlite_flow_cfg_default(struct rlite_flow_config *cfg)
 {

@@ -64,7 +64,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    ret = rlite_lookup_ipcp_addr_by_id(&uipcp->appl.loop.ctrl,
+    ret = rlite_lookup_ipcp_addr_by_id(&uipcp->loop.ctrl,
                                        uipcp->ipcp_id, &local_addr);
     assert(!ret);
 
