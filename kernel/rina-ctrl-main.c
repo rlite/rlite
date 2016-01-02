@@ -332,7 +332,7 @@ out:
 
 static struct registered_application *
 ipcp_application_lookup(struct ipcp_entry *ipcp,
-                        struct rina_name *application_name)
+                        const struct rina_name *application_name)
 {
     struct registered_application *app;
 
@@ -905,6 +905,27 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
+static int
+rina_uipcp_flow_allocate_req_arrived(struct rina_ctrl *rc,
+                                     struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_uipcp_flow_allocate_req_arrived *req =
+                    (struct rina_kmsg_uipcp_flow_allocate_req_arrived *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    ipcp = ipcp_table_find(req->ipcp_id);
+    if (ipcp) {
+        ret = rina_flow_allocate_req_arrived(ipcp, req->remote_port,
+                                             &req->local_application,
+                                             &req->remote_application);
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
 /* To be called under global lock. */
 static int
 rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
@@ -1149,8 +1170,8 @@ out:
 int
 rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
                                uint32_t remote_port,
-                               struct rina_name *local_application,
-                               struct rina_name *remote_application)
+                               const struct rina_name *local_application,
+                               const struct rina_name *remote_application)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_application *app;
@@ -1311,6 +1332,7 @@ static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,
     [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
+    [RINA_KERN_UIPCP_FLOW_ALLOCATE_REQ_ARRIVED] = rina_uipcp_flow_allocate_req_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
