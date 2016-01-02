@@ -541,8 +541,8 @@ flow_config_dump(const struct rina_flow_config *c)
 
     COMMON_PRINT("   dtcp.rtx.max_time_to_retry=%u\n"
                 "   dtcp.rtx.data_rxms_max=%u\n"
-                "   dtcp.rtx.initial_rtx_max=%u\n",
+                "   dtcp.rtx.initial_tr=%u\n",
                 c->dtcp.rtx.max_time_to_retry,
                 c->dtcp.rtx.data_rxms_max,
-                c->dtcp.rtx.initial_rtx_max);
+                c->dtcp.rtx.initial_tr);
 }

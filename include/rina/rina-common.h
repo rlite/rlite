@@ -97,7 +97,7 @@ struct fc_config {
 struct rtx_config {
     uint32_t max_time_to_retry; /* R */
     uint16_t data_rxms_max;
-    uint32_t initial_rtx_max;
+    uint32_t initial_tr;
 } __attribute__((packed));
 
 struct dtcp_config {

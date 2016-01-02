@@ -509,10 +509,10 @@ update_flow_config(struct rina_flow_config *flowcfg, const char *arg)
         return 0;
     }
 
-    if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.initial_rtx_max") == 0) {
+    if (parse_flowcfg_int(arg, &field_int, "dtcp.rtx.initial_tr") == 0) {
         flowcfg->dtcp.rtx_control = 1;
         flowcfg->dtcp_present = 1;
-        flowcfg->dtcp.rtx.initial_rtx_max = field_int;
+        flowcfg->dtcp.rtx.initial_tr = field_int;
         return 0;
     }
 
