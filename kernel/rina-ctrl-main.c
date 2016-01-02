@@ -1656,9 +1656,8 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
                 ret -= sizeof(struct rina_pci);
             }
         } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
-            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr,
-                                           rb);
-            if (ret >= sizeof(mhdr)) {
+            ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
+            if (ret >= 0) {
                 ret += sizeof(mhdr);
             }
         } else {
