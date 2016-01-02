@@ -65,27 +65,6 @@ rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
     printk("%s: IPC [%p] destroyed\n", __func__, priv);
 }
 
-static int
-rina_shim_dummy_application_register(struct ipcp_entry *ipcp,
-                                     struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_shim_dummy_application_unregister(struct ipcp_entry *ipcp,
-                                       struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp,
-                              struct rina_name *dif_name)
-{
-    return 0;
-}
-
 struct flow_allocate_req_work {
     struct work_struct w;
     struct ipcp_entry *ipcp;
@@ -216,9 +195,6 @@ rina_shim_dummy_init(void)
     factory.dif_type = DIF_TYPE_SHIM_DUMMY;
     factory.create = rina_shim_dummy_create;
     factory.ops.destroy = rina_shim_dummy_destroy;
-    factory.ops.application_register = rina_shim_dummy_application_register;
-    factory.ops.application_unregister = rina_shim_dummy_application_unregister;
-    factory.ops.assign_to_dif = rina_shim_dummy_assign_to_dif;
     factory.ops.flow_allocate_req = rina_shim_dummy_fa_req;
     factory.ops.flow_allocate_resp = rina_shim_dummy_fa_resp;
     factory.ops.sdu_write = rina_shim_dummy_sdu_write;

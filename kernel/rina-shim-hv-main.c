@@ -178,27 +178,6 @@ rina_shim_hv_destroy(struct ipcp_entry *ipcp)
 }
 
 static int
-rina_shim_hv_application_register(struct ipcp_entry *ipcp,
-                                     struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_shim_hv_application_unregister(struct ipcp_entry *ipcp,
-                                       struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_shim_hv_assign_to_dif(struct ipcp_entry *ipcp,
-                           struct rina_name *dif_name)
-{
-    return 0;
-}
-
-static int
 rina_shim_hv_fa_req(struct ipcp_entry *ipcp,
                                struct flow_entry *flow)
 {
@@ -297,9 +276,6 @@ rina_shim_hv_init(void)
     factory.dif_type = DIF_TYPE_SHIM_HV;
     factory.create = rina_shim_hv_create;
     factory.ops.destroy = rina_shim_hv_destroy;
-    factory.ops.application_register = rina_shim_hv_application_register;
-    factory.ops.application_unregister = rina_shim_hv_application_unregister;
-    factory.ops.assign_to_dif = rina_shim_hv_assign_to_dif;
     factory.ops.flow_allocate_req = rina_shim_hv_fa_req;
     factory.ops.flow_allocate_resp = rina_shim_hv_fa_resp;
     factory.ops.sdu_write = rina_shim_hv_sdu_write;

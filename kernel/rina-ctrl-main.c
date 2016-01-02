@@ -127,9 +127,6 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
 
     /* Check if IPCP ops are ok. */
     if (!factory->ops.destroy ||
-        !factory->ops.assign_to_dif ||
-        !factory->ops.application_register ||
-        !factory->ops.application_unregister ||
         !factory->ops.sdu_write ||
         !factory->ops.config) {
         return -EINVAL;
@@ -936,16 +933,8 @@ rina_register_internal(int reg, int16_t ipcp_id, struct rina_name *appl_name,
         ret = 0;
         if (reg) {
             ret = ipcp_application_add(entry, appl_name, rc);
-            if (ret == 0 && entry->ops.application_register) {
-                ret = entry->ops.application_register(entry,
-                                            appl_name);
-            }
         } else {
             ret = ipcp_application_del(entry, appl_name);
-            if (ret == 0 && entry->ops.application_unregister) {
-                ret = entry->ops.application_unregister(entry,
-                                                        appl_name);
-            }
         }
     }
 

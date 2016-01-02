@@ -73,27 +73,6 @@ rina_normal_destroy(struct ipcp_entry *ipcp)
     printk("%s: IPC [%p] destroyed\n", __func__, priv);
 }
 
-static int
-rina_normal_application_register(struct ipcp_entry *ipcp,
-                                     struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_normal_application_unregister(struct ipcp_entry *ipcp,
-                                       struct rina_name *application_name)
-{
-    return 0;
-}
-
-static int
-rina_normal_assign_to_dif(struct ipcp_entry *ipcp,
-                              struct rina_name *dif_name)
-{
-    return 0;
-}
-
 enum hrtimer_restart
 snd_inact_tmr_cb(struct hrtimer *timer)
 {
@@ -343,9 +322,6 @@ rina_normal_init(void)
     factory.dif_type = DIF_TYPE_NORMAL;
     factory.create = rina_normal_create;
     factory.ops.destroy = rina_normal_destroy;
-    factory.ops.application_register = rina_normal_application_register;
-    factory.ops.application_unregister = rina_normal_application_unregister;
-    factory.ops.assign_to_dif = rina_normal_assign_to_dif;
     factory.ops.flow_allocate_req = NULL; /* Reflect to userspace. */
     factory.ops.flow_allocate_resp = NULL; /* Reflect to userspace. */
     factory.ops.flow_init = rina_normal_flow_init;

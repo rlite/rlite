@@ -16,11 +16,6 @@ struct rina_ctrl;
 
 struct ipcp_ops {
     void (*destroy)(struct ipcp_entry *ipcp);
-    int (*assign_to_dif)(struct ipcp_entry *ipcp, struct rina_name *dif_name);
-    int (*application_register)(struct ipcp_entry *ipcp,
-                                struct rina_name *app_name);
-    int (*application_unregister)(struct ipcp_entry *ipcp,
-                                  struct rina_name *app_name);
 
     /* Invoked by the core to notify the IPCP about a new
      * flow allocation request from the upper layer. */
