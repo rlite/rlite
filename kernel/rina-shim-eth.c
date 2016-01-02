@@ -164,11 +164,9 @@ arp_lookup_direct(struct rina_shim_eth *priv, const struct rina_name *dst_app)
 
 /* This function is taken after net/ipv4/arp.c:arp_create() */
 static struct sk_buff *
-arp_request_create(struct rina_shim_eth *priv,
-                   struct flow_entry *flow)
+arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
+           const char *tpa, const void *tha, gfp_t gfp)
 {
-    char *spa = NULL;  /* Sender Protocol Address */
-    char *tpa = NULL;  /* Target Protocol Address */
     int spa_len, tpa_len;
     int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
     struct sk_buff *skb = NULL;
@@ -177,12 +175,6 @@ arp_request_create(struct rina_shim_eth *priv,
     int pa_len;
     uint8_t *ptr;
 
-    spa = rina_name_to_string(&flow->local_application);
-    tpa = rina_name_to_string(&flow->remote_application);
-    if (!spa || !tpa) {
-        goto err;
-    }
-
     spa_len = strlen(spa);
     tpa_len = strlen(tpa);
     pa_len = (tpa_len > spa_len) ? tpa_len : spa_len;
@@ -190,9 +182,9 @@ arp_request_create(struct rina_shim_eth *priv,
     arp_msg_len = sizeof(*arp) + 2 * (pa_len + priv->netdev->addr_len);
 
     skb = alloc_skb(hhlen + arp_msg_len + priv->netdev->needed_tailroom,
-                    GFP_KERNEL);
+                    gfp);
     if (!skb) {
-        goto err;
+        return NULL;
     }
 
     skb_reserve(skb, hhlen);
@@ -201,16 +193,18 @@ arp_request_create(struct rina_shim_eth *priv,
     skb->dev = priv->netdev;
     skb->protocol = htons(ETH_P_ARP);
 
-    if (dev_hard_header(skb, skb->dev, ETH_P_ARP, priv->netdev->broadcast,
+    if (dev_hard_header(skb, skb->dev, ETH_P_ARP,
+                        tha ? tha : priv->netdev->broadcast,
                         priv->netdev->dev_addr, skb->len) < 0) {
-        goto err;
+        kfree_skb(skb);
+        return NULL;
     }
 
     arp->ar_hrd = htons(priv->netdev->type);
     arp->ar_pro = htons(ETH_P_RINA);
     arp->ar_hln = priv->netdev->addr_len;
     arp->ar_pln = pa_len;
-    arp->ar_op = htons(ARPOP_REQUEST);
+    arp->ar_op = htons(op);
 
     ptr = (uint8_t *)(arp + 1);
 
@@ -223,8 +217,13 @@ arp_request_create(struct rina_shim_eth *priv,
     memset(ptr + spa_len, 0, pa_len - spa_len);
     ptr += pa_len;
 
-    /* Fill in the Target Hardware Address (unknown). */
-    memset(ptr, 0, priv->netdev->addr_len);
+    /* Fill in the Target Hardware Address, or the unknown
+     * address if not provided. */
+    if (tha) {
+        memcpy(ptr, tha, priv->netdev->addr_len);
+    } else {
+        memset(ptr, 0, priv->netdev->addr_len);
+    }
     ptr += priv->netdev->addr_len;
 
     /* Fill in the zero-padded Target Protocol Address. */
@@ -233,21 +232,6 @@ arp_request_create(struct rina_shim_eth *priv,
     ptr += pa_len;
 
     return skb;
-
-err:
-    if (skb) {
-        kfree_skb(skb);
-    }
-
-    if (spa) {
-        kfree(spa);
-    }
-
-    if (tpa) {
-        kfree(tpa);
-    }
-
-    return NULL;
 }
 
 static int
@@ -257,6 +241,8 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     struct rina_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry;
     struct sk_buff *skb;
+    char *spa = NULL; /* Sender Protocol Address. */
+    char *tpa = NULL; /* Target Protocol Address. */
 
     if (!priv->netdev) {
         return -ENXIO;
@@ -276,7 +262,15 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     entry->flow = flow; /* XXX flow_get() ? */
     list_add_tail(&entry->node, &priv->arp_table);
 
-    skb = arp_request_create(priv, flow);
+    spa = rina_name_to_string(&flow->local_application);
+    tpa = rina_name_to_string(&flow->remote_application);
+    if (!spa || !tpa) {
+        if (spa) kfree(spa);
+        if (tpa) kfree(tpa);
+        return -ENOMEM;
+    }
+
+    skb = arp_create(priv, ARPOP_REQUEST, spa, tpa, NULL, GFP_KERNEL);
     if (!skb) {
         return -ENOMEM;
     }
@@ -296,9 +290,41 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 static void
 shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 {
-    PD("ARPLEN %d EXP %d\n", len, (int)(sizeof(*arp) + 2*(arp->ar_pln + arp->ar_hln)));
+    const char *sha = (const char *)(arp) + sizeof(*arp);
+    const char *spa = (const char *)(arp) + sizeof(*arp) + arp->ar_hln;
+    const char *tpa = (const char *)(arp) + sizeof(*arp) +
+                      2 * arp->ar_hln + arp->ar_pln;
+
+    PD("ARPLEN %d EXP %d\n", len, (int)(sizeof(*arp) +
+                             2*(arp->ar_pln + arp->ar_hln)));
+
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
-        /* Send an ARP reply if necessary. */
+        int upper_name_len;
+        struct sk_buff *skb;
+
+        if (!priv->upper_name_s) {
+            /* No application registered here, there's nothing to do. */
+            return;
+        }
+        upper_name_len = strlen(priv->upper_name_s);
+
+        if (arp->ar_pln < upper_name_len) {
+            /* This ARP request cannot match us. */
+            return;
+        }
+
+        if (memcmp(tpa, priv->upper_name_s, upper_name_len)) {
+            /* No match. */
+            return;
+        }
+
+        /* Send an ARP reply. */
+        skb = arp_create(priv, ARPOP_REPLY, priv->upper_name_s,
+                         spa, sha, GFP_ATOMIC);
+        if (skb) {
+            dev_queue_xmit(skb);
+        }
+
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
         /* Update the ARP table. */
     } else {
