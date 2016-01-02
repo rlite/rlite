@@ -29,6 +29,8 @@ struct rinaperf {
     struct rinaperf_test_config test_config;
 };
 
+typedef int (*perf_function_t)(struct rinaperf *);
+
 static int
 client_test_config(struct rinaperf *rp)
 {
@@ -138,12 +140,36 @@ echo_client(struct rinaperf *rp)
 static int
 echo_server(struct rinaperf *rp)
 {
+    int n, ret;
+    char buf[4096];
+
+    n = read(rp->dfd, buf, sizeof(buf));
+    if (n < 0) {
+        perror("read(flow)");
+        return -1;
+    }
+
+    ret = write(rp->dfd, buf, n);
+    if (ret != n) {
+        if (ret < 0) {
+            perror("write(flow)");
+        } else {
+            printf("partial write");
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+server(struct rinaperf *rp, perf_function_t perf_function)
+{
     struct pending_flow_req *pfr = NULL;
 
     for (;;) {
         int result;
-        char buf[4096];
-        int n, ret;
+        int ret;
 
         pfr = flow_request_wait(&rp->application);
         rp->data_port_id = pfr->port_id;
@@ -169,28 +195,13 @@ echo_server(struct rinaperf *rp)
             goto clos;
         }
 
-        n = read(rp->dfd, buf, sizeof(buf));
-        if (n < 0) {
-            perror("read(flow)");
-            goto clos;
-        }
-
-        ret = write(rp->dfd, buf, n);
-        if (ret != n) {
-            if (ret < 0) {
-                perror("write(flow)");
-            } else {
-                printf("partial write");
-            }
-        }
+        perf_function(rp);
 clos:
         close(rp->dfd);
     }
 
     return 0;
 }
-
-typedef int (*perf_function_t)(struct rinaperf *);
 
 struct perf_function_desc {
     const char *name;
@@ -295,10 +306,13 @@ main(int argc, char **argv)
         if (ret) {
             return ret;
         }
-    }
 
-    /* Run the perf function. */
-    perf_function(&rp);
+        server(&rp, perf_function);
+
+    } else {
+        /* We're the client: run the perf function. */
+        perf_function(&rp);
+    }
 
     /* Stop the event loop. */
     evloop_stop(&rp.application.loop);
