@@ -8,8 +8,6 @@
 
 - rlite-utils: routine di deserializzazione devono gestire errori di lunghezza
 
-- vedere come inserire il campo lunghezza nel PCI header
-
 - se si perde la PDU iniziale contenente il DRF è un casino, anche se c'è la
   ritrasmissione. Dal punto di vista del protocollo, infatti, come gestisco
   i pacchetti successivi (che arrivano prima che il trasmettitore si accorge

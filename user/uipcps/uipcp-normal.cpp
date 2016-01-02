@@ -629,7 +629,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
                     (struct rl_kmsg_fa_req_arrived *)b_resp;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int flow_fd;
-    int result = 0;
+    int result = RLITE_SUCC;
     int ret;
 
     assert(b_req == NULL);
@@ -646,13 +646,13 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
                                 req->port_id, req->ipcp_id);
     if (ret) {
         UPE(uipcp, "rib_neigh_set_port_id() failed\n");
-        result = 1;
+        result = RLITE_ERR;
     }
 
     ret = rlite_flow_allocate_resp(&uipcp->appl, req->kevent_id, req->ipcp_id,
                                    uipcp->ipcp_id, req->port_id, result);
 
-    if (ret || result) {
+    if (ret || result != RLITE_SUCC) {
         UPE(uipcp, "rlite_flow_allocate_resp() failed\n");
         goto err;
     }
@@ -751,14 +751,14 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
                      const struct rina_name *ipcp_name)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    int result;
+    int ret;
 
     /* Perform the registration. */
-    result = rlite_appl_register_wait(&uipcp->appl, reg, lower_dif,
+    ret = rlite_appl_register_wait(&uipcp->appl, reg, lower_dif,
                                       NULL, ipcp_name, 2000);
 
-    if (result) {
-        return result;
+    if (ret) {
+        return ret;
     }
 
     if (!lower_dif) {
@@ -768,9 +768,9 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 
     ScopeLock(rib->lock);
 
-    result = rib->register_to_lower(reg, string(lower_dif));
+    ret = rib->register_to_lower(reg, string(lower_dif));
 
-    return result;
+    return ret;
 }
 
 static int

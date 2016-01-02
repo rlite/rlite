@@ -110,7 +110,7 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
                     const struct rina_name *ipcp_name)
 {
     struct uipcp *uipcp;
-    uint8_t result = 1;
+    uint8_t result = RLITE_ERR;
 
     /* Grab the corresponding userspace IPCP. */
     uipcp = uipcp_lookup(uipcps, ipcp_id);
@@ -127,7 +127,7 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
         result = uipcp->ops.register_to_lower(uipcp, reg, dif_name, ipcp_id,
                                               ipcp_name);
 
-        if (result == 0) {
+        if (result == RLITE_SUCC) {
             /* Track the (un)registration in the persistent registration
              * list. */
             track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
@@ -158,7 +158,7 @@ rlite_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
-    resp.result = 1; /* Report failure by default. */
+    resp.result = RLITE_ERR; /* Report failure by default. */
 
     /* Find the userspace part of the enrolling IPCP. */
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
@@ -188,7 +188,7 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
-    resp.result = 1; /* Report failure by default. */
+    resp.result = RLITE_ERR; /* Report failure by default. */
 
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
     if (!uipcp) {
@@ -213,7 +213,7 @@ rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
     struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
-    resp.result = 1; /* Report failure by default. */
+    resp.result = RLITE_ERR; /* Report failure by default. */
 
     if (req->msg_type == RLITE_CFG_UIPCP_CREATE) {
         resp.result = uipcp_add(uipcps, req->ipcp_id, req->dif_type);
@@ -235,7 +235,7 @@ rlite_conf_uipcp_update(struct uipcps *uipcps, int sfd,
 
     uipcps_fetch(uipcps);
 
-    resp.result = 0;
+    resp.result = RLITE_SUCC;
 
 out:
     return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
@@ -251,7 +251,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     struct uipcp *uipcp;
     int ret;
 
-    resp.result = 1; /* Report failure by default. */
+    resp.result = RLITE_ERR; /* Report failure by default. */
     resp.dump = NULL;
 
     uipcp = uipcp_lookup(uipcps, req->ipcp_id);
@@ -264,7 +264,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     if (uipcp->ops.rib_show) {
         resp.dump = uipcp->ops.rib_show(uipcp);
         if (resp.dump) {
-            resp.result = 0;
+            resp.result = RLITE_SUCC;
         }
     }
 
@@ -338,7 +338,7 @@ unix_server(void *arg)
                     req->msg_type);
             resp.msg_type = RLITE_CFG_BASE_RESP;
             resp.event_id = req->event_id;
-            resp.result = 1;
+            resp.result = RLITE_ERR;
             rlite_msg_write_fd(cfd, (struct rlite_msg_base *)&resp);
         } else {
             /* Valid message type: handle the request. */
