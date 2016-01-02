@@ -259,7 +259,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
         flow->sdu_rx_consumed = rina_normal_sdu_rx_consumed;
-PD("SDU_RX_CONSUMED_SET\n");
+        NPD("flow->sdu_rx_consumed set\n");
     }
 
     return 0;

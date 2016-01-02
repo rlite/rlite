@@ -366,8 +366,6 @@ uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
         return 0;
     }
 
-    PD("I WILL ERASE '%s'\n", rm->obj_name.c_str());
-
     local_port = f->second.initiator ? f->second.src_port : f->second.dst_port;
 
     ret = uipcp_issue_flow_dealloc(uipcp, local_port);
