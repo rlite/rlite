@@ -2,8 +2,8 @@
 # for more information on packaging from GIT sources.
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
-pkgname=rina
-pkgver=0.1
+pkgname=rinalite
+pkgver=0.2
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -50,7 +50,8 @@ build() {
     msg "Building on kernel ${RKVER}..."
 
     cd "$srcdir/$_gitname"
-    make
+    ./configure || exit 1
+    make || exit 1
     msg "Build complete"
 }
 
@@ -64,11 +65,12 @@ package() {
     cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
     cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
 
-    # Install the userspace programs
+    # Install the userspace programs and libraries
     mkdir -p "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/user/uipcp-server" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/user/rina-config" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/user/rinaperf" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/librinalite.so" "$pkgdir/usr/lib"
+    cp "$srcdir/$_gitname/build/uipcp-server" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/rina-config" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/rinaperf" "$pkgdir/usr/bin"
 
     # Install the rina public headers
     mkdir -p "$pkgdir/usr/include/rina"
