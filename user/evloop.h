@@ -85,4 +85,7 @@ unsigned int
 select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
                    int fallback);
 
+unsigned int
+lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name);
+
 #endif  /* __RINA_EVLOOP_H__ */

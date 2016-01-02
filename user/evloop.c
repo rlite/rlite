@@ -544,3 +544,20 @@ select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
     return ~0U;
 }
 
+unsigned int
+lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
+{
+    struct ipcp *ipcp;
+
+    if (rina_name_valid(name)) {
+        list_for_each_entry(ipcp, &loop->ipcps, node) {
+            if (rina_name_valid(&ipcp->ipcp_name)
+                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
+                return ipcp->ipcp_id;
+            }
+        }
+    }
+
+    return ~0U;
+}
+

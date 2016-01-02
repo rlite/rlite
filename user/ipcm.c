@@ -483,23 +483,6 @@ rina_conf_ipcp_create(struct ipcm *ipcm, int sfd,
     return rina_conf_response(sfd, RMB(req), &resp);
 }
 
-static unsigned int
-lookup_ipcp_by_name(struct ipcm *ipcm, const struct rina_name *name)
-{
-    struct ipcp *ipcp;
-
-    if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &ipcm->loop.ipcps, node) {
-            if (rina_name_valid(&ipcp->ipcp_name)
-                    && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
-                return ipcp->ipcp_id;
-            }
-        }
-    }
-
-    return ~0U;
-}
-
 static int
 rina_conf_ipcp_destroy(struct ipcm *ipcm, int sfd,
                        const struct rina_msg_base *b_req)
@@ -511,7 +494,7 @@ rina_conf_ipcp_destroy(struct ipcm *ipcm, int sfd,
     resp.result = 1;
 
     /* Does the request specifies an existing IPC process ? */
-    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
     if (ipcp_id == ~0U) {
         PE("%s: No such IPCP process\n", __func__);
     } else {
@@ -533,7 +516,7 @@ rina_conf_assign_to_dif(struct ipcm *ipcm, int sfd,
     resp.result = 1;  /* Report failure by default. */
 
     /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(ipcm, &req->application_name);
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->application_name);
     if (ipcp_id == ~0U) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
@@ -555,7 +538,7 @@ rina_conf_ipcp_config(struct ipcm *ipcm, int sfd,
     resp.result = 1;  /* Report failure by default. */
 
     /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
     if (ipcp_id == ~0U) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
@@ -578,7 +561,7 @@ rina_conf_ipcp_register(struct ipcm *ipcm, int sfd,
     resp.result = 1;  /* Report failure by default. */
 
     /* Lookup the id of the registering IPCP. */
-    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
     if (ipcp_id == ~0U) {
         PE("%s: Could not find who IPC process\n", __func__);
         goto out;
@@ -610,7 +593,7 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
 
     resp.result = 1; /* Report failure by default. */
 
-    ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
+    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
     if (ipcp_id == ~0U) {
         PE("%s: Could not find enrolling IPC process\n", __func__);
         goto out;
