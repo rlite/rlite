@@ -123,6 +123,7 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
     const char *dif_type;
     const char *dif_name;
     long int ipcp_id;
+    int ret;
 
     assert(argc >= 4);
     ipcp_apn = argv[0];
@@ -137,6 +138,17 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
     if (ipcp_id >= 0) {
         PI("IPCP of type '%s' created, assigned id %u\n", dif_type,
            (unsigned int)ipcp_id);
+    }
+
+    if (type_has_uipcp(dif_type)) {
+        ret = rl_conf_ipcp_uipcp_wait(ctrl, (unsigned int)ipcp_id);
+        if (ret) {
+            PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
+            rl_conf_ipcp_destroy(ctrl, (unsigned int)ipcp_id);
+
+        } else {
+            PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
+        }
     }
 
     return ipcp_id < 0 ? -1 : 0;
@@ -166,7 +178,7 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rl_conf_ipcp_destroy(ctrl, rl_ipcp->ipcp_id, rl_ipcp->dif_type);
+    ret = rl_conf_ipcp_destroy(ctrl, rl_ipcp->ipcp_id);
     if (!ret) {
         PI("IPCP %u destroyed\n", rl_ipcp->ipcp_id);
     }
@@ -411,11 +423,11 @@ test(struct rlite_ctrl *ctrl)
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0);
     assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 1, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 1);
     assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0);
     assert(ret);
 
     return 0;

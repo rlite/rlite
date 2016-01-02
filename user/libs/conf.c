@@ -49,10 +49,32 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
     return ret;
 }
 
+/* Wait for an uIPCP to show up. */
+int
+rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
+{
+    struct rl_kmsg_ipcp_uipcp_wait msg;
+    int ret;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_type = RLITE_KER_IPCP_UIPCP_WAIT;
+    msg.event_id = 1;
+    msg.ipcp_id = ipcp_id;
+
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    if (ret < 0) {
+        PE("Failed to issue request to the kernel\n");
+    }
+
+    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&msg));
+
+    return ret;
+}
+
 /* Destroy an IPC process. */
 int
-rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
-                     const char *dif_type)
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;

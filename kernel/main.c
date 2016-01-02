@@ -57,7 +57,6 @@ struct rlite_ctrl {
     wait_queue_head_t upqueue_wqh;
 
     struct list_head flows_fetch_q;
-
     struct list_head node;
 };
 
@@ -438,6 +437,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->depth = RLITE_DEFAULT_LAYERS;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
+        init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
         hash_add(rlite_dm.ipcp_table, &entry->node, entry->id);
         *pentry = entry;
@@ -1542,6 +1542,7 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         } else {
             entry->uipcp = rc;
             ret = 0;
+            wake_up_interruptible(&entry->uipcp_wqh);
         }
         mutex_unlock(&entry->lock);
     }
@@ -1551,6 +1552,53 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
         PI("IPC process %u attached to uipcp %p\n",
                 req->ipcp_id, rc);
     }
+
+    return ret;
+}
+
+static int
+rlite_ipcp_uipcp_wait(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_uipcp_wait *req =
+                    (struct rl_kmsg_ipcp_uipcp_wait *)bmsg;
+    DECLARE_WAITQUEUE(wait, current);
+    struct ipcp_entry *entry;
+    int ret = 0;
+
+    /* Find the IPC process entry corresponding to req->ipcp_id and wait
+     * for the entry->uipcp field to be filled. */
+    entry = ipcp_get(req->ipcp_id);
+    if (!entry) {
+        return -EINVAL;
+    }
+
+    add_wait_queue(&entry->uipcp_wqh, &wait);
+
+    while (1) {
+        struct rlite_ctrl *uipcp;
+
+        current->state = TASK_INTERRUPTIBLE;
+
+        mutex_lock(&entry->lock);
+        uipcp = entry->uipcp;
+        mutex_unlock(&entry->lock);
+
+        if (uipcp) {
+            break;
+        }
+
+        if (signal_pending(current)) {
+            ret = -ERESTARTSYS;
+            break;
+        }
+
+        schedule();
+    }
+
+    current->state = TASK_RUNNING;
+    remove_wait_queue(&entry->uipcp_wqh, &wait);
+
+    ipcp_put(entry);
 
     return ret;
 }
@@ -2202,6 +2250,7 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_FA_REQ] = rlite_fa_req,
     [RLITE_KER_FA_RESP] = rlite_fa_resp,
     [RLITE_KER_IPCP_UIPCP_SET] = rlite_ipcp_uipcp_set,
+    [RLITE_KER_IPCP_UIPCP_WAIT] = rlite_ipcp_uipcp_wait,
     [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rlite_uipcp_fa_req_arrived,
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
