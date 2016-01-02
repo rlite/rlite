@@ -28,7 +28,7 @@ extern struct rlite_msg_layout rlite_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX+1];
 
 /* Message to allocate a new flow. */
 struct rlite_hmsg_fa_req {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t src_port;
@@ -38,7 +38,7 @@ struct rlite_hmsg_fa_req {
 
 /* Message to respond to a flow allocation request. */
 struct rlite_hmsg_fa_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t src_port;

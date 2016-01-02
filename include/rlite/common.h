@@ -33,21 +33,22 @@ struct rina_name {
 } __attribute__((packed));
 
 typedef uint64_t rl_addr_t;
-typedef uint16_t rlite_msg_t;
+typedef uint16_t rl_ipcp_t;
+typedef uint16_t rl_msg_t;
 
 #define RLITE_SUCC  0
 #define RLITE_ERR   1
 
 /* All the possible messages begin like this. */
 struct rlite_msg_base {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 } __attribute__((packed));
 
 /* A simple response message layout that can be shared by many
  * different types. */
 struct rlite_msg_base_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t result;

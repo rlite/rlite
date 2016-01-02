@@ -78,7 +78,7 @@ shim_hv_handle_ctrl_message(struct rlite_shim_hv *priv,
 {
     int ret = 0;
 
-    rlite_msg_t ty = *((const rlite_msg_t *)RLITE_BUF_DATA(rb));
+    rl_msg_t ty = *((const rl_msg_t *)RLITE_BUF_DATA(rb));
 
     if (ty == RLITE_SHIM_HV_FA_REQ) {
         struct rlite_hmsg_fa_req req;

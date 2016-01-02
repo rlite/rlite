@@ -52,7 +52,7 @@ enum {
 extern struct rlite_msg_layout rlite_ker_numtables[RLITE_KER_MSG_MAX+1];
 
 /* All the messages MUST follow a common format and attribute ordering:
- *   - the first field must be 'rlite_msg_t msg_type'
+ *   - the first field must be 'rl_msg_t msg_type'
  *   - the second field must be 'uint32_t event_id'
  *   - then come (if any) all the fields that are not 'struct rina_name' nor
  *     strings ('char *'), in whatever order
@@ -66,7 +66,7 @@ extern struct rlite_msg_layout rlite_ker_numtables[RLITE_KER_MSG_MAX+1];
 
 /* application --> kernel message to create a new IPC process. */
 struct rl_kmsg_ipcp_create {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     struct rina_name name;
@@ -77,7 +77,7 @@ struct rl_kmsg_ipcp_create {
 /* application <-- kernel message to inform the application about the
  * ID of a new IPC process. */
 struct rl_kmsg_ipcp_create_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -88,7 +88,7 @@ struct rl_kmsg_ipcp_create_resp {
 
 /* application <-- kernel message to fetch flow information. */
 struct rl_kmsg_flow_fetch_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t end;
@@ -105,7 +105,7 @@ struct rl_kmsg_flow_fetch_resp {
 
 /* application <-- kernel message to report updated IPCP information. */
 struct rl_kmsg_ipcp_update {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t update_type;
@@ -119,7 +119,7 @@ struct rl_kmsg_ipcp_update {
 
 /* application --> kernel to register a RLITE name. */
 struct rl_kmsg_appl_register {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -129,7 +129,7 @@ struct rl_kmsg_appl_register {
 
 /* application <-- kernel report the result of (un)registration. */
 struct rl_kmsg_appl_register_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -140,7 +140,7 @@ struct rl_kmsg_appl_register_resp {
 
 /* application --> kernel to initiate a flow allocation. */
 struct rl_kmsg_fa_req {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -154,7 +154,7 @@ struct rl_kmsg_fa_req {
 
 /* application <-- kernel to notify about an incoming flow response. */
 struct rl_kmsg_fa_resp_arrived {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t response;
@@ -163,7 +163,7 @@ struct rl_kmsg_fa_resp_arrived {
 
 /* application <-- kernel to notify an incoming flow request. */
 struct rl_kmsg_fa_req_arrived {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t kevent_id;
@@ -176,7 +176,7 @@ struct rl_kmsg_fa_req_arrived {
 
 /* application --> kernel to respond to an incoming flow request. */
 struct rl_kmsg_fa_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t kevent_id;
@@ -194,7 +194,7 @@ struct rl_kmsg_fa_resp {
 
 /* application --> kernel to configure and IPC process. */
 struct rl_kmsg_ipcp_config {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -204,7 +204,7 @@ struct rl_kmsg_ipcp_config {
 
 /* application --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
 struct rl_kmsg_ipcp_pduft_set {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     /* The IPCP whose PDUFT is to be modified. */
@@ -222,7 +222,7 @@ struct rl_kmsg_ipcp_pduft_set {
 /* uipcp (application) --> kernel to tell the kernel that this event
  * loop corresponds to an uipcp. */
 struct rl_kmsg_ipcp_uipcp_set {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -233,7 +233,7 @@ struct rl_kmsg_ipcp_uipcp_set {
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation request has arrived. */
 struct rl_kmsg_uipcp_fa_req_arrived {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t kevent_id;
@@ -251,7 +251,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
 /* uipcp (application) --> kernel to tell the kernel that a flow
  * allocation response has arrived. */
 struct rl_kmsg_uipcp_fa_resp_arrived {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -266,7 +266,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
 /* uipcp (application) <-- kernel to inform an uipcp that
  * a flow has been deallocated locally. */
 struct rl_kmsg_flow_deallocated {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -278,7 +278,7 @@ struct rl_kmsg_flow_deallocated {
 /* uipcp (application) --> kernel message to ask
  * for a flow to be deallocated. */
 struct rl_kmsg_flow_dealloc {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -286,14 +286,14 @@ struct rl_kmsg_flow_dealloc {
 } __attribute__((packed));
 
 struct rl_kmsg_flow_stats_req {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t port_id;
 } __attribute__((packed));
 
 struct rl_kmsg_flow_stats_resp {
-    rlite_msg_t msg_type;
+    rl_msg_t msg_type;
     uint32_t event_id;
 
     struct rl_flow_stats stats;

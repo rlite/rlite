@@ -2322,7 +2322,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
     char *kbuf;
     ssize_t ret;
 
-    if (len < sizeof(rlite_msg_t)) {
+    if (len < sizeof(rl_msg_t)) {
         /* This message doesn't even contain a message type. */
         return -EINVAL;
     }
