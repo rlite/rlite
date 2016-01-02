@@ -16,10 +16,14 @@ struct ipcm {
     int rfd;
     struct pending_queue pqueue;
     uint32_t event_id_counter;
+    pthread_mutex_t lock;
+    int fetch_complete;
+    pthread_cond_t fetch_complete_cond;
 };
 
 static int
-create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
+create_ipcp_resp(struct ipcm *ipcm,
+                 const struct rina_ctrl_base_msg *b_resp,
                  const struct rina_ctrl_base_msg *b_req)
 {
     struct rina_ctrl_create_ipcp_resp *resp =
@@ -34,8 +38,9 @@ create_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
 }
 
 static int
-destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
-                 const struct rina_ctrl_base_msg *b_req)
+destroy_ipcp_resp(struct ipcm *ipcm,
+                  const struct rina_ctrl_base_msg *b_resp,
+                  const struct rina_ctrl_base_msg *b_req)
 {
     struct rina_ctrl_destroy_ipcp_resp *resp =
             (struct rina_ctrl_destroy_ipcp_resp *)b_resp;
@@ -48,9 +53,12 @@ destroy_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
     return 0;
 }
 
+static int fetch_ipcp(struct ipcm *ipcm);
+
 static int
-fetch_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
-                 const struct rina_ctrl_base_msg *b_req)
+fetch_ipcp_resp(struct ipcm *ipcm,
+                const struct rina_ctrl_base_msg *b_resp,
+                const struct rina_ctrl_base_msg *b_req)
 {
     const struct rina_ctrl_fetch_ipcp_resp *resp =
         (const struct rina_ctrl_fetch_ipcp_resp *)b_resp;
@@ -58,6 +66,12 @@ fetch_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
     char *dif_name_s = NULL;
 
     if (resp->end) {
+        /* Signal fetch_ipcps() that the fetch has been completed. */
+        pthread_mutex_lock(&ipcm->lock);
+        ipcm->fetch_complete = 1;
+        pthread_cond_signal(&ipcm->fetch_complete_cond);
+        pthread_mutex_unlock(&ipcm->lock);
+
         return 0;
     }
 
@@ -76,11 +90,16 @@ fetch_ipcp_resp(const struct rina_ctrl_base_msg *b_resp,
         free(dif_name_s);
     }
 
+    /* The fetch is not complete: Request information about the next
+     * IPC process. */
+    fetch_ipcp(ipcm);
+
     return 0;
 }
 
 /* The signature of a response handler. */
-typedef int (*rina_resp_handler_t)(const struct rina_ctrl_base_msg * b_resp,
+typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
+                                   const struct rina_ctrl_base_msg * b_resp,
                                    const struct rina_ctrl_base_msg *b_req);
 
 /* The table containing all response handlers. */
@@ -148,7 +167,7 @@ void *evloop_function(void *arg)
         printf("Message type %d received from kernel\n", resp->msg_type);
 
         /* Invoke the right response handler. */
-        ret = rina_handlers[resp->msg_type](resp, req_entry->msg);
+        ret = rina_handlers[resp->msg_type](ipcm, resp, req_entry->msg);
         if (ret) {
             printf("%s: Error while handling message type [%d]", __func__,
                     resp->msg_type);
@@ -192,6 +211,10 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
         return ENOMEM;
     }
 
+    pthread_mutex_lock(&ipcm->lock);
+
+    msg->event_id = ipcm->event_id_counter++;
+
     entry->next = NULL;
     entry->msg = msg;
     entry->msg_len = msg_len;
@@ -203,6 +226,7 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
         printf("%s: Serialized message would be too long [%u]\n",
                     __func__, serlen);
         free(entry);
+        pthread_mutex_unlock(&ipcm->lock);
         return ENOBUFS;
     }
     serlen = serialize_rina_msg(serbuf, msg);
@@ -217,6 +241,8 @@ issue_request(struct ipcm *ipcm, struct rina_ctrl_base_msg *msg,
                     ret, serlen);
         }
     }
+
+    pthread_mutex_unlock(&ipcm->lock);
 
     return 0;
 }
@@ -236,7 +262,6 @@ create_ipcp(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_CTRL_CREATE_IPCP;
-    msg->event_id = ipcm->event_id_counter++;
     msg->name = *name;
     msg->dif_type = dif_type;
 
@@ -267,7 +292,6 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_CTRL_DESTROY_IPCP;
-    msg->event_id = ipcm->event_id_counter++;
     msg->ipcp_id = ipcp_id;
 
     printf("Requesting IPC process destruction...\n");
@@ -282,9 +306,9 @@ destroy_ipcp(struct ipcm *ipcm, unsigned int ipcp_id)
     return ret;
 }
 
-/* Fetch information about IPC processes. */
+/* Fetch information about a single IPC process. */
 static int
-fetch_ipcps(struct ipcm *ipcm)
+fetch_ipcp(struct ipcm *ipcm)
 {
     struct rina_ctrl_base_msg *msg;
     int ret;
@@ -297,7 +321,6 @@ fetch_ipcps(struct ipcm *ipcm)
 
     memset(msg, 0, sizeof(*msg));
     msg->msg_type = RINA_CTRL_FETCH_IPCP;
-    msg->event_id = ipcm->event_id_counter++;
 
     printf("Requesting IPC processes fetch...\n");
 
@@ -308,6 +331,28 @@ fetch_ipcps(struct ipcm *ipcm)
     }
 
     return ret;
+}
+
+/* Fetch information about all IPC processes. */
+static int
+fetch_ipcps(struct ipcm *ipcm)
+{
+    int ret = fetch_ipcp(ipcm);
+
+    if (ret) {
+        return ret;
+    }
+
+    /* Wait for the fetch process - which is composed of multiple
+     * request-response transactions - to complete. */
+    pthread_mutex_lock(&ipcm->lock);
+    while (!ipcm->fetch_complete) {
+        pthread_cond_wait(&ipcm->fetch_complete_cond, &ipcm->lock);
+    }
+    ipcm->fetch_complete = 0;
+    pthread_mutex_unlock(&ipcm->lock);
+
+    return 0;
 }
 
 static int
@@ -345,6 +390,9 @@ int main()
         perror("open(/dev/rinactrl)");
         exit(EXIT_FAILURE);
     }
+    pthread_mutex_init(&ipcm.lock, NULL);
+    pthread_cond_init(&ipcm.fetch_complete_cond, NULL);
+    ipcm.fetch_complete = 0;
     pending_queue_init(&ipcm.pqueue);
     ipcm.event_id_counter = 1;
 
