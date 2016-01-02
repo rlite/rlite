@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <pthread.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -115,9 +116,25 @@ private:
     std::map<uint64_t, Info> info;
 };
 
+class ScopeLock {
+public:
+    ScopeLock(pthread_mutex_t& m) : mutex(m) {
+        pthread_mutex_lock(&mutex);
+    }
+    ~ScopeLock() {
+        pthread_mutex_unlock(&mutex);
+    }
+
+private:
+    pthread_mutex_t& mutex;
+};
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
+
+    /* RIB lock. */
+    pthread_mutex_t lock;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             Neighbor *neigh);
@@ -148,6 +165,7 @@ struct uipcp_rib {
     std::map< std::string, struct rina_flow_config > qos_cubes;
 
     uipcp_rib(struct uipcp *_u);
+    ~uipcp_rib();
 
     struct rlite_ipcp *ipcp_info() const;
     char *dump() const;

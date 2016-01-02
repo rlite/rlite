@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <cassert>
+#include <pthread.h>
 
 #include "uipcp-rib.hpp"
 
@@ -251,6 +252,8 @@ uipcp_rib::load_qos_cubes(const char *filename)
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 {
+    pthread_mutex_init(&lock, NULL);
+
     load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos");
 
     /* Insert the handlers for the RIB objects. */
@@ -258,6 +261,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
+}
+
+uipcp_rib::~uipcp_rib()
+{
+    pthread_mutex_destroy(&lock);
 }
 
 struct rlite_ipcp *
@@ -490,6 +498,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage& m, uint64_t dst_addr,
     return mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
 }
 
+/* To be called under RIB lock. */
 int
 uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
 {
@@ -645,6 +654,8 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
                 return 0;
             }
 
+            ScopeLock(rib->lock);
+
             rib->cdap_dispatch(adata.cdap, NULL);
 
             delete m;
@@ -664,6 +675,8 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
         delete m;
         m = NULL;
 
+        ScopeLock(rib->lock);
+
         /* Lookup neighbor by port id. */
         neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
         if (neigh == rib->neighbors.end()) {
@@ -682,12 +695,13 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
             PE("msg_deser() failed\n");
             return -1;
         }
+
+        /* Feed the enrollment state machine. */
+        ret = neigh->second.enroll_fsm_run(m);
+
     } catch (std::bad_alloc) {
         PE("Out of memory\n");
     }
-
-    /* Feed the enrollment state machine. */
-    ret = neigh->second.enroll_fsm_run(m);
 
     delete m;
 
@@ -698,6 +712,8 @@ extern "C" int
 rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
 {
+    ScopeLock(rib->lock);
+
     return rib->application_register(reg, RinaName(appl_name));
 }
 
@@ -705,6 +721,8 @@ extern "C" int
 rib_flow_deallocated(struct uipcp_rib *rib,
                      struct rina_kmsg_flow_deallocated *req)
 {
+    ScopeLock(rib->lock);
+
     return rib->flow_deallocated(req);
 }
 
@@ -721,12 +739,16 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
 
     name = string(lower_dif->apn);
 
+    ScopeLock(rib->lock);
+
     return rib->ipcp_register(reg, name);
 }
 
 extern "C" char *
 rib_dump(struct uipcp_rib *rib)
 {
+    ScopeLock(rib->lock);
+
     return rib->dump();
 }
 
@@ -734,17 +756,23 @@ extern "C" int
 rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
             uint64_t remote_addr)
 {
+    ScopeLock(rib->lock);
+
     return rib->dft_set(RinaName(appl_name), remote_addr);
 }
 
 extern "C" int
 rib_fa_req(struct uipcp_rib *rib, struct rina_kmsg_fa_req *req)
 {
+    ScopeLock(rib->lock);
+
     return rib->fa_req(req);
 }
 
 extern "C" int
 rib_fa_resp(struct uipcp_rib *rib, struct rina_kmsg_fa_resp *resp)
 {
+    ScopeLock(rib->lock);
+
     return rib->fa_resp(resp);
 }
