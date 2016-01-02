@@ -66,6 +66,8 @@ struct upqueue_entry {
 struct registered_application {
     struct rina_name name;
     struct rina_ctrl *rc;
+    struct ipcp_entry *ipcp;
+    unsigned int refcnt;
     struct list_head node;
 };
 
@@ -108,6 +110,8 @@ static struct rina_dm rina_dm;
 #define FUNLOCK() spin_unlock_irq(&rina_dm.flows_lock)
 #define PLOCK() spin_lock_irq(&rina_dm.ipcps_lock)
 #define PUNLOCK() spin_unlock_irq(&rina_dm.ipcps_lock)
+#define RALOCK(_p) spin_lock_irq(&(_p)->regapp_lock)
+#define RAUNLOCK(_p) spin_unlock_irq(&(_p)->regapp_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(uint8_t dif_type)
@@ -307,6 +311,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->mgmt_txrx = NULL;
         entry->refcnt = 1;
         INIT_LIST_HEAD(&entry->registered_applications);
+        spin_lock_init(&entry->regapp_lock);
         INIT_WORK(&entry->remove, ipcp_remove_work);
         mutex_init(&entry->lock);
         hash_add(rina_dm.ipcp_table, &entry->node, entry->id);
@@ -375,13 +380,14 @@ out:
 }
 
 static struct registered_application *
-ipcp_application_lookup(struct ipcp_entry *ipcp,
-                        const struct rina_name *application_name)
+__ipcp_application_get(struct ipcp_entry *ipcp,
+                       const struct rina_name *application_name)
 {
     struct registered_application *app;
 
     list_for_each_entry(app, &ipcp->registered_applications, node) {
         if (rina_name_cmp(&app->name, application_name) == 0) {
+            app->refcnt++;
             return app;
         }
     }
@@ -389,17 +395,49 @@ ipcp_application_lookup(struct ipcp_entry *ipcp,
     return NULL;
 }
 
-static void
-ipcp_application_del_entry(struct ipcp_entry *ipcp,
-                           struct registered_application *app)
+static struct registered_application *
+ipcp_application_get(struct ipcp_entry *ipcp,
+                     const struct rina_name *application_name)
 {
+    struct registered_application *app;
+
+    RALOCK(ipcp);
+    app = __ipcp_application_get(ipcp, application_name);
+    RAUNLOCK(ipcp);
+
+    return app;
+}
+
+static void
+ipcp_application_put(struct ipcp_entry *ipcp,
+                     struct registered_application *app)
+{
+    if (!app) {
+        return;
+    }
+
+    RALOCK(ipcp);
+
+    app->refcnt--;
+    if (app->refcnt) {
+        RAUNLOCK(ipcp);
+        return;
+    }
+
+    list_del(&app->node);
+
+    RAUNLOCK(ipcp);
+
+    /* XXX here we should hold ipcp->lock. */
     if (ipcp->ops.application_register) {
         ipcp->ops.application_register(ipcp, &app->name, 0);
     }
 
-    list_del(&app->node);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
     ipcp_put(ipcp);
+
+    /* From here on registered application cannot be referenced anymore, and so
+     * that we don't need locks. */
     rina_name_free(&app->name);
     kfree(app);
 }
@@ -409,30 +447,48 @@ ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *application_name,
                      struct rina_ctrl *rc)
 {
-    struct registered_application *app;
+    struct registered_application *app, *newapp;
     int ret = 0;
 
-    app = ipcp_application_lookup(ipcp, application_name);
+    /* Create a new registered application. */
+    newapp = kzalloc(sizeof(*newapp), GFP_KERNEL);
+    if (!newapp) {
+        return -ENOMEM;
+    }
+
+    rina_name_copy(&newapp->name, application_name);
+    newapp->rc = rc;
+    newapp->refcnt = 1;
+    newapp->ipcp = ipcp;
+
+    RALOCK(ipcp);
+
+    app = __ipcp_application_get(ipcp, application_name);
     if (app) {
-            /* Application is already registered. */
+            /* Application was already registered. */
+            RAUNLOCK(ipcp);
+            ipcp_application_put(ipcp, app);
+            /* Rollback memory allocation. */
+            rina_name_free(&newapp->name);
+            kfree(newapp);
             return -EINVAL;
     }
 
-    app = kzalloc(sizeof(*app), GFP_KERNEL);
-    if (!app) {
-        return -ENOMEM;
-    }
-    rina_name_copy(&app->name, application_name);
-    app->rc = rc;
+    list_add_tail(&newapp->node, &ipcp->registered_applications);
+
+    RAUNLOCK(ipcp);
+
+    PLOCK();
     ipcp->refcnt++;
+    PUNLOCK();
     PD("%s: REFCNT++ %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
 
-    list_add_tail(&app->node, &ipcp->registered_applications);
-
     if (ipcp->ops.application_register) {
+        mutex_lock(&ipcp->lock);
         ret = ipcp->ops.application_register(ipcp, application_name, 1);
+        mutex_unlock(&ipcp->lock);
         if (ret) {
-            ipcp_application_del_entry(ipcp, app);
+            ipcp_application_put(ipcp, newapp);
         }
     }
 
@@ -445,14 +501,13 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 {
     struct registered_application *app;
 
-    app = ipcp_application_lookup(ipcp, application_name);
-    if (app) {
-        ipcp_application_del_entry(ipcp, app);
-    }
-
+    app = ipcp_application_get(ipcp, application_name);
     if (!app) {
         return -EINVAL;
     }
+
+    ipcp_application_put(ipcp, app); /* To match ipcp_application_get(). */
+    ipcp_application_put(ipcp, app); /* To remove the application. */
 
     return 0;
 }
@@ -710,20 +765,34 @@ application_del_by_rc(struct rina_ctrl *rc)
     struct registered_application *app;
     struct registered_application *tmp;
     const char *s;
+    struct list_head remove_apps;
+
+    INIT_LIST_HEAD(&remove_apps);
+
+    PLOCK();
 
     /* For each IPC processes. */
     hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
+        RALOCK(ipcp);
+
         /* For each application registered to this IPC process. */
         list_for_each_entry_safe(app, tmp,
                 &ipcp->registered_applications, node) {
             if (app->rc == rc) {
-                s = rina_name_to_string(&app->name);
-                printk("%s: Application %s will be automatically "
-                       "unregistered\n",  __func__, s);
-                kfree(s);
-                ipcp_application_del_entry(ipcp, app);
+                if (app->refcnt == 1) {
+                    /* Just move the reference. */
+                    list_del(&app->node);
+                    list_add_tail(&app->node, &remove_apps);
+                } else {
+                    /* Do what ipcp_application_put() would do, but
+                     * without taking the regapp_lock. */
+                    app->refcnt--;
+                }
             }
         }
+
+        RAUNLOCK(ipcp);
+
         /* If the control device to be deleted is an uipcp attached to
          * this IPCP, detach it. */
         if (ipcp->uipcp == rc) {
@@ -731,6 +800,18 @@ application_del_by_rc(struct rina_ctrl *rc)
             printk("%s: IPC process %u detached by uipcp %p\n",
                    __func__, ipcp->id, rc);
         }
+    }
+
+    PUNLOCK();
+
+    /* Remove the selected applications without holding locks (we are in
+     * process context here). */
+    list_for_each_entry_safe(app, tmp, &remove_apps, node) {
+        s = rina_name_to_string(&app->name);
+        printk("%s: Application %s will be automatically "
+                "unregistered\n",  __func__, s);
+        kfree(s);
+        ipcp_application_put(app->ipcp, app);
     }
 }
 
@@ -1163,7 +1244,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
     } else {
         struct registered_application *app;
 
-        app = ipcp_application_lookup(ipcp_entry, remote_application);
+        app = ipcp_application_get(ipcp_entry, remote_application);
         if (app) {
             /* If the remote application is registered within this very
              * IPCP, the allocating flow can managed entirely inside this
@@ -1173,6 +1254,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                       ipcp_entry->addr, remote_application,
                                       local_application, &req->flowcfg, 0);
+            ipcp_application_put(ipcp_entry, app);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
              * to this IPCP. */
@@ -1360,7 +1442,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
 
     /* See whether the local application is registered to this
      * IPC process. */
-    app = ipcp_application_lookup(ipcp, local_application);
+    app = ipcp_application_get(ipcp, local_application);
     if (!app) {
         goto out;
     }
@@ -1394,6 +1476,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     }
     rina_name_free(&req.remote_appl);
 out:
+    ipcp_application_put(ipcp, app);
 
     return ret;
 }
