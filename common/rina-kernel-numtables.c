@@ -1,4 +1,4 @@
-#include "rina/rina-utils.h"
+#include "rina/rinalite-utils.h"
 #include "rina/rina-kernel-msg.h"
 
 

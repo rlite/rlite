@@ -13,7 +13,7 @@
 
 #include <rina/rina-ipcp-types.h>
 #include <rina/rina-common.h>
-#include <rina/rina-utils.h>
+#include <rina/rinalite-utils.h>
 
 
 /* Message types. They **must** be listed alternating requests with

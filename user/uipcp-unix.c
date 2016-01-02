@@ -14,7 +14,7 @@
 #include <endian.h>
 #include "rina/rina-kernel-msg.h"
 #include "rina/rina-conf-msg.h"
-#include "rina/rina-utils.h"
+#include "rina/rinalite-utils.h"
 
 #include "rinalite_list.h"
 #include "helpers.h"

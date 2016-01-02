@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "rina/rina-utils.h"
+#include "rina/rinalite-utils.h"
 #include "rina/rina-conf-msg.h"
 
 

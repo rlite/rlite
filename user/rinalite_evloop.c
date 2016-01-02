@@ -14,7 +14,7 @@
 #include <sys/eventfd.h>
 #include "rina/rina-kernel-msg.h"
 #include "rina/rina-conf-msg.h"
-#include "rina/rina-utils.h"
+#include "rina/rinalite-utils.h"
 
 #include "pending_queue.h"
 #include "rinalite_evloop.h"
