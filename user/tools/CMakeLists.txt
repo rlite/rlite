@@ -12,4 +12,4 @@ target_link_libraries(rina-gw rlite ${CMAKE_THREAD_LIBS_INIT})
  # Installation directives
 install(TARGETS rinaperf rina-config rina-gw rina-rr-tool DESTINATION usr/bin)
 install(FILES rina-gw.conf DESTINATION etc/rlite)
-install(FILES inet-rr-tool DESTINATION usr/bin)
+install(PROGRAMS inet-rr-tool DESTINATION usr/bin)
