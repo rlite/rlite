@@ -31,5 +31,3 @@
 
 - shim-eth: implementare la funzionalità di unpadding per estrarre rina_name
   serializzati dai messaggi ARP.
-
-- ipcp_application_put() potrebbe avere solo 'app' come argomento

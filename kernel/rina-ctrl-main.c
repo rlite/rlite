@@ -409,9 +409,10 @@ ipcp_application_get(struct ipcp_entry *ipcp,
 }
 
 static void
-ipcp_application_put(struct ipcp_entry *ipcp,
-                     struct registered_application *app)
+ipcp_application_put(struct registered_application *app)
 {
+    struct ipcp_entry *ipcp = app->ipcp;
+
     if (!app) {
         return;
     }
@@ -467,7 +468,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     if (app) {
             /* Application was already registered. */
             RAUNLOCK(ipcp);
-            ipcp_application_put(ipcp, app);
+            ipcp_application_put(app);
             /* Rollback memory allocation. */
             rina_name_free(&newapp->name);
             kfree(newapp);
@@ -488,7 +489,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
         ret = ipcp->ops.application_register(ipcp, application_name, 1);
         mutex_unlock(&ipcp->lock);
         if (ret) {
-            ipcp_application_put(ipcp, newapp);
+            ipcp_application_put(newapp);
         }
     }
 
@@ -506,8 +507,8 @@ ipcp_application_del(struct ipcp_entry *ipcp,
         return -EINVAL;
     }
 
-    ipcp_application_put(ipcp, app); /* To match ipcp_application_get(). */
-    ipcp_application_put(ipcp, app); /* To remove the application. */
+    ipcp_application_put(app); /* To match ipcp_application_get(). */
+    ipcp_application_put(app); /* To remove the application. */
 
     return 0;
 }
@@ -811,7 +812,7 @@ application_del_by_rc(struct rina_ctrl *rc)
         printk("%s: Application %s will be automatically "
                 "unregistered\n",  __func__, s);
         kfree(s);
-        ipcp_application_put(app->ipcp, app);
+        ipcp_application_put(app);
     }
 }
 
@@ -1254,7 +1255,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
             ret = rina_fa_req_arrived(ipcp_entry, flow_entry->local_port,
                                       ipcp_entry->addr, remote_application,
                                       local_application, &req->flowcfg, 0);
-            ipcp_application_put(ipcp_entry, app);
+            ipcp_application_put(app);
         } else if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
              * to this IPCP. */
@@ -1476,7 +1477,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     }
     rina_name_free(&req.remote_appl);
 out:
-    ipcp_application_put(ipcp, app);
+    ipcp_application_put(app);
 
     return ret;
 }
