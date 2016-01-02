@@ -88,7 +88,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
     struct rina_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
+    mhdr.type = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
     mhdr.local_port = local_port;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
@@ -101,7 +101,7 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     struct rina_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.type = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
     mhdr.remote_addr = dst_addr;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
@@ -223,7 +223,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
 
     /* Grab the management header. */
     mhdr = (struct rina_mgmt_hdr *)mgmtbuf;
-    assert(mhdr->type == RINA_MGMT_HDR_T_IN);
+    assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
     rib_msg_rcvd(rib, mhdr, ((char *)(mhdr + 1)),
@@ -311,13 +311,13 @@ uipcp_rib::dump() const
                 << endl << "   dtcp.rtx_control=" <<
                 u82boolstr(c.dtcp.rtx_control) << endl;
 
-            if (c.dtcp.fc.fc_type == RINA_FC_T_WIN) {
+            if (c.dtcp.fc.fc_type == RLITE_FC_T_WIN) {
                 ss << "   dtcp.fc.max_cwq_len=" <<
                     static_cast<unsigned int>(c.dtcp.fc.cfg.w.max_cwq_len)
                     << endl << "   dtcp.fc.initial_credit=" <<
                     static_cast<unsigned int>(c.dtcp.fc.cfg.w.initial_credit)
                     << endl;
-            } else if (c.dtcp.fc.fc_type == RINA_FC_T_RATE) {
+            } else if (c.dtcp.fc.fc_type == RLITE_FC_T_RATE) {
                 ss << "   dtcp.fc.sending_rate=" <<
                     static_cast<unsigned int>(c.dtcp.fc.cfg.r.sending_rate)
                     << endl << "   dtcp.fc.time_period=" <<

@@ -1,5 +1,5 @@
 /*
- * RINA Ethernet shim DIF
+ * RLITE Ethernet shim DIF
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
@@ -36,7 +36,7 @@
 #include <linux/if_ether.h>
 
 
-#define ETH_P_RINA  0xD1F0
+#define ETH_P_RLITE  0xD1F0
 
 struct arpt_entry {
     /* Targed Hardware Address. Only support 48-bit addresses for now. */
@@ -248,7 +248,7 @@ arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
     }
 
     arp->ar_hrd = htons(priv->netdev->type);
-    arp->ar_pro = htons(ETH_P_RINA);
+    arp->ar_pro = htons(ETH_P_RLITE);
     arp->ar_hln = priv->netdev->addr_len;
     arp->ar_pln = pa_len;
     arp->ar_op = htons(op);
@@ -616,7 +616,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
            entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
 
     } else {
-        PI("Unknown RINA ARP operation %04X\n",
+        PI("Unknown RLITE ARP operation %04X\n",
                 ntohs(arp->ar_op));
     }
 
@@ -757,8 +757,8 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         /* This is an ARP frame. */
         struct arphdr *arp = (struct arphdr *)skb->data;
 
-        if (ntohs(arp->ar_pro) == ETH_P_RINA) {
-            /* This ARP operation belongs to RINA stack. */
+        if (ntohs(arp->ar_pro) == ETH_P_RLITE) {
+            /* This ARP operation belongs to RLITE stack. */
             shim_eth_arp_rx(priv, arp, skb->len);
 
         } else {
@@ -766,12 +766,12 @@ shim_eth_rx_handler(struct sk_buff **skbp)
             return RX_HANDLER_PASS;
         }
 
-    } else if (ethertype == ETH_P_RINA) {
-        /* This is a RINA shim-eth PDU. */
+    } else if (ethertype == ETH_P_RLITE) {
+        /* This is a RLITE shim-eth PDU. */
         shim_eth_pdu_rx(priv, skb);
 
     } else {
-        /* This frame doesn't belong to RINA stack. */
+        /* This frame doesn't belong to RLITE stack. */
         return RX_HANDLER_PASS;
     }
 
@@ -846,9 +846,9 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     skb_reserve(skb, hhlen);
     skb_reset_network_header(skb);
     skb->dev = priv->netdev;
-    skb->protocol = htons(ETH_P_RINA);
+    skb->protocol = htons(ETH_P_RLITE);
 
-    ret = dev_hard_header(skb, skb->dev, ETH_P_RINA, entry->tha,
+    ret = dev_hard_header(skb, skb->dev, ETH_P_RLITE, entry->tha,
                           priv->netdev->dev_addr, skb->len);
     if (unlikely(ret < 0)) {
         kfree_skb(skb);

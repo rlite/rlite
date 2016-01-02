@@ -1,5 +1,5 @@
 /*
- * RINA shim DIF for HV
+ * RLITE shim DIF for HV
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
@@ -52,7 +52,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     int ret;
     uint8_t *serbuf;
 
-    serlen = rlite_msg_serlen(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
+    serlen = rlite_msg_serlen(rina_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
                              msg);
     serbuf = kmalloc(serlen, GFP_ATOMIC);
     if (!serbuf) {
@@ -60,7 +60,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    ret = serialize_rina_msg(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
+    ret = serialize_rina_msg(rina_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
                              serbuf, msg);
     if (ret != serlen) {
         printk("Error while serializing\n");
@@ -84,11 +84,11 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
 
     rlite_msg_t ty = *((const rlite_msg_t *)serbuf);
 
-    if (ty == RINA_SHIM_HV_FA_REQ) {
+    if (ty == RLITE_SHIM_HV_FA_REQ) {
         struct rina_hmsg_fa_req req;
 
         ret = deserialize_rina_msg(rina_shim_hv_numtables,
-                                   RINA_SHIM_HV_MSG_MAX, serbuf, serlen,
+                                   RLITE_SHIM_HV_MSG_MAX, serbuf, serlen,
                                    &req, sizeof(req));
         if (ret) {
             goto des_fail;
@@ -99,11 +99,11 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
         if (ret) {
             printk("failed to report flow allocation request\n");
         }
-    } else if (ty == RINA_SHIM_HV_FA_RESP) {
+    } else if (ty == RLITE_SHIM_HV_FA_RESP) {
         struct rina_hmsg_fa_resp resp;
 
         ret = deserialize_rina_msg(rina_shim_hv_numtables,
-                                   RINA_SHIM_HV_MSG_MAX, serbuf, serlen,
+                                   RLITE_SHIM_HV_MSG_MAX, serbuf, serlen,
                                    &resp, sizeof(resp));
         if (ret) {
             goto des_fail;
@@ -186,7 +186,7 @@ rina_shim_hv_fa_req(struct ipcp_entry *ipcp,
 {
     struct rina_hmsg_fa_req req;
 
-    req.msg_type = RINA_SHIM_HV_FA_REQ;
+    req.msg_type = RLITE_SHIM_HV_FA_REQ;
     req.event_id = 0;
     rina_name_copy(&req.local_appl, &flow->local_appl);
     rina_name_copy(&req.remote_appl, &flow->remote_appl);
@@ -202,7 +202,7 @@ rina_shim_hv_fa_resp(struct ipcp_entry *ipcp,
 {
     struct rina_hmsg_fa_resp resp;
 
-    resp.msg_type = RINA_SHIM_HV_FA_RESP;
+    resp.msg_type = RLITE_SHIM_HV_FA_RESP;
     resp.event_id = 0;
     resp.local_port = flow->local_port;
     resp.remote_port = flow->remote_port;

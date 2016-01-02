@@ -17,17 +17,17 @@ endif()
 # Some globbing and headers include
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-file(GLOB RINA_HEADERS "include/rlite/*.h")
+file(GLOB RLITE_HEADERS "include/rlite/*.h")
 
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
-message(STATUS "RINA HEADERS: ${RINA_HEADERS}")
+message(STATUS "RLITE HEADERS: ${RLITE_HEADERS}")
 
 add_definitions("-Wall")
 
 include_directories(${INCLUDE_DIR})
 
-install(FILES ${RINA_HEADERS} DESTINATION usr/include/rlite)
+install(FILES ${RLITE_HEADERS} DESTINATION usr/include/rlite)
 install(FILES include/rlite/cdap.hpp DESTINATION usr/include/rlite)
 
 add_subdirectory(user)

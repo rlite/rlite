@@ -601,7 +601,7 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* Initialization of RINA application library. */
+    /* Initialization of RLITE application library. */
     ret = rlite_appl_init(&rp.application);
     if (ret) {
         return ret;

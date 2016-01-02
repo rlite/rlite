@@ -1,5 +1,5 @@
-#ifndef __RINA_UIPCP_H__
-#define __RINA_UIPCP_H__
+#ifndef __RLITE_UIPCP_H__
+#define __RLITE_UIPCP_H__
 
 #include "rlite/conf-msg.h"
 #include "rlite/kernel-msg.h"
@@ -28,7 +28,7 @@ struct uipcps {
     struct list_head ipcp_nodes;
 };
 
-#define RINA_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
+#define RLITE_PERSISTENT_REG_FILE   "/var/rlite/uipcps-pers-reg"
 
 struct uipcp;
 
@@ -144,4 +144,4 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 }
 #endif
 
-#endif /* __RINA_UIPCP_H__ */
+#endif /* __RLITE_UIPCP_H__ */

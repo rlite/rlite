@@ -1,5 +1,5 @@
-#ifndef __RINA_SHIM_HV_MSG_H__
-#define __RINA_SHIM_HV_MSG_H__
+#ifndef __RLITE_SHIM_HV_MSG_H__
+#define __RLITE_SHIM_HV_MSG_H__
 
 /*
  * When compiling from userspace include <stdint.h>,
@@ -16,15 +16,15 @@
 
 
 enum {
-    RINA_SHIM_HV_FA_REQ = 1,
-    RINA_SHIM_HV_FA_RESP, /* 2 */
+    RLITE_SHIM_HV_FA_REQ = 1,
+    RLITE_SHIM_HV_FA_RESP, /* 2 */
 
-    RINA_SHIM_HV_MSG_MAX,
+    RLITE_SHIM_HV_MSG_MAX,
 };
 
 /* Numtables for shim-hv <==> shim-hv messages exchange. */
 
-extern struct rlite_msg_layout rina_shim_hv_numtables[RINA_SHIM_HV_MSG_MAX+1];
+extern struct rlite_msg_layout rina_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX+1];
 
 /* Message to allocate a new flow. */
 struct rina_hmsg_fa_req {
@@ -46,4 +46,4 @@ struct rina_hmsg_fa_resp {
     uint8_t response;
 } __attribute__((packed));
 
-#endif  /* __RINA_SHIM_HV_MSG_H__ */
+#endif  /* __RLITE_SHIM_HV_MSG_H__ */

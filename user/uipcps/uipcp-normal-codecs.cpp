@@ -633,9 +633,9 @@ gpb2FlowCtrlConfig(FlowCtrlConfig& cfg,
                    const gpb::dtcpFlowControlConfig_t &gm)
 {
     if (gm.windowbased()) {
-        cfg.fc_type = RINA_FC_T_WIN;
+        cfg.fc_type = RLITE_FC_T_WIN;
     } else if (gm.ratebased()) {
-        cfg.fc_type = RINA_FC_T_RATE;
+        cfg.fc_type = RLITE_FC_T_RATE;
     }
     gpb2WindowBasedFlowCtrlConfig(cfg.win, gm.windowbasedconfig());
     gpb2RateBasedFlowCtrlConfig(cfg.rate, gm.ratebasedconfig());
@@ -659,8 +659,8 @@ FlowCtrlConfig2gpb(const FlowCtrlConfig& cfg,
     gpb::dtcpRateBasedFlowControlConfig_t *r;
     gpb::policyDescriptor_t *p;
 
-    gm.set_windowbased(cfg.fc_type == RINA_FC_T_WIN);
-    gm.set_ratebased(cfg.fc_type == RINA_FC_T_RATE);
+    gm.set_windowbased(cfg.fc_type == RLITE_FC_T_WIN);
+    gm.set_ratebased(cfg.fc_type == RLITE_FC_T_RATE);
 
     w = new gpb::dtcpWindowBasedFlowControlConfig_t;
     WindowBasedFlowCtrlConfig2gpb(cfg.win, *w);

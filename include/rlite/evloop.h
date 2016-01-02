@@ -58,10 +58,10 @@ struct rlite_evloop {
     /* Table containing the kernel handlers. */
     rina_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
 
-    /* File descriptor for the RINA control device ("/dev/rlite") */
+    /* File descriptor for the RLITE control device ("/dev/rlite") */
     int rfd;
 
-    /* A FIFO queue that stores pending RINA events. */
+    /* A FIFO queue that stores pending RLITE events. */
     struct list_head pqueue;
 
     /* What event-id to use for the next request issued to the kernel. */

@@ -1,5 +1,5 @@
-#ifndef __RINA_COMMON_H__
-#define __RINA_COMMON_H__
+#ifndef __RLITE_COMMON_H__
+#define __RLITE_COMMON_H__
 
 /*
  * When compiling from userspace include <stdint.h>,
@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-#define RINA_UIPCPS_UNIX_NAME     "/var/rlite/uipcp-server"
+#define RLITE_UIPCPS_UNIX_NAME     "/var/rlite/uipcp-server"
 
 /* Application naming information:
  *   - Application Process Name
@@ -53,10 +53,10 @@ struct rlite_msg_base_resp {
 
 /* Bind the flow identified by port_id to
  * this rina_io device. */
-#define RINA_IO_MODE_APPL_BIND    86
+#define RLITE_IO_MODE_APPL_BIND    86
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
-#define RINA_IO_MODE_IPCP_MGMT    88
+#define RLITE_IO_MODE_IPCP_MGMT    88
 
 struct rina_ioctl_info {
     uint8_t mode;
@@ -64,12 +64,12 @@ struct rina_ioctl_info {
     uint16_t ipcp_id;
 } __attribute__((packed));
 
-#define RINA_MGMT_HDR_T_OUT_LOCAL_PORT      1
-#define RINA_MGMT_HDR_T_OUT_DST_ADDR        2
-#define RINA_MGMT_HDR_T_IN                  3
+#define RLITE_MGMT_HDR_T_OUT_LOCAL_PORT      1
+#define RLITE_MGMT_HDR_T_OUT_DST_ADDR        2
+#define RLITE_MGMT_HDR_T_IN                  3
 
 /* Header used across user/kernel boundary when writing/reading
- * management SDUs from rlite-io devices working in RINA_IO_MODE_IPCP_MGMT
+ * management SDUs from rlite-io devices working in RLITE_IO_MODE_IPCP_MGMT
  * mode.
  * Userspace can write a management SDU specifying either a local
  * port (type OUT_LOCAL_PORT) or a destination address (OUT_DST_ADDR). In
@@ -99,9 +99,9 @@ struct window_based_config {
     uint64_t initial_credit;
 } __attribute__((packed));
 
-#define RINA_FC_T_NONE      0
-#define RINA_FC_T_WIN       1
-#define RINA_FC_T_RATE      2
+#define RLITE_FC_T_NONE      0
+#define RLITE_FC_T_WIN       1
+#define RLITE_FC_T_RATE      2
 
 struct fc_config {
     uint8_t fc_type;
@@ -212,4 +212,4 @@ struct rina_flow_spec {
 }
 #endif
 
-#endif  /* __RINA_COMMON_H__ */
+#endif  /* __RLITE_COMMON_H__ */

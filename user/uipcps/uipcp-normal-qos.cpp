@@ -106,7 +106,7 @@ update_qos_cube(struct rina_flow_config& flowcfg, const string& param,
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.sending_rate")) {
-        flowcfg.dtcp.fc.fc_type = RINA_FC_T_RATE;
+        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_RATE;
         flowcfg.dtcp.flow_control = 1;
         flowcfg.dtcp_present = 1;
         flowcfg.dtcp.fc.cfg.r.sending_rate = field_int;
@@ -114,7 +114,7 @@ update_qos_cube(struct rina_flow_config& flowcfg, const string& param,
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.time_period")) {
-        flowcfg.dtcp.fc.fc_type = RINA_FC_T_RATE;
+        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_RATE;
         flowcfg.dtcp.flow_control = 1;
         flowcfg.dtcp_present = 1;
         flowcfg.dtcp.fc.cfg.r.time_period = field_int;
@@ -122,7 +122,7 @@ update_qos_cube(struct rina_flow_config& flowcfg, const string& param,
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.max_cwq_len")) {
-        flowcfg.dtcp.fc.fc_type = RINA_FC_T_WIN;
+        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_WIN;
         flowcfg.dtcp.flow_control = 1;
         flowcfg.dtcp_present = 1;
         flowcfg.dtcp.fc.cfg.w.max_cwq_len = field_int;
@@ -131,7 +131,7 @@ update_qos_cube(struct rina_flow_config& flowcfg, const string& param,
 
     if (!parse_flowcfg_int(param, value, &field_int,
                                             "dtcp.fc.initial_credit")) {
-        flowcfg.dtcp.fc.fc_type = RINA_FC_T_WIN;
+        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_WIN;
         flowcfg.dtcp.flow_control = 1;
         flowcfg.dtcp_present = 1;
         flowcfg.dtcp.fc.cfg.w.initial_credit = field_int;

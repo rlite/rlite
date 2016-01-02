@@ -1,5 +1,5 @@
 /*
- * RINA management functionalities
+ * RLITE management functionalities
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
@@ -1943,7 +1943,7 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             ret = rlite_buf_custom_push(rb, sizeof(*mhdr));
             BUG_ON(ret);
             mhdr = (struct rina_mgmt_hdr *)RLITE_BUF_DATA(rb);
-            mhdr->type = RINA_MGMT_HDR_T_IN;
+            mhdr->type = RLITE_MGMT_HDR_T_IN;
             mhdr->local_port = flow->local_port;
             mhdr->remote_addr = src_addr;
 
@@ -2269,7 +2269,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     }
     ipcp = rio->txrx->ipcp;
 
-    if (unlikely(rio->mode == RINA_IO_MODE_IPCP_MGMT)) {
+    if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
         /* Copy in the management header. */
         if (copy_from_user(&mhdr, ubuf, sizeof(mhdr))) {
             PE("copy_from_user(mgmthdr)\n");
@@ -2291,8 +2291,8 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         return -EFAULT;
     }
 
-    if (unlikely(rio->mode != RINA_IO_MODE_APPL_BIND)) {
-        if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
+    if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
+        if (rio->mode == RLITE_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
         } else {
             PE("Unknown mode, this should not happen\n");
@@ -2472,7 +2472,7 @@ rina_io_release_internal(struct rina_io *rio)
 {
     BUG_ON(!rio);
     switch (rio->mode) {
-        case RINA_IO_MODE_APPL_BIND:
+        case RLITE_IO_MODE_APPL_BIND:
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
             BUG_ON(!rio->flow);
@@ -2481,7 +2481,7 @@ rina_io_release_internal(struct rina_io *rio)
             rio->txrx = NULL;
             break;
 
-        case RINA_IO_MODE_IPCP_MGMT:
+        case RLITE_IO_MODE_IPCP_MGMT:
             BUG_ON(!rio->txrx);
             BUG_ON(!rio->txrx->ipcp);
             /* A previous IPCP was bound to this management file
@@ -2521,11 +2521,11 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     rina_io_release_internal(rio);
 
     switch (info.mode) {
-        case RINA_IO_MODE_APPL_BIND:
+        case RLITE_IO_MODE_APPL_BIND:
             ret = rina_io_ioctl_bind(rio, &info);
             break;
 
-        case RINA_IO_MODE_IPCP_MGMT:
+        case RLITE_IO_MODE_IPCP_MGMT:
             ret = rina_io_ioctl_mgmt(rio, &info);
             break;
     }

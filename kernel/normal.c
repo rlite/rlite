@@ -1,5 +1,5 @@
 /*
- * RINA normal IPC process
+ * RLITE normal IPC process
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *
@@ -247,7 +247,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr_next = NULL;
     dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
 
-    if (fc->fc_type == RINA_FC_T_WIN) {
+    if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
         dtp->snd_rwe += fc->cfg.w.initial_credit;
         dtp->rcv_rwe += fc->cfg.w.initial_credit;
@@ -415,7 +415,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
     }
 
-    if (unlikely((fc->fc_type == RINA_FC_T_WIN &&
+    if (unlikely((fc->fc_type == RLITE_FC_T_WIN &&
                  dtp->next_seq_num_to_send > dtp->snd_rwe &&
                     dtp->cwq_len >= dtp->max_cwq_len)) ||
                         (flow->cfg.dtcp.rtx_control &&
@@ -453,7 +453,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
-        if (fc->fc_type == RINA_FC_T_WIN) {
+        if (fc->fc_type == RLITE_FC_T_WIN) {
             if (pci->seqnum > dtp->snd_rwe) {
                 /* PDU not in the sender window, let's
                  * insert it into the Closed Window Queue.
@@ -506,7 +506,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     struct ipcp_entry *lower_ipcp;
     uint64_t dst_addr = 0; /* Not valid. */
 
-    if (mhdr->type == RINA_MGMT_HDR_T_OUT_DST_ADDR) {
+    if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
         lower_flow = pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!lower_flow)) {
             RPD(5, "No route to IPCP %lu, dropping packet\n",
@@ -516,7 +516,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
             return 0;
         }
         dst_addr = mhdr->remote_addr;
-    } else if (mhdr->type == RINA_MGMT_HDR_T_OUT_LOCAL_PORT) {
+    } else if (mhdr->type == RLITE_MGMT_HDR_T_OUT_LOCAL_PORT) {
         lower_flow = flow_get(mhdr->local_port);
         if (!lower_flow || lower_flow->upper.ipcp != ipcp) {
             RPD(5, "Invalid mgmt header local port %u, "
@@ -691,7 +691,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
-        if (cfg->fc.fc_type == RINA_FC_T_WIN) {
+        if (cfg->fc.fc_type == RLITE_FC_T_WIN) {
             NPD("rcv_rwe [%lu] --> [%lu]\n",
                     (long unsigned)flow->dtp.rcv_rwe,
                     (long unsigned)(flow->dtp.rcv_lwe +

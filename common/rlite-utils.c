@@ -57,7 +57,7 @@ string_prlen(const char *s)
     return slen > 65535 ? 65535 : slen;
 }
 
-/* Size of a serialized RINA name. */
+/* Size of a serialized RLITE name. */
 unsigned int
 rina_name_serlen(const struct rina_name *name)
 {
@@ -107,7 +107,7 @@ deserialize_string(const void **pptr, char **s)
     return 0;
 }
 
-/* Serialize a RINA name. */
+/* Serialize a RLITE name. */
 void
 serialize_rina_name(void **pptr, const struct rina_name *name)
 {
@@ -117,7 +117,7 @@ serialize_rina_name(void **pptr, const struct rina_name *name)
     serialize_string(pptr, name->aei);
 }
 
-/* Deserialize a RINA name. */
+/* Deserialize a RLITE name. */
 int
 deserialize_rina_name(const void **pptr, struct rina_name *name)
 {
@@ -278,7 +278,7 @@ rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
         return;
     }
 
-    /* Skip the copiable part and scan all the RINA names contained in
+    /* Skip the copiable part and scan all the RLITE names contained in
      * the message. */
     name = (struct rina_name *)(((void *)msg) + copylen);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
@@ -585,12 +585,12 @@ flow_config_dump(const struct rina_flow_config *c)
                 c->dtcp.flow_control,
                 c->dtcp.rtx_control);
 
-    if (c->dtcp.fc.fc_type == RINA_FC_T_WIN) {
+    if (c->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
         COMMON_PRINT("   dtcp.fc.max_cwq_len=%lu\n"
                     "   dtcp.fc.initial_credit=%lu\n",
                     (long unsigned)c->dtcp.fc.cfg.w.max_cwq_len,
                     (long unsigned)c->dtcp.fc.cfg.w.initial_credit);
-    } else if (c->dtcp.fc.fc_type == RINA_FC_T_RATE) {
+    } else if (c->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
         COMMON_PRINT("   dtcp.fc.sending_rate=%lu\n"
                     "   dtcp.fc.time_period=%lu\n",
                     (long unsigned)c->dtcp.fc.cfg.r.sending_rate,

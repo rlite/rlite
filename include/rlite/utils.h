@@ -1,5 +1,5 @@
-#ifndef __RINA_SERDES_H__
-#define __RINA_SERDES_H__
+#ifndef __RLITE_SERDES_H__
+#define __RLITE_SERDES_H__
 
 #include "rlite/common.h"
 
@@ -59,4 +59,4 @@ int __rina_name_from_string(const char *str, struct rina_name *name,
 }
 #endif
 
-#endif  /* __RINA_SERDES_H__ */
+#endif  /* __RLITE_SERDES_H__ */

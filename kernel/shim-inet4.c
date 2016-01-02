@@ -1,5 +1,5 @@
 /*
- * RINA TCP/UDP/IPv4 shim IPC process
+ * RLITE TCP/UDP/IPv4 shim IPC process
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *

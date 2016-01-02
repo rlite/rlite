@@ -1,5 +1,5 @@
 /*
- * RINA EFCP support routines
+ * RLITE EFCP support routines
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *

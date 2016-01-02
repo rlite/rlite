@@ -67,7 +67,7 @@ uipcps_connect(void)
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RINA_UIPCPS_UNIX_NAME,
+    strncpy(server_address.sun_path, RLITE_UIPCPS_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
     ret = connect(sfd, (struct sockaddr *)&server_address,
                     sizeof(server_address));

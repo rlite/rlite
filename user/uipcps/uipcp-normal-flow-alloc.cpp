@@ -55,13 +55,13 @@ flowcfg2policies(const struct rina_flow_config *cfg,
     p.dtcp_cfg.rtx_ctrl = cfg->dtcp.rtx_control;
 
     p.dtcp_cfg.flow_ctrl_cfg.fc_type = cfg->dtcp.fc.fc_type;
-    if (cfg->dtcp.fc.fc_type == RINA_FC_T_WIN) {
+    if (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
         p.dtcp_cfg.flow_ctrl_cfg.win.max_cwq_len =
                         cfg->dtcp.fc.cfg.w.max_cwq_len;
         p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit =
                         cfg->dtcp.fc.cfg.w.initial_credit;
 
-    } else if (cfg->dtcp.fc.fc_type == RINA_FC_T_RATE) {
+    } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
         p.dtcp_cfg.flow_ctrl_cfg.rate.sending_rate =
                         cfg->dtcp.fc.cfg.r.sending_rate;
         p.dtcp_cfg.flow_ctrl_cfg.rate.time_period =
@@ -92,13 +92,13 @@ policies2flowcfg(struct rina_flow_config *cfg,
     cfg->dtcp.rtx_control = p.dtcp_cfg.rtx_ctrl;
 
     cfg->dtcp.fc.fc_type = p.dtcp_cfg.flow_ctrl_cfg.fc_type;
-    if (cfg->dtcp.fc.fc_type == RINA_FC_T_WIN) {
+    if (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
         cfg->dtcp.fc.cfg.w.max_cwq_len =
                         p.dtcp_cfg.flow_ctrl_cfg.win.max_cwq_len;
         cfg->dtcp.fc.cfg.w.initial_credit =
                         p.dtcp_cfg.flow_ctrl_cfg.win.initial_credit;
 
-    } else if (cfg->dtcp.fc.fc_type == RINA_FC_T_RATE) {
+    } else if (cfg->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
         cfg->dtcp.fc.cfg.r.sending_rate =
                         p.dtcp_cfg.flow_ctrl_cfg.rate.sending_rate;
         cfg->dtcp.fc.cfg.r.time_period =

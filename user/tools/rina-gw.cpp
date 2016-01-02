@@ -161,14 +161,14 @@ struct Gateway {
     struct rlite_appl appl;
     struct rina_name appl_name;
 
-    /* Used to map IP:PORT --> RINA_NAME, when
+    /* Used to map IP:PORT --> RLITE_NAME, when
      * receiving TCP connection requests from the INET world
-     * towards the RINA world. */
+     * towards the RLITE world. */
     map<InetName, RinaName> srv_map;
     map<int, RinaName> srv_fd_map;
 
-    /* Used to map RINA_NAME --> IP:PORT, when
-     * receiving flow allocation requests from the RINA world
+    /* Used to map RLITE_NAME --> IP:PORT, when
+     * receiving flow allocation requests from the RLITE world
      * towards the INET world. */
     map<RinaName, InetName> dst_map;
 

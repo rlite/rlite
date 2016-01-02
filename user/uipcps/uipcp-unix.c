@@ -363,11 +363,11 @@ unix_server(void *arg)
 static void
 persistent_ipcp_reg_dump(struct uipcps *uipcps)
 {
-    FILE *fpreg = fopen(RINA_PERSISTENT_REG_FILE, "w");
+    FILE *fpreg = fopen(RLITE_PERSISTENT_REG_FILE, "w");
 
     if (!fpreg) {
         PE("Cannot open persistent register file (%s)\n",
-                RINA_PERSISTENT_REG_FILE);
+                RLITE_PERSISTENT_REG_FILE);
     } else {
         char *dif_s, *ipcp_s;
         struct registered_ipcp *ripcp;
@@ -424,7 +424,7 @@ uipcps_update(struct uipcps *uipcps)
     if (1) {
         /* Read the persistent IPCP registration file into
          * the ipcps_registrations list. */
-        FILE *fpreg = fopen(RINA_PERSISTENT_REG_FILE, "r");
+        FILE *fpreg = fopen(RLITE_PERSISTENT_REG_FILE, "r");
         char line[4096];
 
         if (fpreg) {
@@ -473,7 +473,7 @@ sigint_handler(int signum)
     /* TODO Here we should free all the dynamically allocated memory
      * referenced by uipcps. */
 
-    unlink(RINA_UIPCPS_UNIX_NAME);
+    unlink(RLITE_UIPCPS_UNIX_NAME);
     exit(EXIT_SUCCESS);
 }
 
@@ -499,9 +499,9 @@ int main(int argc, char **argv)
     }
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX;
-    strncpy(server_address.sun_path, RINA_UIPCPS_UNIX_NAME,
+    strncpy(server_address.sun_path, RLITE_UIPCPS_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
-    if (unlink(RINA_UIPCPS_UNIX_NAME) == 0) {
+    if (unlink(RLITE_UIPCPS_UNIX_NAME) == 0) {
         /* This should not happen if everything behaves correctly.
          * However, if something goes wrong, the Unix domain socket
          * could still exist and so the following bind() would fail.
@@ -534,7 +534,7 @@ int main(int argc, char **argv)
         perror("warning: chmod(/dev/rlite-io) failed\n");
     }
 
-    if (chmod(RINA_UIPCPS_UNIX_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
+    if (chmod(RLITE_UIPCPS_UNIX_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
                                      | S_IROTH | S_IWOTH)) {
         perror("warning: chmod(/var/rlite/uipcp-server) failed\n");
     }

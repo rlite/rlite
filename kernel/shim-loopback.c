@@ -1,5 +1,5 @@
 /*
- * RINA loopback shim DIF
+ * RLITE loopback shim DIF
  *
  *    Vincenzo Maffione <v.maffione@gmail.it>
  *

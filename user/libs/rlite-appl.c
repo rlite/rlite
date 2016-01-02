@@ -182,7 +182,7 @@ rlite_flow_cfg_default(struct rina_flow_config *cfg)
     cfg->in_order_delivery = 0;
     cfg->max_sdu_gap = (uint64_t)-1;
     cfg->dtcp_present = 0;
-    cfg->dtcp.fc.fc_type = RINA_FC_T_NONE;
+    cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
 }
 
 static struct rina_kmsg_fa_resp_arrived *
@@ -403,14 +403,14 @@ open_port_common(uint32_t port_id, unsigned int mode, uint32_t ipcp_id)
 int
 rlite_open_appl_port(uint32_t port_id)
 {
-    return open_port_common(port_id, RINA_IO_MODE_APPL_BIND, 0);
+    return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
 }
 
 int rlite_open_mgmt_port(uint16_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
-    return open_port_common(~0U, RINA_IO_MODE_IPCP_MGMT, ipcp_id);
+    return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
 /* rlite_flow_allocate() + rlite_open_appl_port() */

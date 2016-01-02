@@ -653,7 +653,7 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->eventfd = -1;
     loop->evloop_th = 0;
 
-    /* Open the RINA control device. */
+    /* Open the RLITE control device. */
     loop->rfd = open(dev, O_RDWR);
     if (loop->rfd < 0) {
         PE("Cannot open '%s'\n", dev);
@@ -661,7 +661,7 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         return loop->rfd;
     }
 
-    /* Set non-blocking operation for the RINA control device, so that
+    /* Set non-blocking operation for the RLITE control device, so that
      * the event-loop can synchronize with the kernel through select(). */
     ret = fcntl(loop->rfd, F_SETFL, O_NONBLOCK);
     if (ret) {

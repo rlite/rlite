@@ -91,7 +91,7 @@ struct rina_kmsg_fetch_ipcp_resp {
     char *dif_type;
 } __attribute__((packed));
 
-/* application --> kernel to register a RINA name. */
+/* application --> kernel to register a RLITE name. */
 struct rina_kmsg_appl_register {
     rlite_msg_t msg_type;
     uint32_t event_id;
