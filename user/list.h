@@ -1,11 +1,6 @@
 #ifndef __TEMPLATE_LIST_H__
 #define __TEMPLATE_LIST_H__aa
 
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-#define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
-
 struct list_head {
         struct list_head *prev;
         struct list_head *succ;
@@ -34,5 +29,16 @@ list_add_tail(struct list_head *list, struct list_head *elem)
         elem->prev = list->prev;
         list->prev = elem;
 }
+
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
+
+#define list_for_each_entry(_cur, _list, _member)                            \
+        for (_cur = container_of((_list)->succ, typeof(*_cur), _member);     \
+             &_cur->_member != (_list);                                      \
+            _cur = container_of(_cur->_member.succ, typeof(*_cur), _member))
 
 #endif  /* __TEMPLATE_LIST_H__ */

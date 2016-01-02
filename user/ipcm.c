@@ -418,14 +418,12 @@ static int
 ipcps_print(struct ipcm *ipcm)
 {
     struct ipcp *ipcp;
-    struct list_head *cur;
 
     printf("IPC Processes table:\n");
-    for (cur = ipcm->ipcps.succ; cur != &ipcm->ipcps; cur = cur->succ) {
+    list_for_each_entry(ipcp, &ipcm->ipcps, node) {
             char *ipcp_name_s = NULL;
             char *dif_name_s = NULL;
 
-            ipcp = container_of(cur, struct ipcp, node);
             ipcp_name_s = rina_name_to_string(&ipcp->ipcp_name);
             dif_name_s = rina_name_to_string(&ipcp->dif_name);
             printf("    id = %d, name = '%s' dif_name = '%s'\n",
