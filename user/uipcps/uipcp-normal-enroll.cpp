@@ -882,8 +882,8 @@ Neighbor::alloc_flow(const char *supp_dif_name)
 
     /* Allocate a flow for the enrollment. */
     ret = rl_appl_flow_alloc(&rib->uipcp->appl, event_id, supp_dif_name, NULL,
-                              &info->ipcp_name, &neigh_name, NULL,
-                              &port_id_, 2000, info->ipcp_id);
+                             &info->ipcp_name, &neigh_name, NULL,
+                             info->ipcp_id, &port_id_, 2000);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");

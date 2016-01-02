@@ -1212,6 +1212,51 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
     return ret;
 }
 
+void
+rlite_flow_spec_default(struct rlite_flow_spec *spec)
+{
+    memset(spec, 0, sizeof(*spec));
+    strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
+}
+
+/* This is used by uipcp, not by appl. */
+void
+rlite_flow_cfg_default(struct rlite_flow_config *cfg)
+{
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->partial_delivery = 0;
+    cfg->incomplete_delivery = 0;
+    cfg->in_order_delivery = 0;
+    cfg->max_sdu_gap = (uint64_t)-1;
+    cfg->dtcp_present = 0;
+    cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
+}
+
+int
+rl_fa_req_fill(struct rl_kmsg_fa_req *req,
+               uint32_t event_id, unsigned int ipcp_id,
+               const char *dif_name,
+               const struct rina_name *ipcp_name,
+               const struct rina_name *local_appl,
+               const struct rina_name *remote_appl,
+               const struct rlite_flow_spec *flowspec,
+               uint16_t upper_ipcp_id)
+{
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_FA_REQ;
+    req->event_id = event_id;
+    req->ipcp_id = ipcp_id;
+    req->upper_ipcp_id = upper_ipcp_id;
+    if (flowspec) {
+        memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
+    } else {
+        rlite_flow_spec_default(&req->flowspec);
+    }
+    rina_name_copy(&req->local_appl, local_appl);
+    rina_name_copy(&req->remote_appl, remote_appl);
+
+    return 0;
+}
 
 int
 rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
@@ -1260,8 +1305,34 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
 }
 
 int
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl)
+rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+                   const struct rina_name *ipcp_name,
+                   const struct rina_name *local_appl,
+                   const struct rina_name *remote_appl,
+                   const struct rlite_flow_spec *flowspec)
 {
+    struct rl_kmsg_fa_req req;
+    struct rlite_ipcp *rlite_ipcp;
+    int ret;
+
+    rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
+    if (!rlite_ipcp) {
+        rlite_ipcp = rlite_select_ipcp_by_dif(ctrl, dif_name);
+    }
+    if (!rlite_ipcp) {
+        PE("No suitable IPCP found\n");
+        return -1;
+    }
+
+    ret = rl_fa_req_fill(&req, 0, rlite_ipcp->ipcp_id, dif_name, ipcp_name,
+                         local_appl, remote_appl, flowspec, 0xffff);
+    if (ret) {
+        PE("Failed to fill flow allocation request\n");
+        return -1;
+    }
+
+    (void)req;
+
     return 0;
 }
 
