@@ -136,41 +136,43 @@ struct rina_flow_config {
 #define PI_ON  /* Enable info print. */
 
 #ifdef __KERNEL__
-#define PRINTFUN printk
+#define PRINTFUN1 printk
 #else
-#define PRINTFUN printf
+#define PRINTFUN1 printf
 #endif
 
+#define PRINTFUN(LEV, FMT, ...) PRINTFUN1("[" LEV "]" FMT, ##__VA_ARGS__)
+
 #ifdef PD_ON
-#define PD(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+#define PD(FMT, ...) PRINTFUN("DBG", FMT, ##__VA_ARGS__)
 #else
-#define PD(format, ...)
+#define PD(FMT, ...)
 #endif
 
 #ifdef PI_ON
-#define PI(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+#define PI(FMT, ...) PRINTFUN("INF", FMT, ##__VA_ARGS__)
 #else
 #define PI(formt, ...)
 #endif
 
-#define PE(format, ...) PRINTFUN(format, ##__VA_ARGS__)
+#define PE(FMT, ...) PRINTFUN("ERR", FMT, ##__VA_ARGS__)
 
-#define NPD(format, ...)
+#define NPD(FMT, ...)
 
 #ifdef __KERNEL__
 
 #define time_sec_cur     (jiffies_to_msecs(jiffies) / 1000U)
 
-/* Rate-limited version, lps indicate how many per second. */
-#define RPD(lps, format, ...)                           \
+/* Rate-limited version, LPS indicate how many per second. */
+#define RPD(LPS, FMT, ...)                              \
     do {                                                \
         static int t0, __cnt;                           \
         if (t0 != time_sec_cur) {                       \
             t0 = time_sec_cur;                          \
             __cnt = 0;                                  \
         }                                               \
-        if (__cnt++ < lps)                              \
-        PD(format, ##__VA_ARGS__);                      \
+        if (__cnt++ < LPS)                              \
+        PD(FMT, ##__VA_ARGS__);                         \
     } while (0)
 
 #endif
