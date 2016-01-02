@@ -262,11 +262,13 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
                               &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
-    handlers.insert(make_pair(obj_name::keepalive, &uipcp_rib::keepalive_handler));
+    handlers.insert(make_pair(obj_name::keepalive,
+                              &uipcp_rib::keepalive_handler));
 
     /* Start timers for periodic tasks. */
-    rl_evloop_schedule(&uipcp->loop, RL_AGE_INCR_INTERVAL * 1000,
-                       age_incr_cb, this);
+    age_incr_tmrid = rl_evloop_schedule(&uipcp->loop,
+                                        RL_AGE_INCR_INTERVAL * 1000,
+                                        age_incr_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
@@ -277,6 +279,7 @@ uipcp_rib::~uipcp_rib()
     }
 
     rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
+    rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }

@@ -289,5 +289,6 @@ age_incr_cb(struct rlite_evloop *loop, void *arg)
     }
 
     /* Reschedule */
-    rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000, age_incr_cb, rib);
+    rib->age_incr_tmrid = rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000,
+                                             age_incr_cb, rib);
 }

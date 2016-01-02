@@ -209,6 +209,9 @@ struct uipcp_rib {
     /* Available QoS cubes. */
     std::map< std::string, struct rlite_flow_config > qos_cubes;
 
+    /* Timer ID for age increment of LFDB entries. */
+    int age_incr_tmrid;
+
     uipcp_rib(struct uipcp *_u);
     ~uipcp_rib();
 
