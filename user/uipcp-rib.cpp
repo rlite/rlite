@@ -611,6 +611,21 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     }
 
     /* Send my DFT. */
+    DFTSlice dft_slice;
+    for (map< string, DFTEntry >::iterator e = rib->dft.begin();
+                                            e != rib->dft.end(); e++) {
+        dft_slice.entries.push_back(e->second);
+    }
+
+    m = CDAPMessage();
+    m.m_create(gpb::F_NO_FLAGS, obj_class::dft, obj_name::dft,
+               0, 0, string());
+    ret = send_to_port_id(&m, 0, &dft_slice);
+    if (ret) {
+        PE("send_to_port_id() failed\n");
+        abort();
+        return 0;
+    }
 
     /* Stop the enrollment. */
     enr_info.start_early = true;
