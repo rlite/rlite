@@ -179,6 +179,8 @@ struct CDAPMessage {
     CDAPMessage(const gpb::CDAPMessage& gm);
     operator gpb::CDAPMessage() const;
 
+    bool valid() const;
+
 private:
     /* Representation of the object value. */
     struct {

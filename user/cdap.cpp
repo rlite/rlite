@@ -291,6 +291,12 @@ CDAPMessage::operator gpb::CDAPMessage() const
     return gm;
 }
 
+bool
+CDAPMessage::valid() const
+{
+    return true;
+}
+
 void
 CDAPMessage::print() const
 {
@@ -490,6 +496,10 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
     char *serbuf;
     int n;
 
+    if (!m->valid()) {
+        return -1;
+    }
+
     /* Run CDAP connection state machine (sender side). */
     if (conn_fsm_run(m, true)) {
         return -1;
@@ -551,6 +561,11 @@ CDAPConn::msg_recv()
     m = new CDAPMessage(gm);
     if (!m) {
         PE("%s: Out of memory\n", __func__);
+    }
+
+    if (!m->valid()) {
+        delete m;
+        return NULL;
     }
 
     /* Run CDAP connection state machine (receiver side). */
