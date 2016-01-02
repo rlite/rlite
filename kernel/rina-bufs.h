@@ -4,8 +4,20 @@
 #include <linux/types.h>
 #include <linux/list.h>
 
+
 enum {
-    PDU_TYPE_MGMT = 0x12,
+    PDU_TYPE_DT             = 0x80, /* Data Transfer PDU */
+    PDU_TYPE_CC             = 0xC3, /* Common Control PDU */
+    PDU_TYPE_ACK            = 0xC4, /* ACK only */
+    PDU_TYPE_NACK           = 0xC5, /* Forced Retransmission PDU (NACK) */
+    PDU_TYPE_SACK           = 0xC6, /* Selective ACK */
+    PDU_TYPE_SNACK          = 0xC7, /* Selective NACK */
+    PDU_TYPE_FC             = 0xC8, /* Flow Control only */
+    PDU_TYPE_ACK_AND_FC     = 0xCC, /* ACK and Flow Control */
+    PDU_TYPE_NACK_AND_FC    = 0xCD, /* NACK and Flow Control */
+    PDU_TYPE_SACK_AND_FC    = 0xCE, /* Selective ACK and Flow Control */
+    PDU_TYPE_SNACK_AND_FC   = 0xCF, /* Selective NACK and Flow Control */
+    PDU_TYPE_MGMT           = 0x40, /* Management PDU */
 };
 
 /* PCI header to be used for transfer PDUs. */

@@ -191,8 +191,8 @@ rina_normal_flow_allocate_resp(struct ipcp_entry *ipcp,
 
 static int
 rina_normal_sdu_write(struct ipcp_entry *ipcp,
-                          struct flow_entry *flow,
-                          struct rina_buf *rb)
+                      struct flow_entry *flow,
+                      struct rina_buf *rb)
 {
     int ret = rina_sdu_rx(ipcp, rb, flow->remote_port);
 
