@@ -356,6 +356,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.src_cep = flow->local_port;
     pci->pdu_type = PDU_T_DT;
     pci->pdu_flags = dtp->set_drf ? 1 : 0;
+    pci->pdu_len = rb->len;
     pci->seqnum = dtp->next_seq_num_to_send++;
 
     dtp->set_drf = false;
@@ -477,6 +478,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.src_cep = 0; /* Not valid. */
     pci->pdu_type = PDU_T_MGMT;
     pci->pdu_flags = 0; /* Not valid. */
+    pci->pdu_len = rb->len;
     pci->seqnum = 0; /* Not valid. */
 
     return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, true);
@@ -568,6 +570,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->base.conn_id.src_cep = flow->local_port;
         pcic->base.pdu_type = pdu_type;
         pcic->base.pdu_flags = 0;
+        pcic->base.pdu_len = rb->len;
         pcic->base.seqnum = flow->dtp.next_snd_ctl_seq++;
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num = ack_nack_seq_num;
