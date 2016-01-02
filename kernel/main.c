@@ -1434,7 +1434,7 @@ rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     int ret = -EINVAL;  /* Report failure by default. */
 
     /* Find the IPC process entry corresponding to req->ipcp_id and
-     * fill the DIF name field. */
+     * fill the entry->uipcp field. */
     entry = ipcp_get(req->ipcp_id);
     if (entry) {
         mutex_lock(&entry->lock);
