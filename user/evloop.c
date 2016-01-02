@@ -73,7 +73,7 @@ ipcp_fetch(struct rina_evloop *loop, int *result)
     printf("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(loop, msg, sizeof(*msg), 1, 1, result);
+           issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
 }
 
 int
@@ -298,12 +298,15 @@ evloop_stop(struct rina_evloop *loop)
     return 0;
 }
 
+#define ONEBILLION 1000000000ULL
+#define ONEMILLION 1000000ULL
+
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
 struct rina_msg_base *
 issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int has_response, int wait_for_completion,
-              int *result)
+              size_t msg_len, int has_response,
+              unsigned int wait_for_completion, int *result)
 {
     struct rina_msg_base *resp = NULL;
     struct pending_entry *entry;
@@ -385,8 +388,29 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         }
 
     } else if (has_response && entry->wait_for_completion) {
-        while (!entry->op_complete) {
-            pthread_cond_wait(&entry->op_complete_cond, &loop->lock);
+        while (!entry->op_complete && *result == 0) {
+            if (entry->wait_for_completion == ~0U) {
+                *result = pthread_cond_wait(&entry->op_complete_cond,
+                                            &loop->lock);
+            } else {
+                struct timespec deadline;
+                struct timespec to;
+
+                /* Compute the absolute deadline to be passed to
+                 * pthread_cond_timedwait(). */
+                to.tv_nsec = (entry->wait_for_completion * ONEMILLION)
+                                % ONEBILLION;
+                to.tv_sec = entry->wait_for_completion / 1000;
+                clock_gettime(CLOCK_REALTIME, &deadline);
+                deadline.tv_sec += to.tv_sec + (deadline.tv_nsec + to.tv_nsec)
+                                    / ONEBILLION;
+                deadline.tv_nsec = (deadline.tv_nsec + to.tv_nsec)
+                                    % ONEBILLION;
+                printf("%u %u\n", (unsigned)deadline.tv_sec, (unsigned)deadline.tv_nsec);
+
+                *result = pthread_cond_timedwait(&entry->op_complete_cond, &loop->lock,
+                                                 &deadline);
+            }
         }
         pthread_cond_destroy(&entry->op_complete_cond);
 

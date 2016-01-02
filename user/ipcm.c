@@ -60,7 +60,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
-ipcp_create(struct ipcm *ipcm, int wait_for_completion,
+ipcp_create(struct ipcm *ipcm, unsigned int wait_for_completion,
             const struct rina_name *name, uint8_t dif_type,
             int *result)
 {
@@ -201,12 +201,12 @@ test(struct ipcm *ipcm)
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
-    icresp = ipcp_create(ipcm, 1, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    icresp = ipcp_create(ipcm, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
     assert(icresp);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
-    icresp = ipcp_create(ipcm, 1, &name, DIF_TYPE_SHIM_DUMMY, &result);
+    icresp = ipcp_create(ipcm, ~0U, &name, DIF_TYPE_SHIM_DUMMY, &result);
     assert(!icresp);
     rina_name_free(&name);
 
@@ -277,7 +277,7 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
     struct rina_kmsg_ipcp_create_resp *kresp;
     int result;
 
-    kresp = ipcp_create(ipcm, 1, &req->ipcp_name, req->dif_type, &result);
+    kresp = ipcp_create(ipcm, ~0U, &req->ipcp_name, req->dif_type, &result);
     if (kresp) {
         rina_msg_free(rina_kernel_numtables, RMB(kresp));
     }

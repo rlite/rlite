@@ -136,7 +136,8 @@ application_register_req(struct application *application,
 }
 
 static struct rina_kmsg_flow_allocate_resp_arrived *
-flow_allocate_req(struct application *application, int wait_for_completion,
+flow_allocate_req(struct application *application,
+                  unsigned int wait_for_completion,
                   uint16_t ipcp_id, struct rina_name *local_application,
                   struct rina_name *remote_application, int *result)
 {
@@ -216,7 +217,7 @@ flow_allocate(struct application *application,
               struct rina_name *dif_name,
               struct rina_name *local_application,
               struct rina_name *remote_application,
-              unsigned int *port_id)
+              unsigned int *port_id, unsigned int wait_ms)
 {
     unsigned int ipcp_id;
     struct rina_kmsg_flow_allocate_resp_arrived *kresp;
@@ -229,8 +230,9 @@ flow_allocate(struct application *application,
         return -1;
     }
 
-    kresp = flow_allocate_req(application, 1, ipcp_id, local_application,
-                             remote_application, &result);
+    kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
+                              ipcp_id, local_application,
+                              remote_application, &result);
     if (!kresp) {
         printf("%s: Flow allocation request failed\n", __func__);
         return -1;

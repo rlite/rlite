@@ -390,7 +390,7 @@ main(int argc, char **argv)
     } else {
         /* We're the client: allocate a flow and run the perf function. */
         ret = flow_allocate(&rp.application, &rp.dif_name, &rp.client_appl_name,
-                &rp.server_appl_name, &rp.data_port_id);
+                &rp.server_appl_name, &rp.data_port_id, 1500);
         if (ret) {
             return ret;
         }

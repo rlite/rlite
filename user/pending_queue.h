@@ -10,7 +10,7 @@ struct pending_entry {
     size_t msg_len;
     struct rina_msg_base *resp;
 
-    int wait_for_completion;
+    unsigned int wait_for_completion;
     int op_complete;
     pthread_cond_t op_complete_cond;
 };
