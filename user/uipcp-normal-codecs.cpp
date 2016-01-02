@@ -6,7 +6,7 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 
-#include "uipcp-codecs.hpp"
+#include "uipcp-normal-codecs.hpp"
 
 #include "EnrollmentInformationMessage.pb.h"
 #include "ApplicationProcessNamingInfoMessage.pb.h"

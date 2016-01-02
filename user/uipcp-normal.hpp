@@ -12,7 +12,7 @@
 #include "rlite/appl.h"
 #include "rlite/conf.h"
 
-#include "uipcp-codecs.hpp"
+#include "uipcp-normal-codecs.hpp"
 #include "uipcp-container.h"
 #include "cdap.hpp"
 
