@@ -204,7 +204,7 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::flows_handler_create(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -286,7 +286,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
 
 /* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::flows_handler_create_r(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -372,7 +372,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 }
 
 int
-uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::flows_handler_delete(const CDAPMessage *rm)
 {
     map<string, FlowRequest>::iterator f;
     uint32_t local_port;
@@ -405,17 +405,17 @@ uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
 }
 
 int
-uipcp_rib::flows_handler(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::flows_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     switch (rm->op_code) {
         case gpb::M_CREATE:
-            return flows_handler_create(rm, neigh);
+            return flows_handler_create(rm);
 
         case gpb::M_CREATE_R:
-            return flows_handler_create_r(rm, neigh);
+            return flows_handler_create_r(rm);
 
         case gpb::M_DELETE:
-            return flows_handler_delete(rm, neigh);
+            return flows_handler_delete(rm);
 
         case gpb::M_DELETE_R:
             UPE(uipcp, "NOT SUPPORTED YET");

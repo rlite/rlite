@@ -42,7 +42,7 @@ uipcp_rib::commit_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 }
 
 int
-uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     struct rlite_ipcp *ipcp;
     const char *objbuf;
@@ -101,7 +101,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_obj_excluding(neigh, add, obj_class::lfdb,
+        remote_sync_obj_excluding(nf->neigh, add, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */

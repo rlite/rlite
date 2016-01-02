@@ -537,7 +537,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
 
 /* To be called under RIB lock. */
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
@@ -560,7 +560,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh)
         return -1;
     }
 
-    return (this->*(hi->second))(rm, neigh);
+    return (this->*(hi->second))(rm, nf);
 }
 
 uint64_t

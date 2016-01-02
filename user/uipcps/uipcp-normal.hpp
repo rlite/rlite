@@ -68,8 +68,9 @@ struct NeighFlow {
     unsigned int lower_ipcp_id;
     CDAPConn *conn;
 
-    int enroll_timeout_id;
-    int keepalive_timeout_id;
+    int enroll_tmrid;
+    int keepalive_tmrid;
+    int pending_keepalive_reqs;
     enum state_t enrollment_state;
 
     NeighFlow(Neighbor *n, unsigned int pid, int ffd,
@@ -180,7 +181,7 @@ struct uipcp_rib {
     pthread_mutex_t lock;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
-                                            Neighbor *neigh);
+                                            NeighFlow *nf);
     std::map< std::string, rib_handler_t > handlers;
 
     /* Lower DIFs. */
@@ -245,18 +246,18 @@ struct uipcp_rib {
                         const UipcpObject *obj_value) const;
 
     /* Receive info from neighbors. */
-    int cdap_dispatch(const CDAPMessage *rm, Neighbor *neigh);
+    int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
 
     /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm, Neighbor *neigh);
-    int neighbors_handler(const CDAPMessage *rm, Neighbor *neigh);
-    int lfdb_handler(const CDAPMessage *rm, Neighbor *neigh);
-    int flows_handler(const CDAPMessage *rm, Neighbor *neigh);
-    int keepalive_handler(const CDAPMessage *rm, Neighbor *neigh);
+    int dft_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
 
-    int flows_handler_create(const CDAPMessage *rm, Neighbor *neigh);
-    int flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh);
-    int flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh);
+    int flows_handler_create(const CDAPMessage *rm);
+    int flows_handler_create_r(const CDAPMessage *rm);
+    int flows_handler_delete(const CDAPMessage *rm);
 
 private:
     int load_qos_cubes(const char *);

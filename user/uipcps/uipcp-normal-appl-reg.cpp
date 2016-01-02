@@ -119,7 +119,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 }
 
 int
-uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
+uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     const char *objbuf;
     size_t objlen;
@@ -172,7 +172,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        remote_sync_obj_excluding(neigh, add, obj_class::dft,
+        remote_sync_obj_excluding(nf->neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
     }
