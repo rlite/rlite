@@ -1,2 +1,3 @@
 user/rinaperf -l -pn.IPCP -P1
 user/rinaperf -t perf -pn.IPCP -P2 -f dtcp.fc.max_cwq_len=100 -f dtcp.fc.initial_credit=10 -i 0 -c 200
+user/rinaperf -t perf -pn.IPCP -P2 -f dtcp.rtx_control -i 250000 -c 1

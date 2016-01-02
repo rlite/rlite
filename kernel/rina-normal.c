@@ -113,17 +113,15 @@ rcv_inact_tmr_cb(struct hrtimer *timer)
 static void
 timer_update(struct hrtimer *timer, unsigned long exp_jiffies)
 {
-    unsigned int msecs = jiffies >= exp_jiffies ? 0 :
-                         jiffies_to_msecs(exp_jiffies - jiffies);
-    unsigned int secs = 0;
+    unsigned long msecs = jiffies_to_msecs(exp_jiffies);
+    long unsigned secs;
 
-    if (msecs >= 1000) {
-        secs = msecs / 1000;
-        msecs -= secs * 1000;
-    }
+    secs = msecs / 1000;
+    msecs -= secs * 1000;
 
-    hrtimer_forward_now(timer, ktime_set(secs, msecs * 1000 * 1000));
-    PD("%s: Forward rtx timer by %u ms\n", __func__,
+    hrtimer_start(timer, ktime_set(secs, msecs * 1000 * 1000),
+                  HRTIMER_MODE_ABS);
+    PD("%s: Forward rtx timer to %lu\n", __func__,
             secs * 1000 + msecs);
 }
 
@@ -393,6 +391,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 hrtimer_start(&dtp->rtx_tmr, ktime_set(0, RTX_MSECS *1000*1000),
                               HRTIMER_MODE_REL);
             }
+            PD("%s: cloning [%lu] into rtxq\n", __func__,
+                    (long unsigned)RINA_BUF_PCI(crb)->seqnum);
         }
 
         /* 3 * (MPL + R + A) */
