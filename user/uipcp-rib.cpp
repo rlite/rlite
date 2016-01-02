@@ -14,6 +14,7 @@
 
 #include "cdap.hpp"
 #include "uipcp-container.h"
+#include "uipcp-codecs.hpp"
 
 using namespace std;
 

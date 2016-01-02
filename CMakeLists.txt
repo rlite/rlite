@@ -19,7 +19,7 @@ protobuf_generate_cpp(UIPCP_GPB_SRC UIPCP_GPB_HDR ${UIPCP_GPB_PROTOFILES})
 
 add_library(rinalite SHARED user/rinalite-utils.c user/rina-kernel-numtables.c user/rina-conf-numtables.c user/rinalite-evloop.c user/pending_queue.c user/rinalite-appl.c)
 add_library(rinalite-cdap SHARED user/cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
-add_library(uipcp-rib STATIC user/uipcp-rib.cpp ${UIPCP_GPB_SRC} ${UIPCP_GPB_HDR})
+add_library(uipcp-rib STATIC user/uipcp-rib.cpp user/uipcp-codecs.cpp ${UIPCP_GPB_SRC} ${UIPCP_GPB_HDR})
 
 target_link_libraries(rinalite pthread)
 target_link_libraries(rinalite-cdap rinalite ${PROTOBUF_LIBRARY})
