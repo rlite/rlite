@@ -64,6 +64,8 @@ struct rina_buf *rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
 
 struct rina_buf * rina_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
 
+struct rina_buf * rina_buf_clone(struct rina_buf *rb, gfp_t gfp);
+
 void rina_buf_free(struct rina_buf *rb);
 
 static inline void rina_buf_pci_pop(struct rina_buf *rb)
