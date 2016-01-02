@@ -136,12 +136,13 @@ struct Worker {
     pthread_t th;
     pthread_mutex_t lock;
     int syncfd;
+    int idx;
 
     /* Holds the active mappings between rlite file descriptors and
      * socket file descriptors. */
     map<int, int> fdmap;
 
-    Worker();
+    Worker(int idx_);
     ~Worker();
 
     int repoll();
@@ -190,15 +191,15 @@ worker_function(void *opaque)
 }
 
 
-Worker::Worker()
+Worker::Worker(int idx_) : idx(idx_)
 {
-    pthread_create(&th, NULL, worker_function, this);
-    pthread_mutex_init(&lock, NULL);
     syncfd = eventfd(0, 0);
     if (syncfd < 0) {
         perror("eventfd()");
         throw std::exception();
     }
+    pthread_create(&th, NULL, worker_function, this);
+    pthread_mutex_init(&lock, NULL);
 }
 
 Worker::~Worker()
@@ -284,6 +285,8 @@ Worker::run()
     struct pollfd pollfds[1 + MAX_FDS];
     char buf[MAX_BUF_SIZE];
 
+    PD("w%d starts\n", idx);
+
     for (;;) {
         int ret;
         int nfds = 1;
@@ -299,26 +302,38 @@ Worker::run()
         }
         pthread_mutex_unlock(&lock);
 
-        ret = poll(pollfds, MAX_FDS, -1);
+        PD("w%d polls %d file descriptors\n", idx, nfds);
+        ret = poll(pollfds, nfds, -1);
         if (ret < 0) {
             perror("poll()");
             break;
 
         } else if (ret == 0) {
-            PI("poll() timeout\n");
+            PI("w%d: poll() timeout\n", idx);
             continue;
         }
 
-        if (pollfds[0].revents & POLLIN) {
-            PD("Mappings changed, rebuliding poll array\n");
-            pthread_mutex_lock(&lock);
-            drain_syncfd();
-            pthread_mutex_unlock(&lock);
+        if (pollfds[0].revents) {
+            ret--;
+            if (pollfds[0].revents & POLLIN) {
+                PD("w%d: Mappings changed, rebuliding poll array\n", idx);
+                pthread_mutex_lock(&lock);
+                drain_syncfd();
+                pthread_mutex_unlock(&lock);
+
+            } else {
+                PD("w%d: Error event %d on syncfd\n", idx,
+                   pollfds[0].revents);
+            }
+
             continue;
         }
 
         for (int i=1, j=0; j<ret; i++) {
             if (pollfds[i].revents) {
+                PD("w%d: fd %d ready, events %d\n", idx,
+                   pollfds[i].fd, pollfds[i].revents);
+
                 if (pollfds[i].revents & POLLIN) {
                     forward_data(pollfds[i].fd, fdmap[pollfds[i].fd], buf);
                 }
@@ -327,12 +342,13 @@ Worker::run()
         }
     }
 
+    PD("w%d stops\n", idx);
 }
 
 Gateway::Gateway()
 {
     for (int i=0; i<NUM_WORKERS; i++) {
-        workers.push_back(new Worker());
+        workers.push_back(new Worker(i));
     }
 
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
