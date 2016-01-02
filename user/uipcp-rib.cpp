@@ -149,6 +149,9 @@ struct uipcp_rib {
     /* For A-DATA messages. */
     InvokeIdMgr invoke_id_mgr;
 
+    /* Supported flows. */
+    map< string, FlowRequest> flow_reqs;
+
     uipcp_rib(struct uipcp *_u);
 
     struct rinalite_ipcp *ipcp_info() const;
@@ -733,6 +736,8 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 int
 uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
 {
+    /* Lookup the corresponding FlowRequest. */
+
     return 0;
 }
 
@@ -997,6 +1002,8 @@ uipcp_rib::flows_handler(const CDAPMessage *rm)
 
     rina_name_free(&local_appl);
     rina_name_free(&remote_appl);
+
+    flow_reqs[rm->obj_name] = freq;
 
     return 0;
 }
