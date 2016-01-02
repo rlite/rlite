@@ -171,7 +171,6 @@ for i in vms:
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'rina-config ipcp-enroll n.DIF n.IPCP %(id)s '\
                                     'n.IPCP %(pvid)s e.1.DIF\n'\
-            'rina-config ipcp-dft-set n.IPCP %(id)s rinaperf-data server 1\n'\
             'ENDSSH\n'\
             '   DONE=$?\n'\
             '   if [ $DONE != "0" ]; then\n'\
