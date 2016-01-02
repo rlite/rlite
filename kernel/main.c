@@ -1207,6 +1207,39 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
+ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd)
+{
+    const char *dif_name = NULL;
+    int ret = 0;
+
+    memset(upd, 0, sizeof(*upd));
+
+    upd->msg_type = RLITE_KER_IPCP_UPDATE;
+    upd->update_type = RLITE_UPDATE_ADD;
+    upd->ipcp_id = ipcp->id;
+    upd->ipcp_addr = ipcp->addr;
+    upd->depth = ipcp->depth;
+    if (rina_name_copy(&upd->ipcp_name, &ipcp->name)) {
+        ret = -ENOMEM;
+    }
+    if (ipcp->dif) {
+        dif_name = ipcp->dif->name;
+        upd->dif_type = kstrdup(ipcp->dif->ty, GFP_ATOMIC);
+        if (!upd->dif_type) {
+            ret = -ENOMEM;
+        }
+    }
+    if (dif_name) {
+        upd->dif_name = kstrdup(dif_name, GFP_ATOMIC);
+        if (!upd->dif_name) {
+            ret = -ENOMEM;
+        }
+    }
+
+    return ret;
+}
+
+static int
 rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_create *req = (struct rl_kmsg_ipcp_create *)bmsg;
@@ -1234,6 +1267,31 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     PI("IPC process %s created\n", name_s);
     if (name_s) {
         kfree(name_s);
+    }
+
+    {
+        struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
+        struct rl_kmsg_ipcp_update upd;
+        struct rlite_ctrl *rcur;
+
+        BUG_ON(!ipcp);
+
+        if (ipcp_update_fill(ipcp, &upd)) {
+            PE("Out of memory\n");
+
+        } else {
+            /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+             * opened ctrl device. */
+            mutex_lock(&rlite_dm.general_lock);
+            list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
+                rlite_upqueue_append(rcur, (struct rlite_msg_base *)&upd);
+            }
+            mutex_unlock(&rlite_dm.general_lock);
+        }
+
+        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                (struct rlite_msg_base *)&upd);
+        ipcp_put(ipcp);
     }
 
     return 0;
@@ -2269,36 +2327,13 @@ initial_ipcp_update(struct rlite_ctrl *rc)
 
     hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
         struct rl_kmsg_ipcp_update upd;
-        const char *dif_name = NULL;
 
-        memset(&upd, 0, sizeof(upd));
-
-        upd.msg_type = RLITE_KER_IPCP_UPDATE;
-        upd.update_type = RLITE_UPDATE_ADD;
-        upd.ipcp_id = entry->id;
-        upd.ipcp_addr = entry->addr;
-        upd.depth = entry->depth;
-        if (rina_name_copy(&upd.ipcp_name, &entry->name)) {
-            ret = -ENOMEM;
-        }
-        if (entry->dif) {
-            dif_name = entry->dif->name;
-            upd.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
-            if (!upd.dif_type) {
-                ret = -ENOMEM;
-            }
-        }
-        if (dif_name) {
-            upd.dif_name = kstrdup(dif_name, GFP_ATOMIC);
-            if (!upd.dif_name) {
-                ret = -ENOMEM;
-            }
-        }
+        ret = ipcp_update_fill(entry, &upd);
 
         rlite_upqueue_append(rc, (const struct rlite_msg_base *)&upd);
 
         rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                       (struct rlite_msg_base *)&upd);
+                (struct rlite_msg_base *)&upd);
     }
 
     PUNLOCK();
