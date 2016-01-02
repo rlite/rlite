@@ -1349,6 +1349,23 @@ out:
 }
 EXPORT_SYMBOL_GPL(rina_sdu_rx);
 
+void
+rina_write_restart(uint32_t local_port)
+{
+    struct flow_entry *flow;
+
+    mutex_lock(&rina_dm.lock);
+
+    flow = flow_table_find(local_port);
+    if (flow) {
+        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
+            POLLWRBAND | POLLWRNORM);
+    }
+
+    mutex_unlock(&rina_dm.lock);
+}
+EXPORT_SYMBOL_GPL(rina_write_restart);
+
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,

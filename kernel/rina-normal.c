@@ -582,6 +582,9 @@ out:
         rmt_tx(ipcp, pci->dst_addr, qrb);
     }
 
+    /* This could be done conditionally. */
+    rina_write_restart(pcic->base.conn_id.dst_cep);
+
     return 0;
 }
 

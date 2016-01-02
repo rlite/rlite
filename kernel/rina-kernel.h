@@ -153,6 +153,8 @@ int rina_fa_resp_arrived(struct ipcp_entry *ipcp,
 int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);
 
+void rina_write_restart(uint32_t local_port);
+
 struct flow_entry *flow_lookup(unsigned int port_id);
 
 static inline void

@@ -74,6 +74,8 @@ rcv_work(struct work_struct *w)
             break;
         }
         rina_sdu_rx(priv->ipcp, rb, remote_port);
+
+        rina_write_restart(remote_port);
     }
 }
 
