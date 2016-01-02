@@ -4,16 +4,16 @@
 
 struct rina_msg_layout rina_kernel_numtables[] = {
     [RINA_KERN_CREATE_IPCP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_create) -
+        .copylen = sizeof(struct rina_kmsg_ipcp_create) -
                    sizeof(struct rina_name),
         .names = 1,
     },
     [RINA_KERN_CREATE_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_create_resp),
+        .copylen = sizeof(struct rina_kmsg_ipcp_create_resp),
         .names = 0,
     },
     [RINA_KERN_DESTROY_IPCP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_destroy),
+        .copylen = sizeof(struct rina_kmsg_ipcp_destroy),
         .names = 0,
     },
     [RINA_KERN_DESTROY_IPCP_RESP] = {
@@ -25,12 +25,12 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .names = 0,
     },
     [RINA_KERN_FETCH_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_fetch_ipcp_resp) -
+        .copylen = sizeof(struct rina_kmsg_fetch_ipcp_resp) -
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
     [RINA_KERN_ASSIGN_TO_DIF] = {
-        .copylen = sizeof(struct rina_msg_assign_to_dif) -
+        .copylen = sizeof(struct rina_kmsg_assign_to_dif) -
                     sizeof(struct rina_name),
         .names = 1,
     },
@@ -39,7 +39,7 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .names = 0,
     },
     [RINA_KERN_APPLICATION_REGISTER] = {
-        .copylen = sizeof(struct rina_msg_application_register) -
+        .copylen = sizeof(struct rina_kmsg_application_register) -
                     sizeof(struct rina_name),
         .names = 1,
     },
@@ -48,7 +48,7 @@ struct rina_msg_layout rina_kernel_numtables[] = {
         .names = 0,
     },
     [RINA_KERN_APPLICATION_UNREGISTER] = {
-        .copylen = sizeof(struct rina_msg_application_register) -
+        .copylen = sizeof(struct rina_kmsg_application_register) -
                     sizeof(struct rina_name),
         .names = 1,
     },

@@ -190,7 +190,7 @@ ipcp_table_find(unsigned int ipcp_id)
 }
 
 static int
-ipcp_add(struct rina_msg_ipcp_create *req, unsigned int *ipcp_id)
+ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 {
     struct ipcp_entry *entry;
     struct ipcp_factory *factory;
@@ -282,8 +282,8 @@ ipcp_del(unsigned int ipcp_id)
 static int
 rina_ipcp_create(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_msg_ipcp_create *req = (struct rina_msg_ipcp_create *)bmsg;
-    struct rina_msg_ipcp_create_resp *resp;
+    struct rina_kmsg_ipcp_create *req = (struct rina_kmsg_ipcp_create *)bmsg;
+    struct rina_kmsg_ipcp_create_resp *resp;
     char *name_s = rina_name_to_string(&req->name);
     unsigned int ipcp_id;
     int ret;
@@ -327,8 +327,8 @@ err2:
 static int
 rina_ipcp_destroy(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_msg_ipcp_destroy *req =
-                        (struct rina_msg_ipcp_destroy *)bmsg;
+    struct rina_kmsg_ipcp_destroy *req =
+                        (struct rina_kmsg_ipcp_destroy *)bmsg;
     struct rina_msg_base_resp *resp;
     int ret;
 
@@ -363,7 +363,7 @@ err1:
 static int
 rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
 {
-    struct rina_msg_fetch_ipcp_resp *resp;
+    struct rina_kmsg_fetch_ipcp_resp *resp;
     struct ipcp_entry *entry;
     bool stop_next;
     bool no_next = true;
@@ -417,8 +417,8 @@ err1:
 static int
 rina_assign_to_dif(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_msg_assign_to_dif *req =
-                    (struct rina_msg_assign_to_dif *)bmsg;
+    struct rina_kmsg_assign_to_dif *req =
+                    (struct rina_kmsg_assign_to_dif *)bmsg;
     struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->dif_name);
     struct ipcp_entry *entry;
@@ -543,8 +543,8 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 static int
 rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
-    struct rina_msg_application_register *req =
-                    (struct rina_msg_application_register *)bmsg;
+    struct rina_kmsg_application_register *req =
+                    (struct rina_kmsg_application_register *)bmsg;
     struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->application_name);
     struct ipcp_entry *entry;

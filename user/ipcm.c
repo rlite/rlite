@@ -44,10 +44,10 @@ ipcp_create_resp(struct ipcm *ipcm,
                  const struct rina_msg_base *b_resp,
                  const struct rina_msg_base *b_req)
 {
-    struct rina_msg_ipcp_create_resp *resp =
-            (struct rina_msg_ipcp_create_resp *)b_resp;
-    struct rina_msg_ipcp_create *req =
-            (struct rina_msg_ipcp_create *)b_req;
+    struct rina_kmsg_ipcp_create_resp *resp =
+            (struct rina_kmsg_ipcp_create_resp *)b_resp;
+    struct rina_kmsg_ipcp_create *req =
+            (struct rina_kmsg_ipcp_create *)b_req;
 
     printf("%s: Assigned id %d\n", __func__, resp->ipcp_id);
     (void)req;
@@ -62,8 +62,8 @@ ipcp_destroy_resp(struct ipcm *ipcm,
 {
     struct rina_msg_base_resp *resp =
             (struct rina_msg_base_resp *)b_resp;
-    struct rina_msg_ipcp_destroy *req =
-            (struct rina_msg_ipcp_destroy *)b_req;
+    struct rina_kmsg_ipcp_destroy *req =
+            (struct rina_kmsg_ipcp_destroy *)b_req;
 
     if (resp->result) {
         printf("%s: Failed to destroy IPC process %d\n", __func__,
@@ -82,8 +82,8 @@ fetch_ipcp_resp(struct ipcm *ipcm,
                 const struct rina_msg_base *b_resp,
                 const struct rina_msg_base *b_req)
 {
-    const struct rina_msg_fetch_ipcp_resp *resp =
-        (const struct rina_msg_fetch_ipcp_resp *)b_resp;
+    const struct rina_kmsg_fetch_ipcp_resp *resp =
+        (const struct rina_kmsg_fetch_ipcp_resp *)b_resp;
     char *ipcp_name_s = NULL;
     char *dif_name_s = NULL;
 
@@ -126,8 +126,8 @@ assign_to_dif_resp(struct ipcm *ipcm,
 {
     struct rina_msg_base_resp *resp =
             (struct rina_msg_base_resp *)b_resp;
-    struct rina_msg_assign_to_dif *req =
-            (struct rina_msg_assign_to_dif *)b_req;
+    struct rina_kmsg_assign_to_dif *req =
+            (struct rina_kmsg_assign_to_dif *)b_req;
     char *name_s = NULL;
 
     name_s = rina_name_to_string(&req->dif_name);
@@ -154,8 +154,8 @@ application_register_resp(struct ipcm *ipcm,
 {
     struct rina_msg_base_resp *resp =
             (struct rina_msg_base_resp *)b_resp;
-    struct rina_msg_application_register *req =
-            (struct rina_msg_application_register *)b_req;
+    struct rina_kmsg_application_register *req =
+            (struct rina_kmsg_application_register *)b_req;
     char *name_s = NULL;
     int reg = resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
 
@@ -350,7 +350,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
 static int
 ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 {
-    struct rina_msg_ipcp_create *msg;
+    struct rina_kmsg_ipcp_create *msg;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -373,7 +373,7 @@ ipcp_create(struct ipcm *ipcm, const struct rina_name *name, uint8_t dif_type)
 static int
 ipcp_destroy(struct ipcm *ipcm, unsigned int ipcp_id)
 {
-    struct rina_msg_ipcp_destroy *msg;
+    struct rina_kmsg_ipcp_destroy *msg;
 
     /* Allocate and create a request message. */
     msg = malloc(sizeof(*msg));
@@ -436,7 +436,7 @@ fetch_ipcps(struct ipcm *ipcm)
 static int
 assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 {
-    struct rina_msg_assign_to_dif *req;
+    struct rina_kmsg_assign_to_dif *req;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -458,7 +458,7 @@ static int
 application_register(struct ipcm *ipcm, int reg, unsigned int ipcp_id,
                      struct rina_name *application_name)
 {
-    struct rina_msg_application_register *req;
+    struct rina_kmsg_application_register *req;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));

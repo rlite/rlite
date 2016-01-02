@@ -8,20 +8,20 @@
 #include <rina/rina-utils.h>
 
 
-/* Numtables for application <==> ipcm messages exchange. */
-
-extern struct rina_msg_layout rina_application_numtables[0];
-
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RINA_APPLICATION_REGISTER = 1,
-    RINA_APPLICATION_UNREGISTER, /* 2 */
+    RINA_APPL_REGISTER = 1,
+    RINA_APPL_UNREGISTER, /* 2 */
 
-    RINA_APPLICATION_MSG_MAX,
+    RINA_APPL_MSG_MAX,
 };
 
-struct rina_msg_appl_register {
+/* Numtables for application <==> ipcm messages exchange. */
+
+extern struct rina_msg_layout rina_application_numtables[RINA_APPL_MSG_MAX];
+
+struct rina_amsg_register {
     rina_msg_t msg_type;
     uint32_t event_id;
 
