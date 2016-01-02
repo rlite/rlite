@@ -1,0 +1,5 @@
+#!/bin/bash
+
+FILES=$(git ls-files | grep -v kernel/ker-numtables.c | grep -v kernel/utils.c | grep -v user/libs/ker-numtables.c | grep -v user/libs/utils.c)
+
+sed -i "s|$1|$2|g" $FILES
