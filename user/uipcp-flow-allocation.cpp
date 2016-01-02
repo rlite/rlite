@@ -193,19 +193,17 @@ int
 uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
-    map<string, FlowRequest>::iterator f;
+    map<unsigned int, FlowRequest>::iterator f;
     string reason;
     CDAPMessage m;
+    int ret;
 
     /* Lookup the corresponding FlowRequest. */
 
-    obj_name << obj_name::flows << "/" << resp->remote_addr
-                << "-" << resp->remote_port;
-
-    f = flow_reqs.find(obj_name.str());
-    if (f == flow_reqs.end()) {
-        PE("Spurious flow allocation response, no object with name %s\n",
-            obj_name.str().c_str());
+    f = flow_reqs_tmp.find(resp->kevent_id);
+    if (f == flow_reqs_tmp.end()) {
+        PE("Spurious flow allocation response, no request for kevent_id %u\n",
+           resp->kevent_id);
         return -1;
     }
 
@@ -218,12 +216,21 @@ uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
          * the kernel. */
         freq.dst_port = resp->port_id;
         freq.connections.front().dst_cep = resp->cep_id;
+
+        /* Move the freq object from the temporary map to the right one. */
+        obj_name << obj_name::flows << "/" << freq.src_addr
+                 << "-" << freq.src_port;
+        flow_reqs[obj_name.str()] = freq;
     }
 
     m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                  resp->response ? -1 : 0, reason);
 
-    return send_to_dst_addr(m, freq.src_addr, freq);
+    ret = send_to_dst_addr(m, freq.src_addr, freq);
+
+    flow_reqs_tmp.erase(f);
+
+    return ret;
 }
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
@@ -287,7 +294,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     freq.src_app.rina_name_fill(&remote_appl);
     policies2flowcfg(&flowcfg, freq.qos, freq.policies);
 
-    uipcp_issue_fa_req_arrived(uipcp, 0, freq.src_port,
+    uipcp_issue_fa_req_arrived(uipcp, kevent_id_cnt, freq.src_port,
                                freq.connections.front().src_cep,
                                freq.src_addr, &local_appl, &remote_appl,
                                &flowcfg);
@@ -296,7 +303,9 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     rina_name_free(&remote_appl);
 
     freq.invoke_id = rm->invoke_id;
-    flow_reqs[rm->obj_name] = freq;
+    flow_reqs_tmp[kevent_id_cnt] = freq;
+
+    kevent_id_cnt++;
 
     return 0;
 }

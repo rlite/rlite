@@ -1783,8 +1783,6 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
              * Reflect the flow allocation response message to userspace. */
             resp->event_id = 0;
             resp->cep_id = flow_entry->local_cep;
-            resp->remote_port = flow_entry->remote_port;
-            resp->remote_addr = flow_entry->remote_addr;
             ret = rina_upqueue_append(ipcp->uipcp,
                     (const struct rina_msg_base *)resp);
         }

@@ -236,6 +236,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
     pthread_mutex_init(&lock, NULL);
 
+    kevent_id_cnt = 1;
+
     mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
     if (mgmtfd < 0) {
         ret = mgmtfd;

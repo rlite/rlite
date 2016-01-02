@@ -161,9 +161,6 @@ struct rina_kmsg_fa_resp {
     uint8_t response;
     uint32_t port_id;
     uint32_t cep_id;     /* Filled by kernel before reflecting to userspace. */
-    /* XXX Next two fields should probably disappear, now there is kevent_id. */
-    uint32_t remote_port; /* Filled by kernel before reflecting to userspace. */
-    uint64_t remote_addr; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
 /* application --> kernel to configure and IPC process. */

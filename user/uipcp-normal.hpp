@@ -172,7 +172,8 @@ struct uipcp_rib {
     InvokeIdMgr invoke_id_mgr;
 
     /* Supported flows. */
-    std::map< std::string, FlowRequest> flow_reqs;
+    std::map< std::string, FlowRequest > flow_reqs;
+    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
 
     /* Available QoS cubes. */
     std::map< std::string, struct rina_flow_config > qos_cubes;
@@ -229,6 +230,9 @@ struct uipcp_rib {
 
 private:
     int load_qos_cubes(const char *);
+
+    /* Id to be used with incoming flow allocation request. */
+    uint32_t kevent_id_cnt;
 };
 
 int normal_ipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req);
