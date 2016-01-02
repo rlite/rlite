@@ -8,7 +8,7 @@ if [ -n "$1" ]; then
     IF=$1
 fi
 
-sudo rlite-config ipcp-create e.IPCP 1 shim-eth e.DIF
-sudo rlite-config ipcp-config e.IPCP 1 netdev $IF
+sudo rlite-ctl ipcp-create e.IPCP 1 shim-eth e.DIF
+sudo rlite-ctl ipcp-config e.IPCP 1 netdev $IF
 
 source tests/epilogue.sh

@@ -51,7 +51,7 @@ package() {
     cp "$srcdir/$_gitname/build/user/libs/librlite-conf.so" "$pkgdir/usr/lib"
     cp "$srcdir/$_gitname/build/user/uipcps/rlite-uipcps" "$pkgdir/usr/bin"
     cp "$srcdir/$_gitname/build/user/tools/rinaperf" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/user/tools/rlite-config" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/build/user/tools/rlite-ctl" "$pkgdir/usr/bin"
     cp "$srcdir/$_gitname/build/user/tools/rina-gw" "$pkgdir/usr/bin"
 
     # Install the rlite public headers

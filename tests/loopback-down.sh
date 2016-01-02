@@ -3,6 +3,6 @@
 source tests/prologue.sh
 source tests/env.sh
 
-sudo rlite-config ipcp-destroy d.IPCP 1
+sudo rlite-ctl ipcp-destroy d.IPCP 1
 
 source tests/epilogue.sh
