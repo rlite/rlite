@@ -158,12 +158,16 @@ evloop_function(void *arg)
 
     for (;;) {
         struct rina_msg_base_resp *resp;
+        struct rina_evloop_fdcb *fdcb;
         fd_set rdfs;
         int ret;
 
         FD_ZERO(&rdfs);
         FD_SET(loop->rfd, &rdfs);
         FD_SET(loop->eventfd, &rdfs);
+        list_for_each_entry(fdcb, &loop->fdcbs, node) {
+            FD_SET(fdcb->fd, &rdfs);
+        }
 
         ret = select(MAX(loop->rfd, loop->eventfd) + 1, &rdfs,
                      NULL, NULL, NULL);
@@ -188,9 +192,23 @@ evloop_function(void *arg)
 
             /* Stop the event loop. */
             break;
+        } else {
+            int found = 0;
 
-        } else if (!FD_ISSET(loop->rfd, &rdfs)) {
-            assert(0);
+            /* Look for fdcb events. */
+            list_for_each_entry(fdcb, &loop->fdcbs, node) {
+                if (FD_ISSET(fdcb->fd, &rdfs)) {
+                    found = 1;
+                    fdcb->cb(loop, fdcb->fd);
+                }
+            }
+
+            /* If no event is found make sure that we have an
+             * event from the kernel through the RINA control device,
+             * otherwise who would wake up us? */
+            if (!found && !FD_ISSET(loop->rfd, &rdfs)) {
+                assert(0);
+            }
         }
 
         pthread_mutex_lock(&loop->lock);
@@ -451,6 +469,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
     list_init(&loop->pqueue);
     loop->event_id_counter = 1;
     list_init(&loop->ipcps);
+    list_init(&loop->fdcbs);
     loop->rfd = -1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
@@ -529,6 +548,45 @@ rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
     loop->handlers[index] = handler;
 
     return 0;
+}
+
+int
+rina_evloop_fdcb_add(struct rina_evloop *loop, int fd, rina_evloop_fdcb_t cb)
+{
+    struct rina_evloop_fdcb *fdcb;
+
+    if (!cb || fd < 0) {
+        PE("%s: Invalid arguments fd [%d], cb[%p]\n", __func__, fd, cb);
+        return -1;
+    }
+
+    fdcb = malloc(sizeof(*fdcb));
+    if (!fdcb) {
+        return ENOMEM;
+    }
+
+    memset(fdcb, 0, sizeof(*fdcb));
+    fdcb->fd = fd;
+    fdcb->cb = cb;
+
+    list_add_tail(&fdcb->node, &loop->fdcbs);
+
+    return 0;
+}
+
+int
+rina_evloop_fdcb_del(struct rina_evloop *loop, int fd)
+{
+    struct rina_evloop_fdcb *fdcb;
+
+    list_for_each_entry(fdcb, &loop->fdcbs, node) {
+        if (fdcb->fd == fd) {
+            list_del(&fdcb->node);
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 unsigned int

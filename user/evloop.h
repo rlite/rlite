@@ -34,6 +34,15 @@ typedef int (*rina_resp_handler_t)(struct rina_evloop *loop,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
+typedef int (*rina_evloop_fdcb_t)(struct rina_evloop *loop, int fd);
+
+struct rina_evloop_fdcb {
+    int fd;
+    rina_evloop_fdcb_t cb;
+
+    struct list_head node;
+};
+
 struct rina_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
@@ -57,6 +66,8 @@ struct rina_evloop {
     /* Used to stop the event-loop. */
     int eventfd;
 
+    struct list_head fdcbs;
+
     struct list_head ipcps;
 };
 
@@ -79,6 +90,13 @@ rina_evloop_fini(struct rina_evloop *loop);
 int
 rina_evloop_set_handler(struct rina_evloop *loop, unsigned int index,
                         rina_resp_handler_t handler);
+
+int
+rina_evloop_fdcb_add(struct rina_evloop *loop, int fd, rina_evloop_fdcb_t cb);
+
+int
+rina_evloop_fdcb_del(struct rina_evloop *loop, int fd);
+
 int
 ipcps_print(struct rina_evloop *loop);
 
