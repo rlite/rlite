@@ -2,7 +2,7 @@
 #include "rlite/conf-msg.h"
 
 
-struct rina_msg_layout rina_conf_numtables[] = {
+struct rlite_msg_layout rina_conf_numtables[] = {
     [RINA_CONF_IPCP_REGISTER] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_register) -
                    2 * sizeof(struct rina_name),
@@ -34,7 +34,7 @@ struct rina_msg_layout rina_conf_numtables[] = {
         .strings = 1,
     },
     [RINA_CONF_BASE_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
+        .copylen = sizeof(struct rlite_msg_base_resp),
     },
     [RINA_CONF_IPCP_RIB_SHOW_REQ] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_rib_show_req),

@@ -41,13 +41,13 @@ struct registered_ipcp {
 static struct uipcps guipcps;
 
 static int
-rina_conf_response(int sfd, struct rina_msg_base *req,
-                   struct rina_msg_base_resp *resp)
+rina_conf_response(int sfd, struct rlite_msg_base *req,
+                   struct rlite_msg_base_resp *resp)
 {
     resp->msg_type = RINA_CONF_BASE_RESP;
     resp->event_id = req->event_id;
 
-    return rina_msg_write_fd(sfd, RINALITE_RMB(resp));
+    return rlite_msg_write_fd(sfd, RINALITE_RMB(resp));
 }
 
 static void
@@ -139,10 +139,10 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
 
 static int
 rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
-                        const struct rina_msg_base *b_req)
+                        const struct rlite_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_register *req = (struct rina_cmsg_ipcp_register *)b_req;
-    struct rina_msg_base_resp resp;
+    struct rlite_msg_base_resp resp;
 
     resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
@@ -152,10 +152,10 @@ rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
 
 static int
 rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
-                      const struct rina_msg_base *b_req)
+                      const struct rlite_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
-    struct rina_msg_base_resp resp;
+    struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
     resp.result = 1; /* Report failure by default. */
@@ -182,10 +182,10 @@ out:
 
 static int
 rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
-                       const struct rina_msg_base *b_req)
+                       const struct rlite_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
-    struct rina_msg_base_resp resp;
+    struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
     resp.result = 1; /* Report failure by default. */
@@ -207,10 +207,10 @@ out:
 
 static int
 rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
-                       const struct rina_msg_base *b_req)
+                       const struct rlite_msg_base *b_req)
 {
     struct rina_cmsg_uipcp_update *req = (struct rina_cmsg_uipcp_update *)b_req;
-    struct rina_msg_base_resp resp;
+    struct rlite_msg_base_resp resp;
     struct uipcp *uipcp;
 
     resp.result = 1; /* Report failure by default. */
@@ -243,7 +243,7 @@ out:
 
 static int
 rina_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
-                        const struct rina_msg_base *b_req)
+                        const struct rlite_msg_base *b_req)
 {
     struct rina_cmsg_ipcp_rib_show_req *req =
                     (struct rina_cmsg_ipcp_rib_show_req *)b_req;
@@ -272,7 +272,7 @@ out:
     resp.msg_type = RINA_CONF_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
-    ret = rina_msg_write_fd(sfd, RINALITE_RMB(&resp));
+    ret = rlite_msg_write_fd(sfd, RINALITE_RMB(&resp));
 
     if (resp.dump) {
         free(resp.dump);
@@ -282,7 +282,7 @@ out:
 }
 
 typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
-                                   const struct rina_msg_base * b_req);
+                                   const struct rlite_msg_base * b_req);
 
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_config_handlers[] = {
@@ -307,7 +307,7 @@ unix_server(void *arg)
     for (;;) {
         struct sockaddr_un client_address;
         socklen_t client_address_len = sizeof(client_address);
-        struct rina_msg_base *req;
+        struct rlite_msg_base *req;
         int cfd;
         int ret;
         int n;
@@ -332,14 +332,14 @@ unix_server(void *arg)
         /* Lookup the message type. */
         req = RINALITE_RMB(msgbuf);
         if (rina_config_handlers[req->msg_type] == NULL) {
-            struct rina_msg_base_resp resp;
+            struct rlite_msg_base_resp resp;
 
             PE("Invalid message received [type=%d]\n",
                     req->msg_type);
             resp.msg_type = RINA_CONF_BASE_RESP;
             resp.event_id = req->event_id;
             resp.result = 1;
-            rina_msg_write_fd(cfd, (struct rina_msg_base *)&resp);
+            rlite_msg_write_fd(cfd, (struct rlite_msg_base *)&resp);
         } else {
             /* Valid message type: handle the request. */
             ret = rina_config_handlers[req->msg_type](uipcps, cfd, req);
@@ -349,7 +349,7 @@ unix_server(void *arg)
             }
         }
 
-        rina_msg_free(rina_conf_numtables, RINA_CONF_MSG_MAX, req);
+        rlite_msg_free(rina_conf_numtables, RINA_CONF_MSG_MAX, req);
 
         /* Close the connection. */
 	close(cfd);

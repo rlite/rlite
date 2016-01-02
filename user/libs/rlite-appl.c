@@ -22,8 +22,8 @@
 
 static int
 flow_allocate_resp_arrived(struct rlite_evloop *loop,
-                           const struct rina_msg_base_resp *b_resp,
-                           const struct rina_msg_base *b_req)
+                           const struct rlite_msg_base_resp *b_resp,
+                           const struct rlite_msg_base *b_req)
 {
     struct rina_kmsg_fa_req *req =
             (struct rina_kmsg_fa_req *)b_req;
@@ -58,8 +58,8 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
 
 static int
 flow_allocate_req_arrived(struct rlite_evloop *loop,
-                          const struct rina_msg_base_resp *b_resp,
-                          const struct rina_msg_base *b_req)
+                          const struct rlite_msg_base_resp *b_resp,
+                          const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *application = container_of(loop,
                                        struct rlite_appl, loop);
@@ -94,8 +94,8 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
 
 static int
 appl_register_resp(struct rlite_evloop *loop,
-                   const struct rina_msg_base_resp *b_resp,
-                   const struct rina_msg_base *b_req)
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
 {
     struct rina_kmsg_appl_register_resp *resp =
             (struct rina_kmsg_appl_register_resp *)b_resp;
@@ -229,7 +229,7 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
                          uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     req = malloc(sizeof(*req));
@@ -302,7 +302,7 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
         ret = -1;
     }
 
-    rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                   RINALITE_RMB(resp));
     free(resp);
 
@@ -352,7 +352,7 @@ rlite_flow_allocate(struct rlite_appl *application, uint32_t event_id,
                 kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
-    rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                   RINALITE_RMB(kresp));
     free(kresp);
 

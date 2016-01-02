@@ -146,9 +146,9 @@ deserialize_rina_name(const void **pptr, struct rina_name *name)
 }
 
 unsigned int
-rina_msg_serlen(struct rina_msg_layout *numtables,
+rlite_msg_serlen(struct rlite_msg_layout *numtables,
                 size_t num_entries,
-                const struct rina_msg_base *msg)
+                const struct rlite_msg_base *msg)
 {
     unsigned int ret;
     struct rina_name *name;
@@ -175,12 +175,12 @@ rina_msg_serlen(struct rina_msg_layout *numtables,
 
     return ret;
 }
-COMMON_EXPORT(rina_msg_serlen);
+COMMON_EXPORT(rlite_msg_serlen);
 
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
-                   void *serbuf, const struct rina_msg_base *msg)
+serialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
+                   void *serbuf, const struct rlite_msg_base *msg)
 {
     void *serptr = serbuf;
     unsigned int serlen;
@@ -217,11 +217,11 @@ COMMON_EXPORT(serialize_rina_msg);
 
 /* Deserialize from serbuf into msgbuf. */
 int
-deserialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
+deserialize_rina_msg(struct rlite_msg_layout *numtables, size_t num_entries,
                      const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
-    struct rina_msg_base *bmsg = (struct rina_msg_base *)serbuf;
+    struct rlite_msg_base *bmsg = (struct rlite_msg_base *)serbuf;
     struct rina_name *name;
     string_t *str;
     unsigned int copylen;
@@ -264,8 +264,8 @@ deserialize_rina_msg(struct rina_msg_layout *numtables, size_t num_entries,
 COMMON_EXPORT(deserialize_rina_msg);
 
 void
-rina_msg_free(struct rina_msg_layout *numtables, size_t num_entries,
-              struct rina_msg_base *msg)
+rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
+              struct rlite_msg_base *msg)
 {
     unsigned int copylen = numtables[msg->msg_type].copylen;
     struct rina_name *name;
@@ -290,9 +290,9 @@ rina_msg_free(struct rina_msg_layout *numtables, size_t num_entries,
         COMMON_FREE(*str);
     }
 }
-COMMON_EXPORT(rina_msg_free);
+COMMON_EXPORT(rlite_msg_free);
 
-unsigned int rina_numtables_max_size(struct rina_msg_layout *numtables,
+unsigned int rina_numtables_max_size(struct rlite_msg_layout *numtables,
                                      unsigned int n)
 {
     unsigned int max = 0;

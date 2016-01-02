@@ -578,8 +578,8 @@ uipcp_rib::remote_sync_obj_all(bool create, const string& obj_class,
 
 static int
 normal_appl_register(struct rlite_evloop *loop,
-                     const struct rina_msg_base_resp *b_resp,
-                     const struct rina_msg_base *b_req)
+                     const struct rlite_msg_base_resp *b_resp,
+                     const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -596,8 +596,8 @@ normal_appl_register(struct rlite_evloop *loop,
 
 static int
 normal_fa_req(struct rlite_evloop *loop,
-             const struct rina_msg_base_resp *b_resp,
-             const struct rina_msg_base *b_req)
+             const struct rlite_msg_base_resp *b_resp,
+             const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -616,8 +616,8 @@ normal_fa_req(struct rlite_evloop *loop,
 
 static int
 neigh_fa_req_arrived(struct rlite_evloop *loop,
-                     const struct rina_msg_base_resp *b_resp,
-                     const struct rina_msg_base *b_req)
+                     const struct rlite_msg_base_resp *b_resp,
+                     const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -676,8 +676,8 @@ err:
 
 static int
 normal_fa_resp(struct rlite_evloop *loop,
-              const struct rina_msg_base_resp *b_resp,
-              const struct rina_msg_base *b_req)
+              const struct rlite_msg_base_resp *b_resp,
+              const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -697,8 +697,8 @@ normal_fa_resp(struct rlite_evloop *loop,
 
 static int
 normal_flow_deallocated(struct rlite_evloop *loop,
-                       const struct rina_msg_base_resp *b_resp,
-                       const struct rina_msg_base *b_req)
+                       const struct rlite_msg_base_resp *b_resp,
+                       const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);

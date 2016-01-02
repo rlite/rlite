@@ -17,7 +17,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
                          const struct rina_kmsg_appl_register *req)
 {
     struct rina_kmsg_appl_register_resp *resp;
-    struct rina_msg_base *fkresp;
+    struct rlite_msg_base *fkresp;
     int result;
 
     /* Allocate and create a request message. */
@@ -50,7 +50,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
                 uint64_t dest_addr, uint32_t local_port)
 {
     struct rina_kmsg_ipcp_pduft_set *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -81,7 +81,7 @@ int
 uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 {
     struct rina_kmsg_ipcp_pduft_flush *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -115,7 +115,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            const struct rina_flow_config *flowcfg)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -158,7 +158,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
                             uint8_t response, const struct rina_flow_config *flowcfg)
 {
     struct rina_kmsg_uipcp_fa_resp_arrived *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -197,7 +197,7 @@ static int
 uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 {
     struct rina_kmsg_ipcp_uipcp_set *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */

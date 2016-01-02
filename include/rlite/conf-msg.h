@@ -25,7 +25,7 @@ enum {
 
 /* Numtables for rina-config <==> uipcp-server messages exchange. */
 
-extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX + 1];
+extern struct rlite_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX + 1];
 
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
@@ -33,7 +33,7 @@ extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX + 1];
 /* rinaconf --> uipcps message to register an IPC process
  * to another IPC process */
 struct rina_cmsg_ipcp_register {
-    rina_msg_t msg_type;
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t reg;
@@ -45,7 +45,7 @@ struct rina_cmsg_ipcp_register {
 /* rinaconf --> uipcps message to enroll an IPC process
  * to another IPC process */
 struct rina_cmsg_ipcp_enroll {
-    rina_msg_t msg_type;
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -57,7 +57,7 @@ struct rina_cmsg_ipcp_enroll {
 
 /* rinaconf --> uipcps message to set an IPC process DFT entry */
 struct rina_cmsg_ipcp_dft_set {
-    rina_msg_t msg_type;
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -67,7 +67,7 @@ struct rina_cmsg_ipcp_dft_set {
 
 /* rinaconf --> uipcps message to update the uipcps */
 struct rina_cmsg_uipcp_update {
-    rina_msg_t msg_type;
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint16_t ipcp_id;
@@ -78,7 +78,7 @@ struct rina_cmsg_uipcp_update {
 
 /* rinaconf <-- uipcps message to report a RIB dump */
 struct rina_cmsg_ipcp_rib_show_resp {
-    rina_msg_t msg_type;
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t result;

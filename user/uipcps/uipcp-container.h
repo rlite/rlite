@@ -49,20 +49,20 @@ struct uipcp_ops {
     char * (*rib_show)(struct uipcp *);
 
     int (*appl_register)(struct rlite_evloop *loop,
-                         const struct rina_msg_base_resp *b_resp,
-                         const struct rina_msg_base *b_req);
+                         const struct rlite_msg_base_resp *b_resp,
+                         const struct rlite_msg_base *b_req);
 
     int (*fa_req)(struct rlite_evloop *loop,
-                  const struct rina_msg_base_resp *b_resp,
-                  const struct rina_msg_base *b_req);
+                  const struct rlite_msg_base_resp *b_resp,
+                  const struct rlite_msg_base *b_req);
 
     int (*fa_resp)(struct rlite_evloop *loop,
-                   const struct rina_msg_base_resp *b_resp,
-                   const struct rina_msg_base *b_req);
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req);
 
     int (*flow_deallocated)(struct rlite_evloop *loop,
-                            const struct rina_msg_base_resp *b_resp,
-                            const struct rina_msg_base *b_req);
+                            const struct rlite_msg_base_resp *b_resp,
+                            const struct rlite_msg_base *b_req);
 };
 
 struct ipcp_node {

@@ -240,8 +240,8 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
 
 static int
 shim_inet4_appl_register(struct rlite_evloop *loop,
-                         const struct rina_msg_base_resp *b_resp,
-                         const struct rina_msg_base *b_req)
+                         const struct rlite_msg_base_resp *b_resp,
+                         const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -312,8 +312,8 @@ err0:
 
 static int
 shim_inet4_fa_req(struct rlite_evloop *loop,
-                  const struct rina_msg_base_resp *b_resp,
-                  const struct rina_msg_base *b_req)
+                  const struct rlite_msg_base_resp *b_resp,
+                  const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                   loop);
@@ -488,8 +488,8 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, unsigned int port_id)
 
 static int
 shim_inet4_fa_resp(struct rlite_evloop *loop,
-                   const struct rina_msg_base_resp *b_resp,
-                   const struct rina_msg_base *b_req)
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);
@@ -527,8 +527,8 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
 
 static int
 shim_inet4_flow_deallocated(struct rlite_evloop *loop,
-                       const struct rina_msg_base_resp *b_resp,
-                       const struct rina_msg_base *b_req)
+                       const struct rlite_msg_base_resp *b_resp,
+                       const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl,
                                                    loop);

@@ -25,8 +25,8 @@ struct rinaconf {
 /* Kernel response handlers. */
 static int
 ipcp_create_resp(struct rlite_evloop *loop,
-                 const struct rina_msg_base_resp *b_resp,
-                 const struct rina_msg_base *b_req)
+                 const struct rlite_msg_base_resp *b_resp,
+                 const struct rlite_msg_base *b_req)
 {
     struct rina_kmsg_ipcp_create_resp *resp =
             (struct rina_kmsg_ipcp_create_resp *)b_resp;
@@ -85,12 +85,12 @@ static int uipcps_disconnect(int sfd)
         return close(sfd);
 }
 
-typedef int (*response_handler_t )(struct rina_msg_base_resp *);
+typedef int (*response_handler_t )(struct rlite_msg_base_resp *);
 
 static int
 read_response(int sfd, response_handler_t handler)
 {
-    struct rina_msg_base_resp *resp;
+    struct rlite_msg_base_resp *resp;
     char msgbuf[4096];
     char serbuf[4096];
     int ret;
@@ -110,7 +110,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    resp = (struct rina_msg_base_resp *)msgbuf;
+    resp = (struct rlite_msg_base_resp *)msgbuf;
     ret = (resp->result) == 0 ? 0 : -1;
 
     PI("uipcps response [type=%u] --> %d\n", resp->msg_type, ret);
@@ -123,7 +123,7 @@ read_response(int sfd, response_handler_t handler)
 }
 
 static int
-request_response(struct rina_msg_base *req, response_handler_t handler)
+request_response(struct rlite_msg_base *req, response_handler_t handler)
 {
     int fd;
     int ret;
@@ -133,7 +133,7 @@ request_response(struct rina_msg_base *req, response_handler_t handler)
         return fd;
     }
 
-    ret = rina_msg_write_fd(fd, req);
+    ret = rlite_msg_write_fd(fd, req);
     if (ret) {
         return ret;
     }
@@ -147,7 +147,7 @@ request_response(struct rina_msg_base *req, response_handler_t handler)
 }
 
 static int
-uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
+uipcp_update(struct rinaconf *rc, rlite_msg_t update_type, uint16_t ipcp_id,
              const char *dif_type)
 {
     struct rina_cmsg_uipcp_update req;
@@ -165,7 +165,7 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
         req.dif_type = NULL;
     }
 
-    return request_response((struct rina_msg_base *)&req, NULL);
+    return request_response((struct rlite_msg_base *)&req, NULL);
 }
 
 /* Create an IPC process. */
@@ -229,7 +229,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
     kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
-        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                       RINALITE_RMB(kresp));
         free(kresp);
     }
@@ -243,7 +243,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
                   const char *dif_type)
 {
     struct rina_kmsg_ipcp_destroy *msg;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -379,7 +379,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
     req.reg = reg;
 
-    return request_response((struct rina_msg_base *)&req, NULL);
+    return request_response((struct rlite_msg_base *)&req, NULL);
 }
 
 static int
@@ -428,7 +428,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req, NULL);
+    return request_response((struct rlite_msg_base *)&req, NULL);
 }
 
 static int
@@ -469,7 +469,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
     req.remote_addr = remote_addr;
 
-    return request_response((struct rina_msg_base *)&req, NULL);
+    return request_response((struct rlite_msg_base *)&req, NULL);
 }
 
 static int
@@ -481,7 +481,7 @@ ipcps_show(int argc, char **argv, struct rinaconf *rc)
 }
 
 static int
-ipcp_rib_show_handler(struct rina_msg_base_resp *b_resp)
+ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
 {
     struct rina_cmsg_ipcp_rib_show_resp *resp =
         (struct rina_cmsg_ipcp_rib_show_resp *)b_resp;
@@ -518,7 +518,7 @@ ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
 
-    return request_response((struct rina_msg_base *)&req,
+    return request_response((struct rlite_msg_base *)&req,
                             ipcp_rib_show_handler);
 }
 
@@ -542,7 +542,7 @@ test(struct rinaconf *rc)
                               "test-shim-loopback.DIF", &result);
     assert(icresp);
     if (icresp) {
-        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
                       RINALITE_RMB(icresp));
     }
     icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",

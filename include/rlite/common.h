@@ -31,21 +31,21 @@ struct rina_name {
     char *aei;
 } __attribute__((packed));
 
-typedef uint16_t rina_msg_t;
+typedef uint16_t rlite_msg_t;
 
 #define RLITE_SUCC  0
 #define RLITE_ERR   1
 
 /* All the possible messages begin like this. */
-struct rina_msg_base {
-    rina_msg_t msg_type;
+struct rlite_msg_base {
+    rlite_msg_t msg_type;
     uint32_t event_id;
 } __attribute__((packed));
 
 /* A simple response message layout that can be shared by many
  * different types. */
-struct rina_msg_base_resp {
-    rina_msg_t msg_type;
+struct rlite_msg_base_resp {
+    rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t result;

@@ -28,15 +28,15 @@ struct rlite_ipcp {
 };
 
 /* Some useful macros for casting. */
-#define RINALITE_RMB(m) (struct rina_msg_base *)(m)
-#define RINALITE_RMBR(m) (struct rina_msg_base_resp *)(m)
+#define RINALITE_RMB(m) (struct rlite_msg_base *)(m)
+#define RINALITE_RMBR(m) (struct rlite_msg_base_resp *)(m)
 
 struct rlite_evloop;
 
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(struct rlite_evloop *loop,
-                                   const struct rina_msg_base_resp *b_resp,
-                                   const struct rina_msg_base *b_req);
+                                   const struct rlite_msg_base_resp *b_resp,
+                                   const struct rlite_msg_base *b_req);
 
 /* The signature of file descriptor callback. */
 typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
@@ -92,8 +92,8 @@ struct rlite_evloop {
 
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
-struct rina_msg_base *
-rlite_issue_request(struct rlite_evloop *loop, struct rina_msg_base *msg,
+struct rlite_msg_base *
+rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
                     size_t msg_len, int has_response,
                     unsigned int wait_for_completion, int *result);
 

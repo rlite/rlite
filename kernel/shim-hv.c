@@ -44,7 +44,7 @@ struct rina_shim_hv {
 
 static int
 shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
-                      struct rina_msg_base *msg)
+                      struct rlite_msg_base *msg)
 {
     struct rina_shim_hv *priv = (struct rina_shim_hv *)ipcp->priv;
     struct iovec iov;
@@ -52,7 +52,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     int ret;
     uint8_t *serbuf;
 
-    serlen = rina_msg_serlen(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
+    serlen = rlite_msg_serlen(rina_shim_hv_numtables, RINA_SHIM_HV_MSG_MAX,
                              msg);
     serbuf = kmalloc(serlen, GFP_ATOMIC);
     if (!serbuf) {
@@ -82,7 +82,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
 {
     int ret;
 
-    rina_msg_t ty = *((const rina_msg_t *)serbuf);
+    rlite_msg_t ty = *((const rlite_msg_t *)serbuf);
 
     if (ty == RINA_SHIM_HV_FA_REQ) {
         struct rina_hmsg_fa_req req;
@@ -192,7 +192,7 @@ rina_shim_hv_fa_req(struct ipcp_entry *ipcp,
     rina_name_copy(&req.remote_appl, &flow->remote_appl);
     req.local_port = flow->local_port;
 
-    return shim_hv_send_ctrl_msg(ipcp, (struct rina_msg_base *)&req);
+    return shim_hv_send_ctrl_msg(ipcp, (struct rlite_msg_base *)&req);
 }
 
 static int
@@ -208,7 +208,7 @@ rina_shim_hv_fa_resp(struct ipcp_entry *ipcp,
     resp.remote_port = flow->remote_port;
     resp.response = response;
 
-    return shim_hv_send_ctrl_msg(ipcp, (struct rina_msg_base *)&resp);
+    return shim_hv_send_ctrl_msg(ipcp, (struct rlite_msg_base *)&resp);
 }
 
 static int

@@ -512,16 +512,16 @@ parse_conf(const char *confname)
 
 static int
 gw_fa_req_arrived(struct rlite_evloop *loop,
-                  const struct rina_msg_base_resp *b_resp,
-                  const struct rina_msg_base *b_req)
+                  const struct rlite_msg_base_resp *b_resp,
+                  const struct rlite_msg_base *b_req)
 {
     return 0;
 }
 
 static int
 gw_fa_resp_arrived(struct rlite_evloop *loop,
-                   const struct rina_msg_base_resp *b_resp,
-                   const struct rina_msg_base *b_req)
+                   const struct rlite_msg_base_resp *b_resp,
+                   const struct rlite_msg_base *b_req)
 {
     struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
     Gateway * gw = container_of(appl, struct Gateway, appl);

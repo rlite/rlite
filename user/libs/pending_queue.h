@@ -6,9 +6,9 @@
 #include "rlite/list.h"
 
 struct pending_entry {
-    struct rina_msg_base *msg;
+    struct rlite_msg_base *msg;
     size_t msg_len;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
 
     unsigned int wait_for_completion;
     int op_complete;

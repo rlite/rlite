@@ -42,14 +42,14 @@
 struct rlite_ctrl;
 
 /* The signature of a message handler. */
-typedef int (*rina_msg_handler_t)(struct rlite_ctrl *rc,
-                                  struct rina_msg_base *bmsg);
+typedef int (*rlite_msg_handler_t)(struct rlite_ctrl *rc,
+                                  struct rlite_msg_base *bmsg);
 
 /* Data structure associated to the /dev/rlite file descriptor. */
 struct rlite_ctrl {
     char msgbuf[1024];
 
-    rina_msg_handler_t *handlers;
+    rlite_msg_handler_t *handlers;
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -224,7 +224,7 @@ rina_ipcp_factory_unregister(const char *dif_type)
 EXPORT_SYMBOL_GPL(rina_ipcp_factory_unregister);
 
 static int
-rina_upqueue_append(struct rlite_ctrl *rc, const struct rina_msg_base *rmsg)
+rina_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -237,7 +237,7 @@ rina_upqueue_append(struct rlite_ctrl *rc, const struct rina_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rina_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, rmsg);
+    serlen = rlite_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, rmsg);
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
@@ -974,7 +974,7 @@ flow_put(struct flow_entry *entry)
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
 
-        rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)&ntfy);
+        rina_upqueue_append(ipcp->uipcp, (const struct rlite_msg_base *)&ntfy);
     }
 
     /* We are in process context here, so we can safely do the
@@ -1069,7 +1069,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
             ntfy.reg = false;
             rina_name_move(&ntfy.appl_name, &app->name);
             rina_upqueue_append(app->ipcp->uipcp,
-                                (const struct rina_msg_base *)&ntfy);
+                                (const struct rlite_msg_base *)&ntfy);
             rina_name_move(&app->name, &ntfy.appl_name);
         }
 
@@ -1202,7 +1202,7 @@ ipcp_del(unsigned int ipcp_id)
 }
 
 static int
-rina_ipcp_create(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_create *req = (struct rina_kmsg_ipcp_create *)bmsg;
     struct rina_kmsg_ipcp_create_resp resp;
@@ -1221,7 +1221,7 @@ rina_ipcp_create(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
     resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
+    ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&resp);
     if (ret) {
         goto err;
     }
@@ -1240,7 +1240,7 @@ err:
 }
 
 static int
-rina_ipcp_destroy(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_destroy *req =
                         (struct rina_kmsg_ipcp_destroy *)bmsg;
@@ -1262,7 +1262,7 @@ struct ipcps_fetch_q_entry {
 };
 
 static int
-rina_ipcp_fetch(struct rlite_ctrl *rc, struct rina_msg_base *req)
+rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 {
     struct ipcps_fetch_q_entry *fqe;
     struct ipcp_entry *entry;
@@ -1313,9 +1313,9 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rina_msg_base *req)
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
-        ret = rina_upqueue_append(rc, (struct rina_msg_base *)&fqe->resp);
-        rina_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
-                      (struct rina_msg_base *)&fqe->resp);
+        ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
+        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+                      (struct rlite_msg_base *)&fqe->resp);
         kfree(fqe);
     }
 
@@ -1325,7 +1325,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rina_msg_base *req)
 }
 
 static int
-rina_ipcp_config(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_config *req =
                     (struct rina_kmsg_ipcp_config *)bmsg;
@@ -1367,7 +1367,7 @@ rina_ipcp_config(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_pduft_set *req =
                     (struct rina_kmsg_ipcp_pduft_set *)bmsg;
@@ -1401,7 +1401,7 @@ rina_ipcp_pduft_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_pduft_flush *req =
                     (struct rina_kmsg_ipcp_pduft_flush *)bmsg;
@@ -1426,7 +1426,7 @@ rina_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_ipcp_uipcp_set *req =
                     (struct rina_kmsg_ipcp_uipcp_set *)bmsg;
@@ -1453,7 +1453,7 @@ rina_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_uipcp_fa_req_arrived *req =
                     (struct rina_kmsg_uipcp_fa_req_arrived *)bmsg;
@@ -1475,7 +1475,7 @@ rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 
 static int
 rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
-                                      struct rina_msg_base *bmsg)
+                                      struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_uipcp_fa_resp_arrived *req =
                     (struct rina_kmsg_uipcp_fa_resp_arrived *)bmsg;
@@ -1524,7 +1524,7 @@ upper_ipcp_flow_bind(struct rlite_ctrl *rc, uint16_t upper_ipcp_id,
 }
 
 static int
-rina_appl_register(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_appl_register *req =
                     (struct rina_kmsg_appl_register *)bmsg;
@@ -1549,7 +1549,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
              * userspace IPCP can take appropriate actions. */
             req->event_id = 0;
             rina_upqueue_append(ipcp->uipcp,
-                    (const struct rina_msg_base *)req);
+                    (const struct rlite_msg_base *)req);
         }
 
         if (ret || !ipcp->uipcp || !req->reg) {
@@ -1564,7 +1564,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
             rina_name_move(&resp.appl_name, &req->appl_name);
 
-            rina_upqueue_append(rc, (const struct rina_msg_base *)&resp);
+            rina_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
 
             if (!ret) {
                 PI("Application process %s %sregistered to IPC process %u\n",
@@ -1587,7 +1587,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
 }
 
 static int
-rina_appl_register_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_appl_register_resp *resp =
                     (struct rina_kmsg_appl_register_resp *)bmsg;
@@ -1620,7 +1620,7 @@ rina_appl_register_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
                 PI("Application process %s %sregistered to IPC process %u\n",
                         name_s, (resp->reg ? "" : "un"), resp->ipcp_id);
             }
-            rina_upqueue_append(app->rc, (const struct rina_msg_base *)resp);
+            rina_upqueue_append(app->rc, (const struct rlite_msg_base *)resp);
         }
         ipcp_application_put(app);
     }
@@ -1647,11 +1647,11 @@ rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
     resp.result = result;
 
     /* Enqueue the response into the upqueue. */
-    return rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
+    return rina_upqueue_append(rc, (struct rlite_msg_base *)&resp);
 }
 
 static int
-rina_fa_req(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_fa_req *req =
                     (struct rina_kmsg_fa_req *)bmsg;
@@ -1693,7 +1693,7 @@ rina_fa_req(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
             req->local_port = flow_entry->local_port;
             req->local_cep = flow_entry->local_cep;
             ret = rina_upqueue_append(ipcp_entry->uipcp,
-                    (const struct rina_msg_base *)req);
+                    (const struct rlite_msg_base *)req);
         }
     }
 
@@ -1722,7 +1722,7 @@ out:
 }
 
 static int
-rina_fa_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
+rina_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 {
     struct rina_kmsg_fa_resp *resp =
                     (struct rina_kmsg_fa_resp *)bmsg;
@@ -1775,7 +1775,7 @@ rina_fa_resp(struct rlite_ctrl *rc, struct rina_msg_base *bmsg)
             resp->event_id = 0;
             resp->cep_id = flow_entry->local_cep;
             ret = rina_upqueue_append(ipcp->uipcp,
-                    (const struct rina_msg_base *)resp);
+                    (const struct rlite_msg_base *)resp);
         }
     }
 
@@ -1836,7 +1836,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     rina_name_copy(&req.remote_appl, remote_appl);
 
     /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)&req);
+    ret = rina_upqueue_append(app->rc, (struct rlite_msg_base *)&req);
     if (ret) {
         flow_put(flow_entry);
     }
@@ -2030,7 +2030,7 @@ rina_write_restart(uint32_t local_port)
 EXPORT_SYMBOL_GPL(rina_write_restart);
 
 /* The table containing all the message handlers. */
-static rina_msg_handler_t rlite_ctrl_handlers[] = {
+static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
     [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
@@ -2051,11 +2051,11 @@ static ssize_t
 rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
-    struct rina_msg_base *bmsg;
+    struct rlite_msg_base *bmsg;
     char *kbuf;
     ssize_t ret;
 
-    if (len < sizeof(rina_msg_t)) {
+    if (len < sizeof(rlite_msg_t)) {
         /* This message doesn't even contain a message type. */
         return -EINVAL;
     }
@@ -2079,7 +2079,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EINVAL;
     }
 
-    bmsg = (struct rina_msg_base *)rc->msgbuf;
+    bmsg = (struct rlite_msg_base *)rc->msgbuf;
 
     /* Demultiplex the message to the right message handler. */
     if (bmsg->msg_type > RINA_KERN_MSG_MAX || !rc->handlers[bmsg->msg_type]) {

@@ -12,7 +12,7 @@ rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
     struct rina_kmsg_ipcp_config *req;
-    struct rina_msg_base *resp;
+    struct rlite_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */

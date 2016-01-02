@@ -11,13 +11,13 @@
 
 
 static inline int
-rina_msg_write_fd(int sfd, struct rina_msg_base *msg)
+rlite_msg_write_fd(int sfd, struct rlite_msg_base *msg)
 {
     unsigned int serlen;
     char *serbuf;
     int n;
 
-    serlen = rina_msg_serlen(rina_conf_numtables, RINA_CONF_MSG_MAX, msg);
+    serlen = rlite_msg_serlen(rina_conf_numtables, RINA_CONF_MSG_MAX, msg);
     serbuf = malloc(serlen);
     if (!serbuf) {
         return -1;
