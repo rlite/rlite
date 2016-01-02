@@ -82,11 +82,15 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
             }
         }
     } else {
-        /* Remove a registration element from the persistent
-         * registration list. */
+        /* Try to remove a registration element from the persistent
+         * registration list. If 'dif_name' and 'ipcp_name' are specified,
+         * match the corresponding tuple fields. Otherwise match the
+         * by IPCP id. */
         list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-            if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
-                    rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) {
+            if ((dif_name && ipcp_name &&
+                    rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
+                    rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) ||
+                    (!dif_name && !ipcp_name && ripcp->ipcp_id == ipcp_id)) {
                 list_del(&ripcp->node);
                 free(ripcp);
                 break;
@@ -116,6 +120,7 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
                                   0, NULL, ipcp_name);
 
     if (result == 0) {
+        /* Track the (un)registration in the persistent registration list. */
         track_ipcp_registration(uipcps, reg, dif_name, ipcp_id, ipcp_name);
     }
 
@@ -209,6 +214,10 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
         resp.result = uipcp_add(uipcps, req->ipcp_id);
 
     } else if (req->msg_type == RINA_CONF_UIPCP_DESTROY) {
+        /* Track all the unregistrations of the destroyed IPCP in
+         * the persistent registrations list. */
+        track_ipcp_registration(uipcps, 0, NULL, req->ipcp_id, NULL);
+
         uipcp = uipcp_lookup(uipcps, req->ipcp_id);
         if (!uipcp) {
             PE("%s: Could not find uipcp for IPC process %u\n",
