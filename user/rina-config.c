@@ -499,7 +499,7 @@ ipcp_rib_show_handler(struct rina_msg_base_resp *b_resp)
         (struct rina_cmsg_ipcp_rib_show_resp *)b_resp;
 
     if (resp->dump) {
-        PI("%s\n", resp->dump);
+        printf("%s\n", resp->dump);
     }
 
     return 0;

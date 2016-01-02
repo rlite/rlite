@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <sstream>
 #include <unistd.h>
 #include <stdint.h>
 #include <cstdlib>
@@ -107,6 +108,7 @@ struct uipcp_rib {
     uipcp_rib(struct uipcp *_u);
 
     struct rinalite_ipcp *ipcp_info() const;
+    char *dump() const;
 
     int add_neighbor(const struct rina_name *neigh_name, int neigh_flow_fd,
                      unsigned int neigh_port_id, bool start_enrollment);
@@ -138,6 +140,42 @@ uipcp_rib::ipcp_info() const
     assert(ipcp);
 
     return ipcp;
+}
+
+char *
+uipcp_rib::dump() const
+{
+    stringstream ss;
+
+    ss << "Candidate Neighbors:" << endl;
+    for (map<string, NeighborCandidate>::const_iterator
+            mit = cand_neighbors.begin();
+                mit != cand_neighbors.end(); mit++) {
+        const NeighborCandidate& cand = mit->second;
+
+        ss << "    Name: " << cand.apn << "/" << cand.api
+            << ", Address: " << cand.address << ", Lower DIFs: {";
+
+        for (list<string>::const_iterator lit = cand.lower_difs.begin();
+                    lit != cand.lower_difs.end(); lit++) {
+            ss << *lit << ", ";
+        }
+        ss << "}" << endl;
+    }
+
+    ss << endl;
+
+    ss << "Directory Forwarding Table:" << endl;
+    for (map<string, DFTEntry>::const_iterator
+            mit = dft.begin(); mit != dft.end(); mit++) {
+        const DFTEntry& entry = mit->second;
+
+        ss << "    Application: " << static_cast<string>(entry.appl_name)
+            << ", Address: " << entry.address << ", Timestamp: "
+                << entry.timestamp << endl;
+    }
+
+    return strdup(ss.str().c_str());
 }
 
 int
@@ -1130,5 +1168,5 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
 extern "C" char *
 rib_dump(struct uipcp_rib *rib)
 {
-    return NULL;
+    return rib->dump();
 }
