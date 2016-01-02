@@ -946,7 +946,6 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_application_register *req =
                     (struct rina_kmsg_application_register *)bmsg;
-    int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
     int ret;
     struct upper_ref upper = {
             .userspace = 1,
@@ -954,7 +953,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         };
 
     mutex_lock(&rina_dm.lock);
-    ret = rina_register_internal(reg, req->ipcp_id, &req->application_name,
+    ret = rina_register_internal(req->reg, req->ipcp_id, &req->application_name,
                                  upper);
     mutex_unlock(&rina_dm.lock);
 
@@ -1266,7 +1265,6 @@ static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
 
 static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
-    [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,

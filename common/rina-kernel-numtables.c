@@ -32,11 +32,6 @@ struct rina_msg_layout rina_kernel_numtables[] = {
                     sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_APPLICATION_UNREGISTER] = {
-        .copylen = sizeof(struct rina_kmsg_application_register) -
-                    sizeof(struct rina_name),
-        .names = 1,
-    },
     [RINA_KERN_FLOW_ALLOCATE_REQ] = {
         .copylen = sizeof(struct rina_kmsg_flow_allocate_req) -
                     2 * sizeof(struct rina_name),

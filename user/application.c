@@ -119,9 +119,9 @@ application_register_req(struct application *application,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER
-                        : RINA_KERN_APPLICATION_UNREGISTER;
+    req->msg_type = RINA_KERN_APPLICATION_REGISTER;
     req->ipcp_id = ipcp_id;
+    req->reg = reg;
     rina_name_copy(&req->application_name, application_name);
 
     PD("Requesting application %sregistration...\n", (reg ? "": "un"));

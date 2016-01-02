@@ -22,18 +22,17 @@ enum {
     RINA_KERN_IPCP_CREATE = 1,
     RINA_KERN_IPCP_CREATE_RESP, /* 2 */
     RINA_KERN_IPCP_DESTROY,     /* 3 */
-    RINA_KERN_IPCP_FETCH, /* 5 */
-    RINA_KERN_IPCP_FETCH_RESP, /* 6 */
-    RINA_KERN_ASSIGN_TO_DIF, /* 7 */
-    RINA_KERN_APPLICATION_REGISTER, /* 9 */
-    RINA_KERN_APPLICATION_UNREGISTER, /* 11 */
-    RINA_KERN_FLOW_ALLOCATE_REQ, /* 13 */
-    RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 14 */
-    RINA_KERN_FLOW_ALLOCATE_RESP, /* 15 */
-    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
-    RINA_KERN_IPCP_CONFIG, /* 17 */
-    RINA_KERN_IPCP_ENROLL, /* 19 */
-    RINA_KERN_IPCP_ENROLL_RESP, /* 20 */
+    RINA_KERN_IPCP_FETCH, /* 4 */
+    RINA_KERN_IPCP_FETCH_RESP, /* 5 */
+    RINA_KERN_ASSIGN_TO_DIF, /* 6 */
+    RINA_KERN_APPLICATION_REGISTER, /* 7 */
+    RINA_KERN_FLOW_ALLOCATE_REQ, /* 8 */
+    RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 9 */
+    RINA_KERN_FLOW_ALLOCATE_RESP, /* 10 */
+    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 11 */
+    RINA_KERN_IPCP_CONFIG, /* 12 */
+    RINA_KERN_IPCP_ENROLL, /* 13 */
+    RINA_KERN_IPCP_ENROLL_RESP, /* 14 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -93,6 +92,7 @@ struct rina_kmsg_application_register {
     uint32_t event_id;
 
     uint16_t ipcp_id;
+    uint8_t reg;
     struct rina_name application_name;
 } __attribute__((packed));
 
