@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source env.sh
+source tests/env.sh
 
 $RINACONF ipcp-create shim-dummy du.IPCP 1 || exit 1
 $RINACONF ipcp-create shim-dummy du.IPCP 2 || exit 1

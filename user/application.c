@@ -86,6 +86,21 @@ flow_allocate_resp(struct rina_evloop *loop,
     return 0;
 }
 
+static int
+flow_allocate_req_arrived(struct rina_evloop *loop,
+                          const struct rina_msg_base_resp *b_resp,
+                          const struct rina_msg_base *b_req)
+{
+    struct rina_kmsg_flow_allocate_req *req =
+            (struct rina_kmsg_flow_allocate_req *)b_resp;
+
+    (void) b_req;
+
+    printf("%s: event-id %u\n", __func__, req->event_id);
+
+    return 0;
+}
+
 /* The table containing all kernel response handlers, executed
  * in the event-loop context.
  * Response handlers must not call issue_request(), in
@@ -97,6 +112,7 @@ flow_allocate_resp(struct rina_evloop *loop,
 static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
     [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
+    [RINA_KERN_FLOW_ALLOCATE_REQ] = flow_allocate_req_arrived,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };

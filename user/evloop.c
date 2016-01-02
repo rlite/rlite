@@ -195,6 +195,18 @@ evloop_function(void *arg)
             continue;
         }
 
+        if (resp->event_id == 0) {
+            /* That's a request originating from the kernel, it's
+             * not a response. */
+            pthread_mutex_unlock(&loop->lock);
+            ret = loop->handlers[resp->msg_type](loop, resp, NULL);
+            if (ret) {
+                printf("%s: Error while handling message type [%d]\n", __func__,
+                                        resp->msg_type);
+            }
+            continue;
+        }
+
         /* Try to match the event_id in the response to the event_id of
          * a previous request. */
         req_entry = pending_queue_remove_by_event_id(&loop->pqueue, resp->event_id);
@@ -267,7 +279,11 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
 
     pthread_mutex_lock(&loop->lock);
 
-    msg->event_id = loop->event_id_counter++;
+    loop->event_id_counter++;
+    if (loop->event_id_counter == (1 << 30)) {
+        loop->event_id_counter = 1;
+    }
+    msg->event_id = loop->event_id_counter;
 
     entry->next = NULL;
     entry->msg = msg;
