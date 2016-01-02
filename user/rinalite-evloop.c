@@ -217,14 +217,14 @@ evloop_function(void *arg)
         ret = read(loop->rfd, serbuf, sizeof(serbuf));
         if (ret < 0) {
             perror("read(rfd)");
-            continue;
+            goto next_one;
         }
 
         /* Here we can malloc the maximum kernel message size. */
         resp = RINALITE_RMBR(malloc(max_resp_size));
         if (!resp) {
             PE("%s: Out of memory\n", __func__);
-            continue;
+            goto next_one;
         }
 
         /* Deserialize the message from serbuf into resp. */
@@ -240,7 +240,7 @@ evloop_function(void *arg)
                 !loop->handlers[resp->msg_type]) {
             PE("%s: Invalid message type [%d] received\n", __func__,
                     resp->msg_type);
-            continue;
+            goto next_one;
         }
 
         if (resp->event_id == 0) {
@@ -252,7 +252,7 @@ evloop_function(void *arg)
                 PE("%s: Error while handling message type [%d]\n", __func__,
                                         resp->msg_type);
             }
-            continue;
+            goto next_one;
         }
 
         /* Try to match the event_id in the response to the event_id of
@@ -262,7 +262,7 @@ evloop_function(void *arg)
         if (!req_entry) {
             PE("%s: No pending request matching event-id [%u]\n", __func__,
                     resp->event_id);
-            continue;
+            goto next_one;
         }
 
         if (req_entry->msg->msg_type + 1 != resp->msg_type) {
@@ -296,6 +296,7 @@ notify_requestor:
             free(req_entry);
             rina_msg_free(rina_kernel_numtables, RINALITE_RMB(resp));
         }
+next_one:
         pthread_mutex_unlock(&loop->lock);
     }
 
