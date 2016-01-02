@@ -26,6 +26,9 @@ enum {
 
 extern struct rina_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX];
 
+/* The same message layout restrictions reported in rina-kernel-msg.h
+ * apply also here. */
+
 /* rinaconf --> uipcps message to register an IPC process
  * to another IPC process */
 struct rina_cmsg_ipcp_register {

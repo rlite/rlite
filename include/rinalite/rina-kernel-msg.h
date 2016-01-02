@@ -16,7 +16,7 @@
 #include <rinalite/rinalite-utils.h>
 
 
-/* Message types. They **must** be listed alternating requests with
+/* Message types. They MUST be listed alternating requests with
  * the corresponding responses. */
 enum {
     RINA_KERN_IPCP_CREATE = 1,
@@ -38,9 +38,20 @@ enum {
     RINA_KERN_MSG_MAX,
 };
 
-/* Numtables for kernel <==> uipcp-server messages exchange. */
+/* Numtables for kernel <==> uipcps messages exchange. */
 
 extern struct rina_msg_layout rina_kernel_numtables[RINA_KERN_MSG_MAX+1];
+
+/* All the messages MUST follow a common format and attribute ordering:
+ *   - the first field must be 'rina_msg_t msg_type'
+ *   - the second field must be 'uint32_t event_id'
+ *   - then come (if any) all the fields that are not 'struct rina_name' nor
+ *     strings ('char *'), in whatever order
+ *   - then come (if any) all the fields that are 'struct rina_name', in
+ *     whatever order
+ *   - then come (if any) all the fields that are strings ('char *'), in
+ *     whatever order
+ */
 
 /* application --> kernel message to create a new IPC process. */
 struct rina_kmsg_ipcp_create {
