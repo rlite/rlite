@@ -89,4 +89,8 @@ select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
 unsigned int
 lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name);
 
+int
+lookup_ipcp_addr_by_id(struct rina_evloop *loop, unsigned int id,
+                       uint64_t *addr);
+
 #endif  /* __RINA_EVLOOP_H__ */

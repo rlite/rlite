@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <signal.h>
 #include <assert.h>
+#include <endian.h>
 #include <rina/rina-kernel-msg.h>
 #include <rina/rina-application-msg.h>
 #include <rina/rina-utils.h>
@@ -77,15 +78,40 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 static int
 uipcp_server_enroll(struct uipcp *uipcp, int fd)
 {
+    uint64_t remote_addr, local_addr;
+    ssize_t n;
+    int ret;
+
     /* Do enrollment here. */
     PD("%s: Enrollment phase (server)\n", __func__);
 
     (void)uipcp;
     (void)fd;
 
+    /* Exchange IPCP addresses. */
+    n = read(fd, &remote_addr, sizeof(remote_addr));
+    if (n != sizeof(remote_addr)) {
+        goto fail;
+    }
+
+    remote_addr = le64toh(remote_addr);
+
+    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+                                 &local_addr);
+    assert(!ret);
+    local_addr = htole64(local_addr);
+    n = write(fd, &local_addr, sizeof(local_addr));
+    if (n != sizeof(local_addr)) {
+        goto fail;
+    }
+
     /* Do not deallocate the flow. */
 
     return 0;
+fail:
+    PE("%s: Enrollment failed\n", __func__);
+
+    return -1;
 }
 
 static void *
@@ -390,6 +416,7 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
         ipcps_fetch(&ipcm->loop);
+        uipcps_fetch(ipcm);
     }
 
     return result;
@@ -570,14 +597,16 @@ static int
 rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
                       const struct rina_msg_base *b_req)
 {
-    unsigned int ipcp_id;
     struct rina_amsg_ipcp_enroll *req = (struct rina_amsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
+    uint64_t remote_addr, local_addr;
+    unsigned int ipcp_id;
     struct uipcp *uipcp;
     unsigned int port_id;
     uint8_t cmd;
     int fd = -1;
     int ret;
+    ssize_t n;
 
     resp.result = 1; /* Report failure by default. */
 
@@ -615,7 +644,21 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    /* Do enrollment here. */
+    /* Exchange IPCP addresses. */
+    ret = lookup_ipcp_addr_by_id(&uipcp->appl.loop, uipcp->ipcp_id,
+                                 &local_addr);
+    assert(!ret);
+    local_addr = htole64(local_addr);
+    n = write(fd, &local_addr, sizeof(local_addr));
+    if (n != sizeof(local_addr)) {
+        goto out;
+    }
+
+    n = read(fd, &remote_addr, sizeof(remote_addr));
+    if (n != sizeof(remote_addr)) {
+        goto out;
+    }
+    remote_addr = le64toh(remote_addr);
 
     resp.result = 0;
 

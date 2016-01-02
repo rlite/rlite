@@ -565,3 +565,19 @@ lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
     return ~0U;
 }
 
+int
+lookup_ipcp_addr_by_id(struct rina_evloop *loop, unsigned int id,
+                       uint64_t *addr)
+{
+    struct ipcp *ipcp;
+
+    list_for_each_entry(ipcp, &loop->ipcps, node) {
+        if (ipcp->ipcp_id == id) {
+            *addr = ipcp->ipcp_addr;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
