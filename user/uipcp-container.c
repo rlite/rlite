@@ -539,6 +539,28 @@ uipcp_fa_resp(struct rinalite_evloop *loop,
     return 0;
 }
 
+static int
+uipcp_application_register(struct rinalite_evloop *loop,
+                           const struct rina_msg_base_resp *b_resp,
+                           const struct rina_msg_base *b_req)
+{
+    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_application_register *req =
+                (struct rina_kmsg_application_register *)b_resp;
+    char *name_s = rina_name_to_string(&req->application_name);
+
+    PD("%s: Application %s %sregistered from IPCP %d\n", __func__, name_s,
+            req->reg ? "" : "un", req->ipcp_id);
+
+    if (name_s) {
+        free(name_s);
+    }
+
+    return 0;
+}
+
 void *
 uipcp_server(void *arg)
 {
@@ -661,18 +683,23 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err1;
     }
 
-    /* Set the evloop handlers for flow allocation request/response
-     * reflected messages. */
-    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
-                                  RINA_KERN_FA_REQ,
-                                  uipcp_fa_req);
+    /* Set the evloop handlers for flow allocation request/response and
+     * registration reflected messages. */
+    ret = rinalite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+                                      uipcp_fa_req);
+    if (ret) {
+        goto err2;
+    }
+
+    ret = rinalite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+                                      uipcp_fa_resp);
     if (ret) {
         goto err2;
     }
 
     ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
-                                  RINA_KERN_FA_RESP,
-                                  uipcp_fa_resp);
+                                      RINA_KERN_APPLICATION_REGISTER,
+                                      uipcp_application_register);
     if (ret) {
         goto err2;
     }

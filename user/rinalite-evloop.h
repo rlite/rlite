@@ -74,26 +74,26 @@ struct rinalite_evloop {
  * @msg. */
 struct rina_msg_base *
 rinalite_issue_request(struct rinalite_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int has_response,
-              unsigned int wait_for_completion, int *result);
+                       size_t msg_len, int has_response,
+                       unsigned int wait_for_completion, int *result);
 
 int
 rinalite_evloop_stop(struct rinalite_evloop *loop);
 
 int
 rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
-                 rina_resp_handler_t *handlers);
+                     rina_resp_handler_t *handlers);
 
 int
 rinalite_evloop_fini(struct rinalite_evloop *loop);
 
 int
 rinalite_evloop_set_handler(struct rinalite_evloop *loop, unsigned int index,
-                        rina_resp_handler_t handler);
+                            rina_resp_handler_t handler);
 
 int
 rinalite_evloop_fdcb_add(struct rinalite_evloop *loop, int fd,
-                     rinalite_evloop_fdcb_t cb);
+                         rinalite_evloop_fdcb_t cb);
 
 int
 rinalite_evloop_fdcb_del(struct rinalite_evloop *loop, int fd);
