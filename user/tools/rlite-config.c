@@ -435,6 +435,15 @@ ipcps_show(int argc, char **argv, struct rinaconf *rc)
 }
 
 static int
+flows_show(int argc, char **argv, struct rinaconf *rc)
+{
+    rlite_flows_fetch(&rc->loop);
+    rlite_flows_print(&rc->loop);
+
+    return 0;
+}
+
+static int
 ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
 {
     struct rl_cmsg_ipcp_rib_show_resp *resp =
@@ -576,6 +585,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_APN IPCP_API",
         .num_args = 2,
         .func = ipcp_rib_show,
+    },
+    {
+        .name = "flows-show",
+        .usage = "",
+        .num_args = 0,
+        .func = flows_show,
     },
 };
 
