@@ -71,7 +71,7 @@ test_cdap_server(int port)
 
         write(pipefds[1], bufin, n);
 
-        m = cdap_msg_recv(pipefds[0]);
+        m = cdap_msg_recv(&mgr, pipefds[0]);
 
         if (!m) {
             PE("%s: cdap_msg_recv()");
@@ -117,7 +117,7 @@ client_connect(int sfd)
     struct AuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    CDAPManager cdap_mgr;
+    CDAPManager mgr;
     struct CDAPMessage *m;
 
     av.name = "George";
@@ -126,12 +126,12 @@ client_connect(int sfd)
     rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
     rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
 
-    if (cdap_m_connect_send(&cdap_mgr, sfd, gpb::AUTH_NONE, &av, &local_appl,
+    if (cdap_m_connect_send(&mgr, sfd, gpb::AUTH_NONE, &av, &local_appl,
                             &remote_appl)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    m = cdap_msg_recv(sfd);
+    m = cdap_msg_recv(&mgr, sfd);
     if (!m) {
         PE("%s: Error receiving CDAP response\n", __func__);
         return -1;

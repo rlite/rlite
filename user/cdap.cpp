@@ -312,7 +312,7 @@ cdap_msg_send(const struct CDAPMessage *m, int fd)
 }
 
 struct CDAPMessage *
-cdap_msg_recv(int fd)
+cdap_msg_recv(CDAPManager *mgr, int fd)
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;

@@ -81,7 +81,7 @@ private:
 };
 
 int cdap_msg_send(const struct CDAPMessage *m, int fd);
-struct CDAPMessage * cdap_msg_recv(int fd);
+struct CDAPMessage * cdap_msg_recv(CDAPManager *mgr, int fd);
 
 int cdap_m_connect_send(CDAPManager *mgr, int fd,
                         gpb::authTypes_t auth_mech,
