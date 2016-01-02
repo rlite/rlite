@@ -823,7 +823,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_cep = 0;   /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
-        entry->state = FLOW_STATE_PENDING;
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
@@ -1090,7 +1089,7 @@ flow_rc_unbind(struct rlite_ctrl *rc)
             /* Since this 'rc' is going to disappear, we have to remove
              * the reference stored into this flow. */
             flow->upper.rc = NULL;
-            if (flow->state != FLOW_STATE_ALLOCATED) {
+            if (flow->txrx.state == FLOW_STATE_PENDING) {
                 /* This flow is still pending. Since this rlite_ctrl
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
@@ -1475,7 +1474,7 @@ rina_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
 static int
 rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
-                                      struct rlite_msg_base *bmsg)
+                           struct rlite_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req =
                     (struct rl_kmsg_uipcp_fa_resp_arrived *)bmsg;
@@ -1488,6 +1487,33 @@ rina_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
                                    req->remote_cep, req->remote_addr,
                                    req->response, &req->flowcfg);
     }
+    ipcp_put(ipcp);
+
+    return ret;
+}
+
+static int
+rina_flow_dealloc(struct rlite_ctrl *rc,
+                  struct rlite_msg_base *bmsg)
+{
+    struct rl_kmsg_flow_dealloc *req =
+                (struct rl_kmsg_flow_dealloc *)bmsg;
+    struct ipcp_entry *ipcp;
+    struct flow_entry *flow;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    ipcp = ipcp_get(req->ipcp_id);
+    flow = flow_get(req->port_id);
+    if (ipcp && flow) {
+        spin_lock_bh(&flow->txrx.rx_lock);
+        if (flow->txrx.state == FLOW_STATE_ALLOCATED) {
+            /* Set the EOF condition on the flow. */
+            flow->txrx.state = FLOW_STATE_DEALLOCATED;
+            ret = 0;
+        }
+        spin_unlock_bh(&flow->txrx.rx_lock);
+    }
+    flow_put(flow);
     ipcp_put(ipcp);
 
     return ret;
@@ -1744,13 +1770,13 @@ rina_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
-    if (flow_entry->state != FLOW_STATE_PENDING) {
+    if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
         PE("flow %u is in invalid state %u\n",
-                flow_entry->local_port, flow_entry->state);
+                flow_entry->local_port, flow_entry->txrx.state);
         goto out;
     }
-    flow_entry->state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
-                                        : FLOW_STATE_NULL;
+    flow_entry->txrx.state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
+                                                   : FLOW_STATE_NULL;
 
     PI("Flow allocation response [%u] issued to IPC process %u, "
             "port-id %u\n", resp->response, flow_entry->txrx.ipcp->id,
@@ -1868,10 +1894,10 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
         return ret;
     }
 
-    if (flow_entry->state != FLOW_STATE_PENDING) {
+    if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
         goto out;
     }
-    flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
+    flow_entry->txrx.state = (response == 0) ? FLOW_STATE_ALLOCATED
                                           : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;
@@ -2047,6 +2073,7 @@ static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
     [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rina_uipcp_fa_req_arrived,
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rina_uipcp_fa_resp_arrived,
+    [RLITE_KER_FLOW_DEALLOC] = rina_flow_dealloc,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
@@ -2358,6 +2385,13 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         spin_lock_bh(&txrx->rx_lock);
         if (list_empty(&txrx->rx_q)) {
+            if (unlikely(txrx->state == FLOW_STATE_DEALLOCATED)) {
+                /* Report the EOF condition to userspace reader. */
+                ret = 0;
+                spin_unlock_bh(&txrx->rx_lock);
+                break;
+            }
+
             spin_unlock_bh(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
@@ -2405,19 +2439,24 @@ static unsigned int
 rina_io_poll(struct file *f, poll_table *wait)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
+    struct txrx *txrx = rio->txrx;
     unsigned int mask = 0;
 
-    if (unlikely(!rio->txrx)) {
+    if (unlikely(!txrx)) {
         return mask;
     }
 
-    poll_wait(f, &rio->txrx->rx_wqh, wait);
+    poll_wait(f, &txrx->rx_wqh, wait);
 
-    spin_lock_bh(&rio->txrx->rx_lock);
-    if (!list_empty(&rio->txrx->rx_q)) {
+    spin_lock_bh(&txrx->rx_lock);
+    if (!list_empty(&txrx->rx_q) ||
+            txrx->state == FLOW_STATE_DEALLOCATED) {
+        /* Userspace can read when the flow rxq is not empty
+         * or when the flow has been deallocated, so that
+         * we can report EOF. */
         mask |= POLLIN | POLLRDNORM;
     }
-    spin_unlock_bh(&rio->txrx->rx_lock);
+    spin_unlock_bh(&txrx->rx_lock);
 
     mask |= POLLOUT | POLLWRNORM;
 

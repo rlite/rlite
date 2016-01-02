@@ -60,6 +60,7 @@ struct txrx {
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
     bool                mgmt;
+    uint8_t             state;
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
@@ -112,6 +113,7 @@ enum {
     FLOW_STATE_NULL = 0,    /* Not really used. */
     FLOW_STATE_PENDING,
     FLOW_STATE_ALLOCATED,
+    FLOW_STATE_DEALLOCATED,
 };
 
 struct upper_ref {
@@ -156,7 +158,6 @@ struct flow_entry {
     uint16_t            local_cep;
     uint16_t            remote_cep;
     uint64_t            remote_addr;
-    uint8_t             state;
     struct rina_name    local_appl;
     struct rina_name    remote_appl;
     struct upper_ref    upper;
@@ -237,6 +238,11 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->tx_wqh);
     txrx->mgmt = mgmt;
+    if (mgmt) {
+        txrx->state = FLOW_STATE_ALLOCATED;
+    } else {
+        txrx->state = FLOW_STATE_PENDING;
+    }
 }
 
 void dtp_init(struct dtp *dtp);

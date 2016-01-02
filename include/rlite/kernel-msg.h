@@ -36,6 +36,7 @@ enum {
     RLITE_KER_UIPCP_FA_REQ_ARRIVED, /* 16 */
     RLITE_KER_UIPCP_FA_RESP_ARRIVED, /* 17 */
     RLITE_KER_FLOW_DEALLOCATED, /* 18 */
+    RLITE_KER_FLOW_DEALLOC, /* 19 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -233,7 +234,8 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     struct rina_flow_config flowcfg;
 } __attribute__((packed));
 
-/* uipcp (application) <-- kernel */
+/* uipcp (application) <-- kernel to inform an uipcp that
+ * a flow has been deallocated locally. */
 struct rl_kmsg_flow_deallocated {
     rlite_msg_t msg_type;
     uint32_t event_id;
@@ -243,5 +245,15 @@ struct rl_kmsg_flow_deallocated {
     uint32_t remote_port_id;
     uint64_t remote_addr;
 } __attribute__((packed));
+
+/* uipcp (application) --> kernel message to ask
+ * for a flow to be deallocated. */
+struct rl_kmsg_flow_dealloc {
+    rlite_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+    uint32_t port_id;
+};
 
 #endif  /* __RLITE_KER_H__ */

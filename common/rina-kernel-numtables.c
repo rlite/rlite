@@ -75,6 +75,9 @@ struct rlite_msg_layout rina_kernel_numtables[] = {
     [RLITE_KER_FLOW_DEALLOCATED] = {
         .copylen = sizeof(struct rl_kmsg_flow_deallocated),
     },
+    [RLITE_KER_FLOW_DEALLOC] = {
+        .copylen = sizeof(struct rl_kmsg_flow_dealloc),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
