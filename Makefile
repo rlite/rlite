@@ -11,7 +11,7 @@ all: $(EXES) ker
 ker:
 	make -C /usr/lib/modules/$(KER)/build M=$(PWD)/kernel modules
 
-user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o
+user/ipcm: user/ipcm.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o
 
 user/ipcm.o: include/rina/rina-ctrl.h user/pending_queue.h
 

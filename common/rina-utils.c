@@ -122,80 +122,16 @@ deserialize_rina_name(const void **pptr, struct rina_name *name)
     return ret;
 }
 
-struct rina_msg_layout {
-    unsigned int copylen;
-    unsigned int names;
-};
-
-static struct rina_msg_layout rina_msg_numtables[] = {
-    [RINA_CTRL_CREATE_IPCP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_create) -
-                   sizeof(struct rina_name),
-        .names = 1,
-    },
-    [RINA_CTRL_CREATE_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_create_resp),
-        .names = 0,
-    },
-    [RINA_CTRL_DESTROY_IPCP] = {
-        .copylen = sizeof(struct rina_msg_ipcp_destroy),
-        .names = 0,
-    },
-    [RINA_CTRL_DESTROY_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_CTRL_FETCH_IPCP] = {
-        .copylen = sizeof(struct rina_msg_base),
-        .names = 0,
-    },
-    [RINA_CTRL_FETCH_IPCP_RESP] = {
-        .copylen = sizeof(struct rina_msg_fetch_ipcp_resp) -
-                    2 * sizeof(struct rina_name),
-        .names = 2,
-    },
-    [RINA_CTRL_ASSIGN_TO_DIF] = {
-        .copylen = sizeof(struct rina_msg_assign_to_dif) -
-                    sizeof(struct rina_name),
-        .names = 1,
-    },
-    [RINA_CTRL_ASSIGN_TO_DIF_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_CTRL_APPLICATION_REGISTER] = {
-        .copylen = sizeof(struct rina_msg_application_register) -
-                    sizeof(struct rina_name),
-        .names = 1,
-    },
-    [RINA_CTRL_APPLICATION_REGISTER_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_CTRL_APPLICATION_UNREGISTER] = {
-        .copylen = sizeof(struct rina_msg_application_register) -
-                    sizeof(struct rina_name),
-        .names = 1,
-    },
-    [RINA_CTRL_APPLICATION_UNREGISTER_RESP] = {
-        .copylen = sizeof(struct rina_msg_base_resp),
-        .names = 0,
-    },
-    [RINA_CTRL_MSG_MAX] = {
-        .copylen = 0,
-        .names = 0,
-    },
-};
-
 unsigned int
-rina_msg_serlen(const struct rina_msg_base *msg)
+rina_msg_serlen(struct rina_msg_layout *numtables,
+                const struct rina_msg_base *msg)
 {
-    unsigned int ret = rina_msg_numtables[msg->msg_type].copylen;
+    unsigned int ret = numtables[msg->msg_type].copylen;
     struct rina_name *name;
     int i;
 
     name = (struct rina_name *)(((void *)msg) + ret);
-    for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         ret += rina_name_serlen(name);
     }
 
@@ -204,7 +140,8 @@ rina_msg_serlen(const struct rina_msg_base *msg)
 
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rina_msg(void *serbuf, const struct rina_msg_base *msg)
+serialize_rina_msg(struct rina_msg_layout *numtables,
+                   void *serbuf, const struct rina_msg_base *msg)
 {
     void *serptr = serbuf;
     unsigned int serlen;
@@ -212,11 +149,11 @@ serialize_rina_msg(void *serbuf, const struct rina_msg_base *msg)
     struct rina_name *name;
     int i;
 
-    copylen = rina_msg_numtables[msg->msg_type].copylen;
+    copylen = numtables[msg->msg_type].copylen;
     memcpy(serbuf, msg, copylen);
     name = (struct rina_name *)(((void *)msg) + copylen);
     serptr = serbuf + copylen;
-    for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         serialize_rina_name(&serptr, name);
     }
     serlen = serptr - serbuf;
@@ -226,7 +163,8 @@ serialize_rina_msg(void *serbuf, const struct rina_msg_base *msg)
 
 /* Deserialize from serbuf into msgbuf. */
 int
-deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
+deserialize_rina_msg(struct rina_msg_layout *numtables,
+                     const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
     struct rina_msg_base *bmsg = (struct rina_msg_base *)serbuf;
@@ -236,12 +174,12 @@ deserialize_rina_msg(const void *serbuf, unsigned int serbuf_len,
     int ret;
     int i;
 
-    copylen = rina_msg_numtables[bmsg->msg_type].copylen;
+    copylen = numtables[bmsg->msg_type].copylen;
     memcpy(msgbuf, serbuf, copylen);
     desptr = serbuf + copylen;
     name = (struct rina_name *)(msgbuf + copylen);
     //COMMON_PRINT(">>>> %u %u %p\n", serbuf_len, copylen, desptr);
-    for (i = 0; i < rina_msg_numtables[bmsg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[bmsg->msg_type].names; i++, name++) {
         ret = deserialize_rina_name(&desptr, name);
         if (ret) {
             return ret;
@@ -281,16 +219,17 @@ rina_name_free(struct rina_name *name)
 COMMON_EXPORT(rina_name_free);
 
 void
-rina_msg_free(struct rina_msg_base *msg)
+rina_msg_free(struct rina_msg_layout *numtables,
+              struct rina_msg_base *msg)
 {
-    unsigned int copylen = rina_msg_numtables[msg->msg_type].copylen;
+    unsigned int copylen = numtables[msg->msg_type].copylen;
     struct rina_name *name;
     int i;
 
     /* Skip the copiable part and scan all the RINA names contained in
      * the message. */
     name = (struct rina_name *)(((void *)msg) + copylen);
-    for (i = 0; i < rina_msg_numtables[msg->msg_type].names; i++, name++) {
+    for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         rina_name_free(name);
     }
 }
