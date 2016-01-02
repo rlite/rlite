@@ -213,4 +213,18 @@ struct DtcpConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct ConnPolicies {
+    bool dtcp_present;
+    DtcpConfig dtcp_cfg;
+    uint64_t seq_num_rollover_th;
+    uint32_t initial_a_timer;
+    PolicyDescr rcvr_timer_inact;
+    PolicyDescr sender_timer_inact;
+    PolicyDescr init_seq_num;
+
+    ConnPolicies() { }
+    ConnPolicies(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

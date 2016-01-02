@@ -822,3 +822,65 @@ DtcpConfig::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static void
+gpb2ConnPolicies(ConnPolicies& cfg,
+                 const gpb::connectionPolicies_t &gm)
+{
+    cfg.dtcp_present = gm.dtcppresent();
+    cfg.seq_num_rollover_th = gm.seqnumrolloverthreshold();
+    cfg.initial_a_timer = gm.initialatimer();
+    gpb2DtcpConfig(cfg.dtcp_cfg, gm.dtcpconfiguration());
+    gpb2PolicyDescr(cfg.rcvr_timer_inact, gm.rcvrtimerinactivitypolicy());
+    gpb2PolicyDescr(cfg.sender_timer_inact, gm.sendertimerinactiviypolicy());
+    gpb2PolicyDescr(cfg.init_seq_num, gm.initialseqnumpolicy());
+}
+
+static int
+ConnPolicies2gpb(const ConnPolicies& cfg,
+                 gpb::connectionPolicies_t &gm)
+{
+    gpb::policyDescriptor_t *p;
+    gpb::dtcpConfig_t *d;
+
+    gm.set_dtcppresent(cfg.dtcp_present);
+    gm.set_seqnumrolloverthreshold(cfg.seq_num_rollover_th);
+    gm.set_initialatimer(cfg.initial_a_timer);
+
+    d = new gpb::dtcpConfig_t;
+    DtcpConfig2gpb(cfg.dtcp_cfg, *d);
+    gm.set_allocated_dtcpconfiguration(d);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.rcvr_timer_inact, *p);
+    gm.set_allocated_rcvrtimerinactivitypolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.sender_timer_inact, *p);
+    gm.set_allocated_sendertimerinactiviypolicy(p);
+
+    p = new gpb::policyDescriptor_t;
+    PolicyDescr2gpb(cfg.init_seq_num, *p);
+    gm.set_allocated_initialseqnumpolicy(p);
+
+    return 0;
+}
+
+ConnPolicies::ConnPolicies(const char *buf, unsigned int size)
+{
+    gpb::connectionPolicies_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2ConnPolicies(*this, gm);
+}
+
+int
+ConnPolicies::serialize(char *buf, unsigned int size) const
+{
+    gpb::connectionPolicies_t gm;
+
+    ConnPolicies2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
