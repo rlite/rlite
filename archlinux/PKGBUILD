@@ -1,0 +1,78 @@
+# See http://wiki.archlinux.org/index.php/VCS_PKGBUILD_Guidelines
+# for more information on packaging from GIT sources.
+
+# Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
+pkgname=rina
+pkgver=0.1
+pkgrel=1
+pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
+arch=('any')
+url=()
+license=('BSD')
+groups=()
+depends=('linux' 'glibc')
+makedepends=('git' 'linux-headers')
+provides=()
+conflicts=()
+replaces=()
+backup=()
+options=()
+install="rina.install"
+source=("rina.install")
+noextract=()
+md5sums=("047aa5adec4c52ddbf86d12dbf300f71")
+
+_gitroot="$PWD/.."
+_gitname="rina"
+
+build() {
+    # Download the latest netmap code from the public repository
+    cd "$srcdir"
+    msg "Connecting to GIT server...."
+    if [[ -d "$_gitname" ]]; then
+        cd "$_gitname" && git pull origin
+        msg "The local files are updated."
+    else
+        git clone "$_gitroot" "$_gitname"
+        cd "$srcdir/$_gitname"
+        # We expect to be already on branch master
+        git clone "$_gitroot/kernel/vmpi" "kernel/vmpi"
+        # We want to be on the 3.16 branch
+        cd kernel/vmpi
+        git checkout 3.16
+        cd ..
+        cd ..
+    fi
+    msg "GIT checkout done or server timeout"
+
+    RKVER=$(uname -r | sed 's|-.*||g')
+    KMAJVER=$(echo "$RKVER" | sed 's|\.[0-9]\+$||g')
+    msg "Building on kernel ${RKVER}..."
+
+    cd "$srcdir/$_gitname"
+    make
+    msg "Build complete"
+}
+
+package() {
+    # Compute the version numbers of the running kernel
+    KVER1=$(uname -r)
+    KVER2=$(uname -r | sed 's/\.[0-9]\+-[0-9]\+//')
+
+    # Install the rina kernel modules into the extramodules-VERSION directory
+    mkdir -p "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
+    cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
+    cp $srcdir/$_gitname/kernel/vmpi/*.ko "$pkgdir/usr/lib/modules/extramodules-${KVER2}"
+
+    # Install the userspace programs
+    mkdir -p "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/user/ipcm" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/user/rina-config" "$pkgdir/usr/bin"
+    cp "$srcdir/$_gitname/user/rinaperf" "$pkgdir/usr/bin"
+
+    # Install the rina public headers
+    mkdir -p "$pkgdir/usr/include/rina"
+    cp $srcdir/$_gitname/include/rina/*.h "$pkgdir/usr/include/rina"
+}
+
+# vim:set ts=2 sw=2 et:
