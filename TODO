@@ -1,8 +1,6 @@
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 
-- limitare la lunghezza delle code nel kernel
-
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 
 - flow entry in stato ALLOCATED ma mai associate ad un file descriptor con
@@ -36,6 +34,3 @@
 - implementare list_for_each_entry_safe()
 
 - uniformare l'uso di RLITE_SUCC e RLITE_ERR
-
-- remove the spurious LFDB entry with "0", which I don't know where it comes
-  from
