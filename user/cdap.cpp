@@ -207,12 +207,13 @@ CDAPValidationTable::CDAPValidationTable()
 
 static struct CDAPValidationTable vt;
 
-CDAPConn::CDAPConn(int arg_fd)
+CDAPConn::CDAPConn(int arg_fd, long arg_version)
 {
     invoke_id_next = 1;
     max_pending_ops = 5;
 
     fd = arg_fd;
+    version = arg_version;
     memset(&local_appl, 0, sizeof(local_appl));
     memset(&remote_appl, 0, sizeof(remote_appl));
     state = NONE;
@@ -463,7 +464,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
 }
 
 bool
-CDAPMessage::valid() const
+CDAPMessage::valid(bool check_invoke_id) const
 {
     bool ret = true;
 
@@ -485,8 +486,10 @@ CDAPMessage::valid() const
     ret = ret && vt.check(FLNUM(Filter), "filter", op_code,
                           filter != string());
 
-    ret = ret && vt.check(FLNUM(InvokeID), "invoke_id", op_code,
-                          invoke_id != 0);
+    if (check_invoke_id) {
+        ret = ret && vt.check(FLNUM(InvokeID), "invoke_id", op_code,
+                              invoke_id != 0);
+    }
 
     ret = ret && vt.check(FLNUM(ObjClass), "obj_class", op_code,
                           obj_class != string());
@@ -714,7 +717,9 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
     char *serbuf;
     int n;
 
-    if (!m->valid()) {
+    m->version = version;
+
+    if (!m->valid(false)) {
         return -1;
     }
 
@@ -781,7 +786,7 @@ CDAPConn::msg_recv()
         PE("%s: Out of memory\n", __func__);
     }
 
-    if (!m->valid()) {
+    if (!m->valid(true)) {
         delete m;
         return NULL;
     }

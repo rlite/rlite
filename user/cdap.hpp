@@ -52,7 +52,7 @@ class CDAPConn {
                    int result, const std::string& result_reason,
                    gpb::opCode_t op_code);
 public:
-    CDAPConn(int fd);
+    CDAPConn(int fd, long version);
 
     /* @invoke_id is not meaningful for request messages. */
     int msg_send(struct CDAPMessage *m, int invoke_id);
@@ -139,6 +139,7 @@ public:
     struct rina_name local_appl;
     struct rina_name remote_appl;
     int fd;
+    long version;
 };
 
 /* Internal representation of a CDAP message. */
@@ -183,7 +184,7 @@ struct CDAPMessage {
     CDAPMessage(const gpb::CDAPMessage& gm);
     operator gpb::CDAPMessage() const;
 
-    bool valid() const;
+    bool valid(bool check_invoke_id) const;
 
 private:
     /* Representation of the object value. */

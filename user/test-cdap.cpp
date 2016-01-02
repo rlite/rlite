@@ -14,6 +14,7 @@
 
 using namespace std;
 
+#define TEST_VERSION 132
 
 static int
 test_cdap_server(int port)
@@ -34,7 +35,7 @@ test_cdap_server(int port)
         return -1;
     }
 
-    CDAPConn conn(pipefds[0]);
+    CDAPConn conn(pipefds[0], TEST_VERSION);
 
     if ((ld = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket()");
@@ -346,7 +347,7 @@ test_cdap_client(int port)
         return -1;
     }
 
-    CDAPConn conn(sk);
+    CDAPConn conn(sk, TEST_VERSION);
 
     client_connect(&conn);
 
