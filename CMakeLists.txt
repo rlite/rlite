@@ -4,8 +4,11 @@ project(rinalite)
 
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+file(GLOB RINA_HEADERS "include/rina/*.h")
+
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
+message(STATUS "RINA HEADERS: ${RINA_HEADERS}")
 
 include_directories(${INCLUDE_DIR})
 
@@ -23,3 +26,4 @@ target_link_libraries(rina-config rinalite)
 
 install(TARGETS rinaperf uipcp-server rina-config DESTINATION usr/bin)
 install(TARGETS rinalite DESTINATION usr/lib)
+install(FILES ${RINA_HEADERS} DESTINATION include/rina)
