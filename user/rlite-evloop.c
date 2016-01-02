@@ -117,22 +117,34 @@ rlite_ipcps_print(struct rlite_evloop *loop)
     return 0;
 }
 
-/* Fetch information about all IPC processes. */
-int
-rlite_ipcps_fetch(struct rlite_evloop *loop)
+static void
+rlite_ipcps_purge(struct rlite_evloop *loop)
 {
-    struct rina_kmsg_fetch_ipcp_resp *resp;
     struct rlite_ipcp *rlite_ipcp;
     struct list_head *elem;
-    int end = 0;
 
     /* Purge the IPCPs list. */
     pthread_mutex_lock(&loop->lock);
     while ((elem = list_pop_front(&loop->ipcps))) {
         rlite_ipcp = container_of(elem, struct rlite_ipcp, node);
+        if (rlite_ipcp->dif_type) {
+            free(rlite_ipcp->dif_type);
+        }
+        rina_name_free(&rlite_ipcp->ipcp_name);
+        rina_name_free(&rlite_ipcp->dif_name);
         free(rlite_ipcp);
     }
     pthread_mutex_unlock(&loop->lock);
+}
+
+/* Fetch information about all IPC processes. */
+int
+rlite_ipcps_fetch(struct rlite_evloop *loop)
+{
+    struct rina_kmsg_fetch_ipcp_resp *resp;
+    int end = 0;
+
+    rlite_ipcps_purge(loop);
 
     /* Reload the IPCPs list. */
     while (!end) {
@@ -656,6 +668,8 @@ int
 rlite_evloop_fini(struct rlite_evloop *loop)
 {
     int ret;
+
+    rlite_ipcps_purge(loop);
 
     {
         /* Clean up the timer_events list. */
