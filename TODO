@@ -26,3 +26,10 @@
   i pacchetti successivi (che arrivano prima che il trasmettitore si accorge
   di dover ritrasmettere la PDU con il DRF settato)? Sarebbe una stupidaggine
   buttare questi pacchetti
+
+- limitare le dimensioni della seqq e della rtxq, altrimenti queste liste
+  potrebbero crescere illimitatamente per semplice misconfigurazione della
+  QoS: ad esempio quando si usa rtx_control senza il controllo di flusso:
+  se si perde una PDU, il trasmettitore continuerà comunque a trasmettere
+  le PDU seguenti (che finiranno in rtxq e seqq) fino al prossimo timer
+  di ritrasmissione.

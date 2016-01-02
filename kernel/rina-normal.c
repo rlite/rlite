@@ -917,8 +917,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             !a && !flow->cfg.dtcp.rtx_control &&
             gap > flow->cfg.max_sdu_gap);
 
-    deliver = !drop && (gap <= flow->cfg.max_sdu_gap) &&
-                (!flow->cfg.dtcp.rtx_control || !gap);
+    deliver = !drop && (gap <= flow->cfg.max_sdu_gap);
 
     if (deliver) {
         struct list_head qrbs;
