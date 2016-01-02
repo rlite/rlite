@@ -27,6 +27,17 @@ struct rlite_ipcp {
     struct list_head node;
 };
 
+struct rlite_flow {
+    /* Flow attributes. */
+    unsigned int ipcp_id;
+    unsigned int local_port;
+    unsigned int remote_port;
+    uint64_t local_addr;
+    uint64_t remote_addr;
+
+    struct list_head node;
+};
+
 /* Some useful macros for casting. */
 #define RLITE_RMB(m) (struct rlite_msg_base *)(m)
 #define RLITE_RMBR(m) (struct rlite_msg_base_resp *)(m)
@@ -78,9 +89,9 @@ struct rlite_evloop {
 
     /* Used to store the list of ipcp entries fetched from kernel.
      * User can only access the 'ipcps'. The other ones are private. */
-    struct list_head *ipcps;
-    struct list_head *ipcps_next;
-    struct list_head ipcps_lists[2];
+    struct list_head *flows;
+    struct list_head *flows_next;
+    struct list_head flows_lists[2];
 
     struct list_head ipcps2;
     rlite_resp_handler_t usr_ipcp_update;
@@ -127,9 +138,12 @@ rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id);
 int
 rlite_ipcps_print(struct rlite_evloop *loop);
 
+int
+rlite_flows_print(struct rlite_evloop *loop);
+
 /* Fetch information about all IPC processes. */
 int
-rlite_ipcps_fetch(struct rlite_evloop *loop);
+rlite_flows_fetch(struct rlite_evloop *loop);
 
 uint32_t
 rlite_evloop_get_id(struct rlite_evloop *loop);

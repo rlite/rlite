@@ -56,7 +56,7 @@ struct rlite_ctrl {
     spinlock_t upqueue_lock;
     wait_queue_head_t upqueue_wqh;
 
-    struct list_head ipcps_fetch_q;
+    struct list_head flows_fetch_q;
 
     struct list_head node;
 };
@@ -1355,25 +1355,23 @@ rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     return ret;
 }
 
-struct ipcps_fetch_q_entry {
-    struct rl_kmsg_fetch_ipcp_resp resp;
+struct flows_fetch_q_entry {
+    struct rl_kmsg_flow_fetch_resp resp;
     struct list_head node;
 };
 
 static int
-rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
+rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 {
-    struct ipcps_fetch_q_entry *fqe;
-    struct ipcp_entry *entry;
+    struct flows_fetch_q_entry *fqe;
+    struct flow_entry *entry;
     int bucket;
     int ret = -ENOMEM;
 
-    PLOCK();
+    FLOCK();
 
-    if (list_empty(&rc->ipcps_fetch_q)) {
-        hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
-            const char *dif_name = NULL;
-
+    if (list_empty(&rc->flows_fetch_q)) {
+        hash_for_each(rlite_dm.flow_table, bucket, entry, node) {
             fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
             if (!fqe) {
                 PE("Out of memory\n");
@@ -1381,21 +1379,15 @@ rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
             }
 
             memset(fqe, 0, sizeof(*fqe));
-            list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
+            list_add_tail(&fqe->node, &rc->flows_fetch_q);
 
-            fqe->resp.msg_type = RLITE_KER_IPCP_FETCH_RESP;
+            fqe->resp.msg_type = RLITE_KER_FLOW_FETCH_RESP;
             fqe->resp.end = 0;
-            fqe->resp.ipcp_id = entry->id;
-            fqe->resp.ipcp_addr = entry->addr;
-            fqe->resp.depth = entry->depth;
-            rina_name_copy(&fqe->resp.ipcp_name, &entry->name);
-            if (entry->dif) {
-                dif_name = entry->dif->name;
-                fqe->resp.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
-            }
-            if (dif_name) {
-                fqe->resp.dif_name = kstrdup(dif_name, GFP_ATOMIC);
-            }
+            fqe->resp.ipcp_id = entry->txrx.ipcp->id;
+            fqe->resp.local_port = entry->local_port;
+            fqe->resp.remote_port = entry->remote_port;
+            fqe->resp.local_addr = entry->txrx.ipcp->addr;
+            fqe->resp.remote_addr = entry->remote_addr;
         }
 
         fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
@@ -1403,14 +1395,14 @@ rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
             PE("Out of memory\n");
         } else {
             memset(fqe, 0, sizeof(*fqe));
-            list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
-            fqe->resp.msg_type = RLITE_KER_IPCP_FETCH_RESP;
+            list_add_tail(&fqe->node, &rc->flows_fetch_q);
+            fqe->resp.msg_type = RLITE_KER_FLOW_FETCH_RESP;
             fqe->resp.end = 1;
         }
     }
 
-    if (!list_empty(&rc->ipcps_fetch_q)) {
-        fqe = list_first_entry(&rc->ipcps_fetch_q, struct ipcps_fetch_q_entry,
+    if (!list_empty(&rc->flows_fetch_q)) {
+        fqe = list_first_entry(&rc->flows_fetch_q, struct flows_fetch_q_entry,
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
@@ -1420,7 +1412,7 @@ rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
         kfree(fqe);
     }
 
-    PUNLOCK();
+    FUNLOCK();
 
     return ret;
 }
@@ -2197,7 +2189,7 @@ EXPORT_SYMBOL_GPL(rlite_write_restart);
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
     [RLITE_KER_IPCP_CREATE] = rlite_ipcp_create,
     [RLITE_KER_IPCP_DESTROY] = rlite_ipcp_destroy,
-    [RLITE_KER_IPCP_FETCH] = rlite_ipcp_fetch,
+    [RLITE_KER_FLOW_FETCH] = rlite_flow_fetch,
     [RLITE_KER_IPCP_CONFIG] = rlite_ipcp_config,
     [RLITE_KER_IPCP_PDUFT_SET] = rlite_ipcp_pduft_set,
     [RLITE_KER_IPCP_PDUFT_FLUSH] = rlite_ipcp_pduft_flush,
@@ -2413,7 +2405,7 @@ rlite_ctrl_open(struct inode *inode, struct file *f)
     spin_lock_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
-    INIT_LIST_HEAD(&rc->ipcps_fetch_q);
+    INIT_LIST_HEAD(&rc->flows_fetch_q);
 
     rc->handlers = rlite_ctrl_handlers;
 

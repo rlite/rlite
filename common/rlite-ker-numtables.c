@@ -15,14 +15,11 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
     [RLITE_KER_IPCP_DESTROY] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_destroy),
     },
-    [RLITE_KER_IPCP_FETCH] = {
+    [RLITE_KER_FLOW_FETCH] = {
         .copylen = sizeof(struct rlite_msg_base),
     },
-    [RLITE_KER_IPCP_FETCH_RESP] = {
-        .copylen = sizeof(struct rl_kmsg_fetch_ipcp_resp) -
-                    1 * sizeof(struct rina_name) - 2 * sizeof(char *),
-        .names = 1,
-        .strings = 2,
+    [RLITE_KER_FLOW_FETCH_RESP] = {
+        .copylen = sizeof(struct rl_kmsg_flow_fetch_resp),
     },
     [RLITE_KER_IPCP_UPDATE] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_update) -

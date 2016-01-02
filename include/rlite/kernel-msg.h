@@ -21,8 +21,8 @@ enum {
     RLITE_KER_IPCP_CREATE = 1,
     RLITE_KER_IPCP_CREATE_RESP, /* 2 */
     RLITE_KER_IPCP_DESTROY,     /* 3 */
-    RLITE_KER_IPCP_FETCH, /* 4 */
-    RLITE_KER_IPCP_FETCH_RESP, /* 5 */
+    RLITE_KER_FLOW_FETCH, /* 4 */
+    RLITE_KER_FLOW_FETCH_RESP, /* 5 */
     RLITE_KER_APPL_REGISTER, /* 6 */
     RLITE_KER_APPL_REGISTER_RESP, /* 7 */
     RLITE_KER_FA_REQ, /* 8 */
@@ -81,18 +81,17 @@ struct rl_kmsg_ipcp_create_resp {
 /* application --> kernel message to destroy an IPC process. */
 #define rl_kmsg_ipcp_destroy rl_kmsg_ipcp_create_resp
 
-/* application <-- kernel message to fetch IPC process information. */
-struct rl_kmsg_fetch_ipcp_resp {
+/* application <-- kernel message to fetch flow information. */
+struct rl_kmsg_flow_fetch_resp {
     rlite_msg_t msg_type;
     uint32_t event_id;
 
     uint8_t end;
     uint16_t ipcp_id;
-    uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
-    uint16_t  depth;
-    struct rina_name ipcp_name;
-    char *dif_name;
-    char *dif_type;
+    uint32_t local_port;
+    uint32_t remote_port;
+    uint64_t local_addr;
+    uint64_t remote_addr;
 } __attribute__((packed));
 
 #define RLITE_UPDATE_ADD    0x01

@@ -56,14 +56,28 @@ rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
     }
 }
 
+static void
+rlite_flows_purge(struct rlite_evloop *loop, struct list_head *flows)
+{
+    struct rlite_flow *rlite_flow;
+    struct list_head *elem;
+
+    /* Purge the IPCPs list. */
+
+    while ((elem = list_pop_front(flows)) != NULL) {
+        rlite_flow = container_of(elem, struct rlite_flow, node);
+        free(rlite_flow);
+    }
+}
+
 static int
-ipcp_fetch_resp(struct rlite_evloop *loop,
+flow_fetch_resp(struct rlite_evloop *loop,
                 const struct rlite_msg_base_resp *b_resp,
                 const struct rlite_msg_base *b_req)
 {
-    const struct rl_kmsg_fetch_ipcp_resp *resp =
-        (const struct rl_kmsg_fetch_ipcp_resp *)b_resp;
-    struct rlite_ipcp *rlite_ipcp;
+    const struct rl_kmsg_flow_fetch_resp *resp =
+        (const struct rl_kmsg_flow_fetch_resp *)b_resp;
+    struct rlite_flow *rlite_flow;
 
     (void)b_req;
 
@@ -74,34 +88,30 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
          * more IPCPs. */
         pthread_mutex_lock(&loop->lock);
 
-        tmp = loop->ipcps;
-        loop->ipcps = loop->ipcps_next;
-        loop->ipcps_next = tmp;
-        rlite_ipcps_purge(loop, loop->ipcps_next);
+        tmp = loop->flows;
+        loop->flows = loop->flows_next;
+        loop->flows_next = tmp;
+        rlite_flows_purge(loop, loop->flows_next);
 
         pthread_mutex_unlock(&loop->lock);
 
         return 0;
     }
 
-    NPD("Fetch IPCP response id=%u, type=%s\n",
-       resp->ipcp_id, resp->dif_type);
-
-    rlite_ipcp = malloc(sizeof(*rlite_ipcp));
-    if (!rlite_ipcp) {
+    rlite_flow = malloc(sizeof(*rlite_flow));
+    if (!rlite_flow) {
         PE("Out of memory\n");
         return 0;
     }
 
-    rlite_ipcp->ipcp_id = resp->ipcp_id;
-    rlite_ipcp->dif_type = strdup(resp->dif_type);
-    rlite_ipcp->ipcp_addr = resp->ipcp_addr;
-    rlite_ipcp->depth = resp->depth;
-    rina_name_copy(&rlite_ipcp->ipcp_name, &resp->ipcp_name);
-    rlite_ipcp->dif_name = strdup(resp->dif_name);
+    rlite_flow->ipcp_id = resp->ipcp_id;
+    rlite_flow->local_port = resp->local_port;
+    rlite_flow->remote_port = resp->remote_port;
+    rlite_flow->local_addr = resp->local_addr;
+    rlite_flow->remote_addr = resp->remote_addr;
 
     pthread_mutex_lock(&loop->lock);
-    list_add_tail(&rlite_ipcp->node, loop->ipcps_next);
+    list_add_tail(&rlite_flow->node, loop->flows_next);
     pthread_mutex_unlock(&loop->lock);
 
     return 0;
@@ -200,8 +210,7 @@ barrier_resp(struct rlite_evloop *loop,
              const struct rlite_msg_base_resp *b_resp,
              const struct rlite_msg_base *b_req)
 {
-    PD("Barrier response received\n");
-
+    /* Nothing to do, this is just a synchronization point. */
     return 0;
 }
 
@@ -221,8 +230,8 @@ rlite_evloop_get_id(struct rlite_evloop *loop)
 }
 
 /* Fetch information about a single IPC process. */
-static struct rl_kmsg_fetch_ipcp_resp *
-ipcp_fetch(struct rlite_evloop *loop, int *result)
+static struct rl_kmsg_flow_fetch_resp *
+flow_fetch(struct rlite_evloop *loop, int *result)
 {
     struct rlite_msg_base *msg;
 
@@ -234,12 +243,12 @@ ipcp_fetch(struct rlite_evloop *loop, int *result)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RLITE_KER_IPCP_FETCH;
+    msg->msg_type = RLITE_KER_FLOW_FETCH;
     msg->event_id = rlite_evloop_get_id(loop);
 
     NPD("Requesting IPC processes fetch...\n");
 
-    return (struct rl_kmsg_fetch_ipcp_resp *)
+    return (struct rl_kmsg_flow_fetch_resp *)
            rlite_issue_request(loop, msg, sizeof(*msg), 1, ~0U, result);
 }
 
@@ -272,19 +281,18 @@ rlite_ipcps_print(struct rlite_evloop *loop)
     return 0;
 }
 
-/* Fetch information about all IPC processes.
- * TODO turn into rlite_flows_fetch */
+/* Fetch information about all flows. */
 int
-rlite_ipcps_fetch(struct rlite_evloop *loop)
+rlite_flows_fetch(struct rlite_evloop *loop)
 {
-    struct rl_kmsg_fetch_ipcp_resp *resp;
+    struct rl_kmsg_flow_fetch_resp *resp;
     int end = 0;
 
     /* Reload the IPCPs list. */
     while (!end) {
         int result;
 
-        resp = ipcp_fetch(loop, &result);
+        resp = flow_fetch(loop, &result);
         if (!resp) {
             end = 1;
         } else {
@@ -294,6 +302,28 @@ rlite_ipcps_fetch(struct rlite_evloop *loop)
             free(resp);
         }
     }
+
+    return 0;
+}
+
+int
+rlite_flows_print(struct rlite_evloop *loop)
+{
+    struct rlite_flow *rlite_flow;
+
+    pthread_mutex_lock(&loop->lock);
+
+    PI_S("Flows table:\n");
+    list_for_each_entry(rlite_flow, loop->flows, node) {
+            PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
+                    "local_addr = %llu, remote_addr = %llu\n",
+                        rlite_flow->ipcp_id, rlite_flow->local_port,
+                        rlite_flow->remote_port,
+                        (long long unsigned int)rlite_flow->local_addr,
+                        (long long unsigned int)rlite_flow->remote_addr);
+    }
+
+    pthread_mutex_unlock(&loop->lock);
 
     return 0;
 }
@@ -769,10 +799,10 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     pthread_mutex_init(&loop->lock, NULL);
     list_init(&loop->pqueue);
     loop->event_id_counter = 1;
-    loop->ipcps = &loop->ipcps_lists[0];
-    loop->ipcps_next = &loop->ipcps_lists[1];
-    list_init(loop->ipcps);
-    list_init(loop->ipcps_next);
+    loop->flows= &loop->flows_lists[0];
+    loop->flows_next = &loop->flows_lists[1];
+    list_init(loop->flows);
+    list_init(loop->flows_next);
     list_init(&loop->ipcps2);
     list_init(&loop->fdcbs);
     list_init(&loop->timer_events);
@@ -808,9 +838,9 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
 
     /* If not redefined, setup default fetch, ipcp_update and
      * barrier_resp handlers. */
-    if (!loop->handlers[RLITE_KER_IPCP_FETCH_RESP]) {
+    if (!loop->handlers[RLITE_KER_FLOW_FETCH_RESP]) {
         NPD("setting default fetch handler\n");
-        loop->handlers[RLITE_KER_IPCP_FETCH_RESP] = ipcp_fetch_resp;
+        loop->handlers[RLITE_KER_FLOW_FETCH_RESP] = flow_fetch_resp;
     }
 
     loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
@@ -856,8 +886,8 @@ rlite_evloop_fini(struct rlite_evloop *loop)
     rlite_evloop_stop(loop);
 
     pthread_mutex_lock(&loop->lock);
-    rlite_ipcps_purge(loop, loop->ipcps);
-    rlite_ipcps_purge(loop, loop->ipcps_next);
+    rlite_flows_purge(loop, loop->flows);
+    rlite_flows_purge(loop, loop->flows_next);
     rlite_ipcps_purge(loop, &loop->ipcps2);
     pthread_mutex_unlock(&loop->lock);
 
