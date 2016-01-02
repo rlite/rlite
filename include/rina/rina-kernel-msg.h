@@ -33,6 +33,7 @@ enum {
     RINA_KERN_IPCP_CONFIG, /* 12 */
     RINA_KERN_IPCP_PDUFT_SET, /* 13 */
     RINA_KERN_IPCP_DFT_SET, /* 14 */
+    RINA_KERN_IPCP_UIPCP_SET, /* 15 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -177,4 +178,12 @@ struct rina_kmsg_ipcp_dft_set {
     struct rina_name appl_name;
 } __attribute__((packed));
 
+/* uipcp (application) --> kernel to tell the kernel that this event
+ * loop corresponds to an uipcp. */
+struct rina_kmsg_ipcp_uipcp_set {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+} __attribute__((packed));
 #endif  /* __RINA_KERN_H__ */

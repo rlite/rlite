@@ -261,6 +261,7 @@ ipcp_add_entry(struct rina_kmsg_ipcp_create *req,
         entry->addr = 0;
         entry->priv = NULL;
         entry->owner = NULL;
+        entry->uipcp = NULL;
         mutex_init(&entry->lock);
         entry->refcnt = 0;
         INIT_LIST_HEAD(&entry->registered_applications);
@@ -549,6 +550,13 @@ application_del_by_rc(struct rina_ctrl *rc)
                 kfree(s);
                 ipcp_application_del_entry(ipcp, app);
             }
+        }
+        /* If the control device to be deleted is an uipcp attached to
+         * this IPCP, detach it. */
+        if (ipcp->uipcp == rc) {
+            ipcp->uipcp = NULL;
+            printk("%s: IPC process %u detached by uipcp %p\n",
+                   __func__, ipcp->id, rc);
         }
     }
 }
@@ -868,6 +876,32 @@ rina_ipcp_dft_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
         if (appl_s) {
             kfree(appl_s);
         }
+    }
+
+    return ret;
+}
+
+static int
+rina_ipcp_uipcp_set(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_uipcp_set *req =
+                    (struct rina_kmsg_ipcp_uipcp_set *)bmsg;
+    struct ipcp_entry *entry;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    mutex_lock(&rina_dm.lock);
+    /* Find the IPC process entry corresponding to req->ipcp_id and
+     * fill the DIF name field. */
+    entry = ipcp_table_find(req->ipcp_id);
+    if (entry) {
+        entry->uipcp = rc;
+        ret = 0;
+    }
+    mutex_unlock(&rina_dm.lock);
+
+    if (ret == 0) {
+        printk("%s: IPC process %u attached to uipcp %p\n", __func__,
+                req->ipcp_id, rc);
     }
 
     return ret;
@@ -1246,6 +1280,7 @@ static rina_msg_handler_t rina_app_ctrl_handlers[] = {
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = rina_flow_allocate_resp,
+    [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 

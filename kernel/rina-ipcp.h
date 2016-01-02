@@ -41,6 +41,8 @@ struct ipcp_ops {
                    uint64_t remote_addr);
 };
 
+struct rina_ctrl;
+
 struct ipcp_entry {
     uint16_t            id;    /* Key */
     struct rina_name    name;
@@ -50,6 +52,7 @@ struct ipcp_entry {
     struct ipcp_ops     ops;
     void                *priv;
     struct list_head    registered_applications;
+    struct rina_ctrl    *uipcp;
 
     /* The module that owns this IPC process. */
     struct module       *owner;
@@ -72,8 +75,6 @@ enum {
     FLOW_STATE_PENDING,
     FLOW_STATE_ALLOCATED,
 };
-
-struct rina_ctrl;
 
 struct upper_ref {
     unsigned int        userspace;

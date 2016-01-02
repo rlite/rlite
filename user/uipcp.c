@@ -96,6 +96,34 @@ uipcp_server(void *arg)
     return NULL;
 }
 
+static int
+uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
+{
+    struct rina_kmsg_ipcp_uipcp_set *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_UIPCP_SET;
+    req->ipcp_id = ipcp_id;
+
+    PD("Requesting IPCP uipcp set...\n");
+
+    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
 struct uipcp *
 uipcp_lookup(struct ipcm *ipcm, uint16_t ipcp_id)
 {
@@ -132,6 +160,12 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
     if (ret) {
         list_del(&uipcp->node);
         return ret;
+    }
+
+    ret = uipcp_evloop_set(uipcp, ipcp_id);
+    if (ret) {
+        list_del(&uipcp->node);
+        rina_application_fini(&uipcp->appl);
     }
 
     ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
