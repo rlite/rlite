@@ -396,7 +396,8 @@ test_cdap_client(int port)
 void
 usage()
 {
-    PI("cdap test program");
+    PI("CDAP test program\n");
+    PI("    ./test-cdap [-l]\n");
 }
 
 int main(int argc, char **argv)
