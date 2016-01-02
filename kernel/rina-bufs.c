@@ -16,16 +16,16 @@ rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
         return NULL;
     }
 
-    kbuf = kmalloc(real_size, GFP_KERNEL);
+    kbuf = kmalloc(sizeof(*rb->raw) + real_size, gfp);
     if (unlikely(!kbuf)) {
         kfree(rb);
         printk("%s: Out of memory\n", __func__);
         return NULL;
     }
 
-    rb->ptr = kbuf;
-    rb->size = real_size;
-    rb->pci = (struct rina_pci *)(kbuf + num_pci * sizeof(struct rina_pci));
+    rb->raw = (struct rina_rawbuf *)kbuf;
+    rb->raw->size = real_size;
+    rb->pci = (struct rina_pci *)(rb->raw->buf + num_pci * sizeof(struct rina_pci));
     rb->len = size;
 
     return rb;
@@ -42,7 +42,7 @@ EXPORT_SYMBOL_GPL(rina_buf_alloc_ctrl);
 void
 rina_buf_free(struct rina_buf *rb)
 {
-    kfree(rb->ptr);
+    kfree(rb->raw);
     kfree(rb);
 }
 EXPORT_SYMBOL_GPL(rina_buf_free);

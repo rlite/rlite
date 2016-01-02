@@ -45,13 +45,18 @@ struct rina_pci_ctrl {
     uint64_t my_rwe;
 } __attribute__((packed));
 
-struct rina_buf {
-    uint8_t    *ptr;
-    struct rina_pci *pci;
-    size_t     size;
-    size_t     len;
+struct rina_rawbuf {
+    size_t size;
+    // TODO recfnt
+    uint8_t buf[0];
+};
 
-    struct list_head node;
+struct rina_buf {
+    struct rina_rawbuf  *raw;
+    struct rina_pci     *pci;
+    size_t              len;
+
+    struct list_head    node;
 };
 
 struct rina_buf *rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
