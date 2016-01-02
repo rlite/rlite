@@ -569,3 +569,4 @@ flow_config_dump(const struct rina_flow_config *c)
                 c->dtcp.rtx.data_rxms_max,
                 c->dtcp.rtx.initial_tr);
 }
+COMMON_EXPORT(flow_config_dump);

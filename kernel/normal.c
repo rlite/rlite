@@ -182,6 +182,9 @@ rtx_tmr_cb(long unsigned arg)
     }
 }
 
+static int rina_normal_sdu_rx_consumed(struct flow_entry *flow,
+                                       struct rina_buf *rb);
+
 #define RTX_MSECS_DEFAULT   1000
 #define DATA_RXMS_MAX_DEFAULT   10
 
@@ -192,6 +195,8 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     unsigned long mpl = 0;
     unsigned long r;
+
+    flow_config_dump(&flow->cfg);
 
     dtp->set_drf = true;
     dtp->next_seq_num_to_send = 0;
@@ -248,6 +253,11 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (flow->cfg.dtcp.rtx_control) {
         dtp->max_rtxq_len = 64;  /* For now it's static. */
+    }
+
+    if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
+        flow->sdu_rx_consumed = rina_normal_sdu_rx_consumed;
+PD("SDU_RX_CONSUMED_SET\n");
     }
 
     return 0;
@@ -1115,9 +1125,10 @@ snd_crb:
 }
 
 static int
-rina_normal_sdu_rx_consumed(struct ipcp_entry *ipcp, struct flow_entry *flow,
+rina_normal_sdu_rx_consumed(struct flow_entry *flow,
                             struct rina_buf *rb)
 {
+    struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct dtp *dtp = &flow->dtp;
     struct rina_buf *crb;
 
@@ -1153,7 +1164,6 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_del = rina_normal_pduft_del,
     .ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write,
     .ops.sdu_rx = rina_normal_sdu_rx,
-    .ops.sdu_rx_consumed = rina_normal_sdu_rx_consumed,
 };
 
 static int __init

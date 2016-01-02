@@ -40,8 +40,6 @@ struct ipcp_ops {
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb, bool maysleep);
     int (*sdu_rx)(struct ipcp_entry *ipcp, struct rina_buf *rb);
-    int (*sdu_rx_consumed)(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                           struct rina_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
@@ -162,6 +160,9 @@ struct flow_entry {
     struct txrx         txrx;
     struct dtp          dtp;
     struct rina_flow_config cfg;
+
+    int (*sdu_rx_consumed)(struct flow_entry *flow,
+                           struct rina_buf *rb);
 
     struct list_head    rmtq;
     unsigned int        rmtq_len;

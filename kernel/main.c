@@ -802,6 +802,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->refcnt = 1;  /* Cogito, ergo sum. */
         entry->never_bound = true;
         entry->priv = NULL;
+        entry->sdu_rx_consumed = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
@@ -2287,9 +2288,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             ret = -EFAULT;
         }
 
-        if (!txrx->mgmt && txrx->ipcp->ops.sdu_rx_consumed) {
+        if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
             rina_buf_pci_push(rb);
-            txrx->ipcp->ops.sdu_rx_consumed(txrx->ipcp, rio->flow, rb);
+            rio->flow->sdu_rx_consumed(rio->flow, rb);
         }
 
         rina_buf_free(rb);

@@ -34,6 +34,3 @@
   con conseguenti malfunzionamenti, visto che in kernelspace non è
   disponibile la DFT completa
 
-- sdu_rx_consumed: l'argomento ipcp può essere rimosso, e la callback
-  associata al flow invece che all'IPCP
-
