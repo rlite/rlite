@@ -574,6 +574,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
     uint8_t pdu_type = 0;
+    uint64_t ack_nack_seq_num = 0;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
@@ -595,6 +596,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->rtx_control) {
         /* POL: RcvrAck */
         /* Do this here or using the A timeout ? */
+        ack_nack_seq_num = flow->dtp.rcv_lwe - 1;
         pdu_type = PDU_T_CTRL_MASK | PDU_T_ACK_BIT | PDU_T_ACK;
         if (cfg->flow_control) {
             pdu_type |= PDU_T_CTRL_MASK | PDU_T_FC_BIT;
@@ -607,7 +609,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (pdu_type) {
-        return ctrl_pdu_alloc(ipcp, flow, pdu_type, 0);
+        return ctrl_pdu_alloc(ipcp, flow, pdu_type, ack_nack_seq_num);
     }
 
     return NULL;
