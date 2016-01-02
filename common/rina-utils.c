@@ -89,14 +89,18 @@ deserialize_string(const void **pptr, char **s)
     uint8_t slen;
 
     deserialize_obj(*pptr, uint8_t, &slen);
-    *s = COMMON_ALLOC(slen + 1);
-    if (!(*s)) {
-        return -1;
-    }
+    if (slen) {
+        *s = COMMON_ALLOC(slen + 1);
+        if (!(*s)) {
+            return -1;
+        }
 
-    memcpy(*s, *pptr, slen);
-    (*s)[slen] = '\0';
-    *pptr += slen;
+        memcpy(*s, *pptr, slen);
+        (*s)[slen] = '\0';
+        *pptr += slen;
+    } else {
+        *s = NULL;
+    }
 
     return 0;
 }
@@ -457,10 +461,10 @@ void
 rina_name_fill(struct rina_name *name, const char *apn,
                const char *api, const char *aen, const char *aei)
 {
-    name->apn = apn ? COMMON_STRDUP(apn) : NULL;
-    name->api = api ? COMMON_STRDUP(api) : NULL;
-    name->aen = aen ? COMMON_STRDUP(aen) : NULL;
-    name->aei = aei ? COMMON_STRDUP(aei) : NULL;
+    name->apn = (apn && strlen(apn)) ? COMMON_STRDUP(apn) : NULL;
+    name->api = (api && strlen(api)) ? COMMON_STRDUP(api) : NULL;
+    name->aen = (aen && strlen(aen)) ? COMMON_STRDUP(aen) : NULL;
+    name->aei = (aei && strlen(aei)) ? COMMON_STRDUP(aei) : NULL;
 }
 COMMON_EXPORT(rina_name_fill);
 
