@@ -55,6 +55,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
 {
     struct rina_mgmt_hdr mhdr;
 
+    memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RINA_MGMT_HDR_T_OUT_LOCAL_PORT;
     mhdr.local_port = local_port;
 
@@ -67,6 +68,7 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
 {
     struct rina_mgmt_hdr mhdr;
 
+    memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RINA_MGMT_HDR_T_OUT_DST_ADDR;
     mhdr.remote_addr = dst_addr;
 
