@@ -256,10 +256,14 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
-    handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
+    handlers.insert(make_pair(obj_name::neighbors,
+                              &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
 
+    /* Start timers for periodic tasks. */
+    rl_evloop_schedule(&uipcp->loop, RL_AGE_INCR_INTERVAL * 1000,
+                       age_incr_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()

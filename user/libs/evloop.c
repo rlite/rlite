@@ -702,7 +702,7 @@ rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 
 int
 rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
-                      rlite_tmr_cb_t cb, void *arg)
+                   rlite_tmr_cb_t cb, void *arg)
 {
     struct rlite_tmr_event *e, *cur;
 

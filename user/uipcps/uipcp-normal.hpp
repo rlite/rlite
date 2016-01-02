@@ -39,6 +39,11 @@ namespace obj_name {
     extern std::string flows;
 };
 
+/* Time interval (in seconds) between two consecutive increments
+ * of the age of LFDB entries. */
+
+#define RL_AGE_INCR_INTERVAL    2
+
 struct Neighbor {
     RinaName ipcp_name;
     int flow_fd;
@@ -249,6 +254,8 @@ int rib_neigh_set_port_id(struct uipcp_rib *rib,
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           int neigh_fd);
+
+void age_incr_cb(struct rlite_evloop *loop, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 

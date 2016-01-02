@@ -176,7 +176,7 @@ void
 Neighbor::enroll_tmr_start()
 {
     enroll_timeout_id = rl_evloop_schedule(&rib->uipcp->loop, 1000,
-                                              enroll_timeout_cb, this);
+                                           enroll_timeout_cb, this);
 }
 
 void

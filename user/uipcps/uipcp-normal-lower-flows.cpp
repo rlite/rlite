@@ -35,13 +35,13 @@ uipcp_rib::add_lower_flow(uint64_t local_addr, const Neighbor& neigh)
         lfl.flows.push_back(mit->second);
     }
     ret = neigh.remote_sync_obj(true, obj_class::lfdb,
-                               obj_name::lfdb, &lfl);
+                                obj_name::lfdb, &lfl);
 
     /* Send the new lower flow to the other neighbors. */
     lfl.flows.clear();
     lfl.flows.push_back(lf);
     ret |= remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
-                                 obj_name::lfdb, &lfl);
+                                     obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
     spe.run(ipcp_info()->ipcp_addr, lfdb);
@@ -111,7 +111,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, Neighbor *neigh)
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
         remote_sync_obj_excluding(neigh, add, obj_class::lfdb,
-                              obj_name::lfdb, &prop_lfl);
+                                  obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
         spe.run(ipcp_info()->ipcp_addr, lfdb);
@@ -285,3 +285,17 @@ uipcp_rib::pduft_sync()
     return 0;
 }
 
+void
+age_incr_cb(struct rlite_evloop *loop, void *arg)
+{
+    struct uipcp_rib *rib = (struct uipcp_rib *)arg;
+    ScopeLock(rib->lock);
+
+    for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
+                                        mit != rib->lfdb.end(); mit++) {
+        mit->second.age += RL_AGE_INCR_INTERVAL;
+    }
+
+    /* Reschedule */
+    rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000, age_incr_cb, rib);
+}
