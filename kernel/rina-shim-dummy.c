@@ -183,9 +183,10 @@ rina_shim_dummy_flow_allocate_resp(struct ipcp_entry *ipcp,
 
 static int
 rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
+                          struct flow_entry *flow,
                           struct rina_buf *rb)
 {
-    return -ENXIO;
+    return rina_sdu_rx(ipcp, rb, flow->remote_port);
 }
 
 static int __init

@@ -698,6 +698,9 @@ flow_add(struct ipcp_entry *ipcp, struct rina_ctrl *rc,
         entry->event_id = event_id;
         mutex_init(&entry->lock);
         entry->refcnt = 0;
+        spin_lock_init(&entry->rxq_lock);
+        INIT_LIST_HEAD(&entry->rxq);
+        init_waitqueue_head(&entry->rxq_wqh);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         ipcp->refcnt++;
     } else {
@@ -983,6 +986,32 @@ out:
 }
 EXPORT_SYMBOL_GPL(rina_flow_allocate_resp_arrived);
 
+int
+rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint16_t local_port)
+{
+    struct flow_entry *flow;
+    int ret = 0;
+
+    mutex_lock(&rina_dm.lock);  /* Here we should use ipcp mutex! */
+
+    flow = flow_table_find(local_port);
+    if (!flow) {
+        ret = -ENXIO;
+        goto out;
+    }
+
+    spin_lock(&flow->rxq_lock);
+    list_add_tail(&rb->node, &flow->rxq);
+    wake_up_interruptible_poll(&flow->rxq_wqh,
+                               POLLIN | POLLRDNORM | POLLRDBAND);
+    spin_unlock(&flow->rxq_lock);
+out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+EXPORT_SYMBOL_GPL(rina_sdu_rx);
+
 /* The table containing all the message handlers. */
 static rina_msg_handler_t rina_ipcm_ctrl_handlers[] = {
     [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
@@ -1262,7 +1291,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
     struct ipcp_entry *ipcp;
-    struct rina_buf rb;
+    struct rina_buf *rb;
     uint8_t *kbuf;
 
     if (unlikely(!rio->flow)) {
@@ -1271,20 +1300,26 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     }
     ipcp = rio->flow->ipcp;
 
-    kbuf = kmalloc(len, GFP_KERNEL);
-    if (unlikely(!kbuf)) {
+    rb = kmalloc(sizeof(*rb), GFP_KERNEL);
+    if (unlikely(!rb)) {
         printk("%s: Out of memory\n", __func__);
         return -ENOMEM;
     }
-    rb.ptr = kbuf;
-    rb.size = len;
+    kbuf = kmalloc(len, GFP_KERNEL);
+    if (unlikely(!kbuf)) {
+        kfree(rb);
+        printk("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+    rb->ptr = kbuf;
+    rb->size = len;
 
-    if (copy_from_user(rb.ptr, ubuf, rb.size)) {
+    if (copy_from_user(rb->ptr, ubuf, rb->size)) {
         printk("%s: copy_from_user()\n", __func__);
         return -EFAULT;
     }
 
-    return ipcp->ops.sdu_write(ipcp, &rb);
+    return ipcp->ops.sdu_write(ipcp, rio->flow, rb);
 }
 
 static ssize_t

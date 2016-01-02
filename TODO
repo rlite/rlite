@@ -9,4 +9,3 @@
 - flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
 - aggiustare gli identificatori di port_id e ipcp_id --> non sono consistenti
 - sostituire tutti i kmalloc() con kzalloc()
-- aggiungere reference counters a flow_entry e ipcp_entry
