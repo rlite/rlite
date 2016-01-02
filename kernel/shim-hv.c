@@ -139,7 +139,7 @@ shim_hv_read_callback(void *opaque, unsigned int channel,
         return;
     }
 
-    rb = rina_buf_alloc(len, 0, GFP_ATOMIC);
+    rb = rina_buf_alloc(len, RLITE_MAX_LAYERS, GFP_ATOMIC);
     if (!rb) {
         printk("Out of memory\n");
         return;

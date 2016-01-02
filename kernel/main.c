@@ -2245,7 +2245,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         ulen -= sizeof(mhdr);
     }
 
-    rb = rina_buf_alloc(ulen, 3, GFP_KERNEL);
+    rb = rina_buf_alloc(ulen, RLITE_MAX_LAYERS, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }

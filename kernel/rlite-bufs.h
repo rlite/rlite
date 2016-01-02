@@ -6,6 +6,8 @@
 #include <asm/atomic.h>
 
 
+#define RLITE_MAX_LAYERS    3
+
 /* PDU type definitions. */
 #define PDU_T_MGMT          0x40    /* Management PDU */
 #define PDU_T_DT            0x80    /* Data Transfer PDU */

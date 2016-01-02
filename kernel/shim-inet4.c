@@ -139,7 +139,8 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
                 PE("Warning: zero lenght packet\n");
             } else {
                 priv->cur_rx_hdr = false;
-                priv->cur_rx_rb = rina_buf_alloc(priv->cur_rx_rblen, 3, GFP_ATOMIC);
+                priv->cur_rx_rb = rina_buf_alloc(priv->cur_rx_rblen,
+                                                 RLITE_MAX_LAYERS, GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     PE("Out of memory\n");
                     break;
