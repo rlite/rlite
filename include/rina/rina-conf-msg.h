@@ -15,6 +15,9 @@ enum {
     RINA_CONF_IPCP_ENROLL,        /* 2 */
     RINA_CONF_IPCP_DFT_SET,       /* 3 */
     RINA_CONF_BASE_RESP,          /* 4 */
+    RINA_CONF_UIPCP_CREATE,       /* 5 */
+    RINA_CONF_UIPCP_DESTROY,      /* 6 */
+    RINA_CONF_UIPCP_UPDATE,       /* 7 */
 
     RINA_CONF_MSG_MAX,
 };
@@ -54,6 +57,14 @@ struct rina_cmsg_ipcp_dft_set {
     uint64_t remote_addr;
     struct rina_name ipcp_name;
     struct rina_name appl_name;
+} __attribute__((packed));
+
+/* rinaconf --> IPCM message to update the uipcps */
+struct rina_cmsg_uipcp_update {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
 } __attribute__((packed));
 
 #endif  /* __RINA_CONF_MSG_H__ */
