@@ -37,7 +37,7 @@ struct rina_evloop {
     pthread_t evloop_th;
 
     /* Table containing the kernel handlers. */
-    rina_resp_handler_t *handlers;
+    rina_resp_handler_t handlers[RINA_KERN_MSG_MAX+1];
 
     /* File descriptor for the RINA control device ("/dev/rina-ctrl") */
     int rfd;

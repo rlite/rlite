@@ -9,5 +9,4 @@
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 - APPLICATION_REGISTER, APPLICATION_UNREGISTER --> APPLICATION_REGISTER
 - b_req in response handlers seems to be always null
-- evloop_init: make a copy of the handlers table
 - move lookup_ipcp_by_name() to evloop.c

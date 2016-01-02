@@ -439,7 +439,7 @@ rina_evloop_init(struct rina_evloop *loop, const char *dev,
         return EINVAL;
     }
 
-    loop->handlers = handlers;
+    memcpy(loop->handlers, handlers, sizeof(loop->handlers));
     pthread_mutex_init(&loop->lock, NULL);
     pending_queue_init(&loop->pqueue);
     loop->event_id_counter = 1;
