@@ -119,8 +119,9 @@ rtx_tmr_cb(long unsigned arg)
 {
     struct flow_entry *flow = (struct flow_entry *)arg;
     struct dtp *dtp = &flow->dtp;
-    struct rina_buf *rb, *tmp, *crb;
+    struct rina_buf *rb, *crb;
     struct list_head rrbq;
+    struct list_head *cur;
 
     PD("%s\n", __func__);
 
@@ -128,29 +129,45 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_lock_irq(&dtp->lock);
 
-    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        if (jiffies >= rb->rtx_jiffies) {
-            /* This rb should be retransmitted. */
-            list_del(&rb->node);
-            rb->rtx_jiffies += msecs_to_jiffies(RTX_MSECS);
-            list_add_tail(&rb->node, &dtp->rtxq);
+    if (dtp->rtx_tmr_next) {
+        /* I couldn't figure out how to implement this with the macros in
+         * list.h, so I went for a custom loop. */
+        for (cur = &dtp->rtx_tmr_next->node; 1; cur = cur->next) {
+            if (cur == &dtp->rtxq) {
+                /* This is the head, it's not contained in an rina_buf: let's
+                 * skip it. */
+                continue;
+            }
 
-            crb = rina_buf_clone(rb, GFP_ATOMIC);
-            if (unlikely(!crb)) {
-                PD("%s: Out of memory\n", __func__);
+            rb = list_entry(cur, struct rina_buf, node);
+
+            if (jiffies >= rb->rtx_jiffies) {
+                /* This rb should be retransmitted. */
+                rb->rtx_jiffies += msecs_to_jiffies(RTX_MSECS);
+
+                crb = rina_buf_clone(rb, GFP_ATOMIC);
+                if (unlikely(!crb)) {
+                    PD("%s: Out of memory\n", __func__);
+                } else {
+                    list_add_tail(&crb->node, &rrbq);
+                }
+
             } else {
-                list_add_tail(&crb->node, &rrbq);
+                if (rb != dtp->rtx_tmr_next) {
+                    PD("%s: Forward rtx timer by %u\n", __func__,
+                            jiffies_to_msecs(rb->rtx_jiffies - jiffies));
+                    dtp->rtx_tmr_next = rb;
+                    mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
+                }
+                break;
             }
 
-        } else {
-            BUG_ON(!dtp->rtx_tmr_next);
-            if (rb->rtx_jiffies != dtp->rtx_tmr_next->rtx_jiffies) {
-                PD("%s: Forward rtx timer by %u\n", __func__,
-                        jiffies_to_msecs(rb->rtx_jiffies - jiffies));
-                dtp->rtx_tmr_next = rb;
-                mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
+            if (unlikely(cur->next == &dtp->rtx_tmr_next->node)) {
+                /* This wrap around condition should never happen (it should be
+                 * prevented by the else branch above), but it is technically
+                 * possible, so it's better to check and exit the loop. */
+                break;
             }
-            break;
         }
     }
 
@@ -741,13 +758,15 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                                 (long unsigned)pci->seqnum);
                         list_del(&cur->node);
                         dtp->rtxq_len--;
+                        if (cur == dtp->rtx_tmr_next) {
+                            dtp->rtx_tmr_next = NULL;
+                        }
                         rina_buf_free(cur);
                     } else {
                         /* The rtxq is sorted by seqnum, so we can safely
                          * stop here. Let's update the rtx timer
-                         * expiration time. */
-                        BUG_ON(!dtp->rtx_tmr_next);
-                        if (cur->rtx_jiffies != dtp->rtx_tmr_next->rtx_jiffies) {
+                         * expiration time, if necessary. */
+                        if (likely(!dtp->rtx_tmr_next)) {
                             PD("%s: Forward rtx timer by %u\n", __func__,
                                     jiffies_to_msecs(cur->rtx_jiffies - jiffies));
                             dtp->rtx_tmr_next = cur;
@@ -758,6 +777,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 }
 
                 if (list_empty(&dtp->rtxq)) {
+                    /* Everything has been acked, we can stop the rtx timer. */
                     del_timer(&dtp->rtx_tmr);
                 }
 
