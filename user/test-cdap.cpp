@@ -97,14 +97,20 @@ test_cdap_server(int port)
 
             case gpb::M_CREATE:
                 conn.m_create_r(m, gpb::F_NO_FLAGS, m->obj_class,
-                                     m->obj_name, obj_inst_cnt++,
-                                     0, string());
+                                m->obj_name, obj_inst_cnt++,
+                                0, string());
                 break;
 
             case gpb::M_DELETE:
                 conn.m_delete_r(m, gpb::F_NO_FLAGS, m->obj_class,
-                                     m->obj_name, m->obj_inst,
-                                     0, string());
+                                m->obj_name, m->obj_inst,
+                                0, string());
+                break;
+
+            case gpb::M_READ:
+                conn.m_read_r(m, gpb::F_NO_FLAGS, m->obj_class,
+                                m->obj_name, m->obj_inst,
+                                0, string());
                 break;
 
             default:
@@ -171,6 +177,28 @@ client_create_some(CDAPConn *conn)
 
     if (conn->m_create(&invoke_id, gpb::F_NO_FLAGS,
                             "class_A", "x", 0, 0, string())) {
+        PE("%s: Failed to send CDAP message\n", __func__);
+    }
+
+    m = conn->msg_recv();
+    if (!m) {
+        PE("%s: Error receiving CDAP response\n", __func__);
+        return -1;
+    }
+
+    m->print();
+
+    return 0;
+}
+
+static int
+client_read_some(CDAPConn *conn)
+{
+    struct CDAPMessage *m;
+    int invoke_id;
+
+    if (conn->m_read(&invoke_id, gpb::F_NO_FLAGS,
+                     "class_A", "x", 0, 0, string())) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
@@ -255,6 +283,7 @@ test_cdap_client(int port)
     client_connect(&conn);
 
     client_create_some(&conn);
+    client_read_some(&conn);
     client_delete_some(&conn);
 
     client_disconnect(&conn);

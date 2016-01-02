@@ -35,18 +35,18 @@ class CDAPConn {
 
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
-    int m_create_delete(int *invoke_id, gpb::flagValues_t flags,
-                        const std::string& obj_class,
-                        const std::string& obj_name, long obj_inst,
-                        int scope, const std::string& filter,
-                        gpb::opCode_t op_code);
+    int m_common(int *invoke_id, gpb::flagValues_t flags,
+                 const std::string& obj_class,
+                 const std::string& obj_name, long obj_inst,
+                 int scope, const std::string& filter,
+                 gpb::opCode_t op_code);
 
-    int m_create_delete_r(const struct CDAPMessage *req,
-                          gpb::flagValues_t flags,
-                          const std::string& obj_class,
-                          const std::string& obj_name, long obj_inst,
-                          int result, const std::string& result_reason,
-                          gpb::opCode_t op_code);
+    int m_common_r(const struct CDAPMessage *req,
+                   gpb::flagValues_t flags,
+                   const std::string& obj_class,
+                   const std::string& obj_name, long obj_inst,
+                   int result, const std::string& result_reason,
+                   gpb::opCode_t op_code);
 public:
     CDAPConn(int fd);
 
@@ -88,6 +88,16 @@ public:
                    gpb::flagValues_t flags, const std::string& obj_class,
                    const std::string& obj_name, long obj_inst,
                    int result, const std::string& result_reason);
+
+    int m_read(int *invoke_id, gpb::flagValues_t flags,
+               const std::string& obj_class,
+               const std::string& obj_name, long obj_inst,
+               int scope, const std::string& filter);
+
+    int m_read_r(const struct CDAPMessage *req,
+                 gpb::flagValues_t flags, const std::string& obj_class,
+                 const std::string& obj_name, long obj_inst,
+                 int result, const std::string& result_reason);
 
     struct rina_name local_appl;
     struct rina_name remote_appl;
