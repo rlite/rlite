@@ -32,6 +32,8 @@ struct uipcp;
 
 struct uipcp_ops {
     const char *dif_type;
+    int (*init)(struct uipcp *);
+    int (*fini)(struct uipcp *);
     int (*ipcp_register)(struct uipcp *uipcp, int reg,
                          const struct rina_name *dif_name,
                          unsigned int ipcp_id,

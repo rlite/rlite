@@ -432,6 +432,67 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 }
 
 static int
+normal_init(struct uipcp *uipcp)
+{
+    int ret;
+
+    uipcp->rib = rib_create(uipcp);
+    if (!uipcp->rib) {
+        return -1;
+    }
+
+    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+                                   uipcp_fa_req_arrived);
+
+    /* Set the evloop handlers for flow allocation request/response and
+     * registration reflected messages. */
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+                                   uipcp_fa_req);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+                                   uipcp_fa_resp);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                   RINA_KERN_APPL_REGISTER,
+                                   uipcp_appl_register);
+
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
+                                   RINA_KERN_FLOW_DEALLOCATED,
+                                   uipcp_flow_deallocated);
+    if (ret) {
+        goto err;
+    }
+
+    uipcp->mgmtfd = rlite_open_mgmt_port(uipcp->ipcp_id);
+    if (uipcp->mgmtfd < 0) {
+        ret = uipcp->mgmtfd;
+        goto err;
+    }
+
+    ret = rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
+    if (ret) {
+        close(uipcp->mgmtfd);
+        goto err;
+    }
+
+    return 0;
+
+err:
+    rib_destroy(uipcp->rib);
+
+    return -1;
+}
+
+static int
+normal_fini(struct uipcp *uipcp)
+{
+    close(uipcp->mgmtfd);
+    rib_destroy(uipcp->rib);
+
+    return 0;
+}
+
+static int
 normal_ipcp_register(struct uipcp *uipcp, int reg,
                      const struct rina_name *dif_name,
                      unsigned int ipcp_id,
@@ -471,6 +532,8 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 
 static struct uipcp_ops normal_ops = {
     .dif_type = "normal",
+    .init = normal_init,
+    .fini = normal_fini,
     .ipcp_register = normal_ipcp_register,
     .ipcp_enroll = normal_ipcp_enroll,
     .ipcp_dft_set = normal_ipcp_dft_set,
@@ -515,43 +578,9 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err0;
     }
 
-    uipcp->rib = rib_create(uipcp);
-    if (!uipcp->rib) {
+    ret = uipcp->ops.init(uipcp);
+    if (ret) {
         goto err1;
-    }
-
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
-                                   uipcp_fa_req_arrived);
-    if (ret) {
-        goto err2;
-    }
-
-    /* Set the evloop handlers for flow allocation request/response and
-     * registration reflected messages. */
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
-                                   uipcp_fa_req);
-    if (ret) {
-        goto err2;
-    }
-
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
-                                   uipcp_fa_resp);
-    if (ret) {
-        goto err2;
-    }
-
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop,
-                                   RINA_KERN_APPL_REGISTER,
-                                   uipcp_appl_register);
-    if (ret) {
-        goto err2;
-    }
-
-    ret = rlite_evloop_set_handler(&uipcp->appl.loop,
-                                   RINA_KERN_FLOW_DEALLOCATED,
-                                   uipcp_flow_deallocated);
-    if (ret) {
-        goto err2;
     }
 
     /* Tell the kernel what is the event loop to be associated to
@@ -562,20 +591,12 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
         goto err2;
     }
 
-    uipcp->mgmtfd = rlite_open_mgmt_port(ipcp_id);
-    if (uipcp->mgmtfd < 0) {
-        ret = uipcp->mgmtfd;
-        goto err2;
-    }
-
-    rlite_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
-
     PD("userspace IPCP %u created\n", ipcp_id);
 
     return 0;
 
 err2:
-    rib_destroy(uipcp->rib);
+    uipcp->ops.fini(uipcp);
 err1:
     rlite_appl_fini(&uipcp->appl);
 err0:
@@ -599,15 +620,13 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 
     rlite_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
 
-    close(uipcp->mgmtfd);
-
     rlite_evloop_stop(&uipcp->appl.loop);
 
     ret = rlite_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);
 
-    rib_destroy(uipcp->rib);
+    uipcp->ops.fini(uipcp);
 
     free(uipcp);
 
