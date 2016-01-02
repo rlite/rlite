@@ -25,6 +25,7 @@ rina_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 
     rb->raw = (struct rina_rawbuf *)kbuf;
     rb->raw->size = real_size;
+    atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + num_pci * sizeof(struct rina_pci));
     rb->len = size;
 
@@ -42,7 +43,9 @@ EXPORT_SYMBOL_GPL(rina_buf_alloc_ctrl);
 void
 rina_buf_free(struct rina_buf *rb)
 {
-    kfree(rb->raw);
+    if (atomic_dec_and_test(&rb->raw->refcnt)) {
+        kfree(rb->raw);
+    }
     kfree(rb);
 }
 EXPORT_SYMBOL_GPL(rina_buf_free);

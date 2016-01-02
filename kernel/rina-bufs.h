@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
+#include <asm/atomic.h>
 
 
 enum {
@@ -47,7 +48,7 @@ struct rina_pci_ctrl {
 
 struct rina_rawbuf {
     size_t size;
-    // TODO recfnt
+    atomic_t refcnt;
     uint8_t buf[0];
 };
 
