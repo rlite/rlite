@@ -45,10 +45,16 @@ struct rx_entry {
 
 struct rina_shim_loopback {
     struct ipcp_entry *ipcp;
+
+    unsigned int drop_fract;
+    unsigned int drop_cdown;
+
+    /* Queuing data structures. */
     bool queued;
     struct rx_entry rxr[RX_ENTRIES];
     unsigned int rdh;
     unsigned int rdt;
+
     spinlock_t lock;
     struct work_struct rcv;
 };
@@ -93,7 +99,8 @@ rina_shim_loopback_create(struct ipcp_entry *ipcp)
     }
 
     priv->ipcp = ipcp;
-    priv->queued = 0;  /* No queue by default. */
+    priv->drop_fract = 0;   /* No drops by default. */
+    priv->queued = 0;       /* No queue by default. */
     INIT_WORK(&priv->rcv, rcv_work);
     spin_lock_init(&priv->lock);
     priv->rdt = priv->rdh = 0;
@@ -216,11 +223,27 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
 static int
 rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
-                          struct flow_entry *flow,
-                          struct rina_buf *rb,
-                          bool maysleep)
+                             struct flow_entry *flow,
+                             struct rina_buf *rb,
+                             bool maysleep)
 {
     struct rina_shim_loopback *priv = ipcp->priv;
+
+    if (unlikely(priv->drop_fract)) {
+        bool drop = false;
+
+        spin_lock(&priv->lock);
+        if (--priv->drop_cdown == 0) {
+            priv->drop_cdown = priv->drop_fract;
+            drop = true;
+        }
+        spin_unlock(&priv->lock);
+
+        if (drop) {
+            rina_buf_free(rb);
+            return 0;
+        }
+    }
 
     if (priv->queued) {
         unsigned int next;
@@ -270,6 +293,20 @@ rina_shim_loopback_config(struct ipcp_entry *ipcp,
 
         if (ret == 0) {
             PD("%s: queued set to %u\n", __func__, priv->queued);
+        }
+
+    } else if (strcmp(param_name, "drop_fract") == 0) {
+        unsigned int drop_fract;
+
+        ret = kstrtouint(param_value, 10, &drop_fract);
+        if (ret == 0) {
+            spin_lock(&priv->lock);
+            priv->drop_fract = priv->drop_cdown = drop_fract;
+            spin_unlock(&priv->lock);
+        }
+
+        if (ret == 0) {
+            PD("%s: drop_fract set to %u\n", __func__, priv->drop_fract);
         }
     }
 
