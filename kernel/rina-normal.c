@@ -239,7 +239,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.qos_id = 0;
     pci->conn_id.dst_cep = flow->remote_port;
     pci->conn_id.src_cep = flow->local_port;
-    pci->pdu_type = PDU_TYPE_DT;
+    pci->pdu_type = PDU_T_DT;
     pci->pdu_flags = dtp->set_drf ? 1 : 0;
     pci->seqnum = dtp->next_seq_num_to_send++;
 
@@ -345,7 +345,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.qos_id = 0;  /* Not valid. */
     pci->conn_id.dst_cep = 0; /* Not valid. */
     pci->conn_id.src_cep = 0; /* Not valid. */
-    pci->pdu_type = PDU_TYPE_MGMT;
+    pci->pdu_type = PDU_T_MGMT;
     pci->pdu_flags = 0; /* Not valid. */
     pci->seqnum = 0; /* Not valid. */
 
@@ -449,15 +449,15 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (cfg->rtx_control) {
         /* POL: RcvrAck */
         /* Do this here or using the A timeout ? */
-        pdu_type = PDU_TYPE_ACK;
+        pdu_type = PDU_T_CTRL_MASK | PDU_T_ACK_BIT | PDU_T_ACK;
         if (cfg->flow_control) {
-            pdu_type |= PDU_TYPE_FC;
+            pdu_type |= PDU_T_CTRL_MASK | PDU_T_FC_BIT;
         }
 
     } else if (cfg->flow_control) {
         /* POL: ReceivingFlowControl */
         /* Send a flow control only control PDU. */
-        pdu_type = PDU_TYPE_FC;
+        pdu_type = PDU_T_CTRL_MASK | PDU_T_FC_BIT;
     }
 
     if (pdu_type) {
@@ -525,6 +525,13 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct list_head qrbs;
     struct rina_buf *qrb;
 
+    if (unlikely((pcic->base.pdu_type & PDU_T_CTRL_MASK)
+                != PDU_T_CTRL_MASK)) {
+        PE("%s: Unknown PDU type %X\n", __func__, pcic->base.pdu_type);
+        rina_buf_free(rb);
+        return 0;
+    }
+
     INIT_LIST_HEAD(&qrbs);
 
     spin_lock_irq(&dtp->lock);
@@ -547,53 +554,65 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     dtp->last_ctrl_seq_num_rcvd = pcic->base.seqnum;
 
-    switch (pcic->base.pdu_type) {
-        case PDU_TYPE_FC:
-            {
-                struct rina_buf *tmp;
+    if (pcic->base.pdu_type & PDU_T_FC_BIT) {
+        struct rina_buf *tmp;
 
-                if (unlikely(pcic->new_rwe < dtp->snd_rwe)) {
-                    /* This should not happen, the other end is
-                     * broken. */
-                    PD("%s: Broken peer, new_rwe would go backward [%lu] "
-                        "--> [%lu]\n", __func__, (long unsigned)dtp->snd_rwe,
-                            (long unsigned)pcic->new_rwe);
+        if (unlikely(pcic->new_rwe < dtp->snd_rwe)) {
+            /* This should not happen, the other end is
+             * broken. */
+            PD("%s: Broken peer, new_rwe would go backward [%lu] "
+                    "--> [%lu]\n", __func__, (long unsigned)dtp->snd_rwe,
+                    (long unsigned)pcic->new_rwe);
+
+        } else {
+            PD("%s: snd_rwe [%lu] --> [%lu]\n", __func__,
+                    (long unsigned)dtp->snd_rwe,
+                    (long unsigned)pcic->new_rwe);
+
+            /* Update snd_rwe. */
+            dtp->snd_rwe = pcic->new_rwe;
+
+            /* The update may have unblocked PDU in the cwq,
+             * let's pop them out. */
+            list_for_each_entry_safe(qrb, tmp, &dtp->cwq, node) {
+                if (dtp->snd_lwe >= dtp->snd_rwe) {
                     break;
                 }
+                list_del(&qrb->node);
+                dtp->cwq_len--;
+                list_add_tail(&qrb->node, &qrbs);
+                dtp->last_seq_num_sent = dtp->snd_lwe++;
+            }
+        }
+    }
 
-                PD("%s: snd_rwe [%lu] --> [%lu]\n", __func__,
-                        (long unsigned)dtp->snd_rwe,
-                        (long unsigned)pcic->new_rwe);
+    if (pcic->base.pdu_type & PDU_T_ACK_BIT) {
+        struct rina_buf *cur, *tmp;
 
-                /* Update snd_rwe. */
-                dtp->snd_rwe = pcic->new_rwe;
+        switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
+            case PDU_T_ACK:
+                list_for_each_entry_safe(cur, tmp, &dtp->rtxq, node) {
+                    struct rina_pci *pci = RINA_BUF_PCI(cur);
 
-                /* The update may have unblocked PDU in the cwq,
-                 * let's pop them out. */
-                list_for_each_entry_safe(qrb, tmp, &dtp->cwq, node) {
-                    if (dtp->snd_lwe >= dtp->snd_rwe) {
+                    if (pci->seqnum <= pcic->ack_nack_seq_num) {
+                        PD("%s: Remove [%lu] from rtxq\n", __func__,
+                                (long unsigned)pci->seqnum);
+                        list_del(&cur->node);
+                        rina_buf_free(cur);
+                    } else {
+                        /* The rtxq is sorted by seqnum. */
                         break;
                     }
-                    list_del(&qrb->node);
-                    dtp->cwq_len--;
-                    list_add_tail(&qrb->node, &qrbs);
-                    dtp->last_seq_num_sent = dtp->snd_lwe++;
                 }
                 break;
-            }
 
-        case PDU_TYPE_ACK_AND_FC:
-        case PDU_TYPE_CC:
-        case PDU_TYPE_ACK:
-        case PDU_TYPE_NACK:
-        case PDU_TYPE_SACK:
-        case PDU_TYPE_SNACK:
-        case PDU_TYPE_NACK_AND_FC:
-        case PDU_TYPE_SACK_AND_FC:
-        case PDU_TYPE_SNACK_AND_FC:
-            PD("%s: Missing support for PDU type [%u]\n",
-                __func__, pcic->base.pdu_type);
-            break;
+            case PDU_T_NACK:
+            case PDU_T_SACK:
+            case PDU_T_SNACK:
+                PD("%s: Missing support for PDU type [%X]\n",
+                        __func__, pcic->base.pdu_type);
+                break;
+        }
     }
 
 out:
@@ -641,7 +660,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         return rmt_tx(ipcp, pci->dst_addr, rb);
     }
 
-    if (pci->pdu_type != PDU_TYPE_DT) {
+    if (pci->pdu_type != PDU_T_DT) {
         /* This is a control PDU. */
         return sdu_rx_ctrl(ipcp, flow, rb);
     }
@@ -689,7 +708,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         if (flow->cfg.dtcp.flow_control &&
                 dtp->rcv_lwe >= dtp->last_snd_data_ack) {
             /* Send ACK flow control PDU */
-            crb = ctrl_pdu_alloc(ipcp, flow, PDU_TYPE_ACK_AND_FC,
+            crb = ctrl_pdu_alloc(ipcp, flow, PDU_T_CTRL_MASK |
+                                 PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
                                  dtp->rcv_lwe);
             if (crb) {
                 dtp->last_snd_data_ack = dtp->rcv_lwe;

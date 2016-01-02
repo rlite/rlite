@@ -6,20 +6,18 @@
 #include <asm/atomic.h>
 
 
-enum {
-    PDU_TYPE_DT             = 0x80, /* Data Transfer PDU */
-    PDU_TYPE_CC             = 0xC3, /* Common Control PDU */
-    PDU_TYPE_ACK            = 0xC4, /* ACK only */
-    PDU_TYPE_NACK           = 0xC5, /* Forced Retransmission PDU (NACK) */
-    PDU_TYPE_SACK           = 0xC6, /* Selective ACK */
-    PDU_TYPE_SNACK          = 0xC7, /* Selective NACK */
-    PDU_TYPE_FC             = 0xC8, /* Flow Control only */
-    PDU_TYPE_ACK_AND_FC     = 0xCC, /* ACK and Flow Control */
-    PDU_TYPE_NACK_AND_FC    = 0xCD, /* NACK and Flow Control */
-    PDU_TYPE_SACK_AND_FC    = 0xCE, /* Selective ACK and Flow Control */
-    PDU_TYPE_SNACK_AND_FC   = 0xCF, /* Selective NACK and Flow Control */
-    PDU_TYPE_MGMT           = 0x40, /* Management PDU */
-};
+/* PDU type definitions. */
+#define PDU_T_MGMT          0x40    /* Management PDU */
+#define PDU_T_DT            0x80    /* Data Transfer PDU */
+#define PDU_T_CTRL_MASK     0xC0
+#define PDU_T_ACK_BIT       0x04
+#define PDU_T_FC_BIT        0x08
+#define PDU_T_ACK_MASK      0x03
+#define PDU_T_ACK           0   /* Conventional ACK */
+#define PDU_T_NACK          1   /* Force PDU retransmission */
+#define PDU_T_SACK          2   /* Selective ACK */
+#define PDU_T_SNACK         3   /* Selective NACK */
+
 
 /* PCI header to be used for transfer PDUs. */
 struct rina_pci {

@@ -1341,7 +1341,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
             goto out;
         }
 
-        if (likely(RINA_BUF_PCI(rb)->pdu_type != PDU_TYPE_MGMT)) {
+        if (likely(RINA_BUF_PCI(rb)->pdu_type != PDU_T_MGMT)) {
             mutex_unlock(&rina_dm.lock);
 
             return flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
@@ -1662,7 +1662,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
              * XXX is this path used anymore ? */
             rina_buf_pci_push(rb);
             memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
-            RINA_BUF_PCI(rb)->pdu_type = PDU_TYPE_MGMT;
+            RINA_BUF_PCI(rb)->pdu_type = PDU_T_MGMT;
             ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
         } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
