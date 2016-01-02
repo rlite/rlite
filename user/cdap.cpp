@@ -485,6 +485,8 @@ CDAPMessage::operator gpb::CDAPMessage() const
 
     if (obj_value.ty != NONE) {
         gm.set_allocated_objvalue(objvalue);
+    } else {
+        delete objvalue;
     }
 
     gm.set_result(result);
