@@ -523,8 +523,11 @@ flow_del_entry(struct flow_entry *entry, int locked)
         mutex_lock(&rina_dm.lock);
 
     if (entry->refcnt) {
+        entry->refcnt--;
+    }
+    if (entry->refcnt) {
         /* Flow is being used by someone. */
-        ret = -EBUSY;
+        ret = 0;
         goto out;
     }
 
@@ -1809,7 +1812,6 @@ rina_io_release_internal(struct rina_io *rio)
         case RINA_IO_MODE_IPCP_BIND:
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
-            rio->flow->refcnt--;
             if (rio->flow->upper.ipcp) {
                 PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
                 ipcp_del_entry(rio->flow->upper.ipcp, 0);
