@@ -77,11 +77,10 @@ test_cdap_server(int port)
         m = conn.msg_recv();
 
         if (!m) {
-            PE("%s: msg_recv()");
+            PE("%s: msg_recv()\n");
             continue;
         }
 
-        PD("%s: CDAP message received\n", __func__);
         m->print();
 
         conn.fd = pipefds[1];  /* This is just a trick. */

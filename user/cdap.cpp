@@ -401,6 +401,11 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
     const char *action = sender ? "send" : "receive";
     int old_state = state;
 
+    if (m->op_code > MAX_CDAP_OPCODE) {
+        PE("%s: Invalid opcode %d\n", __func__, m->op_code);
+        return -1;
+    }
+
     switch (m->op_code) {
         case gpb::M_CONNECT:
             if (state != NONE) {
@@ -437,6 +442,14 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
             }
             state = NONE;
             break;
+
+        default:
+            /* All the operational messages. */
+            if (state != CONNECTED) {
+                PE("%s: Cannot %s %s message: Invalid state %d\n",
+                    __func__, action, opcode_names_table[m->op_code], state);
+                return -1;
+            }
     }
 
     if (old_state != state) {
