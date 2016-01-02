@@ -320,7 +320,7 @@ unix_server(struct uipcps *uipcps)
 	close(cfd);
     }
 
-    return NULL;
+    return 0;
 }
 
 /* Dump the ipcps_registrations list to a file, so that

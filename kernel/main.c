@@ -2262,7 +2262,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         case RLITE_KER_UIPCP_FA_RESP_ARRIVED:
         case RLITE_KER_FLOW_DEALLOC:
         case RLITE_KER_FLOW_FETCH:
-#if 0
+#if 0  // Skip the check for now, just to ease testing
             if (!capable(CAP_SYS_ADMIN)) {
                 kfree(kbuf);
                 return -EPERM;
@@ -2290,7 +2290,7 @@ rlite_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
     struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
-    int blocking = !(f->f_flags & O_NONBLOCK);
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     int ret = 0;
 
     if (blocking) {
@@ -2474,6 +2474,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
     struct rlite_buf *rb;
     struct rlite_mgmt_hdr mhdr;
     size_t orig_len = ulen;
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     ssize_t ret;
 
     if (unlikely(!rio->txrx)) {
@@ -2515,16 +2516,22 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         /* Regular application write. */
         DECLARE_WAITQUEUE(wait, current);
 
-        add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        if (blocking) {
+            add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        }
 
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
 
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, true);
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, blocking);
 
             if (unlikely(ret == -EAGAIN)) {
                 if (signal_pending(current)) {
                     ret = -ERESTARTSYS;
+                    break;
+                }
+
+                if (!blocking) {
                     break;
                 }
 
@@ -2537,7 +2544,9 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         }
 
         current->state = TASK_RUNNING;
-        remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        if (blocking) {
+            remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+        }
     }
 
     if (unlikely(ret < 0)) {
@@ -2551,6 +2560,7 @@ static ssize_t
 rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
     ssize_t ret = 0;
@@ -2559,7 +2569,10 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         return -ENXIO;
     }
 
-    add_wait_queue(&txrx->rx_wqh, &wait);
+    if (blocking) {
+        add_wait_queue(&txrx->rx_wqh, &wait);
+    }
+
     while (len) {
         ssize_t copylen;
         struct rlite_buf *rb;
@@ -2578,6 +2591,11 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             spin_unlock_bh(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
+                break;
+            }
+
+            if (!blocking) {
+                ret = -EAGAIN;
                 break;
             }
 
@@ -2613,7 +2631,10 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&txrx->rx_wqh, &wait);
+
+    if (blocking) {
+        remove_wait_queue(&txrx->rx_wqh, &wait);
+    }
 
     return ret;
 }
