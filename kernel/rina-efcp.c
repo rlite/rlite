@@ -55,6 +55,7 @@ dtp_init(struct dtp *dtp)
     dtp->cwq_len = dtp->max_cwq_len = 0;
     INIT_LIST_HEAD(&dtp->seqq);
     INIT_LIST_HEAD(&dtp->rtxq);
+    hrtimer_init(&dtp->rtx_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 }
 EXPORT_SYMBOL_GPL(dtp_init);
 
@@ -66,6 +67,7 @@ dtp_fini(struct dtp *dtp)
     spin_lock_irq(&dtp->lock);
     hrtimer_cancel(&dtp->snd_inact_tmr);
     hrtimer_cancel(&dtp->rcv_inact_tmr);
+    hrtimer_cancel(&dtp->rtx_tmr);
 
     list_for_each_entry_safe(rb, next, &dtp->cwq, node) {
         list_del(&rb->node);

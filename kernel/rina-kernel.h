@@ -120,6 +120,7 @@ struct dtp {
     struct delayed_work remove;
     struct list_head seqq;
     struct list_head rtxq;
+    struct hrtimer rtx_tmr;
 };
 
 struct flow_entry {

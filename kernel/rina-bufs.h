@@ -55,6 +55,8 @@ struct rina_buf {
     struct rina_pci     *pci;
     size_t              len;
 
+    unsigned long       rtx_jiffies;
+
     struct list_head    node;
 };
 

@@ -110,6 +110,70 @@ rcv_inact_tmr_cb(struct hrtimer *timer)
     return HRTIMER_NORESTART;
 }
 
+#define RTX_MSECS   1000
+
+static int rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr,
+                  struct rina_buf *rb, bool maysleep);
+
+enum hrtimer_restart
+rtx_tmr_cb(struct hrtimer *timer)
+{
+    struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
+    struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
+    struct rina_buf *rb, *tmp, *crb;
+    struct list_head rrbq;
+    enum hrtimer_restart ret = HRTIMER_NORESTART;
+
+    PD("%s\n", __func__);
+
+    INIT_LIST_HEAD(&rrbq);
+
+    spin_lock_irq(&dtp->lock);
+
+    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
+        if (jiffies >= rb->rtx_jiffies) {
+            /* This rb should be retransmitted. */
+            list_del(&rb->node);
+            rb->rtx_jiffies += msecs_to_jiffies(RTX_MSECS);
+            list_add_tail(&rb->node, &dtp->rtxq);
+
+            crb = rina_buf_clone(rb, GFP_ATOMIC);
+            if (unlikely(!crb)) {
+                PD("%s: Out of memory\n", __func__);
+            } else {
+                list_add_tail(&crb->node, &rrbq);
+            }
+
+        } else {
+            unsigned int msecs = jiffies_to_msecs(rb->rtx_jiffies - jiffies);
+            unsigned int secs = 0;
+
+            if (msecs >= 1000) {
+                secs = msecs / 1000;
+                msecs -= secs * 1000;
+            }
+
+            hrtimer_forward_now(timer, ktime_set(secs, msecs));
+            PD("%s: Forward rtx timer by %u ms\n", __func__,
+                    secs * 1000 + msecs);
+            ret = HRTIMER_RESTART;
+            break;
+        }
+    }
+
+    spin_unlock_irq(&dtp->lock);
+
+    list_for_each_entry(crb, &rrbq, node) {
+        struct rina_pci *pci = RINA_BUF_PCI(crb);
+
+        PD("%s: sending [%lu] from rtxq\n", __func__,
+                (long unsigned)pci->seqnum);
+        rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
+    }
+
+    return ret;
+}
+
 static int
 rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
@@ -127,6 +191,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
+    dtp->rtx_tmr.function = rtx_tmr_cb;
 
     if (fc->fc_type == RINA_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -311,12 +376,21 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                 return -ENOMEM;
             }
 
+            /* Record the rtx expiration time. */
+            crb->rtx_jiffies = jiffies + msecs_to_jiffies(RTX_MSECS) - 1;
+
+            /* Add to the rtx queue and start the rtx timer if not already
+             * started. */
             list_add_tail(&crb->node, &dtp->rtxq);
+            if (!hrtimer_active(&dtp->rtx_tmr)) {
+                hrtimer_start(&dtp->rtx_tmr, ktime_set(0, RTX_MSECS *1000*1000),
+                              HRTIMER_MODE_REL);
+            }
         }
 
         /* 3 * (MPL + R + A) */
         hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
-                HRTIMER_MODE_REL);
+                      HRTIMER_MODE_REL);
     }
 
     spin_unlock_irq(&dtp->lock);
