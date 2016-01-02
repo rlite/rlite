@@ -109,7 +109,7 @@ struct CDAPMessage {
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
 
-    void print() const;
+    void dump() const;
 
     CDAPMessage();
     CDAPMessage(const CDAPMessage& o);

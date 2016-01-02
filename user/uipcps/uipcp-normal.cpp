@@ -560,7 +560,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 
     if (hi == handlers.end()) {
         UPE(uipcp, "Unable to manage CDAP message\n");
-        rm->print();
+        rm->dump();
         return -1;
     }
 

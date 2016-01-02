@@ -84,7 +84,7 @@ test_cdap_server(int port)
             continue;
         }
 
-        m->print();
+        m->dump();
 
         conn.fd = pipefds[1];  /* This is just a trick. */
 
@@ -181,7 +181,7 @@ client_connect(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }
@@ -204,7 +204,7 @@ client_create_some(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }
@@ -244,7 +244,7 @@ client_write_some(CDAPConn *conn)
             return -1;
         }
 
-        m->print();
+        m->dump();
     }
 
     return 0;
@@ -268,7 +268,7 @@ client_read_some(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }
@@ -291,7 +291,7 @@ client_startstop_some(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     if (req.m_stop(gpb::F_NO_FLAGS,
                    "class_A", "x", 0, 0, string()) ||
@@ -305,7 +305,7 @@ client_startstop_some(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }
@@ -328,7 +328,7 @@ client_delete_some(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }
@@ -350,7 +350,7 @@ client_disconnect(CDAPConn *conn)
         return -1;
     }
 
-    m->print();
+    m->dump();
 
     return 0;
 }

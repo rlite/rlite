@@ -782,7 +782,7 @@ CDAPMessage::valid(bool check_invoke_id) const
 }
 
 void
-CDAPMessage::print() const
+CDAPMessage::dump() const
 {
     char *name;
 
