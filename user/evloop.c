@@ -42,7 +42,7 @@ ipcp_fetch_resp(struct rina_evloop *loop,
         ipcp->dif_type = resp->dif_type;
         rina_name_copy(&ipcp->ipcp_name, &resp->ipcp_name);
         rina_name_copy(&ipcp->dif_name, &resp->dif_name);
-        list_add_tail(&loop->ipcps, &ipcp->node);
+        list_add_tail(&ipcp->node, &loop->ipcps);
     } else {
         printf("%s: Out of memory\n", __func__);
     }

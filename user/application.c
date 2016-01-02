@@ -19,9 +19,19 @@
 #include "evloop.h"
 
 
+struct pending_flow_req {
+    uint16_t ipcp_id;
+    uint32_t port_id;
+    struct list_head node;
+};
+
 /* IPC Manager data model. */
 struct application {
     struct rina_evloop loop;
+
+    pthread_cond_t flow_req_arrived_cond;
+    struct list_head pending_flow_reqs;
+    pthread_mutex_t lock;
 };
 
 static int
@@ -92,10 +102,26 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
                           const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
+    struct application *application = container_of(loop,
+                                       struct application, loop);
     struct rina_kmsg_flow_allocate_req_arrived *req =
             (struct rina_kmsg_flow_allocate_req_arrived *)b_resp;
+    struct pending_flow_req *pfr = NULL;
 
     assert(b_req == NULL);
+    pfr = malloc(sizeof(*pfr));
+    if (!pfr) {
+        printf("%s: Out of memory\n", __func__);
+        /* TODO negative flow alloc request. */
+        return 0;
+    }
+    pfr->ipcp_id = req->ipcp_id;
+    pfr->port_id = req->port_id;
+
+    pthread_mutex_lock(&application->lock);
+    list_add_tail(&pfr->node, &application->pending_flow_reqs);
+    pthread_cond_signal(&application->flow_req_arrived_cond);
+    pthread_mutex_unlock(&application->lock);
 
     printf("%s: port-id %u\n", __func__, req->port_id);
 
@@ -228,6 +254,21 @@ static int flow_allocate(struct application *application,
     return 0;
 }
 
+static struct pending_flow_req *
+flow_request_wait(struct application *application)
+{
+    struct list_head *elem = NULL;
+
+    pthread_mutex_lock(&application->lock);
+    while ((elem = list_pop_front(&application->pending_flow_reqs)) == NULL) {
+        pthread_cond_wait(&application->flow_req_arrived_cond,
+                          &application->lock);
+    }
+    pthread_mutex_unlock(&application->lock);
+
+    return container_of(elem, struct pending_flow_req, node);
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -241,6 +282,7 @@ process(int argc, char **argv, struct application *application)
     struct rina_name dif_name;
     struct rina_name this_application;
     struct rina_name remote_application;
+    struct pending_flow_req *pfr = NULL;
 
     (void) argc;
     (void) argv;
@@ -255,6 +297,9 @@ process(int argc, char **argv, struct application *application)
 
     flow_allocate(application, &dif_name, &this_application,
                   &remote_application);
+    pfr = flow_request_wait(application);
+    printf("Flow request arrived: [ipcp_id = %u, port_id = %u]\n",
+                pfr->ipcp_id, pfr->port_id);
 }
 
 int main(int argc, char **argv)
@@ -265,6 +310,8 @@ int main(int argc, char **argv)
 
     rina_evloop_init(&application.loop, "/dev/rina-flow-ctrl",
                      rina_kernel_handlers);
+    pthread_mutex_init(&application.lock, NULL);
+    pthread_cond_init(&application.flow_req_arrived_cond, NULL);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */

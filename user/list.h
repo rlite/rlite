@@ -13,7 +13,7 @@ list_init(struct list_head *list)
 }
 
 static inline void
-list_add_front(struct list_head *list, struct list_head *elem)
+list_add_front(struct list_head *elem, struct list_head *list)
 {
         list->succ->prev = elem;
         elem->prev = list;
@@ -22,7 +22,7 @@ list_add_front(struct list_head *list, struct list_head *elem)
 }
 
 static inline void
-list_add_tail(struct list_head *list, struct list_head *elem)
+list_add_tail(struct list_head *elem, struct list_head *list)
 {
         list->prev->succ = elem;
         elem->succ = list;
