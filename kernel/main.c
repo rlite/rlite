@@ -736,45 +736,6 @@ remove_flow_work(struct work_struct *work)
     flow_put(flow);
 }
 
-struct notify_flow_removal_work {
-    struct work_struct work;
-    unsigned ipcp_id;
-    unsigned local_port_id;
-    unsigned remote_port_id;
-    uint64_t remote_addr;
-};
-
-static void
-notify_flow_removal(struct work_struct *work)
-{
-    struct notify_flow_removal_work *notifier = container_of(work,
-                        struct notify_flow_removal_work, work);
-    struct ipcp_entry *ipcp = ipcp_get(notifier->ipcp_id);
-    struct rina_kmsg_flow_deallocated ntfy;
-
-    if (!ipcp) {
-        PI("IPCP %d destroyed before notification of flow %d removal\n",
-            notifier->ipcp_id, notifier->local_port_id);
-        return;
-    }
-
-    /* Notify the uipcp about flow deallocation. TODO */
-    ntfy.msg_type = RINA_KERN_FLOW_DEALLOCATED;
-    ntfy.event_id = 0;
-    ntfy.ipcp_id = notifier->ipcp_id;
-    ntfy.local_port_id = notifier->local_port_id;
-    ntfy.remote_port_id = notifier->remote_port_id;
-    ntfy.remote_addr = notifier->remote_addr;
-
-    BUG_ON(!ipcp->uipcp);
-
-    rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)&ntfy);
-
-    ipcp_put(ipcp);
-
-    kfree(notifier);
-}
-
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
@@ -855,7 +816,6 @@ flow_put(struct flow_entry *entry)
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
-    struct notify_flow_removal_work *notifier;
     struct ipcp_entry *ipcp;
     unsigned long postpone = 0;
 
@@ -942,18 +902,17 @@ flow_put(struct flow_entry *entry)
     }
 
     if (ipcp->uipcp) {
-        notifier = kzalloc(sizeof(*notifier), GFP_ATOMIC);
-        if (!notifier) {
-            PE("Out of memory: cannot notify uipcp\n");
+        struct rina_kmsg_flow_deallocated ntfy;
 
-        } else {
-            INIT_WORK(&notifier->work, notify_flow_removal);
-            notifier->ipcp_id = ipcp->id;
-            notifier->local_port_id = entry->local_port;
-            notifier->remote_port_id = entry->remote_port;
-            notifier->remote_addr = entry->remote_addr;
-            schedule_work(&notifier->work);
-        }
+        /* Notify the uipcp about flow deallocation. */
+        ntfy.msg_type = RINA_KERN_FLOW_DEALLOCATED;
+        ntfy.event_id = 0;
+        ntfy.ipcp_id = ipcp->id;
+        ntfy.local_port_id = entry->local_port;
+        ntfy.remote_port_id = entry->remote_port;
+        ntfy.remote_addr = entry->remote_addr;
+
+        rina_upqueue_append(ipcp->uipcp, (const struct rina_msg_base *)&ntfy);
     }
 
     /* We are in process context here, so we can safely do the
