@@ -186,14 +186,16 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct rina_pci *pci;
     struct dtp *dtp = &flow->dtp;
     struct fc_config *fc = &flow->cfg.dtcp.fc;
+    bool dtcp_present = flow->cfg.dtcp_present;
     int ret;
 
     spin_lock(&dtp->lock);
 
-    /* Stop the sender inactivity timer if it was activated or the callback
-     * running , but without waiting for the callback to finish.
-     * These needs probably to be done only whent DTCP is present. */
-    hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
+    if (dtcp_present) {
+        /* Stop the sender inactivity timer if it was activated or the callback
+         * running , but without waiting for the callback to finish. */
+        hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
+    }
 
     rina_buf_pci_push(rb);
 
@@ -242,9 +244,11 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->last_seq_num_sent = pci->seqnum;
     }
 
-    /* 3 * (MPL + R + A) */
-    hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
-                  HRTIMER_MODE_REL);
+    if (dtcp_present) {
+        /* 3 * (MPL + R + A) */
+        hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
+                HRTIMER_MODE_REL);
+    }
 
     spin_unlock(&dtp->lock);
 
@@ -466,11 +470,13 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     spin_lock(&dtp->lock);
 
-    hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
+    if (flow->cfg.dtcp_present) {
+        hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
 
-    /* 2 * (MPL + R + A) */
-    hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
-            HRTIMER_MODE_REL);
+        /* 2 * (MPL + R + A) */
+        hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
+                      HRTIMER_MODE_REL);
+    }
 
     rina_buf_pci_pop(rb);
 
