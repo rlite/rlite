@@ -114,6 +114,7 @@ struct uipcp_rib {
                      unsigned int neigh_port_id, bool start_enrollment);
     uint64_t dft_lookup(const RinaName& appl_name) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
+    int ipcp_register(int reg, string lower_dif);
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
@@ -222,6 +223,36 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 
     PD("[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->ipcp_id,
        key.c_str(), (long long unsigned)entry.address);
+
+    return 0;
+}
+
+int
+uipcp_rib::ipcp_register(int reg, string lower_dif)
+{
+    list<string>::iterator lit;
+
+    for (lit = lower_difs.begin(); lit != lower_difs.end(); lit++) {
+        if (*lit == lower_dif) {
+            break;
+        }
+    }
+
+    if (reg) {
+        if (lit != lower_difs.end()) {
+            PE("DIF %s already registered\n", lower_dif.c_str());
+            return -1;
+        }
+
+        lower_difs.push_back(lower_dif);
+
+    } else {
+        if (lit == lower_difs.end()) {
+            PE("DIF %s not registered\n", lower_dif.c_str());
+            return -1;
+        }
+        lower_difs.erase(lit);
+    }
 
     return 0;
 }
@@ -1168,7 +1199,6 @@ extern "C" int
 rib_ipcp_register(struct uipcp_rib *rib, int reg,
                   const struct rina_name *lower_dif)
 {
-    list<string>::iterator lit;
     string name;
 
     if (!rina_name_valid(lower_dif)) {
@@ -1177,29 +1207,8 @@ rib_ipcp_register(struct uipcp_rib *rib, int reg,
     }
 
     name = string(lower_dif->apn);
-    for (lit = rib->lower_difs.begin(); lit != rib->lower_difs.end(); lit++) {
-        if (*lit == name) {
-            break;
-        }
-    }
 
-    if (reg) {
-        if (lit != rib->lower_difs.end()) {
-            PE("DIF %s already registered\n", name.c_str());
-            return -1;
-        }
-
-        rib->lower_difs.push_back(name);
-
-    } else {
-        if (lit == rib->lower_difs.end()) {
-            PE("DIF %s not registered\n", name.c_str());
-            return -1;
-        }
-        rib->lower_difs.erase(lit);
-    }
-
-    return 0;
+    return rib->ipcp_register(reg, name);
 }
 
 extern "C" char *
