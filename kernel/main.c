@@ -728,6 +728,34 @@ remove_flow_work(struct work_struct *work)
     flow_put(flow);
 }
 
+struct notify_flow_removal_work {
+    struct work_struct work;
+    unsigned port_id;
+    unsigned ipcp_id;
+};
+
+static void
+notify_flow_removal(struct work_struct *work)
+{
+    struct notify_flow_removal_work *notifier = container_of(work,
+                        struct notify_flow_removal_work, work);
+    struct ipcp_entry *ipcp = ipcp_get(notifier->ipcp_id);
+
+    if (!ipcp) {
+        PI("IPCP %d destroyed before notification of flow %d removal\n",
+            notifier->ipcp_id, notifier->port_id);
+        return;
+    }
+
+    /* Notify the uipcp about flow deallocation. TODO */
+
+PD("WELL, HERE I SHOULD NOTIFY\n");
+
+    ipcp_put(ipcp);
+
+    kfree(notifier);
+}
+
 static int
 flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
@@ -806,6 +834,7 @@ flow_put(struct flow_entry *entry)
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
+    struct notify_flow_removal_work *notifier;
     struct ipcp_entry *ipcp;
 
     if (unlikely(!entry)) {
@@ -888,6 +917,19 @@ flow_put(struct flow_entry *entry)
             PD("Removed IPC process %u PDUFT entry: %llu --> %u\n",
                     entry->upper.ipcp->id,
                     (unsigned long long)dest_addr, entry->local_port);
+        }
+    }
+
+    if (ipcp->uipcp) {
+        notifier = kzalloc(sizeof(*notifier), GFP_ATOMIC);
+        if (!notifier) {
+            PE("Out of memory: cannot notify uipcp\n");
+
+        } else {
+            INIT_WORK(&notifier->work, notify_flow_removal);
+            notifier->ipcp_id = ipcp->id;
+            notifier->port_id = entry->local_port;
+            schedule_work(&notifier->work);
         }
     }
 
