@@ -147,15 +147,5 @@ struct rina_kmsg_ipcp_config {
     char *value;
 } __attribute__((packed));
 
-struct rina_kmsg_ipcp_bind_flow {
-    rina_msg_t msg_type;
-    uint32_t event_id;
-
-    /* Where to bind to. */
-    uint16_t ipcp_id;
-    /* What to bind. */
-    uint32_t port_id;
-} __attribute__((packed));
-
 
 #endif  /* __RINA_KERN_H__ */

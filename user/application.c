@@ -263,10 +263,10 @@ flow_request_wait(struct application *application)
     return container_of(elem, struct pending_flow_req, node);
 }
 
-int
-open_port(uint32_t port_id)
+static int
+open_port_common(uint32_t port_id, int application, uint32_t ipcp_id)
 {
-    long int val = (long int)port_id;
+    struct rina_ioctl_info info;
     int fd;
     int ret;
 
@@ -276,7 +276,11 @@ open_port(uint32_t port_id)
         return -1;
     }
 
-    ret = ioctl(fd, 73, val);
+    info.port_id = port_id;
+    info.ipcp_id = ipcp_id;
+    info.application = application;
+
+    ret = ioctl(fd, 73, &info);
     if (ret) {
         perror("ioctl(/dev/rina-io)");
         return -1;
@@ -286,16 +290,15 @@ open_port(uint32_t port_id)
 }
 
 int
-unbind_port(int fd)
+open_port_appl(uint32_t port_id)
 {
-    long int val = -1;
-    int ret = ioctl(fd, 73, val);
+    return open_port_common(port_id, 1, 0);
+}
 
-    if (ret) {
-        perror("ioctl(/dev/rina-io)");
-    }
-
-    return ret;
+int
+open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
+{
+    return open_port_common(port_id, 0, ipcp_id);
 }
 
 int

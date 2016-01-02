@@ -34,6 +34,12 @@ struct rina_msg_base_resp {
     uint8_t result;
 } __attribute__((packed));
 
+struct rina_ioctl_info {
+    uint32_t port_id;
+    uint16_t ipcp_id;
+    uint8_t  application;
+};
+
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */

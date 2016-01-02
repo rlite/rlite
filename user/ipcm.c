@@ -43,7 +43,6 @@ struct ipcm {
 
 enum {
     IPCP_MGMT_ENROLL = 5,
-    IPCP_MGMT_BIND,
 };
 
 static int
@@ -84,23 +83,9 @@ uipcp_server_enroll(struct uipcp *uipcp, int fd)
     (void)uipcp;
     (void)fd;
 
+    /* Do not deallocate the flow. */
+
     return 0;
-}
-
-static int
-ipcp_bind_flow(struct ipcm *ipcm, uint16_t ipcp_id,
-               uint32_t port_id);
-
-static int
-uipcp_server_bind(struct uipcp *uipcp, uint32_t port_id, int fd)
-{
-    int ret = unbind_port(fd);
-
-    if (ret) {
-        return ret;
-    }
-
-    return ipcp_bind_flow(uipcp->ipcm, uipcp->ipcp_id, port_id);
 }
 
 static void *
@@ -127,30 +112,25 @@ uipcp_server(void *arg)
             continue;
         }
 
-        fd = open_port(port_id);
+        fd = open_port_ipcp(port_id, uipcp->ipcp_id);
         if (fd < 0) {
             continue;
         }
 
         if (read(fd, &cmd, 1) != 1) {
             PE("%s: read(cmd) failed\n", __func__);
-            goto clout;
+            close(fd);
+            continue;
         }
 
         switch (cmd) {
             case IPCP_MGMT_ENROLL:
                 uipcp_server_enroll(uipcp, fd);
                 break;
-            case IPCP_MGMT_BIND:
-                uipcp_server_bind(uipcp, port_id, fd);
-                break;
             default:
                 PI("%s: Unknown cmd %u received\n", __func__, cmd);
                 break;
         }
-
-clout:
-        close(fd);
     }
 
     return NULL;
@@ -411,35 +391,6 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
 }
 
 static int
-ipcp_bind_flow(struct ipcm *ipcm, uint16_t ipcp_id,
-               uint32_t port_id)
-{
-    struct rina_kmsg_ipcp_bind_flow *req;
-    struct rina_msg_base_resp *resp;
-    int result;
-
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_BIND_FLOW;
-    req->ipcp_id = ipcp_id;
-    req->port_id = port_id;
-
-    PD("Requesting IPCP flow binding...\n");
-    resp = (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    return result;
-}
-
-static int
 test(struct ipcm *ipcm)
 {
     struct rina_name name;
@@ -620,7 +571,7 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     struct uipcp *uipcp;
     unsigned int port_id;
     uint8_t cmd;
-    int efd = -1, dfd = -1;
+    int fd = -1;
     int ret;
 
     resp.result = 1; /* Report failure by default. */
@@ -646,66 +597,25 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    efd = open_port(port_id);
-    if (efd < 0) {
+    fd = open_port_ipcp(port_id, uipcp->ipcp_id);
+    if (fd < 0) {
         goto out;
     }
 
     /* Request an enrollment. */
     PD("%s: Enrollment phase (client)\n", __func__);
     cmd = IPCP_MGMT_ENROLL;
-    if (write(efd, &cmd, sizeof(cmd)) != 1) {
+    if (write(fd, &cmd, sizeof(cmd)) != 1) {
         PE("%s: write(cmd) failed\n", __func__);
         goto out;
     }
 
     /* Do enrollment here. */
 
-    close(efd);
-    efd = -1;
-
-    /* Allocate a flow for data. */
-    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0,
-                         &req->ipcp_name, &req->neigh_ipcp_name,
-                         &port_id, 2000);
-    if (ret) {
-        goto out;
-    }
-
-    dfd = open_port(port_id);
-    if (dfd < 0) {
-        goto out;
-    }
-
-    /* Request a kernel bind flow. */
-    cmd = IPCP_MGMT_BIND;
-    if (write(dfd, &cmd, sizeof(cmd)) != 1) {
-        PE("%s: write(cmd) failed\n", __func__);
-        goto out;
-    }
-
-    ret = unbind_port(dfd);
-    if (ret) {
-        goto out;
-    }
-
-    ret =  ipcp_bind_flow(ipcm, ipcp_id, port_id);
-    if (ret) {
-        goto out;
-    }
-
     resp.result = 0;
 
 out:
-    /* Deallocate the data flow. */
-    if (dfd != -1) {
-        close(dfd);
-    }
-
-    /* Deallocate the enrollment flow. */
-    if (efd != -1) {
-        close(efd);
-    }
+    /* Don't dellocate the flow. */
 
     return rina_conf_response(sfd, RMB(req), &resp);
 }

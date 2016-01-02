@@ -44,7 +44,8 @@ int flow_allocate_resp(struct application *application,
                        uint16_t ipcp_id, uint32_t port_id,
                        uint8_t response);
 
-int open_port(uint32_t port_id);
-int unbind_port(int fd);
+int open_port_appl(uint32_t port_id);
+
+int open_port_ipcp(uint32_t port_id, uint16_t ipcp_id);
 
 #endif  /* __RINA_APPLICATION_H__ */

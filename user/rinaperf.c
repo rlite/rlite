@@ -264,7 +264,7 @@ server(struct rinaperf *rp)
             continue;
         }
 
-        rp->dfd = open_port(rp->data_port_id);
+        rp->dfd = open_port_appl(rp->data_port_id);
         if (rp->dfd < 0) {
             continue;
         }
@@ -420,7 +420,7 @@ main(int argc, char **argv)
             return ret;
         }
 
-        rp.dfd = open_port(rp.data_port_id);
+        rp.dfd = open_port_appl(rp.data_port_id);
         if (rp.dfd < 0) {
             return rp.dfd;
         }
