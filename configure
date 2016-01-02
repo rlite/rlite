@@ -7,7 +7,7 @@ no_cmake() {
 }
 
 
-VMPI="n"
+HAVE_VMPI="n"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -15,7 +15,7 @@ do
     key="$1"
     case $key in
         "--with-vmpi")
-        VMPI="y"
+        HAVE_VMPI="y"
         ;;
         *)
         echo "Unknown option '$key'"
@@ -48,7 +48,7 @@ cp Makefile.in Makefile
 
 # Generate the kernel Makfile
 cp kernel/Makefile.in kernel/Makefile
-if [ $VMPI == "y" ]; then
+if [ $HAVE_VMPI == "y" ]; then
     cat << EOS >> kernel/Makefile
 
 obj-m += rinalite-shim-hv.o
@@ -59,3 +59,8 @@ EXTRA_CFLAGS += -I\$(PWD)/kernel/vmpi
 obj-y += vmpi/
 EOS
 fi
+
+sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
+sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh
+chmod +x prepare.sh
+chmod +x unprepare.sh
