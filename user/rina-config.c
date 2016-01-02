@@ -274,7 +274,7 @@ static int ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     const char *ipcp_api;
     struct rina_name ipcp_name;
     unsigned int ipcp_id;
-    int ret = 1;
+    int ret = -1;
 
     assert(argc >= 2);
     ipcp_apn = argv[0];
@@ -337,7 +337,7 @@ static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
     struct rina_name ipcp_name;
     struct rina_name dif_name;
     unsigned int ipcp_id;
-    int ret = 1;  /* Report failure by default. */
+    int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 3);
     dif_name_s = argv[0];
@@ -359,13 +359,54 @@ static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
     return ret;
 }
 
+static int
+rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
+                 const char *param_name, const char *param_value)
+{
+    struct rina_kmsg_ipcp_config *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_CONFIG;
+    req->ipcp_id = ipcp_id;
+    req->name = strdup(param_name);
+    req->value = strdup(param_value);
+
+    PD("Requesting IPCP config...\n");
+
+    resp = issue_request(&rc->loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    if (result == 0 && strcmp(param_name, "address") == 0) {
+        /* Fetch after a succesfull address setting operation. */
+        ipcps_fetch(&rc->loop);
+        /* TODO notify uipcps
+        uipcps_fetch(ipcm);
+        */
+    }
+
+    return result;
+}
+
 static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
 {
-    struct rina_amsg_ipcp_config req;
     const char *ipcp_apn;
     const char *ipcp_api;
     const char *param_name;
     const char *param_value;
+    struct rina_name ipcp_name;
+    unsigned int ipcp_id;
+    int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 4);
     ipcp_apn = argv[0];
@@ -373,13 +414,18 @@ static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
     param_name = argv[2];
     param_value = argv[3];
 
-    req.msg_type = RINA_CONF_IPCP_CONFIG;
-    req.event_id = 0;
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
-    req.name = strdup(param_name);
-    req.value = strdup(param_value);
+    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req);
+    /* The request specifies an IPCP: lookup that. */
+    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (ipcp_id == ~0U) {
+        PE("%s: Could not find a suitable IPC process\n", __func__);
+    } else {
+        /* Forward the request to the kernel. */
+        ret = rina_ipcp_config(rc, ipcp_id, param_name, param_value);
+    }
+
+    return ret;
 }
 
 static int ipcp_register_common(int argc, char **argv, unsigned int reg)
