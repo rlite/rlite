@@ -119,6 +119,9 @@ rlite_evloop_schedule(struct rlite_evloop *loop,
                       unsigned long delta_ms, rlite_tmr_cb_t cb);
 
 int
+rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id);
+
+int
 rlite_ipcps_print(struct rlite_evloop *loop);
 
 /* Fetch information about all IPC processes. */

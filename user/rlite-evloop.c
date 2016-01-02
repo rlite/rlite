@@ -845,5 +845,34 @@ rlite_evloop_schedule(struct rlite_evloop *loop,
 #endif
     pthread_mutex_unlock(&loop->timer_lock);
 
-    return -1;
+    return e->id;
+}
+
+int
+rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id)
+{
+    struct rlite_tmr_event *cur, *e = NULL;
+    int ret = -1;
+
+    pthread_mutex_lock(&loop->timer_lock);
+
+    list_for_each_entry(cur, &loop->timer_events, node) {
+        if (cur->id == id) {
+            e = cur;
+            break;
+        }
+    }
+
+    if (!e) {
+        PE("Cannot found scheduled timer with id %d\n", id);
+    } else {
+        ret = 0;
+        list_del(&e->node);
+        loop->timer_events_cnt--;
+        free(e);
+    }
+
+    pthread_mutex_unlock(&loop->timer_lock);
+
+    return ret;
 }
