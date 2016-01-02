@@ -46,6 +46,7 @@ struct Neighbor {
     unsigned int port_id;
     CDAPConn *conn;
     struct uipcp_rib *rib;
+    int enroll_timeout_id;
 
     enum state_t {
         NONE = 0,
@@ -87,6 +88,8 @@ struct Neighbor {
     int enrolled(const CDAPMessage *rm);
 
     void abort();
+    void enroll_tmr_start();
+    void enroll_tmr_stop();
 };
 
 /* Shortest Path algorithm. */

@@ -144,6 +144,31 @@ Neighbor::abort()
     return;
 }
 
+static void
+enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
+{
+    Neighbor *neigh = static_cast<Neighbor *>(arg);
+    ScopeLock(neigh->rib->lock);
+
+    (void)loop;
+    PI("Enrollment timeout with neighbor '%s'\n",
+       static_cast<string>(neigh->ipcp_name).c_str());
+    neigh->abort();
+}
+
+void
+Neighbor::enroll_tmr_start()
+{
+    enroll_timeout_id = rlite_evloop_schedule(&rib->uipcp->appl.loop, 1000,
+                                              enroll_timeout_cb, this);
+}
+
+void
+Neighbor::enroll_tmr_stop()
+{
+    rlite_evloop_schedule_canc(&rib->uipcp->appl.loop, enroll_timeout_id);
+}
+
 int
 Neighbor::none(const CDAPMessage *rm)
 {
@@ -207,6 +232,7 @@ Neighbor::none(const CDAPMessage *rm)
         return 0;
     }
 
+    enroll_tmr_start();
     enrollment_state = next_state;
 
     return 0;
@@ -246,6 +272,8 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
         return 0;
     }
 
+    enroll_tmr_stop();
+    enroll_tmr_start();
     enrollment_state = I_WAIT_START_R;
 
     return 0;
@@ -370,6 +398,8 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
         return 0;
     }
 
+    enroll_tmr_stop();
+    enroll_tmr_start();
     enrollment_state = S_WAIT_STOP_R;
 
     return 0;
@@ -409,6 +439,8 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
         rib->set_address(enr_info.address);
     }
 
+    enroll_tmr_stop();
+    enroll_tmr_start();
     enrollment_state = I_WAIT_STOP;
 
     return 0;
@@ -467,6 +499,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     if (enr_info.start_early) {
         PI("Initiator is allowed to start early\n");
+        enroll_tmr_stop();
         enrollment_state = ENROLLED;
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -475,6 +508,8 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     } else {
         PI("Initiator is not allowed to start early\n");
+        enroll_tmr_stop();
+        enroll_tmr_start();
         enrollment_state = I_WAIT_START;
     }
 
@@ -515,6 +550,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
         return ret;
     }
 
+    enroll_tmr_stop();
     enrollment_state = ENROLLED;
 
     /* Add a new LowerFlow entry to the RIB, corresponding to

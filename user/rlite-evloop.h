@@ -41,7 +41,7 @@ typedef int (*rina_resp_handler_t)(struct rlite_evloop *loop,
 typedef void (*rlite_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
 
 /* The signature of timer callback. */
-typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop);
+typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop, void *arg);
 
 struct rlite_evloop_fdcb {
     int fd;
@@ -115,8 +115,8 @@ int
 rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
 
 int
-rlite_evloop_schedule(struct rlite_evloop *loop,
-                      unsigned long delta_ms, rlite_tmr_cb_t cb);
+rlite_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
+                      rlite_tmr_cb_t cb, void *arg);
 
 int
 rlite_evloop_schedule_canc(struct rlite_evloop *loop, int id);

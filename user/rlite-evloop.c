@@ -25,6 +25,7 @@ struct rlite_tmr_event {
     int id;
     struct timespec exp;
     rlite_tmr_cb_t cb;
+    void *arg;
 
     struct list_head node;
 };
@@ -283,7 +284,7 @@ evloop_function(void *arg)
             while ((elem = list_pop_front(&expired))) {
                 te = container_of(elem, struct rlite_tmr_event, node);
                 NPD("Exec timer callback [%d]\n", te->id);
-                te->cb(loop);
+                te->cb(loop, te->arg);
                 free(te);
             }
 
@@ -793,8 +794,8 @@ rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id)
 #define TIMER_EVENTS_MAX    64
 
 int
-rlite_evloop_schedule(struct rlite_evloop *loop,
-                      unsigned long delta_ms, rlite_tmr_cb_t cb)
+rlite_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
+                      rlite_tmr_cb_t cb, void *arg)
 {
     struct rlite_tmr_event *e, *cur;
 
@@ -819,6 +820,7 @@ rlite_evloop_schedule(struct rlite_evloop *loop,
 
     e->id = loop->timer_next_id;
     e->cb = cb;
+    e->arg = arg;
     clock_gettime(CLOCK_MONOTONIC, &e->exp);
     e->exp.tv_nsec += delta_ms * ONEMILLION;
     e->exp.tv_sec += e->exp.tv_nsec / ONEBILLION;
