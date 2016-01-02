@@ -1069,6 +1069,13 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 
     assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
 
+    if (rm->result) {
+        PE("Neighbor returned negative response [%d], '%s'\n",
+           rm->result, rm->result_reason.c_str());
+        abort();
+        return 0;
+    }
+
     m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
               0, 0, string());
 
@@ -1226,6 +1233,13 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
         return 0;
     }
 
+    if (rm->result) {
+        PE("Neighbor returned negative response [%d], '%s'\n",
+           rm->result, rm->result_reason.c_str());
+        abort();
+        return 0;
+    }
+
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("M_START_R does not contain a nested message\n");
@@ -1323,6 +1337,13 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_STOP_R) {
         PE("M_START_R expected\n");
+        abort();
+        return 0;
+    }
+
+    if (rm->result) {
+        PE("Neighbor returned negative response [%d], '%s'\n",
+           rm->result, rm->result_reason.c_str());
         abort();
         return 0;
     }
