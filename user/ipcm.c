@@ -40,6 +40,11 @@ struct ipcm {
     struct list_head uipcps;
 };
 
+enum {
+    IPCP_MGMT_ENROLL = 5,
+    IPCP_MGMT_BIND,
+};
+
 static int
 ipcp_create_resp(struct rina_evloop *loop,
                  const struct rina_msg_base_resp *b_resp,
@@ -69,6 +74,18 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
+static int
+uipcp_server_enroll(struct uipcp *uipcp, int fd)
+{
+    /* Do enrollment here. */
+    PD("%s: Enrollment phase (server)\n", __func__);
+
+    (void)uipcp;
+    (void)fd;
+
+    return 0;
+}
+
 static void *
 uipcp_server(void *arg)
 {
@@ -78,6 +95,7 @@ uipcp_server(void *arg)
         struct pending_flow_req *pfr;
         unsigned int port_id;
         int result, fd;
+        uint8_t cmd;
 
         pfr = flow_request_wait(&uipcp->appl);
         port_id = pfr->port_id;
@@ -97,9 +115,21 @@ uipcp_server(void *arg)
             continue;
         }
 
-        /* Do enrollment here. */
-        PD("%s: Enrollment phase (server)\n", __func__);
+        if (read(fd, &cmd, 1) != 1) {
+            PE("%s: read(cmd) failed\n", __func__);
+            goto clout;
+        }
 
+        switch (cmd) {
+            case IPCP_MGMT_ENROLL:
+                uipcp_server_enroll(uipcp, fd);
+                break;
+            default:
+                PI("%s: Unknown cmd %u received\n", __func__, cmd);
+                break;
+        }
+
+clout:
         close(fd);
     }
 
@@ -567,6 +597,7 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
     struct rina_msg_base_resp resp;
     struct uipcp *uipcp;
     unsigned int port_id;
+    uint8_t cmd;
     int fd;
     int ret;
 
@@ -593,13 +624,23 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
         goto out;
     }
 
-    resp.result = 0;
-
     fd = open_port(port_id);
+    if (fd < 0) {
+        goto out;
+    }
+
+    /* Request an enrollment. */
+    PD("%s: Enrollment phase (client)\n", __func__);
+    cmd = IPCP_MGMT_ENROLL;
+    if (write(fd, &cmd, sizeof(cmd)) != 1) {
+        PE("%s: write(cmd) failed\n", __func__);
+        goto clout;
+    }
 
     /* Do enrollment here. */
-    PD("%s: Enrollment phase (client)\n", __func__);
+    resp.result = 0;
 
+clout:
     /* Deallocate the flow. */
     close(fd);
 
