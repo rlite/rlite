@@ -20,5 +20,4 @@
 
 - fix permissions to /var/rina/ directory
 
-- rimuovere le ipcp ops application register/unregister e assign_to_dif:
-  non hanno utilizzi
+- add help() function to rinaperf

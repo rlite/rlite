@@ -30,6 +30,8 @@ struct rinaperf {
     struct rina_name ipcp_name;
     int dfd;
 
+    int interval;
+
     struct rinaperf_test_config test_config;
 };
 
@@ -96,6 +98,7 @@ echo_client(struct rinaperf *rp)
     int ret = 0;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
+    int interval = rp->interval;
     unsigned int i = 0;
 
     if (size > sizeof(buf)) {
@@ -120,6 +123,10 @@ echo_client(struct rinaperf *rp)
         ret = read(rp->dfd, buf, sizeof(buf));
         if (ret < 0) {
             perror("read(buf");
+        }
+
+        if (interval) {
+            usleep(interval);
         }
     }
 
@@ -296,11 +303,12 @@ main(int argc, char **argv)
     int listen = 0;
     int cnt = 1;
     int size = 1;
+    int interval = 0;
     int ret;
     int opt;
     int i;
 
-    while ((opt = getopt(argc, argv, "lt:d:c:s:p:P:")) != -1) {
+    while ((opt = getopt(argc, argv, "lt:d:c:s:p:P:i:")) != -1) {
         switch (opt) {
             case 'l':
                 listen = 1;
@@ -331,8 +339,15 @@ main(int argc, char **argv)
 
             case 's':
                 size = atoi(optarg);
-                if (cnt <= 0) {
+                if (size <= 0) {
                     printf("    Invalid 'size' %d\n", size);
+                }
+                break;
+
+            case 'i':
+                interval = atoi(optarg);
+                if (interval < 0) {
+                    printf("    Invalid 'interval' %d\n", interval);
                 }
                 break;
 
@@ -358,6 +373,8 @@ main(int argc, char **argv)
         rp.test_config.cnt = cnt;
         rp.test_config.size = size;
     }
+
+    rp.interval = interval;
 
     /* Set some signal handler */
     sa.sa_handler = sigint_handler;
