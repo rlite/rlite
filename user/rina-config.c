@@ -139,11 +139,58 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-int main()
+static void
+usage_and_quit(void)
+{
+    printf("Available commands:\n");
+    printf("    application-register DIF_NAME IPCP_APN IPCP_API\n");
+    printf("    application-unregister DIF_NAME IPCP_APN IPCP_API\n");
+    exit(EXIT_SUCCESS);
+}
+
+static int
+process_args(int argc, char **argv)
+{
+    const char *cmd;
+
+    if (argc < 2) {
+        usage_and_quit();
+    }
+
+    cmd = argv[1];
+
+    if (strcmp(cmd, "application-register") == 0) {
+        struct rina_name application_name;
+
+        if (argc < 5) {
+            usage_and_quit();
+        }
+
+        rina_name_fill(&application_name, argv[3], argv[4], NULL, NULL);
+        application_register(&application_name, argv[2]);
+
+    } else if (strcmp(cmd, "application-unregister") == 0) {
+        struct rina_name application_name;
+
+        if (argc < 5) {
+            usage_and_quit();
+        }
+
+        rina_name_fill(&application_name, argv[3], argv[4], NULL, NULL);
+        application_unregister(&application_name, argv[2]);
+
+    } else {
+        printf("Unknown command '%s'\n", cmd);
+        usage_and_quit();
+    }
+
+    return 0;
+}
+
+int main(int argc, char **argv)
 {
     struct sigaction sa;
     int ret;
-    struct rina_name application_name;
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -161,9 +208,5 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    rina_name_fill(&application_name, "echo-client", "1", NULL, NULL);
-    application_register(&application_name, "test-shim-dummy.DIF");
-    application_unregister(&application_name, "test-shim-dummy.DIF");
-
-    return 0;
+    return process_args(argc, argv);
 }
