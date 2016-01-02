@@ -695,7 +695,7 @@ out:
     }
 
     /* This could be done conditionally. */
-    rina_write_restart(pcic->base.conn_id.dst_cep);
+    rina_write_restart_flow(flow);
 
     return 0;
 }

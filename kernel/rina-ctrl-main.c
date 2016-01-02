@@ -1508,25 +1508,33 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
 EXPORT_SYMBOL_GPL(rina_sdu_rx);
 
 void
+rina_write_restart_flow(struct flow_entry *flow)
+{
+    spin_lock(&flow->rmtq_lock);
+
+    if (flow->rmtq_len > 0) {
+        /* Schedule a tasklet to complete the tx work.
+         * If appropriate, the tasklet will wake up
+         * waiting process contexts. */
+        tasklet_schedule(&flow->tx_completion);
+    } else {
+        /* Wake up waiting process contexts directly. */
+        wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
+                POLLWRBAND | POLLWRNORM);
+    }
+
+    spin_unlock(&flow->rmtq_lock);
+}
+EXPORT_SYMBOL_GPL(rina_write_restart_flow);
+
+void
 rina_write_restart(uint32_t local_port)
 {
     struct flow_entry *flow;
 
     flow = flow_get(local_port);
     if (flow) {
-        spin_lock(&flow->rmtq_lock);
-        if (flow->rmtq_len > 0) {
-            /* Schedule a tasklet to complete the tx work.
-             * If appropriate, the tasklet will wake up
-             * waiting process contexts. */
-            tasklet_schedule(&flow->tx_completion);
-        } else {
-            /* Wake up waiting process contexts directly. */
-            wake_up_interruptible_poll(&flow->txrx.tx_wqh, POLLOUT |
-                POLLWRBAND | POLLWRNORM);
-        }
-        spin_unlock(&flow->rmtq_lock);
-
+        rina_write_restart_flow(flow);
         flow_put(flow);
     }
 }

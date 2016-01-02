@@ -178,6 +178,8 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
 void rina_write_restart(uint32_t local_port);
 
+void rina_write_restart_flow(struct flow_entry *flow);
+
 struct flow_entry *flow_lookup(unsigned int port_id);
 
 struct flow_entry *flow_put(struct flow_entry *flow);
