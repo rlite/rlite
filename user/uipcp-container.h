@@ -74,6 +74,9 @@ void rib_destroy(struct uipcp_rib *rib);
 int rib_application_register(struct uipcp_rib *rib, int reg,
                              const struct rina_name *appl_name);
 
+int rib_flow_deallocated(struct uipcp_rib *rib,
+                         struct rina_kmsg_flow_deallocated *req);
+
 int rib_neighbor_flow(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
                       int neigh_fd, unsigned int neigh_port_id);

@@ -290,6 +290,22 @@ uipcp_application_register(struct rinalite_evloop *loop,
     return 0;
 }
 
+static int
+uipcp_flow_deallocated(struct rinalite_evloop *loop,
+                       const struct rina_msg_base_resp *b_resp,
+                       const struct rina_msg_base *b_req)
+{
+    struct rinalite_appl *application = container_of(loop, struct rinalite_appl,
+                                                   loop);
+    struct uipcp *uipcp = container_of(application, struct uipcp, appl);
+    struct rina_kmsg_flow_deallocated *req =
+                (struct rina_kmsg_flow_deallocated *)b_resp;
+
+    rib_flow_deallocated(uipcp->rib, req);
+
+    return 0;
+}
+
 void *
 uipcp_server(void *arg)
 {
@@ -421,6 +437,13 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
     ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
                                       RINA_KERN_APPLICATION_REGISTER,
                                       uipcp_application_register);
+    if (ret) {
+        goto err2;
+    }
+
+    ret = rinalite_evloop_set_handler(&uipcp->appl.loop,
+                                      RINA_KERN_FLOW_DEALLOCATED,
+                                      uipcp_flow_deallocated);
     if (ret) {
         goto err2;
     }

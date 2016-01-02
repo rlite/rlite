@@ -730,8 +730,10 @@ remove_flow_work(struct work_struct *work)
 
 struct notify_flow_removal_work {
     struct work_struct work;
-    unsigned port_id;
     unsigned ipcp_id;
+    unsigned local_port_id;
+    unsigned remote_port_id;
+    uint64_t remote_addr;
 };
 
 static void
@@ -744,7 +746,7 @@ notify_flow_removal(struct work_struct *work)
 
     if (!ipcp) {
         PI("IPCP %d destroyed before notification of flow %d removal\n",
-            notifier->ipcp_id, notifier->port_id);
+            notifier->ipcp_id, notifier->local_port_id);
         return;
     }
 
@@ -752,7 +754,9 @@ notify_flow_removal(struct work_struct *work)
     ntfy.msg_type = RINA_KERN_FLOW_DEALLOCATED;
     ntfy.event_id = 0;
     ntfy.ipcp_id = notifier->ipcp_id;
-    ntfy.port_id = notifier->port_id;
+    ntfy.local_port_id = notifier->local_port_id;
+    ntfy.remote_port_id = notifier->remote_port_id;
+    ntfy.remote_addr = notifier->remote_addr;
 
     BUG_ON(!ipcp->uipcp);
 
@@ -935,7 +939,9 @@ flow_put(struct flow_entry *entry)
         } else {
             INIT_WORK(&notifier->work, notify_flow_removal);
             notifier->ipcp_id = ipcp->id;
-            notifier->port_id = entry->local_port;
+            notifier->local_port_id = entry->local_port;
+            notifier->remote_port_id = entry->remote_port;
+            notifier->remote_addr = entry->remote_addr;
             schedule_work(&notifier->work);
         }
     }

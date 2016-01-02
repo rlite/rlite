@@ -219,7 +219,9 @@ struct rina_kmsg_flow_deallocated {
     uint32_t event_id;
 
     uint16_t ipcp_id;
-    uint32_t port_id;
+    uint32_t local_port_id;
+    uint32_t remote_port_id;
+    uint64_t remote_addr;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */

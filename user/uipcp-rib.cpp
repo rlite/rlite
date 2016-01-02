@@ -165,6 +165,7 @@ struct uipcp_rib {
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int ipcp_register(int reg, string lower_dif);
     int application_register(int reg, const RinaName& appl_name);
+    int flow_deallocated(struct rina_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
     RinaName lookup_neighbor_by_address(uint64_t address);
     int add_lower_flow(uint64_t local_addr, const Neighbor& neigh);
@@ -436,6 +437,39 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
             uipcp->ipcp_id);
 
     remote_sync_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+
+    return 0;
+}
+
+int
+uipcp_rib::flow_deallocated(struct rina_kmsg_flow_deallocated *req)
+{
+    stringstream obj_name;
+    map<string, FlowRequest>::iterator f;
+
+    /* Lookup the corresponding FlowRequest. */
+
+    obj_name << obj_name::flows << "/" << ipcp_info()->ipcp_addr
+                << "-" << req->local_port_id;
+
+    f = flow_reqs.find(obj_name.str());
+
+    if (f == flow_reqs.end()) {
+        obj_name.str(string());
+        obj_name << obj_name::flows << "/" << req->remote_addr
+            << "-" << req->remote_port_id;
+
+        f = flow_reqs.find(obj_name.str());
+    }
+
+    if (f == flow_reqs.end()) {
+        PE("Spurious flow allocation response, no object with name %s\n",
+            obj_name.str().c_str());
+        return -1;
+    }
+
+    flow_reqs.erase(f);
+    PD("Removed flow request %s\n", obj_name.str().c_str());
 
     return 0;
 }
@@ -2079,6 +2113,13 @@ rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
 {
     return rib->application_register(reg, RinaName(appl_name));
+}
+
+extern "C" int
+rib_flow_deallocated(struct uipcp_rib *rib,
+                     struct rina_kmsg_flow_deallocated *req)
+{
+    return rib->flow_deallocated(req);
 }
 
 extern "C" int
