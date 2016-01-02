@@ -188,7 +188,7 @@ struct uipcp_rib {
     int set_address(uint64_t address);
     Neighbor *get_neighbor(const struct rina_name *neigh_name);
     int del_neighbor(const RinaName& neigh_name);
-    uint64_t dft_lookup(const RinaName& appl_name) const;
+    int dft_lookup(const RinaName& appl_name, uint64_t& dstaddr) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
     int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rina_kmsg_appl_register *req);

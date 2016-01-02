@@ -171,7 +171,7 @@ uipcp_update(struct rinaconf *rc, rina_msg_t update_type, uint16_t ipcp_id,
         req.dif_type = NULL;
     }
 
-    return request_response((struct rina_msg_base *)&req, 0, NULL);
+    return request_response((struct rina_msg_base *)&req, 1, NULL);
 }
 
 /* Create an IPC process. */

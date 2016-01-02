@@ -18,17 +18,20 @@ static uint64_t time64()
     return (tv.tv_sec << 32) | (tv.tv_nsec & ((1L << 32) - 1L));
 }
 
-uint64_t
-uipcp_rib::dft_lookup(const RinaName& appl_name) const
+int
+uipcp_rib::dft_lookup(const RinaName& appl_name,
+                      uint64_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
          = dft.find(static_cast<string>(appl_name));
 
     if (mit == dft.end()) {
-        return 0;
+        return -1;
     }
 
-    return mit->second.address;
+    dstaddr = mit->second.local ? 0 : mit->second.address;
+
+    return 0;
 }
 
 int
@@ -69,6 +72,7 @@ uipcp_rib::appl_register(const struct rina_kmsg_appl_register *req)
     dft_entry.address = local_addr;
     dft_entry.appl_name = appl_name;
     dft_entry.timestamp = time64();
+    dft_entry.local = true;
     name_str = static_cast<string>(dft_entry.appl_name);
 
     mit = dft.find(name_str);

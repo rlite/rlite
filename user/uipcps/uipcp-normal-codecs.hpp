@@ -46,8 +46,12 @@ struct DFTEntry : public UipcpObject {
     RinaName appl_name;
     uint64_t address;
     uint64_t timestamp;
+    /* Not externally visible (not serialized), true
+     * if this entry refers to an application registered
+     * locally. */
+    bool local;
 
-    DFTEntry() : address(0), timestamp(0) { }
+    DFTEntry() : address(0), timestamp(0), local(false) { }
     DFTEntry(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };

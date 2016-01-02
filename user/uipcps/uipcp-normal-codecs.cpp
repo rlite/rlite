@@ -167,7 +167,7 @@ DFTEntry2gpb(const DFTEntry &entry, gpb::directoryForwardingTableEntry_t &gm)
     return 0;
 }
 
-DFTEntry::DFTEntry(const char *buf, unsigned int size)
+DFTEntry::DFTEntry(const char *buf, unsigned int size) : local(false)
 {
     gpb::directoryForwardingTableEntry_t gm;
 

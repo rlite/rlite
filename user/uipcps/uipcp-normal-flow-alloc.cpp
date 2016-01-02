@@ -117,7 +117,7 @@ int
 uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_appl);
-    uint64_t remote_addr = dft_lookup(dest_appl);
+    uint64_t remote_addr;
     struct rlite_ipcp *ipcp;
     CDAPMessage m;
     FlowRequest freq;
@@ -126,8 +126,10 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     string cubename;
     struct rina_flow_config flowcfg;
     map<string, struct rina_flow_config>::iterator qcmi;
+    int ret;
 
-    if (!remote_addr) {
+    ret = dft_lookup(dest_appl, remote_addr);
+    if (ret) {
         /* Return a negative flow allocation response immediately. */
         UPI(uipcp, "No DFT matching entry for destination %s\n",
                 static_cast<string>(dest_appl).c_str());
@@ -250,9 +252,10 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
     struct rina_name local_appl, remote_appl;
     struct rina_flow_config flowcfg;
     uint64_t dft_next_hop;
+    int ret;
 
-    dft_next_hop = dft_lookup(freq.dst_app);
-    if (!dft_next_hop) {
+    ret = dft_lookup(freq.dst_app, dft_next_hop);
+    if (ret) {
         /* We don't know how where this application is registered,
          * reject the request. */
         CDAPMessage m;
