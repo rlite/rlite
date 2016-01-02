@@ -32,11 +32,6 @@ $RINACONF ipcp-register d.DIF $NORMIPCP 1
 if [ "$1" == "h" ]; then
     # Host enroll to the guest --> guest up script must be run first
     $RINACONF ipcp-enroll n.DIF $NORMIPCP 1 ng.IPCP 1 d.DIF
-else
-    # The guest normal DIF knows that rinaperf server is registered
-    # on the host, so the host must run the server and the guest
-    # must run the client
-    #$RINACONF ipcp-dft-set $NORMIPCP 1 rinaperf-data server 21
 fi
 
 source tests/epilogue.sh
