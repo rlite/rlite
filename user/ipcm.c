@@ -213,37 +213,6 @@ ipcp_config(struct ipcm *ipcm, uint16_t ipcp_id,
     return result;
 }
 
-int
-ipcp_pduft_set(struct ipcm *ipcm, uint16_t ipcp_id,
-               uint64_t dest_addr, uint32_t local_port)
-{
-    struct rina_kmsg_ipcp_pduft_set *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("%s: Out of memory\n", __func__);
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_PDUFT_SET;
-    req->ipcp_id = ipcp_id;
-    req->dest_addr = dest_addr;
-    req->local_port = local_port;
-
-    PD("Requesting IPCP pdu forwarding table set...\n");
-
-    resp = issue_request(&ipcm->loop, RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("%s: result: %d\n", __func__, result);
-
-    return result;
-}
-
 static int
 test(struct ipcm *ipcm)
 {

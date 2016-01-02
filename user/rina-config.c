@@ -185,7 +185,8 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
     return resp;
 }
 
-static int ipcp_create(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_create(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_kmsg_ipcp_create_resp *kresp;
     const char *ipcp_apn;
@@ -268,7 +269,8 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id)
     return result;
 }
 
-static int ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -329,7 +331,8 @@ rina_assign_to_dif(struct rinaconf *rc, uint16_t ipcp_id,
     return result;
 }
 
-static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
+static int
+assign_to_dif(int argc, char **argv, struct rinaconf *rc)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -398,7 +401,8 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     return result;
 }
 
-static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_config(int argc, char **argv, struct rinaconf *rc)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -428,7 +432,8 @@ static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
     return ret;
 }
 
-static int ipcp_register_common(int argc, char **argv, unsigned int reg)
+static int
+ipcp_register_common(int argc, char **argv, unsigned int reg)
 {
     struct rina_amsg_ipcp_register req;
     const char *ipcp_apn;
@@ -449,17 +454,20 @@ static int ipcp_register_common(int argc, char **argv, unsigned int reg)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int ipcp_register(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_register(int argc, char **argv, struct rinaconf *rc)
 {
     return ipcp_register_common(argc, argv, 1);
 }
 
-static int ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
 {
     return ipcp_register_common(argc, argv, 0);
 }
 
-static int ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_enroll req;
     const char *ipcp_apn;
@@ -487,7 +495,8 @@ static int ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
+static int
+ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_dft_set req;
     const char *ipcp_apn;

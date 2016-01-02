@@ -151,6 +151,37 @@ err:
     return -1;
 }
 
+int
+uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
+               uint64_t dest_addr, uint32_t local_port)
+{
+    struct rina_kmsg_ipcp_pduft_set *req;
+    struct rina_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        PE("%s: Out of memory\n", __func__);
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RINA_KERN_IPCP_PDUFT_SET;
+    req->ipcp_id = ipcp_id;
+    req->dest_addr = dest_addr;
+    req->local_port = local_port;
+
+    PD("Requesting IPCP pdu forwarding table set...\n");
+
+    resp = issue_request(&uipcp->appl.loop, RMB(req), sizeof(*req),
+                         0, 0, &result);
+    assert(!resp);
+    PD("%s: result: %d\n", __func__, result);
+
+    return result;
+}
+
 static int
 uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
                       uint8_t *buf, size_t buflen)
@@ -162,7 +193,7 @@ uipcp_mgmt_sdu_enroll(struct uipcp *uipcp, struct rina_mgmt_hdr *mhdr,
     PD("%s: [uipcp %u] Received enrollment management SDU from IPCP addr %lu\n",
             __func__, uipcp->ipcp_id, (long unsigned)remote_addr);
 
-    ipcp_pduft_set(uipcp->ipcm, uipcp->ipcp_id, remote_addr,
+    uipcp_pduft_set(uipcp, uipcp->ipcp_id, remote_addr,
                    mhdr->local_port);
 
     return 0;
