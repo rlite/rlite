@@ -31,7 +31,7 @@ rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
 
     PD("Requesting IPCP config...\n");
 
-    resp = rlite_issue_request(loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(loop, RLITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);

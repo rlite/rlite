@@ -1,5 +1,5 @@
-#ifndef __RINALITE_CDAP_H__
-#define __RINALITE_CDAP_H__
+#ifndef __RLITE_CDAP_H__
+#define __RLITE_CDAP_H__
 
 #include <string>
 #include <set>
@@ -333,4 +333,4 @@ private:
     }                   obj_value;
 };
 
-#endif /* __RINALITE_CDAP_H__ */
+#endif /* __RLITE_CDAP_H__ */

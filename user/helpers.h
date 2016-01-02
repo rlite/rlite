@@ -1,5 +1,5 @@
-#ifndef __RINALITE_HELPERS_H__
-#define __RINALITE_HELPERS_H__
+#ifndef __RLITE_HELPERS_H__
+#define __RLITE_HELPERS_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,4 +51,4 @@ type_has_uipcp(const char *dif_type)
 }
 
 
-#endif  /* __RINALITE_HELPERS_H__ */
+#endif  /* __RLITE_HELPERS_H__ */

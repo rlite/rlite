@@ -1,5 +1,5 @@
-#ifndef __RINALITE_KERNEL_H__
-#define __RINALITE_KERNEL_H__
+#ifndef __RLITE_KERNEL_H__
+#define __RLITE_KERNEL_H__
 
 #include "rlite/utils.h"
 #include <linux/mutex.h>
@@ -245,4 +245,4 @@ void dtp_dump(struct dtp *dtp);
 
 #define MPL_MSECS_DEFAULT   1000
 
-#endif  /* __RINALITE_KERNEL_H__ */
+#endif  /* __RLITE_KERNEL_H__ */

@@ -194,7 +194,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
     PD("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
-           rlite_issue_request(&rc->loop, RINALITE_RMB(msg),
+           rlite_issue_request(&rc->loop, RLITE_RMB(msg),
                          sizeof(*msg), 1, wait_ms, result);
 
     rlite_ipcps_fetch(&rc->loop);
@@ -230,7 +230,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
     kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
         rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
-                      RINALITE_RMB(kresp));
+                      RLITE_RMB(kresp));
         free(kresp);
     }
 
@@ -264,7 +264,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     PD("Requesting IPC process destruction...\n");
 
-    resp = rlite_issue_request(&rc->loop, RINALITE_RMB(msg),
+    resp = rlite_issue_request(&rc->loop, RLITE_RMB(msg),
                          sizeof(*msg), 0, 0, &result);
     assert(!resp);
     PD("result: %d\n", result);
@@ -543,7 +543,7 @@ test(struct rinaconf *rc)
     assert(icresp);
     if (icresp) {
         rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
-                      RINALITE_RMB(icresp));
+                      RLITE_RMB(icresp));
     }
     icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",
                               "test-shim-loopback.DIF", &result);

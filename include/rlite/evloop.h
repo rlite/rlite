@@ -1,5 +1,5 @@
-#ifndef __RINALITE_EVLOOP_H__
-#define __RINALITE_EVLOOP_H__
+#ifndef __RLITE_EVLOOP_H__
+#define __RLITE_EVLOOP_H__
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -28,8 +28,8 @@ struct rlite_ipcp {
 };
 
 /* Some useful macros for casting. */
-#define RINALITE_RMB(m) (struct rlite_msg_base *)(m)
-#define RINALITE_RMBR(m) (struct rlite_msg_base_resp *)(m)
+#define RLITE_RMB(m) (struct rlite_msg_base *)(m)
+#define RLITE_RMBR(m) (struct rlite_msg_base_resp *)(m)
 
 struct rlite_evloop;
 
@@ -157,4 +157,4 @@ rlite_lookup_ipcp_by_id(struct rlite_evloop *loop, unsigned int id);
 }
 #endif
 
-#endif  /* __RINALITE_EVLOOP_H__ */
+#endif  /* __RLITE_EVLOOP_H__ */

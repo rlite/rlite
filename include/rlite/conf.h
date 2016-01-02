@@ -1,5 +1,5 @@
-#ifndef __RINALITE_CONF_H__
-#define __RINALITE_CONF_H__
+#ifndef __RLITE_CONF_H__
+#define __RLITE_CONF_H__
 
 #include "evloop.h"
 
@@ -15,4 +15,4 @@ int rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
 }
 #endif
 
-#endif  /* __RINALITE_CONF_H__ */
+#endif  /* __RLITE_CONF_H__ */

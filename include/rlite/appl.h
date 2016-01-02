@@ -1,5 +1,5 @@
-#ifndef __RINALITE_APPL_H__
-#define __RINALITE_APPL_H__
+#ifndef __RLITE_APPL_H__
+#define __RLITE_APPL_H__
 
 #include "rlite/common.h"
 #include <stdint.h>
@@ -91,4 +91,4 @@ void rlite_flow_cfg_default(struct rina_flow_config *cfg);
 }
 #endif
 
-#endif  /* __RINALITE_APPL_H__ */
+#endif  /* __RLITE_APPL_H__ */

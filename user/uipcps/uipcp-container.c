@@ -37,7 +37,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
 
     UPD(uipcp, "Issuing application register response ...\n");
 
-    fkresp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(resp),
+    fkresp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(resp),
                                sizeof(*resp), 0, 0, &result);
     assert(!fkresp);
     UPD(uipcp, "result: %d\n", result);
@@ -69,7 +69,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table set...\n");
 
-    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -98,7 +98,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
 
     UPD(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
 
-    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req),
                                   sizeof(*req), 0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -143,7 +143,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     UPD(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
-    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -185,7 +185,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
 
     UPD(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
 
-    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);
@@ -214,7 +214,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
 
     UPD(uipcp, "Requesting IPCP uipcp set...\n");
 
-    resp = rlite_issue_request(&uipcp->appl.loop, RINALITE_RMB(req), sizeof(*req),
+    resp = rlite_issue_request(&uipcp->appl.loop, RLITE_RMB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp);
     UPD(uipcp, "result: %d\n", result);

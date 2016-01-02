@@ -47,7 +47,7 @@ rina_conf_response(int sfd, struct rlite_msg_base *req,
     resp->msg_type = RLITE_CFG_BASE_RESP;
     resp->event_id = req->event_id;
 
-    return rlite_msg_write_fd(sfd, RINALITE_RMB(resp));
+    return rlite_msg_write_fd(sfd, RLITE_RMB(resp));
 }
 
 static void
@@ -147,7 +147,7 @@ rina_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     resp.result = rina_ipcp_register(uipcps, req->reg, &req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
-    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
+    return rina_conf_response(sfd, RLITE_RMB(req), &resp);
 }
 
 static int
@@ -177,7 +177,7 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
     }
 
 out:
-    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
+    return rina_conf_response(sfd, RLITE_RMB(req), &resp);
 }
 
 static int
@@ -202,7 +202,7 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
     }
 
 out:
-    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
+    return rina_conf_response(sfd, RLITE_RMB(req), &resp);
 }
 
 static int
@@ -238,7 +238,7 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
     resp.result = 0;
 
 out:
-    return rina_conf_response(sfd, RINALITE_RMB(req), &resp);
+    return rina_conf_response(sfd, RLITE_RMB(req), &resp);
 }
 
 static int
@@ -272,7 +272,7 @@ out:
     resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
-    ret = rlite_msg_write_fd(sfd, RINALITE_RMB(&resp));
+    ret = rlite_msg_write_fd(sfd, RLITE_RMB(&resp));
 
     if (resp.dump) {
         free(resp.dump);
@@ -330,7 +330,7 @@ unix_server(void *arg)
         }
 
         /* Lookup the message type. */
-        req = RINALITE_RMB(msgbuf);
+        req = RLITE_RMB(msgbuf);
         if (rina_config_handlers[req->msg_type] == NULL) {
             struct rlite_msg_base_resp resp;
 
