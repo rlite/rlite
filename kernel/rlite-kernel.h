@@ -151,7 +151,6 @@ struct dtp {
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
     struct rlite_buf *rtx_tmr_next;
-    struct rl_flow_stats stats;
 };
 
 struct flow_entry {
@@ -180,6 +179,7 @@ struct flow_entry {
 
     void                *priv;
 
+    struct rl_flow_stats stats;
     struct delayed_work remove;
     unsigned int        refcnt;
     bool                never_bound;

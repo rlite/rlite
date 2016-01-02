@@ -861,6 +861,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         tasklet_init(&entry->tx_completion, tx_completion_func,
                      (unsigned long)entry);
         INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
+        rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
         FUNLOCK();
 

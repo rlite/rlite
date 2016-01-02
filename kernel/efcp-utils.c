@@ -38,7 +38,6 @@ dtp_init(struct dtp *dtp)
     INIT_LIST_HEAD(&dtp->rtxq);
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
     init_timer(&dtp->rtx_tmr);
-    rl_flow_stats_init(&dtp->stats);
 }
 EXPORT_SYMBOL_GPL(dtp_init);
 

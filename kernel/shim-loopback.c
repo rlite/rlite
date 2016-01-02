@@ -77,10 +77,10 @@ rcv_work(struct work_struct *w)
             tx_flow = priv->rxr[priv->rdh].tx_flow;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
 
-            tx_flow->dtp.stats.tx_pkt++;
-            tx_flow->dtp.stats.tx_byte += rb->len;
-            rx_flow->dtp.stats.rx_pkt++;
-            rx_flow->dtp.stats.rx_byte += rb->len;
+            tx_flow->stats.tx_pkt++;
+            tx_flow->stats.tx_byte += rb->len;
+            rx_flow->stats.rx_pkt++;
+            rx_flow->stats.rx_byte += rb->len;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -91,8 +91,8 @@ rcv_work(struct work_struct *w)
         ret = rlite_sdu_rx_flow(priv->ipcp, rx_flow, rb, true);
         if (unlikely(ret)) {
             spin_lock_bh(&priv->lock);
-            tx_flow->dtp.stats.tx_err++;
-            rx_flow->dtp.stats.rx_err++;
+            tx_flow->stats.tx_err++;
+            rx_flow->stats.rx_err++;
             spin_unlock_bh(&priv->lock);
         }
         flow_put(rx_flow);
@@ -296,14 +296,14 @@ rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
 
         spin_lock_bh(&priv->lock);
         if (unlikely(ret)) {
-            tx_flow->dtp.stats.tx_err++;
-            rx_flow->dtp.stats.rx_err++;
+            tx_flow->stats.tx_err++;
+            rx_flow->stats.rx_err++;
 
         } else {
-            tx_flow->dtp.stats.tx_pkt++;
-            tx_flow->dtp.stats.tx_byte += len;
-            rx_flow->dtp.stats.rx_pkt++;
-            rx_flow->dtp.stats.rx_byte += len;
+            tx_flow->stats.tx_pkt++;
+            tx_flow->stats.tx_byte += len;
+            rx_flow->stats.rx_pkt++;
+            rx_flow->stats.rx_byte += len;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -360,7 +360,7 @@ rlite_shim_loopback_flow_get_stats(struct flow_entry *flow,
     struct rlite_shim_loopback *priv = flow->txrx.ipcp->priv;
 
     spin_lock_bh(&priv->lock);
-    *stats = flow->dtp.stats;
+    *stats = flow->stats;
     spin_unlock_bh(&priv->lock);
 
     return 0;

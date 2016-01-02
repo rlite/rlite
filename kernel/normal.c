@@ -429,7 +429,7 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (unlikely(rlite_buf_pci_push(rb))) {
-        dtp->stats.tx_err++;
+        flow->stats.tx_err++;
         spin_unlock_bh(&dtp->lock);
         rlite_buf_free(rb);
 
@@ -447,8 +447,8 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_len = rb->len;
     pci->seqnum = dtp->next_seq_num_to_send++;
 
-    dtp->stats.tx_pkt++;
-    dtp->stats.tx_byte += rb->len;
+    flow->stats.tx_pkt++;
+    flow->stats.tx_byte += rb->len;
 
     dtp->set_drf = false;
     if (!dtcp_present) {
@@ -482,9 +482,9 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             int ret = rlite_rtxq_push(dtp, rb);
 
             if (unlikely(ret)) {
-                dtp->stats.tx_pkt--;
-                dtp->stats.tx_byte -= rb->len;
-                dtp->stats.tx_err++;
+                flow->stats.tx_pkt--;
+                flow->stats.tx_byte -= rb->len;
+                flow->stats.tx_err++;
                 spin_unlock_bh(&dtp->lock);
                 rlite_buf_free(rb);
 
@@ -1004,8 +1004,8 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
-        dtp->stats.rx_pkt++;
-        dtp->stats.rx_byte += rb->len;
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
 
         spin_unlock_bh(&dtp->lock);
 
@@ -1026,7 +1026,7 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
         RPD(5, "Dropping duplicate PDU [seq=%lu]\n",
                 (long unsigned)seqnum);
         rlite_buf_free(rb);
-        dtp->stats.rx_err++;
+        flow->stats.rx_err++;
 
         if (flow->cfg.dtcp.flow_control &&
                 dtp->rcv_lwe >= dtp->last_snd_data_ack) {
@@ -1109,8 +1109,8 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
             crb = sdu_rx_sv_update(ipcp, flow);
         }
 
-        dtp->stats.rx_pkt++;
-        dtp->stats.rx_byte += rb->len;
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
 
         spin_unlock_bh(&dtp->lock);
 
@@ -1141,7 +1141,7 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
                 (long unsigned)seqnum);
         rlite_buf_free(rb);
 
-        dtp->stats.rx_err++;
+        flow->stats.rx_err++;
 
     } else {
         /* What is not dropped nor delivered goes in the
@@ -1149,8 +1149,8 @@ rlite_normal_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb)
          */
         seqq_push(dtp, rb);
 
-        dtp->stats.rx_pkt++;
-        dtp->stats.rx_byte += rb->len;
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
     }
 
     crb = sdu_rx_sv_update(ipcp, flow);
@@ -1197,7 +1197,7 @@ rlite_normal_flow_get_stats(struct flow_entry *flow,
     struct dtp *dtp = &flow->dtp;
 
     spin_lock_bh(&dtp->lock);
-    *stats = dtp->stats;
+    *stats = flow->stats;
     spin_unlock_bh(&dtp->lock);
 
     return 0;

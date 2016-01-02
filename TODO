@@ -23,5 +23,3 @@
 - port nginx to rlite
 
 - support RIB M_READ (and M_WRITE)
-
-- move flow stats to flow_entry struct
