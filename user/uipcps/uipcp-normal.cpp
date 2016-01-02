@@ -662,7 +662,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
-    ret = rib_neigh_set_port_id(rib, &req->remote_appl,
+    ret = rib_neigh_set_port_id(rib, &req->remote_appl, req->dif_name,
                                 req->port_id, req->ipcp_id);
     if (ret) {
         UPE(uipcp, "rib_neigh_set_port_id() failed\n");
@@ -817,6 +817,6 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
-    .get_enrollment_targets = normal_get_enrolled_neighs,
+    .get_enrollment_targets = normal_get_enrollment_targets,
 };
 

@@ -63,6 +63,7 @@ struct Neighbor;
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
 struct NeighFlow {
     Neighbor *neigh;
+    std::string supp_dif;
     unsigned int port_id;
     int flow_fd;
     unsigned int lower_ipcp_id;
@@ -74,8 +75,8 @@ struct NeighFlow {
     pthread_cond_t enrollment_stopped;
     enum state_t enrollment_state;
 
-    NeighFlow(Neighbor *n, unsigned int pid, int ffd,
-              unsigned int lid);
+    NeighFlow(Neighbor *n, const std::string& supp_dif, unsigned int pid,
+              int ffd, unsigned int lid);
     ~NeighFlow();
 
     bool enrollment_starting(const CDAPMessage *m) const;
@@ -282,13 +283,15 @@ private:
 
 int normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req);
 
-int normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs);
+int normal_get_enrollment_targets(struct uipcp *uipcp,
+                                  struct list_head *neighs);
 
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
 
 int rib_neigh_set_port_id(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
+                          const char *supp_dif,
                           unsigned int neigh_port_id,
                           unsigned int lower_ipcp_id);
 

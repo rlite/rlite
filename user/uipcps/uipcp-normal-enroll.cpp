@@ -11,8 +11,10 @@ using namespace std;
 #define NEIGH_KEEPALIVE_THRESH  3
 #define NEIGH_ENROLL_TO         1500
 
-NeighFlow::NeighFlow(Neighbor *n, unsigned int pid, int ffd,
-                     unsigned int lid) : neigh(n), port_id(pid), flow_fd(ffd),
+NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
+                     unsigned int pid, int ffd, unsigned int lid) :
+                                  neigh(n), supp_dif(supdif),
+                                  port_id(pid), flow_fd(ffd),
                                   lower_ipcp_id(lid), conn(NULL),
                                   enroll_tmrid(0),
                                   keepalive_tmrid(0),
@@ -1068,7 +1070,7 @@ uipcp_rib::lookup_neigh_flow_by_port_id(unsigned int port_id,
 }
 
 int
-Neighbor::alloc_flow(const char *supp_dif_name)
+Neighbor::alloc_flow(const char *supp_dif)
 {
     struct rina_name neigh_name;
     struct rl_ipcp *info;
@@ -1089,7 +1091,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         struct rl_ipcp *ipcp;
 
         ipcp = rl_ctrl_select_ipcp_by_dif(&rib->uipcp->loop.ctrl,
-                                        supp_dif_name);
+                                          supp_dif);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->ipcp_id;
         } else {
@@ -1101,9 +1103,9 @@ Neighbor::alloc_flow(const char *supp_dif_name)
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
 
     /* Allocate a flow for the enrollment. */
-    ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif_name, NULL,
-                              &info->ipcp_name, &neigh_name, NULL,
-                              info->ipcp_id, &port_id_, 2000);
+    ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif, NULL,
+                               &info->ipcp_name, &neigh_name, NULL,
+                               info->ipcp_id, &port_id_, 2000);
     rina_name_free(&neigh_name);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
@@ -1121,7 +1123,8 @@ Neighbor::alloc_flow(const char *supp_dif_name)
         mgmt_port_id = port_id_;
     }
 
-    flows[port_id_] = new NeighFlow(this, port_id_, flow_fd_, lower_ipcp_id_);
+    flows[port_id_] = new NeighFlow(this, string(supp_dif), port_id_, flow_fd_,
+                                    lower_ipcp_id_);
 
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
@@ -1190,6 +1193,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
 int
 rib_neigh_set_port_id(struct uipcp_rib *rib,
                       const struct rina_name *neigh_name,
+                      const char *supp_dif,
                       unsigned int neigh_port_id,
                       unsigned int lower_ipcp_id)
 {
@@ -1211,7 +1215,8 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
         neigh->mgmt_port_id = neigh_port_id;
     }
 
-    neigh->flows[neigh_port_id] = new NeighFlow(neigh, neigh_port_id, 0,
+    neigh->flows[neigh_port_id] = new NeighFlow(neigh, string(supp_dif),
+                                                neigh_port_id, 0,
                                                 lower_ipcp_id);
 
     return 0;
@@ -1244,7 +1249,7 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
 }
 
 int
-normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
+normal_get_enrollment_targets(struct uipcp *uipcp, struct list_head *neighs)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     struct enrolled_neigh *ni;
@@ -1267,14 +1272,17 @@ normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
             return -1;
         }
 
+        assert(rl_ipcp->dif_name);
+
         if (neigh->ipcp_name.rina_name_fill(&ni->neigh_name) ||
                 rina_name_copy(&ni->ipcp_name, &rl_ipcp->ipcp_name) ||
-                (ni->dif_name = strdup(rl_ipcp->dif_name)) == NULL) {
+                (ni->dif_name = strdup(rl_ipcp->dif_name)) == NULL ||
+                (ni->supp_dif = strdup(neigh->mgmt_conn()->
+                                       supp_dif.c_str())) == NULL) {
             PE("Out of memory\n");
             free(ni);
             return -1;
         }
-        ni->supp_dif = NULL;
         list_add_tail(&ni->node, neighs);
     }
 
