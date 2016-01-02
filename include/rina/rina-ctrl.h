@@ -1,7 +1,11 @@
 #ifndef __RINA_CTRL_H__
 #define __RINA_CTRL_H__
 
-#include <linux/types.h>
+/*
+ * When compiling from userspace include <stdint.h>,
+ * when compiling from kernelspace include <linux/types.h>
+ */
+
 
 /* Application naming information:
  *   - Application Process Name

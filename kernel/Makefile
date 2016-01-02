@@ -1,4 +1,5 @@
 obj-m += rina-ctrl.o
+EXTRA_CFLAGS := -I$(PWD)/../include
 
 KER=`uname -r`
 
