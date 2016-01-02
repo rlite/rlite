@@ -402,7 +402,7 @@ uipcps_update(struct uipcps *uipcps)
     rlite_ipcps_print(&loop);
 
     /* Create an userspace IPCP for each existing IPCP. */
-    list_for_each_entry(rlite_ipcp, &loop.ipcps, node) {
+    list_for_each_entry(rlite_ipcp, loop.ipcps, node) {
         if (type_has_uipcp(rlite_ipcp->dif_type)) {
             ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id,
                             rlite_ipcp->dif_type);

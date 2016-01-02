@@ -82,8 +82,11 @@ struct rlite_evloop {
     int timer_events_cnt;
     int timer_next_id;
 
-    /* Used to store the list of ipcp entries fetched from kernel. */
-    struct list_head ipcps;
+    /* Used to store the list of ipcp entries fetched from kernel.
+     * User can only access the 'ipcps'. The other ones are private. */
+    struct list_head *ipcps;
+    struct list_head *ipcps_next;
+    struct list_head ipcps_lists[2];
 };
 
 /* Issue a request message to the kernel. Takes the ownership of
