@@ -139,7 +139,7 @@ struct Worker {
 
     /* Holds the active mappings between rlite file descriptors and
      * socket file descriptors. */
-    map<int, int> active_mappings;
+    map<int, int> fdmap;
 
     Worker();
     ~Worker();
@@ -259,8 +259,8 @@ Worker::run()
         pollfds[0].events = POLLIN;
 
         pthread_mutex_lock(&lock);
-        for (map<int, int>::iterator mit = active_mappings.begin();
-                                mit != active_mappings.end(); mit++, nfds++) {
+        for (map<int, int>::iterator mit = fdmap.begin();
+                                mit != fdmap.end(); mit++, nfds++) {
             pollfds[nfds].fd = mit->first;
             pollfds[nfds].events = POLLIN | POLLOUT;
         }
@@ -291,7 +291,7 @@ Worker::run()
                     int m;
 
                     if (n > 0) {
-                        m = write(active_mappings[pollfds[i].fd], buf, n);
+                        m = write(fdmap[pollfds[i].fd], buf, n);
                         if (m != n) {
                             if (m < 0) {
                                 perror("write()");
@@ -455,8 +455,8 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     }
 
     pthread_mutex_lock(&w->lock);
-    w->active_mappings[cfd] = rfd;
-    w->active_mappings[rfd] = cfd;
+    w->fdmap[cfd] = rfd;
+    w->fdmap[rfd] = cfd;
     w->repoll();
     pthread_mutex_unlock(&w->lock);
 
