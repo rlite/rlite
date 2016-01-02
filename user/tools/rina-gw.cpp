@@ -143,6 +143,9 @@ struct Worker {
 
     Worker();
     ~Worker();
+
+    int repoll();
+    int drain_syncfd();
 };
 
 #define NUM_WORKERS     1
@@ -191,6 +194,42 @@ Worker::~Worker()
         perror("pthread_join");
     }
     close(syncfd);
+}
+
+int
+Worker::repoll()
+{
+    uint64_t x = 1;
+    int n;
+
+    n = write(syncfd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("write(syncfd)");
+        if (n < 0) {
+            return n;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+Worker::drain_syncfd()
+{
+    uint64_t x;
+    int n;
+
+    n = read(syncfd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("read(syncfd)");
+        if (n < 0) {
+            return n;
+        }
+        return -1;
+    }
+
+    return 0;
 }
 
 Gateway::Gateway()
@@ -335,6 +374,7 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
     pthread_mutex_lock(&w->lock);
     w->active_mappings[cfd] = rfd;
     w->active_mappings[rfd] = cfd;
+    w->repoll();
     pthread_mutex_unlock(&w->lock);
 
     PI("New mapping created %d <--> %d\n", cfd, rfd);
@@ -524,6 +564,9 @@ worker_function(void *opaque)
 
         if (pollfds[0].revents & POLLIN) {
             PD("Mappings changed, rebuliding poll array\n");
+            pthread_mutex_lock(&w->lock);
+            w->drain_syncfd();
+            pthread_mutex_unlock(&w->lock);
             continue;
         }
 
