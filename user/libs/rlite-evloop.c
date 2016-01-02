@@ -352,6 +352,41 @@ time_cmp(const struct timespec *t1, const struct timespec *t2)
     return 0;
 }
 
+struct rlite_msg_base_resp *
+read_next_msg(int rfd)
+{
+    unsigned int max_resp_size = rlite_numtables_max_size(
+                rlite_ker_numtables,
+                sizeof(rlite_ker_numtables)/sizeof(struct rlite_msg_layout));
+    struct rlite_msg_base_resp *resp;
+    char serbuf[4096];
+    int ret;
+
+    ret = read(rfd, serbuf, sizeof(serbuf));
+    if (ret < 0) {
+        perror("read(rfd)");
+        return NULL;
+    }
+
+    /* Here we can malloc the maximum kernel message size. */
+    resp = RLITE_MBR(malloc(max_resp_size));
+    if (!resp) {
+        PE("Out of memory\n");
+        return NULL;
+    }
+
+    /* Deserialize the message from serbuf into resp. */
+    ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                                serbuf, ret, (void *)resp, max_resp_size);
+    if (ret) {
+        PE("Problems during deserialization [%d]\n", ret);
+        free(resp);
+        return NULL;
+    }
+
+    return resp;
+}
+
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
 /* The event loop function for kernel responses management. */
@@ -360,10 +395,6 @@ evloop_function(void *arg)
 {
     struct rlite_evloop *loop = (struct rlite_evloop *)arg;
     struct pending_entry *req_entry;
-    char serbuf[4096];
-    unsigned int max_resp_size = rlite_numtables_max_size(
-                rlite_ker_numtables,
-                sizeof(rlite_ker_numtables)/sizeof(struct rlite_msg_layout));
 
     for (;;) {
         struct rlite_msg_base_resp *resp;
@@ -421,8 +452,7 @@ evloop_function(void *arg)
             pthread_mutex_unlock(&loop->timer_lock);
         }
 
-        ret = select(maxfd + 1, &rdfs,
-                     NULL, NULL, top);
+        ret = select(maxfd + 1, &rdfs, NULL, NULL, top);
         if (ret == -1) {
             /* Error. */
             perror("select()");
@@ -494,25 +524,9 @@ evloop_function(void *arg)
         }
 
         /* Read the next message posted by the kernel. */
-        ret = read(loop->ctrl.rfd, serbuf, sizeof(serbuf));
-        if (ret < 0) {
-            perror("read(rfd)");
-            continue;
-        }
-
-        /* Here we can malloc the maximum kernel message size. */
-        resp = RLITE_MBR(malloc(max_resp_size));
+        resp = read_next_msg(loop->ctrl.rfd);
         if (!resp) {
-            PE("Out of memory\n");
             continue;
-        }
-
-        /* Deserialize the message from serbuf into resp. */
-        ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                                   serbuf, ret, (void *)resp, max_resp_size);
-        if (ret) {
-            PE("Problems during deserialization [%d]\n",
-                    ret);
         }
 
         /* Do we have an handler for this response message? */
@@ -1319,7 +1333,7 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
     return 0;
 }
 
-int
+uint32_t
 rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
@@ -1328,6 +1342,7 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
 {
     struct rl_kmsg_fa_req req;
     struct rlite_ipcp *rlite_ipcp;
+    uint32_t event_id;
     int ret;
 
     rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
@@ -1336,23 +1351,25 @@ rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
     }
     if (!rlite_ipcp) {
         PE("No suitable IPCP found\n");
-        return -1;
+        return 0;
     }
 
-    ret = rl_fa_req_fill(&req, rl_ctrl_get_id(ctrl), rlite_ipcp->ipcp_id,
+    event_id = rl_ctrl_get_id(ctrl);
+
+    ret = rl_fa_req_fill(&req, event_id, rlite_ipcp->ipcp_id,
                          dif_name, ipcp_name, local_appl, remote_appl,
                          flowspec, 0xffff);
     if (ret) {
         PE("Failed to fill flow allocation request\n");
-        return -1;
+        return 0;
     }
 
     (void)req;
 
-    return 0;
+    return event_id;
 }
 
-int
+uint32_t
 rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
                  const char *dif_name,
                  const struct rina_name *ipcp_name,
@@ -1360,6 +1377,7 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
 {
     struct rl_kmsg_appl_register req;
     struct rlite_ipcp *rlite_ipcp;
+    uint32_t event_id;
     int ret;
 
     rlite_ipcp = rlite_lookup_ipcp_by_name(ctrl, ipcp_name);
@@ -1368,24 +1386,82 @@ rl_ctrl_register(struct rlite_ctrl *ctrl, int reg,
     }
     if (!rlite_ipcp) {
         PE("Could not find a suitable IPC process\n");
-        return NULL;
+        return 0;
     }
 
-    ret = rl_register_req_fill(&req, rl_ctrl_get_id(ctrl), rlite_ipcp->ipcp_id,
+    event_id = rl_ctrl_get_id(ctrl);
+
+    ret = rl_register_req_fill(&req, event_id, rlite_ipcp->ipcp_id,
                                reg, appl_name);
     if (ret) {
         PE("Failed to fill (un)register request\n");
-        return -1;
+        return 0;
     }
 
     (void)req;
 
-    return 0;
+    return event_id;
 }
 
-struct rlite_msg_base *
-rl_ctrl_wait(struct rlite_ctrl *ctrl)
+struct rlite_msg_base_resp *
+rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
 {
+    struct rlite_msg_base_resp *resp;
+    struct pending_entry *entry;
+    fd_set rdfs;
+    int ret;
+
+    /* Try to match the event_id with a response that has already been read. */
+    pthread_mutex_lock(&ctrl->lock);
+    entry = pending_queue_remove_by_event_id(&ctrl->pqueue, event_id);
+    pthread_mutex_unlock(&ctrl->lock);
+
+    if (entry) {
+        return RLITE_MBR(entry->msg);
+    }
+
+    for (;;) {
+        FD_ZERO(&rdfs);
+        FD_SET(ctrl->rfd, &rdfs);
+
+        ret = select(ctrl->rfd + 1, &rdfs, NULL, NULL, NULL);
+
+        if (ret == -1) {
+            /* Error. */
+            perror("select()");
+            break;
+
+        } else if (ret == 0) {
+            /* Timeout */
+            PE("Unexpected timeout\n");
+            break;
+        }
+
+        /* Read the next message posted by the kernel. */
+        resp = read_next_msg(ctrl->rfd);
+        if (!resp) {
+            continue;
+        }
+
+        if (resp->event_id == event_id) {
+            /* We found it. */
+            return resp;
+        }
+
+        entry = malloc(sizeof(*entry));
+        if (!entry) {
+            PE("Out of memory\n");
+            free(resp);
+
+            return NULL;
+        }
+        memset(entry, 0, sizeof(*entry));
+        entry->msg = RLITE_MB(resp);
+        pthread_mutex_lock(&ctrl->lock);
+        list_add_tail(&entry->node, &ctrl->pqueue);
+        pthread_mutex_unlock(&ctrl->lock);
+    }
+
     return NULL;
 }
 
