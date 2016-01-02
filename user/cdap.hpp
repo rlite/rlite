@@ -59,6 +59,9 @@ public:
     long version;
 };
 
+struct CDAPMessage *
+msg_deser_stateless(char *serbuf, size_t serlen);
+
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
     int                 abs_syntax;

@@ -25,6 +25,7 @@ using namespace std;
 
 
 namespace obj_class {
+    static string adata = "a_data";
     static string dft = "dft";
     static string neighbors = "neighbors";
     static string enrollment = "enrollment";
@@ -35,6 +36,7 @@ namespace obj_class {
 };
 
 namespace obj_name {
+    static string adata = "a_data";
     static string dft = "/dif/mgmt/fa/" + obj_class::dft;
     static string neighbors = "/daf/mgmt/" + obj_class::neighbors;
     static string enrollment = "/def/mgmt/" + obj_class::enrollment;
@@ -1672,6 +1674,26 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     CDAPMessage *m;
 
     try {
+        m = msg_deser_stateless(serbuf, serlen);
+        if (m->obj_class == obj_class::adata &&
+                    m->obj_name == obj_name::adata) {
+            /* A-DATA message, does not belong to any CDAP
+             * session. */
+            delete m; // TODO
+        }
+
+        /* This is not an A-DATA message, so we try to match it
+         * against existing CDAP connections.
+         */
+
+        /* Easy and inefficient solution for now. We delete the
+         * already parsed CDAP message and call msg_deser() on
+         * the matching connection (if found) --> This causes the
+         * same message to be deserialized twice. The second
+         * deserialization can be avoided extending the CDAP
+         * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
+        delete m;
+
         /* Lookup neighbor by port id. */
         neigh = rib->lookup_neigh_by_port_id(mhdr->local_port);
         if (neigh == rib->neighbors.end()) {

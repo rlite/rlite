@@ -828,7 +828,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 }
 
 struct CDAPMessage *
-CDAPConn::msg_deser(char *serbuf, size_t serlen)
+msg_deser_stateless(char *serbuf, size_t serlen)
 {
     struct CDAPMessage *m;
     gpb::CDAPMessage gm;
@@ -839,6 +839,18 @@ CDAPConn::msg_deser(char *serbuf, size_t serlen)
 
     if (!m->valid(true)) {
         delete m;
+        return NULL;
+    }
+
+    return m;
+}
+
+struct CDAPMessage *
+CDAPConn::msg_deser(char *serbuf, size_t serlen)
+{
+    struct CDAPMessage *m = msg_deser_stateless(serbuf, serlen);
+
+    if (!m) {
         return NULL;
     }
 
