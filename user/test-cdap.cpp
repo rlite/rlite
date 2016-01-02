@@ -9,7 +9,7 @@
 #include <netinet/in.h> /* INET constants and stuff */
 #include <arpa/inet.h>  /* IP address conversion stuff */
 
-#include "cdap.hpp"
+#include "rlite/cdap.hpp"
 #include "rlite/utils.h"
 
 using namespace std;

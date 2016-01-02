@@ -11,10 +11,10 @@
 #include "rlite/conf-msg.h"
 #include "rlite/appl.h"
 #include "rlite/conf.h"
+#include "rlite/cdap.hpp"
 
 #include "uipcp-normal-codecs.hpp"
 #include "uipcp-container.h"
-#include "cdap.hpp"
 
 namespace obj_class {
     extern std::string adata;

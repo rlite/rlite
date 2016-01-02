@@ -6,7 +6,7 @@
 #include <string>
 
 #include "rlite/common.h"
-#include "cdap.hpp"
+#include "rlite/cdap.hpp"
 
 
 struct UipcpObject {

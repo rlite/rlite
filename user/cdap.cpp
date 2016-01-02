@@ -6,7 +6,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
-#include "cdap.hpp"
+#include "rlite/cdap.hpp"
 
 using namespace std;
 
