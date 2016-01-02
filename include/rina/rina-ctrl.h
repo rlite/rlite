@@ -12,19 +12,8 @@
 #endif
 
 #include <rina/rina-ipcp-types.h>
+#include <rina/rina-common.h>
 
-/* Application naming information:
- *   - Application Process Name
- *   - Application Process Instance
- *   - Application Entity Name
- *   - Application Entity Instance
- */
-struct rina_name {
-    char *apn;
-    char *api;
-    char *aen;
-    char *aei;
-} __attribute__((packed));
 
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
