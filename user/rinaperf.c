@@ -195,7 +195,7 @@ perf_client(struct rinaperf *rp)
     if (us) {
         printf("Throughput: %.3f Kpps, %.3f Mbps\n",
                 ((float)rp->test_config.cnt) * 1000.0 / us,
-                ((float)size) * rp->test_config.cnt / us);
+                ((float)size) * 8 * rp->test_config.cnt / us);
     }
 
     close(rp->dfd);
