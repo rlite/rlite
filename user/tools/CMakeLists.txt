@@ -6,7 +6,7 @@ add_executable(rina-gw rina-gw.cpp)
 
 target_link_libraries(rinaperf rlite)
 target_link_libraries(rina-rr-tool rlite)
-target_link_libraries(rlite-config rlite rlite-conf)
+target_link_libraries(rlite-config rlite rlite-conf rlite-evloop)
 target_link_libraries(rina-gw rlite rlite-evloop ${CMAKE_THREAD_LIBS_INIT})
 
  # Installation directives
