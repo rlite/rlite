@@ -277,8 +277,10 @@ outs =  '#!/bin/bash\n'                                             \
         '-m 1G '                                                    \
         '-device e1000,mac=00:0a:0a:0a:0a:99,netdev=mgmt '          \
         '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
+        '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '             \
         '-vga std  &\n'                                             \
-                % {'img': args.image, 'fwdp': args.base_port}
+                % {'img': args.image, 'fwdp': args.base_port,
+                   'fwdc': 10000 + args.base_port}
 
 fout.write(outs)
 fout.close()
