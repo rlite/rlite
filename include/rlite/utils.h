@@ -11,6 +11,12 @@ struct rlite_msg_layout {
     unsigned int copylen;
     unsigned int names;
     unsigned int strings;
+    unsigned int buffers;
+};
+
+struct rl_buf_field {
+    void        *buf;
+    uint32_t    len;
 };
 
 unsigned rina_name_serlen(const struct rina_name *name);
