@@ -679,9 +679,12 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
     struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    int blocking = !(f->f_flags & O_NONBLOCK);
     int ret = 0;
 
-    add_wait_queue(&rc->upqueue_wqh, &wait);
+    if (blocking) {
+        add_wait_queue(&rc->upqueue_wqh, &wait);
+    }
     while (len) {
         current->state = TASK_INTERRUPTIBLE;
 
@@ -692,6 +695,11 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
+                break;
+            }
+
+            if (!blocking) {
+                ret = -EAGAIN;
                 break;
             }
 
@@ -722,9 +730,30 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&rc->upqueue_wqh, &wait);
+    if (blocking) {
+        remove_wait_queue(&rc->upqueue_wqh, &wait);
+    }
 
     return ret;
+}
+
+static unsigned int
+rina_ctrl_poll(struct file *f, poll_table *wait)
+{
+    struct rina_ctrl *rc = (struct rina_ctrl *)f->private_data;
+    unsigned int mask = 0;
+
+    poll_wait(f, &rc->upqueue_wqh, wait);
+
+    mutex_lock(&rc->upqueue_lock);
+    if (!list_empty(&rc->upqueue)) {
+        mask |= POLLIN | POLLRDNORM;
+    }
+    mutex_unlock(&rc->upqueue_lock);
+
+    mask |= POLLOUT | POLLWRNORM;
+
+    return mask;
 }
 
 static int
@@ -762,6 +791,7 @@ static const struct file_operations rina_ctrl_fops = {
     .open           = rina_ctrl_open,
     .write          = rina_ctrl_write,
     .read           = rina_ctrl_read,
+    .poll           = rina_ctrl_poll,
     .llseek         = noop_llseek,
 };
 

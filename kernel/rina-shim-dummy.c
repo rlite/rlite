@@ -65,19 +65,22 @@ rina_shim_dummy_destroy(struct ipcp_entry *ipcp)
 }
 
 static int
-rina_shim_dummy_application_register(struct ipcp_entry *ipcp, struct rina_name *application_name)
+rina_shim_dummy_application_register(struct ipcp_entry *ipcp,
+                                     struct rina_name *application_name)
 {
     return 0;
 }
 
 static int
-rina_shim_dummy_application_unregister(struct ipcp_entry *ipcp, struct rina_name *application_name)
+rina_shim_dummy_application_unregister(struct ipcp_entry *ipcp,
+                                       struct rina_name *application_name)
 {
     return 0;
 }
 
 static int
-rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp, struct rina_name *dif_name)
+rina_shim_dummy_assign_to_dif(struct ipcp_entry *ipcp,
+                              struct rina_name *dif_name)
 {
     return 0;
 }

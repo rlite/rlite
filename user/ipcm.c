@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/select.h>
 #include <rina/rina-ctrl.h>
 #include "pending_queue.h"
 #include <rina/rina-utils.h>
@@ -184,7 +185,20 @@ void *evloop_function(void *arg)
 
     for (;;) {
         struct rina_msg_base *resp;
+        fd_set rdfs;
         int ret;
+
+        FD_ZERO(&rdfs);
+        FD_SET(ipcm->rfd, &rdfs);
+
+        ret = select(ipcm->rfd + 1, &rdfs, NULL, NULL, NULL);
+        if (ret == -1) {
+            perror("select()");
+            continue;
+        } else if (ret == 0 || !FD_ISSET(ipcm->rfd, &rdfs)) {
+            /* Timeout or ipcm->rfd is not ready. */
+            continue;
+        }
 
         /* Read the next message posted by the kernel. */
         ret = read(ipcm->rfd, serbuf, sizeof(serbuf));
@@ -502,6 +516,11 @@ int main()
     ipcm.rfd = open("/dev/rina-ctrl", O_RDWR);
     if (ipcm.rfd < 0) {
         perror("open(/dev/rinactrl)");
+        exit(EXIT_FAILURE);
+    }
+    ret = fcntl(ipcm.rfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        perror("fcntl(O_NONBLOCK)");
         exit(EXIT_FAILURE);
     }
     pthread_mutex_init(&ipcm.lock, NULL);
