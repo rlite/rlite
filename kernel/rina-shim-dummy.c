@@ -37,6 +37,7 @@
 struct rx_entry {
     struct rina_buf *rb;
     unsigned int remote_port;
+    unsigned int local_port;
 };
 
 #define RX_POW      8
@@ -61,11 +62,13 @@ rcv_work(struct work_struct *w)
     for (;;) {
         struct rina_buf *rb = NULL;
         unsigned int remote_port;
+        unsigned int local_port;
 
         spin_lock(&priv->lock);
         if (priv->rdh != priv->rdt) {
             rb = priv->rxr[priv->rdh].rb;
             remote_port = priv->rxr[priv->rdh].remote_port;
+            local_port = priv->rxr[priv->rdh].local_port;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
         }
         spin_unlock(&priv->lock);
@@ -75,7 +78,7 @@ rcv_work(struct work_struct *w)
         }
         rina_sdu_rx(priv->ipcp, rb, remote_port);
 
-        rina_write_restart(remote_port);
+        rina_write_restart(local_port);
     }
 }
 
@@ -229,6 +232,7 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
         } else {
             priv->rxr[priv->rdt].rb = rb;
             priv->rxr[priv->rdt].remote_port = flow->remote_port;
+            priv->rxr[priv->rdt].local_port = flow->local_port;
             priv->rdt = next;
         }
         spin_unlock(&priv->lock);
