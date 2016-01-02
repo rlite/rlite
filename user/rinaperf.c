@@ -11,14 +11,20 @@
 #include "application.h"
 
 
-static int
-echo_client(struct application *application)
-{
-    struct rina_name dif_name;
+struct rinaperf {
+    struct application application;
+
     struct rina_name this_application;
     struct rina_name remote_application;
-    unsigned int port_id;
+    struct rina_name dif_name;
+    unsigned int ctrl_port_id;
+};
+
+static int
+echo_client(struct rinaperf *rp)
+{
     struct timeval t_start, t_end;
+    unsigned int data_port_id;
     unsigned long us;
     int ret;
     int fd;
@@ -29,19 +35,19 @@ echo_client(struct application *application)
         size = sizeof(buf);
     }
 
-    ipcps_fetch(&application->loop);
+    ipcps_fetch(&rp->application.loop);
 
-    rina_name_fill(&dif_name, "d.DIF", "", "", "");
-    rina_name_fill(&this_application, "client", "1", NULL, NULL);
-    rina_name_fill(&remote_application, "server", "1", NULL, NULL);
+    rina_name_fill(&rp->dif_name, "d.DIF", "", "", "");
+    rina_name_fill(&rp->this_application, "client", "1", NULL, NULL);
+    rina_name_fill(&rp->remote_application, "server", "1", NULL, NULL);
 
-    ret = flow_allocate(application, &dif_name, &this_application,
-                        &remote_application, &port_id);
+    ret = flow_allocate(&rp->application, &rp->dif_name, &rp->this_application,
+                        &rp->remote_application, &data_port_id);
     if (ret) {
         return ret;
     }
 
-    fd = open_port(port_id);
+    fd = open_port(data_port_id);
     if (fd < 0) {
         return fd;
     }
@@ -76,37 +82,36 @@ echo_client(struct application *application)
 }
 
 static int
-echo_server(struct application *application)
+echo_server(struct rinaperf *rp)
 {
-    struct rina_name dif_name;
-    struct rina_name this_application;
     struct pending_flow_req *pfr = NULL;
     int ret;
 
-    ipcps_fetch(&application->loop);
+    ipcps_fetch(&rp->application.loop);
 
-    rina_name_fill(&dif_name, "d.DIF", "", "", "");
-    rina_name_fill(&this_application, "server", "1", NULL, NULL);
+    rina_name_fill(&rp->dif_name, "d.DIF", "", "", "");
+    rina_name_fill(&rp->this_application, "server", "1", NULL, NULL);
 
-    ret = application_register(application, 1, &dif_name, &this_application);
+    ret = application_register(&rp->application, 1, &rp->dif_name,
+                               &rp->this_application);
     if (ret) {
         return ret;
     }
 
     for (;;) {
-        unsigned int port_id;
+        unsigned int data_port_id;
         int result;
         int fd;
         char buf[4096];
         int n, m;
 
-        pfr = flow_request_wait(application);
-        port_id = pfr->port_id;
-        printf("%s: flow request arrived: [ipcp_id = %u, port_id = %u]\n",
+        pfr = flow_request_wait(&rp->application);
+        data_port_id = pfr->port_id;
+        printf("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
 
         /* Always accept incoming connection, for now. */
-        result = flow_allocate_resp(application, pfr->ipcp_id,
+        result = flow_allocate_resp(&rp->application, pfr->ipcp_id,
                                     pfr->port_id, 0);
         free(pfr);
 
@@ -114,7 +119,7 @@ echo_server(struct application *application)
             continue;
         }
 
-        fd = open_port(port_id);
+        fd = open_port(data_port_id);
         if (fd < 0) {
             continue;
         }
@@ -140,7 +145,7 @@ clos:
     return 0;
 }
 
-typedef int (*perf_function_t)(struct application *);
+typedef int (*perf_function_t)(struct rinaperf *);
 
 struct perf_function_desc {
     const char *name;
@@ -164,7 +169,7 @@ static struct perf_function_desc server_descs[] = {
 int
 main(int argc, char **argv)
 {
-    struct application application;
+    struct rinaperf rp;
     const struct perf_function_desc *descs = client_descs;
     const char *type = "echo";
     perf_function_t perf_function = NULL;
@@ -206,16 +211,16 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    ret = rina_application_init(&application);
+    ret = rina_application_init(&rp.application);
     if (ret) {
         return ret;
     }
 
     /* Run the perf function. */
-    perf_function(&application);
+    perf_function(&rp);
 
     /* Stop the event loop. */
-    evloop_stop(&application.loop);
+    evloop_stop(&rp.application.loop);
 
-    return rina_application_fini(&application);
+    return rina_application_fini(&rp.application);
 }
