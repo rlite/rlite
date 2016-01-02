@@ -24,7 +24,6 @@
 
 #include <linux/module.h>
 #include <linux/aio.h>
-#include <linux/moduleparam.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/list.h>
@@ -35,6 +34,7 @@
 #include <linux/spinlock.h>
 #include <linux/net.h>
 #include <linux/file.h>
+#include <linux/version.h>
 
 
 struct rina_shim_inet4 {
@@ -113,8 +113,32 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rina_buf *rb, bool maysleep)
 {
+    struct socket *sock = flow->priv;
+    struct msghdr msghdr;
+    struct iovec iov;
+    int ret;
+
+    memset(&msghdr, 0, sizeof(msghdr));
+    iov.iov_base = RINA_BUF_DATA(rb);
+    iov.iov_len = rb->len;
+
+    msghdr.msg_flags = MSG_DONTWAIT;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 1, rb->len);
+    ret = sock_sendmsg(sock, &msghdr, rb->len);
+#else
+    msghdr.msg_iov = &iov;
+    msghdr.msg_iovlen = 1;
+    ret = kernel_sendmsg(sock, &msghdr, (struct kvec *)&iov, 1, rb->len);
+#endif
+
+    if (unlikely(ret < 0)) {
+        PE("sock_sendmsg() failed [%d]\n", ret);
+    } else {
+        PI("successfully sent %d/%d bytes\n", ret, (int)rb->len);
+    }
+
     rina_buf_free(rb);
-    PI("Just dropping packet\n");
 
     return 0;
 }
