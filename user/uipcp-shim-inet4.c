@@ -201,26 +201,20 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     ep->appl_name_s = rina_name_to_string(&req->appl_name);
     if (!ep->appl_name_s) {
         PE("Out of memory\n");
-        free(ep);
-        return -1;
+        goto err1;
     }
 
     ret = appl_name_to_sock_addr(&req->appl_name, &ep->addr);
     if (ret) {
         PE("Failed to get inet4 address from appl_name '%s'\n",
            ep->appl_name_s);
-        free(ep->appl_name_s);
-        free(ep);
-
-        return -1;
+        goto err2;
     }
 
     ep->fd = socket(PF_INET, SOCK_STREAM, 0);
     if (ep->fd < 0) {
         PE("socket() failed [%d]\n", errno);
-        free(ep->appl_name_s);
-        free(ep);
-        return -1;
+        goto err2;
     }
 
     {
@@ -229,27 +223,18 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
         if (setsockopt(ep->fd, SOL_SOCKET, SO_REUSEADDR, &enable,
                        sizeof(enable))) {
             PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
-            close(ep->fd);
-            free(ep->appl_name_s);
-            free(ep);
-            return -1;
+            goto err3;
         }
     }
 
     if (bind(ep->fd, (struct sockaddr *)&ep->addr, sizeof(ep->addr))) {
         PE("bind() failed [%d]\n", errno);
-        close(ep->fd);
-        free(ep->appl_name_s);
-        free(ep);
-        return -1;
+        goto err3;
     }
 
     if (listen(ep->fd, 5)) {
         PE("listen() failed [%d]\n", errno);
-        close(ep->fd);
-        free(ep->appl_name_s);
-        free(ep);
-        return -1;
+        goto err3;
     }
 
     rlite_evloop_fdcb_add(&uipcp->appl.loop, ep->fd, accept_conn);
@@ -257,6 +242,15 @@ shim_inet4_appl_register(struct rlite_evloop *loop,
     list_add_tail(&ep->node, &shim->endpoints);
 
     return 0;
+
+err3:
+    close(ep->fd);
+err2:
+    free(ep->appl_name_s);
+err1:
+    free(ep);
+
+    return -1;
 }
 
 static int
@@ -268,13 +262,22 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
+    struct sockaddr_in local_addr, remote_addr;
+    int ret;
 
     PD("[uipcp %u] Got reflected message\n", uipcp->ipcp_id);
 
     assert(b_req == NULL);
 
-    (void)req;
-    (void)uipcp;
+    ret = appl_name_to_sock_addr(&req->local_application, &local_addr);
+    if (ret) {
+        PE("Failed to get inet4 address for local application\n");
+    }
+
+    ret = appl_name_to_sock_addr(&req->remote_application, &remote_addr);
+    if (ret) {
+        PE("Failed to get inet4 address for remote application\n");
+    }
 
     return 0;
 }
