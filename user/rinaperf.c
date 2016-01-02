@@ -467,6 +467,7 @@ main(int argc, char **argv)
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
     struct rina_flow_config flowcfg;
+    int fconfigured = 0;
     int listen = 0;
     int cnt = 1;
     int size = 1;
@@ -534,6 +535,7 @@ main(int argc, char **argv)
                     printf("    Invalid flow config %s\n", optarg);
                     return -1;
                 }
+                fconfigured = 1;
                 break;
 
             default:
@@ -544,6 +546,10 @@ main(int argc, char **argv)
     }
 
     if (!listen) {
+        if (fconfigured) {
+            flow_config_dump(&flowcfg);
+        }
+
         for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
             if (strcmp(descs[i].name, type) == 0) {
                 perf_function = descs[i].client_function;
