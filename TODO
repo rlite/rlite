@@ -27,3 +27,6 @@
 - limitare le dimensioni della seqq
 
 - proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
+
+- riorganizzare il codice di uipcp-server, da dividere nella parte unix_server
+  e la parte uipcp_server

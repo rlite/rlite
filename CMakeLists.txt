@@ -20,3 +20,6 @@ add_executable(rina-config user/rina-config.c)
 target_link_libraries(rinaperf rinalite)
 target_link_libraries(uipcp-server rinalite)
 target_link_libraries(rina-config rinalite)
+
+install(TARGETS rinaperf uipcp-server rina-config DESTINATION usr/bin)
+install(TARGETS rinalite DESTINATION usr/lib)
