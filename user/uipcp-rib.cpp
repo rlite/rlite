@@ -278,6 +278,20 @@ uipcp_rib::dump() const
                     << ", Age: " << flow.age << endl;
     }
 
+    ss << endl;
+
+    ss << "Supported flows:" << endl;
+    for (map<string, FlowRequest>::const_iterator
+            mit = flow_reqs.begin(); mit != flow_reqs.end(); mit++) {
+        const FlowRequest& freq = mit->second;
+
+        ss << "    SrcAppl: " << static_cast<string>(freq.src_app) <<
+                ", DstAppl: " << static_cast<string>(freq.dst_app) <<
+                ", SrcAddr: " << freq.src_addr << ", SrcPort: " <<
+                freq.src_port << ", DstAddr: " << freq.dst_addr <<
+                ", DstPort: " << freq.dst_port << endl;
+    }
+
     return strdup(ss.str().c_str());
 }
 
