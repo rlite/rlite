@@ -221,12 +221,31 @@ perf_server(struct rinaperf *rp)
     return 0;
 }
 
+struct perf_function_desc {
+    const char *name;
+    perf_function_t client_function;
+    perf_function_t server_function;
+};
+
+static struct perf_function_desc descs[] = {
+    {
+        .name = "echo",
+        .client_function = echo_client,
+        .server_function = echo_server,
+    },
+    {   .name = "perf",
+        .client_function = perf_client,
+        .server_function = perf_server,
+    }
+};
+
 static int
-server(struct rinaperf *rp, perf_function_t perf_function)
+server(struct rinaperf *rp)
 {
     struct pending_flow_req *pfr = NULL;
 
     for (;;) {
+        perf_function_t perf_function = NULL;
         int result;
         int ret;
 
@@ -254,6 +273,12 @@ server(struct rinaperf *rp, perf_function_t perf_function)
             goto clos;
         }
 
+        if (rp->test_config.ty >= sizeof(descs)) {
+            continue;
+        }
+        perf_function = descs[rp->test_config.ty].server_function;
+        assert(perf_function);
+
         perf_function(rp);
 clos:
         close(rp->dfd);
@@ -262,36 +287,10 @@ clos:
     return 0;
 }
 
-struct perf_function_desc {
-    const char *name;
-    perf_function_t function;
-};
-
-static struct perf_function_desc client_descs[] = {
-    {
-        .name = "echo",
-        .function = echo_client,
-    },
-    {   .name = "perf",
-        .function = perf_client,
-    }
-};
-
-static struct perf_function_desc server_descs[] = {
-    {
-        .name = "echo",
-        .function = echo_server,
-    },
-    {   .name = "perf",
-        .function = perf_server,
-    }
-};
-
 int
 main(int argc, char **argv)
 {
     struct rinaperf rp;
-    const struct perf_function_desc *descs = client_descs;
     const char *type = "echo";
     const char *dif_name = "d.DIF";
     perf_function_t perf_function = NULL;
@@ -302,8 +301,6 @@ main(int argc, char **argv)
     int ret;
     int opt;
     int i;
-
-    assert(sizeof(client_descs) == sizeof(server_descs));
 
     while ((opt = getopt(argc, argv, "lt:d:c:s:")) != -1) {
         switch (opt) {
@@ -340,24 +337,22 @@ main(int argc, char **argv)
         }
     }
 
-    if (listen) {
-        descs = server_descs;
-    }
-
-    for (i = 0; i < sizeof(client_descs)/sizeof(client_descs[0]); i++) {
-        if (strcmp(descs[i].name, type) == 0) {
-            perf_function = descs[i].function;
-            break;
+    if (!listen) {
+        for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
+            if (strcmp(descs[i].name, type) == 0) {
+                perf_function = descs[i].client_function;
+                break;
+            }
         }
-    }
 
-    if (perf_function == NULL) {
-        printf("    Unknown test type '%s'\n", type);
-        return -1;
+        if (perf_function == NULL) {
+            printf("    Unknown test type '%s'\n", type);
+            return -1;
+        }
+        rp.test_config.ty = i;
+        rp.test_config.cnt = cnt;
+        rp.test_config.size = size;
     }
-    rp.test_config.ty = i;
-    rp.test_config.cnt = cnt;
-    rp.test_config.size = size;
 
     /* Initialization of RINA application library. */
     ret = rina_application_init(&rp.application);
@@ -390,7 +385,7 @@ main(int argc, char **argv)
             return ret;
         }
 
-        server(&rp, perf_function);
+        server(&rp);
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
