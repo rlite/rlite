@@ -251,8 +251,12 @@ test(struct ipcm *ipcm)
     rina_name_fill(&ipcp_name, "prova.IPCP", "1", NULL, NULL);
     ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
 
+    rina_name_fill(&ipcp_name, "prova.IPCP", "2", NULL, NULL);
+    ret = create_ipcp(ipcm, &ipcp_name, DIF_TYPE_SHIM_DUMMY);
+
     /* Destroy the IPCP. */
     destroy_ipcp(ipcm, 0);
+    destroy_ipcp(ipcm, 1);
 
     return ret;
 }

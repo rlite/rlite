@@ -138,6 +138,8 @@ rina_ipcp_create(struct rina_ctrl *rc, const char __user *buf, size_t len)
     entry->msg_len = sizeof(*rmsg);
     mutex_lock(&rc->upqueue_lock);
     list_add_tail(&entry->node, &rc->upqueue);
+    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
+                               POLLRDBAND);
     mutex_unlock(&rc->upqueue_lock);
 
     name_s = rina_name_to_string(&kmsg.name);
@@ -198,6 +200,8 @@ rina_ipcp_destroy(struct rina_ctrl *rc, const char __user *buf, size_t len)
     /* Enqueue the response into the upqueue. */
     mutex_lock(&rc->upqueue_lock);
     list_add_tail(&entry->node, &rc->upqueue);
+    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
+                               POLLRDBAND);
     mutex_unlock(&rc->upqueue_lock);
 
     printk("IPC process %u destroyed\n", kmsg.ipcp_id);
