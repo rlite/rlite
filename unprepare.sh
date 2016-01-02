@@ -11,7 +11,7 @@ sudo rmmod rina-ctrl
 
 # unprepare VMPI-KVM
 pushd .
-cd ../vmpi
+cd kernel/vmpi
 ./unprepare-host-kvm.sh
 ./unprepare-guest-kvm.sh
 popd

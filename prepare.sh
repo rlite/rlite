@@ -4,7 +4,7 @@ set -x
 
 # prepare VMPI-KVM
 pushd .
-cd ../vmpi
+cd kernel/vmpi
 ./prepare-host-kvm.sh
 ./prepare-guest-kvm.sh
 popd
