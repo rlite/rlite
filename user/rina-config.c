@@ -15,6 +15,7 @@
 #include "rinalite/rina-conf-msg.h"
 #include "helpers.h"
 #include "rinalite-evloop.h"
+#include "rinalite-conf.h"
 
 
 struct rinaconf {
@@ -298,29 +299,8 @@ static int
 rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
                  const char *param_name, const char *param_value)
 {
-    struct rina_kmsg_ipcp_config *req;
-    struct rina_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("Out of memory\n");
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_CONFIG;
-    req->ipcp_id = ipcp_id;
-    req->name = strdup(param_name);
-    req->value = strdup(param_value);
-
-    PD("Requesting IPCP config...\n");
-
-    resp = rinalite_issue_request(&rc->loop, RINALITE_RMB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp);
-    PD("result: %d\n", result);
+    int result = rinalite_ipcp_config(&rc->loop, ipcp_id,
+                                      param_name, param_value);
 
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
