@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <cerrno>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -12,6 +14,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
+#include "rlite/appl.h"
 
 using namespace std;
 
@@ -80,16 +83,37 @@ RinaName::RinaName(const RinaName& other)
 }
 
 struct Gateway {
+    struct rlite_appl appl;
+
     /* Used to map IP:PORT --> RINA_NAME, when
      * receiving TCP connection requests from the INET world
      * towards the RINA world. */
     map<InetName, RinaName> srv_map;
+    map<int, RinaName> srv_fd_map;
 
     /* Used to map RINA_NAME --> IP:PORT, when
      * receiving flow allocation requests from the RINA world
      * towards the INET world. */
     map<RinaName, InetName> dst_map;
+
+    Gateway();
+    ~Gateway();
 };
+
+Gateway::Gateway()
+{
+    rlite_appl_init(&appl);
+}
+
+Gateway::~Gateway()
+{
+    for (map<int, RinaName>::iterator mit = srv_fd_map.begin();
+                                    mit != srv_fd_map.end(); mit++) {
+        close(mit->first);
+    }
+
+    rlite_appl_fini(&appl);
+}
 
 Gateway gw;
 
@@ -167,6 +191,52 @@ parse_conf(const char *confname)
     return 0;
 }
 
+static void
+accept_inet_conn(struct rlite_evloop *loop, int fd)
+{
+}
+
+static int
+inet_server_socket(const InetName& inet_name)
+{
+    int enable = 1;
+    int fd;
+
+    fd = socket(PF_INET, SOCK_STREAM, 0);
+
+    if (fd < 0) {
+        PE("socket() failed [%d]\n", errno);
+        return -1;
+    }
+
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable,
+                   sizeof(enable))) {
+        PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
+        close(fd);
+        return -1;
+    }
+
+    if (bind(fd, (struct sockaddr *)&inet_name.addr, sizeof(inet_name.addr))) {
+        PE("bind() failed [%d]\n", errno);
+        close(fd);
+        return -1;
+    }
+
+    if (listen(fd, 10)) {
+        PE("listen() failed [%d]\n", errno);
+        close(fd);
+        return -1;
+    }
+
+    if (rlite_evloop_fdcb_add(&gw.appl.loop, fd, accept_inet_conn)) {
+        PE("rlite_evloop_fcdb_add() failed [%d]\n", errno);
+        close(fd);
+        return -1;
+    }
+
+    return 0;
+}
+
 static int
 setup()
 {
@@ -180,6 +250,18 @@ setup()
                                     mit != gw.dst_map.end(); mit++) {
         cout << "DST: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
+    }
+
+    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
+                                    mit != gw.srv_map.end(); mit++) {
+        int fd = inet_server_socket(mit->first);
+
+        if (fd < 0) {
+            PE("Failed to open listening socket for '%s'\n",
+               static_cast<string>(mit->first).c_str());
+        } else {
+            gw.srv_fd_map[fd] = mit->second;
+        }
     }
 
     return 0;

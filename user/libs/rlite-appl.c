@@ -460,7 +460,7 @@ rlite_appl_init(struct rlite_appl *application)
     list_init(&application->pending_flow_reqs);
 
     ret = rlite_evloop_init(&application->loop, "/dev/rlite",
-                               rina_kernel_handlers);
+                            rina_kernel_handlers);
     if (ret) {
         return ret;
     }
