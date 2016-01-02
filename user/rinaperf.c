@@ -11,7 +11,7 @@
 #include <poll.h>
 #include "rinalite/rinalite-utils.h"
 
-#include "rinalite_appl.h"
+#include "rinalite-appl.h"
 
 
 #define SDU_SIZE_MAX    65535

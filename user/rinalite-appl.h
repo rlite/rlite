@@ -3,8 +3,8 @@
 
 #include <rinalite/rinalite-common.h>
 #include <stdint.h>
-#include "rinalite_list.h"
-#include "rinalite_evloop.h"
+#include "rinalite-list.h"
+#include "rinalite-evloop.h"
 
 
 struct rinalite_pending_flow_req {

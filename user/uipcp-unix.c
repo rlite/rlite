@@ -16,10 +16,10 @@
 #include "rinalite/rina-conf-msg.h"
 #include "rinalite/rinalite-utils.h"
 
-#include "rinalite_list.h"
+#include "rinalite-list.h"
 #include "helpers.h"
-#include "rinalite_evloop.h"
-#include "rinalite_appl.h"
+#include "rinalite-evloop.h"
+#include "rinalite-appl.h"
 #include "uipcp-container.h"
 
 

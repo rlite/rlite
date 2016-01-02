@@ -2,8 +2,8 @@
 #define __RINA_UIPCP_H__
 
 #include <rinalite/rina-conf-msg.h>
-#include "rinalite_list.h"
-#include "rinalite_appl.h"
+#include "rinalite-list.h"
+#include "rinalite-appl.h"
 
 
 /* User IPCP data model. */

@@ -14,7 +14,7 @@
 
 #include "rinalite/rina-conf-msg.h"
 #include "helpers.h"
-#include "rinalite_evloop.h"
+#include "rinalite-evloop.h"
 
 
 struct rinaconf {

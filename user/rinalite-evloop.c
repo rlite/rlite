@@ -17,7 +17,7 @@
 #include "rinalite/rinalite-utils.h"
 
 #include "pending_queue.h"
-#include "rinalite_evloop.h"
+#include "rinalite-evloop.h"
 
 
 static int

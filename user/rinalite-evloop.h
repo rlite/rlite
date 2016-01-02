@@ -8,7 +8,7 @@
 #include <rinalite/rina-conf-msg.h>
 #include <rinalite/rinalite-utils.h>
 
-#include "rinalite_list.h"
+#include "rinalite-list.h"
 
 
 struct rinalite_ipcp {
