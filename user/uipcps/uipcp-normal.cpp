@@ -748,7 +748,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 
     /* Perform the registration. */
     result = rlite_appl_register_wait(&uipcp->appl, reg, lower_dif,
-                                      0, NULL, ipcp_name);
+                                      0, NULL, ipcp_name, 2000);
 
     if (result) {
         return result;

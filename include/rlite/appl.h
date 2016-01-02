@@ -50,7 +50,8 @@ rlite_appl_register(struct rlite_appl *application,
 int rlite_appl_register_wait(struct rlite_appl *application,
                              int reg, const struct rina_name *dif_name,
                              int fallback, const struct rina_name *ipcp_name,
-                             const struct rina_name *appl_name);
+                             const struct rina_name *appl_name,
+                             unsigned int wait_ms);
 
 int rlite_flow_allocate(struct rlite_appl *application,
                   struct rina_name *dif_name, int dif_fallback,

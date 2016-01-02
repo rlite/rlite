@@ -767,14 +767,16 @@ main(int argc, char **argv)
         /* In listen mode also register the application names. */
         if (have_ctrl) {
             ret = rlite_appl_register_wait(&rp.application, 1, &rp.dif_name,
-                                       1, &rp.ipcp_name, &server_ctrl_name);
+                                           1, &rp.ipcp_name, &server_ctrl_name,
+                                           3000);
             if (ret) {
                 return ret;
             }
         }
 
         ret = rlite_appl_register_wait(&rp.application, 1, &rp.dif_name,
-                                   1, &rp.ipcp_name, &rp.server_appl_name);
+                                       1, &rp.ipcp_name, &rp.server_appl_name,
+                                       3000);
         if (ret) {
             return ret;
         }

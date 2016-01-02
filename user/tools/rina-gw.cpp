@@ -287,7 +287,7 @@ setup()
         }
 
         rlite_appl_register_wait(&gw.appl, 1, &dif_name, 0, NULL,
-                                           &mit->first.name_r);
+                                 &mit->first.name_r, 3000);
         rina_name_free(&dif_name);
         if (ret) {
             PE("Registration of application '%s'\n",

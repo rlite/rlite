@@ -280,12 +280,13 @@ int
 rlite_appl_register_wait(struct rlite_appl *application, int reg,
                          const struct rina_name *dif_name, int fallback,
                          const struct rina_name *ipcp_name,
-                         const struct rina_name *appl_name)
+                         const struct rina_name *appl_name,
+                         unsigned int wait_ms)
 {
     struct rina_kmsg_appl_register_resp *resp;
     int ret = 0;
 
-    resp = rlite_appl_register(application, ~0U, reg, dif_name, fallback,
+    resp = rlite_appl_register(application, wait_ms, reg, dif_name, fallback,
                                ipcp_name, appl_name);
 
     if (!resp) {
