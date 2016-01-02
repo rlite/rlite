@@ -9,7 +9,7 @@ if [ -z "$1" ]; then
 fi
 
 # Try to extract the last vmpi-id from the kernel log
-vmpi_id=$(dmesg | grep -o "Provider [01]:[0-9]\+" | tail -n1 | grep -o "[0-9]\+$")
+vmpi_id=$(dmesg | grep -o "Provider \(HOST\|GUEST\):[0-9]\+" | tail -n1 | grep -o "[0-9]\+$")
 if [ -z ${vmpi_id} ]; then
     echo "No registered provider"
 fi
