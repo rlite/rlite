@@ -5,6 +5,16 @@ import argparse
 import subprocess
 import common
 import time
+import sys
+
+
+def python2():
+    return sys.version_info[0] <= 2
+
+def bts(b):
+    if python2():
+        return b
+    return str(b, 'ascii')
 
 
 description = "Continuous integration for rlite"
@@ -136,10 +146,12 @@ for topofile in topologies:
     try:
         p = subprocess.run(['./test-client.sh'], timeout = 1 * tou,
                            stdout = subprocess.PIPE)
-        print(p.stdout)
+        test_output = bts(p.stdout)
     except subprocess.TimeoutExpired:
         print("test-client.sh timed out")
         continue
+
+    print("Results: '%s'" % test_output)
 
     try:
         subprocess.run(['./down.sh'], timeout = 10 * tou)
