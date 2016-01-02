@@ -169,6 +169,8 @@ struct uipcp_rib {
     map<string, Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
 
+    int send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj);
+
     /* Synchronize neighbors. */
     int remote_sync_neigh(const Neighbor& neigh, bool create,
                           const string& obj_class, const string& obj_name,
@@ -580,6 +582,68 @@ flowcfg2policies(struct rina_flow_config *cfg,
 }
 
 int
+uipcp_rib::send_to_dst_addr(uint64_t dst_addr, const UipcpObject& obj)
+{
+    struct rinalite_ipcp *ipcp;
+    CDAPMessage m;
+    AData adata;
+    CDAPMessage am;
+    char objbuf[4096];
+    char aobjbuf[4096];
+    char *serbuf;
+    int objlen;
+    int aobjlen;
+    size_t serlen;
+    int ret;
+
+    ipcp = ipcp_info();
+
+    m.m_create(gpb::F_NO_FLAGS, obj_class::flows, obj_class::flow,
+               0, 0, string());
+
+    objlen = obj.serialize(objbuf, sizeof(objbuf));
+    if (objlen < 0) {
+        PE("serialization failed\n");
+        return -1;
+    }
+
+    m.set_obj_value(objbuf, objlen);
+
+    m.invoke_id = invoke_id_mgr.get_invoke_id();
+
+    adata.src_addr = ipcp->ipcp_addr;
+    adata.dst_addr = dst_addr;
+    adata.cdap = &m;
+
+    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata,
+               0, 0, string());
+
+    aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
+    if (aobjlen < 0) {
+        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        PE("serialization failed\n");
+        return -1;
+    }
+
+    am.set_obj_value(aobjbuf, aobjlen);
+
+    try {
+        ret = msg_ser_stateless(&am, &serbuf, &serlen);
+    } catch (std::bad_alloc) {
+        ret = -1;
+    }
+
+    if (ret) {
+        PE("message serialization failed\n");
+        invoke_id_mgr.put_invoke_id(m.invoke_id);
+        delete serbuf;
+        return -1;
+    }
+
+    return mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
+}
+
+int
 uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 {
     RinaName dest_appl(&req->remote_application);
@@ -617,61 +681,7 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     freq.create_flow_retries = 0;
     freq.hop_cnt = 0;
 
-    // TODO move in a separate function
-    CDAPMessage m;
-    AData adata;
-    CDAPMessage am;
-    char objbuf[4096];
-    char aobjbuf[4096];
-    char *serbuf;
-    int objlen;
-    int aobjlen;
-    size_t serlen;
-    int ret;
-
-    m.m_create(gpb::F_NO_FLAGS, obj_class::flows, obj_class::flow,
-               0, 0, string());
-
-    objlen = freq.serialize(objbuf, sizeof(objbuf));
-    if (objlen < 0) {
-        PE("serialization failed\n");
-        return -1;
-    }
-
-    m.set_obj_value(objbuf, objlen);
-
-    m.invoke_id = invoke_id_mgr.get_invoke_id();
-
-    adata.src_addr = freq.src_addr;
-    adata.dst_addr = freq.dst_addr;
-    adata.cdap = &m;
-
-    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata,
-               0, 0, string());
-
-    aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
-    if (aobjlen < 0) {
-        invoke_id_mgr.put_invoke_id(m.invoke_id);
-        PE("serialization failed\n");
-        return -1;
-    }
-
-    am.set_obj_value(aobjbuf, aobjlen);
-
-    try {
-        ret = msg_ser_stateless(&am, &serbuf, &serlen);
-    } catch (std::bad_alloc) {
-        ret = -1;
-    }
-
-    if (ret) {
-        PE("message serialization failed\n");
-        invoke_id_mgr.put_invoke_id(m.invoke_id);
-        delete serbuf;
-        return -1;
-    }
-
-    return mgmt_write_to_dst_addr(uipcp, freq.dst_addr, serbuf, serlen);
+    return send_to_dst_addr(freq.dst_addr, freq);
 }
 
 int

@@ -141,7 +141,7 @@ struct PolicyDescr : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct WindowBasedFlowCtrlConfig {
+struct WindowBasedFlowCtrlConfig : public UipcpObject {
     uint64_t max_cwq_len; /* closed window queue */
     uint64_t initial_credit;
     PolicyDescr rcvr_flow_ctrl;
@@ -152,7 +152,7 @@ struct WindowBasedFlowCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct RateBasedFlowCtrlConfig {
+struct RateBasedFlowCtrlConfig : public UipcpObject {
     uint64_t sending_rate;
     uint64_t time_period; /* us */
     PolicyDescr no_rate_slow_down;
@@ -164,7 +164,7 @@ struct RateBasedFlowCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct FlowCtrlConfig {
+struct FlowCtrlConfig : public UipcpObject {
     uint8_t fc_type;
     WindowBasedFlowCtrlConfig win;
     RateBasedFlowCtrlConfig rate;
@@ -184,7 +184,7 @@ struct FlowCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct RtxCtrlConfig {
+struct RtxCtrlConfig : public UipcpObject {
     uint32_t max_time_to_retry; /* R div initial_tr */
     uint16_t data_rxmsn_max;
     uint32_t initial_tr;
@@ -201,7 +201,7 @@ struct RtxCtrlConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct DtcpConfig {
+struct DtcpConfig : public UipcpObject {
     bool flow_ctrl;
     FlowCtrlConfig flow_ctrl_cfg;
     bool rtx_ctrl;
@@ -214,7 +214,7 @@ struct DtcpConfig {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct ConnPolicies {
+struct ConnPolicies : public UipcpObject {
     bool dtcp_present;
     DtcpConfig dtcp_cfg;
     uint64_t seq_num_rollover_th;
@@ -228,7 +228,7 @@ struct ConnPolicies {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct ConnId {
+struct ConnId : public UipcpObject {
     uint32_t qos_id;
     uint32_t src_cep;
     uint32_t dst_cep;
@@ -238,7 +238,7 @@ struct ConnId {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct FlowRequest {
+struct FlowRequest : public UipcpObject {
     RinaName src_app;
     RinaName dst_app;
     uint64_t src_port;
@@ -260,7 +260,7 @@ struct FlowRequest {
     int serialize(char *buf, unsigned int size) const;
 };
 
-struct AData {
+struct AData : public UipcpObject {
     uint64_t src_addr;
     uint64_t dst_addr;
     CDAPMessage *cdap;
