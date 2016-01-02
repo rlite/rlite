@@ -506,6 +506,7 @@ static struct rina_msg_base_resp *
 assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 {
     struct rina_kmsg_assign_to_dif *req;
+    struct rina_msg_base_resp *resp;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -521,8 +522,12 @@ assign_to_dif(struct ipcm *ipcm, uint16_t ipcp_id, struct rina_name *dif_name)
 
     printf("Requesting DIF assignment...\n");
 
-    return (struct rina_msg_base_resp *)
+    resp = (struct rina_msg_base_resp *)
            issue_request(ipcm, (struct rina_msg_base *)req, sizeof(*req));
+
+    ipcps_fetch(ipcm);
+
+    return resp;
 }
 
 static struct rina_msg_base_resp *
