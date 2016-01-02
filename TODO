@@ -25,12 +25,6 @@
 - CDAP: supportare un semplice meccanismo di ritrasmissione, in caso la
   connessione CDAP sia supportata da un flusso non affidabile
 
-- riflettere la close() di un file descriptor rina-io in a uipcp. Per fare
-  questo, spostare il work flow.dfp.remove in flow.remove, e riutilizzare
-  flow.remove (INIT_WORK) per fare la notifica in userspace
-
 - VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
-
-- riorganizzare uipcp-rib.cpp in modo da suddividerlo in più files
 
 - serialize/unserialize: controllare boundary delle numtables
