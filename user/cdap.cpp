@@ -11,6 +11,27 @@
 using namespace std;
 
 
+CDAPManager::CDAPManager()
+{
+    invoke_id_next = 1;
+    max_pending_ops = 5;
+}
+
+int
+CDAPManager::get_invoke_id()
+{
+    int ret;
+
+    while (pending_invoke_ids.count(invoke_id_next)) {
+        invoke_id_next++;
+    }
+
+    ret = invoke_id_next++;
+    pending_invoke_ids.insert(ret);
+
+    return ret;
+}
+
 CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
 {
     op_code = op_code_arg;
@@ -315,7 +336,8 @@ cdap_msg_recv(int fd)
 }
 
 int
-cdap_m_connect_send(int fd, gpb::authTypes_t auth_mech,
+cdap_m_connect_send(CDAPManager *mgr, int fd,
+                    gpb::authTypes_t auth_mech,
                     const struct AuthValue *auth_value,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl)
@@ -323,10 +345,33 @@ cdap_m_connect_send(int fd, gpb::authTypes_t auth_mech,
     struct CDAPMessage m(gpb::M_CONNECT);
     int ret;
 
+    m.invoke_id = mgr->get_invoke_id();
+
     m.auth_mech = auth_mech;
     m.auth_value = *auth_value;
     ret = rina_name_copy(&m.src_appl, local_appl);
     ret |= rina_name_copy(&m.dst_appl, remote_appl);
+
+    if (ret) {
+        PE("%s: Out of memory\n", __func__);
+        return ret;
+    }
+
+    return cdap_msg_send(&m, fd);
+}
+
+int
+cdap_m_connect_r_send(CDAPManager *mgr, int fd, const struct CDAPMessage *req)
+{
+    struct CDAPMessage m(gpb::M_CONNECT_R);
+    int ret;
+
+    m.invoke_id = req->invoke_id;
+
+    m.auth_mech = req->auth_mech;
+    m.auth_value = req->auth_value;
+    ret = rina_name_copy(&m.src_appl, &req->dst_appl);
+    ret |= rina_name_copy(&m.dst_appl, &req->src_appl);
 
     if (ret) {
         PE("%s: Out of memory\n", __func__);

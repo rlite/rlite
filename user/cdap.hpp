@@ -2,6 +2,7 @@
 #define __RINALITE_CDAP_H__
 
 #include <string>
+#include <set>
 
 #include "rinalite/rinalite-common.h"
 #include "CDAP.pb.h"
@@ -10,6 +11,16 @@ struct AuthValue {
     std::string name;
     std::string password;
     std::string other;
+};
+
+class CDAPManager {
+    std::set<int> pending_invoke_ids;
+    int invoke_id_next;
+    int max_pending_ops;
+
+public:
+    CDAPManager();
+    int get_invoke_id();
 };
 
 /* Internal representation of a CDAP message. */
@@ -72,9 +83,13 @@ private:
 int cdap_msg_send(const struct CDAPMessage *m, int fd);
 struct CDAPMessage * cdap_msg_recv(int fd);
 
-int cdap_m_connect_send(int fd, gpb::authTypes_t auth_mech,
-                    const struct AuthValue *auth_value,
-                    const struct rina_name *local_appl,
-                    const struct rina_name *remote_appl);
+int cdap_m_connect_send(CDAPManager *mgr, int fd,
+                        gpb::authTypes_t auth_mech,
+                        const struct AuthValue *auth_value,
+                        const struct rina_name *local_appl,
+                        const struct rina_name *remote_appl);
+
+int cdap_m_connect_r_send(CDAPManager *mgr, int fd,
+                          const struct CDAPMessage *req);
 
 #endif /* __RINALITE_CDAP_H__ */
