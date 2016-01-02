@@ -5,13 +5,14 @@
 #include <stdint.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <assert.h>
 #include <rina/rina-utils.h>
 
 #include "application.h"
 
 
-static void
-client(int argc, char **argv, struct application *application)
+static int
+echo_client(struct application *application)
 {
     struct rina_name dif_name;
     struct rina_name this_application;
@@ -23,9 +24,6 @@ client(int argc, char **argv, struct application *application)
     int fd;
     char buf[4096];
     int size = 10;
-
-    (void) argc;
-    (void) argv;
 
     if (size > sizeof(buf)) {
         size = sizeof(buf);
@@ -40,12 +38,12 @@ client(int argc, char **argv, struct application *application)
     ret = flow_allocate(application, &dif_name, &this_application,
                         &remote_application, &port_id);
     if (ret) {
-        return;
+        return ret;
     }
 
     fd = open_port(port_id);
     if (fd < 0) {
-        return;
+        return fd;
     }
 
     memset(buf, 'x', size);
@@ -73,10 +71,12 @@ client(int argc, char **argv, struct application *application)
     printf("SDU size: %d bytes, latency: %lu us\n", ret, us);
 
     close(fd);
+
+    return 0;
 }
 
 static int
-server(int argc, char **argv, struct application *application)
+echo_server(struct application *application)
 {
     struct rina_name dif_name;
     struct rina_name this_application;
@@ -140,14 +140,40 @@ clos:
     return 0;
 }
 
+typedef int (*perf_function_t)(struct application *);
+
+struct perf_function_desc {
+    const char *name;
+    perf_function_t function;
+};
+
+static struct perf_function_desc client_descs[] = {
+    {
+        .name = "echo",
+        .function = echo_client,
+    }
+};
+
+static struct perf_function_desc server_descs[] = {
+    {
+        .name = "echo",
+        .function = echo_server,
+    }
+};
+
 int
 main(int argc, char **argv)
 {
     struct application application;
+    const struct perf_function_desc *descs = client_descs;
+    const char *type = "echo";
+    perf_function_t perf_function = NULL;
+    int listen = 0;
     int ret;
     int opt;
-    int listen = 0;
-    const char *type = "echo";
+    int i;
+
+    assert(sizeof(client_descs) == sizeof(server_descs));
 
     while ((opt = getopt(argc, argv, "lt:")) != -1) {
         switch (opt) {
@@ -165,20 +191,27 @@ main(int argc, char **argv)
         }
     }
 
+    if (listen) {
+        descs = server_descs;
+    }
+
+    for (i = 0; i < sizeof(client_descs)/sizeof(client_descs[0]); i++) {
+        if (strcmp(descs[i].name, type) == 0) {
+            perf_function = descs[i].function;
+        }
+    }
+
+    if (perf_function == NULL) {
+        printf("    Unknown test type %s\n", type);
+        exit(EXIT_FAILURE);
+    }
+
     ret = rina_application_init(&application);
     if (ret) {
         return ret;
     }
 
-    if (strcmp(type, "echo") == 0) {
-        if (listen) {
-            server(argc, argv, &application);
-        } else {
-            client(argc, argv, &application);
-        }
-    } else {
-        printf("    Unknown test type %s\n", type);
-    }
+    perf_function(&application);
 
     return rina_application_fini(&application);
 }
