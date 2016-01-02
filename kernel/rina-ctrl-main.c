@@ -1202,6 +1202,42 @@ rina_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
+static int
+rina_io_open(struct inode *inode, struct file *f)
+{
+    return -ENXIO;
+}
+
+static int
+rina_io_release(struct inode *inode, struct file *f)
+{
+    return -ENXIO;
+}
+
+static ssize_t
+rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
+{
+    return -ENXIO;
+}
+
+static ssize_t
+rina_io_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
+{
+    return -ENXIO;
+}
+
+static unsigned int
+rina_io_poll(struct file *f, poll_table *wait)
+{
+    return 0;
+}
+
+static long
+rina_io_ioctl(struct file *file, unsigned int cmd, unsigned long data)
+{
+    return -ENXIO;
+}
+
 static const struct file_operations rina_ipcm_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rina_ctrl_release,
@@ -1234,6 +1270,23 @@ static struct miscdevice rina_app_ctrl_misc = {
     .fops = &rina_app_ctrl_fops,
 };
 
+static const struct file_operations rina_io_fops = {
+    .owner          = THIS_MODULE,
+    .release        = rina_io_release,
+    .open           = rina_io_open,
+    .write          = rina_io_write,
+    .read           = rina_io_read,
+    .poll           = rina_io_poll,
+    .unlocked_ioctl = rina_io_ioctl,
+    .llseek         = noop_llseek,
+};
+
+static struct miscdevice rina_io_misc = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = "rina-io",
+    .fops = &rina_io_fops,
+};
+
 static int __init
 rina_ctrl_init(void)
 {
@@ -1248,14 +1301,22 @@ rina_ctrl_init(void)
 
     ret = misc_register(&rina_ipcm_ctrl_misc);
     if (ret) {
-        printk("%s: Failed to register rina-ctrl misc device\n", __func__);
+        printk("%s: Failed to register rina-ipcm-ctrl misc device\n", __func__);
         return ret;
     }
 
     ret = misc_register(&rina_app_ctrl_misc);
     if (ret) {
         misc_deregister(&rina_ipcm_ctrl_misc);
-        printk("%s: Failed to register rina-flow-ctrl misc device\n", __func__);
+        printk("%s: Failed to register rina-app-ctrl misc device\n", __func__);
+        return ret;
+    }
+
+    ret = misc_register(&rina_io_misc);
+    if (ret) {
+        misc_deregister(&rina_app_ctrl_misc);
+        misc_deregister(&rina_ipcm_ctrl_misc);
+        printk("%s: Failed to register rina-io misc device\n", __func__);
         return ret;
     }
 
@@ -1265,8 +1326,9 @@ rina_ctrl_init(void)
 static void __exit
 rina_ctrl_fini(void)
 {
-    misc_deregister(&rina_ipcm_ctrl_misc);
+    misc_deregister(&rina_io_misc);
     misc_deregister(&rina_app_ctrl_misc);
+    misc_deregister(&rina_ipcm_ctrl_misc);
 }
 
 module_init(rina_ctrl_init);
