@@ -120,16 +120,11 @@ inet4_rx_worker(struct work_struct *w)
 
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
                              sizeof(lenhdr), msghdr.msg_flags);
-        /* ret = sock->ops->recvmsg(NULL, sock, &msghdr, sizeof(lenhdr),
-                                 MSG_DONTWAIT | MSG_TRUNC); */
         if (unlikely(ret != sizeof(lenhdr))) {
             if (ret >= 0) {
                 PE("Partial read %d/%d\n", ret, 2);
 
-            } else if (ret == -EAGAIN) {
-                PD("recvmsg(): got EAGAIN\n");
-
-            } else {
+            } else if (ret != -EAGAIN) {
                 PE("recvmsg(): %d\n", ret);
             }
 
@@ -156,18 +151,13 @@ inet4_rx_worker(struct work_struct *w)
         iov.iov_base = RINA_BUF_DATA(rb);
         iov.iov_len = lenhdr;
 
-        /*ret = sock->ops->recvmsg(NULL, sock, &msghdr, lenhdr,
-                                 MSG_DONTWAIT | MSG_TRUNC); */
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
                              lenhdr, msghdr.msg_flags);
         if (unlikely(ret != lenhdr)) {
             if (ret >= 0) {
                 PE("Partial read %d/%d\n", ret, lenhdr);
 
-            } else if (ret == -EAGAIN) {
-                PD("recvmsg(): got EAGAIN\n");
-
-            } else {
+            } else if (ret != -EAGAIN) {
                 PE("recvmsg(): %d\n", ret);
             }
             break;
@@ -290,9 +280,6 @@ rina_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
             PI("sock_sendmsg(): partial write %d/%d\n",
                ret, (int)rb->len);
         }
-
-    } else {
-        PD("sock_sendmsg(): %d, %d\n", (int)rb->len, ret);
     }
 
     rina_buf_free(rb);
