@@ -39,7 +39,7 @@ struct rl_cmsg_ipcp_register {
     uint8_t reg;
     uint16_t ipcp_id;
     struct rina_name ipcp_name;
-    struct rina_name dif_name;
+    char *dif_name;
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to enroll an IPC process
@@ -49,10 +49,10 @@ struct rl_cmsg_ipcp_enroll {
     uint32_t event_id;
 
     uint16_t ipcp_id;
-    struct rina_name dif_name;
     struct rina_name ipcp_name;
     struct rina_name neigh_ipcp_name;
-    struct rina_name supp_dif_name;
+    char *dif_name;
+    char *supp_dif_name;
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to set an IPC process DFT entry */

@@ -1293,7 +1293,9 @@ rlite_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
                 dif_name = entry->dif->name;
                 fqe->resp.dif_type = kstrdup(entry->dif->ty, GFP_ATOMIC);
             }
-            rina_name_fill(&fqe->resp.dif_name, dif_name, NULL, NULL, NULL);
+            if (dif_name) {
+                fqe->resp.dif_name = kstrdup(dif_name, GFP_ATOMIC);
+            }
         }
 
         fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
@@ -1869,7 +1871,9 @@ rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     req.port_id = flow_entry->local_port;
     rina_name_copy(&req.local_appl, local_appl);
     rina_name_copy(&req.remote_appl, remote_appl);
-    rina_name_fill(&req.dif_name, ipcp->dif->name, NULL, NULL, NULL);
+    if (ipcp->dif->name) {
+        req.dif_name = kstrdup(ipcp->dif->name, GFP_ATOMIC);
+    }
 
     /* Enqueue the request into the upqueue. */
     ret = rlite_upqueue_append(app->rc, (struct rlite_msg_base *)&req);

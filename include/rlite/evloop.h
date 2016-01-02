@@ -22,7 +22,7 @@ struct rlite_ipcp {
     uint64_t ipcp_addr;
     unsigned int depth;
     char *dif_type;
-    struct rina_name dif_name;
+    char *dif_name;
 
     struct list_head node;
 };
@@ -140,7 +140,7 @@ rlite_evloop_get_id(struct rlite_evloop *loop);
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
-                         const struct rina_name *dif_name);
+                         const char *dif_name);
 
 struct rlite_ipcp *
 rlite_lookup_ipcp_by_name(struct rlite_evloop *loop,

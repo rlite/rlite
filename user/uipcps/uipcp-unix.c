@@ -26,7 +26,7 @@
 
 
 struct registered_ipcp {
-    struct rina_name dif_name;
+    char *dif_name;
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
 
@@ -52,7 +52,7 @@ rlite_conf_response(int sfd, struct rlite_msg_base *req,
 
 static void
 track_ipcp_registration(struct uipcps *uipcps, int reg,
-                        const struct rina_name *dif_name,
+                        const char *dif_name,
                         unsigned int ipcp_id,
                         const struct rina_name *ipcp_name)
 {
@@ -64,7 +64,7 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
         /* Append a successful registration to the persistent
          * registration list. */
         list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-            if (rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
+            if (strcmp(ripcp->dif_name, dif_name) == 0 &&
                     rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) {
                 found = 1;
                 break;
@@ -77,7 +77,7 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
                 PE("ripcp allocation failed\n");
             } else {
                 memset(ripcp, 0, sizeof(*ripcp));
-                rina_name_copy(&ripcp->dif_name, dif_name);
+                ripcp->dif_name = strdup(dif_name);
                 ripcp->ipcp_id = ipcp_id;
                 rina_name_copy(&ripcp->ipcp_name, ipcp_name);
                 list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
@@ -90,11 +90,11 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
          * by IPCP id. */
         list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
             if ((dif_name && ipcp_name &&
-                    rina_name_cmp(&ripcp->dif_name, dif_name) == 0 &&
+                    strcmp(ripcp->dif_name, dif_name) == 0 &&
                     rina_name_cmp(&ripcp->ipcp_name, ipcp_name) == 0) ||
                     (!dif_name && !ipcp_name && ripcp->ipcp_id == ipcp_id)) {
                 list_del(&ripcp->node);
-                rina_name_free(&ripcp->dif_name);
+                free(ripcp->dif_name);
                 rina_name_free(&ripcp->ipcp_name);
                 free(ripcp);
                 break;
@@ -105,9 +105,9 @@ track_ipcp_registration(struct uipcps *uipcps, int reg,
 
 static uint8_t
 rlite_ipcp_register(struct uipcps *uipcps, int reg,
-                   const struct rina_name *dif_name,
-                   unsigned int ipcp_id,
-                   const struct rina_name *ipcp_name)
+                    const char *dif_name,
+                    unsigned int ipcp_id,
+                    const struct rina_name *ipcp_name)
 {
     struct uipcp *uipcp;
     uint8_t result = 1;
@@ -125,7 +125,7 @@ rlite_ipcp_register(struct uipcps *uipcps, int reg,
         rlite_ipcps_fetch(&uipcp->appl.loop);
 
         result = uipcp->ops.register_to_lower(uipcp, reg, dif_name, ipcp_id,
-                                          ipcp_name);
+                                              ipcp_name);
 
         if (result == 0) {
             /* Track the (un)registration in the persistent registration
@@ -144,7 +144,7 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rlite_msg_base_resp resp;
 
-    resp.result = rlite_ipcp_register(uipcps, req->reg, &req->dif_name,
+    resp.result = rlite_ipcp_register(uipcps, req->reg, req->dif_name,
                                      req->ipcp_id, &req->ipcp_name);
 
     return rlite_conf_response(sfd, RLITE_RMB(req), &resp);
@@ -369,18 +369,16 @@ persistent_ipcp_reg_dump(struct uipcps *uipcps)
         PE("Cannot open persistent register file (%s)\n",
                 RLITE_PERSISTENT_REG_FILE);
     } else {
-        char *dif_s, *ipcp_s;
+        char *ipcp_s;
         struct registered_ipcp *ripcp;
 
         list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-            dif_s = rina_name_to_string(&ripcp->dif_name);
             ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
-            if (dif_s && ipcp_s) {
-                fprintf(fpreg, "%s %u %s\n", dif_s, ripcp->ipcp_id, ipcp_s);
+            if (ipcp_s) {
+                fprintf(fpreg, "%s %u %s\n", ripcp->dif_name, ripcp->ipcp_id, ipcp_s);
             } else {
                 PE("Error in rina_name_to_string()\n");
             }
-            if (dif_s) free(dif_s);
             if (ipcp_s) free(ipcp_s);
         }
         fclose(fpreg);
@@ -432,7 +430,6 @@ uipcps_update(struct uipcps *uipcps)
                 char *s1 = NULL;
                 char *s2 = NULL;
                 char *s3 = NULL;
-                struct rina_name dif_name;
                 struct rina_name ipcp_name;
                 unsigned int ipcp_id;
                 uint8_t reg_result;
@@ -446,10 +443,10 @@ uipcps_update(struct uipcps *uipcps)
                 s2 = strtok(0, " ");
                 s3 = strtok(0, " ");
 
-                if (s1 && s2 && s3 && rina_name_from_string(s1, &dif_name) == 0
+                if (s1 && s2 && s3 == 0
                         && rina_name_from_string(s3, &ipcp_name) == 0) {
                     ipcp_id = atoi(s2);
-                    reg_result = rlite_ipcp_register(uipcps, 1, &dif_name,
+                    reg_result = rlite_ipcp_register(uipcps, 1, s3,
                                                     ipcp_id, &ipcp_name);
                     PI("Automatic re-registration for %s --> %s\n",
                         s3, (reg_result == 0) ? "DONE" : "FAILED");

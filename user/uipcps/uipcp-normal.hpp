@@ -74,7 +74,7 @@ struct Neighbor {
 
     const char *enrollment_state_repr(state_t s) const;
     bool has_mgmt_flow() const { return flow_fd != -1; }
-    int alloc_flow(struct rina_name *supp_dif_name);
+    int alloc_flow(const char *supp_dif_name);
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;

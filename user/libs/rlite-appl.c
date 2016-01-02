@@ -82,7 +82,7 @@ flow_allocate_req_arrived(struct rlite_evloop *loop,
     pfr->port_id = req->port_id;
     rina_name_copy(&pfr->remote_appl, &req->remote_appl);
     rina_name_copy(&pfr->local_appl, &req->local_appl);
-    rina_name_copy(&pfr->dif_name, &req->dif_name);
+    pfr->dif_name = strdup(req->dif_name);
 
     pthread_mutex_lock(&appl->lock);
     list_add_tail(&pfr->node, &appl->pending_flow_reqs);
@@ -262,7 +262,7 @@ rlite_flow_allocate_resp(struct rlite_appl *appl, uint32_t kevent_id,
 struct rl_kmsg_appl_register_resp *
 rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
                     unsigned int wait_ms, int reg,
-                    const struct rina_name *dif_name,
+                    const char *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name)
 {
@@ -284,7 +284,7 @@ rlite_appl_register(struct rlite_appl *appl, uint32_t event_id,
 
 int
 rlite_appl_register_wait(struct rlite_appl *appl, int reg,
-                         const struct rina_name *dif_name,
+                         const char *dif_name,
                          const struct rina_name *ipcp_name,
                          const struct rina_name *appl_name,
                          unsigned int wait_ms)
@@ -313,7 +313,7 @@ rlite_appl_register_wait(struct rlite_appl *appl, int reg,
 
 int
 rlite_flow_allocate(struct rlite_appl *appl, uint32_t event_id,
-                    const struct rina_name *dif_name,
+                    const char *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
@@ -418,7 +418,7 @@ int rlite_open_mgmt_port(uint16_t ipcp_id)
 /* rlite_flow_allocate() + rlite_open_appl_port() */
 int
 rlite_flow_allocate_open(struct rlite_appl *appl,
-                   const struct rina_name *dif_name,
+                   const char *dif_name,
                    const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,

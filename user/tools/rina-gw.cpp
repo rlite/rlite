@@ -60,7 +60,6 @@ struct RinaName {
     string name_s;
     struct rina_name name_r;
     string dif_name_s;
-    struct rina_name dif_name_r;
 
     RinaName();
     RinaName(const string& n, const string& d);
@@ -78,25 +77,18 @@ struct RinaName {
 RinaName::RinaName()
 {
     memset(&name_r, 0, sizeof(name_r));
-    memset(&dif_name_r, 0, sizeof(dif_name_r));
 }
 
 RinaName::~RinaName()
 {
     rina_name_free(&name_r);
-    rina_name_free(&dif_name_r);
 }
 
 RinaName::RinaName(const string& n, const string& d) : name_s(n), dif_name_s(d)
 {
     memset(&name_r, 0, sizeof(name_r));
-    memset(&dif_name_r, 0, sizeof(dif_name_r));
 
     if (rina_name_from_string(n.c_str(), &name_r)) {
-        throw std::bad_alloc();
-    }
-
-    if (rina_name_from_string(d.c_str(), &dif_name_r)) {
         throw std::bad_alloc();
     }
 }
@@ -108,9 +100,6 @@ RinaName::RinaName(const RinaName& other)
     name_s = other.name_s;
     dif_name_s = other.dif_name_s;
     if (rina_name_copy(&name_r, &other.name_r)) {
-        throw std::bad_alloc();
-    }
-    if (rina_name_copy(&dif_name_r, &other.dif_name_r)) {
         throw std::bad_alloc();
     }
 }
@@ -125,9 +114,6 @@ RinaName::operator=(const RinaName& other)
     name_s = other.name_s;
     dif_name_s = other.dif_name_s;
     if (rina_name_copy(&name_r, &other.name_r)) {
-        throw std::bad_alloc();
-    }
-    if (rina_name_copy(&dif_name_r, &other.dif_name_r)) {
         throw std::bad_alloc();
     }
 
@@ -523,7 +509,6 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
     Worker *w = gw->workers[0];
     RinaName dst_name;
     char *dst_name_s;
-    char *dif_name_s;
     int cfd;
     int rfd;
     int ret;
@@ -534,17 +519,11 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
         return 0;
     }
 
-    dif_name_s = rina_name_to_string(&req->dif_name);
-    if (!dif_name_s) {
-        PE("rina_name_to_string(dif_name) failed\n");
-        return 0;
-    }
-
     try {
-        dst_name = RinaName(string(dst_name_s), string(dif_name_s));
+        dst_name = RinaName(string(dst_name_s), string(req->dif_name));
     } catch (...) {
         PE("Failed to build RinaName out of '%s' and '%s'\n",
-           dst_name_s, dif_name_s);
+           dst_name_s, req->dif_name);
         free(dst_name_s);
         return 0;
     }
@@ -678,9 +657,9 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     event_id = rlite_evloop_get_id(loop);
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rlite_flow_allocate(appl, event_id, &mit->second.dif_name_r, NULL,
-                              &gw->appl_name, &mit->second.name_r, &flowspec,
-                              &unused, 0, 0xffff);
+    ret = rlite_flow_allocate(appl, event_id, mit->second.dif_name_s.c_str(),
+                              NULL, &gw->appl_name, &mit->second.name_r,
+                              &flowspec, &unused, 0, 0xffff);
     if (ret) {
         PE("Flow allocation failed\n");
         return;
@@ -762,8 +741,8 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rlite_appl_register_wait(&gw.appl, 1, &mit->first.dif_name_r, NULL,
-                                 &mit->first.name_r, 3000);
+        rlite_appl_register_wait(&gw.appl, 1, mit->first.dif_name_s.c_str(),
+                                 NULL, &mit->first.name_r, 3000);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());

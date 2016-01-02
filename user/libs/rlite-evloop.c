@@ -44,7 +44,7 @@ rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
             free(rlite_ipcp->dif_type);
         }
         rina_name_free(&rlite_ipcp->ipcp_name);
-        rina_name_free(&rlite_ipcp->dif_name);
+        free(rlite_ipcp->dif_name);
         free(rlite_ipcp);
     }
 }
@@ -91,7 +91,7 @@ ipcp_fetch_resp(struct rlite_evloop *loop,
     rlite_ipcp->ipcp_addr = resp->ipcp_addr;
     rlite_ipcp->depth = resp->depth;
     rina_name_copy(&rlite_ipcp->ipcp_name, &resp->ipcp_name);
-    rina_name_copy(&rlite_ipcp->dif_name, &resp->dif_name);
+    rlite_ipcp->dif_name = strdup(resp->dif_name);
 
     pthread_mutex_lock(&loop->lock);
     list_add_tail(&rlite_ipcp->node, loop->ipcps_next);
@@ -148,23 +148,17 @@ rlite_ipcps_print(struct rlite_evloop *loop)
     PI_S("IPC Processes table:\n");
     list_for_each_entry(rlite_ipcp, loop->ipcps, node) {
             char *ipcp_name_s = NULL;
-            char *dif_name_s = NULL;
 
             ipcp_name_s = rina_name_to_string(&rlite_ipcp->ipcp_name);
-            dif_name_s = rina_name_to_string(&rlite_ipcp->dif_name);
             PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                     " address = %llu, depth = %u\n",
                         rlite_ipcp->ipcp_id, ipcp_name_s, rlite_ipcp->dif_type,
-                        dif_name_s,
+                        rlite_ipcp->dif_name,
                         (long long unsigned int)rlite_ipcp->ipcp_addr,
                         rlite_ipcp->depth);
 
             if (ipcp_name_s) {
                     free(ipcp_name_s);
-            }
-
-            if (dif_name_s) {
-                    free(dif_name_s);
             }
     }
 
@@ -821,29 +815,28 @@ rlite_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 
 struct rlite_ipcp *
 rlite_select_ipcp_by_dif(struct rlite_evloop *loop,
-                         const struct rina_name *dif_name)
+                         const char *dif_name)
 {
     struct rlite_ipcp *cur;
 
     pthread_mutex_lock(&loop->lock);
 
-    if (rina_name_valid(dif_name)) {
+    if (dif_name) {
         /* The request specifies a DIF: lookup that. */
         list_for_each_entry(cur, loop->ipcps, node) {
-            if (rina_name_valid(&cur->dif_name)
-                    && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
+            if (strcmp(cur->dif_name, dif_name) == 0) {
                 pthread_mutex_unlock(&loop->lock);
                 return cur;
             }
         }
-    } else if (dif_name == NULL) {
+
+    } else {
         struct rlite_ipcp *rlite_ipcp = NULL;
 
         /* The request does not specify a DIF: select any DIF,
          * giving priority to normal DIFs. */
         list_for_each_entry(cur, loop->ipcps, node) {
-            if (rina_name_valid(&cur->dif_name) &&
-                    (strcmp(cur->dif_type, "normal") == 0 ||
+            if ((strcmp(cur->dif_type, "normal") == 0 ||
                         !rlite_ipcp)) {
                 rlite_ipcp = cur;
             }

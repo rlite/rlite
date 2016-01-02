@@ -88,7 +88,7 @@ struct rl_kmsg_fetch_ipcp_resp {
     uint64_t ipcp_addr;  /* 64 bits should be enough for any DIF. */
     uint16_t  depth;
     struct rina_name ipcp_name;
-    struct rina_name dif_name;
+    char *dif_name;
     char *dif_type;
 } __attribute__((packed));
 
@@ -146,7 +146,7 @@ struct rl_kmsg_fa_req_arrived {
     uint16_t ipcp_id;
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    struct rina_name dif_name;
+    char *dif_name;
 } __attribute__((packed));
 
 /* application --> kernel to respond to an incoming flow request. */

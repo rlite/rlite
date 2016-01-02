@@ -746,12 +746,11 @@ normal_fini(struct uipcp *uipcp)
 
 static int
 normal_ipcp_register(struct uipcp *uipcp, int reg,
-                     const struct rina_name *lower_dif,
+                     const char *lower_dif,
                      unsigned int ipcp_id,
                      const struct rina_name *ipcp_name)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    string name;
     int result;
 
     /* Perform the registration. */
@@ -762,16 +761,14 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
         return result;
     }
 
-    if (!rina_name_valid(lower_dif)) {
-        UPE(uipcp, "lower_dif name is not valid\n");
+    if (!lower_dif) {
+        UPE(uipcp, "lower_dif name is not specified\n");
         return -1;
     }
 
-    name = string(lower_dif->apn);
-
     ScopeLock(rib->lock);
 
-    result = rib->register_to_lower(reg, name);
+    result = rib->register_to_lower(reg, string(lower_dif));
 
     return result;
 }

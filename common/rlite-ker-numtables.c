@@ -20,9 +20,9 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
     },
     [RLITE_KER_IPCP_FETCH_RESP] = {
         .copylen = sizeof(struct rl_kmsg_fetch_ipcp_resp) -
-                    2 * sizeof(struct rina_name) - sizeof(char *),
-        .names = 2,
-        .strings = 1,
+                    1 * sizeof(struct rina_name) - 2 * sizeof(char *),
+        .names = 1,
+        .strings = 2,
     },
     [RLITE_KER_APPL_REGISTER] = {
         .copylen = sizeof(struct rl_kmsg_appl_register) -
@@ -47,8 +47,9 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
     },
     [RLITE_KER_FA_REQ_ARRIVED] = {
         .copylen = sizeof(struct rl_kmsg_fa_req_arrived) -
-                    3 * sizeof(struct rina_name),
-        .names = 3,
+                    2 * sizeof(struct rina_name) - sizeof(char *),
+        .names = 2,
+        .strings = 1,
     },
     [RLITE_KER_IPCP_CONFIG] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_config) -

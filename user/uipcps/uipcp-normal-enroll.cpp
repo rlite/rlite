@@ -847,7 +847,7 @@ uipcp_rib::lookup_neigh_by_name(const RinaName& name)
 }
 
 int
-Neighbor::alloc_flow(struct rina_name *supp_dif_name)
+Neighbor::alloc_flow(const char *supp_dif_name)
 {
     struct rina_name neigh_name;
     struct rlite_ipcp *info;
@@ -922,7 +922,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, struct rl_cmsg_ipcp_enroll *req)
         return -1;
     }
 
-    ret = neigh->alloc_flow(&req->supp_dif_name);
+    ret = neigh->alloc_flow(req->supp_dif_name);
     if (ret) {
         return ret;
     }

@@ -38,7 +38,7 @@ struct uipcp_ops {
     int (*fini)(struct uipcp *);
 
     int (*register_to_lower)(struct uipcp *uipcp, int reg,
-                             const struct rina_name *dif_name,
+                             const char *dif_name,
                              unsigned int ipcp_id,
                              const struct rina_name *ipcp_name);
 

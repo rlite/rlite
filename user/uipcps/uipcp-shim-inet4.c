@@ -568,9 +568,9 @@ shim_inet4_init(struct uipcp *uipcp)
 
     uipcp->priv = shim;
 
-    /* Store the serialized name of the new IPCP, it will be
+    /* Store the name of the DIF, it will be
      * used during the registration. */
-    shim->dif_name = rina_name_to_string(&rlite_ipcp->dif_name);
+    shim->dif_name = strdup(rlite_ipcp->dif_name);
     if (!shim->dif_name) {
         UPE(uipcp, "Out of memory\n");
         free(shim);

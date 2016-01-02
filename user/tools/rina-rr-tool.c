@@ -21,8 +21,7 @@ struct rlite_rr {
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
-    struct rina_name dif_name;
-    struct rina_name *dif_name_ptr;
+    char *dif_name;
     struct rina_name ipcp_name;
     struct rlite_flow_spec flowspec;
 };
@@ -38,9 +37,9 @@ client(struct rlite_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rlite_flow_allocate_open(&rr->application, rr->dif_name_ptr,
-            &rr->ipcp_name, &rr->client_appl_name,
-            &rr->server_appl_name, &rr->flowspec, 1500);
+    dfd = rlite_flow_allocate_open(&rr->application, rr->dif_name,
+                                   &rr->ipcp_name, &rr->client_appl_name,
+                                   &rr->server_appl_name, &rr->flowspec, 1500);
     if (dfd < 0) {
         return dfd;
     }
@@ -93,7 +92,7 @@ server(struct rlite_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rlite_appl_register_wait(&rr->application, 1, rr->dif_name_ptr,
+    ret = rlite_appl_register_wait(&rr->application, 1, rr->dif_name,
             &rr->ipcp_name, &rr->server_appl_name,
             3000);
     if (ret) {
@@ -262,7 +261,6 @@ main(int argc, char **argv)
     /* This fetch is necessary to use rlite_appl_register_wait(). */
     rlite_ipcps_fetch(&rr.application.loop);
 
-    rina_name_fill(&rr.dif_name, dif_name, NULL, NULL, NULL);
     rina_name_fill(&client_ctrl_name, "rlite_rr-ctrl", "client", NULL, NULL);
     rina_name_fill(&server_ctrl_name, "rlite_rr-ctrl", "server", NULL, NULL);
     rina_name_fill(&rr.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
@@ -272,10 +270,7 @@ main(int argc, char **argv)
     }
     rina_name_fill(&rr.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    rr.dif_name_ptr = NULL;
-    if (dif_name) {
-        rr.dif_name_ptr = &rr.dif_name;
-    }
+    rr.dif_name = dif_name ? strdup(dif_name) : NULL;
 
     if (listen) {
         server(&rr);

@@ -376,7 +376,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     req.msg_type = RLITE_CFG_IPCP_REGISTER;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
-    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
+    req.dif_name = strdup(dif_name);
     req.reg = reg;
 
     return request_response((struct rlite_msg_base *)&req, NULL);
@@ -424,9 +424,9 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
     req.msg_type = RLITE_CFG_IPCP_ENROLL;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
-    rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
+    req.dif_name = strdup(dif_name);
     rina_name_fill(&req.neigh_ipcp_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
-    rina_name_fill(&req.supp_dif_name, supp_dif_name, NULL, NULL, NULL);
+    req.supp_dif_name = strdup(supp_dif_name);
 
     return request_response((struct rlite_msg_base *)&req, NULL);
 }
