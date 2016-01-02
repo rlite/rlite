@@ -40,6 +40,8 @@ struct ipcp_ops {
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb, bool maysleep);
     int (*sdu_rx)(struct ipcp_entry *ipcp, struct rina_buf *rb);
+    int (*sdu_rx_consumed)(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                           struct rina_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, uint64_t dest_addr,
@@ -59,6 +61,7 @@ struct txrx {
     unsigned int        rx_qlen;
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
+    bool                mgmt;
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
@@ -125,6 +128,7 @@ struct dtp {
     uint64_t next_seq_num_to_send;
     uint64_t last_seq_num_sent;
     uint64_t rcv_lwe;
+    uint64_t rcv_lwe_priv;
     uint64_t rcv_rwe;
     uint64_t max_seq_num_rcvd;
     uint64_t last_snd_data_ack;
@@ -214,7 +218,7 @@ struct flow_entry *flow_put(struct flow_entry *flow);
 struct flow_entry *flow_get(unsigned int port_id);
 
 static inline void
-txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
+txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
 {
     spin_lock_init(&txrx->rx_lock);
     INIT_LIST_HEAD(&txrx->rx_q);
@@ -222,6 +226,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->tx_wqh);
+    txrx->mgmt = mgmt;
 }
 
 void dtp_init(struct dtp *dtp);

@@ -803,7 +803,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->never_bound = true;
         entry->priv = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
-        txrx_init(&entry->txrx, ipcp);
+        txrx_init(&entry->txrx, ipcp, false);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         INIT_LIST_HEAD(&entry->rmtq);
         entry->rmtq_len = 0;
@@ -2277,6 +2277,11 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             ret = -EFAULT;
         }
 
+        if (!txrx->mgmt && txrx->ipcp->ops.sdu_rx_consumed) {
+            rina_buf_pci_push(rb);
+            txrx->ipcp->ops.sdu_rx_consumed(txrx->ipcp, rio->flow, rb);
+        }
+
         rina_buf_free(rb);
 
         break;
@@ -2351,7 +2356,7 @@ rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
         return -ENOMEM;
     }
 
-    txrx_init(rio->txrx, ipcp);
+    txrx_init(rio->txrx, ipcp, true);
     PD("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
     ipcp->mgmt_txrx = rio->txrx;
 

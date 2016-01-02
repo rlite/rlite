@@ -29,9 +29,11 @@
 
 - addr size non consistente (PCI/resto dello stack)
 
-- aggiungere supporto per QoS cubes
-
 - poichè la registrazione non ha un messaggio di risposta, attualmente
   non è possibile per l'userspace IPCP il rifiuto della registrazione,
   con conseguenti malfunzionamenti, visto che in kernelspace non è
   disponibile la DFT completa
+
+- sdu_rx_consumed: l'argomento ipcp può essere rimosso, e la callback
+  associata al flow invece che all'IPCP
+

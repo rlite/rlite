@@ -197,7 +197,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
-    dtp->rcv_lwe = dtp->rcv_rwe = 0;
+    dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
     dtp->last_snd_data_ack = 0;
     dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
@@ -742,11 +742,11 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
     list_for_each_entry_safe(qrb, tmp, &dtp->seqq, node) {
         struct rina_pci *pci = RINA_BUF_PCI(qrb);
 
-        if (pci->seqnum - dtp->rcv_lwe <= max_sdu_gap) {
+        if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
             list_del(&qrb->node);
             dtp->seqq_len--;
             list_add_tail(&qrb->node, qrbs);
-            dtp->rcv_lwe = pci->seqnum + 1;
+            dtp->rcv_lwe_priv = pci->seqnum + 1;
             RPD(5, "[%lu] popped out from seqq\n",
                     (long unsigned)pci->seqnum);
         }
@@ -948,7 +948,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         /* Flush reassembly queue */
 
-        dtp->rcv_lwe = seqnum + 1;
+        dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
 
         crb = sdu_rx_sv_update(ipcp, flow);
@@ -961,7 +961,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         goto snd_crb;
     }
 
-    if (unlikely(seqnum < dtp->rcv_lwe)) {
+    if (unlikely(seqnum < dtp->rcv_lwe_priv)) {
         /* This is a duplicate. Probably we sould not drop it
          * if the flow configuration does not require it. */
         RPD(5, "Dropping duplicate PDU [seq=%lu]\n",
@@ -985,13 +985,13 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     }
 
-    if (unlikely(dtp->rcv_lwe < seqnum &&
+    if (unlikely(dtp->rcv_lwe_priv < seqnum &&
                 seqnum <= dtp->max_seq_num_rcvd)) {
         /* This may go in a gap or be a duplicate
          * amongst the gaps. */
 
-        NPD("Possible gap fill, RLWE would jump %lu --> %lu\n",
-                (long unsigned)dtp->rcv_lwe,
+        NPD("Possible gap fill, RLWE_PRIV would jump %lu --> %lu\n",
+                (long unsigned)dtp->rcv_lwe_priv,
                 (unsigned long)seqnum + 1);
 
     } else if (seqnum == dtp->max_seq_num_rcvd + 1) {
@@ -999,8 +999,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     } else {
         /* Out of order. */
-        RPD(5, "Out of order packet, RLWE would jump %lu --> %lu\n",
-                (long unsigned)dtp->rcv_lwe,
+        RPD(5, "Out of order packet, RLWE_PRIV would jump %lu --> %lu\n",
+                (long unsigned)dtp->rcv_lwe_priv,
                 (unsigned long)seqnum + 1);
     }
 
@@ -1008,7 +1008,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         dtp->max_seq_num_rcvd = seqnum;
     }
 
-    gap = seqnum - dtp->rcv_lwe;
+    gap = seqnum - dtp->rcv_lwe_priv;
 
     /* Here we may have received a PDU that it's not the next expected
      * sequence number or generally that does no meet the max_sdu_gap
@@ -1046,13 +1046,16 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         struct list_head qrbs;
         struct rina_buf *qrb, *tmp;
 
-        /* Update rcv_lwe only if this PDU is going to be
+        /* Update rcv_lwe_priv only if this PDU is going to be
          * delivered. */
-        dtp->rcv_lwe = seqnum + 1;
+        dtp->rcv_lwe_priv = seqnum + 1;
 
         seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
 
-        crb = sdu_rx_sv_update(ipcp, flow);
+        if (flow->upper.ipcp) {
+            dtp->rcv_lwe = dtp->rcv_lwe_priv;
+            crb = sdu_rx_sv_update(ipcp, flow);
+        }
 
         spin_unlock_bh(&dtp->lock);
 
@@ -1097,6 +1100,27 @@ snd_crb:
     return ret;
 }
 
+static int
+rina_normal_sdu_rx_consumed(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                            struct rina_buf *rb)
+{
+    struct dtp *dtp = &flow->dtp;
+    struct rina_buf *crb;
+
+    spin_lock_bh(&dtp->lock);
+
+    dtp->rcv_lwe =  RINA_BUF_PCI(rb)->seqnum + 1;
+    crb = sdu_rx_sv_update(ipcp, flow);
+
+    spin_unlock_bh(&dtp->lock);
+
+    if (crb) {
+        rmt_tx(ipcp, flow->remote_addr, crb, false);
+    }
+
+    return 0;
+}
+
 #define SHIM_DIF_TYPE   "normal"
 
 static struct ipcp_factory normal_factory = {
@@ -1114,6 +1138,7 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_del = rina_normal_pduft_del,
     .ops.mgmt_sdu_write = rina_normal_mgmt_sdu_write,
     .ops.sdu_rx = rina_normal_sdu_rx,
+    .ops.sdu_rx_consumed = rina_normal_sdu_rx_consumed,
 };
 
 static int __init
