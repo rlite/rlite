@@ -233,8 +233,14 @@ evloop_function(void *arg)
             continue;
         }
 
-        /* Lookup the first two fields of the message. XXX can be done after deserialization */
-        resp = (struct rina_msg_base_resp *)serbuf;
+        /* Deserialize the message from serbuf into msgbuf. */
+        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret, msgbuf, sizeof(msgbuf));
+        if (ret) {
+            printf("%s: Problems during deserialization [%d]\n",
+                    __func__, ret);
+        }
+
+        resp = (struct rina_msg_base_resp *)msgbuf;
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
@@ -259,14 +265,6 @@ evloop_function(void *arg)
                     resp->msg_type);
             goto free_entry;
         }
-
-        /* Deserialize the message from serbuf into msgbuf. */
-        ret = deserialize_rina_msg(rina_kernel_numtables, serbuf, ret, msgbuf, sizeof(msgbuf));
-        if (ret) {
-            printf("%s: Problems during deserialization [%d]\n",
-                    __func__, ret);
-        }
-        resp = (struct rina_msg_base_resp *)msgbuf;
 
         printf("Message type %d received from kernel\n", resp->msg_type);
 
