@@ -115,6 +115,10 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
         return -1;
     }
 
+    /* Perform a fetch to find out if shim IPCPs have been created,
+     * deleted or configured from the last fetch. */
+    ipcps_fetch(&uipcp->appl.loop);
+
     /* Perform the registration. */
     result = application_register(&uipcp->appl, reg, dif_name,
                                   0, NULL, ipcp_name);
@@ -158,6 +162,10 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
             __func__, req->ipcp_id);
         goto out;
     }
+
+    /* Perform a fetch to find out if shim IPCPs have been created,
+     * deleted or configured from the last fetch. */
+    ipcps_fetch(&uipcp->appl.loop);
 
     /* Perform enrollment in userspace. */
     ret = uipcp_enroll(uipcp, req);
