@@ -256,7 +256,6 @@ for br_name in sorted(bridges):
             'set -x\n'\
             'rlite-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
                                     'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
-            'sleep 1\n'\
             'true\n'\
             'ENDSSH\n'\
             '   DONE=$?\n'\
@@ -287,7 +286,6 @@ for level in range(2, args.levels + 1):
             'set -x\n'\
             'rlite-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
                             'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
-            'sleep 1\n'\
             'true\n'\
             'ENDSSH\n'\
             '   DONE=$?\n'\
