@@ -49,7 +49,7 @@ struct Neighbor {
     list< string > lower_difs;
     uint64_t address;
 
-    enum {
+    enum state_t {
         NONE = 0,
         I_WAIT_CONNECT_R,
         S_WAIT_START,
@@ -68,6 +68,8 @@ struct Neighbor {
              int fd, unsigned int port_id);
     Neighbor(const Neighbor &other);
     ~Neighbor();
+
+    const char *enrollment_state_repr(state_t s) const;
 
     int send_to_port_id(CDAPMessage *m, const UipcpObject *obj);
     int fsm_run(const CDAPMessage *rm);
@@ -148,6 +150,40 @@ Neighbor::~Neighbor()
     }
 }
 
+const char *
+Neighbor::enrollment_state_repr(state_t s) const
+{
+    switch (s) {
+        case NONE:
+            return "NONE";
+
+        case I_WAIT_CONNECT_R:
+            return "I_WAIT_CONNECT_R";
+
+        case S_WAIT_START:
+            return "S_WAIT_START";
+
+        case I_WAIT_START_R:
+            return "I_WAIT_START_R";
+
+        case S_WAIT_STOP_R:
+            return "S_WAIT_STOP_R";
+
+        case I_WAIT_STOP:
+            return "I_WAIT_STOP";
+
+        case I_WAIT_START:
+            return "I_WAIT_START";
+
+        case ENROLLED:
+            return "ENROLLED";
+    }
+
+    assert(0);
+
+    return NULL;
+}
+
 int
 Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
 {
@@ -170,6 +206,7 @@ Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
 
     ret = conn->msg_ser(m, 0, &serbuf, &serlen);
     if (ret) {
+        PE("%s: message serialization failed\n", __func__);
         delete serbuf;
         return -1;
     }
@@ -182,6 +219,7 @@ Neighbor::none(const CDAPMessage *rm)
 {
     CDAPMessage m;
     int ret;
+    state_t next_state;
 
     if (rm == NULL) {
         /* (1) I --> S: M_CONNECT */
@@ -208,7 +246,7 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
-        enrollment_state = I_WAIT_CONNECT_R;
+        next_state = I_WAIT_CONNECT_R;
 
     } else {
         /* (1) S <-- I: M_CONNECT
@@ -223,10 +261,18 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
-        enrollment_state = S_WAIT_START;
+        next_state = S_WAIT_START;
     }
 
-    return send_to_port_id(&m, NULL);
+    ret = send_to_port_id(&m, NULL);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return 0;
+    }
+
+    enrollment_state = next_state;
+
+    return 0;
 }
 
 int
@@ -236,6 +282,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
      * (3) I --> S: M_START */
     EnrollmentInfo enr_info;
     CDAPMessage m;
+    int ret;
 
     assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
 
@@ -244,9 +291,15 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
 
     enr_info.lower_difs = rib->lower_difs;
 
+    ret = send_to_port_id(&m, &enr_info);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return 0;
+    }
+
     enrollment_state = I_WAIT_START_R;
 
-    return send_to_port_id(&m, &enr_info);
+    return 0;
 }
 
 int
@@ -304,9 +357,15 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
              0, 0, string());
 
+    ret = send_to_port_id(&m, &enr_info);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return 0;
+    }
+
     enrollment_state = S_WAIT_STOP_R;
 
-    return send_to_port_id(&m, &enr_info);
+    return 0;
 }
 
 int
@@ -370,6 +429,10 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     m.m_stop_r(rm, gpb::F_NO_FLAGS, 0, string());
 
     ret = send_to_port_id(&m, NULL);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return 0;
+    }
 
     if (enr_info.start_early) {
         enrollment_state = ENROLLED;
@@ -396,6 +459,8 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
         return 0;
     }
 
+    /* This is not required if the initiator is allowed to start
+     * early. */
     m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
               0, 0, string());
 
@@ -413,7 +478,8 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 int
 Neighbor::i_wait_start(const CDAPMessage *rm)
 {
-    assert(0);
+    /* Not yet implemented. */
+    assert(false);
     return 0;
 }
 
@@ -434,7 +500,7 @@ Neighbor::enrolled(const CDAPMessage *rm)
 int
 Neighbor::fsm_run(const CDAPMessage *rm)
 {
-    unsigned int old_state = enrollment_state;
+    state_t old_state = enrollment_state;
     int ret;
 
     assert(enrollment_state >= NONE &&
@@ -446,8 +512,9 @@ Neighbor::fsm_run(const CDAPMessage *rm)
     }
 
     if (old_state != enrollment_state) {
-        PI("%s: switching state %u --> %u\n", __func__, old_state,
-                enrollment_state);
+        PI("%s: switching state %s --> %s\n", __func__,
+             enrollment_state_repr(old_state),
+             enrollment_state_repr(enrollment_state));
     }
 
     return 0;
