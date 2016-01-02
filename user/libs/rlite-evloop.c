@@ -602,6 +602,11 @@ rlite_evloop_stop(struct rlite_evloop *loop)
     uint64_t x = 1;
     int n;
 
+    if (!(loop->flags & RLITE_EVLOOP_SPAWN)) {
+        /* Nothing to do here. */
+        return 0;
+    }
+
     n = write(loop->eventfd, &x, sizeof(x));
     if (n != sizeof(x)) {
         perror("write(eventfd)");
@@ -815,6 +820,7 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->rfd = -1;
     loop->eventfd = -1;
     loop->evloop_th = 0;
+    loop->running = 0;
     loop->usr_ipcp_update = NULL;
 
     /* Open the RLITE control device. */
@@ -854,29 +860,63 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
         loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
     }
 
-    /* Create and start the event-loop thread. */
-    ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
-    if (ret) {
-        perror("pthread_create(event-loop)");
-        return ret;
+    if (loop->flags & RLITE_EVLOOP_SPAWN) {
+        /* Create and start the event-loop thread. */
+        ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
+        if (ret) {
+            perror("pthread_create(event-loop)");
+            return ret;
+        }
+        loop->running = 1;
+        ret = rlite_evloop_barrier(loop);
     }
-    loop->running = 1;
-
-    ret = rlite_evloop_barrier(loop);
 
     return ret;
 }
 
 int
+rlite_evloop_run(struct rlite_evloop *loop)
+{
+    pthread_mutex_lock(&loop->lock);
+    if (loop->running) {
+        pthread_mutex_unlock(&loop->lock);
+        PE("Evloop is already running\n");
+
+        return -1;
+    }
+    loop->running = 1;
+    pthread_mutex_unlock(&loop->lock);
+
+    if (rlite_evloop_barrier(loop)) {
+        PE("barrier() failed\n");
+        pthread_mutex_lock(&loop->lock);
+        loop->running = 0;
+        pthread_mutex_unlock(&loop->lock);
+
+        return -1;
+    }
+
+    evloop_function(loop);
+
+    return 0;
+}
+
+int
 rlite_evloop_join(struct rlite_evloop *loop)
 {
-    if (loop->evloop_th) {
+    if (!(loop->flags & RLITE_EVLOOP_SPAWN)) {
+        PE("Cannot join evloop, RLITE_EVLOOP_SPAWN flag not set\n");
+        return -1;
+    }
+
+    if (loop->running) {
         int ret = pthread_join(loop->evloop_th, NULL);
 
         if (ret < 0) {
             perror("pthread_join(event-loop)");
             return ret;
         }
+        loop->running = 0;
         loop->evloop_th = 0;
     }
 
@@ -921,7 +961,9 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
     pending_queue_fini(&loop->pqueue);
 
-    rlite_evloop_join(loop);
+    if ((loop->flags & RLITE_EVLOOP_SPAWN)) {
+        rlite_evloop_join(loop);
+    }
 
     /* Clean up all the data structures. To be completed. */
     if (loop->eventfd >= 0) {

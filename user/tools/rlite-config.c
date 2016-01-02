@@ -688,8 +688,6 @@ int main(int argc, char **argv)
 
     ret = process_args(argc, argv, &rc);
 
-    rlite_evloop_stop(&rc.loop);
-
     rlite_evloop_fini(&rc.loop);
 
     return 0;

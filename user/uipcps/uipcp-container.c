@@ -376,8 +376,6 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
         return 0;
     }
 
-    rlite_evloop_stop(&uipcp->appl.loop);
-
     ret = rlite_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);

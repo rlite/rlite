@@ -606,7 +606,7 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* Initialization of RLITE application library. */
+    /* Initialization of RLITE application. */
     ret = rlite_appl_init(&rp.application, RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
@@ -660,9 +660,6 @@ main(int argc, char **argv)
 
         perf_function(&rp);
     }
-
-    /* Stop the event loop. */
-    rlite_evloop_stop(&rp.application.loop);
 
     return rlite_appl_fini(&rp.application);
 }

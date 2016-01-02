@@ -252,7 +252,7 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* Initialization of RLITE application library. */
+    /* Initialization of RLITE application. */
     ret = rlite_appl_init(&rr.application, RLITE_EVLOOP_SPAWN);
     if (ret) {
         return ret;
@@ -275,9 +275,6 @@ main(int argc, char **argv)
     } else {
         client(&rr);
     }
-
-    /* Stop the event loop. */
-    rlite_evloop_stop(&rr.application.loop);
 
     return rlite_appl_fini(&rr.application);
 }
