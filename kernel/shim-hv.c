@@ -225,6 +225,12 @@ rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
         return -ENXIO;
     }
 
+    if (unlikely(rb->len > PAGE_SIZE-8)) {
+        RPD(5, "Exceeding maximum VMPI payload (%lu)\n",
+            PAGE_SIZE-8);
+        return -EINVAL;
+    }
+
     iov.iov_base = RLITE_BUF_DATA(rb);
     iov.iov_len = rb->len;
 

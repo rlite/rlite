@@ -813,6 +813,11 @@ rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     BUG_ON(!entry);
 
+    if (unlikely(rb->len > ETH_DATA_LEN)) {
+        RPD(5, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
+        return -EINVAL;
+    }
+
     rmb();
 
     if (unlikely(priv->ntu == priv->ntp)) {
