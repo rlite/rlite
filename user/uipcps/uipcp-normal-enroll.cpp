@@ -182,7 +182,7 @@ Neighbor::abort(NeighFlow *nf)
     }
 }
 
-#define NEIGH_KEEPALIVE_INTVAL  2000
+#define NEIGH_KEEPALIVE_INTVAL  5000
 #define NEIGH_ENROLL_TO         1500
 
 static void

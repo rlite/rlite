@@ -228,8 +228,24 @@ evloop_function(void *arg)
             perror("select()");
             continue;
 
-        } else if (ret == 0) {
-            /* Timeout. Process expired timers. Timer callbacks
+        }
+
+        if (FD_ISSET(loop->eventfd, &rdfs)) {
+            /* Stop request arrived. */
+            uint64_t x;
+            int n;
+
+            n = read(loop->eventfd, &x, sizeof(x));
+            if (n != sizeof(x)) {
+                perror("read(eventfd)");
+            }
+
+            /* Stop the event loop. */
+            break;
+        }
+
+        {
+            /* Process expired timers. Timer callbacks
              * are allowed to call rl_evloop_schedule(), so
              * rescheduling is possible. */
             struct timespec now;
@@ -263,23 +279,10 @@ evloop_function(void *arg)
                 te->cb(loop, te->arg);
                 free(te);
             }
+        }
 
-            continue;
-
-        } else if (FD_ISSET(loop->eventfd, &rdfs)) {
-            /* Stop request arrived. */
-            uint64_t x;
-            int n;
-
-            n = read(loop->eventfd, &x, sizeof(x));
-            if (n != sizeof(x)) {
-                perror("read(eventfd)");
-            }
-
-            /* Stop the event loop. */
-            break;
-        } else {
-            /* First look for fdcb events. */
+        {
+            /* Process fdcb events. */
             list_for_each_entry(fdcb, &loop->fdcbs, node) {
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
                     fdcb->cb(loop, fdcb->fd);
@@ -291,6 +294,10 @@ evloop_function(void *arg)
                  * available on the rlite control device. */
                 continue;
             }
+        }
+
+        if (!FD_ISSET(loop->ctrl.rfd, &rdfs)) {
+            continue;
         }
 
         /* Read the next message posted by the kernel. */
