@@ -33,6 +33,7 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/hashtable.h>
+#include <linux/ktime.h>
 
 
 #define PDUFT_HASHTABLE_BITS    3
@@ -93,9 +94,43 @@ rina_normal_assign_to_dif(struct ipcp_entry *ipcp,
     return 0;
 }
 
+enum hrtimer_restart
+snd_inact_tmr_cb(struct hrtimer *timer)
+{
+    struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
+
+    PD("%s\n", __func__);
+    dtp->set_drf = true;
+
+    /* InitialSeqNumPolicy */
+    dtp->next_seq_num_to_send = 0;
+
+    /* Discard the retransmission queue. */
+
+    /* Discard the closed window queue */
+
+    /* Send control ack PDU */
+
+    /* Send transfer PDU with zero length. */
+
+    /* Notify user flow that there has been no activity for a while */
+
+    return HRTIMER_NORESTART;
+}
+
+enum hrtimer_restart
+rcv_inact_tmr_cb(struct hrtimer *timer)
+{
+    PD("%s\n", __func__);
+    return HRTIMER_NORESTART;
+}
+
 static int
 rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
+    flow->dtp.snd_inact_tmr.function = snd_inact_tmr_cb;
+    flow->dtp.rcv_inact_tmr.function = rcv_inact_tmr_cb;
+
     return 0;
 }
 
@@ -124,6 +159,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct rina_pci *pci;
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
+    struct dtp *dtp = &flow->dtp;
     int ret;
 
     lower_flow = pduft_lookup(priv, flow->remote_addr);
@@ -139,6 +175,10 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         BUG_ON(!lower_ipcp);
     }
 
+    /* Stop the sender inactivity timer if it was activated or the callback
+     * running , but without waiting for the callback to finish. */
+    hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
+
     rina_buf_pci_push(rb);
 
     pci = RINA_BUF_PCI(rb);
@@ -148,7 +188,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.dst_cep = flow->remote_port;
     pci->conn_id.src_cep = flow->local_port;
     pci->pdu_type = PDU_TYPE_DT;
-    pci->pdu_flags = 0;
+    pci->pdu_flags = dtp->set_drf ? 1 : 0;
+    dtp->set_drf = false;
     pci->seqnum = flow->dtp.next_seq_num_to_send++;
 
     if (lower_flow) {
@@ -166,6 +207,9 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         ret = ipcp->ops.sdu_rx(ipcp, rb);
         ret = (ret == 0) ? len : ret;
     }
+
+    /* 3 * (MPL + R + A) */
+    hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30), HRTIMER_MODE_REL);
 
     return ret;
 }

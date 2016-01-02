@@ -99,6 +99,7 @@ struct upper_ref {
 };
 
 struct dtp {
+    bool set_drf;
     uint64_t next_seq_num_to_send;
     struct hrtimer snd_inact_tmr;
     struct hrtimer rcv_inact_tmr;
@@ -156,8 +157,16 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 static inline void
 dtp_init(struct dtp *dtp)
 {
+    dtp->set_drf = true;
     hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+}
+
+static inline void
+dtp_fini(struct dtp *dtp)
+{
+    hrtimer_cancel(&dtp->snd_inact_tmr);
+    hrtimer_cancel(&dtp->rcv_inact_tmr);
 }
 
 #endif  /* __RINA_IPCP_H__ */

@@ -522,6 +522,8 @@ flow_del_entry(struct flow_entry *entry, int locked)
         goto out;
     }
 
+    dtp_fini(&entry->dtp);
+
     entry->txrx.ipcp->refcnt--;
     list_for_each_entry_safe(rb, tmp, &entry->txrx.queue, node) {
         rina_buf_free(rb);
