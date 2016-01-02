@@ -54,26 +54,44 @@ InetName::operator std::string() const
 struct RinaName {
     string name_s;
     struct rina_name name_r;
-    string dif_name;
+    string dif_name_s;
+    struct rina_name dif_name_r;
 
-    RinaName() { memset(&name_r, 0, sizeof(name_r)); }
+    RinaName();
     RinaName(const string& n, const string& d);
     RinaName(const RinaName& other);
     RinaName& operator=(const RinaName& other);
-    ~RinaName() { rina_name_free(&name_r); }
+    ~RinaName();
 
     bool operator<(const RinaName& other) const {
         return name_s < other.name_s;
     }
 
-    operator std::string() const { return dif_name + ":" + name_s; }
+    operator std::string() const { return dif_name_s + ":" + name_s; }
 };
 
-RinaName::RinaName(const string& n, const string& d) : name_s(n), dif_name(d)
+RinaName::RinaName()
 {
     memset(&name_r, 0, sizeof(name_r));
+    memset(&dif_name_r, 0, sizeof(dif_name_r));
+}
+
+RinaName::~RinaName()
+{
+    rina_name_free(&name_r);
+    rina_name_free(&dif_name_r);
+}
+
+RinaName::RinaName(const string& n, const string& d) : name_s(n), dif_name_s(d)
+{
+    memset(&name_r, 0, sizeof(name_r));
+    memset(&dif_name_r, 0, sizeof(dif_name_r));
 
     if (rina_name_from_string(n.c_str(), &name_r)) {
+        throw std::bad_alloc();
+    }
+
+    if (rina_name_from_string(d.c_str(), &dif_name_r)) {
         throw std::bad_alloc();
     }
 }
@@ -83,8 +101,11 @@ RinaName::RinaName(const RinaName& other)
     memset(&name_r, 0, sizeof(name_r));
 
     name_s = other.name_s;
-    dif_name = other.dif_name;
+    dif_name_s = other.dif_name_s;
     if (rina_name_copy(&name_r, &other.name_r)) {
+        throw std::bad_alloc();
+    }
+    if (rina_name_copy(&dif_name_r, &other.dif_name_r)) {
         throw std::bad_alloc();
     }
 }
@@ -97,7 +118,11 @@ RinaName::operator=(const RinaName& other)
     }
 
     name_s = other.name_s;
+    dif_name_s = other.dif_name_s;
     if (rina_name_copy(&name_r, &other.name_r)) {
+        throw std::bad_alloc();
+    }
+    if (rina_name_copy(&dif_name_r, &other.dif_name_r)) {
         throw std::bad_alloc();
     }
 
@@ -106,6 +131,7 @@ RinaName::operator=(const RinaName& other)
 
 struct Gateway {
     struct rlite_appl appl;
+    struct rina_name appl_name;
 
     /* Used to map IP:PORT --> RINA_NAME, when
      * receiving TCP connection requests from the INET world
@@ -124,7 +150,12 @@ struct Gateway {
 
 Gateway::Gateway()
 {
-    rlite_appl_init(&appl);
+    rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
+
+    if (rlite_appl_init(&appl)) {
+        throw std::exception();
+    }
+
     rlite_ipcps_fetch(&appl.loop);
 }
 
@@ -231,8 +262,41 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
 }
 
 static void
-accept_inet_conn(struct rlite_evloop *loop, int fd)
+accept_inet_conn(struct rlite_evloop *loop, int lfd)
 {
+    struct rlite_appl *appl = container_of(loop, struct rlite_appl, loop);
+    Gateway * gw = container_of(appl, struct Gateway, appl);
+    struct sockaddr_in remote_addr;
+    socklen_t addrlen = sizeof(remote_addr);
+    map<int, RinaName>::iterator mit;
+    struct rina_flow_spec flowspec;
+    unsigned int unused;
+    int cfd;
+    int ret;
+
+    /* First of all let's call accept, so that we consume the event
+     * on lfd, independently of what happen next. */
+    cfd = accept(lfd, (struct sockaddr *)&remote_addr, &addrlen);
+    if (cfd < 0) {
+        PE("accept() failed\n");
+        return;
+    }
+
+    mit = gw->srv_fd_map.find(lfd);
+    if (mit == gw->srv_fd_map.end()) {
+        PE("Internal error: Failed to lookup lfd %d into srv_fd_map\n", lfd);
+        return;
+    }
+
+    strcpy(flowspec.cubename, "rel");
+
+    /* Issue a non-blocking flow allocation request. */
+    ret = rlite_flow_allocate(appl, &mit->second.dif_name_r, 0, NULL,
+                              &gw->appl_name, &mit->second.name_r, &flowspec,
+                              &unused, 0, 0);
+    if (ret) {
+        PE("Flow allocation failed");
+    }
 }
 
 static int
@@ -306,18 +370,8 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        struct rina_name dif_name;
-        int ret;
-
-        ret = rina_name_from_string(mit->first.dif_name.c_str(), &dif_name);
-        if (ret) {
-            PE("rina_name_from_string() failed\n");
-            continue;
-        }
-
-        rlite_appl_register_wait(&gw.appl, 1, &dif_name, 0, NULL,
+        rlite_appl_register_wait(&gw.appl, 1, &mit->first.dif_name_r, 0, NULL,
                                  &mit->first.name_r, 3000);
-        rina_name_free(&dif_name);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());

@@ -37,3 +37,6 @@
 
 - remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
+
+- dif_fallback.. can it be emulated by dif_name == NULL?
+- rina_name_fill() should return errors
