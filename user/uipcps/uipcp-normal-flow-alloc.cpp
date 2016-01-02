@@ -269,7 +269,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         return send_to_dst_addr(m, freq.src_addr, freq);
     }
 
-    if (dft_next_hop != ipcp_info()->ipcp_addr) {
+    if (dft_next_hop) {
         /* freq.dst_app is not registered with us, we have
          * to forward the request. TODO */
         CDAPMessage m;
