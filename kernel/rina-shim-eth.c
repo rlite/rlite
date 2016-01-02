@@ -423,24 +423,26 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         return;
     }
 
+    spin_lock_irq(&priv->arpt_lock);
+
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         int upper_name_len;
         struct sk_buff *skb;
 
         if (!priv->upper_name_s) {
             /* No application registered here, there's nothing to do. */
-            return;
+            goto out;
         }
         upper_name_len = strlen(priv->upper_name_s);
 
         if (arp->ar_pln < upper_name_len) {
             /* This ARP request cannot match us. */
-            return;
+            goto out;
         }
 
         if (memcmp(tpa, priv->upper_name_s, upper_name_len)) {
             /* No match. */
-            return;
+            goto out;
         }
 
         /* Send an ARP reply. */
@@ -455,22 +457,18 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         /* Update the ARP table with an entry SPA --> SHA. */
         struct arpt_entry *entry;
 
-        spin_lock_irq(&priv->arpt_lock);
-
         entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
         if (!entry) {
-            spin_unlock_irq(&priv->arpt_lock);
             /* Gratuitous ARP reply. Don't accept it (for now). */
             PI("%s: Dropped gratuitous ARP reply\n", __func__);
-            return;
+            goto out;
         }
 
         if (arp->ar_hln != sizeof(entry->tha)) {
-            spin_unlock_irq(&priv->arpt_lock);
             /* Only support 48-bits hardware address (for now). */
             PI("%s: Dropped ARP reply with SHA/THA len of %d\n",
                __func__, arp->ar_hln);
-            return;
+            goto out;
         }
 
         memcpy(entry->tha, sha, arp->ar_hln);
@@ -480,11 +478,13 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
            __func__, entry->tpa, entry->tha[0], entry->tha[1],
            entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
 
-        spin_unlock_irq(&priv->arpt_lock);
     } else {
         PI("%s: Unknown RINA ARP operation %04X\n", __func__,
                 ntohs(arp->ar_op));
     }
+
+out:
+    spin_unlock_irq(&priv->arpt_lock);
 }
 
 static rx_handler_result_t
