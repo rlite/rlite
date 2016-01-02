@@ -150,7 +150,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 
     freq.invoke_id = 0;  /* invoke_id is actually set in send_to_dst_addr() */
     freq.initiator = true;
-    flow_reqs[obj_name.str()] = freq;
+    flow_reqs[obj_name.str() + string("L")] = freq;
 
     return send_to_dst_addr(m, freq.dst_addr, &freq);
 }
@@ -187,7 +187,7 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
         /* Move the freq object from the temporary map to the right one. */
         obj_name << obj_name::flows << "/" << freq.src_addr
                  << "-" << freq.src_port;
-        flow_reqs[obj_name.str()] = freq;
+        flow_reqs[obj_name.str() + string("R")] = freq;
     }
 
     m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
@@ -293,7 +293,8 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
     }
 
     FlowRequest remote_freq(objbuf, objlen);
-    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
+    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name +
+                                                          string("L"));
 
     if (f == flow_reqs.end()) {
         UPE(uipcp, "M_CREATE_R for '%s' does not match any pending request\n",
@@ -321,25 +322,35 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     uint64_t remote_addr;
     CDAPMessage m;
 
-    /* Lookup the corresponding FlowRequest. */
+    /* Lookup the corresponding FlowRequest, and figure out whether we
+     * were the initiator of the request. */
 
     obj_name << obj_name::flows << "/" << ipcp_info()->ipcp_addr
                 << "-" << req->local_port_id;
 
-    f = flow_reqs.find(obj_name.str());
+    f = flow_reqs.find(obj_name.str() + string("L"));
 
     if (f == flow_reqs.end()) {
+        /* We were not the initiator, let's see if we were the target. */
         obj_name.str(string());
         obj_name << obj_name::flows << "/" << req->remote_addr
             << "-" << req->remote_port_id;
 
-        f = flow_reqs.find(obj_name.str());
-    }
+        f = flow_reqs.find(obj_name.str() + string("R"));
 
-    if (f == flow_reqs.end()) {
-        UPE(uipcp, "Spurious flow allocation response, no object with name %s\n",
-            obj_name.str().c_str());
-        return -1;
+        if (f == flow_reqs.end()) {
+            UPE(uipcp, "Spurious flow deallocated notification, no object with name %s\n",
+                    obj_name.str().c_str());
+            return -1;
+
+        } else {
+            /* We were the target. */
+            assert(!f->second.initiator);
+        }
+
+    } else {
+        /* We were the initiator. */
+        assert(f->second.initiator);
     }
 
     remote_addr = f->second.initiator ? f->second.dst_addr : f->second.src_addr;
@@ -357,13 +368,27 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 int
 uipcp_rib::flows_handler_delete(const CDAPMessage *rm, Neighbor *neigh)
 {
-    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name);
+    map<string, FlowRequest>::iterator f;
     uint32_t local_port;
     int ret;
 
+    f = flow_reqs.find(rm->obj_name + string("L"));
+
     if (f == flow_reqs.end()) {
-        UPI(uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
-        return 0;
+        f = flow_reqs.find(rm->obj_name + string("R"));
+
+        if (f == flow_reqs.end()) {
+            UPI(uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
+            return 0;
+
+        } else {
+            /* We were the target. */
+            assert(!f->second.initiator);
+        }
+
+    } else {
+        /* We were the initiator. */
+        assert(f->second.initiator);
     }
 
     local_port = f->second.initiator ? f->second.src_port : f->second.dst_port;
