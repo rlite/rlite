@@ -72,7 +72,7 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
     if (!pfr) {
         PE("%s: Out of memory\n", __func__);
         /* Negative flow allocation response. */
-        return flow_allocate_resp(application,req->ipcp_id, 0xffff,
+        return rinalite_flow_allocate_resp(application,req->ipcp_id, 0xffff,
                                     req->port_id, 1);
     }
     pfr->ipcp_id = req->ipcp_id;
@@ -104,7 +104,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 };
 
 static int
-application_register_req(struct rinalite_appl *application,
+rinalite_appl_register_req(struct rinalite_appl *application,
                          int reg, unsigned int ipcp_id,
                          const struct rina_name *application_name)
 {
@@ -184,7 +184,7 @@ flow_allocate_req(struct rinalite_appl *application,
 }
 
 int
-flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
+rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
                    uint16_t upper_ipcp_id, uint32_t port_id, uint8_t response)
 {
     struct rina_kmsg_fa_resp *req;
@@ -215,7 +215,7 @@ flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
 }
 
 int
-application_register(struct rinalite_appl *application, int reg,
+rinalite_appl_register(struct rinalite_appl *application, int reg,
                      const struct rina_name *dif_name, int fallback,
                      const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
@@ -232,12 +232,12 @@ application_register(struct rinalite_appl *application, int reg,
     }
 
     /* Forward the request to the kernel. */
-    return application_register_req(application, reg, ipcp->ipcp_id,
+    return rinalite_appl_register_req(application, reg, ipcp->ipcp_id,
                                      application_name);
 }
 
 int
-flow_allocate(struct rinalite_appl *application,
+rinalite_flow_allocate(struct rinalite_appl *application,
               struct rina_name *dif_name, int dif_fallback,
               struct rina_name *ipcp_name,
               const struct rina_name *local_application,
@@ -331,7 +331,7 @@ int open_ipcp_mgmt(uint16_t ipcp_id)
     return open_port_common(~0U, RINA_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
-/* flow_allocate() + open_port_appl() */
+/* rinalite_flow_allocate() + open_port_appl() */
 int
 flow_allocate_open(struct rinalite_appl *application,
                    struct rina_name *dif_name, int dif_fallback,
@@ -344,7 +344,7 @@ flow_allocate_open(struct rinalite_appl *application,
     unsigned int port_id;
     int ret;
 
-    ret = flow_allocate(application, dif_name, dif_fallback, ipcp_name,
+    ret = rinalite_flow_allocate(application, dif_name, dif_fallback, ipcp_name,
                         local_application, remote_application, flowcfg,
                         &port_id, wait_ms, 0xffff);
     if (ret) {
@@ -367,7 +367,7 @@ flow_request_wait_open(struct rinalite_appl *application)
             __func__, pfr->ipcp_id, pfr->port_id);
 
     /* Always accept incoming connection, for now. */
-    result = flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
+    result = rinalite_flow_allocate_resp(application, pfr->ipcp_id, 0xffff,
                                 pfr->port_id, 0);
     port_id = pfr->port_id;
     pfr_free(pfr);
@@ -380,7 +380,7 @@ flow_request_wait_open(struct rinalite_appl *application)
 }
 
 int
-rina_application_init(struct rinalite_appl *application)
+rinalite_appl_init(struct rinalite_appl *application)
 {
     int ret;
 
@@ -398,7 +398,7 @@ rina_application_init(struct rinalite_appl *application)
 }
 
 int
-rina_application_fini(struct rinalite_appl *application)
+rinalite_appl_fini(struct rinalite_appl *application)
 {
     return rina_evloop_fini(&application->loop);
 }

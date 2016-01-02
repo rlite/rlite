@@ -129,7 +129,7 @@ int uipcp_enroll(struct uipcp *uipcp, struct rina_cmsg_ipcp_enroll *req)
     list_add_tail(&neigh->node, &uipcp->enrolled_neighbors);
 
     /* Allocate a flow for the enrollment. */
-    ret = flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
+    ret = rinalite_flow_allocate(&uipcp->appl, &req->supp_dif_name, 0, NULL,
                          &req->ipcp_name, &req->neigh_ipcp_name, NULL,
                          &port_id, 2000, uipcp->ipcp_id);
     if (ret) {
@@ -562,7 +562,7 @@ uipcp_server(void *arg)
         PD("%s: flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
 
-        result = flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
+        result = rinalite_flow_allocate_resp(&uipcp->appl, pfr->ipcp_id,
                                     uipcp->ipcp_id, pfr->port_id, 0);
 
         if (result) {
@@ -656,7 +656,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
-    ret = rina_application_init(&uipcp->appl);
+    ret = rinalite_appl_init(&uipcp->appl);
     if (ret) {
         goto err1;
     }
@@ -705,7 +705,7 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 err3:
     close(uipcp->mgmtfd);
 err2:
-    rina_application_fini(&uipcp->appl);
+    rinalite_appl_fini(&uipcp->appl);
 err1:
     list_del(&uipcp->node);
 
@@ -738,7 +738,7 @@ uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
 
     rina_evloop_stop(&uipcp->appl.loop);
 
-    ret = rina_application_fini(&uipcp->appl);
+    ret = rinalite_appl_fini(&uipcp->appl);
 
     list_del(&uipcp->node);
 

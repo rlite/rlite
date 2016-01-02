@@ -703,12 +703,12 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RINA application library. */
-    ret = rina_application_init(&rp.application);
+    ret = rinalite_appl_init(&rp.application);
     if (ret) {
         return ret;
     }
 
-    /* This fetch is necessary to use application_register(). */
+    /* This fetch is necessary to use rinalite_appl_register(). */
     ipcps_fetch(&rp.application.loop);
 
     /* Rinaperf-specific initialization. */
@@ -727,14 +727,14 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = application_register(&rp.application, 1, &rp.dif_name,
+            ret = rinalite_appl_register(&rp.application, 1, &rp.dif_name,
                                        1, &rp.ipcp_name, &server_ctrl_name);
             if (ret) {
                 return ret;
             }
         }
 
-        ret = application_register(&rp.application, 1, &rp.dif_name,
+        ret = rinalite_appl_register(&rp.application, 1, &rp.dif_name,
                                    1, &rp.ipcp_name, &rp.server_appl_name);
         if (ret) {
             return ret;
@@ -762,5 +762,5 @@ main(int argc, char **argv)
     /* Stop the event loop. */
     rina_evloop_stop(&rp.application.loop);
 
-    return rina_application_fini(&rp.application);
+    return rinalite_appl_fini(&rp.application);
 }

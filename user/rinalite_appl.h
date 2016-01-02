@@ -31,16 +31,16 @@ struct rinalite_appl {
     pthread_mutex_t lock;
 };
 
-int rina_application_init(struct rinalite_appl *application);
+int rinalite_appl_init(struct rinalite_appl *application);
 
-int rina_application_fini(struct rinalite_appl *application);
+int rinalite_appl_fini(struct rinalite_appl *application);
 
-int application_register(struct rinalite_appl *application,
+int rinalite_appl_register(struct rinalite_appl *application,
                          int reg, const struct rina_name *dif_name,
                          int fallback, const struct rina_name *ipcp_name,
                          const struct rina_name *application_name);
 
-int flow_allocate(struct rinalite_appl *application,
+int rinalite_flow_allocate(struct rinalite_appl *application,
                   struct rina_name *dif_name, int dif_fallback,
                   struct rina_name *ipcp_name, /* Useful for testing. */
                   const struct rina_name *local_application,
@@ -51,7 +51,7 @@ int flow_allocate(struct rinalite_appl *application,
 
 struct pending_flow_req *flow_request_wait(struct rinalite_appl *application);
 
-int flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
+int rinalite_flow_allocate_resp(struct rinalite_appl *application, uint16_t ipcp_id,
                        uint16_t upper_ipcp_id,uint32_t port_id,
                        uint8_t response);
 
