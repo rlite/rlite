@@ -18,8 +18,6 @@
   di stato "waitingForDRF" che aiuti a "forzare il DRF" quando esso non è
   presente ma dovrebbe
 
-- proteggere l'accesso al flusso (fase di allocazione) con uno spinlock
-
 - CDAP: supportare un semplice meccanismo di ritrasmissione, in caso la
   connessione CDAP sia supportata da un flusso non affidabile
 

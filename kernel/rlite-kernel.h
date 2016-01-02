@@ -54,7 +54,7 @@ struct ipcp_ops {
 };
 
 struct txrx {
-    /* Read operation support. */
+    /* Read operation (and flow state) support. */
     struct list_head    rx_q;
     unsigned int        rx_qlen;
     wait_queue_head_t   rx_wqh;

@@ -1777,13 +1777,16 @@ rlite_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
+    spin_lock_bh(&flow_entry->txrx.rx_lock);
     if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
         PE("flow %u is in invalid state %u\n",
                 flow_entry->local_port, flow_entry->txrx.state);
+        spin_unlock_bh(&flow_entry->txrx.rx_lock);
         goto out;
     }
     flow_entry->txrx.state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
                                                    : FLOW_STATE_NULL;
+    spin_unlock_bh(&flow_entry->txrx.rx_lock);
 
     PI("Flow allocation response [%u] issued to IPC process %u, "
             "port-id %u\n", resp->response, flow_entry->txrx.ipcp->id,
@@ -1906,14 +1909,18 @@ rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
         return ret;
     }
 
+    spin_lock_bh(&flow_entry->txrx.rx_lock);
     if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
+        spin_unlock_bh(&flow_entry->txrx.rx_lock);
         goto out;
     }
     flow_entry->txrx.state = (response == 0) ? FLOW_STATE_ALLOCATED
-                                          : FLOW_STATE_NULL;
+                                             : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;
     flow_entry->remote_addr = remote_addr;
+    spin_unlock_bh(&flow_entry->txrx.rx_lock);
+
     if (flowcfg) {
         memcpy(&flow_entry->cfg, flowcfg, sizeof(*flowcfg));
         if (ipcp->ops.flow_init) {
