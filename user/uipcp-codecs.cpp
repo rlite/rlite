@@ -56,6 +56,8 @@ RinaName2gpb(const RinaName &name)
     gan->set_applicationprocessinstance(name.api);
     gan->set_applicationentityname(name.aen);
     gan->set_applicationprocessinstance(name.aei);
+
+    return gan;
 }
 
 EnrollmentInfo::EnrollmentInfo(const char *buf, unsigned int size)
