@@ -51,7 +51,7 @@ Neighbor::~Neighbor()
             UPD(rib->uipcp, "N-1 flow deallocated [fd=%d]\n", flow_fd);
         }
 
-        uipcp_lower_flow_removed(rib->uipcp, rib->uipcp->ipcp_id,
+        uipcps_lower_flow_removed(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
                                   lower_ipcp_id);
     }
 }
@@ -897,8 +897,8 @@ Neighbor::alloc_flow(struct rina_name *supp_dif_name)
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n", flow_fd,
         port_id);
 
-    uipcp_lower_flow_added(rib->uipcp, rib->uipcp->ipcp_id,
-                           lower_ipcp_id);
+    uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->ipcp_id,
+                            lower_ipcp_id);
 
     return 0;
 }

@@ -270,8 +270,6 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
     uipcp->uipcps = uipcps;
     uipcp->ops = *ops;
     uipcp->priv = NULL;
-    list_init(&uipcp->uppers);
-    list_init(&uipcp->lowers);
 
     list_add_tail(&uipcp->node, &uipcps->uipcps);
 
@@ -379,20 +377,169 @@ uipcps_fetch(struct uipcps *uipcps)
     return 0;
 }
 
-int
-uipcp_lower_flow_added(struct uipcp *uipcp, unsigned int upper,
-                       unsigned int lower)
+static int
+uipcps_compute_depths(struct uipcps *uipcps)
 {
-    PD("Adding flow %d -> %d\n", upper, lower);
+    struct ipcp_node *ipn;
+    struct flow_edge *e;
+
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        PD_S("NODE %u\n", ipn->ipcp_id);
+        PD_S("    uppers = [");
+        list_for_each_entry(e, &ipn->uppers, node) {
+            PD_S("%u, ", e->ipcp->ipcp_id);
+        }
+        PD_S("]\n");
+        PD_S("    lowers = [");
+        list_for_each_entry(e, &ipn->lowers, node) {
+            PD_S("%u, ", e->ipcp->ipcp_id);
+        }
+        PD_S("]\n");
+    }
+
+    return 0;
+}
+
+static struct ipcp_node *
+uipcps_node_get(struct uipcps *uipcps, unsigned int ipcp_id)
+{
+    struct ipcp_node *ipn;
+
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        if (ipn->ipcp_id == ipcp_id) {
+            return ipn;
+        }
+    }
+
+    ipn = malloc(sizeof(*ipn));
+    if (!ipn) {
+        PE("Out of memory\n");
+        return NULL;
+    }
+
+    ipn->ipcp_id = ipcp_id;
+    ipn->refcnt = 0;
+    list_init(&ipn->lowers);
+    list_init(&ipn->uppers);
+    list_add_tail(&ipn->node, &uipcps->ipcp_nodes);
+
+    return ipn;
+}
+
+static void
+uipcps_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
+{
+    if (ipn->refcnt) {
+        return;
+    }
+
+    assert(list_empty(&ipn->uppers));
+    assert(list_empty(&ipn->lowers));
+
+    list_del(&ipn->node);
+    free(ipn);
+}
+
+static int
+flow_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
+                    struct list_head *edges)
+{
+    struct flow_edge *e;
+
+    list_for_each_entry(e, edges, node) {
+        if (e->ipcp == neigh) {
+            goto ok;
+        }
+    }
+
+    e = malloc(sizeof(*e));
+    if (!e) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    e->ipcp = neigh;
+    e->refcnt = 0;
+    list_add_tail(&e->node, edges);
+ok:
+    e->refcnt++;
+    neigh->refcnt++;
+
+    return 0;
+}
+
+static int
+flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
+                    struct list_head *edges)
+{
+    struct flow_edge *e;
+
+    list_for_each_entry(e, edges, node) {
+        if (e->ipcp == neigh) {
+            e->refcnt--;
+            if (e->refcnt == 0) {
+                /* This list_del is safe only because we exit
+                 * the loop immediately. */
+                list_del(&e->node);
+                free(e);
+            }
+            neigh->refcnt--;
+
+            return 0;
+        }
+    }
+
+    PE("Cannot find neigh %u for ipcp %u\n", neigh->ipcp_id, ipcp->ipcp_id);
+
+    return -1;
+}
+
+int
+uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
+                       unsigned int lower_id)
+{
+    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
+    struct ipcp_node *lower= uipcps_node_get(uipcps, lower_id);
+
+    if (!upper || !lower) {
+        return -1;
+    }
+
+    if (flow_edge_add(upper, lower, &upper->lowers) ||
+            flow_edge_add(lower, upper, &lower->uppers)) {
+        flow_edge_del(upper, lower, &upper->lowers);
+
+        return -1;
+    }
+
+    PD("Added flow (%d -> %d)\n", upper_id, lower_id);
+
+    uipcps_compute_depths(uipcps);
 
     return 0;
 }
 
 int
-uipcp_lower_flow_removed(struct uipcp *uipcp, unsigned int upper,
-                         unsigned int lower)
+uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
+                         unsigned int lower_id)
 {
-    PD("Removing flow %d -> %d\n", upper, lower);
+    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
+    struct ipcp_node *lower= uipcps_node_get(uipcps, lower_id);
+
+    if (lower == NULL) {
+        PE("Could not find uipcp %u\n", lower_id);
+        return -1;
+    }
+
+    flow_edge_del(upper, lower, &upper->lowers);
+    flow_edge_del(lower, upper, &lower->uppers);
+
+    uipcps_node_put(uipcps, upper);
+    uipcps_node_put(uipcps, lower);
+
+    PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
+
+    uipcps_compute_depths(uipcps);
 
     return 0;
 }

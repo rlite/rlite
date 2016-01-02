@@ -659,7 +659,7 @@ neigh_fa_req_arrived(struct rlite_evloop *loop,
         goto err;
     }
 
-    uipcp_lower_flow_added(uipcp, uipcp->ipcp_id, req->ipcp_id);
+    uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->ipcp_id, req->ipcp_id);
 
     return 0;
 

@@ -520,6 +520,7 @@ int main(int argc, char **argv)
 
     list_init(&uipcps->uipcps);
     list_init(&uipcps->ipcps_registrations);
+    list_init(&uipcps->ipcp_nodes);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the uipcp server. */
