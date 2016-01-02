@@ -19,6 +19,10 @@
 #include "helpers.h"
 
 
+/* Some useful macros for casting. */
+#define RMB(m) (struct rina_msg_base *)(m)
+#define RMBR(m) (struct rina_msg_base_resp *)(m)
+
 struct ipcp {
         unsigned int ipcp_id;
         struct rina_name ipcp_name;
@@ -269,7 +273,7 @@ evloop_function(void *arg)
         }
 
         /* Here we can malloc the maximum kernel message size. */
-        resp = (struct rina_msg_base_resp *)malloc(max_resp_size);
+        resp = RMBR(malloc(max_resp_size));
         if (!resp) {
             printf("%s: Out of memory\n", __func__);
             continue;
@@ -323,14 +327,14 @@ notify_requestor:
              * complete, reporting the response in the 'resp' pointer field. */
             pthread_mutex_lock(&ipcm->lock);
             req_entry->op_complete = 1;
-            req_entry->resp = (struct rina_msg_base *)resp;
+            req_entry->resp = RMB(resp);
             pthread_cond_signal(&req_entry->op_complete_cond);
         } else {
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
             rina_msg_free(rina_kernel_numtables, req_entry->msg);
             free(req_entry);
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+            rina_msg_free(rina_kernel_numtables, RMB(resp));
         }
         pthread_mutex_unlock(&ipcm->lock);
     }
@@ -356,7 +360,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
      * the event loop not being able to find the pending request. */
     entry = malloc(sizeof(*entry));
     if (!entry) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)msg);
+        rina_msg_free(rina_kernel_numtables, msg);
         printf("%s: Out of memory\n", __func__);
         return NULL;
     }
@@ -381,7 +385,7 @@ issue_request(struct ipcm *ipcm, struct rina_msg_base *msg,
                     __func__, serlen);
         free(entry);
         pthread_mutex_unlock(&ipcm->lock);
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)msg);
+        rina_msg_free(rina_kernel_numtables, msg);
         return NULL;
     }
     serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, msg);
@@ -439,7 +443,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting IPC process creation...\n");
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
-           issue_request(ipcm, (struct rina_msg_base *)msg,
+           issue_request(ipcm, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -468,7 +472,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
     printf("Requesting IPC process destruction...\n");
 
     resp = (struct rina_msg_base_resp *)
-           issue_request(ipcm, (struct rina_msg_base *)msg,
+           issue_request(ipcm, RMB(msg),
                          sizeof(*msg), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -550,7 +554,7 @@ ipcps_fetch(struct ipcm *ipcm)
         } else {
             end = resp->end;
             rina_msg_free(rina_kernel_numtables,
-                          (struct rina_msg_base *)resp);
+                          RMB(resp));
         }
     }
 
@@ -581,7 +585,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting DIF assignment...\n");
 
     resp = (struct rina_msg_base_resp *)
-           issue_request(ipcm, (struct rina_msg_base *)req,
+           issue_request(ipcm, RMB(req),
                          sizeof(*req), wait_for_completion);
 
     ipcps_fetch(ipcm);
@@ -612,7 +616,7 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     return (struct rina_msg_base_resp *)
-           issue_request(ipcm, (struct rina_msg_base *)req,
+           issue_request(ipcm, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
 
@@ -640,7 +644,7 @@ flow_allocate_req(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting flow allocation...\n");
 
     return (struct rina_kmsg_flow_allocate_resp *)
-           issue_request(ipcm, (struct rina_msg_base *)req,
+           issue_request(ipcm, RMB(req),
                          sizeof(*req), wait_for_completion);
 }
 
@@ -655,14 +659,14 @@ test(struct ipcm *ipcm)
     rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
     icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY);
     if (icresp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)icresp);
+        rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
     icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY);
     if (icresp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)icresp);
+        rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
     rina_name_free(&name);
 
@@ -670,7 +674,7 @@ test(struct ipcm *ipcm)
     rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
     resp = assign_to_dif(ipcm, 0, 0, &name);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
@@ -681,14 +685,14 @@ test(struct ipcm *ipcm)
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
     resp = application_register(ipcm, 0, 1, 0, &name);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
     resp = application_register(ipcm, 0, 1, 1, &name);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
@@ -696,32 +700,42 @@ test(struct ipcm *ipcm)
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
     resp = application_register(ipcm, 0, 0, 0, &name);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
     resp = application_register(ipcm, 0, 0, 1, &name);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
     resp = ipcp_destroy(ipcm, 0, 0);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
 
     resp = ipcp_destroy(ipcm, 0, 1);
     if (resp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
+        rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
 
     return 0;
 }
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
+
+static int
+rina_appl_response(int sfd, struct rina_msg_base *req,
+                   struct rina_msg_base_resp *resp)
+{
+    resp->msg_type = req->msg_type + 1;
+    resp->event_id = req->event_id;
+
+    return rina_msg_write(sfd, RMB(resp));
+}
 
 static int
 rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
@@ -733,14 +747,12 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
 
     kresp = ipcp_create(ipcm, 1, &req->ipcp_name, req->dif_type);
     if (kresp) {
-        rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+        rina_msg_free(rina_kernel_numtables, RMB(kresp));
     }
 
-    resp.msg_type = RINA_APPL_IPCP_CREATE_RESP;
-    resp.event_id = req->event_id;
     resp.result = 0;  // TODO how is error reported from kernel ?
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), &resp);
 }
 
 static unsigned int
@@ -778,16 +790,14 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
         /* Valid IPCP id. Forward the request to the kernel. */
         kresp = ipcp_destroy(ipcm, 1, ipcp_id);
         if (kresp) {
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
             result = kresp->result;
         }
     }
 
-    resp.msg_type = RINA_APPL_IPCP_DESTROY_RESP;
-    resp.event_id = req->event_id;
     resp.result = result;
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), &resp);
 }
 
 static int
@@ -809,15 +819,13 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
         kresp = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name);
         if (kresp) {
             result = kresp->result;
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
 
-    resp.msg_type = RINA_APPL_ASSIGN_TO_DIF_RESP;
-    resp.event_id = req->event_id;
     resp.result = result;
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), &resp);
 }
 
 static unsigned int
@@ -871,15 +879,13 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
         kresp = application_register(ipcm, 1, 1, ipcp_id, &req->application_name);
         if (kresp) {
             result = kresp->result;
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
 
-    resp.msg_type = RINA_APPL_REGISTER_RESP;
-    resp.event_id = req->event_id;
     resp.result = result;
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), &resp);
 }
 
 static int
@@ -901,15 +907,13 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
                 &req->application_name);
         if (kresp) {
             result = kresp->result;
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
 
-    resp.msg_type = RINA_APPL_UNREGISTER_RESP;
-    resp.event_id = req->event_id;
     resp.result = result;
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), &resp);
 }
 
 static int
@@ -935,16 +939,14 @@ rina_appl_flow_allocate_req(struct ipcm *ipcm, int sfd,
         if (kresp) {
             result = kresp->result;
             port_id = kresp->port_id;
-            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
 
-    resp.msg_type = RINA_APPL_FLOW_ALLOCATE_RESP;
-    resp.event_id = req->event_id;
     resp.result = result;
     resp.port_id = port_id;
 
-    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+    return rina_appl_response(sfd, RMB(req), RMBR(&resp));
 }
 
 typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
@@ -995,7 +997,7 @@ unix_server(void *arg)
         }
 
         /* Lookup the message type. */
-        req = (struct rina_msg_base *)msgbuf;
+        req = RMB(msgbuf);
         if (rina_application_handlers[req->msg_type] == NULL) {
             struct rina_msg_base_resp resp;
 

@@ -1,4 +1,5 @@
 - dif_type had better be a string
 - manage NULL strings (mainly struct rina_name) so that NULL <==> ""
 - implement pending_queue using list.h
-- ipcm: riutilizzare il codice in coda alle funzioni rina_appl_*()
+- testare cosa succede se si crea più volte un IPC process con lo stesso
+  nome
