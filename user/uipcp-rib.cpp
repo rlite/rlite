@@ -714,10 +714,13 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
     stringstream obj_name;
 
     if (!remote_addr) {
-        /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
+        /* Return a negative flow allocation response immediately. */
         PI("No DFT matching entry for destination %s\n",
                 static_cast<string>(dest_appl).c_str());
-        return 0;
+
+        return uipcp_fa_resp_arrived(uipcp, req->local_port,
+                                     0 /* don't care */,
+                                     0 /* dont't care */, 1);
     }
 
     ipcp = ipcp_info();
