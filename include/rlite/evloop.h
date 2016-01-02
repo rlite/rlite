@@ -89,7 +89,7 @@ struct rlite_evloop {
     struct list_head *flows_next;
     struct list_head flows_lists[2];
 
-    struct list_head ipcps2;
+    struct list_head ipcps;
     rlite_resp_handler_t usr_ipcp_update;
 };
 
