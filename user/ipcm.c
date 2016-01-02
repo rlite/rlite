@@ -515,19 +515,59 @@ test(struct ipcm *ipcm)
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
 
+static int
+rina_appl_register(struct ipcm *ipcm, const struct rina_msg_base *b_req)
+{
+    printf("Received application register request\n");
+    return 0;
+}
+
+typedef int (*rina_req_handler_t)(struct ipcm *ipcm,
+                                   const struct rina_msg_base * b_req);
+
+/* The table containing all response handlers. */
+static rina_req_handler_t rina_application_handlers[] = {
+    [RINA_APPL_REGISTER] = rina_appl_register,
+    [RINA_APPL_MSG_MAX] = NULL,
+};
+
 static void *
 server_function(void *arg)
 {
     struct ipcm *ipcm = arg;
+    char serbuf[4096];
+    char msgbuf[4096];
 
     for (;;) {
-        int cfd;
         struct sockaddr_un client_address;
         socklen_t client_address_len = sizeof(client_address);
+        struct rina_msg_base *req;
+        int cfd;
+        int ret;
+        int n;
 
         cfd = accept(ipcm->lfd, (struct sockaddr *)&client_address,
                      &client_address_len);
-	printf("Got connection\n");
+
+        n = read(cfd, serbuf, sizeof(serbuf));
+        if (n < 0) {
+                printf("%s: read() error [%d]\n", __func__, n);
+        }
+
+        ret = deserialize_rina_msg(rina_application_numtables, serbuf, n,
+                                        msgbuf, sizeof(msgbuf));
+        if (ret) {
+                printf("%s: deserialization error [%d]\n", __func__, ret);
+        }
+
+        req = (struct rina_msg_base *)msgbuf;
+
+        ret = rina_application_handlers[req->msg_type](ipcm, req);
+        if (ret) {
+            printf("%s: Error while handling message type [%d]", __func__,
+                    req->msg_type);
+        }
+
 	close(cfd);
     }
 
