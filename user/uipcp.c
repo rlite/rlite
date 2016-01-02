@@ -7,14 +7,22 @@
 #include "ipcm.h"
 
 
+#define MGMTBUF_SIZE_MAX 2048
+
 static int
 mgmt_write(struct uipcp *uipcp, const struct rina_mgmt_hdr *mhdr,
            void *buf, size_t buflen)
 {
-    void *mgmtbuf = malloc(sizeof(*mhdr) + buflen);
+    void *mgmtbuf;
     int n;
     int ret = 0;
 
+    if (buflen > MGMTBUF_SIZE_MAX) {
+        PE("%s: Dropping oversized mgmt message %d/%d\n", __func__,
+            (int)buflen, MGMTBUF_SIZE_MAX);
+    }
+
+    mgmtbuf = malloc(sizeof(*mhdr) + buflen);
     if (!mgmtbuf) {
         PE("%s: Out of memory\n", __func__);
         return ENOMEM;
@@ -60,6 +68,25 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, uint64_t dst_addr,
     mhdr.u.dst_addr = dst_addr;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
+}
+
+static void
+mgmt_fd_ready(struct rina_evloop *loop, int fd)
+{
+    struct application *appl = container_of(loop, struct application, loop);
+    struct uipcp *uipcp = container_of(appl, struct uipcp, appl);
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    int n;
+
+    PD("%s: fd %d ready!\n", __func__, fd);
+
+    assert(fd == uipcp->mgmtfd);
+
+    n = read(fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        PE("%s: Error: read() failed [%d]\n", __func__, n);
+        return;
+    }
 }
 
 /*static */int
@@ -457,6 +484,8 @@ uipcp_add(struct ipcm *ipcm, uint16_t ipcp_id)
         goto err2;
     }
 
+    rina_evloop_fdcb_add(&uipcp->appl.loop, uipcp->mgmtfd, mgmt_fd_ready);
+
     ret = pthread_create(&uipcp->server_th, NULL, uipcp_server, uipcp);
     if (ret) {
         goto err3;
@@ -487,6 +516,8 @@ uipcp_del(struct ipcm *ipcm, uint16_t ipcp_id)
         /* The specified IPCP is a Shim IPCP. */
         return 0;
     }
+
+    rina_evloop_fdcb_del(&uipcp->appl.loop, uipcp->mgmtfd);
 
     close(uipcp->mgmtfd);
 

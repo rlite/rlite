@@ -34,7 +34,7 @@ typedef int (*rina_resp_handler_t)(struct rina_evloop *loop,
                                    const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
-typedef int (*rina_evloop_fdcb_t)(struct rina_evloop *loop, int fd);
+typedef void (*rina_evloop_fdcb_t)(struct rina_evloop *loop, int fd);
 
 struct rina_evloop_fdcb {
     int fd;
