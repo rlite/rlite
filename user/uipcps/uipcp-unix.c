@@ -401,6 +401,7 @@ process_persistence_file(struct uipcps *uipcps)
         s4 = strtok(0, " ");
 
         if (strncmp(s0, "REG", 3) == 0) {
+            /* Redo an ipcp registration. */
             struct rl_cmsg_ipcp_register msg;
             int ret = 0;
 
@@ -426,6 +427,7 @@ process_persistence_file(struct uipcps *uipcps)
                            RLITE_MB(&msg));
 
         } else if (strncmp(s0, "ENR", 3) == 0) {
+            /* Redo an enrollment. */
             struct rl_cmsg_ipcp_enroll msg;
             int ret = 0;
 
@@ -493,39 +495,11 @@ uipcps_update(struct uipcps *uipcps)
     return 0;
 }
 
-/* Dump the ipcps_registrations list to a file, so that
- * subsequent uipcps invocations can redo the registrations. */
 static void
-persistent_ipcp_reg_dump(struct uipcps *uipcps)
+dump_persistence_file(struct uipcps *uipcps)
 {
     FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "w");
-    char *ipcp_s;
     struct registered_ipcp *ripcp;
-
-    if (!fpreg) {
-        PE("Cannot open persistence file (%s)\n",
-                RLITE_PERSISTENCE_FILE);
-        return;
-    }
-
-    list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-        ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
-        if (ipcp_s) {
-            fprintf(fpreg, "REG %s %s\n", ripcp->dif_name, ipcp_s);
-        } else {
-            PE("Error in rina_name_to_string()\n");
-        }
-        if (ipcp_s) free(ipcp_s);
-    }
-    fclose(fpreg);
-}
-
-/* Dump to a file the list of enrolled ipcps for which we were initiator,
- * so that subsequent uipcps invocations can redo the registrations. */
-static void
-persistent_ipcp_enroll_dump(struct uipcps *uipcps)
-{
-    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "a");
     struct uipcp *uipcp;
 
     if (!fpreg) {
@@ -534,6 +508,22 @@ persistent_ipcp_enroll_dump(struct uipcps *uipcps)
         return;
     }
 
+    /* Dump the ipcps_registrations list, so that
+     * subsequent uipcps invocations can redo the registrations. */
+    list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
+        char *ipcp_s;
+
+        ipcp_s = rina_name_to_string(&ripcp->ipcp_name);
+        if (ipcp_s) {
+            fprintf(fpreg, "REG %s %s\n", ripcp->dif_name, ipcp_s);
+        } else {
+            PE("Error in rina_name_to_string()\n");
+        }
+        if (ipcp_s) free(ipcp_s);
+    }
+
+    /* Dump to a file the list of enrolled ipcps for which we were initiator,
+     * so that subsequent uipcps invocations can redo the registrations. */
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         char *ipcp_s, *neigh_s;
         struct enrolled_neigh *en, *tmp;
@@ -575,8 +565,7 @@ sigint_handler(int signum)
     struct uipcps *uipcps = &guipcps;
 
     pthread_mutex_lock(&uipcps->lock);
-    persistent_ipcp_reg_dump(uipcps);
-    persistent_ipcp_enroll_dump(uipcps);
+    dump_persistence_file(uipcps);
     pthread_mutex_unlock(&uipcps->lock);
 
     /* TODO Here we should free all the dynamically allocated memory
