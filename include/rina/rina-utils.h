@@ -48,4 +48,15 @@ int rina_name_valid(const struct rina_name *name);
 
 void flow_config_dump(const struct rina_flow_config *c);
 
+#ifdef __KERNEL__
+/* GFP variations of some of the functions above. */
+void __rina_name_fill(struct rina_name *name, const char *apn,
+                      const char *api, const char *aen, const char *aei,
+                      int maysleep);
+
+char * __rina_name_to_string(const struct rina_name *name, int maysleep);
+int __rina_name_from_string(const char *str, struct rina_name *name,
+                            int maysleep);
+#endif
+
 #endif  /* __RINA_SERDES_H__ */

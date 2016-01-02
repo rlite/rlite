@@ -6,11 +6,12 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-#define COMMON_ALLOC(_sz)   kmalloc(_sz, GFP_KERNEL)
-#define COMMON_FREE(_p)   kfree(_p)
-#define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s)   kstrdup(_s, GFP_KERNEL)
-#define COMMON_EXPORT(_n)   EXPORT_SYMBOL_GPL(_n)
+#define COMMON_ALLOC(_sz, _sl)      kmalloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC)
+#define COMMON_FREE(_p)             kfree(_p)
+#define COMMON_PRINT(format, ...)   printk(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s, _sl)      kstrdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC)
+#define COMMON_EXPORT(_n)           EXPORT_SYMBOL_GPL(_n)
+#define COMMON_STATIC
 
 #else
 
@@ -19,11 +20,12 @@
 #include <string.h>
 #include <stdint.h>
 
-#define COMMON_ALLOC(_sz)   malloc(_sz)
-#define COMMON_FREE(_p)   free(_p)
-#define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s)   strdup(_s)
+#define COMMON_ALLOC(_sz, _unused)  malloc(_sz)
+#define COMMON_FREE(_p)             free(_p)
+#define COMMON_PRINT(format, ...)   printf(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s, _unused)  strdup(_s)
 #define COMMON_EXPORT(_n)
+#define COMMON_STATIC               static
 
 #endif
 
@@ -90,7 +92,7 @@ deserialize_string(const void **pptr, char **s)
 
     deserialize_obj(*pptr, uint8_t, &slen);
     if (slen) {
-        *s = COMMON_ALLOC(slen + 1);
+        *s = COMMON_ALLOC(slen + 1, 1);
         if (!(*s)) {
             return -1;
         }
@@ -327,17 +329,37 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
         return 0;
     }
 
-    dst->apn = src->apn ? COMMON_STRDUP(src->apn) : NULL;
-    dst->api = src->api ? COMMON_STRDUP(src->api) : NULL;
-    dst->aen = src->aen ? COMMON_STRDUP(src->aen) : NULL;
-    dst->aei = src->aei ? COMMON_STRDUP(src->aei) : NULL;
+    dst->apn = src->apn ? COMMON_STRDUP(src->apn, 1) : NULL;
+    dst->api = src->api ? COMMON_STRDUP(src->api, 1) : NULL;
+    dst->aen = src->aen ? COMMON_STRDUP(src->aen, 1) : NULL;
+    dst->aei = src->aei ? COMMON_STRDUP(src->aei, 1) : NULL;
 
     return 0;
 }
 COMMON_EXPORT(rina_name_copy);
 
-char *
-rina_name_to_string(const struct rina_name *name)
+COMMON_STATIC void
+__rina_name_fill(struct rina_name *name, const char *apn,
+                 const char *api, const char *aen, const char *aei,
+                 int maysleep)
+{
+    name->apn = (apn && strlen(apn)) ? COMMON_STRDUP(apn, maysleep) : NULL;
+    name->api = (api && strlen(api)) ? COMMON_STRDUP(api, maysleep) : NULL;
+    name->aen = (aen && strlen(aen)) ? COMMON_STRDUP(aen, maysleep) : NULL;
+    name->aei = (aei && strlen(aei)) ? COMMON_STRDUP(aei, maysleep) : NULL;
+}
+COMMON_EXPORT(__rina_name_fill);
+
+void
+rina_name_fill(struct rina_name *name, const char *apn,
+               const char *api, const char *aen, const char *aei)
+{
+    __rina_name_fill(name, apn, api, aen, aei, 1);
+}
+COMMON_EXPORT(rina_name_fill);
+
+COMMON_STATIC char *
+__rina_name_to_string(const struct rina_name *name, int maysleep)
 {
     char *str = NULL;
     char *cur;
@@ -356,7 +378,7 @@ rina_name_to_string(const struct rina_name *name)
     aei_len = name->aei ? strlen(name->aei) : 0;
 
     str = cur = COMMON_ALLOC(apn_len + 1 + api_len + 1 +
-                             aen_len + 1 + aei_len + 1);
+                             aen_len + 1 + aei_len + 1, maysleep);
     if (!str) {
         return NULL;
     }
@@ -386,13 +408,20 @@ rina_name_to_string(const struct rina_name *name)
 
     return str;
 }
+COMMON_EXPORT(__rina_name_to_string);
+
+char *
+rina_name_to_string(const struct rina_name *name)
+{
+    return __rina_name_to_string(name, 1);
+}
 COMMON_EXPORT(rina_name_to_string);
 
-int
-rina_name_from_string(const char *str, struct rina_name *name)
+COMMON_STATIC int
+__rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
 {
     char *apn, *api, *aen, *aei;
-    char *strc = COMMON_STRDUP(str);
+    char *strc = COMMON_STRDUP(str, maysleep);
     char **strp = &strc;
 
     memset(name, 0, sizeof(*name));
@@ -411,10 +440,17 @@ rina_name_from_string(const char *str, struct rina_name *name)
         return -1;
     }
 
-    rina_name_fill(name, apn, api, aen, aei);
+    __rina_name_fill(name, apn, api, aen, aei, maysleep);
     COMMON_FREE(strc);
 
     return 0;
+}
+COMMON_EXPORT(__rina_name_from_string);
+
+int
+rina_name_from_string(const char *str, struct rina_name *name)
+{
+    return __rina_name_from_string(str, name, 1);
 }
 COMMON_EXPORT(rina_name_from_string);
 
@@ -456,17 +492,6 @@ rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
     return 0;
 }
 COMMON_EXPORT(rina_name_cmp);
-
-void
-rina_name_fill(struct rina_name *name, const char *apn,
-               const char *api, const char *aen, const char *aei)
-{
-    name->apn = (apn && strlen(apn)) ? COMMON_STRDUP(apn) : NULL;
-    name->api = (api && strlen(api)) ? COMMON_STRDUP(api) : NULL;
-    name->aen = (aen && strlen(aen)) ? COMMON_STRDUP(aen) : NULL;
-    name->aei = (aei && strlen(aei)) ? COMMON_STRDUP(aei) : NULL;
-}
-COMMON_EXPORT(rina_name_fill);
 
 int
 rina_name_valid(const struct rina_name *name)

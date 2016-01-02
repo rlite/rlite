@@ -326,7 +326,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         }
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
-        /* Update the ARP table. */
+        /* Update the ARP table with an entry SPA --> SHA. */
     } else {
         PI("%s: Unknown RINA ARP operation %04X\n", __func__,
                 ntohs(arp->ar_op));
