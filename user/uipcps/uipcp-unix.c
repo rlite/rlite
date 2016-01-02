@@ -103,7 +103,7 @@ track_ipcp_unregistration(struct uipcps *uipcps,
 }
 
 static uint8_t
-rlite_ipcp_register(struct uipcps *uipcps, int reg,
+rl_ipcp_register(struct uipcps *uipcps, int reg,
                     const char *dif_name,
                     const struct rina_name *ipcp_name)
 {
@@ -143,7 +143,7 @@ rlite_conf_ipcp_register(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rlite_msg_base_resp resp;
 
-    resp.result = rlite_ipcp_register(uipcps, req->reg, req->dif_name,
+    resp.result = rl_ipcp_register(uipcps, req->reg, req->dif_name,
                                       &req->ipcp_name);
 
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
@@ -369,7 +369,7 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
 static int
 uipcps_update(struct uipcps *uipcps)
 {
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int ret = 0;
 
     ret = rl_evloop_init(&uipcps->loop, "/dev/rlite", NULL, 0);
@@ -384,10 +384,10 @@ uipcps_update(struct uipcps *uipcps)
 
     /* Create an userspace IPCP for each existing IPCP. */
     pthread_mutex_lock(&uipcps->loop.lock);
-    list_for_each_entry(rlite_ipcp, &uipcps->loop.ctrl.ipcps, node) {
-        if (type_has_uipcp(rlite_ipcp->dif_type)) {
-            ret = uipcp_add(uipcps, rlite_ipcp->ipcp_id,
-                            rlite_ipcp->dif_type);
+    list_for_each_entry(rl_ipcp, &uipcps->loop.ctrl.ipcps, node) {
+        if (type_has_uipcp(rl_ipcp->dif_type)) {
+            ret = uipcp_add(uipcps, rl_ipcp->ipcp_id,
+                            rl_ipcp->dif_type);
             if (ret) {
                 pthread_mutex_unlock(&uipcps->loop.lock);
                 return ret;
@@ -425,7 +425,7 @@ uipcps_update(struct uipcps *uipcps)
                 if (strncmp(s0, "REG", 3) == 0) {
                     if (s1 && s2 &&
                                 rina_name_from_string(s2, &ipcp_name) == 0) {
-                        reg_result = rlite_ipcp_register(uipcps, 1, s1,
+                        reg_result = rl_ipcp_register(uipcps, 1, s1,
                                                          &ipcp_name);
                         PI("Automatic re-registration for %s --> %s\n",
                                 s2, (reg_result == 0) ? "DONE" : "FAILED");

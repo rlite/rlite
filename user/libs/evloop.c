@@ -827,14 +827,14 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
                     const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register *req;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int result;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return NULL;
     }
@@ -846,7 +846,7 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
         return NULL;
     }
 
-    rl_register_req_fill(req, event_id, rlite_ipcp->ipcp_id, reg,
+    rl_register_req_fill(req, event_id, rl_ipcp->ipcp_id, reg,
                          appl_name);
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
@@ -897,14 +897,14 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
 {
     struct rl_kmsg_fa_req *req;
     struct rl_kmsg_fa_resp_arrived *kresp;
-    struct rlite_ipcp *rlite_ipcp;
+    struct rl_ipcp *rl_ipcp;
     int result;
 
-    rlite_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rlite_ipcp) {
-        rlite_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
+    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
+    if (!rl_ipcp) {
+        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     }
-    if (!rlite_ipcp) {
+    if (!rl_ipcp) {
         PE("No suitable IPCP found\n");
         return -1;
     }
@@ -915,7 +915,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
         PE("Out of memory\n");
         return -1;
     }
-    rl_fa_req_fill(req, event_id, rlite_ipcp->ipcp_id, dif_name, ipcp_name,
+    rl_fa_req_fill(req, event_id, rl_ipcp->ipcp_id, dif_name, ipcp_name,
                    local_appl, remote_appl, flowspec, upper_ipcp_id);
 
     PD("Requesting flow allocation...\n");

@@ -284,10 +284,10 @@ uipcp_rib::~uipcp_rib()
     pthread_mutex_destroy(&lock);
 }
 
-struct rlite_ipcp *
+struct rl_ipcp *
 uipcp_rib::ipcp_info() const
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
 
     ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->ipcp_id);
     assert(ipcp);
@@ -304,7 +304,7 @@ char *
 uipcp_rib::dump() const
 {
     stringstream ss;
-    struct rlite_ipcp *ipcp = ipcp_info();
+    struct rl_ipcp *ipcp = ipcp_info();
 
     ss << "QoS cubes" << endl;
     for (map<string, struct rlite_flow_config>::const_iterator
@@ -467,7 +467,7 @@ int
 uipcp_rib::send_to_dst_addr(CDAPMessage *m, uint64_t dst_addr,
                             const UipcpObject *obj)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     AData adata;
     CDAPMessage am;
     char objbuf[4096];

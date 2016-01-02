@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-struct rlite_ipcp {
+struct rl_ipcp {
     /* IPCP attributes. */
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
@@ -52,11 +52,11 @@ rl_ctrl_get_id(struct rlite_ctrl *ctrl);
 int
 rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl);
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
                          const char *dif_name);
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
                           const struct rina_name *name);
 
@@ -64,7 +64,7 @@ int
 rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
                              uint64_t *addr);
 
-struct rlite_ipcp *
+struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
 
 void

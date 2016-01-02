@@ -216,7 +216,7 @@ struct uipcp_rib {
     uipcp_rib(struct uipcp *_u);
     ~uipcp_rib();
 
-    struct rlite_ipcp *ipcp_info() const;
+    struct rl_ipcp *ipcp_info() const;
     char *dump() const;
 
     int set_address(uint64_t address);

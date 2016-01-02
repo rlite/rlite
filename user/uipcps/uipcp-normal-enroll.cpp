@@ -328,7 +328,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
         /* (1) I --> S: M_CONNECT */
 
         CDAPAuthValue av;
-        struct rlite_ipcp *ipcp;
+        struct rl_ipcp *ipcp;
         struct rina_name dst_name;
 
         ipcp = rib->ipcp_info();
@@ -390,7 +390,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START */
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     EnrollmentInfo enr_info;
     CDAPMessage m;
     int ret;
@@ -433,7 +433,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
      * (4) S --> I: M_START_R
      * (5) S --> I: M_CREATE
      * (6) S --> I: M_STOP */
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool has_address;
@@ -671,7 +671,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (7) S <-- I: M_STOP_R */
     /* (8) S --> I: M_START(status) */
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     CDAPMessage m;
     int ret;
 
@@ -844,7 +844,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
         NeighborCandidateList ncl;
         NeighborCandidate cand;
         RinaName cand_name;
-        struct rlite_ipcp *ipcp;
+        struct rl_ipcp *ipcp;
 
         /* My neighbors. */
         for (map<string, NeighborCandidate>::iterator cit =
@@ -946,7 +946,7 @@ common_lower_dif(const list<string> l1, const list<string> l2)
 int
 uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
@@ -1069,7 +1069,7 @@ int
 Neighbor::alloc_flow(const char *supp_dif_name)
 {
     struct rina_name neigh_name;
-    struct rlite_ipcp *info;
+    struct rl_ipcp *info;
     unsigned int lower_ipcp_id_ = ~0U;
     unsigned int port_id_;
     unsigned int event_id;
@@ -1084,7 +1084,7 @@ Neighbor::alloc_flow(const char *supp_dif_name)
     ipcp_name.rina_name_fill(&neigh_name);
 
     {
-        struct rlite_ipcp *ipcp;
+        struct rl_ipcp *ipcp;
 
         ipcp = rl_ctrl_select_ipcp_by_dif(&rib->uipcp->loop.ctrl,
                                         supp_dif_name);
@@ -1247,7 +1247,7 @@ normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     struct enrolled_neigh *ni;
     ScopeLock(rib->lock);
-    struct rlite_ipcp *rlite_ipcp = rib->ipcp_info();
+    struct rl_ipcp *rl_ipcp = rib->ipcp_info();
 
     list_init(neighs);
 
@@ -1262,8 +1262,8 @@ normal_get_enrolled_neighs(struct uipcp *uipcp, struct list_head *neighs)
         }
 
         if (neigh->ipcp_name.rina_name_fill(&ni->neigh_name) ||
-                rina_name_copy(&ni->ipcp_name, &rlite_ipcp->ipcp_name) ||
-                (ni->dif_name = strdup(rlite_ipcp->dif_name)) == NULL) {
+                rina_name_copy(&ni->ipcp_name, &rl_ipcp->ipcp_name) ||
+                (ni->dif_name = strdup(rl_ipcp->dif_name)) == NULL) {
             PE("Out of memory\n");
             free(ni);
             return -1;

@@ -44,7 +44,7 @@ uipcp_rib::commit_lower_flow(uint64_t local_addr, const Neighbor& neigh)
 int
 uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    struct rlite_ipcp *ipcp;
+    struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
