@@ -114,6 +114,8 @@ ipcp_update(struct rlite_evloop *loop,
 {
     const struct rl_kmsg_ipcp_update *upd =
         (const struct rl_kmsg_ipcp_update *)b_resp;
+    struct rlite_ipcp *rlite_ipcp = NULL;
+    struct rlite_ipcp *cur;
 
     (void)b_req;
 
@@ -121,6 +123,70 @@ ipcp_update(struct rlite_evloop *loop,
        "dif_type=%s\n",
         upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
         upd->dif_name, upd->dif_type);
+
+    pthread_mutex_lock(&loop->lock);
+
+    list_for_each_entry(cur, &loop->ipcps2, node) {
+        if (cur->ipcp_id == upd->ipcp_id) {
+            rlite_ipcp = cur;
+            break;
+        }
+    }
+
+    switch (upd->update_type) {
+        case RLITE_UPDATE_ADD:
+            if (rlite_ipcp) {
+                PE("UPDATE IPCP [ADD]: ipcp %u already exists\n", upd->ipcp_id);
+                goto out;
+            }
+            break;
+
+        case RLITE_UPDATE_UPD:
+        case RLITE_UPDATE_DEL:
+            if (!rlite_ipcp) {
+                PE("UPDATE IPCP [UPD/DEL]: ipcp %u does not exists\n", upd->ipcp_id);
+                goto out;
+            }
+            break;
+
+        default:
+            PE("Invalid update type %u\n", upd->update_type);
+            goto out;
+    }
+
+    if (upd->update_type == RLITE_UPDATE_UPD ||
+            upd->update_type == RLITE_UPDATE_DEL) {
+        /* Free the entry. */
+        if (rlite_ipcp->dif_type) {
+            free(rlite_ipcp->dif_type);
+        }
+        rina_name_free(&rlite_ipcp->ipcp_name);
+        free(rlite_ipcp->dif_name);
+        list_del(&rlite_ipcp->node);
+        free(rlite_ipcp);
+    }
+
+    if (upd->update_type == RLITE_UPDATE_ADD ||
+            upd->update_type == RLITE_UPDATE_UPD) {
+        /* Create a new entry. */
+        rlite_ipcp = malloc(sizeof(*rlite_ipcp));
+        if (!rlite_ipcp) {
+            PE("Out of memory\n");
+            goto out;
+        }
+
+        rlite_ipcp->ipcp_id = upd->ipcp_id;
+        rlite_ipcp->dif_type = strdup(upd->dif_type);
+        rlite_ipcp->ipcp_addr = upd->ipcp_addr;
+        rlite_ipcp->depth = upd->depth;
+        rina_name_copy(&rlite_ipcp->ipcp_name, &upd->ipcp_name);
+        rlite_ipcp->dif_name = strdup(upd->dif_name);
+
+        list_add_tail(&rlite_ipcp->node, &loop->ipcps2);
+    }
+
+out:
+    pthread_mutex_unlock(&loop->lock);
 
     return 0;
 }
@@ -663,6 +729,7 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     loop->ipcps_next = &loop->ipcps_lists[1];
     list_init(loop->ipcps);
     list_init(loop->ipcps_next);
+    list_init(&loop->ipcps2);
     list_init(&loop->fdcbs);
     list_init(&loop->timer_events);
     pthread_mutex_init(&loop->timer_lock, NULL);

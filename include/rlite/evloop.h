@@ -81,6 +81,8 @@ struct rlite_evloop {
     struct list_head *ipcps;
     struct list_head *ipcps_next;
     struct list_head ipcps_lists[2];
+
+    struct list_head ipcps2;
 };
 
 /* Issue a request message to the kernel. Takes the ownership of
