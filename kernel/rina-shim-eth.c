@@ -59,7 +59,10 @@ struct rina_shim_eth {
     char *upper_name_s;
     struct list_head arp_table;
     spinlock_t arpt_lock;
+    struct timer_list arp_resolver_tmr;
 };
+
+static void arp_resolver_cb(unsigned long arg);
 
 static void *
 rina_shim_eth_create(struct ipcp_entry *ipcp)
@@ -76,6 +79,9 @@ rina_shim_eth_create(struct ipcp_entry *ipcp)
     priv->upper_name_s = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
+    init_timer(&priv->arp_resolver_tmr);
+    priv->arp_resolver_tmr.function = arp_resolver_cb;
+    priv->arp_resolver_tmr.data = (unsigned long)priv;
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -88,14 +94,14 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     struct rina_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
 
-    spin_lock(&priv->arpt_lock);
+    spin_lock_irq(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del(&entry->node);
         kfree(entry->spa);
         kfree(entry->tpa);
         kfree(entry);
     }
-    spin_unlock(&priv->arpt_lock);
+    spin_unlock_irq(&priv->arpt_lock);
 
     if (priv->netdev) {
         rtnl_lock();
@@ -246,6 +252,54 @@ arp_create(struct rina_shim_eth *priv, uint16_t op, const char *spa,
     return skb;
 }
 
+static void
+arp_resolver_cb(unsigned long arg)
+{
+    struct rina_shim_eth *priv = (struct rina_shim_eth *)arg;
+    struct arpt_entry *entry;
+    bool some_incomplete = false;
+    struct sk_buff_head skbq;
+
+    skb_queue_head_init(&skbq);
+
+    spin_lock_irq(&priv->arpt_lock);
+    list_for_each_entry(entry, &priv->arp_table, node) {
+        if (!entry->complete) {
+            struct sk_buff *skb;
+
+            some_incomplete = true;
+
+            BUG_ON(!entry->spa);
+            BUG_ON(!entry->tpa);
+            PD("%s: Trying again to resolve %s\n", __func__, entry->tpa);
+            skb = arp_create(priv, ARPOP_REQUEST, entry->spa,
+                             strlen(entry->spa), entry->tpa,
+                             strlen(entry->tpa), NULL, GFP_ATOMIC);
+
+            if (skb) {
+                __skb_queue_tail(&skbq, skb);
+            }
+        }
+    }
+
+    if (some_incomplete) {
+        mod_timer(&priv->arp_resolver_tmr, jiffies + msecs_to_jiffies(2000));
+    }
+
+    spin_unlock_irq(&priv->arpt_lock);
+
+    for (;;) {
+        struct sk_buff *skb;
+
+        skb = __skb_dequeue(&skbq);
+        if (!skb) {
+            break;
+        }
+
+        dev_queue_xmit(skb);
+    }
+}
+
 static int
 rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
                      struct flow_entry *flow)
@@ -266,13 +320,13 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         goto nomem;
     }
 
-    spin_lock(&priv->arpt_lock);
+    spin_lock_irq(&priv->arpt_lock);
 
     entry = arp_lookup_direct_b(priv, tpa, strlen(tpa));
     if (entry) {
         /* ARP entry already exist for remote application. Nothing
          * to do here. */
-        spin_unlock(&priv->arpt_lock);
+        spin_unlock_irq(&priv->arpt_lock);
         kfree(spa);
         kfree(tpa);
         return 0;
@@ -288,7 +342,7 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     entry->complete = false;
     list_add_tail(&entry->node, &priv->arp_table);
 
-    spin_unlock(&priv->arpt_lock);
+    spin_unlock_irq(&priv->arpt_lock);
 
     spa = rina_name_to_string(&flow->local_application);
     tpa = rina_name_to_string(&flow->remote_application);
@@ -306,6 +360,12 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
     kfree(tpa);
 
     dev_queue_xmit(skb);
+
+    spin_lock_irq(&priv->arpt_lock);
+    if (!timer_pending(&priv->arp_resolver_tmr)) {
+        mod_timer(&priv->arp_resolver_tmr, jiffies + msecs_to_jiffies(2000));
+    }
+    spin_unlock_irq(&priv->arpt_lock);
 
     return 0;
 
@@ -377,18 +437,18 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         /* Update the ARP table with an entry SPA --> SHA. */
         struct arpt_entry *entry;
 
-        spin_lock(&priv->arpt_lock);
+        spin_lock_irq(&priv->arpt_lock);
 
         entry = arp_lookup_direct_b(priv, spa, arp->ar_pln);
         if (!entry) {
-            spin_unlock(&priv->arpt_lock);
+            spin_unlock_irq(&priv->arpt_lock);
             /* Gratuitous ARP reply. Don't accept it (for now). */
             PI("%s: Dropped gratuitous ARP reply\n", __func__);
             return;
         }
 
         if (arp->ar_hln != sizeof(entry->tha)) {
-            spin_unlock(&priv->arpt_lock);
+            spin_unlock_irq(&priv->arpt_lock);
             /* Only support 48-bits hardware address (for now). */
             PI("%s: Dropped ARP reply with SHA/THA len of %d\n",
                __func__, arp->ar_hln);
@@ -402,7 +462,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
            __func__, entry->tpa, entry->tha[0], entry->tha[1],
            entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
 
-        spin_unlock(&priv->arpt_lock);
+        spin_unlock_irq(&priv->arpt_lock);
     } else {
         PI("%s: Unknown RINA ARP operation %04X\n", __func__,
                 ntohs(arp->ar_op));
