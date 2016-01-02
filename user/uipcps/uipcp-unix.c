@@ -488,6 +488,12 @@ int main(int argc, char **argv)
     struct sigaction sa;
     int ret;
 
+    /* We require root permissions. */
+    if (geteuid() != 0) {
+        PE("uipcps daemon needs root permissions\n");
+        return -1;
+    }
+
     /* Open a Unix domain socket to listen to. */
     uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (uipcps->lfd < 0) {
