@@ -103,7 +103,9 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     spin_lock_irq(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del(&entry->node);
-        kfree(entry->spa);
+        if (entry->spa) {
+            kfree(entry->spa);
+        }
         kfree(entry->tpa);
         kfree(entry);
     }
@@ -429,6 +431,18 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return -EINVAL;
 }
 
+static size_t
+arp_name_len(const char *buf, size_t buflen)
+{
+    size_t j = 0;
+
+    while (j < buflen && buf[j] != 0) {
+        j++;
+    }
+
+    return j;
+}
+
 static void
 shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
 {
@@ -447,6 +461,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
     spin_lock_irq(&priv->arpt_lock);
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
+        struct arpt_entry *entry;
         int upper_name_len;
 
         if (!priv->upper_name_s) {
@@ -469,6 +484,33 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         skb = arp_create(priv, ARPOP_REPLY, priv->upper_name_s,
                          strlen(priv->upper_name_s),
                          spa, arp->ar_pln, sha, GFP_ATOMIC);
+
+        entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
+        if (entry) {
+            size_t spa_len = arp_name_len(spa, arp->ar_pln);
+
+            entry->tpa = kmalloc(spa_len + 1, GFP_ATOMIC);
+            if (!entry->tpa) {
+                kfree(entry);
+                entry = NULL;
+            } else {
+                memcpy(entry->tpa, spa, spa_len);
+                entry->tpa[spa_len] = '\0';
+                entry->spa = NULL;  /* Won't be needed. */
+                entry->complete = true;
+                entry->flow = NULL;
+                memcpy(entry->tha, sha, sizeof(entry->tha));
+                list_add_tail(&entry->node, &priv->arp_table);
+
+                PD("%s: ARP entry %s --> %02X%02X%02X%02X%02X%02X completed\n",
+                        __func__, entry->tpa, entry->tha[0], entry->tha[1],
+                        entry->tha[2], entry->tha[3], entry->tha[4], entry->tha[5]);
+            }
+        }
+
+        if (!entry) {
+            PI("%s: ARP table entry allocation failed\n", __func__);
+        }
 
     } else if (ntohs(arp->ar_op) == ARPOP_REPLY) {
         /* Update the ARP table with an entry SPA --> SHA. */
