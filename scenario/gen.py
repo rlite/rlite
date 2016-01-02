@@ -157,7 +157,7 @@ for i in vms:
     outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'sudo hostname %(name)s\n'\
             '\n'\
@@ -216,7 +216,7 @@ if args.type == 'inet4':
         outs += ''\
                 'DONE=255\n'\
                 'while [ $DONE != "0" ]; do\n'\
-                '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
         for entry in inet4_dir:
                 outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
@@ -252,7 +252,7 @@ for br_name in bridges:
         outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'rina-config ipcp-enroll n.1.DIF n.1.IPCP %(id)s '\
                                     'n.1.IPCP %(pvid)s e.%(brid)s.DIF\n'\
@@ -283,7 +283,7 @@ for level in range(2, args.levels + 1):
         outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'rina-config ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP %(id)s '\
                             'n.%(level)s.IPCP %(pvid)s n.%(lm1)s.DIF\n'\
@@ -388,7 +388,7 @@ outs =  '#!/bin/bash\n'                                             \
 outs += ''\
         'DONE=255\n'\
         'while [ $DONE != "0" ]; do\n'\
-        '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': pvm['ssh']}
+        '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': pvm['ssh']}
 
 for level in range(1, args.levels + 1):
     outs += 'rinaperf -l -d n.%(level)s.DIF &> /dev/null &\n' % {'level' : level}
@@ -424,7 +424,7 @@ for vm_name in vms:
     outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
     for level in range(1, args.levels + 1):
         outs += 'rinaperf -c 10 -d n.%(level)s.DIF\n' % {'level': level}
