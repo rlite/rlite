@@ -100,7 +100,7 @@ struct CDAPMessage {
 
     bool valid(bool check_invoke_id) const;
 
-    void get_obj_value(int32_t& v)
+    void get_obj_value(int32_t& v) const
     {
         v = 0;
         if (obj_value.ty == I32) {
@@ -114,7 +114,7 @@ struct CDAPMessage {
         obj_value.u.i32 = v;
     }
 
-    void get_obj_value(int64_t& v)
+    void get_obj_value(int64_t& v) const
     {
         v = 0;
         if (obj_value.ty == I64) {
@@ -128,7 +128,7 @@ struct CDAPMessage {
         obj_value.u.i64 = v;
     }
 
-    void get_obj_value(float& v)
+    void get_obj_value(float& v) const
     {
         v = 0.0;
         if (obj_value.ty == FLOAT) {
@@ -142,7 +142,7 @@ struct CDAPMessage {
         obj_value.u.fp_single = v;
     }
 
-    void get_obj_value(double& v)
+    void get_obj_value(double& v) const
     {
         v = 0.0;
         if (obj_value.ty == DOUBLE) {
@@ -156,7 +156,7 @@ struct CDAPMessage {
         obj_value.u.fp_double = v;
     }
 
-    void get_obj_value(bool& v)
+    void get_obj_value(bool& v) const
     {
         v = false;
         if (obj_value.ty == BOOL) {
@@ -170,7 +170,7 @@ struct CDAPMessage {
         obj_value.u.boolean = v;
     }
 
-    void get_obj_value(std::string& v)
+    void get_obj_value(std::string& v) const
     {
         v = std::string();
         if (obj_value.ty == STRING) {
@@ -190,7 +190,7 @@ struct CDAPMessage {
         obj_value.str = std::string(v);
     }
 
-    void get_obj_value(const char *& p, size_t& l)
+    void get_obj_value(const char *& p, size_t& l) const
     {
         p = NULL;
         l = 0;
