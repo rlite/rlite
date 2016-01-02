@@ -30,15 +30,27 @@ remove_flow_work(struct work_struct *work)
     struct dtp *dtp = container_of(work, struct dtp, remove.work);
     struct flow_entry *flow = container_of(dtp, struct flow_entry, dtp);
     struct rina_buf *rb, *tmp;
+    int dropped;
 
     spin_lock_irq(&dtp->lock);
-    PD("%s: Delayed flow removal, dropping %u PDUs\n",
+
+    PD("%s: Delayed flow removal, dropping %u PDUs from cwq\n",
             __func__, dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del(&rb->node);
         rina_buf_free(rb);
         dtp->cwq_len--;
     }
+
+    dropped = 0;
+    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
+        list_del(&rb->node);
+        rina_buf_free(rb);
+        dropped++;
+    }
+    PD("%s: Delayed flow removal, dropped %d PDUs from rtxq\n",
+            __func__, dropped);
+
     spin_unlock_irq(&dtp->lock);
 
     flow_put(flow);
