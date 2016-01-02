@@ -5,6 +5,7 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
+#include <linux/hrtimer.h>
 
 #include "rina-bufs.h"
 
@@ -30,6 +31,8 @@ struct ipcp_ops {
      * flow allocation response from the upper layer. */
     int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                               uint8_t response);
+
+    int (*flow_init)(struct ipcp_entry *ipcp, struct flow_entry *flow);
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rina_buf *rb);
@@ -97,15 +100,9 @@ struct upper_ref {
 
 struct dtp {
     uint64_t next_seq_num_to_send;
+    struct hrtimer snd_inact_tmr;
+    struct hrtimer rcv_inact_tmr;
 };
-
-static inline void txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
-{
-    spin_lock_init(&txrx->lock);
-    INIT_LIST_HEAD(&txrx->queue);
-    init_waitqueue_head(&txrx->wqh);
-    txrx->ipcp = ipcp;
-}
 
 struct flow_entry {
     uint16_t            local_port;  /* flow table key */
@@ -117,7 +114,7 @@ struct flow_entry {
     struct rina_name    remote_application;
     struct upper_ref    upper;
     uint32_t            event_id; /* requestor event id */
-    struct txrx          txrx;
+    struct txrx         txrx;
     struct dtp          dtp;
 
     struct mutex        lock; /* Unused */
@@ -146,5 +143,21 @@ int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);
 
 struct flow_entry *flow_lookup(unsigned int port_id);
+
+static inline void
+txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
+{
+    spin_lock_init(&txrx->lock);
+    INIT_LIST_HEAD(&txrx->queue);
+    init_waitqueue_head(&txrx->wqh);
+    txrx->ipcp = ipcp;
+}
+
+static inline void
+dtp_init(struct dtp *dtp)
+{
+    hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+}
 
 #endif  /* __RINA_IPCP_H__ */

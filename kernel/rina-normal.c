@@ -93,6 +93,12 @@ rina_normal_assign_to_dif(struct ipcp_entry *ipcp,
     return 0;
 }
 
+static int
+rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+{
+    return 0;
+}
+
 static struct flow_entry *
 pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 {
@@ -298,6 +304,7 @@ rina_normal_init(void)
     factory.ops.assign_to_dif = rina_normal_assign_to_dif;
     factory.ops.flow_allocate_req = NULL; /* Reflect to userspace. */
     factory.ops.flow_allocate_resp = NULL; /* Reflect to userspace. */
+    factory.ops.flow_init = rina_normal_flow_init;
     factory.ops.sdu_write = rina_normal_sdu_write;
     factory.ops.config = rina_normal_config;
     factory.ops.pduft_set = rina_normal_pduft_set;
