@@ -21,27 +21,27 @@ struct rlite_flow {
 };
 
 long int
-rlconf_ipcp_create(struct rlite_ctrl *ctrl,
-                   const struct rina_name *name, const char *dif_type,
-                   const char *dif_name);
+rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
+                    const struct rina_name *name, const char *dif_type,
+                    const char *dif_name);
 
 int
-rlconf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
-                    const char *dif_type);
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+                     const char *dif_type);
 
 int
-rlconf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
                     const char *param_name, const char *param_value);
 
 /* Fetch information about all flows in the system. */
 int
-rlconf_flows_print(struct list_head *flows);
+rl_conf_flows_print(struct list_head *flows);
 
 int
-rlconf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows);
+rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows);
 
 void
-rlconf_flows_purge(struct list_head *flows);
+rl_conf_flows_purge(struct list_head *flows);
 
 #ifdef __cplusplus
 }

@@ -132,7 +132,7 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
 
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    ipcp_id = rlconf_ipcp_create(ctrl, &ipcp_name, dif_type, dif_name);
+    ipcp_id = rl_conf_ipcp_create(ctrl, &ipcp_name, dif_type, dif_name);
 
     if (ipcp_id >= 0) {
         PI("IPCP of type '%s' created, assigned id %u\n", dif_type,
@@ -166,7 +166,7 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rlconf_ipcp_destroy(ctrl, rlite_ipcp->ipcp_id, rlite_ipcp->dif_type);
+    ret = rl_conf_ipcp_destroy(ctrl, rlite_ipcp->ipcp_id, rlite_ipcp->dif_type);
     if (!ret) {
         PI("IPCP %u destroyed\n", rlite_ipcp->ipcp_id);
     }
@@ -199,7 +199,7 @@ ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
         PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
-        ret = rlconf_ipcp_config(ctrl, rlite_ipcp->ipcp_id, param_name, param_value);
+        ret = rl_conf_ipcp_config(ctrl, rlite_ipcp->ipcp_id, param_name, param_value);
         if (!ret) {
             PI("IPCP %u configured correctly: %s <== %s\n", rlite_ipcp->ipcp_id,
                param_name, param_value);
@@ -345,9 +345,9 @@ flows_show(int argc, char **argv, struct rlite_ctrl *ctrl)
     struct list_head flows;
 
     list_init(&flows);
-    rlconf_flows_fetch(ctrl, &flows);
-    rlconf_flows_print(&flows);
-    rlconf_flows_purge(&flows);
+    rl_conf_flows_fetch(ctrl, &flows);
+    rl_conf_flows_print(&flows);
+    rl_conf_flows_purge(&flows);
 
     return 0;
 }
@@ -403,27 +403,27 @@ test(struct rlite_ctrl *ctrl)
 
     /* Create an IPC process of type shim-loopback. */
     rina_name_fill(&name, "test-shim-loopback.IPCP", "1", NULL, NULL);
-    lret = rlconf_ipcp_create(ctrl, &name, "shim-loopback",
+    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
                                 "test-shim-loopback.DIF");
     assert(lret >= 0);
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-loopback.IPCP", "2", NULL, NULL);
-    lret = rlconf_ipcp_create(ctrl, &name, "shim-loopback",
+    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
                               "test-shim-loopback.DIF");
     assert(lret >= 0);
 
-    lret = rlconf_ipcp_create(ctrl, &name, "shim-loopback",
+    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
                               "test-shim-loopback.DIF");
     assert(lret < 0);
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    ret = rlconf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
     assert(!ret);
-    ret = rlconf_ipcp_destroy(ctrl, 1, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 1, "shim-loopback");
     assert(!ret);
-    ret = rlconf_ipcp_destroy(ctrl, 0, "shim-loopback");
+    ret = rl_conf_ipcp_destroy(ctrl, 0, "shim-loopback");
     assert(ret);
 
     return 0;

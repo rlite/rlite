@@ -10,9 +10,9 @@
 
 /* Create an IPC process. */
 long int
-rlconf_ipcp_create(struct rlite_ctrl *ctrl,
-                   const struct rina_name *name, const char *dif_type,
-                   const char *dif_name)
+rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
+                    const struct rina_name *name, const char *dif_type,
+                    const char *dif_name)
 {
     struct rl_kmsg_ipcp_create msg;
     struct rl_kmsg_ipcp_create_resp *resp;
@@ -51,8 +51,8 @@ rlconf_ipcp_create(struct rlite_ctrl *ctrl,
 
 /* Destroy an IPC process. */
 int
-rlconf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
-                    const char *dif_type)
+rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+                     const char *dif_type)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;
@@ -75,7 +75,7 @@ rlconf_ipcp_destroy(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
 
 /* Configure an IPC process. */
 int
-rlconf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
+rl_conf_ipcp_config(struct rlite_ctrl *ctrl, unsigned int ipcp_id,
                     const char *param_name, const char *param_value)
 {
     struct rl_kmsg_ipcp_config msg;
@@ -125,7 +125,7 @@ flow_fetch_resp(struct list_head *flows,
 }
 
 int
-rlconf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
+rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
 {
     struct rl_kmsg_flow_fetch_resp *resp;
     struct rlite_msg_base msg;
@@ -170,7 +170,7 @@ rlconf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
 }
 
 void
-rlconf_flows_purge(struct list_head *flows)
+rl_conf_flows_purge(struct list_head *flows)
 {
     struct rlite_flow *rlite_flow, *tmp;
 
@@ -182,7 +182,7 @@ rlconf_flows_purge(struct list_head *flows)
 }
 
 int
-rlconf_flows_print(struct list_head *flows)
+rl_conf_flows_print(struct list_head *flows)
 {
     struct rlite_flow *rlite_flow;
 
