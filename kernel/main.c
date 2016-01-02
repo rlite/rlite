@@ -1814,8 +1814,11 @@ out:
 }
 EXPORT_SYMBOL_GPL(rina_fa_resp_arrived);
 
+/* Userspace queue threshold. */
+#define USR_Q_TH        128
+
 int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rina_buf *rb)
+                     struct rina_buf *rb, bool qlimit)
 {
     struct txrx *txrx;
     int ret = 0;
@@ -1867,8 +1870,15 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     spin_lock_bh(&txrx->rx_lock);
-    list_add_tail(&rb->node, &txrx->rx_q);
-    txrx->rx_qlen++;
+    if (unlikely(qlimit && txrx->rx_qlen >= USR_Q_TH)) {
+        /* This is useful when flow control is not used on a flow. */
+        RPD(5, "dropping PDU [length %lu] to avoid userspace rx queue "
+                "overrun\n", (long unsigned)rb->len);
+        rina_buf_free(rb);
+    } else {
+        list_add_tail(&rb->node, &txrx->rx_q);
+        txrx->rx_qlen++;
+    }
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
@@ -1889,7 +1899,7 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         return -ENXIO;
     }
 
-    ret = rina_sdu_rx_flow(ipcp, flow, rb);
+    ret = rina_sdu_rx_flow(ipcp, flow, rb, true);
     flow_put(flow);
 
     return ret;

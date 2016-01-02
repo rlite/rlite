@@ -895,9 +895,6 @@ out:
     return 0;
 }
 
-/* Userspace queue threshold. */
-#define USR_Q_TH        128
-
 static int
 rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 {
@@ -910,6 +907,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     struct dtp *dtp;
     bool deliver;
     bool drop;
+    bool qlimit;
     int ret = 0;
 
     if (pci->dst_addr != ipcp->addr) {
@@ -937,6 +935,11 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     dtp = &flow->dtp;
 
+    /* Ask rina_sdu_rx_flow() to limit the userspace queue only
+     * if this flow does not use flow control. If flow control
+     * is used, it will limit the userspace queue automatically. */
+    qlimit = (flow->cfg.dtcp.flow_control == 0);
+
     spin_lock_bh(&dtp->lock);
 
     if (flow->cfg.dtcp_present) {
@@ -956,7 +959,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         spin_unlock_bh(&dtp->lock);
 
         rina_buf_pci_pop(rb);
-        ret = rina_sdu_rx_flow(ipcp, flow, rb);
+        ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         goto snd_crb;
     }
@@ -1034,14 +1037,6 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     deliver = !drop && (gap <= flow->cfg.max_sdu_gap);
 
-    if (unlikely(deliver && !flow->upper.ipcp &&
-                 flow->txrx.rx_qlen >= USR_Q_TH)) {
-        RPD(5, "early dropping [%lu] to avoid userspace rx queue "
-                "overrun\n", (long unsigned)seqnum);
-        deliver = false;
-        drop = true;
-    }
-
     if (deliver) {
         struct list_head qrbs;
         struct rina_buf *qrb, *tmp;
@@ -1060,7 +1055,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         spin_unlock_bh(&dtp->lock);
 
         rina_buf_pci_pop(rb);
-        ret = rina_sdu_rx_flow(ipcp, flow, rb);
+        ret = rina_sdu_rx_flow(ipcp, flow, rb, qlimit);
 
         /* Also deliver PDUs just extracted from the seqq. Note
          * that we must use the safe version of list scanning, since
@@ -1068,7 +1063,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
             list_del(&qrb->node);
             rina_buf_pci_pop(qrb);
-            ret |= rina_sdu_rx_flow(ipcp, flow, qrb);
+            ret |= rina_sdu_rx_flow(ipcp, flow, qrb, qlimit);
         }
 
         goto snd_crb;
@@ -1109,7 +1104,8 @@ rina_normal_sdu_rx_consumed(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     spin_lock_bh(&dtp->lock);
 
-    dtp->rcv_lwe =  RINA_BUF_PCI(rb)->seqnum + 1;
+    /* Update the advertised RCVLWE and send an ACK control PDU. */
+    dtp->rcv_lwe = RINA_BUF_PCI(rb)->seqnum + 1;
     crb = sdu_rx_sv_update(ipcp, flow);
 
     spin_unlock_bh(&dtp->lock);

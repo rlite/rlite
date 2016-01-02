@@ -491,7 +491,7 @@ rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 entry->rx_tmpq_len);
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
             list_del(&rb->node);
-            rina_sdu_rx_flow(ipcp, flow, rb);
+            rina_sdu_rx_flow(ipcp, flow, rb, true);
         }
         entry->rx_tmpq_len = 0;
         arpt_flow_bind(entry, flow);
@@ -673,7 +673,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
     if (likely(flow)) {
         spin_unlock_bh(&priv->arpt_lock);
 
-        rina_sdu_rx_flow(priv->ipcp, flow, rb);
+        rina_sdu_rx_flow(priv->ipcp, flow, rb, true);
 
         return;
     }

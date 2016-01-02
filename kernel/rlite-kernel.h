@@ -205,7 +205,7 @@ int rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb,
                 uint32_t local_port);
 
 int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rina_buf *rb);
+                     struct rina_buf *rb, bool qlimit);
 
 void rina_write_restart(uint32_t local_port);
 
