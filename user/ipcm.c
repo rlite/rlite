@@ -55,7 +55,7 @@ struct ipcm {
 
 static int
 ipcp_create_resp(struct ipcm *ipcm,
-                 const struct rina_msg_base *b_resp,
+                 const struct rina_msg_base_resp *b_resp,
                  const struct rina_msg_base *b_req)
 {
     struct rina_kmsg_ipcp_create_resp *resp =
@@ -71,15 +71,13 @@ ipcp_create_resp(struct ipcm *ipcm,
 
 static int
 ipcp_destroy_resp(struct ipcm *ipcm,
-                  const struct rina_msg_base *b_resp,
+                  const struct rina_msg_base_resp *b_resp,
                   const struct rina_msg_base *b_req)
 {
-    struct rina_msg_base_resp *resp =
-            (struct rina_msg_base_resp *)b_resp;
     struct rina_kmsg_ipcp_destroy *req =
             (struct rina_kmsg_ipcp_destroy *)b_req;
 
-    if (resp->result) {
+    if (b_resp->result) {
         printf("%s: Failed to destroy IPC process %d\n", __func__,
                 req->ipcp_id);
     } else {
@@ -93,7 +91,7 @@ static int ipcp_fetch(struct ipcm *ipcm);
 
 static int
 ipcp_fetch_resp(struct ipcm *ipcm,
-                const struct rina_msg_base *b_resp,
+                const struct rina_msg_base_resp *b_resp,
                 const struct rina_msg_base *b_req)
 {
     const struct rina_kmsg_fetch_ipcp_resp *resp =
@@ -135,18 +133,16 @@ ipcp_fetch_resp(struct ipcm *ipcm,
 
 static int
 assign_to_dif_resp(struct ipcm *ipcm,
-                   const struct rina_msg_base *b_resp,
+                   const struct rina_msg_base_resp *b_resp,
                    const struct rina_msg_base *b_req)
 {
-    struct rina_msg_base_resp *resp =
-            (struct rina_msg_base_resp *)b_resp;
     struct rina_kmsg_assign_to_dif *req =
             (struct rina_kmsg_assign_to_dif *)b_req;
     char *name_s = NULL;
 
     name_s = rina_name_to_string(&req->dif_name);
 
-    if (resp->result) {
+    if (b_resp->result) {
         printf("%s: Failed to assign IPC process %u to DIF %s\n",
                 __func__, req->ipcp_id, name_s);
     } else {
@@ -163,19 +159,17 @@ assign_to_dif_resp(struct ipcm *ipcm,
 
 static int
 application_register_resp(struct ipcm *ipcm,
-                          const struct rina_msg_base *b_resp,
+                          const struct rina_msg_base_resp *b_resp,
                           const struct rina_msg_base *b_req)
 {
-    struct rina_msg_base_resp *resp =
-            (struct rina_msg_base_resp *)b_resp;
     struct rina_kmsg_application_register *req =
             (struct rina_kmsg_application_register *)b_req;
     char *name_s = NULL;
-    int reg = resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
+    int reg = b_resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
 
     name_s = rina_name_to_string(&req->application_name);
 
-    if (resp->result) {
+    if (b_resp->result) {
         printf("%s: Failed to %sregister application %s to IPC process %u\n",
                 __func__, (reg ? "" : "un"), name_s, req->ipcp_id);
     } else {
@@ -192,7 +186,7 @@ application_register_resp(struct ipcm *ipcm,
 
 /* The signature of a response handler. */
 typedef int (*rina_resp_handler_t)(struct ipcm *ipcm,
-                                   const struct rina_msg_base * b_resp,
+                                   const struct rina_msg_base_resp *b_resp,
                                    const struct rina_msg_base *b_req);
 
 /* The table containing all kernel response handlers. */
@@ -216,7 +210,7 @@ evloop_function(void *arg)
     char msgbuf[4096];
 
     for (;;) {
-        struct rina_msg_base *resp;
+        struct rina_msg_base_resp *resp;
         fd_set rdfs;
         int ret;
 
@@ -239,8 +233,8 @@ evloop_function(void *arg)
             continue;
         }
 
-        /* Lookup the first two fields of the message. */
-        resp = (struct rina_msg_base *)serbuf;
+        /* Lookup the first two fields of the message. XXX can be done after deserialization */
+        resp = (struct rina_msg_base_resp *)serbuf;
 
         /* Do we have an handler for this response message? */
         if (resp->msg_type > RINA_KERN_MSG_MAX ||
@@ -272,7 +266,7 @@ evloop_function(void *arg)
             printf("%s: Problems during deserialization [%d]\n",
                     __func__, ret);
         }
-        resp = (struct rina_msg_base *)msgbuf;
+        resp = (struct rina_msg_base_resp *)msgbuf;
 
         printf("Message type %d received from kernel\n", resp->msg_type);
 
