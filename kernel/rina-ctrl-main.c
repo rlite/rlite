@@ -608,6 +608,35 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
+static void
+application_del_by_rc(struct rina_ctrl *rc)
+{
+    struct ipcp_entry *ipcp;
+    int bucket;
+    struct registered_application *app;
+    struct registered_application *tmp;
+    const char *s;
+
+    mutex_lock(&rina_dm.lock);
+    /* For each IPC processes. */
+    hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
+        /* For each application registered to this IPC process. */
+        list_for_each_entry_safe(app, tmp,
+                &ipcp->registered_applications, node) {
+            if (app->rc == rc) {
+                s = rina_name_to_string(&app->name);
+                printk("%s: Application %s automatically unregistered\n",
+                        __func__, s);
+                kfree(s);
+                list_del(&app->node);
+                rina_name_free(&app->name);
+                kfree(app);
+            }
+        }
+    }
+    mutex_unlock(&rina_dm.lock);
+}
+
 static int
 rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
@@ -1109,24 +1138,10 @@ rina_ctrl_release(struct inode *inode, struct file *f)
         rina_dm.ctrl = NULL;
         mutex_unlock(&rina_dm.lock);
     } else {
-        struct ipcp_entry *ipcp;
-        int bucket;
-        struct registered_application *app;
-        struct registered_application *tmp;
-
-        mutex_lock(&rina_dm.lock);
-        hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
-            list_for_each_entry_safe(app, tmp,
-                                     &ipcp->registered_applications, node) {
-                if (app->rc == rc) {
-                    printk("Deleting %p\n", rc);
-                    list_del(&app->node);
-                    rina_name_free(&app->name);
-                    kfree(app);
-                }
-            }
-        }
-        mutex_unlock(&rina_dm.lock);
+        /* This is a ctrl device opened by an application.
+         * We must invalidate (e.g. unregister) all the
+         * application names registered with this device. */
+        application_del_by_rc(rc);
     }
 
     kfree(rc);
