@@ -35,10 +35,14 @@ struct rina_msg_base_resp {
 } __attribute__((packed));
 
 struct rina_ioctl_info {
+    /* The port-id of the flow to bind to. */
     uint32_t port_id;
+    /* Is the user of the flow an IPCP ? Or is it just an application ? */
+    uint8_t is_upper_ipcp;
+    /* The IPCP that uses the flow, not to be confused with the IPCP
+     * that provides the flow. */
     uint16_t ipcp_id;
-    uint8_t  application;
-};
+} __attribute__((packed));
 
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */

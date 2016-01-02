@@ -264,7 +264,7 @@ flow_request_wait(struct application *application)
 }
 
 static int
-open_port_common(uint32_t port_id, int application, uint32_t ipcp_id)
+open_port_common(uint32_t port_id, int is_upper_ipcp, uint32_t ipcp_id)
 {
     struct rina_ioctl_info info;
     int fd;
@@ -278,7 +278,7 @@ open_port_common(uint32_t port_id, int application, uint32_t ipcp_id)
 
     info.port_id = port_id;
     info.ipcp_id = ipcp_id;
-    info.application = application;
+    info.is_upper_ipcp = is_upper_ipcp;
 
     ret = ioctl(fd, 73, &info);
     if (ret) {
@@ -292,13 +292,13 @@ open_port_common(uint32_t port_id, int application, uint32_t ipcp_id)
 int
 open_port_appl(uint32_t port_id)
 {
-    return open_port_common(port_id, 1, 0);
+    return open_port_common(port_id, 0, 0);
 }
 
 int
 open_port_ipcp(uint32_t port_id, uint16_t ipcp_id)
 {
-    return open_port_common(port_id, 0, ipcp_id);
+    return open_port_common(port_id, 1, ipcp_id);
 }
 
 /* flow_allocate() + open_port_appl() */

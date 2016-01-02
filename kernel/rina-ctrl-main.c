@@ -1741,7 +1741,7 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     rio->flow = flow;
     rio->flow->refcnt++;
 
-    if (!info.application) {
+    if (info.is_upper_ipcp) {
         struct ipcp_entry *ipcp;
 
         /* Lookup the IPCP user of 'flow'. */
