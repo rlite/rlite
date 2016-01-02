@@ -109,10 +109,8 @@ ipcp_register(struct uipcps *uipcps,
     int result = RLITE_ERR;
 
     /* Grab the corresponding userspace IPCP. */
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
     if (!uipcp) {
-        pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
 
@@ -129,7 +127,8 @@ ipcp_register(struct uipcps *uipcps,
             }
         }
     }
-    pthread_mutex_unlock(&uipcps->lock);
+
+    uipcp_put(uipcps, uipcp->ipcp_id);
 
     return result;
 }
@@ -152,15 +151,13 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
     int ret = RLITE_ERR; /* Report failure by default. */
     struct uipcp *uipcp;
 
-    pthread_mutex_lock(&uipcps->lock);
-
     /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
     if (uipcp && uipcp->ops.enroll) {
         ret = uipcp->ops.enroll(uipcp, req, 1);
     }
 
-    pthread_mutex_unlock(&uipcps->lock);
+    uipcp_put(uipcps, uipcp->ipcp_id);
 
     return ret;
 }
@@ -187,8 +184,7 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
 
     resp.result = RLITE_ERR; /* Report failure by default. */
 
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
     if (!uipcp) {
         goto out;
     }
@@ -197,9 +193,9 @@ rlite_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.dft_set(uipcp, req);
     }
 
-out:
-    pthread_mutex_unlock(&uipcps->lock);
+    uipcp_put(uipcps, uipcp->ipcp_id);
 
+out:
     return rlite_conf_response(sfd, RLITE_MB(req), &resp);
 }
 
@@ -216,8 +212,7 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     resp.result = RLITE_ERR; /* Report failure by default. */
     resp.dump = NULL;
 
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
     if (!uipcp) {
         goto out;
     }
@@ -229,9 +224,9 @@ rlite_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         }
     }
 
-out:
-    pthread_mutex_unlock(&uipcps->lock);
+    uipcp_put(uipcps, uipcp->ipcp_id);
 
+out:
     resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
@@ -357,8 +352,6 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
     struct uipcp *uipcp;
     int ret = -1;
 
-    pthread_mutex_lock(&uipcps->lock);
-
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
             if (upd->dif_type && type_has_uipcp(upd->dif_type)) {
@@ -368,12 +361,14 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
             break;
 
         case RLITE_UPDATE_DEL:
+            pthread_mutex_lock(&uipcps->lock);
             uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
+            pthread_mutex_unlock(&uipcps->lock);
             if (uipcp) {
                 /* Track all the unregistrations of the destroyed IPCP in
                  * the persistent registrations list. */
                 track_ipcp_unregistration(uipcps, upd->ipcp_id);
-                ret = uipcp_del(uipcps, upd->ipcp_id);
+                ret = uipcp_put(uipcps, upd->ipcp_id);
 
             } else {
                 /* This is an IPCP with no userspace implementation. */
@@ -385,8 +380,6 @@ uipcps_ipcp_update(struct rlite_evloop *loop,
             ret = 0;
             break;
     }
-
-    pthread_mutex_unlock(&uipcps->lock);
 
     if (ret) {
         PE("IPCP update synchronization failed\n");

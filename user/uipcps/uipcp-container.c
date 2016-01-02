@@ -271,7 +271,7 @@ select_uipcp_ops(const char *dif_type)
 
 /* To be called under uipcps lock. */
 struct uipcp *
-uipcp_lookup_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
+uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
 {
     struct rl_ipcp *rl_ipcp;
     struct uipcp *uipcp;
@@ -285,10 +285,13 @@ uipcp_lookup_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
         return NULL;
     }
 
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, rl_ipcp->ipcp_id);
     if (!uipcp) {
         PE("No uipcp for [%u]\n", rl_ipcp->ipcp_id);
     }
+    uipcp->refcnt++;
+    pthread_mutex_unlock(&uipcps->lock);
 
     return uipcp;
 }
@@ -308,7 +311,6 @@ uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id)
     return NULL;
 }
 
-/* To be called under uipcps lock. */
 int
 uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 {
@@ -332,8 +334,11 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
     uipcp->uipcps = uipcps;
     uipcp->ops = *ops;
     uipcp->priv = NULL;
+    uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
+    pthread_mutex_lock(&uipcps->lock);
     list_add_tail(&uipcp->node, &uipcps->uipcps);
+    pthread_mutex_unlock(&uipcps->lock);
 
     ret = rl_evloop_init(&uipcp->loop, NULL, NULL, 0);
     if (ret) {
@@ -387,24 +392,37 @@ err0:
     return ret;
 }
 
-/* To be called under uipcps lock. */
 int
-uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id)
+uipcp_put(struct uipcps *uipcps, uint16_t ipcp_id)
 {
     struct uipcp *uipcp;
+    int destroy;
     int ret;
 
+    pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
+        pthread_mutex_unlock(&uipcps->lock);
         /* The specified IPCP is a Shim IPCP. */
+        return 0;
+    }
+
+    uipcp->refcnt--;
+    destroy = (uipcp->refcnt == 0) ? 1 : 0;
+
+    if (destroy) {
+        list_del(&uipcp->node);
+    }
+
+    pthread_mutex_unlock(&uipcps->lock);
+
+    if (!destroy) {
         return 0;
     }
 
     uipcp->ops.fini(uipcp);
 
     ret = rl_evloop_fini(&uipcp->loop);
-
-    list_del(&uipcp->node);
 
     free(uipcp);
 

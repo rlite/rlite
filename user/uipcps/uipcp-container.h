@@ -107,6 +107,7 @@ struct uipcp {
 
     struct uipcp_ops ops;
     void *priv;
+    unsigned int refcnt;
 
     struct list_head node;
 };
@@ -115,12 +116,12 @@ void *uipcp_server(void *arg);
 
 int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type);
 
-int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
+int uipcp_put(struct uipcps *uipcps, uint16_t ipcp_id);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 
-struct uipcp *uipcp_lookup_by_name(struct uipcps *uipcps,
-                                   const struct rina_name *ipcp_name);
+struct uipcp *uipcp_get_by_name(struct uipcps *uipcps,
+                                const struct rina_name *ipcp_name);
 
 int uipcps_print(struct uipcps *uipcps);
 
