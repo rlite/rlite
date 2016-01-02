@@ -408,12 +408,33 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 
     switch (m->op_code) {
         case gpb::M_CONNECT:
-            if (state != NONE) {
-                PE("%s: Cannot %s M_CONNECT message: Invalid state %d\n",
-                                    __func__, action, state);
-                return -1;
+            {
+                struct rina_name *local, *remote;
+                int ret;
+
+                if (state != NONE) {
+                    PE("%s: Cannot %s M_CONNECT message: Invalid state %d\n",
+                            __func__, action, state);
+                    return -1;
+                }
+
+                if (sender) {
+                    local = &m->src_appl;
+                    remote = &m->dst_appl;
+                } else {
+                    local = &m->dst_appl;
+                    remote = &m->src_appl;
+                }
+                ret = rina_name_copy(&local_appl, local);
+                ret |= rina_name_copy(&remote_appl, remote);
+                if (ret) {
+                    rina_name_free(&local_appl);
+                    rina_name_free(&remote_appl);
+                    return ret;
+                }
+
+                state = AWAITCON;
             }
-            state = AWAITCON;
             break;
 
         case gpb::M_CONNECT_R:
@@ -431,6 +452,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                                     __func__, action, state);
                 return -1;
             }
+            rina_name_free(&local_appl);
+            rina_name_free(&remote_appl);
             state = AWAITCLOSE;
             break;
 
