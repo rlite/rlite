@@ -724,6 +724,7 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     bool stop_next;
     bool no_next = true;
     int bucket;
+    int ret;
 
     memset(&resp, 0, sizeof(resp));
     resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
@@ -753,7 +754,12 @@ rina_ipcp_fetch(struct rina_ctrl *rc, struct rina_msg_base *req)
     }
     mutex_unlock(&rina_dm.lock);
 
-    return rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
+    ret = rina_upqueue_append(rc, (struct rina_msg_base *)&resp);
+
+    rina_name_free(&resp.ipcp_name);
+    rina_name_free(&resp.dif_name);
+
+    return ret;
 }
 
 static int
