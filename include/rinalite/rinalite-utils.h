@@ -1,16 +1,6 @@
 #ifndef __RINA_SERDES_H__
 #define __RINA_SERDES_H__
 
-/*
- * When compiling from userspace include <stdint.h>,
- * when compiling from kernelspace include <linux/types.h>
- */
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
-#include <stdint.h>
-#endif
-
 #include <rinalite/rinalite-common.h>
 
 struct rina_msg_layout {

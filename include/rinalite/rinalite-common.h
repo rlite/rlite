@@ -1,6 +1,15 @@
 #ifndef __RINA_COMMON_H__
 #define __RINA_COMMON_H__
 
+/*
+ * When compiling from userspace include <stdint.h>,
+ * when compiling from kernelspace include <linux/types.h>
+ */
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
+#include <stdint.h>
+#endif
 
 #define RINA_UIPCPS_UNIX_NAME     "/var/rinalite/uipcp-server"
 
