@@ -145,7 +145,7 @@ arp_request_create(struct rina_shim_eth *priv,
     skb->protocol = htons(ETH_P_ARP);
 
     if (dev_hard_header(skb, skb->dev, ETH_P_ARP, priv->netdev->broadcast,
-                        priv->netdev->dev_addr, skb->len)) {
+                        priv->netdev->dev_addr, skb->len) < 0) {
         goto err;
     }
 
