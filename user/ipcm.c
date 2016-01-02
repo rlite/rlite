@@ -627,6 +627,46 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
 }
 
 static int
+rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
+                       const struct rina_msg_base *b_req)
+{
+    struct rina_amsg_ipcp_destroy *req = (struct rina_amsg_ipcp_destroy *)b_req;
+    struct rina_msg_base_resp resp;
+    struct rina_msg_base_resp *kresp;
+    struct ipcp *ipcp;
+    unsigned int ipcp_id = ~0;
+    uint8_t result = 1;
+
+    /* Does the request specifies an existing IPC process ? */
+    if (rina_name_valid(&req->ipcp_name)) {
+        list_for_each_entry(ipcp, &ipcm->ipcps, node) {
+            if (rina_name_valid(&ipcp->ipcp_name)
+                    && rina_name_cmp(&ipcp->ipcp_name, &req->ipcp_name) == 0) {
+                ipcp_id = ipcp->ipcp_id;
+                break;
+            }
+        }
+    }
+
+    if (ipcp_id != ~0) {
+        /* Valid IPCP id. */
+        kresp = ipcp_destroy(ipcm, ipcp_id);
+        if (kresp) {
+            rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)kresp);
+            result = kresp->result;
+        }
+    } else {
+        printf("%s: No such IPCP process\n", __func__);
+    }
+
+    resp.msg_type = RINA_APPL_IPCP_DESTROY_RESP;
+    resp.event_id = req->event_id;
+    resp.result = result;
+
+    return rina_msg_write(sfd, (struct rina_msg_base *)&resp);
+}
+
+static int
 rina_appl_register(struct ipcm *ipcm, int sfd,
                    const struct rina_msg_base *b_req)
 {
@@ -714,6 +754,7 @@ typedef int (*rina_req_handler_t)(struct ipcm *ipcm, int sfd,
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_application_handlers[] = {
     [RINA_APPL_IPCP_CREATE] = rina_appl_ipcp_create,
+    [RINA_APPL_IPCP_DESTROY] = rina_appl_ipcp_destroy,
     [RINA_APPL_REGISTER] = rina_appl_register,
     [RINA_APPL_UNREGISTER] = rina_appl_unregister,
     [RINA_APPL_MSG_MAX] = NULL,

@@ -148,6 +148,23 @@ static int ipcp_create(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
+static int ipcp_destroy(int argc, char **argv)
+{
+    struct rina_amsg_ipcp_destroy req;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+
+    assert(argc >= 2);
+    ipcp_apn = argv[0];
+    ipcp_api = argv[1];
+
+    req.msg_type = RINA_APPL_IPCP_DESTROY;
+    req.event_id = 0;
+    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+
+    return request_response((struct rina_msg_base *)&req);
+}
+
 static int application_register_common(const struct rina_name *app_name,
                                        const char *dif_name, int reg)
 {
@@ -237,7 +254,7 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .name = "ipcp-destroy",
         .usage = "IPCP_APN IPCP_API",
         .num_args = 2,
-        .func = NULL,
+        .func = ipcp_destroy,
     },
 };
 
