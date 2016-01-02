@@ -21,16 +21,7 @@
 #ifndef __RLITE_SHIM_HV_MSG_H__
 #define __RLITE_SHIM_HV_MSG_H__
 
-/*
- * When compiling from userspace include <stdint.h>,
- * when compiling from kernelspace include <linux/types.h>
- */
-#ifdef __KERNEL__
 #include <linux/types.h>
-#else
-#include <stdint.h>
-#endif
-
 #include "rlite/common.h"
 #include "rlite/utils.h"
 
