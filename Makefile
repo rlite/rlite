@@ -22,7 +22,7 @@ user/pending_queue.o: $(HEADERS) user/pending_queue.h
 
 user/evloop.o: $(HEADERS) user/evloop.h user/pending_queue.h
 
-user/rina-config: user/rina-config.o user/rina-application-numtables.o user/rina-utils.o user/helpers.o
+user/rina-config: user/rina-config.o user/rina-application-numtables.o user/rina-utils.o user/helpers.o user/evloop.o user/rina-kernel-numtables.o user/pending_queue.o
 
 user/rina-config.o: $(HEADERS)
 

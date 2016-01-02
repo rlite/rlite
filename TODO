@@ -37,3 +37,5 @@
        di ricezione e trasmissione
     d) attualmente il locking non è safe nel datapath (per esempio vedi
        rina_normal_sdu_write() o rina_normal_sdu_rx()
+
+- evloop_stop --> rina_evloop_stop

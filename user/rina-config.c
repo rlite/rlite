@@ -14,7 +14,42 @@
 
 #include <rina/rina-application-msg.h>
 #include "helpers.h"
+#include "evloop.h"
 
+
+struct rinaconf {
+    struct rina_evloop loop;
+};
+
+/* Kernel response handlers. */
+static int
+ipcp_create_resp(struct rina_evloop *loop,
+                 const struct rina_msg_base_resp *b_resp,
+                 const struct rina_msg_base *b_req)
+{
+    struct rina_kmsg_ipcp_create_resp *resp =
+            (struct rina_kmsg_ipcp_create_resp *)b_resp;
+    struct rina_kmsg_ipcp_create *req =
+            (struct rina_kmsg_ipcp_create *)b_req;
+
+    PI("%s: Assigned id %d\n", __func__, resp->ipcp_id);
+    (void)req;
+
+    return 0;
+}
+
+/* The table containing all kernel response handlers, executed
+ * in the event-loop context.
+ * Response handlers must not call issue_request(), in
+ * order to avoid deadlocks.
+ * These would happen because issue_request() may block for
+ * completion, and is waken up by the event-loop thread itself.
+ * Therefore, the event-loop thread would wait for itself, i.e.
+ * we would have a deadlock. */
+static rina_resp_handler_t rina_kernel_handlers[] = {
+    [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
+    [RINA_KERN_MSG_MAX] = NULL,
+};
 
 static int
 ipcm_connect()
@@ -110,28 +145,69 @@ static const char *dif_types[] = {
     [DIF_TYPE_SHIM_HV] = "shim-hv",
 };
 
-static int ipcp_create(int argc, char **argv)
+/* Create an IPC process. */
+static struct rina_kmsg_ipcp_create_resp *
+rina_ipcp_create(struct rinaconf *rc, unsigned int wait_for_completion,
+                 const struct rina_name *name, uint8_t dif_type,
+                 int *result)
 {
-    struct rina_amsg_ipcp_create req;
+    struct rina_kmsg_ipcp_create *msg;
+    struct rina_kmsg_ipcp_create_resp *resp;
+
+    /* Allocate and create a request message. */
+    msg = malloc(sizeof(*msg));
+    if (!msg) {
+        PE("%s: Out of memory\n", __func__);
+        return NULL;
+    }
+
+    memset(msg, 0, sizeof(*msg));
+    msg->msg_type = RINA_KERN_IPCP_CREATE;
+    rina_name_copy(&msg->name, name);
+    msg->dif_type = dif_type;
+
+    PD("Requesting IPC process creation...\n");
+
+    resp = (struct rina_kmsg_ipcp_create_resp *)
+           issue_request(&rc->loop, RMB(msg),
+                         sizeof(*msg), 1, wait_for_completion, result);
+
+    ipcps_fetch(&rc->loop);
+
+    /* TODO notify the uipcps manager
+    if (dif_type == DIF_TYPE_NORMAL && *result == 0 && resp) {
+        *result = uipcp_add(ipcm, resp->ipcp_id);
+    }
+
+    uipcps_fetch(ipcm);
+    */
+
+    return resp;
+}
+
+static int ipcp_create(int argc, char **argv, struct rinaconf *rc)
+{
+    struct rina_kmsg_ipcp_create_resp *kresp;
     const char *ipcp_apn;
     const char *ipcp_api;
+    struct rina_name ipcp_name;
+    uint8_t dif_type;
+    int result;
     int i;
 
     assert(argc >= 3);
     ipcp_apn = argv[1];
     ipcp_api = argv[2];
 
-    req.msg_type = RINA_CONF_IPCP_CREATE;
-    req.event_id = 0;
-    req.dif_type = DIF_TYPE_MAX;
+    dif_type = DIF_TYPE_MAX;
     for (i = 0; i < DIF_TYPE_MAX; i++) {
         assert(dif_types[i]);
         if (strcmp(argv[0], dif_types[i]) == 0) {
-            req.dif_type = i;
+            dif_type = i;
             break;
         }
     }
-    if (req.dif_type == DIF_TYPE_MAX) {
+    if (dif_type == DIF_TYPE_MAX) {
         /* No such dif type. Print the available types
          * and exit. */
         PE("No such dif type. Available DIF types:\n");
@@ -140,12 +216,17 @@ static int ipcp_create(int argc, char **argv)
         }
         return -1;
     }
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
-    return request_response((struct rina_msg_base *)&req);
+    kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, &result);
+    if (kresp) {
+        rina_msg_free(rina_kernel_numtables, RMB(kresp));
+    }
+
+    return result;
 }
 
-static int ipcp_destroy(int argc, char **argv)
+static int ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_destroy req;
     const char *ipcp_apn;
@@ -162,7 +243,7 @@ static int ipcp_destroy(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int assign_to_dif(int argc, char **argv)
+static int assign_to_dif(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_assign_to_dif req;
     const char *ipcp_apn;
@@ -182,7 +263,7 @@ static int assign_to_dif(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int ipcp_config(int argc, char **argv)
+static int ipcp_config(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_config req;
     const char *ipcp_apn;
@@ -226,17 +307,17 @@ static int ipcp_register_common(int argc, char **argv, unsigned int reg)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int ipcp_register(int argc, char **argv)
+static int ipcp_register(int argc, char **argv, struct rinaconf *rc)
 {
     return ipcp_register_common(argc, argv, 1);
 }
 
-static int ipcp_unregister(int argc, char **argv)
+static int ipcp_unregister(int argc, char **argv, struct rinaconf *rc)
 {
     return ipcp_register_common(argc, argv, 0);
 }
 
-static int ipcp_enroll(int argc, char **argv)
+static int ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_enroll req;
     const char *ipcp_apn;
@@ -264,7 +345,7 @@ static int ipcp_enroll(int argc, char **argv)
     return request_response((struct rina_msg_base *)&req);
 }
 
-static int ipcp_dft_set(int argc, char **argv)
+static int ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
 {
     struct rina_amsg_ipcp_dft_set req;
     const char *ipcp_apn;
@@ -298,7 +379,7 @@ struct cmd_descriptor {
     const char *name;
     const char *usage;
     unsigned int num_args;
-    int (*func)(int argc, char **argv);
+    int (*func)(int argc, char **argv, struct rinaconf *rc);
 };
 
 static struct cmd_descriptor cmd_descriptors[] = {
@@ -370,7 +451,7 @@ usage(int i)
 }
 
 static int
-process_args(int argc, char **argv)
+process_args(int argc, char **argv, struct rinaconf *rc)
 {
     const char *cmd;
     int i;
@@ -394,7 +475,7 @@ process_args(int argc, char **argv)
                 return -1;
             }
 
-            return cmd_descriptors[i].func(argc - 2, argv + 2);
+            return cmd_descriptors[i].func(argc - 2, argv + 2, rc);
         }
     }
 
@@ -412,8 +493,15 @@ sigint_handler(int signum)
 
 int main(int argc, char **argv)
 {
+    struct rinaconf rc;
     struct sigaction sa;
     int ret;
+
+    ret = rina_evloop_init(&rc.loop, "/dev/rina-ctrl",
+                     rina_kernel_handlers);
+    if (ret) {
+        return ret;
+    }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the IPCM server. */
@@ -431,5 +519,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    return process_args(argc, argv);
+    /* Fetch kernel state. */
+    ipcps_fetch(&rc.loop);
+
+    ret = process_args(argc, argv, &rc);
+
+    evloop_stop(&rc.loop);
+
+    rina_evloop_fini(&rc.loop);
+
+    return 0;
 }
