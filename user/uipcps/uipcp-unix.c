@@ -256,62 +256,92 @@ static rlite_req_handler_t rlite_config_handlers[] = {
     [RLITE_CFG_MSG_MAX] = NULL,
 };
 
+struct worker_info {
+    struct uipcps *uipcps;
+    int cfd;
+};
+
+static void *
+worker_fn(void *opaque)
+{
+    struct worker_info *wi = opaque;
+    struct rlite_msg_base *req;
+    char serbuf[4096];
+    char msgbuf[4096];
+    int ret;
+    int n;
+
+    PD("Worker %p started\n", wi);
+
+    /* Read the request message in serialized form. */
+    n = read(wi->cfd, serbuf, sizeof(serbuf));
+    if (n < 0) {
+        PE("read() error [%d]\n", n);
+    }
+
+    /* Deserialize into a formatted message. */
+    ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
+            serbuf, n, msgbuf, sizeof(msgbuf));
+    if (ret) {
+        PE("deserialization error [%d]\n", ret);
+    }
+
+    /* Lookup the message type. */
+    req = RLITE_MB(msgbuf);
+    if (rlite_config_handlers[req->msg_type] == NULL) {
+        struct rlite_msg_base_resp resp;
+
+        PE("Invalid message received [type=%d]\n",
+                req->msg_type);
+        resp.msg_type = RLITE_CFG_BASE_RESP;
+        resp.event_id = req->event_id;
+        resp.result = RLITE_ERR;
+        rlite_msg_write_fd(wi->cfd, RLITE_MB(&resp));
+    } else {
+        /* Valid message type: handle the request. */
+        ret = rlite_config_handlers[req->msg_type](wi->uipcps, wi->cfd, req);
+        if (ret) {
+            PE("Error while handling message type [%d]\n",
+                    req->msg_type);
+        }
+    }
+
+    rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX, req);
+
+    /* Close the connection. */
+    close(wi->cfd);
+
+    free(wi);
+
+    PD("Worker %p stopped\n", wi);
+
+    return NULL;
+}
+
 /* Unix server thread to manage configuration requests. */
 static int
 unix_server(struct uipcps *uipcps)
 {
-    char serbuf[4096];
-    char msgbuf[4096];
-
     for (;;) {
         struct sockaddr_un client_address;
         socklen_t client_address_len = sizeof(client_address);
-        struct rlite_msg_base *req;
-        int cfd;
+        struct worker_info *wi;
+        pthread_t wth;
         int ret;
-        int n;
 
-        /* Accept a new client. */
-        cfd = accept(uipcps->lfd, (struct sockaddr *)&client_address,
-                     &client_address_len);
+        wi = malloc(sizeof(*wi));
+        wi->uipcps = uipcps;
 
-        /* Read the request message in serialized form. */
-        n = read(cfd, serbuf, sizeof(serbuf));
-        if (n < 0) {
-            PE("read() error [%d]\n", n);
-        }
+        /* Accept a new client and create a thread to serve it. */
+        wi->cfd = accept(uipcps->lfd, (struct sockaddr *)&client_address,
+                         &client_address_len);
 
-        /* Deserialize into a formatted message. */
-        ret = deserialize_rlite_msg(rlite_conf_numtables, RLITE_CFG_MSG_MAX,
-                                   serbuf, n, msgbuf, sizeof(msgbuf));
+        ret = pthread_create(&wth, NULL, worker_fn, wi);
         if (ret) {
-            PE("deserialization error [%d]\n", ret);
+            PE("pthread_create() failed [%d]\n", errno);
+            close(wi->cfd);
+            free(wi);
         }
-
-        /* Lookup the message type. */
-        req = RLITE_MB(msgbuf);
-        if (rlite_config_handlers[req->msg_type] == NULL) {
-            struct rlite_msg_base_resp resp;
-
-            PE("Invalid message received [type=%d]\n",
-                    req->msg_type);
-            resp.msg_type = RLITE_CFG_BASE_RESP;
-            resp.event_id = req->event_id;
-            resp.result = RLITE_ERR;
-            rlite_msg_write_fd(cfd, RLITE_MB(&resp));
-        } else {
-            /* Valid message type: handle the request. */
-            ret = rlite_config_handlers[req->msg_type](uipcps, cfd, req);
-            if (ret) {
-                PE("Error while handling message type [%d]\n",
-                        req->msg_type);
-            }
-        }
-
-        rlite_msg_free(rlite_conf_numtables, RLITE_CFG_MSG_MAX, req);
-
-        /* Close the connection. */
-	close(cfd);
     }
 
     return 0;
