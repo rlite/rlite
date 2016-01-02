@@ -38,9 +38,6 @@ struct uipcp {
     int mgmtfd;
     pthread_t server_th;
 
-    /* Implementation of the Directory Forwarding Table (DFT). */
-    struct list_head dft;
-
     struct uipcp_rib *rib;
 
     struct list_head node;
@@ -57,8 +54,6 @@ int uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcp_del(struct uipcps *uipcps, uint16_t ipcp_id);
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, uint16_t ipcp_id);
 int uipcps_fetch(struct uipcps *uipcps);
-int uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
-                  uint64_t remote_addr);
 int mgmt_write_to_local_port(struct uipcp *uipcp, uint32_t local_port,
                              void *buf, size_t buflen);
 
@@ -80,6 +75,12 @@ int rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
 
 int rib_ipcp_register(struct uipcp_rib *rib, int reg,
                       const struct rina_name *lower_dif);
+
+uint64_t rib_dft_lookup(struct uipcp_rib *rib,
+                        const struct rina_name *appl_name);
+
+int rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
+                uint64_t remote_addr);
 
 char *rib_dump(struct uipcp_rib *rib);
 

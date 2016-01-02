@@ -112,6 +112,9 @@ struct uipcp_rib {
 
     int add_neighbor(const struct rina_name *neigh_name, int neigh_flow_fd,
                      unsigned int neigh_port_id, bool start_enrollment);
+    uint64_t dft_lookup(const RinaName& appl_name) const;
+    int dft_set(const RinaName& appl_name, uint64_t remote_addr);
+
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
     int remote_sync(bool create, const string& obj_class,
@@ -189,6 +192,36 @@ uipcp_rib::add_neighbor(const struct rina_name *neigh_name,
     if (start_enrollment) {
         return neighbors.back().enroll_fsm_run(NULL);
     }
+
+    return 0;
+}
+
+uint64_t
+uipcp_rib::dft_lookup(const RinaName& appl_name) const
+{
+    map< string, DFTEntry >::const_iterator mit
+         = dft.find(static_cast<string>(appl_name));
+
+    if (mit == dft.end()) {
+        return 0;
+    }
+
+    return mit->second.address;
+}
+
+int
+uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
+{
+    string key = static_cast<string>(appl_name);
+    DFTEntry entry;
+
+    entry.address = remote_addr;
+    entry.appl_name = appl_name;
+
+    dft[key] = entry;
+
+    PD("[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->ipcp_id,
+       key.c_str(), (long long unsigned)entry.address);
 
     return 0;
 }
@@ -1174,3 +1207,17 @@ rib_dump(struct uipcp_rib *rib)
 {
     return rib->dump();
 }
+
+extern "C" uint64_t
+rib_dft_lookup(struct uipcp_rib *rib, const struct rina_name *appl_name)
+{
+    return rib->dft_lookup(RinaName(appl_name));
+}
+
+extern "C" int
+rib_dft_set(struct uipcp_rib *rib, const struct rina_name *appl_name,
+            uint64_t remote_addr)
+{
+    return rib->dft_set(RinaName(appl_name), remote_addr);
+}
+

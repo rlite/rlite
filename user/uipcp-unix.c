@@ -198,7 +198,7 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    ret = uipcp_dft_set(uipcp, &req->appl_name, req->remote_addr);
+    ret = rib_dft_set(uipcp->rib, &req->appl_name, req->remote_addr);
     if (ret) {
         goto out;
     }

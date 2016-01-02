@@ -339,56 +339,6 @@ out:
     fflush(stdout);
 }
 
-struct dft_entry {
-    struct rina_name appl_name;
-    uint64_t remote_addr;
-
-    struct list_head node;
-};
-
-static struct dft_entry *
-dft_lookup(struct uipcp *uipcp, const struct rina_name *appl_name)
-{
-    struct dft_entry *entry;
-
-    list_for_each_entry(entry, &uipcp->dft, node) {
-        if (rina_name_cmp(&entry->appl_name, appl_name) == 0) {
-            return entry;
-        }
-    }
-
-    return NULL;
-}
-
-int
-uipcp_dft_set(struct uipcp *uipcp, const struct rina_name *appl_name,
-              uint64_t remote_addr)
-{
-    struct dft_entry *entry;
-    char *appl_s;
-
-    entry = dft_lookup(uipcp, appl_name);
-    if (!entry) {
-        entry = malloc(sizeof(*entry));
-        if (!entry) {
-            return -1;
-        }
-        memset(entry, 0, sizeof(*entry));
-        rina_name_copy(&entry->appl_name, appl_name);
-        list_add_tail(&entry->node, &uipcp->dft);
-    }
-    entry->remote_addr = remote_addr;
-
-    appl_s = rina_name_to_string(appl_name);
-    PD("[uipcp %u] '%s' --> %llu\n", uipcp->ipcp_id,
-        appl_s, (long long unsigned)remote_addr);
-    if (appl_s) {
-        free(appl_s);
-    }
-
-    return 0;
-}
-
 static int
 uipcp_fa_req(struct rinalite_evloop *loop,
              const struct rina_msg_base_resp *b_resp,
@@ -398,7 +348,7 @@ uipcp_fa_req(struct rinalite_evloop *loop,
                                                    loop);
     struct uipcp *uipcp = container_of(application, struct uipcp, appl);
     struct rina_kmsg_fa_req *req = (struct rina_kmsg_fa_req *)b_resp;
-    struct dft_entry *dft_entry;
+    uint64_t remote_addr;
     uint8_t *mgmtsdu;
     void *cur;
     size_t len;
@@ -407,8 +357,8 @@ uipcp_fa_req(struct rinalite_evloop *loop,
 
     assert(b_req == NULL);
 
-    dft_entry = dft_lookup(uipcp, &req->remote_application);
-    if (!dft_entry) {
+    remote_addr = rib_dft_lookup(uipcp->rib, &req->remote_application);
+    if (!remote_addr) {
         /* TODO send a RINA_KERN_UIPCP_FA_RESP_ARRIVED ? */
         PI("No DFT matching entry\n");
         return 0;
@@ -433,7 +383,7 @@ uipcp_fa_req(struct rinalite_evloop *loop,
     serialize_rina_name(&cur, &req->local_application);
     serialize_rina_name(&cur, &req->remote_application);
 
-    mgmt_write_to_dst_addr(uipcp, dft_entry->remote_addr,
+    mgmt_write_to_dst_addr(uipcp, remote_addr,
                            mgmtsdu, len);
 
     free(mgmtsdu);
@@ -610,7 +560,6 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id)
 
     uipcp->ipcp_id = ipcp_id;
     uipcp->uipcps = uipcps;
-    list_init(&uipcp->dft);
 
     uipcp->rib = rib_create(uipcp);
     if (!uipcp->rib) {
