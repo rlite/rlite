@@ -67,22 +67,12 @@ int rl_appl_flow_alloc(struct rlite_appl *appl,
                         uint16_t upper_ipcp_id,
                         unsigned int *port_id, unsigned int wait_ms);
 
-int rl_appl_flow_alloc_open(struct rlite_appl *appl,
-                       const char *dif_name,
-                       const struct rina_name *ipcp_name,
-                       const struct rina_name *local_appl,
-                       const struct rina_name *remote_appl,
-                       const struct rlite_flow_spec *flowcfg,
-                       unsigned int wait_ms);
-
 int rl_appl_fa_resp(struct rlite_appl *appl,
                              uint32_t kevent_id, uint16_t ipcp_id,
                              uint16_t upper_ipcp_id, uint32_t port_id,
                              uint8_t response);
 
 struct rlite_pending_flow_req *rl_appl_flow_accept(struct rlite_appl *appl);
-
-int rl_appl_flow_accept_open(struct rlite_appl *appl);
 
 #ifdef __cplusplus
 }

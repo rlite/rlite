@@ -306,65 +306,6 @@ rl_appl_flow_accept(struct rlite_appl *appl)
     return container_of(elem, struct rlite_pending_flow_req, node);
 }
 
-/* rl_appl_flow_alloc() + rlite_open_appl_port() */
-int
-rl_appl_flow_alloc_open(struct rlite_appl *appl,
-                   const char *dif_name,
-                   const struct rina_name *ipcp_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec,
-                   unsigned int wait_ms)
-{
-    unsigned int port_id;
-    uint32_t event_id;
-    int ret;
-
-    if (wait_ms == 0) {
-        /* If the user wants to work in non-blocking mode, it
-         * must use rl_appl_flow_alloc() directly. */
-        PE("Cannot work in non-blocking mode\n");
-        return -1;
-    }
-
-    event_id = rl_ctrl_get_id(&appl->loop.ctrl);
-
-    ret = rl_appl_flow_alloc(appl, event_id, dif_name, ipcp_name,
-                              local_appl, remote_appl, flowspec, 0xffff,
-                              &port_id, wait_ms);
-    if (ret) {
-        return -1;
-    }
-
-    return rlite_open_appl_port(port_id);
-}
-
-/* rl_appl_flow_accept() + rlite_open_appl_port() */
-int
-rl_appl_flow_accept_open(struct rlite_appl *appl)
-{
-    struct rlite_pending_flow_req *pfr;
-    unsigned int port_id;
-    int result;
-
-    pfr = rl_appl_flow_accept(appl);
-    PD("flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-            pfr->ipcp_id, pfr->port_id);
-
-    /* Always accept incoming connection, for now. */
-    result = rl_appl_fa_resp(appl, pfr->kevent_id,
-                             pfr->ipcp_id, 0xffff,
-                             pfr->port_id, RLITE_SUCC);
-    port_id = pfr->port_id;
-    rl_pfr_free(pfr);
-
-    if (result) {
-        return -1;
-    }
-
-    return rlite_open_appl_port(port_id);
-}
-
 int
 rl_appl_init(struct rlite_appl *appl, unsigned int flags)
 {
