@@ -150,7 +150,8 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 }
 
 static int
-rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb)
+rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
+       bool maysleep)
 {
     struct flow_entry *lower_flow;
     struct ipcp_entry *lower_ipcp;
@@ -178,7 +179,8 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb)
             current->state = TASK_INTERRUPTIBLE;
 
             /* Push down to the underlying IPCP. */
-            ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+            ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow,
+                                            rb, maysleep);
 
             if (unlikely(ret == -EAGAIN)) {
                 /* Cannot restart system call from here... */
@@ -205,7 +207,7 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb)
 static int
 rina_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
-                      struct rina_buf *rb)
+                      struct rina_buf *rb, bool maysleep)
 {
     struct rina_pci *pci;
     struct dtp *dtp = &flow->dtp;
@@ -295,7 +297,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         return 0;
     }
 
-    return rmt_tx(ipcp, flow->remote_addr, rb);
+    return rmt_tx(ipcp, flow->remote_addr, rb, maysleep);
 }
 
 static int
@@ -349,7 +351,7 @@ rina_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
     pci->pdu_flags = 0; /* Not valid. */
     pci->seqnum = 0; /* Not valid. */
 
-    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+    return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb, true);
 }
 
 static int
@@ -626,7 +628,7 @@ out:
 
         PD("%s: sending [%lu] from cwq\n", __func__,
                 (long unsigned)pci->seqnum);
-        rmt_tx(ipcp, pci->dst_addr, qrb);
+        rmt_tx(ipcp, pci->dst_addr, qrb, false);
     }
 
     /* This could be done conditionally. */
@@ -657,7 +659,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     if (pci->dst_addr != ipcp->addr) {
         /* The PDU is not for this IPCP, forward it. */
-        return rmt_tx(ipcp, pci->dst_addr, rb);
+        return rmt_tx(ipcp, pci->dst_addr, rb, false);
     }
 
     if (pci->pdu_type != PDU_T_DT) {
@@ -810,7 +812,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
 snd_crb:
     if (crb) {
-        rmt_tx(ipcp, flow->remote_addr, crb);
+        rmt_tx(ipcp, flow->remote_addr, crb, false);
     }
 
     return ret;

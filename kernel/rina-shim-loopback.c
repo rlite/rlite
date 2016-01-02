@@ -217,7 +217,8 @@ rina_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 static int
 rina_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                           struct flow_entry *flow,
-                          struct rina_buf *rb)
+                          struct rina_buf *rb,
+                          bool maysleep)
 {
     struct rina_shim_loopback *priv = ipcp->priv;
 

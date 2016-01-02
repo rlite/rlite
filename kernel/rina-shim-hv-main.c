@@ -211,7 +211,7 @@ rina_shim_hv_fa_resp(struct ipcp_entry *ipcp,
 static int
 rina_shim_hv_sdu_write(struct ipcp_entry *ipcp,
                        struct flow_entry *flow,
-                       struct rina_buf *rb)
+                       struct rina_buf *rb, bool maysleep)
 {
     struct iovec iov;
     struct rina_shim_hv *priv = (struct rina_shim_hv *)ipcp->priv;

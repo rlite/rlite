@@ -1663,7 +1663,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
             rina_buf_pci_push(rb);
             memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
             RINA_BUF_PCI(rb)->pdu_type = PDU_T_MGMT;
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, true);
         } else if (rio->mode == RINA_IO_MODE_IPCP_MGMT) {
             ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb);
         } else {
@@ -1679,7 +1679,7 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         for (;;) {
             current->state = TASK_INTERRUPTIBLE;
 
-            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb, true);
 
             if (unlikely(ret == -EAGAIN)) {
                 if (signal_pending(current)) {
