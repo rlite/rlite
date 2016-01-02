@@ -82,9 +82,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
                unsigned int flags);
 
 int
-rl_evloop_run(struct rlite_evloop *loop);
-
-int
 rl_evloop_fini(struct rlite_evloop *loop);
 
 int

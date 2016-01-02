@@ -576,24 +576,6 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
 }
 
 int
-rl_evloop_run(struct rlite_evloop *loop)
-{
-    pthread_mutex_lock(&loop->lock);
-    if (loop->running) {
-        pthread_mutex_unlock(&loop->lock);
-        PE("Evloop is already running\n");
-
-        return -1;
-    }
-    loop->running = 1;
-    pthread_mutex_unlock(&loop->lock);
-
-    evloop_function(loop);
-
-    return 0;
-}
-
-int
 rl_evloop_join(struct rlite_evloop *loop)
 {
     if (loop->running) {
