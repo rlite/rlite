@@ -356,7 +356,7 @@ uipcps_update(struct uipcps *uipcps)
     struct rinalite_ipcp *rinalite_ipcp;
     int ret = 0;
 
-    ret = rinalite_evloop_init(&loop, "/dev/rina-ctrl", NULL);
+    ret = rinalite_evloop_init(&loop, "/dev/rinalite", NULL);
     if (ret) {
         return ret;
     }

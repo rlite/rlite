@@ -388,7 +388,7 @@ rinalite_appl_init(struct rinalite_appl *application)
     pthread_cond_init(&application->flow_req_arrived_cond, NULL);
     list_init(&application->pending_flow_reqs);
 
-    ret = rinalite_evloop_init(&application->loop, "/dev/rina-ctrl",
+    ret = rinalite_evloop_init(&application->loop, "/dev/rinalite",
                      rina_kernel_handlers);
     if (ret) {
         return ret;

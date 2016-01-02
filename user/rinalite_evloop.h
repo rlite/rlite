@@ -49,7 +49,7 @@ struct rinalite_evloop {
     /* Table containing the kernel handlers. */
     rina_resp_handler_t handlers[RINA_KERN_MSG_MAX+1];
 
-    /* File descriptor for the RINA control device ("/dev/rina-ctrl") */
+    /* File descriptor for the RINA control device ("/dev/rinalite") */
     int rfd;
 
     /* A FIFO queue that stores pending RINA events. */

@@ -456,7 +456,7 @@ rinalite_evloop_init(struct rinalite_evloop *loop, const char *dev,
     int ret;
 
     if (!dev) {
-        dev = "/dev/rina-ctrl";
+        dev = "/dev/rinalite";
     }
 
     if (handlers) {

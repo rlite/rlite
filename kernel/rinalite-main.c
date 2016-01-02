@@ -45,7 +45,7 @@ struct rina_ctrl;
 typedef int (*rina_msg_handler_t)(struct rina_ctrl *rc,
                                   struct rina_msg_base *bmsg);
 
-/* Data structure associated to the /dev/rina-ctrl file descriptor. */
+/* Data structure associated to the /dev/rinalite file descriptor. */
 struct rina_ctrl {
     char msgbuf[1024];
 
@@ -2296,7 +2296,7 @@ static const struct file_operations rina_ctrl_fops = {
 
 static struct miscdevice rina_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rina-ctrl",
+    .name = "rinalite",
     .fops = &rina_ctrl_fops,
 };
 
@@ -2334,7 +2334,7 @@ rina_ctrl_init(void)
 
     ret = misc_register(&rina_ctrl_misc);
     if (ret) {
-        printk("%s: Failed to register rina-ctrl misc device\n", __func__);
+        printk("%s: Failed to register rinalite misc device\n", __func__);
         return ret;
     }
 
@@ -2358,4 +2358,4 @@ rina_ctrl_fini(void)
 module_init(rina_ctrl_init);
 module_exit(rina_ctrl_fini);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("devname: rina-ctrl");
+MODULE_ALIAS("devname: rinalite");

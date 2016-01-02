@@ -8,7 +8,7 @@ sudo rmmod rina-normal.ko
 sudo rmmod rina-shim-loopback.ko
 sudo rmmod rina-shim-hv.ko
 sudo rmmod rina-shim-eth.ko
-sudo rmmod rina-ctrl
+sudo rmmod rinalite
 
 # unprepare VMPI-KVM
 pushd .

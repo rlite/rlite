@@ -673,7 +673,7 @@ int main(int argc, char **argv)
     int enable_testing = 0;
     int ret;
 
-    ret = rinalite_evloop_init(&rc.loop, "/dev/rina-ctrl",
+    ret = rinalite_evloop_init(&rc.loop, "/dev/rinalite",
                      rina_kernel_handlers);
     if (ret) {
         return ret;

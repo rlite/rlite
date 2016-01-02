@@ -9,12 +9,12 @@ cd kernel/vmpi
 ./prepare-guest-kvm.sh
 popd
 
-sudo insmod kernel/rina-ctrl.ko
+sudo insmod kernel/rinalite.ko
 sudo insmod kernel/rina-shim-loopback.ko
 sudo insmod kernel/rina-shim-hv.ko
 sudo insmod kernel/rina-shim-eth.ko
 sudo insmod kernel/rina-normal.ko
-sudo chmod a+rwx /dev/rina-ctrl
+sudo chmod a+rwx /dev/rinalite
 sudo chmod a+rwx /dev/rina-io
 
 sudo mkdir -p /var/rinalite
