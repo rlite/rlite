@@ -16,12 +16,9 @@
 - CDAP: supportare un semplice meccanismo di ritrasmissione, in caso la
   connessione CDAP sia supportata da un flusso non affidabile
 
-- VMPI: TX ring è probabilmente inutile per un utilizzo kernelspace-only
+- VMPI: TX ring is probably useless w.r.t. kernelspace-only usage
 
-- addr size non consistente (PCI/resto dello stack)
-
-- [NOT VERIFIED] remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
-  getting ERR in the logs
+- addr size not consistent (PCI/all the stack)
 
 - port nginx to rlite
 
