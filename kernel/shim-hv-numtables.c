@@ -1,5 +1,5 @@
 #include <rinalite/rinalite-utils.h>
-#include "rina-shim-hv-msg.h"
+#include "shim-hv-msg.h"
 
 
 struct rina_msg_layout rina_shim_hv_numtables[] = {

@@ -24,7 +24,7 @@
 #include <rinalite/rina-ipcp-types.h>
 #include <vmpi-provider.h>
 #include "rinalite-kernel.h"
-#include "rina-shim-hv-msg.h"
+#include "shim-hv-msg.h"
 
 #include <linux/module.h>
 #include <linux/uio.h>

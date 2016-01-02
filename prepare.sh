@@ -10,10 +10,10 @@ cd kernel/vmpi
 popd
 
 sudo insmod kernel/rinalite.ko
-sudo insmod kernel/rina-shim-loopback.ko
-sudo insmod kernel/rina-shim-hv.ko
-sudo insmod kernel/rina-shim-eth.ko
-sudo insmod kernel/rina-normal.ko
+sudo insmod kernel/rinalite-shim-loopback.ko
+sudo insmod kernel/rinalite-shim-hv.ko
+sudo insmod kernel/rinalite-shim-eth.ko
+sudo insmod kernel/rinalite-normal.ko
 sudo chmod a+rwx /dev/rinalite
 sudo chmod a+rwx /dev/rina-io
 
