@@ -220,7 +220,8 @@ arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
            int spa_len, const char *tpa, int tpa_len, const void *tha,
            gfp_t gfp)
 {
-    int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
+    struct net_device *netdev = priv->netdev;
+    int hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length */
     struct sk_buff *skb = NULL;
     struct arphdr *arp;
     int arp_msg_len;
@@ -229,9 +230,9 @@ arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
 
     pa_len = (tpa_len > spa_len) ? tpa_len : spa_len;
 
-    arp_msg_len = sizeof(*arp) + 2 * (pa_len + priv->netdev->addr_len);
+    arp_msg_len = sizeof(*arp) + 2 * (pa_len + netdev->addr_len);
 
-    skb = alloc_skb(hhlen + arp_msg_len + priv->netdev->needed_tailroom,
+    skb = alloc_skb(hhlen + arp_msg_len + netdev->needed_tailroom,
                     gfp);
     if (!skb) {
         return NULL;
@@ -240,27 +241,27 @@ arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
     skb_reserve(skb, hhlen);
     skb_reset_network_header(skb);
     arp = (struct arphdr *)skb_put(skb, arp_msg_len);
-    skb->dev = priv->netdev;
+    skb->dev = netdev;
     skb->protocol = htons(ETH_P_ARP);
 
     if (dev_hard_header(skb, skb->dev, ETH_P_ARP,
-                        tha ? tha : priv->netdev->broadcast,
-                        priv->netdev->dev_addr, skb->len) < 0) {
+                        tha ? tha : netdev->broadcast,
+                        netdev->dev_addr, skb->len) < 0) {
         kfree_skb(skb);
         return NULL;
     }
 
-    arp->ar_hrd = htons(priv->netdev->type);
+    arp->ar_hrd = htons(netdev->type);
     arp->ar_pro = htons(ETH_P_RLITE);
-    arp->ar_hln = priv->netdev->addr_len;
+    arp->ar_hln = netdev->addr_len;
     arp->ar_pln = pa_len;
     arp->ar_op = htons(op);
 
     ptr = (uint8_t *)(arp + 1);
 
     /* Fill in the Sender Hardware Address. */
-    memcpy(ptr, priv->netdev->dev_addr, priv->netdev->addr_len);
-    ptr += priv->netdev->addr_len;
+    memcpy(ptr, netdev->dev_addr, netdev->addr_len);
+    ptr += netdev->addr_len;
 
     /* Fill in the zero-padded Sender Protocol Address. */
     memcpy(ptr, spa, spa_len);
@@ -270,11 +271,11 @@ arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
     /* Fill in the Target Hardware Address, or the unknown
      * address if not provided. */
     if (tha) {
-        memcpy(ptr, tha, priv->netdev->addr_len);
+        memcpy(ptr, tha, netdev->addr_len);
     } else {
-        memset(ptr, 0, priv->netdev->addr_len);
+        memset(ptr, 0, netdev->addr_len);
     }
-    ptr += priv->netdev->addr_len;
+    ptr += netdev->addr_len;
 
     /* Fill in the zero-padded Target Protocol Address. */
     memcpy(ptr, tpa, tpa_len);
@@ -818,7 +819,8 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
                         bool maysleep)
 {
     struct rlite_shim_eth *priv = ipcp->priv;
-    int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
+    struct net_device *netdev = priv->netdev;
+    int hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length */
     struct sk_buff *skb = NULL;
     struct arpt_entry *entry = flow->priv;
     int ret;
@@ -849,7 +851,7 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     spin_unlock_bh(&priv->tx_lock);
 
-    skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
+    skb = alloc_skb(hhlen + rb->len + netdev->needed_tailroom,
                     GFP_KERNEL);
     if (!skb) {
         PD("Out of memory\n");
@@ -858,11 +860,11 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     skb_reserve(skb, hhlen);
     skb_reset_network_header(skb);
-    skb->dev = priv->netdev;
+    skb->dev = netdev;
     skb->protocol = htons(ETH_P_RLITE);
 
     ret = dev_hard_header(skb, skb->dev, ETH_P_RLITE, entry->tha,
-                          priv->netdev->dev_addr, skb->len);
+                          netdev->dev_addr, skb->len);
     if (unlikely(ret < 0)) {
         kfree_skb(skb);
 
@@ -901,34 +903,54 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
     int ret = -EINVAL;
 
     if (strcmp(param_name, "netdev") == 0) {
+        struct net_device *netdev = NULL;
         void *ns = &init_net;
 #ifdef CONFIG_NET_NS
         ns = current->nsproxy->net_ns;
 #endif
-        priv->netdev = dev_get_by_name(ns, param_value);
+        /* Detach from the current netdev, if any. */
+        spin_lock_bh(&priv->tx_lock);
         if (priv->netdev) {
+            netdev = priv->netdev;
+            priv->netdev = NULL;
+        }
+        spin_unlock_bh(&priv->tx_lock);
+
+        if (netdev) {
             rtnl_lock();
-            ret = netdev_rx_handler_register(priv->netdev, shim_eth_rx_handler,
-                                             priv);
+            netdev_rx_handler_unregister(netdev);
             rtnl_unlock();
-            if (ret == 0) {
-                spin_lock_bh(&priv->tx_lock);
+            dev_put(netdev);
+            PD("detached from netdev %p\n", netdev);
+        }
 
-                priv->ntu = 0;
-                if (priv->netdev->tx_queue_len) {
-                    priv->ntp = priv->ntu + priv->netdev->tx_queue_len;
-                } else {
-                    priv->ntp = -2;
-                }
+        /* Try to attach the rx handler to the new device. */
+        netdev = dev_get_by_name(ns, param_value);
+        if (!netdev) {
+            return -EINVAL;
+        }
 
-                spin_unlock_bh(&priv->tx_lock);
+        rtnl_lock();
+        ret = netdev_rx_handler_register(netdev, shim_eth_rx_handler, priv);
+        rtnl_unlock();
 
-                PD("netdev set to %p\n", priv->netdev);
+        if (ret == 0) {
+            spin_lock_bh(&priv->tx_lock);
 
+            priv->netdev = netdev;
+            priv->ntu = 0;
+            if (netdev->tx_queue_len) {
+                priv->ntp = priv->ntu + netdev->tx_queue_len;
             } else {
-                dev_put(priv->netdev);
-                priv->netdev = NULL;
+                priv->ntp = -2;
             }
+
+            spin_unlock_bh(&priv->tx_lock);
+
+            PD("netdev set to %p\n", priv->netdev);
+
+        } else {
+            dev_put(netdev);
         }
     }
 
