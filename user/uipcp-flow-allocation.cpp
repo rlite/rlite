@@ -134,17 +134,18 @@ uipcp_rib::fa_req(struct rina_kmsg_fa_req *req)
 
         return uipcp_issue_fa_resp_arrived(uipcp, req->local_port,
                                      0 /* don't care */,
-                                     0 /* dont't care */,
+                                     0 /* don't care */,
+                                     0 /* don't care */,
                                      1, NULL);
     }
 
     ipcp = ipcp_info();
 
     conn_id.qos_id = 0;
-    conn_id.src_cep = req->local_port;
-    conn_id.src_cep = 0;
+    conn_id.src_cep = req->local_cep;
+    conn_id.dst_cep = 0;
 
-    freq.src_app = RinaName(&req->local_appl);;
+    freq.src_app = RinaName(&req->local_appl);
     freq.dst_app = dest_appl;
     freq.src_port = req->local_port;
     freq.dst_port = 0;
@@ -213,10 +214,12 @@ uipcp_rib::fa_resp(struct rina_kmsg_fa_resp *resp)
     if (resp->response) {
         reason = "Application refused the accept the flow request";
     } else {
-        /* Update the freq object with the port-id allocated by
+        /* Update the freq object with the port-id and cep-id allocated by
          * the kernel. */
         freq.dst_port = resp->port_id;
+        freq.connections.front().dst_cep = resp->cep_id;
     }
+
     m.m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                  resp->response ? -1 : 0, reason);
 
@@ -268,14 +271,26 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm, Neighbor *neigh)
         return send_to_dst_addr(m, freq.src_addr, freq);
     }
 
+    if (freq.connections.size() < 1) {
+        CDAPMessage m;
+
+        PE("No connections specified on this flow\n");
+        m.m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
+                     -1, "Cannot find DFT entry");
+
+        return send_to_dst_addr(m, freq.src_addr, freq);
+    }
+
     /* freq.dst_app is registered with us, let's go ahead. */
 
     freq.dst_app.rina_name_fill(&local_appl);
     freq.src_app.rina_name_fill(&remote_appl);
     policies2flowcfg(&flowcfg, freq.qos, freq.policies);
 
-    uipcp_issue_fa_req_arrived(uipcp, 0, freq.src_port, freq.src_addr,
-                               &local_appl, &remote_appl, &flowcfg);
+    uipcp_issue_fa_req_arrived(uipcp, 0, freq.src_port,
+                               freq.connections.front().src_cep,
+                               freq.src_addr, &local_appl, &remote_appl,
+                               &flowcfg);
 
     rina_name_free(&local_appl);
     rina_name_free(&remote_appl);
@@ -312,9 +327,12 @@ uipcp_rib::flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh)
 
     /* Update the local freq object with the remote one. */
     freq.dst_port = remote_freq.dst_port;
+    freq.connections.front().dst_cep = remote_freq.connections.front().dst_cep;
 
     return uipcp_issue_fa_resp_arrived(uipcp, freq.src_port, freq.dst_port,
-                                 freq.dst_addr, rm->result, &freq.flowcfg);
+                                       freq.connections.front().dst_cep,
+                                       freq.dst_addr, rm->result,
+                                       &freq.flowcfg);
 }
 
 int

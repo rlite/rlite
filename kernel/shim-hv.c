@@ -94,7 +94,7 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
             goto des_fail;
         }
 
-        ret = rina_fa_req_arrived(priv->ipcp, 0, req.local_port, 0,
+        ret = rina_fa_req_arrived(priv->ipcp, 0, req.local_port, 0, 0,
                     &req.remote_appl, &req.local_appl, NULL);
         if (ret) {
             printk("failed to report flow allocation request\n");
@@ -109,8 +109,10 @@ shim_hv_handle_ctrl_message(struct rina_shim_hv *priv,
             goto des_fail;
         }
 
+        /* XXX shouldn't we swap resp.remote_port and resp.local_port
+         * arguments? */
         ret = rina_fa_resp_arrived(priv->ipcp, resp.remote_port,
-                                   resp.local_port, 0, resp.response, NULL);
+                                   resp.local_port, 0, 0, resp.response, NULL);
         if (ret) {
             printk("failed to report flow allocation response\n");
         }

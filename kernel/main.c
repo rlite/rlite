@@ -85,10 +85,11 @@ struct registered_appl {
     struct list_head node;
 };
 
-#define IPCP_ID_BITMAP_SIZE 1024
-#define IPCP_HASHTABLE_BITS  7
-#define PORT_ID_BITMAP_SIZE 1024
+#define IPCP_ID_BITMAP_SIZE     1024
+#define PORT_ID_BITMAP_SIZE     1024
+#define CEP_ID_BITMAP_SIZE      1024
 #define PORT_ID_HASHTABLE_BITS  7
+#define IPCP_HASHTABLE_BITS     7
 
 struct rina_dm {
     /* Bitmap to manage IPC process ids. */
@@ -102,6 +103,9 @@ struct rina_dm {
 
     /* Hash table to store information about each flow. */
     DECLARE_HASHTABLE(flow_table, PORT_ID_HASHTABLE_BITS);
+
+    /* Bitmap to manage connection endpoint ids. */
+    DECLARE_BITMAP(cep_id_bitmap, CEP_ID_BITMAP_SIZE);
 
     struct list_head ipcp_factories;
 
@@ -764,15 +768,26 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     FLOCK();
 
-    /* Try to alloc a port id from the bitmap. */
+    /* Try to alloc a port id and a cep id from the bitmaps.
+     * In the future we could allocate cep ids only for normal
+     * IPCPs and not for all IPCPs. */
     entry->local_port = bitmap_find_next_zero_area(rina_dm.port_id_bitmap,
-                                                PORT_ID_BITMAP_SIZE, 0, 1, 0);
-    if (entry->local_port < PORT_ID_BITMAP_SIZE) {
+                                                   PORT_ID_BITMAP_SIZE,
+                                                   0, 1, 0);
+    entry->local_cep = bitmap_find_next_zero_area(rina_dm.cep_id_bitmap,
+                                                  CEP_ID_BITMAP_SIZE,
+                                                  0, 1, 0);
+    if (entry->local_port < PORT_ID_BITMAP_SIZE &&
+                entry->local_cep < CEP_ID_BITMAP_SIZE) {
         bitmap_set(rina_dm.port_id_bitmap, entry->local_port, 1);
+
+        bitmap_set(rina_dm.cep_id_bitmap, entry->local_cep, 1);
+
         /* Build and insert a flow entry in the hash table. */
         rina_name_copy(&entry->local_appl, local_appl);
         rina_name_copy(&entry->remote_appl, remote_appl);
         entry->remote_port = 0;  /* Not valid. */
+        entry->remote_cep = 0;   /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_PENDING;
         entry->upper = upper;
@@ -938,6 +953,7 @@ flow_put(struct flow_entry *entry)
     rina_name_free(&entry->local_appl);
     rina_name_free(&entry->remote_appl);
     bitmap_clear(rina_dm.port_id_bitmap, entry->local_port, 1);
+    bitmap_clear(rina_dm.cep_id_bitmap, entry->local_cep, 1);
     printk("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 out:
@@ -1394,8 +1410,9 @@ rina_uipcp_fa_req_arrived(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rina_fa_req_arrived(ipcp, req->kevent_id, req->remote_port, req->remote_addr,
-                                  &req->local_appl,
+        ret = rina_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
+                                  req->remote_cep,
+                                  req->remote_addr, &req->local_appl,
                                   &req->remote_appl, &req->flowcfg);
     }
 
@@ -1415,8 +1432,8 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rina_fa_resp_arrived(ipcp, req->local_port,
-                                   req->remote_port, req->remote_addr,
+        ret = rina_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
+                                   req->remote_cep, req->remote_addr,
                                    req->response, &req->flowcfg);
     }
     ipcp_put(ipcp);
@@ -1485,6 +1502,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * and directly invoke rina_fa_req_arrived, with reversed
              * arguments. */
             ret = rina_fa_req_arrived(ipcp_entry, 0, flow_entry->local_port,
+                                      flow_entry->local_cep,
                                       ipcp_entry->addr, remote_appl,
                                       local_appl, NULL /* XXX */);
             ipcp_application_put(app);
@@ -1498,6 +1516,7 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
              * Reflect the flow allocation request message to userspace. */
             req->event_id = 0;
             req->local_port = flow_entry->local_port;
+            req->local_cep = flow_entry->local_cep;
             ret = rina_upqueue_append(ipcp_entry->uipcp,
                     (const struct rina_msg_base *)req);
         }
@@ -1711,7 +1730,8 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
              * and directly invoke rina_fa_resp_arrived, with reversed
              * arguments. */
             ret = rina_fa_resp_arrived(ipcp, flow_entry->remote_port,
-                                       flow_entry->local_port, ipcp->addr,
+                                       flow_entry->local_port,
+                                       flow_entry->local_cep, ipcp->addr,
                                        response, NULL);
         } else if (!ipcp->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
@@ -1722,6 +1742,7 @@ rina_fa_resp_internal(struct flow_entry *flow_entry,
              * currently true for normal IPCPs.
              * Reflect the flow allocation response message to userspace. */
             resp->event_id = 0;
+            resp->cep_id = flow_entry->local_cep;
             resp->remote_port = flow_entry->remote_port;
             resp->remote_addr = flow_entry->remote_addr;
             ret = rina_upqueue_append(ipcp->uipcp,
@@ -1764,7 +1785,8 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 /* This may be called from softirq context. */
 int
 rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                    uint32_t remote_port, uint64_t remote_addr,
+                    uint32_t remote_port, uint32_t remote_cep,
+                    uint64_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
                     const struct rina_flow_config *flowcfg)
@@ -1792,6 +1814,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
         goto out;
     }
     flow_entry->remote_port = remote_port;
+    flow_entry->remote_cep = remote_cep;
     flow_entry->remote_addr = remote_addr;
 
     PI("Flow allocation request arrived to IPC process %u, "
@@ -1822,6 +1845,7 @@ int
 rina_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t local_port,
                      uint32_t remote_port,
+                     uint32_t remote_cep,
                      uint64_t remote_addr,
                      uint8_t response,
                      struct rina_flow_config *flowcfg)
@@ -1840,6 +1864,7 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
     flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
                                           : FLOW_STATE_NULL;
     flow_entry->remote_port = remote_port;
+    flow_entry->remote_cep = remote_cep;
     flow_entry->remote_addr = remote_addr;
     if (flowcfg) {
         memcpy(&flow_entry->cfg, flowcfg, sizeof(*flowcfg));
@@ -1855,8 +1880,8 @@ rina_fa_resp_arrived(struct ipcp_entry *ipcp,
             local_port, (long long unsigned)remote_addr);
 
     ret = rina_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
-            flow_entry->event_id,
-            local_port, response);
+                                                 flow_entry->event_id,
+                                                 local_port, response);
 
     if (response) {
         /* Negative response --> delete the flow. */

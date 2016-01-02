@@ -391,7 +391,7 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         kfree(tpa);
 
         if (ret == 0) {
-            rina_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, NULL);
+            rina_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL);
         }
 
         return ret;
@@ -626,7 +626,8 @@ out:
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
-        rina_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0, NULL);
+        rina_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0,
+                             0, NULL);
     }
 
     if (skb) {
@@ -714,7 +715,7 @@ shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
             goto drop;
         }
 
-        ret = rina_fa_req_arrived(priv->ipcp, 0, 0, 0, &priv->upper_name,
+        ret = rina_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, &priv->upper_name,
                 &remote_app, NULL);
         rina_name_free(&remote_app);
 

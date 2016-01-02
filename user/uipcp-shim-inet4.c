@@ -357,8 +357,8 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     /* Succesfull connect() is interpreted as positive flow allocation response. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
-    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0,
-                                0, &cfg);
+    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
+
     return 0;
 
 err2:
@@ -437,7 +437,7 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     /* Push the file descriptor down to kernelspace. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
-    uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0,
+    uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                &local_appl, &remote_appl, &cfg);
     rina_name_free(&local_appl);
     rina_name_free(&remote_appl);

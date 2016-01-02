@@ -120,6 +120,7 @@ struct rina_kmsg_fa_req {
     uint16_t upper_ipcp_id;
     struct rina_flow_spec flowspec;
     uint32_t local_port; /* Filled by kernel before reflection to userspace. */
+    uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
     struct rina_name local_appl;
     struct rina_name remote_appl;
 } __attribute__((packed));
@@ -159,6 +160,8 @@ struct rina_kmsg_fa_resp {
     uint16_t upper_ipcp_id;
     uint8_t response;
     uint32_t port_id;
+    uint32_t cep_id;     /* Filled by kernel before reflecting to userspace. */
+    /* XXX Next two fields should probably disappear, now there is kevent_id. */
     uint32_t remote_port; /* Filled by kernel before reflecting to userspace. */
     uint64_t remote_addr; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
@@ -208,6 +211,7 @@ struct rina_kmsg_uipcp_fa_req_arrived {
     uint32_t kevent_id;
     uint16_t ipcp_id;
     uint32_t remote_port;
+    uint32_t remote_cep;
     uint64_t remote_addr;
     struct rina_flow_config flowcfg;
     /* Requested application. */
@@ -225,6 +229,7 @@ struct rina_kmsg_uipcp_fa_resp_arrived {
     uint16_t ipcp_id;
     uint32_t local_port;
     uint32_t remote_port;
+    uint32_t remote_cep;
     uint64_t remote_addr;
     uint8_t response;
     struct rina_flow_config flowcfg;

@@ -393,7 +393,13 @@ uipcp_rib::dump() const
                 ", DstAppl: " << static_cast<string>(freq.dst_app) <<
                 ", SrcAddr: " << freq.src_addr << ", SrcPort: " <<
                 freq.src_port << ", DstAddr: " << freq.dst_addr <<
-                ", DstPort: " << freq.dst_port << endl;
+                ", DstPort: " << freq.dst_port << ", Connections: [";
+        for (list<ConnId>::const_iterator conn = freq.connections.begin();
+                                conn != freq.connections.end(); conn++) {
+            ss << "<SrcCep=" << conn->src_cep << ", DstCep=" << conn->dst_cep
+                << ", QosId=" << conn->qos_id << "> ";
+        }
+        ss << "]" << endl;
     }
 
     return strdup(ss.str().c_str());
