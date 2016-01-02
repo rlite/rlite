@@ -351,8 +351,10 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
     const char *tpa = (const char *)(arp) + sizeof(*arp) +
                       2 * arp->ar_hln + arp->ar_pln;
 
-    PD("ARPLEN %d EXP %d\n", len, (int)(sizeof(*arp) +
-                             2*(arp->ar_pln + arp->ar_hln)));
+    if (len < sizeof(*arp) + 2*(arp->ar_pln + arp->ar_hln)) {
+        PI("%s: Dropping truncated ARP message\n", __func__);
+        return;
+    }
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         int upper_name_len;
