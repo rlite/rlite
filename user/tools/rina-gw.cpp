@@ -593,7 +593,7 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
     /* Issue a non-blocking flow allocation request. */
     ret = rlite_flow_allocate(appl, event_id, &mit->second.dif_name_r, NULL,
                               &gw->appl_name, &mit->second.name_r, &flowspec,
-                              &unused, 0, 0);
+                              &unused, 0, 0xffff);
     if (ret) {
         PE("Flow allocation failed");
         return;
