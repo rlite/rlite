@@ -43,6 +43,7 @@ struct Neighbor {
     int flow_fd;
     unsigned int port_id;
     CDAPConn *conn;
+    struct uipcp_rib *rib;
 
     enum {
         NONE = 0,
@@ -50,16 +51,19 @@ struct Neighbor {
         S_CONNECT_RCVD,
     } enrollment_state;
 
-    Neighbor(const struct rina_name *name, int fd, unsigned int port_id);
+    Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
+             int fd, unsigned int port_id);
     Neighbor(const Neighbor &other);
     ~Neighbor();
 
-    int send_to_port_id(struct uipcp *uipcp, CDAPMessage *m);
-    int fsm_run(struct uipcp_rib *rib, const CDAPMessage *rm);
+    int send_to_port_id(CDAPMessage *m);
+    int fsm_run(const CDAPMessage *rm);
 };
 
-Neighbor::Neighbor(const struct rina_name *name, int fd, unsigned int port_id_)
+Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
+                   int fd, unsigned int port_id_)
 {
+    rib = rib_;
     rina_name_copy(&ipcp_name, name);
     flow_fd = fd;
     port_id = port_id_;
@@ -69,6 +73,7 @@ Neighbor::Neighbor(const struct rina_name *name, int fd, unsigned int port_id_)
 
 Neighbor::Neighbor(const Neighbor& other)
 {
+    rib = other.rib;
     rina_name_copy(&ipcp_name, &other.ipcp_name);
     flow_fd = other.flow_fd;
     port_id = other.port_id;
@@ -173,7 +178,7 @@ rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
 }
 
 int
-Neighbor::send_to_port_id(struct uipcp *uipcp, CDAPMessage *m)
+Neighbor::send_to_port_id(CDAPMessage *m)
 {
     char *serbuf;
     size_t serlen;
@@ -185,11 +190,11 @@ Neighbor::send_to_port_id(struct uipcp *uipcp, CDAPMessage *m)
         return -1;
     }
 
-    return mgmt_write_to_local_port(uipcp, port_id, serbuf, serlen);
+    return mgmt_write_to_local_port(rib->uipcp, port_id, serbuf, serlen);
 }
 
 int
-Neighbor::fsm_run(struct uipcp_rib *rib, const CDAPMessage *rm)
+Neighbor::fsm_run(const CDAPMessage *rm)
 {
     unsigned int old_state = enrollment_state;
     struct uipcp *uipcp = rib->uipcp;
@@ -237,7 +242,7 @@ Neighbor::fsm_run(struct uipcp_rib *rib, const CDAPMessage *rm)
                 enrollment_state);
     }
 
-    return send_to_port_id(uipcp, &m);
+    return send_to_port_id(&m);
 }
 
 extern "C"
@@ -277,11 +282,11 @@ int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
 
     /* Start the enrollment procedure as initiator. */
 
-    rib->neighbors.push_back(Neighbor(&req->neigh_ipcp_name,
+    rib->neighbors.push_back(Neighbor(rib, &req->neigh_ipcp_name,
                                       flow_fd, port_id));
 
     //return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-    ret = rib->neighbors.back().fsm_run(rib, NULL);
+    ret = rib->neighbors.back().fsm_run(NULL);
     if (ret == 0) {
         return 0;
     }
@@ -315,7 +320,7 @@ rib_neighbor_flow(struct uipcp_rib *rib,
 
     /* Start the enrollment procedure as slave. */
 
-    rib->neighbors.push_back(Neighbor(neigh_name, neigh_fd,
+    rib->neighbors.push_back(Neighbor(rib, neigh_name, neigh_fd,
                                       neigh_port_id));
 
     return 0;
