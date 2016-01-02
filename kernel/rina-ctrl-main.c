@@ -53,7 +53,7 @@ struct rina_ctrl {
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
-    struct mutex upqueue_lock;
+    spinlock_t upqueue_lock;
     wait_queue_head_t upqueue_wqh;
 };
 
@@ -199,11 +199,11 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
 
     entry->sermsg = serbuf;
     entry->serlen = serlen;
-    mutex_lock(&rc->upqueue_lock);
+    spin_lock(&rc->upqueue_lock);
     list_add_tail(&entry->node, &rc->upqueue);
     wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
                                POLLRDBAND);
-    mutex_unlock(&rc->upqueue_lock);
+    spin_unlock(&rc->upqueue_lock);
 
     return 0;
 }
@@ -1615,10 +1615,10 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
     while (len) {
         current->state = TASK_INTERRUPTIBLE;
 
-        mutex_lock(&rc->upqueue_lock);
+        spin_lock(&rc->upqueue_lock);
         if (list_empty(&rc->upqueue)) {
             /* No pending messages? Let's sleep. */
-            mutex_unlock(&rc->upqueue_lock);
+            spin_unlock(&rc->upqueue_lock);
 
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
@@ -1652,7 +1652,7 @@ rina_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
             kfree(entry);
         }
 
-        mutex_unlock(&rc->upqueue_lock);
+        spin_unlock(&rc->upqueue_lock);
         break;
     }
 
@@ -1672,11 +1672,11 @@ rina_ctrl_poll(struct file *f, poll_table *wait)
 
     poll_wait(f, &rc->upqueue_wqh, wait);
 
-    mutex_lock(&rc->upqueue_lock);
+    spin_lock(&rc->upqueue_lock);
     if (!list_empty(&rc->upqueue)) {
         mask |= POLLIN | POLLRDNORM;
     }
-    mutex_unlock(&rc->upqueue_lock);
+    spin_unlock(&rc->upqueue_lock);
 
     mask |= POLLOUT | POLLWRNORM;
 
@@ -1695,7 +1695,7 @@ rina_ctrl_open_common(struct inode *inode, struct file *f)
 
     f->private_data = rc;
     INIT_LIST_HEAD(&rc->upqueue);
-    mutex_init(&rc->upqueue_lock);
+    spin_lock_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
     return rc;
