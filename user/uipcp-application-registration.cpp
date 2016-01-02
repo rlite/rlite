@@ -1,7 +1,22 @@
+#include <ctime>
+
 #include "uipcp-rib.hpp"
 
 using namespace std;
 
+
+static uint64_t time64()
+{
+    struct timespec tv;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
+        PE("clock_gettime() failed\n");
+        tv.tv_sec = 0;
+        tv.tv_nsec = 0;
+    }
+
+    return (tv.tv_sec << 32) | (tv.tv_nsec & ((1L << 32) - 1L));
+}
 
 uint64_t
 uipcp_rib::dft_lookup(const RinaName& appl_name) const
@@ -24,6 +39,7 @@ uipcp_rib::dft_set(const RinaName& appl_name, uint64_t remote_addr)
 
     entry.address = remote_addr;
     entry.appl_name = appl_name;
+    entry.timestamp = time64();
 
     dft[key] = entry;
 
@@ -51,6 +67,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
 
     dft_entry.address = local_addr;
     dft_entry.appl_name = appl_name;
+    dft_entry.timestamp = time64();
     name_str = static_cast<string>(dft_entry.appl_name);
 
     mit = dft.find(name_str);
@@ -90,6 +107,7 @@ uipcp_rib::application_register(int reg, const RinaName& appl_name)
     return 0;
 }
 
+// TODO move to lower-flows.cpp
 int
 uipcp_rib::pduft_sync()
 {
@@ -178,9 +196,11 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, Neighbor *neigh)
         map< string, DFTEntry >::iterator mit = dft.find(key);
 
         if (add) {
-            dft[key] = *e;
-            PD("DFT entry %s %s remotely\n", key.c_str(),
-                    (mit != dft.end() ? "updated" : "added"));
+            if (mit == dft.end() || e->timestamp > mit->second.timestamp) {
+                dft[key] = *e;
+                PD("DFT entry %s %s remotely\n", key.c_str(),
+                        (mit != dft.end() ? "updated" : "added"));
+            }
 
         } else {
             if (mit == dft.end()) {
