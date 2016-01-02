@@ -34,6 +34,7 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/spinlock.h>
+#include <linux/if_ether.h>
 
 
 #define ETH_P_RINA  0xD1F0
@@ -54,12 +55,16 @@ struct arpt_entry {
     /* The flow entry associated to the remote THA. */
     struct flow_entry *flow;
 
+    struct list_head rx_tmp_q;
+    bool fa_req_arrived;
+
     struct list_head node;
 };
 
 struct rina_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
+    struct rina_name upper_name;
     char *upper_name_s;
     struct list_head arp_table;
     spinlock_t arpt_lock;
@@ -100,7 +105,7 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
     struct rina_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del(&entry->node);
         if (entry->spa) {
@@ -110,7 +115,7 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
         kfree(entry);
     }
     priv->arp_tmr_shutdown = true;
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     del_timer_sync(&priv->arp_resolver_tmr);
 
@@ -123,6 +128,7 @@ rina_shim_eth_destroy(struct ipcp_entry *ipcp)
 
     if (priv->upper_name_s) {
         kfree(priv->upper_name_s);
+        rina_name_free(&priv->upper_name);
     }
 
     kfree(priv);
@@ -135,21 +141,31 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
                        int reg)
 {
     struct rina_shim_eth *priv = ipcp->priv;
-    char *tmp;
 
     if (reg) {
+        int ret;
+
         if (priv->upper_name_s) {
             /* Only one application can be currently registered. */
             return -EBUSY;
         }
 
         priv->upper_name_s = rina_name_to_string(appl);
-
-        if (priv->upper_name_s) {
-            PD("%s: Application %s registered\n", __func__, priv->upper_name_s);
+        if (!priv->upper_name_s) {
+            PE("%s: Out of memory\n", __func__);
+            return -ENOMEM;
         }
 
-        return priv->upper_name_s ? 0 : -ENOMEM;
+        ret = rina_name_copy(&priv->upper_name, appl);
+        if (ret) {
+            kfree(priv->upper_name_s);
+            priv->upper_name_s = NULL;
+            return ret;
+        }
+
+        PD("%s: Application %s registered\n", __func__, priv->upper_name_s);
+
+        return 0;
     }
 
     if (!priv->upper_name_s) {
@@ -157,14 +173,9 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
         return 0;
     }
 
-    tmp = rina_name_to_string(appl);
-    if (!tmp) {
-        PE("%s: Out of memory\n", __func__);
-        return -ENOMEM;
-    }
-
-    if (strcmp(tmp, priv->upper_name_s) == 0) {
+    if (rina_name_cmp(appl, &priv->upper_name) == 0) {
         PD("%s: Application %s unregistered\n", __func__, priv->upper_name_s);
+        rina_name_free(&priv->upper_name);
         kfree(priv->upper_name_s);
         priv->upper_name_s = NULL;
     } else {
@@ -172,20 +183,19 @@ rina_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
          * failed registration, so don't report an error. */
     }
 
-    kfree(tmp);
-
     return 0;
 }
 
 /* To be called under arpt_lock. */
 static struct arpt_entry *
-arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app, int len)
+arp_lookup_direct_b(struct rina_shim_eth *priv, const char *dst_app,
+                    int dst_app_len)
 {
     struct arpt_entry *entry;
 
     list_for_each_entry(entry, &priv->arp_table, node) {
-        if (len >= strlen(entry->tpa) &&
-                strncmp(entry->tpa, dst_app, len) == 0) {
+        if (dst_app_len >= strlen(entry->tpa) &&
+                strncmp(entry->tpa, dst_app, dst_app_len) == 0) {
             return entry;
         }
     }
@@ -275,7 +285,7 @@ arp_resolver_cb(unsigned long arg)
 
     skb_queue_head_init(&skbq);
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
 
     /* Scan the ARP table looking for incomplete entries. For each
      * incomplete entry found, generate a corresponding ARP request message.
@@ -308,7 +318,7 @@ arp_resolver_cb(unsigned long arg)
                   msecs_to_jiffies(ARP_TMR_INT_MS));
     }
 
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     /* Send all the generated requests. */
     for (;;) {
@@ -321,6 +331,13 @@ arp_resolver_cb(unsigned long arg)
 
         dev_queue_xmit(skb);
     }
+}
+
+static void
+arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
+{
+    entry->flow = flow;  /* XXX flow_get() ? */
+    flow->priv = entry;
 }
 
 static int
@@ -343,7 +360,7 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         goto nomem;
     }
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
 
     entry = arp_lookup_direct_b(priv, tpa, strlen(tpa));
     if (entry) {
@@ -353,11 +370,11 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
         if (entry->flow) {
             ret = -EBUSY;
         } else {
-            entry->flow = flow;
+            arpt_flow_bind(entry, flow);
             ret = 0;
         }
 
-        spin_unlock_irq(&priv->arpt_lock);
+        spin_unlock_bh(&priv->arpt_lock);
         kfree(spa);
         kfree(tpa);
 
@@ -370,17 +387,19 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
 
     entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
     if (!entry) {
-        spin_unlock_irq(&priv->arpt_lock);
+        spin_unlock_bh(&priv->arpt_lock);
         goto nomem;
     }
 
     entry->tpa = tpa; tpa = NULL;  /* Pass ownership. */
     entry->spa = spa; spa = NULL;  /* Pass ownership. */
-    entry->complete = false;
-    entry->flow = flow;  /* XXX flow_get() ? */
+    entry->complete = false;  /* Not meaningful. */
+    entry->fa_req_arrived = false;
+    INIT_LIST_HEAD(&entry->rx_tmp_q);
+    arpt_flow_bind(entry, flow);
     list_add_tail(&entry->node, &priv->arp_table);
 
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     spa = rina_name_to_string(&flow->local_application);
     tpa = rina_name_to_string(&flow->remote_application);
@@ -399,12 +418,12 @@ rina_shim_eth_fa_req(struct ipcp_entry *ipcp,
 
     dev_queue_xmit(skb);
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
     if (!timer_pending(&priv->arp_resolver_tmr)) {
         mod_timer(&priv->arp_resolver_tmr, jiffies +
                   msecs_to_jiffies(ARP_TMR_INT_MS));
     }
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     return 0;
 
@@ -428,7 +447,44 @@ static int
 rina_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
                       uint8_t response)
 {
-    return -EINVAL;
+    struct rina_shim_eth *priv = ipcp->priv;
+    struct arpt_entry *entry;
+    char *remote_app_s;
+    struct rina_buf *rb, *tmp;
+    struct list_head q;
+    int ret = -ENXIO;
+
+    remote_app_s = rina_name_to_string(&flow->remote_application);
+    if (!remote_app_s) {
+        PE("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    INIT_LIST_HEAD(&q);
+
+    spin_lock_bh(&priv->arpt_lock);
+
+    entry = arp_lookup_direct_b(priv, remote_app_s, strlen(remote_app_s));
+    if (entry) {
+        arpt_flow_bind(entry, flow);
+        ret = 0;
+        list_for_each_entry_safe(rb, tmp, &entry->rx_tmp_q, node) {
+            list_del(&rb->node);
+            list_add_tail(&rb->node, &q);
+            PD("%s: Pop PDU from rx_tmp_q\n", __func__);
+        }
+    }
+
+    spin_unlock_bh(&priv->arpt_lock);
+
+    kfree(remote_app_s);
+
+    list_for_each_entry_safe(rb, tmp, &q, node) {
+        list_del(&rb->node);
+        rina_sdu_rx_flow(ipcp, flow, rb);
+    }
+
+    return ret;
 }
 
 static size_t
@@ -458,7 +514,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
         return;
     }
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         struct arpt_entry *entry;
@@ -498,6 +554,8 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
                 entry->tpa[spa_len] = '\0';
                 entry->spa = NULL;  /* Won't be needed. */
                 entry->complete = true;
+                entry->fa_req_arrived = false;
+                INIT_LIST_HEAD(&entry->rx_tmp_q);
                 entry->flow = NULL;
                 memcpy(entry->tha, sha, sizeof(entry->tha));
                 list_add_tail(&entry->node, &priv->arp_table);
@@ -544,7 +602,7 @@ shim_eth_arp_rx(struct rina_shim_eth *priv, struct arphdr *arp, int len)
     }
 
 out:
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
@@ -558,6 +616,107 @@ out:
     }
 }
 
+static void
+shim_eth_pdu_rx(struct rina_shim_eth *priv, struct sk_buff *skb)
+{
+    struct rina_buf *rb = rina_buf_alloc(skb->len, 3, GFP_ATOMIC);
+    struct ethhdr *hh = eth_hdr(skb);
+    struct arpt_entry *entry;
+    struct flow_entry *flow = NULL;
+    bool match = false;
+
+    PD("SHIM ETH PDU from %02X:%02X:%02X:%02X:%02X:%02X [%d]\n",
+            hh->h_source[0], hh->h_source[1], hh->h_source[2],
+            hh->h_source[3], hh->h_source[4], hh->h_source[5],
+            skb->len);
+
+    if (unlikely(!rb)) {
+        PD("%s: Out of memory\n", __func__);
+        return;
+    }
+
+    skb_copy_bits(skb, 0, RINA_BUF_DATA(rb), skb->len);
+
+    /* TODO This lookup could be (partially) avoided if core implements
+     * another version of rina_sdu_rx_flow() that does not need the flow
+     * argument. */
+    spin_lock_bh(&priv->arpt_lock);
+
+    list_for_each_entry(entry, &priv->arp_table, node) {
+        if (entry->complete && memcmp(hh->h_source,
+                    entry->tha, sizeof(entry->tha)) == 0) {
+            match = true;
+            flow = entry->flow;
+            break;
+        }
+    }
+
+    if (likely(flow)) {
+        spin_unlock_bh(&priv->arpt_lock);
+
+        rina_sdu_rx_flow(priv->ipcp, flow, rb);
+
+        return;
+    }
+
+    /* Here we are the flow allocation slave, we cannot be the flow
+     * allocation initiator. */
+
+    if (!match) {
+        RPD(5, "%s: PDU from unknown source MAC "
+                "%02X:%02X:%02X:%02X:%02X:%02X\n", __func__,
+                hh->h_source[0], hh->h_source[1], hh->h_source[2],
+                hh->h_source[3], hh->h_source[4], hh->h_source[5]);
+        goto drop;
+    }
+
+    /* Here 'entry' is a valid pointer. */
+
+    {
+        struct rina_name remote_app;
+        int ret;
+
+        if (entry->fa_req_arrived) {
+            goto enq;
+        }
+
+        /* The first PDU is interpreted as a flow allocation request. */
+
+        if (!priv->upper_name_s) {
+            PD("%s: Flow allocation request arrived but no application"
+               "registered\n", __func__);
+            goto drop;
+        }
+
+        ret = __rina_name_from_string(entry->tpa, &remote_app, GFP_ATOMIC);
+        if (ret) {
+            PD("%s: Out of memory\n", __func__);
+            goto drop;
+        }
+
+        ret = rina_fa_req_arrived(priv->ipcp, 0, 0, &priv->upper_name,
+                &remote_app, NULL);
+        rina_name_free(&remote_app);
+
+        if (ret) {
+            PD("%s: Out of memory\n", __func__);
+            goto drop;
+        }
+
+        entry->fa_req_arrived = true;
+enq:
+        PD("%s: Push PDU into rx_tmp_q\n", __func__);
+        list_add_tail(&rb->node, &entry->rx_tmp_q);
+    }
+
+    spin_unlock_bh(&priv->arpt_lock);
+    return;
+
+drop:
+    spin_unlock_bh(&priv->arpt_lock);
+    rina_buf_free(rb);
+}
+
 static rx_handler_result_t
 shim_eth_rx_handler(struct sk_buff **skbp)
 {
@@ -565,8 +724,6 @@ shim_eth_rx_handler(struct sk_buff **skbp)
     struct rina_shim_eth *priv = (struct rina_shim_eth *)
                 rcu_dereference(skb->dev->rx_handler_data);
     unsigned int ethertype = ntohs(skb->protocol);
-
-    (void)priv;
 
     PD("%s: intercept skb %u, protocol %u\n", __func__, skb->len, ntohs(skb->protocol));
 
@@ -586,7 +743,7 @@ shim_eth_rx_handler(struct sk_buff **skbp)
 
     } else if (ethertype == ETH_P_RINA) {
         /* This is a RINA shim-eth PDU. */
-        PD("SHIM ETH PDU\n");
+        shim_eth_pdu_rx(priv, skb);
 
     } else {
         /* This frame doesn't belong to RINA stack. */
@@ -601,15 +758,45 @@ shim_eth_rx_handler(struct sk_buff **skbp)
 
 static int
 rina_shim_eth_sdu_write(struct ipcp_entry *ipcp,
-                             struct flow_entry *flow,
-                             struct rina_buf *rb,
-                             bool maysleep)
+                        struct flow_entry *flow,
+                        struct rina_buf *rb,
+                        bool maysleep)
 {
     struct rina_shim_eth *priv = ipcp->priv;
+    int hhlen = LL_RESERVED_SPACE(priv->netdev); /* Hardware header length */
+    struct sk_buff *skb = NULL;
+    struct arpt_entry *entry = flow->priv;
+    int ret;
 
-    (void)priv;
+    BUG_ON(!entry);
+
+    skb = alloc_skb(hhlen + rb->len + priv->netdev->needed_tailroom,
+                    GFP_KERNEL);
+    if (!skb) {
+        PD("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    skb_reserve(skb, hhlen);
+    skb_reset_network_header(skb);
+    skb->dev = priv->netdev;
+    skb->protocol = htons(ETH_P_RINA);
+
+    ret = dev_hard_header(skb, skb->dev, ETH_P_RINA, entry->tha,
+                          priv->netdev->dev_addr, skb->len);
+    if (unlikely(ret < 0)) {
+        kfree_skb(skb);
+
+        return ret;
+    }
+
+    /* Copy data into the skb. */
+    memcpy(skb_put(skb, rb->len), RINA_BUF_DATA(rb), rb->len);
 
     rina_buf_free(rb);
+
+    /* Send the skb to the device for transmission. */
+    dev_queue_xmit(skb);
 
     return 0;
 }
@@ -651,16 +838,24 @@ rina_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
     struct rina_shim_eth *priv = (struct rina_shim_eth *)ipcp->priv;
     struct arpt_entry *entry;
 
-    spin_lock_irq(&priv->arpt_lock);
+    spin_lock_bh(&priv->arpt_lock);
 
     list_for_each_entry(entry, &priv->arp_table, node) {
         if (entry->flow == flow) {
-            PD("%s: Detached from flow %p\n", __func__, entry->flow);
+            struct rina_buf *rb, *tmp;
+
+            PD("%s: Detaching from flow %p\n", __func__, entry->flow);
+            flow->priv = NULL;
             entry->flow = NULL;
+            entry->fa_req_arrived = false;
+            list_for_each_entry_safe(rb, tmp, &entry->rx_tmp_q, node) {
+                list_del(&rb->node);
+                rina_buf_free(rb);
+            }
         }
     }
 
-    spin_unlock_irq(&priv->arpt_lock);
+    spin_unlock_bh(&priv->arpt_lock);
 
     return 0;
 }

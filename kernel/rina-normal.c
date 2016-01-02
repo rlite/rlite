@@ -85,7 +85,7 @@ snd_inact_tmr_cb(long unsigned arg)
 
     PD("%s\n", __func__);
 
-    spin_lock_irq(&dtp->lock);
+    spin_lock_bh(&dtp->lock);
     dtp->set_drf = true;
 
     /* InitialSeqNumPolicy */
@@ -100,7 +100,7 @@ snd_inact_tmr_cb(long unsigned arg)
     /* Send transfer PDU with zero length. */
 
     /* Notify user flow that there has been no activity for a while */
-    spin_unlock_irq(&dtp->lock);
+    spin_unlock_bh(&dtp->lock);
 }
 
 static void
@@ -127,7 +127,7 @@ rtx_tmr_cb(long unsigned arg)
 
     INIT_LIST_HEAD(&rrbq);
 
-    spin_lock_irq(&dtp->lock);
+    spin_lock_bh(&dtp->lock);
 
     if (likely(dtp->rtx_tmr_next)) {
         /* I couldn't figure out how to implement this with the macros in
@@ -174,7 +174,7 @@ rtx_tmr_cb(long unsigned arg)
         }
     }
 
-    spin_unlock_irq(&dtp->lock);
+    spin_unlock_bh(&dtp->lock);
 
     list_for_each_entry(crb, &rrbq, node) {
         struct rina_pci *pci = RINA_BUF_PCI(crb);
@@ -242,9 +242,9 @@ pduft_lookup(struct rina_normal *priv, uint64_t dest_addr)
 {
     struct pduft_entry *entry;
 
-    spin_lock_irq(&priv->pduft_lock);
+    spin_lock_bh(&priv->pduft_lock);
     entry = pduft_lookup_internal(priv, dest_addr);
-    spin_unlock_irq(&priv->pduft_lock);
+    spin_unlock_bh(&priv->pduft_lock);
 
     return entry ? entry->flow : NULL;
 }
@@ -287,10 +287,10 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb,
             if (unlikely(ret == -EAGAIN)) {
                 if (!maysleep) {
                     /* Enqueue in the RMT queue. */
-                    spin_lock_irq(&lower_flow->rmtq_lock);
+                    spin_lock_bh(&lower_flow->rmtq_lock);
                     list_add_tail(&rb->node, &lower_flow->rmtq);
                     lower_flow->rmtq_len++;
-                    spin_unlock_irq(&lower_flow->rmtq_lock);
+                    spin_unlock_bh(&lower_flow->rmtq_lock);
                 } else {
                     /* Cannot restart system call from here... */
 
@@ -326,7 +326,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     bool dtcp_present = flow->cfg.dtcp_present;
 
-    spin_lock_irq(&dtp->lock);
+    spin_lock_bh(&dtp->lock);
 
     if (dtcp_present) {
         /* 3 * (MPL + R + A) */
@@ -339,7 +339,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                         (flow->cfg.dtcp.rtx_control &&
                             dtp->rtxq_len >= dtp->max_rtxq_len)) {
         /* POL: FlowControlOverrun */
-        spin_unlock_irq(&dtp->lock);
+        spin_unlock_bh(&dtp->lock);
 
         /* Backpressure. Don't drop the PDU, we will be
          * invoked again. */
@@ -390,7 +390,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             struct rina_buf *crb = rina_buf_clone(rb, GFP_ATOMIC);
 
             if (unlikely(!crb)) {
-                spin_unlock_irq(&dtp->lock);
+                spin_unlock_bh(&dtp->lock);
                 PE("%s: Out of memory\n", __func__);
                 rina_buf_free(rb);
                 return -ENOMEM;
@@ -414,7 +414,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         }
     }
 
-    spin_unlock_irq(&dtp->lock);
+    spin_unlock_bh(&dtp->lock);
 
     if (unlikely(rb == NULL)) {
         return 0;
@@ -511,7 +511,7 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
-    spin_lock_irq(&priv->pduft_lock);
+    spin_lock_bh(&priv->pduft_lock);
 
     entry = pduft_lookup_internal(priv, dest_addr);
 
@@ -532,7 +532,7 @@ rina_normal_pduft_set(struct ipcp_entry *ipcp, uint64_t dest_addr,
     entry->flow = flow;
     entry->address = dest_addr;
 
-    spin_unlock_irq(&priv->pduft_lock);
+    spin_unlock_bh(&priv->pduft_lock);
 
     return 0;
 }
@@ -542,10 +542,10 @@ rina_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rina_normal *priv = (struct rina_normal *)ipcp->priv;
 
-    spin_lock_irq(&priv->pduft_lock);
+    spin_lock_bh(&priv->pduft_lock);
     list_del(&entry->fnode);
     hash_del(&entry->node);
-    spin_unlock_irq(&priv->pduft_lock);
+    spin_unlock_bh(&priv->pduft_lock);
 
     kfree(entry);
 
@@ -696,7 +696,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     INIT_LIST_HEAD(&qrbs);
 
-    spin_lock_irq(&dtp->lock);
+    spin_lock_bh(&dtp->lock);
 
     if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
         /* Gap in the control SDU space. */
@@ -801,7 +801,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
 out:
-    spin_unlock_irq(&dtp->lock);
+    spin_unlock_bh(&dtp->lock);
 
     rina_buf_free(rb);
 
@@ -859,7 +859,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     dtp = &flow->dtp;
 
-    spin_lock_irq(&dtp->lock);
+    spin_lock_bh(&dtp->lock);
 
     if (flow->cfg.dtcp_present) {
         /* 2 * (MPL + R + A) */
@@ -876,7 +876,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
-        spin_unlock_irq(&dtp->lock);
+        spin_unlock_bh(&dtp->lock);
 
         rina_buf_pci_pop(rb);
         ret = rina_sdu_rx_flow(ipcp, flow, rb);
@@ -902,7 +902,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             }
         }
 
-        spin_unlock_irq(&dtp->lock);
+        spin_unlock_bh(&dtp->lock);
 
         goto snd_crb;
 
@@ -969,7 +969,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
-        spin_unlock_irq(&dtp->lock);
+        spin_unlock_bh(&dtp->lock);
 
         rina_buf_pci_pop(rb);
         ret = rina_sdu_rx_flow(ipcp, flow, rb);
@@ -1000,7 +1000,7 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
 
     crb = sdu_rx_sv_update(ipcp, flow);
 
-    spin_unlock_irq(&dtp->lock);
+    spin_unlock_bh(&dtp->lock);
 
 snd_crb:
     if (crb) {

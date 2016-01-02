@@ -152,6 +152,8 @@ struct flow_entry {
 
     struct list_head    pduft_entries;
 
+    void                *priv;
+
     unsigned int        refcnt;
     struct hlist_node   node;
 };

@@ -107,12 +107,12 @@ struct rina_dm {
 
 static struct rina_dm rina_dm;
 
-#define FLOCK() spin_lock_irq(&rina_dm.flows_lock)
-#define FUNLOCK() spin_unlock_irq(&rina_dm.flows_lock)
-#define PLOCK() spin_lock_irq(&rina_dm.ipcps_lock)
-#define PUNLOCK() spin_unlock_irq(&rina_dm.ipcps_lock)
-#define RALOCK(_p) spin_lock_irq(&(_p)->regapp_lock)
-#define RAUNLOCK(_p) spin_unlock_irq(&(_p)->regapp_lock)
+#define FLOCK() spin_lock_bh(&rina_dm.flows_lock)
+#define FUNLOCK() spin_unlock_bh(&rina_dm.flows_lock)
+#define PLOCK() spin_lock_bh(&rina_dm.ipcps_lock)
+#define PUNLOCK() spin_unlock_bh(&rina_dm.ipcps_lock)
+#define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
+#define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
 static struct ipcp_factory *
 ipcp_factories_find(uint8_t dif_type)
@@ -567,17 +567,17 @@ tx_completion_func(unsigned long arg)
         struct rina_buf *rb;
         int ret;
 
-        spin_lock_irq(&flow->rmtq_lock);
+        spin_lock_bh(&flow->rmtq_lock);
         if (flow->rmtq_len == 0) {
             drained = true;
-            spin_unlock_irq(&flow->rmtq_lock);
+            spin_unlock_bh(&flow->rmtq_lock);
             break;
         }
 
         rb = list_first_entry(&flow->rmtq, struct rina_buf, node);
         list_del(&rb->node);
         flow->rmtq_len--;
-        spin_unlock_irq(&flow->rmtq_lock);
+        spin_unlock_bh(&flow->rmtq_lock);
 
         PD("%s: Sending [%lu] from rmtq\n", __func__,
                 (long unsigned)RINA_BUF_PCI(rb)->seqnum);
@@ -586,10 +586,10 @@ tx_completion_func(unsigned long arg)
         if (unlikely(ret == -EAGAIN)) {
             PD("%s: Pushing [%lu] back to rmtq\n", __func__,
                     (long unsigned)RINA_BUF_PCI(rb)->seqnum);
-            spin_lock_irq(&flow->rmtq_lock);
+            spin_lock_bh(&flow->rmtq_lock);
             list_add(&rb->node, &flow->rmtq);
             flow->rmtq_len++;
-            spin_unlock_irq(&flow->rmtq_lock);
+            spin_unlock_bh(&flow->rmtq_lock);
             break;
         }
     }
@@ -606,12 +606,12 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          const struct rina_name *local_application,
          const struct rina_name *remote_application,
          const struct rina_flow_config *flowcfg,
-         struct flow_entry **pentry)
+         struct flow_entry **pentry, gfp_t gfp)
 {
     struct flow_entry *entry;
     int ret = 0;
 
-    *pentry = entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+    *pentry = entry = kzalloc(sizeof(*entry), gfp);
     if (!entry) {
         return -ENOMEM;
     }
@@ -632,6 +632,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
+        entry->priv = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
@@ -698,7 +699,7 @@ flow_put(struct flow_entry *entry)
          * removal, so that we avoid postponing forever. */
         bool postpone = false;
 
-        spin_lock_irq(&dtp->lock);
+        spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
             PD("%s: Flow removal postponed since cwq contains "
                     "%u PDUs and rtxq contains %u PDUs\n", __func__,
@@ -710,7 +711,7 @@ flow_put(struct flow_entry *entry)
             del_timer(&dtp->snd_inact_tmr);
             del_timer(&dtp->rcv_inact_tmr);
         }
-        spin_unlock_irq(&dtp->lock);
+        spin_unlock_bh(&dtp->lock);
 
         if (postpone) {
             schedule_delayed_work(&dtp->remove, 2 * HZ);
@@ -1250,7 +1251,8 @@ rina_fa_req_internal(uint16_t ipcp_id, struct upper_ref upper,
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, local_application,
-                   remote_application, &req->flowcfg, &flow_entry);
+                   remote_application, &req->flowcfg, &flow_entry,
+                   GFP_KERNEL);
     if (ret) {
         goto out;
     }
@@ -1443,6 +1445,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
+/* This may be called from softirq context. */
 int
 rina_fa_req_arrived(struct ipcp_entry *ipcp,
                     uint32_t remote_port, uint64_t remote_addr,
@@ -1467,7 +1470,8 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp,
     upper.rc = app->rc;
     upper.ipcp = NULL;
     ret = flow_add(ipcp, upper, 0, local_application,
-                   remote_application, flowcfg, &flow_entry);
+                   remote_application, flowcfg, &flow_entry,
+                   GFP_ATOMIC);
     if (ret) {
         goto out;
     }
@@ -1585,9 +1589,9 @@ int rina_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
         txrx = &flow->txrx;
     }
 
-    spin_lock_irq(&txrx->rx_lock);
+    spin_lock_bh(&txrx->rx_lock);
     list_add_tail(&rb->node, &txrx->rx_q);
-    spin_unlock_irq(&txrx->rx_lock);
+    spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
@@ -1617,7 +1621,7 @@ EXPORT_SYMBOL_GPL(rina_sdu_rx);
 void
 rina_write_restart_flow(struct flow_entry *flow)
 {
-    spin_lock_irq(&flow->rmtq_lock);
+    spin_lock_bh(&flow->rmtq_lock);
 
     if (flow->rmtq_len > 0) {
         /* Schedule a tasklet to complete the tx work.
@@ -1630,7 +1634,7 @@ rina_write_restart_flow(struct flow_entry *flow)
                 POLLWRBAND | POLLWRNORM);
     }
 
-    spin_unlock_irq(&flow->rmtq_lock);
+    spin_unlock_bh(&flow->rmtq_lock);
 }
 EXPORT_SYMBOL_GPL(rina_write_restart_flow);
 
@@ -1973,9 +1977,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         current->state = TASK_INTERRUPTIBLE;
 
-        spin_lock_irq(&txrx->rx_lock);
+        spin_lock_bh(&txrx->rx_lock);
         if (list_empty(&txrx->rx_q)) {
-            spin_unlock_irq(&txrx->rx_lock);
+            spin_unlock_bh(&txrx->rx_lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
                 break;
@@ -1988,7 +1992,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
         rb = list_first_entry(&txrx->rx_q, struct rina_buf, node);
         list_del(&rb->node);
-        spin_unlock_irq(&txrx->rx_lock);
+        spin_unlock_bh(&txrx->rx_lock);
 
         copylen = rb->len;
         if (copylen > len) {
@@ -2022,11 +2026,11 @@ rina_io_poll(struct file *f, poll_table *wait)
 
     poll_wait(f, &rio->txrx->rx_wqh, wait);
 
-    spin_lock_irq(&rio->txrx->rx_lock);
+    spin_lock_bh(&rio->txrx->rx_lock);
     if (!list_empty(&rio->txrx->rx_q)) {
         mask |= POLLIN | POLLRDNORM;
     }
-    spin_unlock_irq(&rio->txrx->rx_lock);
+    spin_unlock_bh(&rio->txrx->rx_lock);
 
     mask |= POLLOUT | POLLWRNORM;
 
