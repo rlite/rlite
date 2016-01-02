@@ -24,6 +24,33 @@ struct application {
 };
 
 static int
+application_register_resp(struct rina_evloop *loop,
+                          const struct rina_msg_base_resp *b_resp,
+                          const struct rina_msg_base *b_req)
+{
+    struct rina_kmsg_application_register *req =
+            (struct rina_kmsg_application_register *)b_req;
+    char *name_s = NULL;
+    int reg = b_resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
+
+    name_s = rina_name_to_string(&req->application_name);
+
+    if (b_resp->result) {
+        printf("%s: Failed to %sregister application %s to IPC process %u\n",
+                __func__, (reg ? "" : "un"), name_s, req->ipcp_id);
+    } else {
+        printf("%s: Application %s %sregistered to IPC process %u\n",
+                __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
+    }
+
+    if (name_s) {
+        free(name_s);
+    }
+
+    return 0;
+}
+
+static int
 flow_allocate_resp(struct rina_evloop *loop,
                         const struct rina_msg_base_resp *b_resp,
                         const struct rina_msg_base *b_req)
@@ -68,9 +95,39 @@ flow_allocate_resp(struct rina_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
+    [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
+    [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_FLOW_ALLOCATE_RESP] = flow_allocate_resp,
     [RINA_KERN_MSG_MAX] = NULL,
 };
+
+static struct rina_msg_base_resp *
+application_register_req(struct application *application,
+                         int wait_for_completion,
+                         int reg, unsigned int ipcp_id,
+                         struct rina_name *application_name)
+{
+    struct rina_kmsg_application_register *req;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        printf("%s: Out of memory\n", __func__);
+        return NULL;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER
+                        : RINA_KERN_APPLICATION_UNREGISTER;
+    req->ipcp_id = ipcp_id;
+    rina_name_copy(&req->application_name, application_name);
+
+    printf("Requesting application %sregistration...\n", (reg ? "": "un"));
+
+    return (struct rina_msg_base_resp *)
+           issue_request(&application->loop, RMB(req),
+                         sizeof(*req), wait_for_completion);
+}
 
 static struct rina_kmsg_flow_allocate_resp *
 flow_allocate_req(struct application *application, int wait_for_completion,
@@ -100,15 +157,38 @@ flow_allocate_req(struct application *application, int wait_for_completion,
                          sizeof(*req), wait_for_completion);
 }
 
-static int allocate_flow(struct application *application,
+static int
+application_register(struct application *application, int reg,
+                     struct rina_name *dif_name,
+                     struct rina_name *application_name)
+{
+    unsigned int ipcp_id;
+    struct rina_msg_base_resp *kresp;
+
+    ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
+    if (ipcp_id == ~0U) {
+        printf("%s: Could not find a suitable IPC process\n", __func__);
+        return -1;
+    }
+
+    /* Forward the request to the kernel. */
+    kresp = application_register_req(application, 1, reg, ipcp_id,
+                                     application_name);
+    if (kresp) {
+            rina_msg_free(rina_kernel_numtables, RMB(kresp));
+    }
+
+    return 0;
+}
+
+static int flow_allocate(struct application *application,
                          struct rina_name *dif_name,
                          struct rina_name *local_application,
                          struct rina_name *remote_application)
 {
     unsigned int ipcp_id;
-    struct rina_kmsg_flow_allocate_resp *resp;
+    struct rina_kmsg_flow_allocate_resp *kresp;
 
-    ipcps_fetch(&application->loop);
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
 
     if (ipcp_id == ~0U) {
@@ -116,15 +196,17 @@ static int allocate_flow(struct application *application,
         return -1;
     }
 
-    resp = flow_allocate_req(application, 1, ipcp_id, local_application,
+    kresp = flow_allocate_req(application, 1, ipcp_id, local_application,
                              remote_application);
-    if (!resp) {
+    if (!kresp) {
         printf("%s: Flow allocation request failed\n", __func__);
         return -1;
     }
 
     printf("%s: Flow allocation response: ret = %u, port-id = %u\n",
-                __func__, resp->result, resp->port_id);
+                __func__, kresp->result, kresp->port_id);
+
+    rina_msg_free(rina_kernel_numtables, RMB(kresp));
 
     return 0;
 }
@@ -146,10 +228,15 @@ process(int argc, char **argv, struct application *application)
     (void) argc;
     (void) argv;
 
+    ipcps_fetch(&application->loop);
+
     rina_name_fill(&dif_name, "d.DIF", "", "", "");
     rina_name_fill(&this_application, "client", "1", NULL, NULL);
     rina_name_fill(&remote_application, "server", "1", NULL, NULL);
-    allocate_flow(application, &dif_name, &this_application,
+
+    application_register(application, 1, &dif_name, &remote_application);
+
+    flow_allocate(application, &dif_name, &this_application,
                   &remote_application);
 }
 

@@ -63,6 +63,7 @@ struct upqueue_entry {
 
 struct registered_application {
     struct rina_name name;
+    struct rina_ctrl *rc;
     struct list_head node;
 };
 
@@ -539,7 +540,8 @@ ipcp_application_lookup(struct ipcp_entry *ipcp,
 
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
-                     struct rina_name *application_name)
+                     struct rina_name *application_name,
+                     struct rina_ctrl *rc)
 {
     struct registered_application *app;
     char *name_s;
@@ -559,6 +561,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     }
     memset(app, 0, sizeof(*app));
     rina_name_copy(&app->name, application_name);
+    app->rc = rc;
 
     list_add_tail(&app->node, &ipcp->registered_applications);
 
@@ -592,6 +595,9 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     if (!app) {
         return -EINVAL;
     }
+
+    rina_name_free(&app->name);
+    kfree(app);
 
     name_s = rina_name_to_string(application_name);
     printk("%s: Application %s unregistered\n", __func__, name_s);
@@ -627,7 +633,7 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     if (entry) {
         ret = 0;
         if (reg) {
-            ret = ipcp_application_add(entry, &req->application_name);
+            ret = ipcp_application_add(entry, &req->application_name, rc);
             if (ret == 0 && entry->ops.application_register) {
                 ret = entry->ops.application_register(entry,
                                             &req->application_name);
@@ -865,7 +871,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
                     __func__, req->ipcp_id);
 
     /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(rina_dm.ctrl, (struct rina_msg_base *)req);
+    ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)req);
     if (ret) {
         flow_del(flow_entry->local_port, 0);
         rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
@@ -889,6 +895,8 @@ static rina_msg_handler_t rina_ctrl_handlers[] = {
 };
 
 static rina_msg_handler_t rina_flow_ctrl_handlers[] = {
+    [RINA_KERN_APPLICATION_REGISTER] = rina_application_register,
+    [RINA_KERN_APPLICATION_UNREGISTER] = rina_application_register,
     [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
     [RINA_KERN_FLOW_ALLOCATE_REQ] = rina_flow_allocate_req,
     [RINA_KERN_MSG_MAX] = NULL,
@@ -1099,6 +1107,25 @@ rina_ctrl_release(struct inode *inode, struct file *f)
         mutex_lock(&rina_dm.lock);
         BUG_ON(rc != rina_dm.ctrl);
         rina_dm.ctrl = NULL;
+        mutex_unlock(&rina_dm.lock);
+    } else {
+        struct ipcp_entry *ipcp;
+        int bucket;
+        struct registered_application *app;
+        struct registered_application *tmp;
+
+        mutex_lock(&rina_dm.lock);
+        hash_for_each(rina_dm.ipcp_table, bucket, ipcp, node) {
+            list_for_each_entry_safe(app, tmp,
+                                     &ipcp->registered_applications, node) {
+                if (app->rc == rc) {
+                    printk("Deleting %p\n", rc);
+                    list_del(&app->node);
+                    rina_name_free(&app->name);
+                    kfree(app);
+                }
+            }
+        }
         mutex_unlock(&rina_dm.lock);
     }
 
