@@ -54,7 +54,7 @@ ipcp_fetch_resp(struct rina_evloop *loop,
 
 /* Fetch information about a single IPC process. */
 static struct rina_kmsg_fetch_ipcp_resp *
-ipcp_fetch(struct rina_evloop *loop)
+ipcp_fetch(struct rina_evloop *loop, int *result)
 {
     struct rina_msg_base *msg;
 
@@ -71,7 +71,7 @@ ipcp_fetch(struct rina_evloop *loop)
     printf("Requesting IPC processes fetch...\n");
 
     return (struct rina_kmsg_fetch_ipcp_resp *)
-           issue_request(loop, msg, sizeof(*msg), 1);
+           issue_request(loop, msg, sizeof(*msg), 1, result);
 }
 
 int
@@ -120,7 +120,9 @@ ipcps_fetch(struct rina_evloop *loop)
 
     /* Reload the IPCPs list. */
     while (!end) {
-        resp = ipcp_fetch(loop);
+        int result;
+
+        resp = ipcp_fetch(loop, &result);
         if (!resp) {
             end = 1;
         } else {
@@ -258,7 +260,7 @@ notify_requestor:
  * @msg. */
 struct rina_msg_base *
 issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
-              size_t msg_len, int wait_for_completion)
+              size_t msg_len, int wait_for_completion, int *result)
 {
     struct rina_msg_base *resp = NULL;
     struct pending_entry *entry;
@@ -266,6 +268,8 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
     unsigned int serlen;
     int has_response = 1;
     int ret;
+
+    *result = 0;
 
     if (!loop->handlers[msg->msg_type + 1]) {
         /* The event loop user did not specify a response
@@ -282,6 +286,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         if (!entry) {
             rina_msg_free(rina_kernel_numtables, msg);
             printf("%s: Out of memory\n", __func__);
+            *result = ENOMEM;
             return NULL;
         }
     }
@@ -313,6 +318,7 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         free(entry);
         pthread_mutex_unlock(&loop->lock);
         rina_msg_free(rina_kernel_numtables, msg);
+        *result = ENOBUFS;
         return NULL;
     }
     serlen = serialize_rina_msg(rina_kernel_numtables, serbuf, msg);
@@ -325,9 +331,12 @@ issue_request(struct rina_evloop *loop, struct rina_msg_base *msg,
         }
         if (ret < 0) {
             perror("write(rfd)");
+            *result = ret;
         } else {
+            /* This should never happen if kernel code is correct. */
             printf("%s: Error: partial write [%d/%u]\n", __func__,
                     ret, serlen);
+            *result = EINVAL;
         }
     }
 

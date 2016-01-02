@@ -150,7 +150,8 @@ static struct rina_msg_base_resp *
 application_register_req(struct application *application,
                          int wait_for_completion,
                          int reg, unsigned int ipcp_id,
-                         struct rina_name *application_name)
+                         struct rina_name *application_name,
+                         int *result)
 {
     struct rina_kmsg_application_register *req;
 
@@ -171,13 +172,13 @@ application_register_req(struct application *application,
 
     return (struct rina_msg_base_resp *)
            issue_request(&application->loop, RMB(req),
-                         sizeof(*req), wait_for_completion);
+                         sizeof(*req), wait_for_completion, result);
 }
 
 static struct rina_kmsg_flow_allocate_resp_arrived *
 flow_allocate_req(struct application *application, int wait_for_completion,
                   uint16_t ipcp_id, struct rina_name *local_application,
-                  struct rina_name *remote_application)
+                  struct rina_name *remote_application, int *result)
 {
     struct rina_kmsg_flow_allocate_req *req;
 
@@ -199,7 +200,7 @@ flow_allocate_req(struct application *application, int wait_for_completion,
 
     return (struct rina_kmsg_flow_allocate_resp_arrived *)
            issue_request(&application->loop, RMB(req),
-                         sizeof(*req), wait_for_completion);
+                         sizeof(*req), wait_for_completion, result);
 }
 
 static int
@@ -209,6 +210,7 @@ application_register(struct application *application, int reg,
 {
     unsigned int ipcp_id;
     struct rina_msg_base_resp *kresp;
+    int result;
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
     if (ipcp_id == ~0U) {
@@ -218,7 +220,7 @@ application_register(struct application *application, int reg,
 
     /* Forward the request to the kernel. */
     kresp = application_register_req(application, 1, reg, ipcp_id,
-                                     application_name);
+                                     application_name, &result);
     if (kresp) {
             rina_msg_free(rina_kernel_numtables, RMB(kresp));
     }
@@ -233,6 +235,7 @@ static int flow_allocate(struct application *application,
 {
     unsigned int ipcp_id;
     struct rina_kmsg_flow_allocate_resp_arrived *kresp;
+    int result;
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
 
@@ -242,7 +245,7 @@ static int flow_allocate(struct application *application,
     }
 
     kresp = flow_allocate_req(application, 1, ipcp_id, local_application,
-                             remote_application);
+                             remote_application, &result);
     if (!kresp) {
         printf("%s: Flow allocation request failed\n", __func__);
         return -1;

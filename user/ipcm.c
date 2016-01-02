@@ -135,7 +135,8 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 /* Create an IPC process. */
 static struct rina_kmsg_ipcp_create_resp *
 ipcp_create(struct ipcm *ipcm, int wait_for_completion,
-            const struct rina_name *name, uint8_t dif_type)
+            const struct rina_name *name, uint8_t dif_type,
+            int *result)
 {
     struct rina_kmsg_ipcp_create *msg;
     struct rina_kmsg_ipcp_create_resp *resp;
@@ -156,7 +157,7 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
 
     resp = (struct rina_kmsg_ipcp_create_resp *)
            issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), wait_for_completion);
+                         sizeof(*msg), wait_for_completion, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -165,7 +166,8 @@ ipcp_create(struct ipcm *ipcm, int wait_for_completion,
 
 /* Destroy an IPC process. */
 static struct rina_msg_base_resp *
-ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
+ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id,
+             int *result)
 {
     struct rina_kmsg_ipcp_destroy *msg;
     struct rina_msg_base_resp *resp;
@@ -185,7 +187,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
 
     resp = (struct rina_msg_base_resp *)
            issue_request(&ipcm->loop, RMB(msg),
-                         sizeof(*msg), wait_for_completion);
+                         sizeof(*msg), wait_for_completion, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -194,7 +196,7 @@ ipcp_destroy(struct ipcm *ipcm, int wait_for_completion, unsigned int ipcp_id)
 
 static struct rina_msg_base_resp *
 assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
-              uint16_t ipcp_id, struct rina_name *dif_name)
+              uint16_t ipcp_id, struct rina_name *dif_name, int *result)
 {
     struct rina_kmsg_assign_to_dif *req;
     struct rina_msg_base_resp *resp;
@@ -214,8 +216,8 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting DIF assignment...\n");
 
     resp = (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(req),
-                         sizeof(*req), wait_for_completion);
+           issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         wait_for_completion, result);
 
     ipcps_fetch(&ipcm->loop);
 
@@ -225,7 +227,7 @@ assign_to_dif(struct ipcm *ipcm, int wait_for_completion,
 static struct rina_msg_base_resp *
 application_register(struct ipcm *ipcm, int wait_for_completion,
                      int reg, unsigned int ipcp_id,
-                     struct rina_name *application_name)
+                     struct rina_name *application_name, int *result)
 {
     struct rina_kmsg_application_register *req;
 
@@ -245,8 +247,8 @@ application_register(struct ipcm *ipcm, int wait_for_completion,
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
     return (struct rina_msg_base_resp *)
-           issue_request(&ipcm->loop, RMB(req),
-                         sizeof(*req), wait_for_completion);
+           issue_request(&ipcm->loop, RMB(req), sizeof(*req),
+                         wait_for_completion, result);
 }
 
 static int
@@ -255,17 +257,18 @@ test(struct ipcm *ipcm)
     struct rina_name name;
     struct rina_kmsg_ipcp_create_resp *icresp;
     struct rina_msg_base_resp *resp;
+    int result;
 
     /* Create an IPC process of type shim-dummy. */
     rina_name_fill(&name, "test-shim-dummy.IPCP", "1", NULL, NULL);
-    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY);
+    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "test-shim-dummy.IPCP", "2", NULL, NULL);
-    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY);
+    icresp = ipcp_create(ipcm, 0, &name, DIF_TYPE_SHIM_DUMMY, &result);
     if (icresp) {
         rina_msg_free(rina_kernel_numtables, RMB(icresp));
     }
@@ -273,7 +276,7 @@ test(struct ipcm *ipcm)
 
     /* Assign to DIF. */
     rina_name_fill(&name, "test-shim-dummy.DIF", NULL, NULL, NULL);
-    resp = assign_to_dif(ipcm, 0, 0, &name);
+    resp = assign_to_dif(ipcm, 0, 0, &name, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
@@ -284,14 +287,14 @@ test(struct ipcm *ipcm)
 
     /* Register some applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    resp = application_register(ipcm, 0, 1, 0, &name);
+    resp = application_register(ipcm, 0, 1, 0, &name, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    resp = application_register(ipcm, 0, 1, 1, &name);
+    resp = application_register(ipcm, 0, 1, 1, &name, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
@@ -299,26 +302,26 @@ test(struct ipcm *ipcm)
 
     /* Unregister the applications. */
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
-    resp = application_register(ipcm, 0, 0, 0, &name);
+    resp = application_register(ipcm, 0, 0, 0, &name, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     rina_name_fill(&name, "ServerApplication", "1", NULL, NULL);
-    resp = application_register(ipcm, 0, 0, 1, &name);
+    resp = application_register(ipcm, 0, 0, 1, &name, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
     rina_name_free(&name);
 
     /* Destroy the IPCPs. */
-    resp = ipcp_destroy(ipcm, 0, 0);
+    resp = ipcp_destroy(ipcm, 0, 0, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
 
-    resp = ipcp_destroy(ipcm, 0, 1);
+    resp = ipcp_destroy(ipcm, 0, 1, &result);
     if (resp) {
         rina_msg_free(rina_kernel_numtables, RMB(resp));
     }
@@ -343,13 +346,14 @@ rina_appl_ipcp_create(struct ipcm *ipcm, int sfd,
     struct rina_amsg_ipcp_create *req = (struct rina_amsg_ipcp_create *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_kmsg_ipcp_create_resp *kresp;
+    int result;
 
-    kresp = ipcp_create(ipcm, 1, &req->ipcp_name, req->dif_type);
+    kresp = ipcp_create(ipcm, 1, &req->ipcp_name, req->dif_type, &result);
     if (kresp) {
         rina_msg_free(rina_kernel_numtables, RMB(kresp));
     }
 
-    resp.result = 0;  // TODO how is error reported from kernel ?
+    resp.result = result;
 
     return rina_appl_response(sfd, RMB(req), &resp);
 }
@@ -379,7 +383,9 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
     unsigned int ipcp_id;
-    uint8_t result = 1;
+    int result;
+
+    resp.result = 1;
 
     /* Does the request specifies an existing IPC process ? */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->ipcp_name);
@@ -387,14 +393,12 @@ rina_appl_ipcp_destroy(struct ipcm *ipcm, int sfd,
         printf("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        kresp = ipcp_destroy(ipcm, 1, ipcp_id);
+        kresp = ipcp_destroy(ipcm, 1, ipcp_id, &result);
         if (kresp) {
             rina_msg_free(rina_kernel_numtables, RMB(kresp));
-            result = kresp->result;
+            resp.result = kresp->result;
         }
     }
-
-    resp.result = result;
 
     return rina_appl_response(sfd, RMB(req), &resp);
 }
@@ -407,7 +411,9 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
-    uint8_t result = 1;
+    int result;
+
+    resp.result = 1;
 
     /* The request specifies an IPCP: lookup that. */
     ipcp_id = lookup_ipcp_by_name(ipcm, &req->application_name);
@@ -415,14 +421,12 @@ rina_appl_assign_to_dif(struct ipcm *ipcm, int sfd,
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name);
+        kresp = assign_to_dif(ipcm, 1, ipcp_id, &req->dif_name, &result);
         if (kresp) {
-            result = kresp->result;
+            resp.result = kresp->result;
             rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
-
-    resp.result = result;
 
     return rina_appl_response(sfd, RMB(req), &resp);
 }
@@ -435,21 +439,22 @@ rina_appl_register(struct ipcm *ipcm, int sfd,
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
-    uint8_t result = 1;
+    int result;
+
+    resp.result = 1;
 
     ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 1);
     if (ipcp_id == ~0U) {
         printf("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        kresp = application_register(ipcm, 1, 1, ipcp_id, &req->application_name);
+        kresp = application_register(ipcm, 1, 1, ipcp_id,
+                                     &req->application_name, &result);
         if (kresp) {
-            result = kresp->result;
+            resp.result = kresp->result;
             rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
-
-    resp.result = result;
 
     return rina_appl_response(sfd, RMB(req), &resp);
 }
@@ -462,7 +467,9 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     struct rina_amsg_register *req = (struct rina_amsg_register *)b_req;
     struct rina_msg_base_resp resp;
     struct rina_msg_base_resp *kresp;
-    uint8_t result = 1;
+    int result;
+
+    resp.result = 1;
 
     ipcp_id = select_ipcp_by_dif(&ipcm->loop, &req->dif_name, 0);
     if (ipcp_id == ~0U) {
@@ -470,14 +477,12 @@ rina_appl_unregister(struct ipcm *ipcm, int sfd,
     } else {
         /* Forward the request to the kernel. */
         kresp = application_register(ipcm, 1, 0, ipcp_id,
-                &req->application_name);
+                                     &req->application_name, &result);
         if (kresp) {
-            result = kresp->result;
+            resp.result = kresp->result;
             rina_msg_free(rina_kernel_numtables, RMB(kresp));
         }
     }
-
-    resp.result = result;
 
     return rina_appl_response(sfd, RMB(req), &resp);
 }
