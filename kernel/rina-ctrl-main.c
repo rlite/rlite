@@ -63,7 +63,11 @@ struct upqueue_entry {
 
 struct registered_application {
     struct rina_name name;
-    struct rina_ctrl *rc;
+    unsigned int userspace;
+    union {
+        struct rina_ctrl *rc;
+        struct ipcp_entry *ipcp;
+    } p;
     struct list_head node;
 };
 
@@ -578,34 +582,6 @@ rina_ipcp_config(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     return ret;
 }
 
-static int
-rina_ipcp_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
-{
-    struct rina_kmsg_ipcp_register *req =
-                    (struct rina_kmsg_ipcp_register *)bmsg;
-    struct ipcp_entry *entry_who;
-    struct ipcp_entry *entry_where;
-    int ret = 0;
-
-    mutex_lock(&rina_dm.lock);
-    entry_who = ipcp_table_find(req->ipcp_id_who);
-    if (!entry_who) {
-        ret = -EINVAL;
-    }
-    entry_where = ipcp_table_find(req->ipcp_id_where);
-    if (!entry_where) {
-        ret = -EINVAL;
-    }
-    // TODO
-    mutex_unlock(&rina_dm.lock);
-
-    if (ret == 0) {
-        printk("%s: OOOOOOK [%u]\n", __func__, req->reg);
-    }
-
-    return ret;
-}
-
 static struct registered_application *
 ipcp_application_lookup(struct ipcp_entry *ipcp,
                         struct rina_name *application_name)
@@ -624,7 +600,7 @@ ipcp_application_lookup(struct ipcp_entry *ipcp,
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *application_name,
-                     struct rina_ctrl *rc)
+                     struct rina_ctrl *rc, struct ipcp_entry *reg_ipcp)
 {
     struct registered_application *app;
     char *name_s;
@@ -640,10 +616,23 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
     app = kzalloc(sizeof(*app), GFP_KERNEL);
     if (!app) {
+        mutex_unlock(&ipcp->lock);
         return -ENOMEM;
     }
     rina_name_copy(&app->name, application_name);
-    app->rc = rc;
+    if (rc) {
+        /* An application is registering. */
+        app->p.rc = rc;
+        app->userspace = 1;
+    } else if (ipcp) {
+        /* An IPC process is registering. */
+        app->p.ipcp = ipcp;
+        app->userspace = 0;
+    } else {
+        mutex_unlock(&ipcp->lock);
+        kfree(app);
+        return -EINVAL;
+    }
 
     list_add_tail(&app->node, &ipcp->registered_applications);
 
@@ -690,6 +679,74 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
+/* To be called under global lock. */
+static int
+rina_common_register(int reg, int16_t ipcp_id, struct rina_name *appl_name,
+                     struct rina_ctrl *rc, struct ipcp_entry *reg_ipcp)
+{
+    char *name_s = rina_name_to_string(appl_name);
+    struct ipcp_entry *entry;
+    int ret = -EINVAL;  /* Report failure by default. */
+
+    BUG_ON(rc && reg_ipcp);
+
+    /* Find the IPC process entry corresponding to req->ipcp_id. */
+    entry = ipcp_table_find(ipcp_id);
+    if (entry) {
+        ret = 0;
+        if (reg) {
+            ret = ipcp_application_add(entry, appl_name, rc, reg_ipcp);
+            if (ret == 0 && entry->ops.application_register) {
+                ret = entry->ops.application_register(entry,
+                                            appl_name);
+            }
+        } else {
+            ret = ipcp_application_del(entry, appl_name);
+            if (ret == 0 && entry->ops.application_unregister) {
+                ret = entry->ops.application_unregister(entry,
+                                                        appl_name);
+            }
+        }
+    }
+
+    if (ret == 0) {
+        printk("%s: Application process %s %sregistered to IPC process %u\n",
+                __func__, name_s, (reg ? "" : "un"), ipcp_id);
+    }
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return ret;
+}
+
+static int
+rina_ipcp_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
+{
+    struct rina_kmsg_ipcp_register *req =
+                    (struct rina_kmsg_ipcp_register *)bmsg;
+    struct ipcp_entry *entry_who;
+    int ret = 0;
+
+    mutex_lock(&rina_dm.lock);
+
+    entry_who = ipcp_table_find(req->ipcp_id_who);
+    if (!entry_who) {
+        ret = -EINVAL;
+    }
+
+    ret = rina_common_register(req->reg, req->ipcp_id_where, &entry_who->name,
+                               NULL, entry_who);
+
+    mutex_unlock(&rina_dm.lock);
+
+    if (ret == 0) {
+        printk("%s: OOOOOOK [%u]\n", __func__, req->reg);
+    }
+
+    return ret;
+}
+
 static void
 application_del_by_rc(struct rina_ctrl *rc)
 {
@@ -705,7 +762,7 @@ application_del_by_rc(struct rina_ctrl *rc)
         /* For each application registered to this IPC process. */
         list_for_each_entry_safe(app, tmp,
                 &ipcp->registered_applications, node) {
-            if (app->rc == rc) {
+            if (app->userspace && app->p.rc == rc) {
                 s = rina_name_to_string(&app->name);
                 printk("%s: Application %s automatically unregistered\n",
                         __func__, s);
@@ -724,39 +781,13 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_application_register *req =
                     (struct rina_kmsg_application_register *)bmsg;
-    char *name_s = rina_name_to_string(&req->application_name);
-    struct ipcp_entry *entry;
     int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret;
 
     mutex_lock(&rina_dm.lock);
-    /* Find the IPC process entry corresponding to req->ipcp_id. */
-    entry = ipcp_table_find(req->ipcp_id);
-    if (entry) {
-        ret = 0;
-        if (reg) {
-            ret = ipcp_application_add(entry, &req->application_name, rc);
-            if (ret == 0 && entry->ops.application_register) {
-                ret = entry->ops.application_register(entry,
-                                            &req->application_name);
-            }
-        } else {
-            ret = ipcp_application_del(entry, &req->application_name);
-            if (ret == 0 && entry->ops.application_unregister) {
-                ret = entry->ops.application_unregister(entry,
-                                            &req->application_name);
-            }
-        }
-    }
+    ret = rina_common_register(reg, req->ipcp_id, &req->application_name,
+                                rc, NULL);
     mutex_unlock(&rina_dm.lock);
-
-    if (ret == 0) {
-        printk("%s: Application process %s %sregistered to IPC process %u\n",
-                __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
-    }
-    if (name_s) {
-        kfree(name_s);
-    }
 
     return ret;
 }
@@ -1021,7 +1052,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     }
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp, app->rc, 0, local_application, remote_application,
+    ret = flow_add(ipcp, app->p.rc, 0, local_application, remote_application,
                    &flow_entry, 0);
     if (ret) {
         mutex_unlock(&rina_dm.lock);
@@ -1039,7 +1070,7 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
                 "port-id %u\n", __func__, req->ipcp_id, req->port_id);
 
     /* Enqueue the request into the upqueue. */
-    ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)req);
+    ret = rina_upqueue_append(app->p.rc, (struct rina_msg_base *)req);
     if (ret) {
         flow_del_entry(flow_entry, 0);
         rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)req);
