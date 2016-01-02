@@ -1279,6 +1279,11 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     rb.ptr = kbuf;
     rb.size = len;
 
+    if (copy_from_user(rb.ptr, ubuf, rb.size)) {
+        printk("%s: copy_from_user()\n", __func__);
+        return -EFAULT;
+    }
+
     return ipcp->ops.sdu_write(ipcp, &rb);
 }
 

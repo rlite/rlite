@@ -9,6 +9,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
 #include <signal.h>
 #include <assert.h>
 #include <rina/rina-kernel-msg.h>
@@ -233,7 +234,8 @@ application_register(struct application *application, int reg,
 static int flow_allocate(struct application *application,
                          struct rina_name *dif_name,
                          struct rina_name *local_application,
-                         struct rina_name *remote_application)
+                         struct rina_name *remote_application,
+                         unsigned int *port_id)
 {
     unsigned int ipcp_id;
     struct rina_kmsg_flow_allocate_resp_arrived *kresp;
@@ -256,6 +258,7 @@ static int flow_allocate(struct application *application,
     printf("%s: Flow allocation response: ret = %u, port-id = %u\n",
                 __func__, kresp->result, kresp->port_id);
     result = kresp->result;
+    *port_id = kresp->port_id;
     rina_msg_free(rina_kernel_numtables, RMB(kresp));
 
     return result;
@@ -283,12 +286,37 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
+static int
+open_port(unsigned port_id)
+{
+    int fd;
+    int ret;
+
+    fd = open("/dev/rina-io", O_RDWR);
+    if (fd < 0) {
+        perror("open(/dev/rina-io)");
+        return -1;
+    }
+
+    ret = ioctl(fd, 73, port_id);
+    if (ret) {
+        perror("ioctl(/dev/rina-io)");
+        return -1;
+    }
+
+    return fd;
+}
+
 static void
-process(int argc, char **argv, struct application *application)
+client(int argc, char **argv, struct application *application)
 {
     struct rina_name dif_name;
     struct rina_name this_application;
     struct rina_name remote_application;
+    unsigned int port_id;
+    int ret;
+    int fd;
+    char buf[10];
 
     (void) argc;
     (void) argv;
@@ -299,10 +327,32 @@ process(int argc, char **argv, struct application *application)
     rina_name_fill(&this_application, "client", "1", NULL, NULL);
     rina_name_fill(&remote_application, "server", "1", NULL, NULL);
 
-    application_register(application, 1, &dif_name, &remote_application);
+    ret = application_register(application, 1, &dif_name, &remote_application);
+    if (ret) {
+        return;
+    }
 
-    flow_allocate(application, &dif_name, &this_application,
-                  &remote_application);
+    ret = flow_allocate(application, &dif_name, &this_application,
+                        &remote_application, &port_id);
+    if (ret) {
+        return;
+    }
+
+    fd = open_port(port_id);
+    if (fd < 0) {
+        return;
+    }
+
+    printf("%s: Open fd %d\n", __func__, fd);
+
+    memset(buf, 'x', sizeof(buf));
+
+    ret = write(fd, buf, sizeof(buf));
+    if (ret) {
+        perror("write(buf)");
+    }
+
+    close(fd);
 }
 
 static void *
@@ -312,9 +362,12 @@ server_function(void *arg)
     struct pending_flow_req *pfr = NULL;
 
     for (;;) {
+        unsigned int port_id;
         int result;
+        int fd;
 
         pfr = flow_request_wait(application);
+        port_id = pfr->port_id;
         printf("%s: flow request arrived: [ipcp_id = %u, port_id = %u]\n",
                 __func__, pfr->ipcp_id, pfr->port_id);
 
@@ -322,7 +375,19 @@ server_function(void *arg)
         result = flow_allocate_resp(application, pfr->ipcp_id,
                                     pfr->port_id, 0);
         free(pfr);
-        (void) result;
+
+        if (result) {
+            continue;
+        }
+
+        fd = open_port(port_id);
+        if (fd < 0) {
+            continue;
+        }
+
+        printf("%s: Open fd %d\n", __func__, fd);
+
+        close(fd);
     }
 
     return NULL;
@@ -365,7 +430,7 @@ int main(int argc, char **argv)
     }
 
     /* Execute the client part. */
-    process(argc, argv, &application);
+    client(argc, argv, &application);
 
     ret = pthread_join(application.server_th, NULL);
     if (ret < 0) {
