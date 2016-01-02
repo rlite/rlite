@@ -82,5 +82,6 @@ void rina_pci_dump(struct rina_pci *pci);
 
 #define RINA_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RINA_BUF_PCI(rb) rb->pci
+#define RINA_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
 
 #endif  /* __RINA_BUFS_H__ */

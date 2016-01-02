@@ -460,9 +460,49 @@ seqq_pop_many(struct dtp *dtp, uint64_t max_sdu_gap, struct list_head *qrbs)
 }
 
 static int
-sdu_rx_ctrl(struct rina_buf *rb)
+sdu_rx_ctrl(struct flow_entry *flow, struct rina_buf *rb)
 {
-    /* Control PDU. TODO */
+    struct rina_pci_ctrl *pcic = RINA_BUF_PCI_CTRL(rb);
+    struct dtp *dtp = &flow->dtp;
+
+    spin_lock(&dtp->lock);
+
+    if (unlikely(pcic->base.seqnum > dtp->last_ctrl_seq_num_rcvd + 1)) {
+        /* Gap in the control SDU space. */
+        /* POL: Lost control PDU. */
+        PD("%s: Lost control PDUs: [%lu] --> [%lu]\n", __func__,
+            (long unsigned)dtp->last_ctrl_seq_num_rcvd,
+            (long unsigned)pcic->base.seqnum);
+    } else if (unlikely(pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
+        /* Duplicated control PDU: just drop it. */
+        PD("%s: Duplicated control PDU [%lu], last [%lu]", __func__,
+            (long unsigned)pcic->base.seqnum,
+            (long unsigned)dtp->last_ctrl_seq_num_rcvd);
+
+        goto out;
+    }
+
+    dtp->last_ctrl_seq_num_rcvd = pcic->base.seqnum;
+
+    switch (pcic->base.pdu_type) {
+        case PDU_TYPE_FC:
+        case PDU_TYPE_ACK_AND_FC:
+        case PDU_TYPE_CC:
+        case PDU_TYPE_ACK:
+        case PDU_TYPE_NACK:
+        case PDU_TYPE_SACK:
+        case PDU_TYPE_SNACK:
+        case PDU_TYPE_NACK_AND_FC:
+        case PDU_TYPE_SACK_AND_FC:
+        case PDU_TYPE_SNACK_AND_FC:
+            PD("%s: Missing support for PDU type [%u]\n",
+                __func__, pcic->base.pdu_type);
+            break;
+    }
+
+out:
+    spin_unlock(&dtp->lock);
+
     rina_buf_free(rb);
 
     return 0;
@@ -494,7 +534,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     }
 
     if (pci->pdu_type != PDU_TYPE_DT) {
-        return sdu_rx_ctrl(rb);
+        /* This is a control PDU. */
+        return sdu_rx_ctrl(flow, rb);
     }
 
     /* This is data transfer PDU. */
