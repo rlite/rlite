@@ -31,6 +31,8 @@ class CDAPConn {
         AWAITCLOSE,
     } state;
 
+    const char *conn_state_repr(int st);
+
     int __put_invoke_id(std::set<int> &pending, int invoke_id);
     int get_invoke_id();
     int put_invoke_id(int invoke_id);

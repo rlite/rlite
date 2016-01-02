@@ -226,6 +226,27 @@ CDAPConn::~CDAPConn()
     rina_name_free(&remote_appl);
 }
 
+const char *
+CDAPConn::conn_state_repr(int st)
+{
+    switch(st) {
+        case NONE:
+            return "NONE";
+
+        case AWAITCON:
+            return "AWAITCON";
+
+        case CONNECTED:
+            return "CONNECTED";
+
+        case AWAITCLOSE:
+            return "AWAITCLOSE";
+    }
+
+    assert(0);
+    return NULL;
+}
+
 int
 CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 {
@@ -730,7 +751,9 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
     }
 
     if (old_state != state) {
-        PD("%s: Connection state %d --> %d\n", __func__, old_state, state);
+        PD("%s: Connection state %s --> %s\n", __func__,
+                conn_state_repr(old_state),
+                conn_state_repr(state));
     }
 
     return 0;

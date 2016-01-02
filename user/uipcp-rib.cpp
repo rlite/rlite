@@ -72,7 +72,7 @@ struct Neighbor {
     const char *enrollment_state_repr(state_t s) const;
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
-    int fsm_run(const CDAPMessage *rm);
+    int enroll_fsm_run(const CDAPMessage *rm);
 
     /* Enrollment state machine handlers. */
     int none(const CDAPMessage *rm);
@@ -485,11 +485,11 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     if (enr_info.start_early) {
         enrollment_state = ENROLLED;
-        PI("%s: Initiator is allowed to start early\n");
+        PI("%s: Initiator is allowed to start early\n", __func__);
 
     } else {
         enrollment_state = I_WAIT_START;
-        PI("%s: Initiator is not allowed to start early\n");
+        PI("%s: Initiator is not allowed to start early\n", __func__);
     }
 
     return 0;
@@ -549,7 +549,7 @@ Neighbor::enrolled(const CDAPMessage *rm)
 }
 
 int
-Neighbor::fsm_run(const CDAPMessage *rm)
+Neighbor::enroll_fsm_run(const CDAPMessage *rm)
 {
     state_t old_state = enrollment_state;
     int ret;
@@ -702,7 +702,7 @@ int uipcp_enroll(struct uipcp_rib *rib, struct rina_cmsg_ipcp_enroll *req)
                                       flow_fd, port_id));
 
     //return uipcp_enroll_send_mgmtsdu(uipcp, port_id);
-    ret = rib->neighbors.back().fsm_run(NULL);
+    ret = rib->neighbors.back().enroll_fsm_run(NULL);
     if (ret == 0) {
         return 0;
     }
@@ -774,7 +774,7 @@ rib_msg_rcvd(struct uipcp_rib *rib, struct rina_mgmt_hdr *mhdr,
     }
 
     /* Feed the enrollment state machine. */
-    return neigh->fsm_run(m);
+    return neigh->enroll_fsm_run(m);
 }
 
 extern "C" int
