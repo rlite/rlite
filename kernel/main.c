@@ -1496,17 +1496,26 @@ rina_uipcp_fa_resp_arrived(struct rina_ctrl *rc,
 /* Connect the upper IPCP which is using this flow
  * so that rina_sdu_rx() can deliver SDU to the IPCP. */
 static int
-upper_ipcp_flow_bind(uint16_t upper_ipcp_id, struct flow_entry *flow)
+upper_ipcp_flow_bind(struct rina_ctrl *rc, uint16_t upper_ipcp_id,
+                     struct flow_entry *flow)
 {
     struct ipcp_entry *upper_ipcp;
 
     /* Lookup the IPCP user of 'flow'. */
     upper_ipcp = ipcp_get(upper_ipcp_id);
     if (!upper_ipcp) {
-        printk("Error: No such upper ipcp %u\n",
+        PE("No such upper ipcp %u\n",
                 upper_ipcp_id);
 
         return -ENXIO;
+    }
+
+    if (upper_ipcp->uipcp != rc) {
+        PE("Control device %p cannot bind flow to kernel datapath "
+           "without first declaring itself an IPCP\n", rc);
+        ipcp_put(upper_ipcp);
+
+        return -EINVAL;
     }
 
     flow->upper.ipcp = upper_ipcp;
@@ -1689,7 +1698,7 @@ rina_fa_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     if (!ret && req->upper_ipcp_id != 0xffff) {
-        ret = upper_ipcp_flow_bind(req->upper_ipcp_id, flow_entry);
+        ret = upper_ipcp_flow_bind(rc, req->upper_ipcp_id, flow_entry);
     }
 
 out:
@@ -1745,7 +1754,7 @@ rina_fa_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
             flow_entry->local_port);
 
     if (!resp->response && resp->upper_ipcp_id != 0xffff) {
-        ret = upper_ipcp_flow_bind(resp->upper_ipcp_id, flow_entry);
+        ret = upper_ipcp_flow_bind(rc, resp->upper_ipcp_id, flow_entry);
     }
 
     /* Notify the involved IPC process about the response. */
