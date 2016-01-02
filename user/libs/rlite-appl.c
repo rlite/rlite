@@ -129,10 +129,10 @@ appl_register_resp(struct rlite_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
-    [RINA_KERN_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
-    [RINA_KERN_APPL_REGISTER_RESP] = appl_register_resp,
-    [RINA_KERN_MSG_MAX] = NULL,
+    [RLITE_KER_FA_REQ_ARRIVED] = flow_allocate_req_arrived,
+    [RLITE_KER_FA_RESP_ARRIVED] = flow_allocate_resp_arrived,
+    [RLITE_KER_APPL_REGISTER_RESP] = appl_register_resp,
+    [RLITE_KER_MSG_MAX] = NULL,
 };
 
 struct rina_kmsg_appl_register_resp *
@@ -152,7 +152,7 @@ rlite_appl_register_req(struct rlite_appl *application, uint32_t event_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_APPL_REGISTER;
+    req->msg_type = RLITE_KER_APPL_REGISTER;
     req->event_id = event_id;
     req->ipcp_id = ipcp_id;
     req->reg = reg;
@@ -204,7 +204,7 @@ flow_allocate_req(struct rlite_appl *application, uint32_t event_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_FA_REQ;
+    req->msg_type = RLITE_KER_FA_REQ;
     req->event_id = event_id;
     req->ipcp_id = ipcp_id;
     req->upper_ipcp_id = upper_ipcp_id;
@@ -239,7 +239,7 @@ rlite_flow_allocate_resp(struct rlite_appl *application, uint32_t kevent_id,
     }
     memset(req, 0, sizeof(*req));
 
-    req->msg_type = RINA_KERN_FA_RESP;
+    req->msg_type = RLITE_KER_FA_RESP;
     req->event_id = 1;
     req->kevent_id = kevent_id;
     req->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
@@ -302,7 +302,7 @@ rlite_appl_register_wait(struct rlite_appl *application, int reg,
         ret = -1;
     }
 
-    rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                   RINALITE_RMB(resp));
     free(resp);
 
@@ -352,7 +352,7 @@ rlite_flow_allocate(struct rlite_appl *application, uint32_t event_id,
                 kresp->result, kresp->port_id);
     result = kresp->result;
     *port_id = kresp->port_id;
-    rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                   RINALITE_RMB(kresp));
     free(kresp);
 

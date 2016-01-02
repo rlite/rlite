@@ -48,8 +48,8 @@ ipcp_create_resp(struct rlite_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_IPCP_CREATE_RESP] = ipcp_create_resp,
-    [RINA_KERN_MSG_MAX] = NULL,
+    [RLITE_KER_IPCP_CREATE_RESP] = ipcp_create_resp,
+    [RLITE_KER_MSG_MAX] = NULL,
 };
 
 static int
@@ -102,7 +102,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    ret = deserialize_rina_msg(rina_conf_numtables, RINA_CONF_MSG_MAX,
+    ret = deserialize_rina_msg(rina_conf_numtables, RLITE_CFG_MSG_MAX,
                                serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("error while deserializing response [%d]\n",
@@ -185,7 +185,7 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_CREATE;
+    msg->msg_type = RLITE_KER_IPCP_CREATE;
     msg->event_id = rlite_evloop_get_id(&rc->loop);
     rina_name_copy(&msg->name, name);
     msg->dif_type = strdup(dif_type);
@@ -200,9 +200,9 @@ rina_ipcp_create(struct rinaconf *rc, unsigned int wait_ms,
     rlite_ipcps_fetch(&rc->loop);
 
     if (type_has_uipcp(dif_type) && *result == 0 && resp) {
-        uipcp_update(rc, RINA_CONF_UIPCP_CREATE, resp->ipcp_id, dif_type);
+        uipcp_update(rc, RLITE_CFG_UIPCP_CREATE, resp->ipcp_id, dif_type);
     } else {
-        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
+        uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
     }
 
     return resp;
@@ -229,7 +229,7 @@ ipcp_create(int argc, char **argv, struct rinaconf *rc)
 
     kresp = rina_ipcp_create(rc, ~0U, &ipcp_name, dif_type, dif_name, &result);
     if (kresp) {
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                       RINALITE_RMB(kresp));
         free(kresp);
     }
@@ -254,11 +254,11 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
     }
 
     if (type_has_uipcp(dif_type)) {
-        uipcp_update(rc, RINA_CONF_UIPCP_DESTROY, ipcp_id, dif_type);
+        uipcp_update(rc, RLITE_CFG_UIPCP_DESTROY, ipcp_id, dif_type);
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_DESTROY;
+    msg->msg_type = RLITE_KER_IPCP_DESTROY;
     msg->event_id = 1;
     msg->ipcp_id = ipcp_id;
 
@@ -271,7 +271,7 @@ rina_ipcp_destroy(struct rinaconf *rc, unsigned int ipcp_id,
 
     rlite_ipcps_fetch(&rc->loop);
 
-    uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
+    uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
 
     return result;
 }
@@ -313,7 +313,7 @@ rina_ipcp_config(struct rinaconf *rc, uint16_t ipcp_id,
     if (result == 0 && strcmp(param_name, "address") == 0) {
         /* Fetch after a succesfull address setting operation. */
         rlite_ipcps_fetch(&rc->loop);
-        uipcp_update(rc, RINA_CONF_UIPCP_UPDATE, 0, NULL);
+        uipcp_update(rc, RLITE_CFG_UIPCP_UPDATE, 0, NULL);
     }
 
     return result;
@@ -373,7 +373,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
         return -1;
     }
 
-    req.msg_type = RINA_CONF_IPCP_REGISTER;
+    req.msg_type = RLITE_CFG_IPCP_REGISTER;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
@@ -421,7 +421,7 @@ ipcp_enroll(int argc, char **argv, struct rinaconf *rc)
         return -1;
     }
 
-    req.msg_type = RINA_CONF_IPCP_ENROLL;
+    req.msg_type = RLITE_CFG_IPCP_ENROLL;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
     rina_name_fill(&req.dif_name, dif_name, NULL, NULL, NULL);
@@ -463,7 +463,7 @@ ipcp_dft_set(int argc, char **argv, struct rinaconf *rc)
         return -1;
     }
 
-    req.msg_type = RINA_CONF_IPCP_DFT_SET;
+    req.msg_type = RLITE_CFG_IPCP_DFT_SET;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
     rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
@@ -514,7 +514,7 @@ ipcp_rib_show(int argc, char **argv, struct rinaconf *rc)
         return -1;
     }
 
-    req.msg_type = RINA_CONF_IPCP_RIB_SHOW_REQ;
+    req.msg_type = RLITE_CFG_IPCP_RIB_SHOW_REQ;
     req.event_id = 0;
     req.ipcp_id = rlite_ipcp->ipcp_id;
 
@@ -542,7 +542,7 @@ test(struct rinaconf *rc)
                               "test-shim-loopback.DIF", &result);
     assert(icresp);
     if (icresp) {
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                       RINALITE_RMB(icresp));
     }
     icresp = rina_ipcp_create(rc, ~0U, &name, "shim-loopback",

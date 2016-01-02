@@ -17,13 +17,13 @@ rlite_msg_write_fd(int sfd, struct rlite_msg_base *msg)
     char *serbuf;
     int n;
 
-    serlen = rlite_msg_serlen(rina_conf_numtables, RINA_CONF_MSG_MAX, msg);
+    serlen = rlite_msg_serlen(rina_conf_numtables, RLITE_CFG_MSG_MAX, msg);
     serbuf = malloc(serlen);
     if (!serbuf) {
         return -1;
     }
 
-    serialize_rina_msg(rina_conf_numtables, RINA_CONF_MSG_MAX,
+    serialize_rina_msg(rina_conf_numtables, RLITE_CFG_MSG_MAX,
                        serbuf, msg);
 
     n = write(sfd, serbuf, serlen);

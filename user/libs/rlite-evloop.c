@@ -129,7 +129,7 @@ ipcp_fetch(struct rlite_evloop *loop, int *result)
     }
 
     memset(msg, 0, sizeof(*msg));
-    msg->msg_type = RINA_KERN_IPCP_FETCH;
+    msg->msg_type = RLITE_KER_IPCP_FETCH;
     msg->event_id = rlite_evloop_get_id(loop);
 
     NPD("Requesting IPC processes fetch...\n");
@@ -189,7 +189,7 @@ rlite_ipcps_fetch(struct rlite_evloop *loop)
             end = 1;
         } else {
             end = resp->end;
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           RINALITE_RMB(resp));
             free(resp);
         }
@@ -379,7 +379,7 @@ evloop_function(void *arg)
         }
 
         /* Deserialize the message from serbuf into resp. */
-        ret = deserialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        ret = deserialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                                    serbuf, ret, (void *)resp, max_resp_size);
         if (ret) {
             PE("Problems during deserialization [%d]\n",
@@ -387,11 +387,11 @@ evloop_function(void *arg)
         }
 
         /* Do we have an handler for this response message? */
-        if (resp->msg_type > RINA_KERN_MSG_MAX ||
+        if (resp->msg_type > RLITE_KER_MSG_MAX ||
                 !loop->handlers[resp->msg_type]) {
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           RINALITE_RMB(resp));
             free(resp);
             continue;
@@ -405,7 +405,7 @@ evloop_function(void *arg)
                 PE("Error while handling message type [%d]\n",
                                         resp->msg_type);
             }
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           RINALITE_RMB(resp));
             free(resp);
             continue;
@@ -420,7 +420,7 @@ evloop_function(void *arg)
         if (!req_entry) {
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           RINALITE_RMB(resp));
             free(resp);
             continue;
@@ -453,11 +453,11 @@ notify_requestor:
         } else {
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           req_entry->msg);
             free(req_entry->msg);
             free(req_entry);
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                           RINALITE_RMB(resp));
             free(resp);
         }
@@ -504,7 +504,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
         PE("has_response == 0 --> wait_for_completion == 0\n");
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
         *result = EINVAL;
         return NULL;
@@ -517,7 +517,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
          * the event loop not being able to find the pending request. */
         entry = malloc(sizeof(*entry));
         if (!entry) {
-            rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+            rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
             free(msg);
             PE("Out of memory\n");
             *result = ENOMEM;
@@ -538,18 +538,18 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     }
 
     /* Serialize the message. */
-    serlen = rlite_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+    serlen = rlite_msg_serlen(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
     if (serlen > sizeof(serbuf)) {
         PE("Serialized message would be too long [%u]\n",
                     serlen);
         free(entry);
         pthread_mutex_unlock(&loop->lock);
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
         *result = ENOBUFS;
         return NULL;
     }
-    serlen = serialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    serlen = serialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, msg);
 
     /* Issue the request to the kernel. */
@@ -572,7 +572,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
                     ret, serlen);
             *result = EINVAL;
         }
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
 
     } else if (has_response && entry->wait_for_completion) {
@@ -605,7 +605,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         pthread_cond_destroy(&entry->op_complete_cond);
 
         /* Free the pending queue entry and the associated request message. */
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, entry->msg);
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, entry->msg);
         free(entry->msg);
         resp = entry->resp;
         free(entry);
@@ -613,7 +613,7 @@ rlite_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     } else if (!has_response) {
         /* This request does not require a response, we can free the request
          * message immediately. */
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX, msg);
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
     }
 
@@ -676,9 +676,9 @@ rlite_evloop_init(struct rlite_evloop *loop, const char *dev,
     }
 
     /* If not redefined, setup default fetch handler. */
-    if (!loop->handlers[RINA_KERN_IPCP_FETCH_RESP]) {
+    if (!loop->handlers[RLITE_KER_IPCP_FETCH_RESP]) {
         NPD("setting default fetch handler\n");
-        loop->handlers[RINA_KERN_IPCP_FETCH_RESP] = ipcp_fetch_resp;
+        loop->handlers[RLITE_KER_IPCP_FETCH_RESP] = ipcp_fetch_resp;
     }
 
     /* Create and start the event-loop thread. */
@@ -762,7 +762,7 @@ int
 rlite_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
                          rina_resp_handler_t handler)
 {
-    if (index >= RINA_KERN_MSG_MAX) {
+    if (index >= RLITE_KER_MSG_MAX) {
         return -1;
     }
 

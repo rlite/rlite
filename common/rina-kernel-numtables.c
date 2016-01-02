@@ -3,79 +3,79 @@
 
 
 struct rlite_msg_layout rina_kernel_numtables[] = {
-    [RINA_KERN_IPCP_CREATE] = {
+    [RLITE_KER_IPCP_CREATE] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_create) -
                    sizeof(struct rina_name) - 2 * sizeof(char *),
         .names = 1,
         .strings = 2,
     },
-    [RINA_KERN_IPCP_CREATE_RESP] = {
+    [RLITE_KER_IPCP_CREATE_RESP] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_create_resp),
     },
-    [RINA_KERN_IPCP_DESTROY] = {
+    [RLITE_KER_IPCP_DESTROY] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_destroy),
     },
-    [RINA_KERN_IPCP_FETCH] = {
+    [RLITE_KER_IPCP_FETCH] = {
         .copylen = sizeof(struct rlite_msg_base),
     },
-    [RINA_KERN_IPCP_FETCH_RESP] = {
+    [RLITE_KER_IPCP_FETCH_RESP] = {
         .copylen = sizeof(struct rina_kmsg_fetch_ipcp_resp) -
                     2 * sizeof(struct rina_name) - sizeof(char *),
         .names = 2,
         .strings = 1,
     },
-    [RINA_KERN_APPL_REGISTER] = {
+    [RLITE_KER_APPL_REGISTER] = {
         .copylen = sizeof(struct rina_kmsg_appl_register) -
                     1 * sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_APPL_REGISTER_RESP] = {
+    [RLITE_KER_APPL_REGISTER_RESP] = {
         .copylen = sizeof(struct rina_kmsg_appl_register_resp) -
                     1 * sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_FA_REQ] = {
+    [RLITE_KER_FA_REQ] = {
         .copylen = sizeof(struct rina_kmsg_fa_req) -
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_KERN_FA_RESP_ARRIVED] = {
+    [RLITE_KER_FA_RESP_ARRIVED] = {
         .copylen = sizeof(struct rina_kmsg_fa_resp_arrived),
     },
-    [RINA_KERN_FA_RESP] = {
+    [RLITE_KER_FA_RESP] = {
         .copylen = sizeof(struct rina_kmsg_fa_resp),
     },
-    [RINA_KERN_FA_REQ_ARRIVED] = {
+    [RLITE_KER_FA_REQ_ARRIVED] = {
         .copylen = sizeof(struct rina_kmsg_fa_req_arrived) -
                     1 * sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_KERN_IPCP_CONFIG] = {
+    [RLITE_KER_IPCP_CONFIG] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_config) -
                     2 * sizeof(char *),
         .strings = 2,
     },
-    [RINA_KERN_IPCP_PDUFT_SET] = {
+    [RLITE_KER_IPCP_PDUFT_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_pduft_set),
     },
-    [RINA_KERN_IPCP_PDUFT_FLUSH] = {
+    [RLITE_KER_IPCP_PDUFT_FLUSH] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_pduft_flush),
     },
-    [RINA_KERN_IPCP_UIPCP_SET] = {
+    [RLITE_KER_IPCP_UIPCP_SET] = {
         .copylen = sizeof(struct rina_kmsg_ipcp_uipcp_set),
     },
-    [RINA_KERN_UIPCP_FA_REQ_ARRIVED] = {
+    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = {
         .copylen = sizeof(struct rina_kmsg_uipcp_fa_req_arrived) -
                     2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_KERN_UIPCP_FA_RESP_ARRIVED] = {
+    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = {
         .copylen = sizeof(struct rina_kmsg_uipcp_fa_resp_arrived),
     },
-    [RINA_KERN_FLOW_DEALLOCATED] = {
+    [RLITE_KER_FLOW_DEALLOCATED] = {
         .copylen = sizeof(struct rina_kmsg_flow_deallocated),
     },
-    [RINA_KERN_MSG_MAX] = {
+    [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
     },

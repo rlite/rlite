@@ -237,14 +237,14 @@ rina_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rlite_msg_serlen(rina_kernel_numtables, RINA_KERN_MSG_MAX, rmsg);
+    serlen = rlite_msg_serlen(rina_kernel_numtables, RLITE_KER_MSG_MAX, rmsg);
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    serlen = serialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    serlen = serialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, rmsg);
 
     entry->sermsg = serbuf;
@@ -967,7 +967,7 @@ flow_put(struct flow_entry *entry)
         struct rina_kmsg_flow_deallocated ntfy;
 
         /* Notify the uipcp about flow deallocation. */
-        ntfy.msg_type = RINA_KERN_FLOW_DEALLOCATED;
+        ntfy.msg_type = RLITE_KER_FLOW_DEALLOCATED;
         ntfy.event_id = 0;
         ntfy.ipcp_id = ipcp->id;
         ntfy.local_port_id = entry->local_port;
@@ -1063,7 +1063,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
         if (app->ipcp->uipcp) {
             struct rina_kmsg_appl_register ntfy;
 
-            ntfy.msg_type = RINA_KERN_APPL_REGISTER;
+            ntfy.msg_type = RLITE_KER_APPL_REGISTER;
             ntfy.event_id = 0;
             ntfy.ipcp_id = app->ipcp->id;
             ntfy.reg = false;
@@ -1216,7 +1216,7 @@ rina_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     }
 
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RINA_KERN_IPCP_CREATE_RESP;
+    resp.msg_type = RLITE_KER_IPCP_CREATE_RESP;
     resp.event_id = req->event_id;
     resp.ipcp_id = ipcp_id;
 
@@ -1284,7 +1284,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
 
-            fqe->resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
+            fqe->resp.msg_type = RLITE_KER_IPCP_FETCH_RESP;
             fqe->resp.end = 0;
             fqe->resp.ipcp_id = entry->id;
             fqe->resp.ipcp_addr = entry->addr;
@@ -1303,7 +1303,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
         } else {
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->ipcps_fetch_q);
-            fqe->resp.msg_type = RINA_KERN_IPCP_FETCH_RESP;
+            fqe->resp.msg_type = RLITE_KER_IPCP_FETCH_RESP;
             fqe->resp.end = 1;
         }
     }
@@ -1314,7 +1314,7 @@ rina_ipcp_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
         ret = rina_upqueue_append(rc, (struct rlite_msg_base *)&fqe->resp);
-        rlite_msg_free(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+        rlite_msg_free(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                       (struct rlite_msg_base *)&fqe->resp);
         kfree(fqe);
     }
@@ -1557,7 +1557,7 @@ rina_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
              * requesting application. */
             struct rina_kmsg_appl_register_resp resp;
 
-            resp.msg_type = RINA_KERN_APPL_REGISTER_RESP;
+            resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
             resp.event_id = req->event_id;
             resp.ipcp_id = req->ipcp_id;
             resp.reg = req->reg;
@@ -1641,7 +1641,7 @@ rina_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
     struct rina_kmsg_fa_resp_arrived resp;
 
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RINA_KERN_FA_RESP_ARRIVED;
+    resp.msg_type = RLITE_KER_FA_RESP_ARRIVED;
     resp.event_id = event_id;
     resp.port_id = port_id;
     resp.result = result;
@@ -1828,7 +1828,7 @@ rina_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
         "port-id %u\n", ipcp->id, flow_entry->local_port);
 
     memset(&req, 0, sizeof(req));
-    req.msg_type = RINA_KERN_FA_REQ_ARRIVED;
+    req.msg_type = RLITE_KER_FA_REQ_ARRIVED;
     req.event_id = 0;
     req.kevent_id = kevent_id;
     req.ipcp_id = ipcp->id;
@@ -2031,20 +2031,20 @@ EXPORT_SYMBOL_GPL(rina_write_restart);
 
 /* The table containing all the message handlers. */
 static rlite_msg_handler_t rlite_ctrl_handlers[] = {
-    [RINA_KERN_IPCP_CREATE] = rina_ipcp_create,
-    [RINA_KERN_IPCP_DESTROY] = rina_ipcp_destroy,
-    [RINA_KERN_IPCP_FETCH] = rina_ipcp_fetch,
-    [RINA_KERN_IPCP_CONFIG] = rina_ipcp_config,
-    [RINA_KERN_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
-    [RINA_KERN_IPCP_PDUFT_FLUSH] = rina_ipcp_pduft_flush,
-    [RINA_KERN_APPL_REGISTER] = rina_appl_register,
-    [RINA_KERN_APPL_REGISTER_RESP] = rina_appl_register_resp,
-    [RINA_KERN_FA_REQ] = rina_fa_req,
-    [RINA_KERN_FA_RESP] = rina_fa_resp,
-    [RINA_KERN_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
-    [RINA_KERN_UIPCP_FA_REQ_ARRIVED] = rina_uipcp_fa_req_arrived,
-    [RINA_KERN_UIPCP_FA_RESP_ARRIVED] = rina_uipcp_fa_resp_arrived,
-    [RINA_KERN_MSG_MAX] = NULL,
+    [RLITE_KER_IPCP_CREATE] = rina_ipcp_create,
+    [RLITE_KER_IPCP_DESTROY] = rina_ipcp_destroy,
+    [RLITE_KER_IPCP_FETCH] = rina_ipcp_fetch,
+    [RLITE_KER_IPCP_CONFIG] = rina_ipcp_config,
+    [RLITE_KER_IPCP_PDUFT_SET] = rina_ipcp_pduft_set,
+    [RLITE_KER_IPCP_PDUFT_FLUSH] = rina_ipcp_pduft_flush,
+    [RLITE_KER_APPL_REGISTER] = rina_appl_register,
+    [RLITE_KER_APPL_REGISTER_RESP] = rina_appl_register_resp,
+    [RLITE_KER_FA_REQ] = rina_fa_req,
+    [RLITE_KER_FA_RESP] = rina_fa_resp,
+    [RLITE_KER_IPCP_UIPCP_SET] = rina_ipcp_uipcp_set,
+    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rina_uipcp_fa_req_arrived,
+    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rina_uipcp_fa_resp_arrived,
+    [RLITE_KER_MSG_MAX] = NULL,
 };
 
 static ssize_t
@@ -2072,7 +2072,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EFAULT;
     }
 
-    ret = deserialize_rina_msg(rina_kernel_numtables, RINA_KERN_MSG_MAX,
+    ret = deserialize_rina_msg(rina_kernel_numtables, RLITE_KER_MSG_MAX,
                                kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);
@@ -2082,7 +2082,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
     bmsg = (struct rlite_msg_base *)rc->msgbuf;
 
     /* Demultiplex the message to the right message handler. */
-    if (bmsg->msg_type > RINA_KERN_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
+    if (bmsg->msg_type > RLITE_KER_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
         kfree(kbuf);
         return -EINVAL;
     }

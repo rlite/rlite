@@ -3,48 +3,48 @@
 
 
 struct rlite_msg_layout rina_conf_numtables[] = {
-    [RINA_CONF_IPCP_REGISTER] = {
+    [RLITE_CFG_IPCP_REGISTER] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_register) -
                    2 * sizeof(struct rina_name),
         .names = 2,
     },
-    [RINA_CONF_IPCP_ENROLL] = {
+    [RLITE_CFG_IPCP_ENROLL] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_enroll) -
                    4 * sizeof(struct rina_name),
         .names = 4,
     },
-    [RINA_CONF_IPCP_DFT_SET] = {
+    [RLITE_CFG_IPCP_DFT_SET] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_dft_set) -
                    1 * sizeof(struct rina_name),
         .names = 1,
     },
-    [RINA_CONF_UIPCP_CREATE] = {
+    [RLITE_CFG_UIPCP_CREATE] = {
         .copylen = sizeof(struct rina_cmsg_uipcp_update) -
                    1 * sizeof(char *),
         .strings = 1,
     },
-    [RINA_CONF_UIPCP_DESTROY] = {
+    [RLITE_CFG_UIPCP_DESTROY] = {
         .copylen = sizeof(struct rina_cmsg_uipcp_update) -
                    1 * sizeof(char *),
         .strings = 1,
     },
-    [RINA_CONF_UIPCP_UPDATE] = {
+    [RLITE_CFG_UIPCP_UPDATE] = {
         .copylen = sizeof(struct rina_cmsg_uipcp_update) -
                    1 * sizeof(char *),
         .strings = 1,
     },
-    [RINA_CONF_BASE_RESP] = {
+    [RLITE_CFG_BASE_RESP] = {
         .copylen = sizeof(struct rlite_msg_base_resp),
     },
-    [RINA_CONF_IPCP_RIB_SHOW_REQ] = {
+    [RLITE_CFG_IPCP_RIB_SHOW_REQ] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_rib_show_req),
     },
-    [RINA_CONF_IPCP_RIB_SHOW_RESP] = {
+    [RLITE_CFG_IPCP_RIB_SHOW_RESP] = {
         .copylen = sizeof(struct rina_cmsg_ipcp_rib_show_resp) -
                    1 * sizeof(char *),
         .strings = 1,
     },
-    [RINA_CONF_MSG_MAX] = {
+    [RLITE_CFG_MSG_MAX] = {
         .copylen = 0,
     }
 };

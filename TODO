@@ -1,4 +1,4 @@
-- implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
+- implementare l'event kernel --> user RLITE_KER_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 
 - vmpi_provider_find_instance non dovrebbe essere bloccante

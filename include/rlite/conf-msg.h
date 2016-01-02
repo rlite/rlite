@@ -1,5 +1,5 @@
-#ifndef __RINA_CONF_MSG_H__
-#define __RINA_CONF_MSG_H__
+#ifndef __RLITE_CFG_MSG_H__
+#define __RLITE_CFG_MSG_H__
 
 #include <stdint.h>
 
@@ -10,22 +10,22 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RINA_CONF_IPCP_REGISTER = 1,  /* 1 */
-    RINA_CONF_IPCP_ENROLL,        /* 2 */
-    RINA_CONF_IPCP_DFT_SET,       /* 3 */
-    RINA_CONF_BASE_RESP,          /* 4 */
-    RINA_CONF_UIPCP_CREATE,       /* 5 */
-    RINA_CONF_UIPCP_DESTROY,      /* 6 */
-    RINA_CONF_UIPCP_UPDATE,       /* 7 */
-    RINA_CONF_IPCP_RIB_SHOW_REQ,  /* 8 */
-    RINA_CONF_IPCP_RIB_SHOW_RESP, /* 9 */
+    RLITE_CFG_IPCP_REGISTER = 1,  /* 1 */
+    RLITE_CFG_IPCP_ENROLL,        /* 2 */
+    RLITE_CFG_IPCP_DFT_SET,       /* 3 */
+    RLITE_CFG_BASE_RESP,          /* 4 */
+    RLITE_CFG_UIPCP_CREATE,       /* 5 */
+    RLITE_CFG_UIPCP_DESTROY,      /* 6 */
+    RLITE_CFG_UIPCP_UPDATE,       /* 7 */
+    RLITE_CFG_IPCP_RIB_SHOW_REQ,  /* 8 */
+    RLITE_CFG_IPCP_RIB_SHOW_RESP, /* 9 */
 
-    RINA_CONF_MSG_MAX,
+    RLITE_CFG_MSG_MAX,
 };
 
 /* Numtables for rina-config <==> uipcp-server messages exchange. */
 
-extern struct rlite_msg_layout rina_conf_numtables[RINA_CONF_MSG_MAX + 1];
+extern struct rlite_msg_layout rina_conf_numtables[RLITE_CFG_MSG_MAX + 1];
 
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
@@ -85,4 +85,4 @@ struct rina_cmsg_ipcp_rib_show_resp {
     char *dump;
 } __attribute__((packed));
 
-#endif  /* __RINA_CONF_MSG_H__ */
+#endif  /* __RLITE_CFG_MSG_H__ */

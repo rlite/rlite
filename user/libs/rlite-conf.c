@@ -23,7 +23,7 @@ rlite_ipcp_config(struct rlite_evloop *loop, uint16_t ipcp_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_CONFIG;
+    req->msg_type = RLITE_KER_IPCP_CONFIG;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
     req->name = strdup(param_name);

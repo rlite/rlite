@@ -653,9 +653,9 @@ setup()
     /* Register the handler for incoming flow allocation requests and
      * response, since we'll not be using rlite/appl.h functionalities for
      * that. */
-    ret = rlite_evloop_set_handler(&gw.appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+    ret = rlite_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_REQ_ARRIVED,
                                    gw_fa_req_arrived);
-    ret |= rlite_evloop_set_handler(&gw.appl.loop, RINA_KERN_FA_RESP_ARRIVED,
+    ret |= rlite_evloop_set_handler(&gw.appl.loop, RLITE_KER_FA_RESP_ARRIVED,
                                     gw_fa_resp_arrived);
     if (ret) {
         return -1;

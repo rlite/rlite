@@ -727,7 +727,7 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
-    return rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ_ARRIVED,
+    return rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ_ARRIVED,
                                     neigh_fa_req_arrived);
 
     return 0;

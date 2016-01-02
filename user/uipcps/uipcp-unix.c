@@ -44,7 +44,7 @@ static int
 rina_conf_response(int sfd, struct rlite_msg_base *req,
                    struct rlite_msg_base_resp *resp)
 {
-    resp->msg_type = RINA_CONF_BASE_RESP;
+    resp->msg_type = RLITE_CFG_BASE_RESP;
     resp->event_id = req->event_id;
 
     return rlite_msg_write_fd(sfd, RINALITE_RMB(resp));
@@ -215,10 +215,10 @@ rina_conf_uipcp_update(struct uipcps *uipcps, int sfd,
 
     resp.result = 1; /* Report failure by default. */
 
-    if (req->msg_type == RINA_CONF_UIPCP_CREATE) {
+    if (req->msg_type == RLITE_CFG_UIPCP_CREATE) {
         resp.result = uipcp_add(uipcps, req->ipcp_id, req->dif_type);
 
-    } else if (req->msg_type == RINA_CONF_UIPCP_DESTROY) {
+    } else if (req->msg_type == RLITE_CFG_UIPCP_DESTROY) {
         /* Track all the unregistrations of the destroyed IPCP in
          * the persistent registrations list. */
         track_ipcp_registration(uipcps, 0, NULL, req->ipcp_id, NULL);
@@ -269,7 +269,7 @@ rina_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     }
 
 out:
-    resp.msg_type = RINA_CONF_IPCP_RIB_SHOW_RESP;
+    resp.msg_type = RLITE_CFG_IPCP_RIB_SHOW_RESP;
     resp.event_id = req->event_id;
 
     ret = rlite_msg_write_fd(sfd, RINALITE_RMB(&resp));
@@ -286,14 +286,14 @@ typedef int (*rina_req_handler_t)(struct uipcps *uipcps, int sfd,
 
 /* The table containing all application request handlers. */
 static rina_req_handler_t rina_config_handlers[] = {
-    [RINA_CONF_IPCP_REGISTER] = rina_conf_ipcp_register,
-    [RINA_CONF_IPCP_ENROLL] = rina_conf_ipcp_enroll,
-    [RINA_CONF_IPCP_DFT_SET] = rina_conf_ipcp_dft_set,
-    [RINA_CONF_UIPCP_CREATE] = rina_conf_uipcp_update,
-    [RINA_CONF_UIPCP_DESTROY] = rina_conf_uipcp_update,
-    [RINA_CONF_UIPCP_UPDATE] = rina_conf_uipcp_update,
-    [RINA_CONF_IPCP_RIB_SHOW_REQ] = rina_conf_ipcp_rib_show,
-    [RINA_CONF_MSG_MAX] = NULL,
+    [RLITE_CFG_IPCP_REGISTER] = rina_conf_ipcp_register,
+    [RLITE_CFG_IPCP_ENROLL] = rina_conf_ipcp_enroll,
+    [RLITE_CFG_IPCP_DFT_SET] = rina_conf_ipcp_dft_set,
+    [RLITE_CFG_UIPCP_CREATE] = rina_conf_uipcp_update,
+    [RLITE_CFG_UIPCP_DESTROY] = rina_conf_uipcp_update,
+    [RLITE_CFG_UIPCP_UPDATE] = rina_conf_uipcp_update,
+    [RLITE_CFG_IPCP_RIB_SHOW_REQ] = rina_conf_ipcp_rib_show,
+    [RLITE_CFG_MSG_MAX] = NULL,
 };
 
 /* Unix server thread to manage configuration requests. */
@@ -323,7 +323,7 @@ unix_server(void *arg)
         }
 
         /* Deserialize into a formatted message. */
-        ret = deserialize_rina_msg(rina_conf_numtables, RINA_CONF_MSG_MAX,
+        ret = deserialize_rina_msg(rina_conf_numtables, RLITE_CFG_MSG_MAX,
                                    serbuf, n, msgbuf, sizeof(msgbuf));
         if (ret) {
             PE("deserialization error [%d]\n", ret);
@@ -336,7 +336,7 @@ unix_server(void *arg)
 
             PE("Invalid message received [type=%d]\n",
                     req->msg_type);
-            resp.msg_type = RINA_CONF_BASE_RESP;
+            resp.msg_type = RLITE_CFG_BASE_RESP;
             resp.event_id = req->event_id;
             resp.result = 1;
             rlite_msg_write_fd(cfd, (struct rlite_msg_base *)&resp);
@@ -349,7 +349,7 @@ unix_server(void *arg)
             }
         }
 
-        rlite_msg_free(rina_conf_numtables, RINA_CONF_MSG_MAX, req);
+        rlite_msg_free(rina_conf_numtables, RLITE_CFG_MSG_MAX, req);
 
         /* Close the connection. */
 	close(cfd);

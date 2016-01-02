@@ -28,7 +28,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint16_t ipcp_id,
     }
 
     memset(resp, 0, sizeof(*resp));
-    resp->msg_type = RINA_KERN_APPL_REGISTER_RESP;
+    resp->msg_type = RLITE_KER_APPL_REGISTER_RESP;
     resp->event_id = req->event_id;  /* This is just 0 for now. */
     resp->ipcp_id = ipcp_id;
     resp->reg = 1;
@@ -61,7 +61,7 @@ uipcp_pduft_set(struct uipcp *uipcp, uint16_t ipcp_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_PDUFT_SET;
+    req->msg_type = RLITE_KER_IPCP_PDUFT_SET;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
     req->dest_addr = dest_addr;
@@ -92,7 +92,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, uint16_t ipcp_id)
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_PDUFT_FLUSH;
+    req->msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
@@ -126,7 +126,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_UIPCP_FA_REQ_ARRIVED;
+    req->msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
     req->event_id = 1;
     req->kevent_id = kevent_id;
     req->ipcp_id = uipcp->ipcp_id;
@@ -169,7 +169,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, uint32_t local_port,
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_UIPCP_FA_RESP_ARRIVED;
+    req->msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
     req->event_id = 1;
     req->ipcp_id = uipcp->ipcp_id;
     req->local_port = local_port;
@@ -208,7 +208,7 @@ uipcp_evloop_set(struct uipcp *uipcp, uint16_t ipcp_id)
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RINA_KERN_IPCP_UIPCP_SET;
+    req->msg_type = RLITE_KER_IPCP_UIPCP_SET;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
@@ -291,18 +291,18 @@ uipcp_add(struct uipcps *uipcps, uint16_t ipcp_id, const char *dif_type)
 
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_REQ,
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_REQ,
                                     uipcp->ops.fa_req);
 
-    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RINA_KERN_FA_RESP,
+    ret |= rlite_evloop_set_handler(&uipcp->appl.loop, RLITE_KER_FA_RESP,
                                     uipcp->ops.fa_resp);
 
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
-                                   RINA_KERN_APPL_REGISTER,
+                                   RLITE_KER_APPL_REGISTER,
                                    uipcp->ops.appl_register);
 
     ret |= rlite_evloop_set_handler(&uipcp->appl.loop,
-                                    RINA_KERN_FLOW_DEALLOCATED,
+                                    RLITE_KER_FLOW_DEALLOCATED,
                                     uipcp->ops.flow_deallocated);
     if (ret) {
         goto err2;
