@@ -22,11 +22,16 @@ class CDAPManager {
     int __put_invoke_id(std::set<int> &pending, int invoke_id);
 
 public:
-    CDAPManager();
+    CDAPManager(int fd);
     int get_invoke_id();
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
     int put_invoke_id_remote(int invoke_id);
+
+    struct rina_name local_appl;
+    struct rina_name remote_appl;
+    int connected;
+    int fd;
 };
 
 /* Internal representation of a CDAP message. */

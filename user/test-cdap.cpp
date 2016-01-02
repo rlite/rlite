@@ -22,7 +22,6 @@ test_cdap_server(int port)
     socklen_t addrlen;
     char bufin[4096];
     struct sockaddr_in remote;
-    CDAPManager mgr;
     struct CDAPMessage *m;
     int pipefds[2];
     int one = 1;
@@ -38,6 +37,8 @@ test_cdap_server(int port)
         perror("socket()");
         return -1;
     }
+
+    CDAPManager mgr(ld);
 
     if (setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
         perror("setsockopt()");
@@ -117,7 +118,7 @@ client_connect(int sfd)
     struct CDAPAuthValue av;
     struct rina_name local_appl;
     struct rina_name remote_appl;
-    CDAPManager mgr;
+    CDAPManager mgr(sfd);
     struct CDAPMessage *m;
     int invoke_id;
 

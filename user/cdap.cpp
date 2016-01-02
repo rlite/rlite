@@ -11,10 +11,15 @@
 using namespace std;
 
 
-CDAPManager::CDAPManager()
+CDAPManager::CDAPManager(int fd)
 {
     invoke_id_next = 1;
     max_pending_ops = 5;
+
+    fd = 0;
+    memset(&local_appl, 0, sizeof(local_appl));
+    memset(&remote_appl, 0, sizeof(remote_appl));
+    connected = 0;
 }
 
 int
@@ -346,6 +351,10 @@ cdap_msg_send(CDAPManager *mgr, struct CDAPMessage *m, int fd,
            PE("%s: Invoke id %s does not match any pending request\n",
                 __func__, m->invoke_id);
         }
+
+        if (m->op_code == gpb::M_CONNECT_R) {
+            mgr->connected = 1;
+        }
     }
 
     gm = static_cast<gpb::CDAPMessage>(*m);
@@ -400,6 +409,10 @@ cdap_msg_recv(CDAPManager *mgr, int fd)
                 __func__);
             delete m;
             m = NULL;
+        }
+
+        if (m->op_code == gpb::M_CONNECT_R) {
+            mgr->connected = 1;
         }
 
     } else {
