@@ -1,4 +1,4 @@
-%module rlite
+%module rlite_raw
 %{
 /* AGGIUNTE */
 #include "rlite/rlite.h"
