@@ -24,15 +24,3 @@
 
 - vedere come inserire il campo lunghezza nell PCI header
 
-- aggiustare il locking:
-    a) flow_lookup() dovrebbe sparire
-    b) il global lock deve sparire, almeno nel datapath.
-    c) il punto b) non è solo una questione di performance. È anzi prima di tutto
-       un modo di poter invocare lock diversi a diversy layer lungo il datapath
-       di ricezione e trasmissione
-    d) attualmente il locking non è safe nel datapath (per esempio vedi
-       rina_normal_sdu_write() o rina_normal_sdu_rx()
-
-- lo schema di locking non è consistente con i tipi di contesto: un mutex non
-  può essere chiamato nel ramo di ricezione (rina_tx_restart() inclusa) nè nel
-  tasklet di completamento trasmissione;

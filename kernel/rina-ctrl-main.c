@@ -204,7 +204,7 @@ rina_upqueue_append(struct rina_ctrl *rc, const struct rina_msg_base *rmsg)
     return 0;
 }
 
-static int ipcp_del_entry(struct ipcp_entry *entry, int locked);
+static int ipcp_del_entry(struct ipcp_entry *entry);
 
 static void
 ipcp_remove_work(struct work_struct *w)
@@ -213,7 +213,7 @@ ipcp_remove_work(struct work_struct *w)
 
     mutex_lock(&rina_dm.lock);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_del_entry(ipcp, 0);
+    ipcp_del_entry(ipcp);
     mutex_unlock(&rina_dm.lock);
 }
 
@@ -337,7 +337,7 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 
 out:
     if (ret) {
-        ipcp_del_entry(entry, 0);
+        ipcp_del_entry(entry);
     }
     mutex_unlock(&rina_dm.lock);
 
@@ -405,7 +405,7 @@ ipcp_application_del_entry(struct ipcp_entry *ipcp,
 {
     list_del(&app->node);
     PD("%s: REFCNT-- %u: %u\n", __func__, ipcp->id, ipcp->refcnt);
-    ipcp_del_entry(ipcp, 0);
+    ipcp_del_entry(ipcp);
     rina_name_free(&app->name);
     kfree(app);
 }
@@ -729,19 +729,13 @@ flow_orphan(struct flow_entry *flow)
     }
 }
 
+/* Must be called under global lock. */
 static int
-ipcp_del_entry(struct ipcp_entry *entry, int locked)
+ipcp_del_entry(struct ipcp_entry *entry)
 {
-    int ret = 0;
-
-    if (locked) {
-        mutex_lock(&rina_dm.lock);
-    }
-
     entry->refcnt--;
     if (entry->refcnt) {
-        ret = 0;
-        goto out;
+        return 0;
     }
 
     /* Inoke the destructor method, if the constructor
@@ -768,12 +762,8 @@ ipcp_del_entry(struct ipcp_entry *entry, int locked)
     }
     bitmap_clear(rina_dm.ipcp_id_bitmap, entry->id, 1);
     kfree(entry);
-out:
-    if (locked) {
-        mutex_unlock(&rina_dm.lock);
-    }
 
-    return ret;
+    return 0;
 }
 
 static int
@@ -796,7 +786,7 @@ ipcp_del(unsigned int ipcp_id)
         goto out;
     }
 
-    ret = ipcp_del_entry(entry, 0);
+    ret = ipcp_del_entry(entry);
 out:
     mutex_unlock(&rina_dm.lock);
 
@@ -1971,7 +1961,7 @@ rina_io_release_internal(struct rina_io *rio)
              * so let's unbind from it. */
             if (rio->flow->upper.ipcp) {
                 PD("%s: REFCNT-- %u: %u\n", __func__, rio->flow->upper.ipcp->id, rio->flow->upper.ipcp->refcnt);
-                ipcp_del_entry(rio->flow->upper.ipcp, 0);
+                ipcp_del_entry(rio->flow->upper.ipcp);
             }
             flow_put(rio->flow);
             rio->flow = NULL;
@@ -1985,7 +1975,7 @@ rina_io_release_internal(struct rina_io *rio)
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
             PD("%s: REFCNT-- %u: %u\n", __func__, rio->txrx->ipcp->id, rio->txrx->ipcp->refcnt);
-            ipcp_del_entry(rio->txrx->ipcp, 0);
+            ipcp_del_entry(rio->txrx->ipcp);
             kfree(rio->txrx);
             rio->txrx = NULL;
             break;
