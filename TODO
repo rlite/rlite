@@ -20,6 +20,15 @@
 
 - fix permissions to /var/rina/ directory
 
+- è possibile far sì che operazioni come ipcp-create, ipcp-destroy,
+  ipcp-assign-to-dif, ipcp-config, ipcp-register, ipcp-unregister e
+  ipcp-dft-set vengano fatte direttamente da rina-config, senza passare
+  per l'ipcm? In questo modo si eviterebbero tanti messaggi verso
+  l'unix server: sistema più pulito, semplice ed efficiente, e meno
+  codice. In pratica si tratterebbe di lasciare nell'ipcm solo la parte
+  uipcp (e quindi anche l'enrolling) --> ovviamente l'ipcm cambierebbe
+  nome
+
 - aggiustare il locking:
     a) flow_lookup() dovrebbe sparire
     b) il global lock deve sparire, almeno nel datapath.
