@@ -149,6 +149,38 @@ for i in vms:
             '   fi\n'\
             'done\n\n'
 
+
+# Choose the VM with id 1 as enrollment pivot
+pvm = None
+for i in vms:
+    if vms[i]['id'] == 1:
+        pvm = vms[i]
+
+assert pvm != None
+
+# Enroll everybody against the pivot VM
+for i in vms:
+    vm = vms[i]
+    if vm['id'] == pvm['id']:
+        # Skip the pivot VM
+        continue
+
+    # XXX watch out: e.1.DIF is hardcoded here, waiting
+    # for a fix to come
+    outs += ''\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
+            'rina-config ipcp-enroll n.DIF n.IPCP %(id)s '\
+                                    'n.IPCP %(pvid)s e.1.DIF\n'\
+            'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
+                          'pvid': pvm['id']}
+
 fout.write(outs)
 
 fout.close()
