@@ -395,7 +395,7 @@ rina_name_from_string(const char *str, struct rina_name *name)
     char *strc = COMMON_STRDUP(str);
     char **strp = &strc;
 
-    memset(name, sizeof(*name), 0);
+    memset(name, 0, sizeof(*name));
 
     if (!strc) {
         return -1;

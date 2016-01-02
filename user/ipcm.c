@@ -419,7 +419,7 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
             if (!ripcp) {
                 PE("%s: ripcp allocation failed\n", __func__);
             } else {
-                memset(ripcp, sizeof(*ripcp), 0);
+                memset(ripcp, 0, sizeof(*ripcp));
                 rina_name_copy(&ripcp->dif_name, dif_name);
                 rina_name_copy(&ripcp->ipcp_name, ipcp_name);
                 list_add_tail(&ripcp->node, &ipcm->ipcps_registrations);
