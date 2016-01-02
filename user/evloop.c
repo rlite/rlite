@@ -591,7 +591,7 @@ rina_evloop_fdcb_del(struct rina_evloop *loop, int fd)
     return -1;
 }
 
-unsigned int
+struct ipcp *
 select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
                    int fallback)
 {
@@ -602,7 +602,7 @@ select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
         list_for_each_entry(cur, &loop->ipcps, node) {
             if (rina_name_valid(&cur->dif_name)
                     && rina_name_cmp(&cur->dif_name, dif_name) == 0) {
-                return cur->ipcp_id;
+                return cur;
             }
         }
     } else if (fallback) {
@@ -618,13 +618,13 @@ select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
             }
         }
 
-        return ipcp ? ipcp->ipcp_id : ~0U;
+        return ipcp;
     }
 
-    return ~0U;
+    return NULL;
 }
 
-unsigned int
+struct ipcp *
 lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
 {
     struct ipcp *ipcp;
@@ -633,12 +633,12 @@ lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name)
         list_for_each_entry(ipcp, &loop->ipcps, node) {
             if (rina_name_valid(&ipcp->ipcp_name)
                     && rina_name_cmp(&ipcp->ipcp_name, name) == 0) {
-                return ipcp->ipcp_id;
+                return ipcp;
             }
         }
     }
 
-    return ~0U;
+    return NULL;
 }
 
 int

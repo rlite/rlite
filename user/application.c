@@ -217,19 +217,19 @@ application_register(struct application *application, int reg,
                      const struct rina_name *ipcp_name,
                      const struct rina_name *application_name)
 {
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
 
-    ipcp_id = lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (ipcp_id == ~0U) {
-        ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, fallback);
+    ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!ipcp) {
+        ipcp = select_ipcp_by_dif(&application->loop, dif_name, fallback);
     }
-    if (ipcp_id == ~0U) {
+    if (!ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
         return -1;
     }
 
     /* Forward the request to the kernel. */
-    return application_register_req(application, reg, ipcp_id,
+    return application_register_req(application, reg, ipcp->ipcp_id,
                                      application_name);
 }
 
@@ -242,22 +242,22 @@ flow_allocate(struct application *application,
               const struct rina_flow_config *flowcfg,
               unsigned int *port_id, unsigned int wait_ms)
 {
-    unsigned int ipcp_id;
     struct rina_kmsg_fa_resp_arrived *kresp;
+    struct ipcp *ipcp;
     int result;
 
-    ipcp_id = lookup_ipcp_by_name(&application->loop, ipcp_name);
-    if (ipcp_id == ~0U) {
-        ipcp_id = select_ipcp_by_dif(&application->loop, dif_name,
-                                     dif_fallback);
+    ipcp = lookup_ipcp_by_name(&application->loop, ipcp_name);
+    if (!ipcp) {
+        ipcp = select_ipcp_by_dif(&application->loop, dif_name,
+                                  dif_fallback);
     }
-    if (ipcp_id == ~0U) {
+    if (!ipcp) {
         PE("%s: No suitable IPCP found\n", __func__);
         return -1;
     }
 
     kresp = flow_allocate_req(application, wait_ms ? wait_ms : ~0U,
-                              ipcp_id, local_application,
+                              ipcp->ipcp_id, local_application,
                               remote_application, flowcfg, &result);
     if (!kresp) {
         PE("%s: Flow allocation request failed\n", __func__);

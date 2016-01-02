@@ -71,7 +71,7 @@ ipcm_connect()
     ret = connect(sfd, (struct sockaddr *)&server_address,
                     sizeof(server_address));
     if (ret) {
-        perror("bind(AF_UNIX, path)");
+        perror("connect(AF_UNIX, path)");
         exit(EXIT_FAILURE);
         return -1;
     }
@@ -276,7 +276,7 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     const char *ipcp_apn;
     const char *ipcp_api;
     struct rina_name ipcp_name;
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
     int ret = -1;
 
     assert(argc >= 2);
@@ -286,12 +286,12 @@ ipcp_destroy(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* Does the request specifies an existing IPC process ? */
-    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (!ipcp) {
         PE("%s: No such IPCP process\n", __func__);
     } else {
         /* Valid IPCP id. Forward the request to the kernel. */
-        ret = rina_ipcp_destroy(rc, ipcp_id);
+        ret = rina_ipcp_destroy(rc, ipcp->ipcp_id);
     }
 
     return ret;
@@ -339,7 +339,7 @@ assign_to_dif(int argc, char **argv, struct rinaconf *rc)
     const char *dif_name_s;
     struct rina_name ipcp_name;
     struct rina_name dif_name;
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
     int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 3);
@@ -351,12 +351,12 @@ assign_to_dif(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&dif_name, dif_name_s, NULL, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (!ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        ret = rina_assign_to_dif(rc, ipcp_id, &dif_name);
+        ret = rina_assign_to_dif(rc, ipcp->ipcp_id, &dif_name);
     }
 
     return ret;
@@ -407,7 +407,7 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     const char *param_name;
     const char *param_value;
     struct rina_name ipcp_name;
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
     int ret = -1;  /* Report failure by default. */
 
     assert(argc >= 4);
@@ -419,12 +419,12 @@ ipcp_config(int argc, char **argv, struct rinaconf *rc)
     rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     /* The request specifies an IPCP: lookup that. */
-    ipcp_id = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&rc->loop, &ipcp_name);
+    if (!ipcp) {
         PE("%s: Could not find a suitable IPC process\n", __func__);
     } else {
         /* Forward the request to the kernel. */
-        ret = rina_ipcp_config(rc, ipcp_id, param_name, param_value);
+        ret = rina_ipcp_config(rc, ipcp->ipcp_id, param_name, param_value);
     }
 
     return ret;

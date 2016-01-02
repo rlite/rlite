@@ -104,11 +104,11 @@ ipcps_print(struct rina_evloop *loop);
 int
 ipcps_fetch(struct rina_evloop *loop);
 
-unsigned int
+struct ipcp *
 select_ipcp_by_dif(struct rina_evloop *loop, const struct rina_name *dif_name,
                    int fallback);
 
-unsigned int
+struct ipcp *
 lookup_ipcp_by_name(struct rina_evloop *loop, const struct rina_name *name);
 
 int

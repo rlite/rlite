@@ -57,19 +57,19 @@ rina_ipcp_register(struct ipcm *ipcm, int reg,
                    const struct rina_name *dif_name,
                    const struct rina_name *ipcp_name)
 {
-    unsigned int ipcp_id;
     struct uipcp *uipcp;
+    struct ipcp *ipcp;
     uint8_t result;
 
     /* Lookup the id of the registering IPCP. */
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&ipcm->loop, ipcp_name);
+    if (!ipcp) {
         PE("%s: Could not find who IPC process\n", __func__);
         return 1;
     }
 
     /* Grab the corresponding userspace IPCP. */
-    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    uipcp = uipcp_lookup(ipcm, ipcp->ipcp_id);
     assert(uipcp);
 
     /* Perform the registration. */
@@ -128,22 +128,23 @@ rina_conf_ipcp_enroll(struct ipcm *ipcm, int sfd,
 {
     struct rina_cmsg_ipcp_enroll *req = (struct rina_cmsg_ipcp_enroll *)b_req;
     struct rina_msg_base_resp resp;
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
     struct uipcp *uipcp;
     int ret;
 
     resp.result = 1; /* Report failure by default. */
 
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
+    if (!ipcp) {
         PE("%s: Could not find enrolling IPC process\n", __func__);
         goto out;
     }
 
     /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    uipcp = uipcp_lookup(ipcm, ipcp->ipcp_id);
     if (!uipcp) {
-        PE("%s: Could not find userspace IPC process %u\n", __func__, ipcp_id);
+        PE("%s: Could not find userspace IPC process %u\n",
+            __func__, ipcp->ipcp_id);
         goto out;
     }
 
@@ -165,21 +166,22 @@ rina_conf_ipcp_dft_set(struct ipcm *ipcm, int sfd,
 {
     struct rina_cmsg_ipcp_dft_set *req = (struct rina_cmsg_ipcp_dft_set *)b_req;
     struct rina_msg_base_resp resp;
-    unsigned int ipcp_id;
+    struct ipcp *ipcp;
     struct uipcp *uipcp;
     int ret;
 
     resp.result = 1; /* Report failure by default. */
 
-    ipcp_id = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
-    if (ipcp_id == ~0U) {
+    ipcp = lookup_ipcp_by_name(&ipcm->loop, &req->ipcp_name);
+    if (!ipcp) {
         PE("%s: Could not find IPC process\n", __func__);
         goto out;
     }
 
-    uipcp = uipcp_lookup(ipcm, ipcp_id);
+    uipcp = uipcp_lookup(ipcm, ipcp->ipcp_id);
     if (!uipcp) {
-        PE("%s: Could not find uipcp for IPC process %u\n", __func__, ipcp_id);
+        PE("%s: Could not find uipcp for IPC process %u\n",
+            __func__, ipcp->ipcp_id);
         goto out;
     }
 
