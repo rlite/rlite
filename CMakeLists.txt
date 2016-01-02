@@ -22,7 +22,7 @@ target_link_libraries(rinalite pthread)
 add_executable(rinaperf user/rinaperf.c)
 add_executable(rinalite-uipcps user/uipcp-container.c user/uipcp-unix.c)
 add_executable(rina-config user/rina-config.c)
-add_executable(test-cdap user/test-cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
+add_executable(test-cdap user/test-cdap.cpp user/cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 
 message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to test-cdap target")
 target_include_directories(test-cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
