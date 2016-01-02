@@ -114,6 +114,7 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->snd_lwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
     dtp->rcv_lwe = 0;
+    dtp->max_seq_num_rcvd = -1;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
@@ -336,11 +337,13 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
             /* Flush reassembly queue */
 
             dtp->rcv_lwe = pci->seqnum + 1;
+            dtp->max_seq_num_rcvd = pci->seqnum;
 
             ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
         } else {
             if (unlikely(pci->seqnum < dtp->rcv_lwe)) {
-                /* This is a duplicate. */
+                /* This is a duplicate. Probably we sould not drop it
+                 * if the flow configuration does not require it. */
                 PD("%s: Dropping duplicate PDU [seq=%lu]\n", __func__,
                     (long unsigned)pci->seqnum);
                 rina_buf_free(rb);
@@ -350,22 +353,32 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
                 return 0;
             }
 
-            if (unlikely(pci->seqnum > dtp->rcv_lwe)) {
+            if (unlikely(dtp->rcv_lwe < pci->seqnum &&
+                                pci->seqnum <= dtp->max_seq_num_rcvd)) {
                 /* This may go in a gap or be a duplicate
                  * amongst the gaps. */
 
-                PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+                PD("%s: Possible gap fill, RLWE jumps %lu --> %lu\n",
                     __func__, (long unsigned)dtp->rcv_lwe,
                     (unsigned long)pci->seqnum + 1);
-
                 // TODO, for now just pass it up, and ignore gaps
 
                 dtp->rcv_lwe = pci->seqnum + 1;
                 ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
-            } else { /* pci->seqnum == dtp->rcv_lwe */
+            } else if (pci->seqnum == dtp->max_seq_num_rcvd + 1) {
                 /* In order PDU. */
-
                 dtp->rcv_lwe++;
+                dtp->max_seq_num_rcvd++;
+                ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
+            } else {
+                /* Out of order. */
+                PD("%s: Out of order packet, RLWE jumps %lu --> %lu\n",
+                    __func__, (long unsigned)dtp->rcv_lwe,
+                    (unsigned long)pci->seqnum + 1);
+
+                // TODO, for now just pass it up, and ignore out of order
+                dtp->rcv_lwe = pci->seqnum + 1;
+                dtp->max_seq_num_rcvd = pci->seqnum;
                 ret = rina_sdu_rx(ipcp, rb, pci->conn_id.dst_cep);
             }
         }
