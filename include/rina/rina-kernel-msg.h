@@ -34,7 +34,8 @@ enum {
     RINA_KERN_APPLICATION_UNREGISTER_RESP, /* 12 */
     RINA_KERN_FLOW_ALLOCATE_REQ, /* 13 */
     RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED, /* 14 */
-    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 15 */
+    RINA_KERN_FLOW_ALLOCATE_RESP, /* 15 */
+    RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED, /* 16 */
 
     RINA_KERN_MSG_MAX,
 };
@@ -97,6 +98,7 @@ struct rina_kmsg_application_register {
     struct rina_name application_name;
 } __attribute__((packed));
 
+/* application --> kernel to initiate a flow allocation. */
 struct rina_kmsg_flow_allocate_req {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -107,6 +109,7 @@ struct rina_kmsg_flow_allocate_req {
     struct rina_name remote_application;
 } __attribute__((packed));
 
+/* application <-- kernel to notify about an incoming flow response. */
 struct rina_kmsg_flow_allocate_resp_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
@@ -115,12 +118,23 @@ struct rina_kmsg_flow_allocate_resp_arrived {
     uint32_t port_id;
 } __attribute__((packed));
 
+/* application <-- kernel to notify an incoming flow request. */
 struct rina_kmsg_flow_allocate_req_arrived {
     rina_msg_t msg_type;
     uint32_t event_id;
 
     uint32_t port_id;
     uint16_t ipcp_id;
+} __attribute__((packed));
+
+/* application --> kernel to respond to an incoming flow request. */
+struct rina_kmsg_flow_allocate_resp {
+    rina_msg_t msg_type;
+    uint32_t event_id;
+
+    uint16_t ipcp_id;
+    uint8_t result;
+    uint32_t port_id;
 } __attribute__((packed));
 
 #endif  /* __RINA_KERN_H__ */
