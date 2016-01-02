@@ -137,6 +137,7 @@ for i in vms:
                 'rina-config ipcp-create e.IPCP %(idx)s shim-eth e.%(idx)s.DIF\n'\
                 'rina-config ipcp-config e.IPCP %(idx)s netdev $PORT\n'\
                 'rina-config ipcp-register e.%(idx)s.DIF n.IPCP %(id)s\n'\
+                'true\n'\
                     % {'mac': port['mac'], 'idx': port['idx'],
                        'id': vm['id']}
 
