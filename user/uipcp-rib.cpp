@@ -83,6 +83,8 @@ struct Neighbor {
     int s_wait_stop_r(const CDAPMessage *rm);
     int i_wait_start(const CDAPMessage *rm);
     int enrolled(const CDAPMessage *rm);
+
+    void abort();
 };
 
 typedef int (*rib_handler_t)(struct uipcp_rib *);
@@ -214,6 +216,35 @@ Neighbor::send_to_port_id(CDAPMessage *m, const UipcpObject *obj)
     return mgmt_write_to_local_port(rib->uipcp, port_id, serbuf, serlen);
 }
 
+void
+Neighbor::abort()
+{
+    CDAPMessage m;
+    int ret;
+
+    PE("%s: Aborting enrollment\n", __func__);
+
+    if (enrollment_state == NONE) {
+        return;
+    }
+
+    enrollment_state = NONE;
+
+    m.m_release(gpb::F_NO_FLAGS);
+
+    ret = send_to_port_id(&m, NULL);
+    if (ret) {
+        PE("%s: send_to_port_id() failed\n", __func__);
+        return;
+    }
+
+    if (conn) {
+        delete conn;
+    }
+
+    return;
+}
+
 int
 Neighbor::none(const CDAPMessage *rm)
 {
@@ -234,8 +265,9 @@ Neighbor::none(const CDAPMessage *rm)
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
         conn = new CDAPConn(flow_fd, 1);
-        if (conn) {
+        if (!conn) {
             PE("%s: Out of memory\n", __func__);
+            abort();
             return -1;
         }
 
@@ -243,6 +275,7 @@ Neighbor::none(const CDAPMessage *rm)
                           &ipcp_name);
         if (ret) {
             PE("%s: M_CONNECT creation failed\n", __func__);
+            abort();
             return -1;
         }
 
@@ -258,6 +291,7 @@ Neighbor::none(const CDAPMessage *rm)
         m.m_connect_r(rm, 0, string());
         if (ret) {
             PE("%s: M_CONNECT_R creation failed\n", __func__);
+            abort();
             return -1;
         }
 
@@ -267,6 +301,7 @@ Neighbor::none(const CDAPMessage *rm)
     ret = send_to_port_id(&m, NULL);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
+        abort();
         return 0;
     }
 
@@ -294,6 +329,7 @@ Neighbor::i_wait_connect_r(const CDAPMessage *rm)
     ret = send_to_port_id(&m, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
+        abort();
         return 0;
     }
 
@@ -316,12 +352,14 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_START) {
         PE("%s: M_START expected\n", __func__);
+        abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("%s: M_START does not contain a nested message\n");
+        abort();
         return 0;
     }
 
@@ -342,6 +380,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     ret = send_to_port_id(&m, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
+        abort();
         return 0;
     }
 
@@ -360,6 +399,7 @@ Neighbor::s_wait_start(const CDAPMessage *rm)
     ret = send_to_port_id(&m, &enr_info);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
+        abort();
         return 0;
     }
 
@@ -377,12 +417,14 @@ Neighbor::i_wait_start_r(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_START_R) {
         PE("%s: M_START_R expected\n", __func__);
+        abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("%s: M_START_R does not contain a nested message\n");
+        abort();
         return 0;
     }
 
@@ -410,12 +452,14 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_STOP) {
         PE("%s: M_STOP expected\n", __func__);
+        abort();
         return 0;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
         PE("%s: M_STOP does not contain a nested message\n");
+        abort();
         return 0;
     }
 
@@ -431,6 +475,7 @@ Neighbor::i_wait_stop(const CDAPMessage *rm)
     ret = send_to_port_id(&m, NULL);
     if (ret) {
         PE("%s: send_to_port_id() failed\n", __func__);
+        abort();
         return 0;
     }
 
@@ -456,6 +501,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
 
     if (rm->op_code != gpb::M_STOP_R) {
         PE("%s: M_START_R expected\n", __func__);
+        abort();
         return 0;
     }
 
@@ -467,6 +513,7 @@ Neighbor::s_wait_stop_r(const CDAPMessage *rm)
     ret = send_to_port_id(&m, NULL);
     if (ret) {
         PE("%s: send_to_port_id failed\n", __func__);
+        abort();
         return ret;
     }
 

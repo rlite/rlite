@@ -41,6 +41,7 @@ class CDAPConn {
 
 public:
     CDAPConn(int fd, long version);
+    ~CDAPConn();
 
     /* @invoke_id is not meaningful for request messages. */
     int msg_send(struct CDAPMessage *m, int invoke_id);

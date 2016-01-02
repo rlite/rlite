@@ -220,6 +220,12 @@ CDAPConn::CDAPConn(int arg_fd, long arg_version)
     state = NONE;
 }
 
+CDAPConn::~CDAPConn()
+{
+    rina_name_free(&local_appl);
+    rina_name_free(&remote_appl);
+}
+
 int
 CDAPConn::__put_invoke_id(set<int>& pending, int invoke_id)
 {
