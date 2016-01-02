@@ -30,7 +30,7 @@ struct inet4_endpoint {
 
 struct shim_inet4 {
     struct uipcp *uipcp;
-    char *ipcp_name;  /* My name. */
+    char *dif_name;  /* Name of my DIF. */
     struct list_head endpoints;
     struct list_head bindpoints;
     uint32_t kevent_id_cnt;
@@ -39,7 +39,7 @@ struct shim_inet4 {
 #define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
 
 static int
-parse_directory(struct shim_inet4 *shim, int appl2sock, int use_shim_name,
+parse_directory(struct shim_inet4 *shim, int appl2sock, int cmp_shim_name,
                 struct sockaddr_in *addr, struct rina_name *appl_name)
 {
     char *appl_name_s = NULL;
@@ -119,7 +119,7 @@ parse_directory(struct shim_inet4 *shim, int appl2sock, int use_shim_name,
 
         if (appl2sock) {
             if (strcmp(nm, appl_name_s) == 0 &&
-                    (!use_shim_name || strcmp(shnm, shim->ipcp_name) == 0)) {
+                    (!cmp_shim_name || strcmp(shnm, shim->dif_name) == 0)) {
                 memcpy(addr, &cur_addr, sizeof(cur_addr));
                 found = 1;
             }
@@ -156,9 +156,9 @@ parse_directory(struct shim_inet4 *shim, int appl2sock, int use_shim_name,
 static int
 appl_name_to_sock_addr(struct shim_inet4 *shim,
                        const struct rina_name *appl_name,
-                       struct sockaddr_in *addr, int use_shim_name)
+                       struct sockaddr_in *addr, int cmp_shim_name)
 {
-    return parse_directory(shim, 1, use_shim_name, addr,
+    return parse_directory(shim, 1, cmp_shim_name, addr,
                            (struct rina_name *)appl_name);
 }
 
@@ -346,7 +346,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
     }
 
     /* This lookup is needed for the connect(). */
-    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr, 0);
+    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr, 1);
     if (ret) {
         UPE(uipcp, "Failed to get inet4 address for remote appl\n");
         goto err1;
@@ -363,7 +363,7 @@ shim_inet4_fa_req(struct rlite_evloop *loop,
 
     if ((ret = connect(ep->fd, (const struct sockaddr *)&remote_addr,
                 sizeof(remote_addr)))) {
-        UPE(uipcp, "Failed to connect to remote addr [%d]\n", ret);
+        UPE(uipcp, "Failed to connect to remote addr [%d]\n", errno);
         goto err2;
     }
 
@@ -577,8 +577,8 @@ shim_inet4_init(struct uipcp *uipcp)
 
     /* Store the serialized name of the new IPCP, it will be
      * used during the registration. */
-    shim->ipcp_name = rina_name_to_string(&rlite_ipcp->ipcp_name);
-    if (!shim->ipcp_name) {
+    shim->dif_name = rina_name_to_string(&rlite_ipcp->dif_name);
+    if (!shim->dif_name) {
         UPE(uipcp, "Out of memory\n");
         free(shim);
         return -1;
@@ -619,7 +619,7 @@ shim_inet4_fini(struct uipcp *uipcp)
         }
     }
 
-    free(shim->ipcp_name);
+    free(shim->dif_name);
 
     free(shim);
 
