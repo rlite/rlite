@@ -29,6 +29,14 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
     return gm.ByteSize();
 }
 
+RinaName::RinaName(const struct rina_name *name)
+{
+    apn = name->apn ? string(name->apn) : string();
+    api = name->api ? string(name->api) : string();
+    aen = name->aen ? string(name->aen) : string();
+    aei = name->aei ? string(name->aei) : string();
+}
+
 static void
 gpb2RinaName(RinaName &name, const gpb::applicationProcessNamingInfo_t& gname)
 {

@@ -5,6 +5,8 @@
 #include <list>
 #include <string>
 
+#include "rinalite/rinalite-common.h"
+
 
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
@@ -26,6 +28,9 @@ struct RinaName {
     std::string api;
     std::string aen;
     std::string aei;
+
+    RinaName() { }
+    RinaName(const struct rina_name *name);
 };
 
 struct DFTEntry : public UipcpObject {
@@ -41,6 +46,7 @@ struct DFTEntry : public UipcpObject {
 struct DFTSlice : public UipcpObject {
     std::list<DFTEntry> entries;
 
+    DFTSlice() { }
     DFTSlice(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };

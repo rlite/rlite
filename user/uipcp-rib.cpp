@@ -102,12 +102,14 @@ struct uipcp_rib {
     list< Neighbor > neighbors;
 
     /* Directory Forwarding Table. */
-    map< string, uint64_t > dft;
+    map< string, DFTEntry > dft;
 
     uipcp_rib(struct uipcp *_u) : uipcp(_u) {}
 
     list<Neighbor>::iterator lookup_neigh_by_port_id(unsigned int port_id);
     uint64_t address_allocate() const;
+    int remote_sync(bool create, const string& obj_class,
+                    const string& obj_name, const UipcpObject *obj_value);
 };
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
@@ -635,27 +637,31 @@ rib_destroy(struct uipcp_rib *rib)
     delete rib;
 }
 
-static int
-rib_remote_sync(struct uipcp_rib *rib, bool create, const string& obj_class,
-                const string& obj_name, int x)
+int
+uipcp_rib::remote_sync(bool create, const string& obj_class,
+                       const string& obj_name, const UipcpObject *obj_value)
 {
-    struct enrolled_neighbor *neigh;
-#if 0
     CDAPMessage m;
-    int invoke_id;
+    int ret;
 
-    list_for_each_entry(neigh, &rib->uipcp->enrolled_neighbors, node) {
+    for (list<Neighbor>::iterator neigh = neighbors.begin();
+                        neigh != neighbors.end(); neigh++) {
+        if (neigh->enrollment_state != Neighbor::ENROLLED) {
+            /* Skip this one since it's not enrolled yet. */
+            continue;
+        }
+
         if (create) {
             m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name,
                        0, 0, "");
+
         } else {
             m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name,
                        0, 0, "");
         }
-    }
 
-    conn.msg_send(&m, 0);
-#endif
+        ret = neigh->send_to_port_id(&m, 0, obj_value);
+    }
 }
 
 extern "C"
@@ -779,12 +785,14 @@ rib_application_register(struct uipcp_rib *rib, int reg,
                          const struct rina_name *appl_name)
 {
     char *name_s = rina_name_to_string(appl_name);
-    map< string, uint64_t >::iterator mit;
+    map< string, DFTEntry >::iterator mit;
     struct uipcp *uipcp = rib->uipcp;
     uint64_t local_addr;
     string name_str;
     int ret;
     bool create = true;
+    DFTSlice dft_slice;
+    DFTEntry dft_entry;
 
     ret = rinalite_lookup_ipcp_addr_by_id(&uipcp->appl.loop,
                                           uipcp->ipcp_id,
@@ -799,18 +807,22 @@ rib_application_register(struct uipcp_rib *rib, int reg,
     name_str = name_s;
     free(name_s);
 
+    dft_entry.address = local_addr;
+    dft_entry.appl_name = RinaName(appl_name);
+
     mit = rib->dft.find(name_str);
 
     if (reg) {
         if (mit != rib->dft.end()) {
             PE("Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", name_str.c_str(),
-                    (long long unsigned)mit->second, (long long unsigned)local_addr);
+                    (long long unsigned)mit->second.address,
+                    (long long unsigned)local_addr);
             return -1;
         }
 
         /* Insert the object into the RIB. */
-        rib->dft.insert(make_pair(name_str, local_addr));
+        rib->dft.insert(make_pair(name_str, dft_entry));
 
     } else {
         if (mit == rib->dft.end()) {
@@ -824,7 +836,9 @@ rib_application_register(struct uipcp_rib *rib, int reg,
         create = false;
     }
 
-    rib_remote_sync(rib, create, obj_class::dft, obj_name::dft, 10329);
+    dft_slice.entries.push_back(dft_entry);
+
+    rib->remote_sync(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     PD("Application %s %sregistered %s uipcp %d\n",
             name_str.c_str(), reg ? "" : "un", reg ? "to" : "from",
