@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror -g
 CFLAGS += -I$(PWD)/include
 LDFLAGS += -lpthread
-EXES=user/ipcm user/rina-config
+EXES=user/ipcm user/rina-config user/application
 HEADERS=$(shell find include/rina)
 
 KER=`uname -r`
@@ -27,6 +27,10 @@ user/rina-config.o: $(HEADERS)
 user/rina-utils.o: $(HEADERS)
 
 user/helpers.o: $(HEADERS) user/helpers.h
+
+user/application: user/application.o user/pending_queue.o user/rina-utils.o user/rina-kernel-numtables.o user/evloop.o
+
+user/application.o: $(HEADERS) user/pending_queue.h user/evloop.h
 
 clean:
 	-rm user/*.o
