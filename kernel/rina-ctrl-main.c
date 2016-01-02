@@ -99,7 +99,7 @@ struct rina_dm {
     spinlock_t ipcps_lock;
 
     /* Lock for ipcp_factories list. */
-    struct mutex lock;
+    struct mutex factories_lock;
 };
 
 static struct rina_dm rina_dm;
@@ -133,7 +133,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
         return -EINVAL;
     }
 
-    mutex_lock(&rina_dm.lock);
+    mutex_lock(&rina_dm.factories_lock);
 
     if (ipcp_factories_find(factory->dif_type)) {
         ret = -EBUSY;
@@ -167,7 +167,7 @@ rina_ipcp_factory_register(struct ipcp_factory *factory)
     printk("%s: IPC processes factory %u registered\n",
             __func__, factory->dif_type);
 out:
-    mutex_unlock(&rina_dm.lock);
+    mutex_unlock(&rina_dm.factories_lock);
 
     return ret;
 }
@@ -178,7 +178,7 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 {
     struct ipcp_factory *factory;
 
-    mutex_lock(&rina_dm.lock);
+    mutex_lock(&rina_dm.factories_lock);
 
     factory = ipcp_factories_find(dif_type);
     if (!factory) {
@@ -187,7 +187,7 @@ rina_ipcp_factory_unregister(uint8_t dif_type)
 
     list_del(&factory->node);
 
-    mutex_unlock(&rina_dm.lock);
+    mutex_unlock(&rina_dm.factories_lock);
 
     kfree(factory);
 
@@ -334,7 +334,7 @@ ipcp_add(struct rina_kmsg_ipcp_create *req, unsigned int *ipcp_id)
 
     BUG_ON(entry == NULL);
 
-    mutex_lock(&rina_dm.lock);
+    mutex_lock(&rina_dm.factories_lock);
 
     factory = ipcp_factories_find(req->dif_type);
     if (!factory) {
@@ -369,7 +369,7 @@ out:
     if (ret) {
         ipcp_put(entry);
     }
-    mutex_unlock(&rina_dm.lock);
+    mutex_unlock(&rina_dm.factories_lock);
 
     return ret;
 }
@@ -2117,7 +2117,7 @@ rina_ctrl_init(void)
 
     bitmap_zero(rina_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
     hash_init(rina_dm.ipcp_table);
-    mutex_init(&rina_dm.lock);
+    mutex_init(&rina_dm.factories_lock);
     spin_lock_init(&rina_dm.flows_lock);
     spin_lock_init(&rina_dm.ipcps_lock);
     rina_dm.ipcp_fetch_last = NULL;
