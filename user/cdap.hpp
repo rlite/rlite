@@ -142,6 +142,14 @@ struct CDAPMessage {
         obj_value.str = std::string(v);
     }
 
+    void set_obj_value(const char *buf, size_t len)
+    {
+        obj_value.ty = BYTES;
+        obj_value.u.buf.ptr = const_cast<char *>(buf);
+        obj_value.u.buf.len = len;
+        obj_value.u.buf.owned = false;
+    }
+
     int m_connect(gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value,
                   const struct rina_name *local_appl,
@@ -247,8 +255,13 @@ private:
             float           fp_single;
             double          fp_double;
             bool            boolean;
+            struct {
+                char *ptr;
+                size_t len;
+                bool owned;
+            } buf; /* byteval */
         } u;
-        std::string              str; /* strval and byteval */
+        std::string              str; /* strval */
     }                   obj_value;
 };
 

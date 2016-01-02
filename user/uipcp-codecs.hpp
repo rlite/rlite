@@ -12,7 +12,7 @@ struct EnrollmentInfo {
 
     EnrollmentInfo() : address(0), start_early(false) { }
     EnrollmentInfo(const char *buf, unsigned int size);
-    unsigned int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const;
 };
 
 #endif  /* __UIPCP_CODECS_H__ */

@@ -65,6 +65,7 @@ struct Neighbor {
 
     /* Enrollment state machine handlers. */
     int none(const CDAPMessage *rm);
+    int i_connect_sent(const CDAPMessage *rm);
 };
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
@@ -248,6 +249,8 @@ Neighbor::none(const CDAPMessage *rm)
             return -1;
         }
 
+        enrollment_state = I_CONNECT_SENT;
+
     } else {
         /* We are the enrollment slave, let's send an
          * M_CONNECT_R message. */
@@ -257,7 +260,33 @@ Neighbor::none(const CDAPMessage *rm)
             PE("%s: M_CONNECT_R creation failed\n", __func__);
             return -1;
         }
+
+        enrollment_state = S_CONNECT_RCVD;
     }
+
+    return send_to_port_id(&m);
+}
+
+int
+Neighbor::i_connect_sent(const CDAPMessage *rm)
+{
+    EnrollmentInfo enr_info;
+    CDAPMessage m;
+    char objbuf[4096];
+    int objlen;
+
+    assert(rm->op_code == gpb::M_CONNECT_R); /* Rely on CDAP fsm. */
+
+    m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
+              0, 0, string());
+
+    objlen = enr_info.serialize(objbuf, sizeof(objbuf));
+    if (objlen < 0) {
+        PE("%s: serialization failed\n", __func__);
+        return objlen;
+    }
+
+    m.set_obj_value(objbuf, objlen);
 
     return send_to_port_id(&m);
 }

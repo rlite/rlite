@@ -29,7 +29,8 @@ EnrollmentInfo::EnrollmentInfo(const char *buf, unsigned int size)
     }
 }
 
-unsigned int EnrollmentInfo::serialize(char *buf, unsigned int size) const
+int
+EnrollmentInfo::serialize(char *buf, unsigned int size) const
 {
     gpb::enrollmentInformation_t gm;
 

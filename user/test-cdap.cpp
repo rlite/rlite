@@ -217,6 +217,7 @@ client_write_some(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
     int invoke_id;
+    char buf[10];
 
     req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
     req.set_obj_value(18);
@@ -224,27 +225,30 @@ client_write_some(CDAPConn *conn)
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
+    req.m_write(gpb::F_NO_FLAGS, "class_B", "y", 0, 0, string());
     req.set_obj_value("ciccio");
     if (conn->msg_send(&req, 0)) {
         PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    m = conn->msg_recv();
-    if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
-        return -1;
+    req.m_write(gpb::F_NO_FLAGS, "class_C", "z", 0, 0, string());
+    for (unsigned int i = 0; i < sizeof(buf); i++) {
+        buf[i] = '0' + i;
+    }
+    req.set_obj_value(buf, sizeof(buf));
+    if (conn->msg_send(&req, 0)) {
+        PE("%s: Failed to send CDAP message\n", __func__);
     }
 
-    m->print();
+    for (int i = 0; i < 3; i++) {
+        m = conn->msg_recv();
+        if (!m) {
+            PE("%s: Error receiving CDAP response\n", __func__);
+            return -1;
+        }
 
-    m = conn->msg_recv();
-    if (!m) {
-        PE("%s: Error receiving CDAP response\n", __func__);
-        return -1;
+        m->print();
     }
-
-    m->print();
 
     return 0;
 }

@@ -297,6 +297,10 @@ CDAPMessage::~CDAPMessage()
 {
     rina_name_free(&src_appl);
     rina_name_free(&dst_appl);
+    if (obj_value.ty == BYTES && obj_value.u.buf.owned
+                && obj_value.u.buf.ptr) {
+        delete obj_value.u.buf.ptr;
+    }
 }
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
@@ -347,8 +351,17 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
         obj_value.ty = BOOL;
 
     } else if (objvalue.has_byteval()) {
-        obj_value.str = objvalue.byteval();
-        obj_value.ty = BYTES;
+        obj_value.u.buf.ptr = new char[objvalue.byteval().size()];
+        if (!obj_value.u.buf.ptr) {
+            PE("%s: BYTES object allocation failed\n", __func__);
+            obj_value.ty = NONE;
+        } else {
+            memcpy(obj_value.u.buf.ptr, objvalue.byteval().data(),
+                   objvalue.byteval().size());
+            obj_value.u.buf.len = objvalue.byteval().size();
+            obj_value.u.buf.owned = true;
+            obj_value.ty = BYTES;
+        }
 
     } else {
         obj_value.ty = NONE;
@@ -430,7 +443,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
             break;
 
         case BYTES:
-            objvalue->set_byteval(obj_value.str);
+            objvalue->set_byteval(obj_value.u.buf.ptr, obj_value.u.buf.len);
             break;
     }
 
@@ -580,7 +593,8 @@ CDAPMessage::print() const
             break;
 
         case BYTES:
-            PD("obj_value: %s, ", obj_value.str.c_str());
+            PD("obj_value: %d bytes at %p, ", obj_value.u.buf.len,
+                                              obj_value.u.buf.ptr);
             break;
     }
 
