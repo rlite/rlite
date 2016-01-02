@@ -42,7 +42,7 @@ struct rina_msg_base_resp {
 #define RINA_IOCTL_CMD_IPCP_BIND    87
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
-#define RINA_IOCTL_CMD_IPCM_MGMT    88
+#define RINA_IOCTL_CMD_IPCP_MGMT    88
 
 struct rina_ioctl_info {
     uint8_t cmd;

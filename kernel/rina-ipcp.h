@@ -86,6 +86,24 @@ struct dtp {
     uint64_t next_seq_num_to_send;
 };
 
+struct txrx {
+    /* Read operation support. */
+    struct list_head    queue;
+    wait_queue_head_t   wqh;
+    spinlock_t          lock;
+
+    /* Write operation support. */
+    struct ipcp_entry   *ipcp;
+};
+
+static inline void txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
+{
+    spin_lock_init(&txrx->lock);
+    INIT_LIST_HEAD(&txrx->queue);
+    init_waitqueue_head(&txrx->wqh);
+    txrx->ipcp = ipcp;
+}
+
 struct flow_entry {
     uint16_t            local_port;  /* flow table key */
     uint16_t            remote_port;
@@ -93,12 +111,9 @@ struct flow_entry {
     uint8_t             state;
     struct rina_name    local_application;
     struct rina_name    remote_application;
-    struct ipcp_entry   *ipcp;
     struct upper_ref    upper;
     uint32_t            event_id; /* requestor event id */
-    struct list_head    rxq;
-    wait_queue_head_t   rxq_wqh;
-    spinlock_t          rxq_lock;
+    struct txrx          txrx;
     struct dtp          dtp;
 
     struct mutex        lock; /* Unused */

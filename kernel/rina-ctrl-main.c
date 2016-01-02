@@ -470,14 +470,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->remote_port = 0;  /* Not valid. */
         entry->pduft_dest_addr = 0;  /* Not valid. */
         entry->state = FLOW_STATE_NULL;
-        entry->ipcp = ipcp;
         entry->upper = upper;
         entry->event_id = event_id;
         mutex_init(&entry->lock);
         entry->refcnt = 0;
-        spin_lock_init(&entry->rxq_lock);
-        INIT_LIST_HEAD(&entry->rxq);
-        init_waitqueue_head(&entry->rxq_wqh);
+        txrx_init(&entry->txrx, ipcp);
         hash_add(rina_dm.flow_table, &entry->node, entry->local_port);
         ipcp->refcnt++;
     } else {
@@ -508,8 +505,8 @@ flow_del_entry(struct flow_entry *entry, int locked)
         goto out;
     }
 
-    entry->ipcp->refcnt--;
-    list_for_each_entry_safe(rb, tmp, &entry->rxq, node) {
+    entry->txrx.ipcp->refcnt--;
+    list_for_each_entry_safe(rb, tmp, &entry->txrx.queue, node) {
         rina_buf_free(rb);
     }
     hash_del(&entry->node);
@@ -1105,16 +1102,15 @@ rina_flow_allocate_resp_internal(struct flow_entry *flow_entry,
                                         : FLOW_STATE_NULL;
 
     PI("%s: Flow allocation response [%u] issued to IPC process %u, "
-            "port-id %u\n", __func__, response, flow_entry->ipcp->id,
+            "port-id %u\n", __func__, response, flow_entry->txrx.ipcp->id,
             flow_entry->local_port);
 
     /* Notify the involved IPC process about the response. */
-    ipcp = flow_entry->ipcp;
+    ipcp = flow_entry->txrx.ipcp;
     if (ipcp->ops.flow_allocate_resp) {
         /* This IPCP handles the flow allocation in kernel-space. This is
          * currently true for shim IPCPs. */
-        ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
-                                                       flow_entry, response);
+        ret = ipcp->ops.flow_allocate_resp(ipcp, flow_entry, response);
     } else {
         /* This IPCP handles the flow allocation in user-space. This is
          * currently true for normal IPCPs. */
@@ -1297,10 +1293,10 @@ rina_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb, uint32_t local_port)
         rina_buf_pci_pop(rb);
     }
 
-    spin_lock(&flow->rxq_lock);
-    list_add_tail(&rb->node, &flow->rxq);
-    spin_unlock(&flow->rxq_lock);
-    wake_up_interruptible_poll(&flow->rxq_wqh,
+    spin_lock(&flow->txrx.lock);
+    list_add_tail(&rb->node, &flow->txrx.queue);
+    spin_unlock(&flow->txrx.lock);
+    wake_up_interruptible_poll(&flow->txrx.wqh,
                     POLLIN | POLLRDNORM | POLLRDBAND);
 out:
     mutex_unlock(&rina_dm.lock);
@@ -1560,6 +1556,7 @@ rina_ctrl_release(struct inode *inode, struct file *f)
 
 struct rina_io {
     struct flow_entry *flow;
+    struct txrx *txrx;
 };
 
 static int
@@ -1604,11 +1601,11 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
     struct rina_buf *rb;
     ssize_t ret;
 
-    if (unlikely(!rio->flow)) {
+    if (unlikely(!rio->txrx)) {
         printk("%s: Error: Flow not assigned\n", __func__);
         return -ENXIO;
     }
-    ipcp = rio->flow->ipcp;
+    ipcp = rio->txrx->ipcp;
 
     rb = rina_buf_alloc(ulen, 3, GFP_KERNEL);
     if (!rb) {
@@ -1622,16 +1619,17 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         return -EFAULT;
     }
 
-    if (unlikely(rio->flow->upper.ipcp)) {
+    if (unlikely(rio->flow && rio->flow->upper.ipcp)) {
         /* Fill the PCI for a management PDU. */
         rina_buf_pci_push(rb);
         memset(RINA_BUF_PCI(rb), 0, sizeof(struct rina_pci));
         RINA_BUF_PCI(rb)->pdu_type = PDU_TYPE_MGMT;
     }
 
+    // TODO flow is NULL if MGMT
     ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
 
-    if (unlikely(rio->flow->upper.ipcp)) {
+    if (unlikely(rio->flow && rio->flow->upper.ipcp)) {
         if (ret > sizeof(struct rina_pci)) {
             ret -= sizeof(struct rina_pci);
         }
@@ -1644,24 +1642,24 @@ static ssize_t
 rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
     struct rina_io *rio = (struct rina_io *)f->private_data;
-    struct flow_entry *flow = rio->flow;
+    struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
     ssize_t ret = 0;
 
-    if (unlikely(!flow)) {
+    if (unlikely(!txrx)) {
         return -ENXIO;
     }
 
-    add_wait_queue(&flow->rxq_wqh, &wait);
+    add_wait_queue(&txrx->wqh, &wait);
     while (len) {
         ssize_t copylen;
         struct rina_buf *rb;
 
         current->state = TASK_INTERRUPTIBLE;
 
-        spin_lock(&flow->rxq_lock);
-        if (list_empty(&flow->rxq)) {
-            spin_unlock(&flow->rxq_lock);
+        spin_lock(&txrx->lock);
+        if (list_empty(&txrx->queue)) {
+            spin_unlock(&txrx->lock);
             if (signal_pending(current)) {
                 ret = -ERESTARTSYS;
                 break;
@@ -1672,9 +1670,9 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             continue;
         }
 
-        rb = list_first_entry(&flow->rxq, struct rina_buf, node);
+        rb = list_first_entry(&txrx->queue, struct rina_buf, node);
         list_del(&rb->node);
-        spin_unlock(&flow->rxq_lock);
+        spin_unlock(&txrx->lock);
 
         copylen = rb->len;
         if (copylen > len) {
@@ -1691,7 +1689,7 @@ rina_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
     }
 
     current->state = TASK_RUNNING;
-    remove_wait_queue(&flow->rxq_wqh, &wait);
+    remove_wait_queue(&txrx->wqh, &wait);
 
     return ret;
 }
@@ -1702,8 +1700,8 @@ rina_io_poll(struct file *f, poll_table *wait)
     return 0;
 }
 
-static long rina_io_ioctl_bind(struct rina_io *rio,
-                               struct rina_ioctl_info *info)
+static long
+rina_io_ioctl_bind(struct rina_io *rio, struct rina_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
     long ret = 0;
@@ -1718,6 +1716,7 @@ static long rina_io_ioctl_bind(struct rina_io *rio,
             rio->flow->upper.ipcp->refcnt--;
         }
         rio->flow = NULL;
+        rio->txrx = NULL;
     }
 
     flow = flow_table_find(info->port_id);
@@ -1730,8 +1729,11 @@ static long rina_io_ioctl_bind(struct rina_io *rio,
     /* Bind the flow to this file descriptor. */
     rio->flow = flow;
     rio->flow->refcnt++;
+    rio->txrx = &flow->txrx;
 
     if (info->cmd == RINA_IOCTL_CMD_IPCP_BIND) {
+        /* Connect the upper IPCP which is using this flow
+         * so that rina_sdu_rx() can deliver SDU to the IPCP. */
         struct ipcp_entry *ipcp;
 
         /* Lookup the IPCP user of 'flow'. */
@@ -1746,6 +1748,25 @@ static long rina_io_ioctl_bind(struct rina_io *rio,
     }
 
 out:
+    mutex_unlock(&rina_dm.lock);
+
+    return ret;
+}
+
+static long
+rina_io_ioctl_mgmt(struct rina_io *rio, struct rina_ioctl_info *info)
+{
+    struct ipcp_entry *ipcp;
+    long ret = 0;
+
+    mutex_lock(&rina_dm.lock);
+
+    /* Lookup the IPCP to manage. */
+    ipcp = ipcp_table_find(info->ipcp_id);
+    if (!ipcp) {
+        printk("%s: Error: No such ipcp\n", __func__);
+        ret = -ENXIO;
+    }
     mutex_unlock(&rina_dm.lock);
 
     return ret;
@@ -1769,6 +1790,10 @@ rina_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         case RINA_IOCTL_CMD_APPL_BIND:
         case RINA_IOCTL_CMD_IPCP_BIND:
             return rina_io_ioctl_bind(rio, &info);
+            break;
+
+        case RINA_IOCTL_CMD_IPCP_MGMT:
+            return rina_io_ioctl_mgmt(rio, &info);
             break;
 
         default:

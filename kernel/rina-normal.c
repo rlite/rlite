@@ -126,7 +126,7 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         rina_buf_free(rb);
         return 0;
     }
-    lower_ipcp = lower_flow->ipcp;
+    lower_ipcp = lower_flow->txrx.ipcp;
     BUG_ON(!lower_ipcp);
 
     rina_buf_pci_push(rb);
