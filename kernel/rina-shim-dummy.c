@@ -135,11 +135,50 @@ rina_shim_dummy_flow_allocate_req(struct ipcp_entry *ipcp,
     return 0;
 }
 
+struct flow_allocate_resp_work {
+    struct work_struct w;
+    struct ipcp_entry *ipcp;
+    uint16_t local_port;
+    uint8_t response;
+};
+
+static void
+flow_allocate_resp_work(struct work_struct *w)
+{
+    struct flow_allocate_resp_work *farw = container_of(w,
+                        struct flow_allocate_resp_work, w);
+    int ret;
+
+    ret = rina_flow_allocate_resp_arrived(farw->ipcp, farw->local_port,
+                                          farw->response);
+    if (ret) {
+        printk("%s: failed to report flow allocation response\n",
+                __func__);
+    }
+
+    kfree(farw);
+}
+
 static int
 rina_shim_dummy_flow_allocate_resp(struct ipcp_entry *ipcp,
-                                   struct flow_entry *flow)
+                                   struct flow_entry *flow,
+                                   uint8_t response)
 {
-    return -ENXIO;
+    struct flow_allocate_resp_work *farw;
+
+    farw = kmalloc(sizeof(*farw), GFP_KERNEL);
+    if (!farw) {
+        printk("%s: Out of memory\n", __func__);
+        return -ENOMEM;
+    }
+
+    farw->ipcp = ipcp;
+    farw->local_port = flow->remote_port;
+    farw->response = response;
+    INIT_WORK(&farw->w, flow_allocate_resp_work);
+    schedule_work(&farw->w);
+
+    return 0;
 }
 
 static int

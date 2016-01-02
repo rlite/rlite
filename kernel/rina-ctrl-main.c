@@ -809,8 +809,8 @@ rina_flow_allocate_req(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 
     mutex_unlock(&rina_dm.lock);
 
-    printk("%s: Flow allocation requested to IPC process %u\n",
-                    __func__, req->ipcp_id);
+    printk("%s: Flow allocation requested to IPC process %u, "
+                "port-id %u\n", __func__, req->ipcp_id, flow_entry->local_port);
 
     return 0;
 
@@ -850,12 +850,14 @@ rina_flow_allocate_resp(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
                 __func__, flow_entry->local_port, flow_entry->state);
         goto out;
     }
-    flow_entry->state = FLOW_STATE_ALLOCATED;
+    flow_entry->state = (req->response == 0) ? FLOW_STATE_ALLOCATED
+                                             : FLOW_STATE_NULL;
 
     /* Notify the involved IPC process about the response. */
     ret = flow_entry->ipcp->ops.flow_allocate_resp(flow_entry->ipcp,
-                                             flow_entry);
-    if (ret) {
+                                                   flow_entry,
+                                                   req->response);
+    if (ret || req->response) {
         flow_del(flow_entry->local_port, 0);
     }
 
@@ -905,8 +907,8 @@ rina_flow_allocate_req_arrived(struct ipcp_entry *ipcp,
     req->ipcp_id = ipcp->id;
     req->port_id = flow_entry->local_port;
 
-    printk("%s: Flow allocation requested to IPC process %u\n",
-                    __func__, req->ipcp_id);
+    printk("%s: Flow allocation request arrived to IPC process %u, "
+                "port-id %u\n", __func__, req->ipcp_id, req->port_id);
 
     /* Enqueue the request into the upqueue. */
     ret = rina_upqueue_append(app->rc, (struct rina_msg_base *)req);
@@ -941,6 +943,9 @@ rina_flow_allocate_resp_arrived(struct ipcp_entry *ipcp,
     }
     flow_entry->state = (response == 0) ? FLOW_STATE_ALLOCATED
                                           : FLOW_STATE_NULL;
+
+    printk("%s: Flow allocation response arrived to IPC process %u, "
+                "port-id %u\n", __func__, ipcp->id, local_port);
 
     ret = rina_append_allocate_flow_resp_arrived(flow_entry->rc,
                                                  flow_entry->event_id,

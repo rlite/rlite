@@ -11,10 +11,14 @@ struct flow_entry;
 struct ipcp_ops {
     void (*destroy)(struct ipcp_entry *ipcp);
     int (*assign_to_dif)(struct ipcp_entry *ipcp, struct rina_name *dif_name);
-    int (*application_register)(struct ipcp_entry *ipcp, struct rina_name *app_name);
-    int (*application_unregister)(struct ipcp_entry *ipcp, struct rina_name *app_name);
-    int (*flow_allocate_req)(struct ipcp_entry *ipcp, struct flow_entry *flow);
-    int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow);
+    int (*application_register)(struct ipcp_entry *ipcp,
+                                struct rina_name *app_name);
+    int (*application_unregister)(struct ipcp_entry *ipcp,
+                                  struct rina_name *app_name);
+    int (*flow_allocate_req)(struct ipcp_entry *ipcp,
+                             struct flow_entry *flow);
+    int (*flow_allocate_resp)(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                              uint8_t response);
     int (*sdu_write)(struct ipcp_entry *ipcp, void *sdu, unsigned int sdu_len);
 };
 
