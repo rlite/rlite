@@ -111,15 +111,29 @@ for i in vms:
 for i in vms:
     vm = vms[i]
 
-    outs += 'DONE=255\n'\
+    outs += ''\
+            'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n'\
             'sudo hostname %(name)s\n'\
+            '\n'\
+            'sudo modprobe rina-ctrl\n'\
+            'sudo modprobe rina-shim-eth\n'\
+            'sudo modprobe rina-normal\n'\
+            'sudo chmod a+rwx /dev/rina-ctrl\n'\
+            'sudo chmod a+rwx /dev/rina-io\n'\
+            'sudo mkdir -p /var/rina\n'\
+            'sudo chmod -R a+rw /var/rina\n'\
+            '\n'\
                 % {'name': vm['name'], 'ssh': vm['ssh']}
 
     for port in vm['ports']:
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
-                'sudo ip link set $PORT up\n' % {'mac': port['mac']}
+                'sudo ip link set $PORT up\n'\
+                'rina-config ipcp-create shim-eth e.IPCP %(idx)s\n'\
+                'rina-config ipcp-config e.IPCP %(idx)s netdev $PORT\n'\
+                'rina-config ipcp-config e.IPCP %(idx)s dif e.%(idx)s.DIF\n'\
+                    % {'mac': port['mac'], 'idx': port['idx']}
 
     outs += 'ENDSSH\n'\
             '   DONE=$?\n'\
