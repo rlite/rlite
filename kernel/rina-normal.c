@@ -77,13 +77,15 @@ rina_normal_destroy(struct ipcp_entry *ipcp)
     printk("%s: IPC [%p] destroyed\n", __func__, priv);
 }
 
-enum hrtimer_restart
-snd_inact_tmr_cb(struct hrtimer *timer)
+static void
+snd_inact_tmr_cb(long unsigned arg)
 {
-    struct dtp *dtp = container_of(timer, struct dtp, snd_inact_tmr);
+    struct flow_entry *flow = (struct flow_entry *)arg;
+    struct dtp *dtp = &flow->dtp;
+
+    PD("%s\n", __func__);
 
     spin_lock_irq(&dtp->lock);
-    PD("%s\n", __func__);
     dtp->set_drf = true;
 
     /* InitialSeqNumPolicy */
@@ -99,15 +101,12 @@ snd_inact_tmr_cb(struct hrtimer *timer)
 
     /* Notify user flow that there has been no activity for a while */
     spin_unlock_irq(&dtp->lock);
-
-    return HRTIMER_NORESTART;
 }
 
-enum hrtimer_restart
-rcv_inact_tmr_cb(struct hrtimer *timer)
+static void
+rcv_inact_tmr_cb(long unsigned arg)
 {
     PD("%s\n", __func__);
-    return HRTIMER_NORESTART;
 }
 
 #define RTX_MSECS   1000
@@ -178,7 +177,9 @@ rina_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->next_snd_ctl_seq = dtp->last_ctrl_seq_num_rcvd = 0;
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
+    dtp->snd_inact_tmr.data = (unsigned long)flow;
     dtp->rcv_inact_tmr.function = rcv_inact_tmr_cb;
+    dtp->rcv_inact_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data = (unsigned long)flow;
 
@@ -299,9 +300,8 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     spin_lock_irq(&dtp->lock);
 
     if (dtcp_present) {
-        /* Stop the sender inactivity timer if it was activated or the callback
-         * running , but without waiting for the callback to finish. */
-        hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
+        /* 3 * (MPL + R + A) */
+        mod_timer(&dtp->snd_inact_tmr, jiffies + msecs_to_jiffies(1000));
     }
 
     if (fc->fc_type == RINA_FC_T_WIN &&
@@ -379,10 +379,6 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
             PD("%s: cloning [%lu] into rtxq\n", __func__,
                     (long unsigned)RINA_BUF_PCI(crb)->seqnum);
         }
-
-        /* 3 * (MPL + R + A) */
-        hrtimer_start(&dtp->snd_inact_tmr, ktime_set(0, 1 << 30),
-                      HRTIMER_MODE_REL);
     }
 
     spin_unlock_irq(&dtp->lock);
@@ -819,11 +815,8 @@ rina_normal_sdu_rx(struct ipcp_entry *ipcp, struct rina_buf *rb)
     spin_lock_irq(&dtp->lock);
 
     if (flow->cfg.dtcp_present) {
-        hrtimer_try_to_cancel(&dtp->rcv_inact_tmr);
-
         /* 2 * (MPL + R + A) */
-        hrtimer_start(&dtp->rcv_inact_tmr, ktime_set(0, (1 << 30)/3*2),
-                      HRTIMER_MODE_REL);
+        mod_timer(&dtp->rcv_inact_tmr, jiffies + jiffies_to_msecs(668));
     }
 
     rina_buf_pci_pop(rb);

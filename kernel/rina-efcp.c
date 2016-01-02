@@ -61,8 +61,8 @@ void
 dtp_init(struct dtp *dtp)
 {
     spin_lock_init(&dtp->lock);
-    hrtimer_init(&dtp->snd_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    hrtimer_init(&dtp->rcv_inact_tmr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    init_timer(&dtp->snd_inact_tmr);
+    init_timer(&dtp->rcv_inact_tmr);
     INIT_DELAYED_WORK(&dtp->remove, remove_flow_work);
     INIT_LIST_HEAD(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
@@ -78,8 +78,8 @@ dtp_fini(struct dtp *dtp)
     struct rina_buf *rb, *next;
 
     spin_lock_irq(&dtp->lock);
-    hrtimer_cancel(&dtp->snd_inact_tmr);
-    hrtimer_cancel(&dtp->rcv_inact_tmr);
+    del_timer(&dtp->snd_inact_tmr);
+    del_timer(&dtp->rcv_inact_tmr);
     del_timer(&dtp->rtx_tmr);
 
     list_for_each_entry_safe(rb, next, &dtp->cwq, node) {
