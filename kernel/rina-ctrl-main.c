@@ -1628,7 +1628,31 @@ rina_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos
         }
     } else {
         /* Regular application write. */
-        ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
+        DECLARE_WAITQUEUE(wait, current);
+
+        add_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
+
+        for (;;) {
+            current->state = TASK_INTERRUPTIBLE;
+
+            ret = ipcp->ops.sdu_write(ipcp, rio->flow, rb);
+
+            if (unlikely(ret == -EAGAIN)) {
+                if (signal_pending(current)) {
+                    ret = -ERESTARTSYS;
+                    break;
+                }
+
+                /* No room to write, let's sleep. */
+                schedule();
+                continue;
+            }
+
+            break;
+        }
+
+        current->state = TASK_RUNNING;
+        remove_wait_queue(&rio->flow->txrx.tx_wqh, &wait);
     }
 
     if (unlikely(ret < 0)) {

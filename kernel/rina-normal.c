@@ -165,12 +165,36 @@ rmt_tx(struct ipcp_entry *ipcp, uint64_t remote_addr, struct rina_buf *rb)
     }
 
     if (lower_flow) {
+        DECLARE_WAITQUEUE(wait, current);
+        int ret;
+
         /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
         lower_ipcp = lower_flow->txrx.ipcp;
         BUG_ON(!lower_ipcp);
 
-        /* Push down to the underlying IPCP. */
-        return lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+        add_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+
+        for (;;) {
+            current->state = TASK_INTERRUPTIBLE;
+
+            /* Push down to the underlying IPCP. */
+            ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow, rb);
+
+            if (unlikely(ret == -EAGAIN)) {
+                /* Cannot restart system call from here... */
+
+                /* No room to write, let's sleep. */
+                schedule();
+                continue;
+            }
+
+            break;
+        }
+
+        current->state = TASK_RUNNING;
+        remove_wait_queue(&lower_flow->txrx.tx_wqh, &wait);
+
+        return ret;
     }
 
     /* This SDU gets loopbacked to this IPCP, since this is a
@@ -197,6 +221,17 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
         hrtimer_try_to_cancel(&dtp->snd_inact_tmr);
     }
 
+    if (fc->fc_type == RINA_FC_T_WIN &&
+            dtp->next_seq_num_to_send > dtp->snd_rwe &&
+                dtp->cwq_len >= dtp->max_cwq_len) {
+        /* POL: FlowControlOverrun */
+        spin_unlock(&dtp->lock);
+
+        /* Backpressure. Don't drop the PDU, we will be
+         * invoked again. */
+        return -EAGAIN;
+    }
+
     rina_buf_pci_push(rb);
 
     pci = RINA_BUF_PCI(rb);
@@ -212,28 +247,14 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
     dtp->set_drf = false;
     if (fc->fc_type == RINA_FC_T_WIN) {
         if (pci->seqnum > dtp->snd_rwe) {
-            /* PDU not in the sender window, let's try to
-             * insert it into the Closed Window Queue. */
-            if (dtp->cwq_len < dtp->max_cwq_len) {
-                /* There's room in the queue. */
-                list_add_tail(&rb->node, &dtp->cwq);
-                dtp->cwq_len++;
-                PD("%s: push [%lu] into cwq\n", __func__,
-                        (long unsigned)pci->seqnum);
-            } else {
-                /* POL: FlowControlOverrun */
-
-                /* TODO Set blocking write (backpressure) ? */
-
-                spin_unlock(&dtp->lock);
-
-                PD("%s: Dropping overrun PDU [%lu]", __func__,
-                        (long unsigned)pci->seqnum);
-                rina_buf_free(rb);
-
-
-                return 0;
-            }
+            /* PDU not in the sender window, let's
+             * insert it into the Closed Window Queue.
+             * Because of the check above, we are sure
+             * that dtp->cwq_len < dtp->max_cwq_len. */
+            list_add_tail(&rb->node, &dtp->cwq);
+            dtp->cwq_len++;
+            PD("%s: push [%lu] into cwq\n", __func__,
+                    (long unsigned)pci->seqnum);
         } else {
             /* PDU in the sender window. */
             /* POL: TxControl. */

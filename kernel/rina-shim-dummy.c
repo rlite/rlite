@@ -218,13 +218,12 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
 
     if (priv->queued) {
         unsigned int next;
+        int ret = 0;
 
         spin_lock(&priv->lock);
         next = (priv->rdt + 1) & (RX_ENTRIES -1);
         if (unlikely(next == priv->rdh)) {
-            /* PD("%s: Dropping PDU because internal queue is full\n",
-                __func__); */
-            rina_buf_free(rb);
+            ret = -EAGAIN;
         } else {
             priv->rxr[priv->rdt].rb = rb;
             priv->rxr[priv->rdt].remote_port = flow->remote_port;
@@ -232,7 +231,11 @@ rina_shim_dummy_sdu_write(struct ipcp_entry *ipcp,
         }
         spin_unlock(&priv->lock);
 
+        if (ret) {
+            return ret;
+        }
         schedule_work(&priv->rcv);
+
     } else {
         rina_sdu_rx(ipcp, rb, flow->remote_port);
     }

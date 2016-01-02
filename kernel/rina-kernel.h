@@ -51,6 +51,7 @@ struct txrx {
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
+    wait_queue_head_t   tx_wqh;
 };
 
 struct ipcp_entry {
@@ -161,6 +162,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     INIT_LIST_HEAD(&txrx->rx_q);
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
+    init_waitqueue_head(&txrx->tx_wqh);
 }
 
 void dtp_init(struct dtp *dtp);
