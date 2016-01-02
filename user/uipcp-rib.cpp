@@ -49,7 +49,11 @@ struct Neighbor {
         NONE = 0,
         I_CONNECT_SENT,
         S_CONNECT_RCVD,
+        ENROLLMENT_STATE_LAST,
     } enrollment_state;
+
+    typedef int (Neighbor::*enroll_fsm_handler_t)(const CDAPMessage *rm);
+    enroll_fsm_handler_t enroll_fsm_handlers[ENROLLMENT_STATE_LAST];
 
     Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
              int fd, unsigned int port_id);
@@ -58,6 +62,9 @@ struct Neighbor {
 
     int send_to_port_id(CDAPMessage *m);
     int fsm_run(const CDAPMessage *rm);
+
+    /* Enrollment state machine handlers. */
+    int none(const CDAPMessage *rm);
 };
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
@@ -69,6 +76,8 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     port_id = port_id_;
     conn = NULL;
     enrollment_state = NONE;
+    memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
+    enroll_fsm_handlers[NONE] = &Neighbor::none;
 }
 
 Neighbor::Neighbor(const Neighbor& other)
@@ -79,6 +88,8 @@ Neighbor::Neighbor(const Neighbor& other)
     port_id = other.port_id;
     enrollment_state = enrollment_state;
     conn = NULL;
+    memcpy(enroll_fsm_handlers, other.enroll_fsm_handlers,
+           sizeof(enroll_fsm_handlers));
 }
 
 Neighbor::~Neighbor()
@@ -209,45 +220,48 @@ Neighbor::send_to_port_id(CDAPMessage *m)
 }
 
 int
-Neighbor::fsm_run(const CDAPMessage *rm)
+Neighbor::none(const CDAPMessage *rm)
 {
-    unsigned int old_state = enrollment_state;
-    struct uipcp *uipcp = rib->uipcp;
-    struct rinalite_ipcp *ipcp;
     CDAPMessage m;
     int ret;
 
-    ipcp = rinalite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
-    assert(ipcp);
+    if (rm == NULL) {
+        CDAPAuthValue av;
+        struct uipcp *uipcp = rib->uipcp;
+        struct rinalite_ipcp *ipcp;
 
-    switch (enrollment_state) {
-        case NONE:
-            if (rm == NULL) {
-                CDAPAuthValue av;
+        ipcp = rinalite_lookup_ipcp_by_id(&uipcp->appl.loop, uipcp->ipcp_id);
+        assert(ipcp);
 
-                /* We are the enrollment initiator, let's send an
-                 * M_CONNECT message. */
-                conn = new CDAPConn(flow_fd, 1);
-                if (conn) {
-                    PE("%s: Out of memory\n", __func__);
-                    break;
-                }
-
-                ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
-                                   &ipcp_name);
-                if (ret) {
-                    PE("%s: M_CONNECT creation failed\n", __func__);
-                    break;
-                }
-            }
-            break;
-
-        default:
-            assert(0);
+        /* We are the enrollment initiator, let's send an
+         * M_CONNECT message. */
+        conn = new CDAPConn(flow_fd, 1);
+        if (conn) {
+            PE("%s: Out of memory\n", __func__);
             return -1;
-            break;
+        }
+
+        ret = m.m_connect(gpb::AUTH_NONE, &av, &ipcp->ipcp_name,
+                          &ipcp_name);
+        if (ret) {
+            PE("%s: M_CONNECT creation failed\n", __func__);
+            return -1;
+        }
     }
 
+    return send_to_port_id(&m);
+}
+
+int
+Neighbor::fsm_run(const CDAPMessage *rm)
+{
+    unsigned int old_state = enrollment_state;
+    int ret;
+
+    assert(enrollment_state >= NONE &&
+           enrollment_state < ENROLLMENT_STATE_LAST);
+    assert(enroll_fsm_handlers[enrollment_state]);
+    ret = (this->*(enroll_fsm_handlers[enrollment_state]))(rm);
     if (ret) {
         return ret;
     }
@@ -257,7 +271,7 @@ Neighbor::fsm_run(const CDAPMessage *rm)
                 enrollment_state);
     }
 
-    return send_to_port_id(&m);
+    return 0;
 }
 
 extern "C"
