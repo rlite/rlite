@@ -3,8 +3,6 @@
 - implementare l'event kernel --> user RINA_KERN_CONFIG_CHANGED, per avvisare
   le applicazioni che è necessario rifare un ipcps_fetch()
 
-- flow entry pendenti nel kernel devono sparire dopo un po', per evitare leakage
-
 - passare ad autotools
 
 - limitare la lunghezza delle code nel kernel
@@ -36,3 +34,6 @@
 - fare in modo che il flusso non venga veramente allocato finchè la cwq
   non è stata svuotata, altrimenti quei pacchetti non vengono mai
   trasmessi
+
+- flow entry in stato ALLOCATED ma mai associate ad un file descriptor con
+  bind() dovrebbero sparire dopo un po', altrimenti c'è leakage

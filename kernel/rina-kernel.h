@@ -83,7 +83,7 @@ struct ipcp_factory {
 };
 
 enum {
-    FLOW_STATE_NULL = 0,
+    FLOW_STATE_NULL = 0,    /* Not really used. */
     FLOW_STATE_PENDING,
     FLOW_STATE_ALLOCATED,
 };

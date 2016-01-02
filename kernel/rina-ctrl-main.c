@@ -596,7 +596,26 @@ flow_rc_unbind(struct rina_ctrl *rc)
 
     hash_for_each_safe(rina_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
+            /* Since this 'rc' is going to disappear, we have to remove
+             * the its reference in this flow. */
             flow->upper.rc = NULL;
+            if (flow->state != FLOW_STATE_ALLOCATED) {
+                /* This flow is still pending. Since this rina_ctrl
+                 * device is being deallocated, there won't by a way
+                 * to deliver a flow allocation response, so we can
+                 * remove the flow. */
+                flow_del_entry(flow, 0);
+            } else {
+                /* If no rina_io device binds to this allocated flow,
+                 * the associated memory will never be released.
+                 * Two solutions:
+                 *      (a) - When the flows transitions into allocated
+                 *            state, start a timer that delete the
+                 *            flow if its refcnt is still zero.
+                 *      (b) - Delete the flow here if refcnt is
+                 *            still zero.
+                 */
+            }
         }
     }
 }
