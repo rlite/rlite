@@ -19,6 +19,7 @@ void rina_msg_free(struct rina_msg_base *msg);
 void rina_name_move(struct rina_name *dst, struct rina_name *src);
 int rina_name_copy(struct rina_name *dst, const struct rina_name *src);
 char *rina_name_to_string(const struct rina_name *name);
+int rina_name_cmp(const struct rina_name *one, const struct rina_name *two);
 
 /* Serialize a numeric variable _v of type _t. */
 #define serialize_obj(_p, _t, _v)       \

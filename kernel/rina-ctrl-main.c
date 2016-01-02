@@ -494,10 +494,12 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     entry = ipcp_table_find(req->ipcp_id);
     if (entry) {
         if (entry->ops.application_register) {
-            entry->ops.application_register(entry->priv,
+            ret = entry->ops.application_register(entry->priv,
                                             &req->application_name);
+        } else {
+            ret = 0;
         }
-        resp->result = 0;  /* Report success. */
+        resp->result = (ret ? 1 : 0);  /* Report result. */
     }
     mutex_unlock(&rina_dm.lock);
 

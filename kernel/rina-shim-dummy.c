@@ -25,20 +25,22 @@
 
 #include <linux/module.h>
 #include <linux/aio.h>
-#include <linux/miscdevice.h>
-#include <linux/poll.h>
 #include <linux/moduleparam.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
-#include <linux/bitmap.h>
-#include <linux/hashtable.h>
 
 
 struct rina_shim_dummy {
-    int fake;
+    struct mutex lock;
+    struct list_head registered_applications;
+};
+
+struct registered_application {
+    struct rina_name name;
+    struct list_head node;
 };
 
 static void *
@@ -52,6 +54,8 @@ rina_shim_dummy_create(void)
     }
 
     memset(priv, 0, sizeof(*priv));
+    INIT_LIST_HEAD(&priv->registered_applications);
+    mutex_init(&priv->lock);
 
     printk("%s: New IPC created [%p]\n", __func__, priv);
 
@@ -66,6 +70,42 @@ rina_shim_dummy_destroy(void *data)
     kfree(priv);
 
     printk("%s: IPC [%p] destroyed\n", __func__, data);
+}
+
+static int
+rina_shim_dummy_application_register(void *data, struct rina_name *application_name)
+{
+    struct registered_application *app;
+    struct rina_shim_dummy *priv = data;
+    char *name_s;
+
+    mutex_lock(&priv->lock);
+
+    list_for_each_entry(app, &priv->registered_applications, node) {
+        if (rina_name_cmp(&app->name, application_name) == 0) {
+            mutex_unlock(&priv->lock);
+            return -EINVAL;
+        }
+    }
+
+    app = kmalloc(sizeof(*app), GFP_KERNEL);
+    if (!app) {
+        return -ENOMEM;
+    }
+    memset(app, 0, sizeof(*app));
+    rina_name_copy(&app->name, application_name);
+
+    list_add_tail(&app->node, &priv->registered_applications);
+
+    mutex_unlock(&priv->lock);
+
+    name_s = rina_name_to_string(application_name);
+    printk("%s: Application %s registered\n", __func__, name_s);
+    if (name_s) {
+        kfree(name_s);
+    }
+
+    return 0;
 }
 
 static int
@@ -84,6 +124,7 @@ rina_shim_dummy_init(void)
     factory.create = rina_shim_dummy_create;
     memset(&factory.ops, 0, sizeof(factory.ops));
     factory.ops.destroy = rina_shim_dummy_destroy;
+    factory.ops.application_register = rina_shim_dummy_application_register;
     factory.ops.assign_to_dif = rina_shim_dummy_assign_to_dif;
 
     ret = rina_ipcp_factory_register(&factory);

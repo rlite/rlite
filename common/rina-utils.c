@@ -10,6 +10,7 @@
 #define COMMON_FREE(_p)   kfree(_p)
 #define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
 #define COMMON_STRDUP(_s)   kstrdup(_s, GFP_KERNEL)
+#define COMMON_EXPORT(_n)   EXPORT_SYMBOL_GPL(_n)
 
 #else
 
@@ -21,6 +22,7 @@
 #define COMMON_FREE(_p)   free(_p)
 #define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
 #define COMMON_STRDUP(_s)   strdup(_s)
+#define COMMON_EXPORT(_n)
 
 #endif
 
@@ -267,6 +269,7 @@ rina_name_free(struct rina_name *name)
         COMMON_FREE(name->aei);
     }
 }
+COMMON_EXPORT(rina_name_free);
 
 void
 rina_msg_free(struct rina_msg_base *msg)
@@ -302,6 +305,7 @@ rina_name_move(struct rina_name *dst, struct rina_name *src)
     dst->aei = src->aei;
     src->aei = NULL;
 }
+COMMON_EXPORT(rina_name_move);
 
 int
 rina_name_copy(struct rina_name *dst, const struct rina_name *src)
@@ -317,6 +321,7 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
 
     return 0;
 }
+COMMON_EXPORT(rina_name_copy);
 
 char *
 rina_name_to_string(const struct rina_name *name)
@@ -368,3 +373,43 @@ rina_name_to_string(const struct rina_name *name)
 
     return str;
 }
+COMMON_EXPORT(rina_name_to_string);
+
+int
+rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
+{
+    if (!one || !two) {
+        return !(one == two);
+    }
+
+    if (!!one->apn ^ !!two->apn) {
+        return -1;
+    }
+    if (one->apn && strcmp(one->apn, two->apn)) {
+        return -1;
+    }
+
+    if (!!one->api ^ !!two->api) {
+        return -1;
+    }
+    if (one->api && strcmp(one->api, two->api)) {
+        return -1;
+    }
+
+    if (!!one->aen ^ !!two->aen) {
+        return -1;
+    }
+    if (one->aen && strcmp(one->aen, two->aen)) {
+        return -1;
+    }
+
+    if (!!one->aei ^ !!two->aei) {
+        return -1;
+    }
+    if (one->aei && strcmp(one->aei, two->aei)) {
+        return -1;
+    }
+
+    return 0;
+}
+COMMON_EXPORT(rina_name_cmp);

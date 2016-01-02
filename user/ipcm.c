@@ -499,6 +499,8 @@ test(struct ipcm *ipcm)
 
     rina_name_fill(&name, "ClientApplication", "1", NULL, NULL);
     application_register(ipcm, 0, &name);
+    application_register(ipcm, 0, &name);
+    rina_name_free(&name);
 
     /* Destroy the IPCP. */
     ret = ipcp_destroy(ipcm, 0);
