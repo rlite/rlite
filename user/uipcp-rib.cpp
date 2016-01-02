@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <sstream>
 #include <unistd.h>
@@ -39,8 +40,82 @@ namespace obj_name {
     string flows = "/dif/ra/fa/" + obj_class::flows;
 };
 
+static void
+string_strip(string& s)
+{
+    unsigned int i;
+    unsigned int j;
+
+    for (i = 0; i < s.size() && isspace(s[i]); i++) {
+    }
+
+    if (i == s.size()) {
+        return;
+    }
+
+    s = s.substr(i);
+
+    for (j = s.size() - 1; j >= i && isspace(s[j]); j--) {
+    }
+
+    s = s.substr(0, j + 1);
+}
+
+int
+uipcp_rib::load_qos_cubes(const char *filename)
+{
+    ifstream fin(filename);
+    unsigned int cnt = 1;
+    string line;
+
+    if (fin.fail()) {
+        PE("Failed to find qoscubes file %s\n", filename);
+        return -1;
+    }
+
+    for (; getline(fin, line); cnt++) {
+        string cubename, param, value;
+        size_t pos;
+
+        string_strip(line);
+        if (line.size() == 0) {
+            continue;
+        }
+
+        pos = line.find('=');
+        if (pos == string::npos || pos < 1 || line.rfind('=') != pos
+                || pos + 1 >= line.size()) {
+            PE("Invalid specification at line %u\n", cnt);
+            continue;
+        }
+
+        param = line.substr(0, pos - 1);
+        value = line.substr(pos + 1);
+        string_strip(param);
+        string_strip(value);
+
+        pos = param.find('.');
+        if (pos == string::npos || pos < 1 || pos + 1 >= param.size()) {
+            PE("Invalid specification at line %u\n", cnt);
+            continue;
+        }
+        cubename = param.substr(0, pos);
+        param = param.substr(pos + 1);
+        string_strip(cubename);
+        string_strip(param);
+
+        cout << cubename << "|" << param << "|" << value << endl;
+    }
+
+    fin.close();
+
+    return 0;
+}
+
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
 {
+    load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos");
+
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
     handlers.insert(make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));

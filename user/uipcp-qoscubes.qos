@@ -1,0 +1,42 @@
+unrel.partial_delivery = false
+unrel.incomplete_delivery = false
+unrel.in_order_delivery = false
+unrel.max_sdu_gap = -1
+unrel.dtcp_present = false
+
+relfc.partial_delivery = false
+relfc.incomplete_delivery = false
+relfc.in_order_delivery = true
+relfc.max_sdu_gap = -1
+relfc.dtcp_present = true
+relfc.dtcp.intial_a = 10
+relfc.dtcp.flow_control = true
+relfc.dtcp.rtx_control = false
+relfc.dtcp.fc.max_cwq_len = 75
+relfc.dtcp.fc.initial_credit = 50
+
+relrtx.partial_delivery = false
+relrtx.incomplete_delivery = false
+relrtx.in_order_delivery = true
+relrtx.max_sdu_gap = 0
+relrtx.dtcp_present = true
+relrtx.dtcp.intial_a = 10
+relrtx.dtcp.flow_control = false
+relrtx.dtcp.rtx_control = true
+relrtx.dtcp.rtx.max_time_to_retry = 15
+relrtx.dtcp.rtx.data_rxms_max = 15
+relrtx.dtcp.rtx.initial_tr = 10
+
+rel.partial_delivery = false
+rel.incomplete_delivery = false
+rel.in_order_delivery = true
+rel.max_sdu_gap = 0
+rel.dtcp_present = true
+rel.dtcp.intial_a = 10
+rel.dtcp.flow_control = true
+rel.dtcp.rtx_control = true
+rel.dtcp.fc.max_cwq_len = 75
+rel.dtcp.fc.initial_credit = 50
+rel.dtcp.rtx.max_time_to_retry = 15
+rel.dtcp.rtx.data_rxms_max = 15
+rel.dtcp.rtx.initial_tr = 10

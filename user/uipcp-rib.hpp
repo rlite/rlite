@@ -193,6 +193,9 @@ struct uipcp_rib {
 
     int flows_handler_create(const CDAPMessage *rm, Neighbor *neigh);
     int flows_handler_create_r(const CDAPMessage *rm, Neighbor *neigh);
+
+private:
+    int load_qos_cubes(const char *);
 };
 
 #endif  /* __UIPCP_RIB_H__ */
