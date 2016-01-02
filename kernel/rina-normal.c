@@ -194,13 +194,22 @@ rina_normal_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rina_buf *rb)
 {
-    int ret = rina_sdu_rx(ipcp, rb, flow->remote_port);
+    struct rina_pci *pci;
 
-    if (ret) {
-        return 0;
-    }
+    rina_buf_pci_push(rb);
+    pci = RINA_BUF_PCI(rb);
+    pci->dst_addr = flow->pduft_dest_addr;
+    pci->src_addr = ipcp->addr;
+    pci->conn_id.qos_id = 0;
+    pci->conn_id.dst_cep = flow->remote_port;
+    pci->conn_id.src_cep = flow->local_port;
+    pci->pdu_type = PDU_TYPE_DT;
+    pci->pdu_flags = 0;
+    pci->seqnum = 0; /* TODO next_seq_num_to_send */
 
-    return rb->len;
+    rina_buf_free(rb); /* TODO pass it to the RMT */
+
+    return 0; /* TODO return len on success. */
 }
 
 static int
