@@ -49,6 +49,8 @@ struct Neighbor {
         NONE = 0,
         I_CONNECT_SENT,
         S_CONNECT_R_SENT,
+        I_START_SENT,
+        S_START_R_SENT,
         ENROLLMENT_STATE_LAST,
     } enrollment_state;
 
@@ -297,18 +299,38 @@ Neighbor::i_connect_sent(const CDAPMessage *rm)
 
     enr_info.lower_difs = rib->lower_difs;
 
+    enrollment_state = I_START_SENT;
+
     return send_to_port_id(&m, &enr_info);
 }
 
 int
 Neighbor::s_connect_r_sent(const CDAPMessage *rm)
 {
+    const char *objbuf;
+    size_t objlen;
+
     if (rm->op_code != gpb::M_START) {
         PE("%s: M_START expected\n", __func__);
         return 0;
     }
 
-    //TODO decode EnrollmentInfo
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        PE("%s: M_START does not contain a nested message\n");
+        return 0;
+    }
+
+    EnrollmentInfo enr_info(objbuf, objlen);
+    CDAPMessage m;
+
+    (void)enr_info;
+
+    m.m_start_r(rm, gpb::F_NO_FLAGS, 0, string());
+
+    enrollment_state = S_START_R_SENT;
+
+    return send_to_port_id(&m, NULL);
 }
 
 int
