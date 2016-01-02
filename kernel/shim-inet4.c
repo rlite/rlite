@@ -382,6 +382,10 @@ inet4_tx_worker(struct work_struct *w)
         }
         spin_unlock_bh(&priv->txq_lock);
 
+        if (!qe) {
+            break;
+        }
+
         inet4_xmit(qe->flow_priv, qe->rb);
 
         flow_put(qe->flow_priv->flow);
