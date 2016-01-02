@@ -142,7 +142,7 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
 
     nf->keepalive_tmrid = 0;
 
-    UPI(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+    UPD(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(nf->neigh->ipcp_name).c_str());
 
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
