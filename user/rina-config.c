@@ -10,12 +10,15 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
+#include <assert.h>
 
 #include <rina/rina-application-msg.h>
 #include "helpers.h"
 
 
 #define UNIX_DOMAIN_SOCKNAME    "/home/vmaffione/unix"
+
+static void usage_and_quit(void);
 
 static int
 ipcm_connect()
@@ -82,7 +85,7 @@ read_response(int sfd)
 }
 
 static int application_register_common(const struct rina_name *app_name,
-                                       char *dif_name, int reg)
+                                       const char *dif_name, int reg)
 {
     struct rina_amsg_register msg;
     int fd;
@@ -121,30 +124,90 @@ static int application_register_common(const struct rina_name *app_name,
     return ipcm_disconnect(fd);
 }
 
-static int application_register(const struct rina_name *app_name,
-                                char *dif_name)
+static int
+application_register(int argc, char **argv)
 {
-    return application_register_common(app_name, dif_name, 1);
+    struct rina_name application_name;
+    const char *dif_name;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+
+    if (argc < 3) {
+        usage_and_quit();
+    }
+
+    dif_name = argv[0];
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
+
+    rina_name_fill(&application_name, ipcp_apn, ipcp_api, NULL, NULL);
+
+    return application_register_common(&application_name, dif_name, 1);
 }
 
-static int application_unregister(const struct rina_name *app_name,
-                                  char *dif_name)
+static int
+application_unregister(int argc, char **argv)
 {
-    return application_register_common(app_name, dif_name, 0);
+    struct rina_name application_name;
+    const char *dif_name;
+    const char *ipcp_apn;
+    const char *ipcp_api;
+
+    if (argc < 3) {
+        usage_and_quit();
+    }
+
+    dif_name = argv[0];
+    ipcp_apn = argv[1];
+    ipcp_api = argv[2];
+
+    rina_name_fill(&application_name, ipcp_apn, ipcp_api, NULL, NULL);
+
+    return application_register_common(&application_name, dif_name, 0);
 }
 
-static void
-sigint_handler(int signum)
-{
-    exit(EXIT_SUCCESS);
-}
+struct cmd_descriptor {
+    const char *name;
+    const char *usage;
+    int (*func)(int argc, char **argv);
+};
+
+static struct cmd_descriptor cmd_descriptors[] = {
+    {
+        .name = "application-register",
+        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .func = application_register,
+    },
+    {
+        .name = "application-unregister",
+        .usage = "DIF_NAME IPCP_APN IPCP_API",
+        .func = application_unregister,
+    },
+    {
+        .name = "ipcp-create",
+        .usage = "DIF_TYPE IPCP_APN IPCP_API",
+        .func = NULL,
+    },
+    {
+        .name = "ipcp-destroy",
+        .usage = "IPCP_APN IPCP_API",
+        .func = NULL,
+    },
+};
+
+#define NUM_COMMANDS    (sizeof(cmd_descriptors)/sizeof(struct cmd_descriptor))
 
 static void
 usage_and_quit(void)
 {
+    int i;
+
     printf("Available commands:\n");
-    printf("    application-register DIF_NAME IPCP_APN IPCP_API\n");
-    printf("    application-unregister DIF_NAME IPCP_APN IPCP_API\n");
+
+    for (i = 0; i < NUM_COMMANDS; i++) {
+        printf("    %s %s\n", cmd_descriptors[i].name, cmd_descriptors[i].usage);
+    }
+
     exit(EXIT_SUCCESS);
 }
 
@@ -152,39 +215,32 @@ static int
 process_args(int argc, char **argv)
 {
     const char *cmd;
+    int i;
 
     if (argc < 2) {
+        /* No command. */
         usage_and_quit();
     }
 
     cmd = argv[1];
 
-    if (strcmp(cmd, "application-register") == 0) {
-        struct rina_name application_name;
-
-        if (argc < 5) {
-            usage_and_quit();
+    for (i = 0; i < NUM_COMMANDS; i++) {
+        if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
+            assert(cmd_descriptors[i].func);
+            return cmd_descriptors[i].func(argc - 2, argv + 2);
         }
-
-        rina_name_fill(&application_name, argv[3], argv[4], NULL, NULL);
-        application_register(&application_name, argv[2]);
-
-    } else if (strcmp(cmd, "application-unregister") == 0) {
-        struct rina_name application_name;
-
-        if (argc < 5) {
-            usage_and_quit();
-        }
-
-        rina_name_fill(&application_name, argv[3], argv[4], NULL, NULL);
-        application_unregister(&application_name, argv[2]);
-
-    } else {
-        printf("Unknown command '%s'\n", cmd);
-        usage_and_quit();
     }
 
+    printf("Unknown command '%s'\n", cmd);
+    usage_and_quit();
+
     return 0;
+}
+
+static void
+sigint_handler(int signum)
+{
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv)

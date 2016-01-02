@@ -378,8 +378,8 @@ rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
 COMMON_EXPORT(rina_name_cmp);
 
 void
-rina_name_fill(struct rina_name *name, char *apn,
-               char *api, char *aen, char *aei)
+rina_name_fill(struct rina_name *name, const char *apn,
+               const char *api, const char *aen, const char *aei)
 {
     name->apn = apn ? COMMON_STRDUP(apn) : NULL;
     name->api = api ? COMMON_STRDUP(api) : NULL;
