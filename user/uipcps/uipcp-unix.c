@@ -623,12 +623,12 @@ int main(int argc, char **argv)
     }
 
     if (!char_device_exists(ctrl_dev_name)) {
-        PE("Device %s not found", ctrl_dev_name);
+        PE("Device %s not found\n", ctrl_dev_name);
         return -1;
     }
 
     if (!char_device_exists(io_dev_name)) {
-        PE("Device %s not found", io_dev_name);
+        PE("Device %s not found\n", io_dev_name);
         return -1;
     }
 
