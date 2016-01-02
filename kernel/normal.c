@@ -504,10 +504,10 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
 }
 
 /* Get N-1 flow and N-1 IPCP where the mgmt PDU should be
- * written. Does not take ownership of the PDU, since it's
- * not a transmission routine. */
+ * written and prepare the mgmt SDU. This does not take ownership
+ * of the PDU, since it's not a transmission routine. */
 static int
-rlite_normal_mgmt_sdu_write(struct ipcp_entry *ipcp,
+rlite_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
                            const struct rlite_mgmt_hdr *mhdr,
                            struct rlite_buf *rb,
                            struct ipcp_entry **lower_ipcp,
@@ -1223,7 +1223,7 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_set = rlite_normal_pduft_set,
     .ops.pduft_flush = rlite_normal_pduft_flush,
     .ops.pduft_del = rlite_normal_pduft_del,
-    .ops.mgmt_sdu_write = rlite_normal_mgmt_sdu_write,
+    .ops.mgmt_sdu_build = rlite_normal_mgmt_sdu_build,
     .ops.sdu_rx = rlite_normal_sdu_rx,
     .ops.flow_get_stats = rlite_normal_flow_get_stats,
 };

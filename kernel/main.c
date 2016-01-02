@@ -2647,7 +2647,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         struct ipcp_entry *lower_ipcp;
         struct flow_entry *lower_flow;
 
-        if (!ipcp->ops.mgmt_sdu_write) {
+        if (!ipcp->ops.mgmt_sdu_build) {
             RPD(3, "Missing mgmt_sdu_write() operation\n");
             rlite_buf_free(rb);
             return -ENXIO;
@@ -2655,7 +2655,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 
         /* Management write. Prepare the buffer and get the lower
          * flow and lower IPCP. */
-        ret = ipcp->ops.mgmt_sdu_write(ipcp, &mhdr, rb, &lower_ipcp,
+        ret = ipcp->ops.mgmt_sdu_build(ipcp, &mhdr, rb, &lower_ipcp,
                                        &lower_flow);
         if (ret) {
             rlite_buf_free(rb);
