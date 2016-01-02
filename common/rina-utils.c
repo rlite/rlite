@@ -385,6 +385,36 @@ rina_name_to_string(const struct rina_name *name)
 COMMON_EXPORT(rina_name_to_string);
 
 int
+rina_name_from_string(const char *str, struct rina_name *name)
+{
+    char *apn, *api, *aen, *aei;
+    char *strc = COMMON_STRDUP(str);
+    char **strp = &strc;
+
+    memset(name, sizeof(*name), 0);
+
+    if (!strc) {
+        return -1;
+    }
+
+    apn = strsep(strp, "/");
+    api = strsep(strp, "/");
+    aen = strsep(strp, "/");
+    aei = strsep(strp, "/");
+
+    if (!apn || !api || !aen || !aei) {
+        COMMON_FREE(strc);
+        return -1;
+    }
+
+    rina_name_fill(name, apn, api, aen, aei);
+    COMMON_FREE(strc);
+
+    return 0;
+}
+COMMON_EXPORT(rina_name_from_string);
+
+int
 rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
 {
     if (!one || !two) {

@@ -105,7 +105,7 @@ static rina_resp_handler_t rina_kernel_handlers[] = {
 static int
 application_register_req(struct application *application,
                          int reg, unsigned int ipcp_id,
-                         struct rina_name *application_name)
+                         const struct rina_name *application_name)
 {
     struct rina_kmsg_application_register *req;
     struct rina_msg_base *resp;
@@ -195,8 +195,8 @@ flow_allocate_resp(struct application *application, uint16_t ipcp_id,
 
 int
 application_register(struct application *application, int reg,
-                     struct rina_name *dif_name, int fallback,
-                     struct rina_name *application_name)
+                     const struct rina_name *dif_name, int fallback,
+                     const struct rina_name *application_name)
 {
     unsigned int ipcp_id;
 

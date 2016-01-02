@@ -13,12 +13,4 @@
 
 - vmpi_provider_find_instance non dovrebbe essere bloccante
 
-- quando l'ipcm viene terminato, gli uipcp (o meglio, gli IPCP corrispondenti)
-  vengono automaticamente deregistrati dagli (N-1) IPCP a cui sono registrati.
-  Se quindi si rilancia l'ipcm (che ricrea gli uipcp) e si riprova a fare
-  l'enrollment, questo fallisce, poichè gli uipcp non sono registrati. Per
-  risolvere questo problema, bisognerebbe che l'ipcm memorizzasse (su disco)
-  le registrazioni effettuate e le riproducesse quando l'uipcp viene ricreato.
-  Questo comportamento potrebbe essere opzionale.
-
 - spostare il codice uipcp in un file separato

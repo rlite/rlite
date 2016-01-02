@@ -13,6 +13,7 @@
 
 
 struct ipcp {
+    /* IPCP attributes. */
     unsigned int ipcp_id;
     struct rina_name ipcp_name;
     uint64_t ipcp_addr;
