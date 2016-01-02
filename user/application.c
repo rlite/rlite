@@ -37,33 +37,6 @@ struct application {
 };
 
 static int
-application_register_resp(struct rina_evloop *loop,
-                          const struct rina_msg_base_resp *b_resp,
-                          const struct rina_msg_base *b_req)
-{
-    struct rina_kmsg_application_register *req =
-            (struct rina_kmsg_application_register *)b_req;
-    char *name_s = NULL;
-    int reg = b_resp->msg_type == RINA_KERN_APPLICATION_REGISTER_RESP ? 1 : 0;
-
-    name_s = rina_name_to_string(&req->application_name);
-
-    if (b_resp->result) {
-        printf("%s: Failed to %sregister application %s to IPC process %u\n",
-                __func__, (reg ? "" : "un"), name_s, req->ipcp_id);
-    } else {
-        printf("%s: Application %s %sregistered to IPC process %u\n",
-                __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
-    }
-
-    if (name_s) {
-        free(name_s);
-    }
-
-    return 0;
-}
-
-static int
 flow_allocate_resp_arrived(struct rina_evloop *loop,
                            const struct rina_msg_base_resp *b_resp,
                            const struct rina_msg_base *b_req)
@@ -139,27 +112,26 @@ flow_allocate_req_arrived(struct rina_evloop *loop,
  * Therefore, the event-loop thread would wait for itself, i.e.
  * we would have a deadlock. */
 static rina_resp_handler_t rina_kernel_handlers[] = {
-    [RINA_KERN_APPLICATION_REGISTER_RESP] = application_register_resp,
-    [RINA_KERN_APPLICATION_UNREGISTER_RESP] = application_register_resp,
     [RINA_KERN_FLOW_ALLOCATE_REQ_ARRIVED] = flow_allocate_req_arrived,
     [RINA_KERN_FLOW_ALLOCATE_RESP_ARRIVED] = flow_allocate_resp_arrived,
     [RINA_KERN_MSG_MAX] = NULL,
 };
 
-static struct rina_msg_base_resp *
+static int
 application_register_req(struct application *application,
                          int wait_for_completion,
                          int reg, unsigned int ipcp_id,
-                         struct rina_name *application_name,
-                         int *result)
+                         struct rina_name *application_name)
 {
     struct rina_kmsg_application_register *req;
+    struct rina_msg_base *resp;
+    int result;
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
     if (!req) {
         printf("%s: Out of memory\n", __func__);
-        return NULL;
+        return ENOMEM;
     }
 
     memset(req, 0, sizeof(*req));
@@ -170,9 +142,12 @@ application_register_req(struct application *application,
 
     printf("Requesting application %sregistration...\n", (reg ? "": "un"));
 
-    return (struct rina_msg_base_resp *)
-           issue_request(&application->loop, RMB(req),
-                         sizeof(*req), wait_for_completion, result);
+    resp = issue_request(&application->loop, RMB(req),
+                         sizeof(*req), wait_for_completion, &result);
+    assert(!resp);
+    printf("%s: result: %d\n", __func__, result);
+
+    return result;
 }
 
 static struct rina_kmsg_flow_allocate_resp_arrived *
@@ -209,8 +184,6 @@ application_register(struct application *application, int reg,
                      struct rina_name *application_name)
 {
     unsigned int ipcp_id;
-    struct rina_msg_base_resp *kresp;
-    int result;
 
     ipcp_id = select_ipcp_by_dif(&application->loop, dif_name, 1);
     if (ipcp_id == ~0U) {
@@ -219,13 +192,8 @@ application_register(struct application *application, int reg,
     }
 
     /* Forward the request to the kernel. */
-    kresp = application_register_req(application, 1, reg, ipcp_id,
-                                     application_name, &result);
-    if (kresp) {
-            rina_msg_free(rina_kernel_numtables, RMB(kresp));
-    }
-
-    return 0;
+    return application_register_req(application, 1, reg, ipcp_id,
+                                     application_name);
 }
 
 static int flow_allocate(struct application *application,

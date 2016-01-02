@@ -600,19 +600,10 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
 {
     struct rina_kmsg_application_register *req =
                     (struct rina_kmsg_application_register *)bmsg;
-    struct rina_msg_base_resp *resp;
     char *name_s = rina_name_to_string(&req->application_name);
     struct ipcp_entry *entry;
     int reg = req->msg_type == RINA_KERN_APPLICATION_REGISTER ? 1 : 0;
-    int ret;
-
-    /* Create the response message. */
-    resp = kmalloc(sizeof(*resp), GFP_KERNEL);
-    if (!resp) {
-        return -ENOMEM;
-    }
-
-    resp->result = 1;  /* Report failure by default. */
+    int ret = -EINVAL;  /* Report failure by default. */
 
     mutex_lock(&rina_dm.lock);
     /* Find the IPC process entry corresponding to req->ipcp_id. */
@@ -632,21 +623,10 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
                                             &req->application_name);
             }
         }
-        resp->result = (ret ? 1 : 0);  /* Report result. */
     }
     mutex_unlock(&rina_dm.lock);
 
-    resp->msg_type = reg ? RINA_KERN_APPLICATION_REGISTER_RESP
-                         : RINA_KERN_APPLICATION_UNREGISTER_RESP;
-    resp->event_id = req->event_id;
-
-    /* Enqueue the response into the upqueue. */
-    ret = rina_upqueue_append(rc, (struct rina_msg_base *)resp);
-    if (ret) {
-        goto err3;
-    }
-
-    if (resp->result == 0) {
+    if (ret == 0) {
         printk("%s: Application process %s %sregistered to IPC process %u\n",
                 __func__, name_s, (reg ? "" : "un"), req->ipcp_id);
     }
@@ -655,11 +635,6 @@ rina_application_register(struct rina_ctrl *rc, struct rina_msg_base *bmsg)
     }
 
     return 0;
-
-err3:
-    rina_msg_free(rina_kernel_numtables, (struct rina_msg_base *)resp);
-
-    return ret;
 }
 
 /* Code improvement: we may merge ipcp_table_find() and flow_table_find()
