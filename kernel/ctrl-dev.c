@@ -654,6 +654,82 @@ ipcp_application_del(struct ipcp_entry *ipcp,
     return 0;
 }
 
+static void
+application_del_by_rc(struct rlite_ctrl *rc)
+{
+    struct ipcp_entry *ipcp;
+    int bucket;
+    struct registered_appl *app;
+    struct registered_appl *tmp;
+    const char *s;
+    struct list_head remove_apps;
+
+    INIT_LIST_HEAD(&remove_apps);
+
+    PLOCK();
+
+    /* For each IPC processes. */
+    hash_for_each(rlite_dm.ipcp_table, bucket, ipcp, node) {
+        RALOCK(ipcp);
+
+        /* For each application registered to this IPC process. */
+        list_for_each_entry_safe(app, tmp,
+                &ipcp->registered_appls, node) {
+            if (app->rc == rc) {
+                if (app->refcnt == 1) {
+                    /* Just move the reference. */
+                    list_del(&app->node);
+                    list_add_tail(&app->node, &remove_apps);
+                } else {
+                    /* Do what ipcp_application_put() would do, but
+                     * without taking the regapp_lock. */
+                    app->refcnt--;
+                }
+            }
+        }
+
+        RAUNLOCK(ipcp);
+
+        /* If the control device to be deleted is an uipcp attached to
+         * this IPCP, detach it. */
+        if (ipcp->uipcp == rc) {
+            ipcp->uipcp = NULL;
+            PI("IPC process %u detached by uipcp %p\n",
+                   ipcp->id, rc);
+        }
+    }
+
+    PUNLOCK();
+
+    /* Remove the selected applications without holding locks (we are in
+     * process context here). */
+    list_for_each_entry_safe(app, tmp, &remove_apps, node) {
+        s = rina_name_to_string(&app->name);
+        PD("Application %s will be automatically "
+                "unregistered\n",  s);
+        kfree(s);
+
+        /* Notify userspace IPCP if required. */
+        if (app->ipcp->uipcp) {
+            struct rl_kmsg_appl_register ntfy;
+
+            ntfy.msg_type = RLITE_KER_APPL_REGISTER;
+            ntfy.event_id = 0;
+            ntfy.ipcp_id = app->ipcp->id;
+            ntfy.reg = false;
+            rina_name_move(&ntfy.appl_name, &app->name);
+            rlite_upqueue_append(app->ipcp->uipcp,
+                                (const struct rlite_msg_base *)&ntfy);
+            rina_name_move(&app->name, &ntfy.appl_name);
+            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                           RLITE_MB(&ntfy));
+        }
+
+        /* Remove. */
+        ipcp_application_put(app);
+    }
+}
+
 struct flow_entry *
 flow_get(rl_port_t port_id)
 {
@@ -940,82 +1016,6 @@ out:
     return ret;
 }
 EXPORT_SYMBOL(flow_put);
-
-static void
-application_del_by_rc(struct rlite_ctrl *rc)
-{
-    struct ipcp_entry *ipcp;
-    int bucket;
-    struct registered_appl *app;
-    struct registered_appl *tmp;
-    const char *s;
-    struct list_head remove_apps;
-
-    INIT_LIST_HEAD(&remove_apps);
-
-    PLOCK();
-
-    /* For each IPC processes. */
-    hash_for_each(rlite_dm.ipcp_table, bucket, ipcp, node) {
-        RALOCK(ipcp);
-
-        /* For each application registered to this IPC process. */
-        list_for_each_entry_safe(app, tmp,
-                &ipcp->registered_appls, node) {
-            if (app->rc == rc) {
-                if (app->refcnt == 1) {
-                    /* Just move the reference. */
-                    list_del(&app->node);
-                    list_add_tail(&app->node, &remove_apps);
-                } else {
-                    /* Do what ipcp_application_put() would do, but
-                     * without taking the regapp_lock. */
-                    app->refcnt--;
-                }
-            }
-        }
-
-        RAUNLOCK(ipcp);
-
-        /* If the control device to be deleted is an uipcp attached to
-         * this IPCP, detach it. */
-        if (ipcp->uipcp == rc) {
-            ipcp->uipcp = NULL;
-            PI("IPC process %u detached by uipcp %p\n",
-                   ipcp->id, rc);
-        }
-    }
-
-    PUNLOCK();
-
-    /* Remove the selected applications without holding locks (we are in
-     * process context here). */
-    list_for_each_entry_safe(app, tmp, &remove_apps, node) {
-        s = rina_name_to_string(&app->name);
-        PD("Application %s will be automatically "
-                "unregistered\n",  s);
-        kfree(s);
-
-        /* Notify userspace IPCP if required. */
-        if (app->ipcp->uipcp) {
-            struct rl_kmsg_appl_register ntfy;
-
-            ntfy.msg_type = RLITE_KER_APPL_REGISTER;
-            ntfy.event_id = 0;
-            ntfy.ipcp_id = app->ipcp->id;
-            ntfy.reg = false;
-            rina_name_move(&ntfy.appl_name, &app->name);
-            rlite_upqueue_append(app->ipcp->uipcp,
-                                (const struct rlite_msg_base *)&ntfy);
-            rina_name_move(&app->name, &ntfy.appl_name);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(&ntfy));
-        }
-
-        /* Remove. */
-        ipcp_application_put(app);
-    }
-}
 
 static void
 flow_rc_unbind(struct rlite_ctrl *rc)
