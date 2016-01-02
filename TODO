@@ -20,9 +20,7 @@
 
 - addr size non consistente (PCI/resto dello stack)
 
-- implementare list_for_each_entry_safe()
-
-- remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
+- [NOT VERIFIED] remove race condition that happens sometimes with ./gen.py -t inet4 -l3:
   getting ERR in the logs
 
 - add copy constructor to CDAPMessage class

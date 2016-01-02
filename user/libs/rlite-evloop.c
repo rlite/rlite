@@ -40,18 +40,17 @@ struct rlite_tmr_event {
 static void
 rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
 {
-    struct rlite_ipcp *rlite_ipcp;
-    struct list_head *elem;
+    struct rlite_ipcp *rlite_ipcp, *tmp;
 
     /* Purge the IPCPs list. */
 
-    while ((elem = list_pop_front(ipcps)) != NULL) {
-        rlite_ipcp = container_of(elem, struct rlite_ipcp, node);
+    list_for_each_entry_safe(rlite_ipcp, tmp, ipcps, node) {
         if (rlite_ipcp->dif_type) {
             free(rlite_ipcp->dif_type);
         }
         rina_name_free(&rlite_ipcp->ipcp_name);
         free(rlite_ipcp->dif_name);
+        list_del(&rlite_ipcp->node);
         free(rlite_ipcp);
     }
 }
@@ -59,13 +58,11 @@ rlite_ipcps_purge(struct rlite_evloop *loop, struct list_head *ipcps)
 static void
 rlite_flows_purge(struct rlite_evloop *loop, struct list_head *flows)
 {
-    struct rlite_flow *rlite_flow;
-    struct list_head *elem;
+    struct rlite_flow *rlite_flow, *tmp;
 
-    /* Purge the IPCPs list. */
-
-    while ((elem = list_pop_front(flows)) != NULL) {
-        rlite_flow = container_of(elem, struct rlite_flow, node);
+    /* Purge the flows list. */
+    list_for_each_entry_safe(rlite_flow, tmp, flows, node) {
+        list_del(&rlite_flow->node);
         free(rlite_flow);
     }
 }
@@ -893,12 +890,11 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
     {
         /* Clean up the fdcbs list. */
-        struct rlite_evloop_fdcb *fdcb;
-        struct list_head *elem;
+        struct rlite_evloop_fdcb *fdcb, *tmp;
 
         pthread_mutex_lock(&loop->lock);
-        while ((elem = list_pop_front(&loop->fdcbs))) {
-            fdcb = container_of(elem, struct rlite_evloop_fdcb, node);
+        list_for_each_entry_safe(fdcb, tmp, &loop->fdcbs, node) {
+            list_del(&fdcb->node);
             free(fdcb);
         }
         pthread_mutex_unlock(&loop->lock);
@@ -906,12 +902,11 @@ rlite_evloop_fini(struct rlite_evloop *loop)
 
     {
         /* Clean up the timer_events list. */
-        struct rlite_tmr_event *e;
-        struct list_head *elem;
+        struct rlite_tmr_event *e, *tmp;
 
         pthread_mutex_lock(&loop->timer_lock);
-        while ((elem = list_pop_front(&loop->timer_events))) {
-            e = container_of(elem, struct rlite_tmr_event, node);
+        list_for_each_entry_safe(e, tmp, &loop->timer_events, node) {
+            list_del(&e->node);
             free(e);
         }
         pthread_mutex_unlock(&loop->timer_lock);

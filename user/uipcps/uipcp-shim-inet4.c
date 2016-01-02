@@ -588,13 +588,12 @@ static int
 shim_inet4_fini(struct uipcp *uipcp)
 {
     struct shim_inet4 *shim = SHIM(uipcp);
-    struct list_head *elem;
 
     {
-        struct inet4_bindpoint *bp;
+        struct inet4_bindpoint *bp, *tmp;
 
-        while ((elem = list_pop_front(&shim->bindpoints))) {
-            bp = container_of(elem, struct inet4_bindpoint, node);
+        list_for_each_entry_safe(bp, tmp, &shim->bindpoints, node) {
+            list_del(&bp->node);
             close(bp->fd);
             free(bp->appl_name_s);
             free(bp);
@@ -602,10 +601,10 @@ shim_inet4_fini(struct uipcp *uipcp)
     }
 
     {
-        struct inet4_endpoint *ep;
+        struct inet4_endpoint *ep, *tmp;
 
-        while ((elem = list_pop_front(&shim->endpoints))) {
-            ep = container_of(elem, struct inet4_endpoint, node);
+        list_for_each_entry_safe(ep, tmp, &shim->endpoints, node) {
+            list_del(&ep->node);
             close(ep->fd);
             free(ep);
         }

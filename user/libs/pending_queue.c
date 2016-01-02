@@ -29,16 +29,16 @@ pending_queue_remove_by_event_id(struct list_head *list, uint32_t event_id)
 void
 pending_queue_fini(struct list_head *list)
 {
-    struct list_head *cur;
-    struct pending_entry *e;
+    struct pending_entry *e, *tmp;
 
-    for (;;) {
-        cur = list_pop_front(list);
-        if (cur) {
-            e = container_of(cur, struct pending_entry, node);
-            free(e);
-        } else {
-            break;
+    list_for_each_entry_safe(e, tmp, list, node) {
+        list_del(&e->node);
+        if (e->msg) {
+            free(e->msg);
         }
+        if (e->resp) {
+            free(e->resp);
+        }
+        free(e);
     }
 }

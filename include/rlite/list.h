@@ -69,13 +69,22 @@ list_del(struct list_head *elem)
         const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
         (type *)( (char *)__mptr - offsetof1(type,member) );})
 
-#define list_for_each_entry(_cur, _list, _member)                            \
-        for (_cur = container_of((_list)->succ, typeof(*_cur), _member);     \
-             &_cur->_member != (_list);                                      \
-            _cur = container_of(_cur->_member.succ, typeof(*_cur), _member))
-
 /* The list_first_entry() macro assumes a first entry exists. */
 #define list_first_entry(_list, _type, _member)                 \
             container_of((_list)->succ, _type, _member)
+
+#define list_next_entry(_cur, _member)  \
+            container_of((_cur)->_member.succ, typeof(*(_cur)), _member)
+
+#define list_for_each_entry(_cur, _list, _member)                            \
+        for (_cur = list_first_entry(_list, typeof(*_cur), _member);     \
+             &_cur->_member != (_list);                                      \
+            _cur = list_next_entry(_cur, _member))
+
+#define list_for_each_entry_safe(_cur, _tmp, _list, _member)                \
+        for (_cur = list_first_entry(_list, typeof(*_cur), _member),        \
+             _tmp = list_next_entry(_cur, _member); \
+             &_cur->_member != (_list);                                     \
+            _cur = _tmp, _tmp = list_next_entry(_tmp, _member))
 
 #endif  /* __TEMPLATE_LIST_H__ */
