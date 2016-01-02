@@ -117,12 +117,12 @@ rina_ipcp_register(struct uipcps *uipcps, int reg,
         return -1;
     }
 
-    if (uipcp->ops.ipcp_register) {
+    if (uipcp->ops.register_to_lower) {
         /* Perform a fetch to find out if shim IPCPs have been created,
          * deleted or configured from the last fetch. */
         rlite_ipcps_fetch(&uipcp->appl.loop);
 
-        result = uipcp->ops.ipcp_register(uipcp, reg, dif_name, ipcp_id,
+        result = uipcp->ops.register_to_lower(uipcp, reg, dif_name, ipcp_id,
                                           ipcp_name);
 
         if (result == 0) {
@@ -166,12 +166,12 @@ rina_conf_ipcp_enroll(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    if (uipcp->ops.ipcp_enroll) {
+    if (uipcp->ops.enroll) {
         /* Perform a fetch to find out if shim IPCPs have been created,
          * deleted or configured from the last fetch. */
         rlite_ipcps_fetch(&uipcp->appl.loop);
 
-        resp.result = uipcp->ops.ipcp_enroll(uipcp, req);
+        resp.result = uipcp->ops.enroll(uipcp, req);
     }
 
 out:
@@ -195,8 +195,8 @@ rina_conf_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    if (uipcp->ops.ipcp_dft_set) {
-        resp.result = uipcp->ops.ipcp_dft_set(uipcp, req);
+    if (uipcp->ops.dft_set) {
+        resp.result = uipcp->ops.dft_set(uipcp, req);
     }
 
 out:
@@ -259,8 +259,8 @@ rina_conf_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    if (uipcp->ops.ipcp_rib_show) {
-        resp.dump = uipcp->ops.ipcp_rib_show(uipcp);
+    if (uipcp->ops.rib_show) {
+        resp.dump = uipcp->ops.rib_show(uipcp);
         if (resp.dump) {
             resp.result = 0;
         }

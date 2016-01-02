@@ -37,16 +37,16 @@ struct uipcp_ops {
 
     int (*fini)(struct uipcp *);
 
-    int (*ipcp_register)(struct uipcp *uipcp, int reg,
+    int (*register_to_lower)(struct uipcp *uipcp, int reg,
                          const struct rina_name *dif_name,
                          unsigned int ipcp_id,
                          const struct rina_name *ipcp_name);
 
-    int (*ipcp_enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
+    int (*enroll)(struct uipcp *, struct rina_cmsg_ipcp_enroll *);
 
-    int (*ipcp_dft_set)(struct uipcp *, struct rina_cmsg_ipcp_dft_set *);
+    int (*dft_set)(struct uipcp *, struct rina_cmsg_ipcp_dft_set *);
 
-    char * (*ipcp_rib_show)(struct uipcp *);
+    char * (*rib_show)(struct uipcp *);
 
     int (*appl_register)(struct rlite_evloop *loop,
                          const struct rina_msg_base_resp *b_resp,

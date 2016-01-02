@@ -388,7 +388,7 @@ uipcp_rib::set_address(uint64_t address)
 }
 
 int
-uipcp_rib::ipcp_register(int reg, string lower_dif)
+uipcp_rib::register_to_lower(int reg, string lower_dif)
 {
     list<string>::iterator lit;
 
@@ -763,7 +763,7 @@ normal_ipcp_register(struct uipcp *uipcp, int reg,
 
     ScopeLock(uipcp->rib->lock);
 
-    result = uipcp->rib->ipcp_register(reg, name);
+    result = uipcp->rib->register_to_lower(reg, name);
 
     return result;
 }
@@ -788,10 +788,10 @@ struct uipcp_ops normal_ops = {
     .dif_type = "normal",
     .init = normal_init,
     .fini = normal_fini,
-    .ipcp_register = normal_ipcp_register,
-    .ipcp_enroll = normal_ipcp_enroll,
-    .ipcp_dft_set = normal_ipcp_dft_set,
-    .ipcp_rib_show = normal_ipcp_rib_show,
+    .register_to_lower = normal_ipcp_register,
+    .enroll = normal_ipcp_enroll,
+    .dft_set = normal_ipcp_dft_set,
+    .rib_show = normal_ipcp_rib_show,
     .appl_register = normal_appl_register,
     .fa_req = normal_fa_req,
     .fa_req_arrived = normal_fa_req_arrived,

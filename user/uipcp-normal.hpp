@@ -180,7 +180,7 @@ struct uipcp_rib {
     int del_neighbor(const RinaName& neigh_name);
     uint64_t dft_lookup(const RinaName& appl_name) const;
     int dft_set(const RinaName& appl_name, uint64_t remote_addr);
-    int ipcp_register(int reg, std::string lower_dif);
+    int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rina_kmsg_appl_register *req);
     int flow_deallocated(struct rina_kmsg_flow_deallocated *req);
     uint64_t lookup_neighbor_address(const RinaName& neigh_name) const;
