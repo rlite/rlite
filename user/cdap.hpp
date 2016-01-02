@@ -13,9 +13,9 @@ struct CDAPAuthValue {
     std::string password;
     std::string other;
 
-    bool empty() const { return name != std::string() ||
-                         password != std::string() ||
-                         other != std::string(); }
+    bool empty() const { return name == std::string() &&
+                         password == std::string() &&
+                         other == std::string(); }
 };
 
 class CDAPConn {

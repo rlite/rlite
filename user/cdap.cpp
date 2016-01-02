@@ -278,7 +278,7 @@ CDAPConn::put_invoke_id_remote(int invoke_id)
 
 CDAPMessage::CDAPMessage(gpb::opCode_t op_code_arg)
 {
-    abs_syntax = CDAP_ABS_SYNTAX;
+    abs_syntax = 0;
     auth_mech = gpb::AUTH_NONE;
     memset(&src_appl, 0, sizeof(src_appl));
     memset(&dst_appl, 0, sizeof(dst_appl));
@@ -828,6 +828,7 @@ CDAPConn::m_connect(int *invoke_id,
     struct CDAPMessage m(gpb::M_CONNECT);
     int ret;
 
+    m.abs_syntax = CDAP_ABS_SYNTAX;
     m.auth_mech = auth_mech;
     m.auth_value = *auth_value;
     ret = rina_name_copy(&m.src_appl, local_appl);
@@ -848,6 +849,7 @@ CDAPConn::m_connect_r(const struct CDAPMessage *req, int result,
     struct CDAPMessage m(gpb::M_CONNECT_R);
     int ret;
 
+    m.abs_syntax = CDAP_ABS_SYNTAX;
     m.auth_mech = req->auth_mech;
     m.auth_value = req->auth_value;
     ret = rina_name_copy(&m.src_appl, &req->dst_appl);
