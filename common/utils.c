@@ -648,6 +648,7 @@ flow_config_dump(const struct rlite_flow_config *c)
                 "   max_sdu_gap=%llu\n"
                 "   dtcp_present=%u\n"
                 "   dtcp.initial_a=%u\n"
+                "   dtcp.bandwidth=%u\n"
                 "   dtcp.flow_control=%u\n"
                 "   dtcp.rtx_control=%u\n",
                 c->partial_delivery,
@@ -656,6 +657,7 @@ flow_config_dump(const struct rlite_flow_config *c)
                 (long long unsigned)c->max_sdu_gap,
                 c->dtcp_present,
                 c->dtcp.initial_a,
+                c->dtcp.bandwidth,
                 c->dtcp.flow_control,
                 c->dtcp.rtx_control);
 

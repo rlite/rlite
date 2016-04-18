@@ -113,6 +113,12 @@ update_qos_cube(struct rlite_flow_config& flowcfg, const string& param,
         return 0;
     }
 
+    if (!parse_flowcfg_int(param, value, &field_int, "dtcp.bandwidth")) {
+        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp.bandwidth = field_int;
+        return 0;
+    }
+
     if (!parse_flowcfg_bool(param, value, &flowcfg.dtcp.flow_control,
                                                 "dtcp.flow_control")) {
         flowcfg.dtcp_present = 1;

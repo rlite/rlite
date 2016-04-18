@@ -152,6 +152,7 @@ struct dtcp_config {
     uint8_t rtx_control;
     struct rtx_config rtx;
     uint32_t initial_a;  /* A */
+    uint32_t bandwidth; /* in bps */
 } __attribute__((packed));
 
 struct rlite_flow_config {

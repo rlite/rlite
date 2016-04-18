@@ -342,6 +342,8 @@ uipcp_rib::dump() const
                 << "   dtcp_present=" << u82boolstr(c.dtcp_present) << endl
                 << "   dtcp.initial_a=" <<
                 static_cast<unsigned int>(c.dtcp.initial_a) << endl
+                << "   dtcp.bandwidth=" <<
+                static_cast<unsigned int>(c.dtcp.bandwidth) << endl
                 << "   dtcp.flow_control=" << u82boolstr(c.dtcp.flow_control)
                 << endl << "   dtcp.rtx_control=" <<
                 u82boolstr(c.dtcp.rtx_control) << endl;
