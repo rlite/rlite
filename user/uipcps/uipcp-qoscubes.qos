@@ -40,3 +40,10 @@ rel.dtcp.fc.initial_credit = 50
 rel.dtcp.rtx.max_time_to_retry = 15
 rel.dtcp.rtx.data_rxms_max = 15
 rel.dtcp.rtx.initial_tr = 10
+
+unrel20M.partial_delivery = false
+unrel20M.incomplete_delivery = false
+unrel20M.in_order_delivery = false
+unrel20M.max_sdu_gap = -1
+unrel20M.dtcp_present = true
+unrel20M.dtcp.bandwidth = 20000000
