@@ -151,6 +151,12 @@ struct upper_ref {
     struct ipcp_entry   *ipcp;
 };
 
+/* Support for token bucket traffic shaping. */
+struct tkbk {
+    ktime_t t_last_refill;
+    unsigned long bucket_size;
+};
+
 struct dtp {
     spinlock_t lock;
 
@@ -179,6 +185,7 @@ struct dtp {
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
     struct rlite_buf *rtx_tmr_next;
+    struct tkbk tkbk;
 #define DTP_F_DRF_SET		(1<<0)
 #define DTP_F_DRF_EXPECTED	(1<<1)
     uint8_t flags;

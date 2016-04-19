@@ -34,6 +34,7 @@
 #include <linux/hashtable.h>
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 
 
 #define PDUFT_HASHTABLE_BITS    3
@@ -249,8 +250,9 @@ rtx_tmr_cb(long unsigned arg)
 static int rlite_normal_sdu_rx_consumed(struct flow_entry *flow,
                                        struct rlite_buf *rb);
 
-#define RTX_MSECS_DEFAULT   1000
+#define RTX_MSECS_DEFAULT       1000
 #define DATA_RXMS_MAX_DEFAULT   10
+#define TKBK_INTVAL_MSEC        2
 
 static int
 rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
@@ -314,6 +316,13 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
         flow->sdu_rx_consumed = rlite_normal_sdu_rx_consumed;
         NPD("flow->sdu_rx_consumed set\n");
+    }
+
+    if (flow->cfg.dtcp.bandwidth) {
+        dtp->tkbk.t_last_refill = ktime_get();
+        /* Init bucket with TKBK_INTVAL_MSEC milliseconds worth of bandwidth. */
+        dtp->tkbk.bucket_size = ((flow->cfg.dtcp.bandwidth/8) *
+                                TKBK_INTVAL_MSEC) / 1000;
     }
 
     return 0;
@@ -468,6 +477,28 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
 
     if (dtcp_present) {
         mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
+    }
+
+    /* Token bucket traffic shaping. */
+    if (flow->cfg.dtcp.bandwidth) {
+        while (dtp->tkbk.bucket_size < rb->len) {
+            ktime_t now;
+            unsigned long us;
+
+            spin_unlock_bh(&dtp->lock);
+            msleep(TKBK_INTVAL_MSEC);
+            spin_lock_bh(&dtp->lock);
+
+            now = ktime_get();
+            us = ktime_to_us(ktime_sub(now, dtp->tkbk.t_last_refill));
+            if (dtp->tkbk.bucket_size < rb->len &&
+                                            us >= TKBK_INTVAL_MSEC * 1000) {
+                dtp->tkbk.bucket_size += ((flow->cfg.dtcp.bandwidth / 8) * us)
+                                                                    / 1000000;
+                dtp->tkbk.t_last_refill = now;
+            }
+        }
+        dtp->tkbk.bucket_size -= rb->len;
     }
 
     if (unlikely((fc->fc_type == RLITE_FC_T_WIN &&
