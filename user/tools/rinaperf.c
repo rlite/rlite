@@ -469,7 +469,7 @@ usage(void)
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
-        "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
+        "   -f QOSCUBENAME : specify QoS cube for this run\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
         "   -a APNAME : application process name of the rinaperf client\n"
