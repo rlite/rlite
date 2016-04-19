@@ -326,16 +326,16 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
          * the following holds
          *      B = R * M / 8000
          * If the bandwidth is large enough, we can choose M = TKBK_INTVAL_MSEC
-         * and B will be >= 1500. If B is not large enough, we choose a larger
-         * M, in such a way that B is can be approximately 1500.
+         * and will be B >= 250. If B is not large enough, we choose a larger
+         * M, in such a way that B is still 250.
          */
         if (flow->cfg.dtcp.bandwidth < 4000) {
             /* We don't accept to provide less than 4 Kbps, so that intval_ms
-             * can be always smaller than 3 seconds. */
+             * can be always <= 500 milliseconds. */
             flow->cfg.dtcp.bandwidth = 4000;
         }
-        if (flow->cfg.dtcp.bandwidth < (12000000 / TKBK_INTVAL_MSEC)) {
-            dtp->tkbk.intval_ms = (12000000) / flow->cfg.dtcp.bandwidth;
+        if (flow->cfg.dtcp.bandwidth < (2000000 / TKBK_INTVAL_MSEC)) {
+            dtp->tkbk.intval_ms = (2000000) / flow->cfg.dtcp.bandwidth;
         } else {
             dtp->tkbk.intval_ms = TKBK_INTVAL_MSEC;
         }
