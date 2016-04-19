@@ -319,10 +319,29 @@ rlite_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (flow->cfg.dtcp.bandwidth) {
+        /* With the following definitions:
+         *      R := requested bandwidth in bps
+         *      M := token bucket timer period in milliseconds
+         *      B := refill amount in bytes for each timer period
+         * the following holds
+         *      B = R * M / 8000
+         * If the bandwidth is large enough, we can choose M = TKBK_INTVAL_MSEC
+         * and B will be >= 1500. If B is not large enough, we choose a larger
+         * M, in such a way that B is can be approximately 1500.
+         */
+        if (flow->cfg.dtcp.bandwidth < 4000) {
+            /* We don't accept to provide less than 4 Kbps, so that intval_ms
+             * can be always smaller than 3 seconds. */
+            flow->cfg.dtcp.bandwidth = 4000;
+        }
+        if (flow->cfg.dtcp.bandwidth < (12000000 / TKBK_INTVAL_MSEC)) {
+            dtp->tkbk.intval_ms = (12000000) / flow->cfg.dtcp.bandwidth;
+        } else {
+            dtp->tkbk.intval_ms = TKBK_INTVAL_MSEC;
+        }
+        dtp->tkbk.bucket_size = (flow->cfg.dtcp.bandwidth *
+                                 dtp->tkbk.intval_ms) / 8000;
         dtp->tkbk.t_last_refill = ktime_get();
-        /* Init bucket with TKBK_INTVAL_MSEC milliseconds worth of bandwidth. */
-        dtp->tkbk.bucket_size = ((flow->cfg.dtcp.bandwidth/8) *
-                                TKBK_INTVAL_MSEC) / 1000;
     }
 
     return 0;
@@ -486,13 +505,13 @@ rlite_normal_sdu_write(struct ipcp_entry *ipcp,
             unsigned long us;
 
             spin_unlock_bh(&dtp->lock);
-            msleep(TKBK_INTVAL_MSEC);
+            msleep(dtp->tkbk.intval_ms);
             spin_lock_bh(&dtp->lock);
 
             now = ktime_get();
             us = ktime_to_us(ktime_sub(now, dtp->tkbk.t_last_refill));
             if (dtp->tkbk.bucket_size < rb->len &&
-                                            us >= TKBK_INTVAL_MSEC * 1000) {
+                                            us >= dtp->tkbk.intval_ms * 1000) {
                 dtp->tkbk.bucket_size += ((flow->cfg.dtcp.bandwidth / 8) * us)
                                                                     / 1000000;
                 dtp->tkbk.t_last_refill = now;

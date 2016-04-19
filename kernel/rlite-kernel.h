@@ -155,6 +155,7 @@ struct upper_ref {
 struct tkbk {
     ktime_t t_last_refill;
     unsigned long bucket_size;
+    unsigned long intval_ms;
 };
 
 struct dtp {
