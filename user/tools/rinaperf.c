@@ -318,34 +318,45 @@ perf_client(struct rinaperf *rp)
 }
 
 static void
-rate_print(unsigned long long *limit, struct timespec *ts,
-           unsigned long long bytes)
+rate_print(unsigned long long *bytes, unsigned long long *cnt,
+            unsigned long long *bytes_limit, struct timespec *ts)
 {
-        struct timespec now;
-        unsigned long long elapsed_ns;
-        double kpps;
-        double mbps;
+    struct timespec now;
+    unsigned long long elapsed_ns;
+    double kpps;
+    double mbps;
 
-        clock_gettime(CLOCK_MONOTONIC, &now);
+    clock_gettime(CLOCK_MONOTONIC, &now);
 
-        elapsed_ns = ((now.tv_sec - ts->tv_sec) * 1000000000 +
-                        now.tv_nsec - ts->tv_nsec);
-        kpps = ((1000000) * (double)*limit) / elapsed_ns;
-        mbps = ((8 * 1000) * (double)bytes) / elapsed_ns;
+    elapsed_ns = ((now.tv_sec - ts->tv_sec) * 1000000000 +
+                    now.tv_nsec - ts->tv_nsec);
+
+    kpps = ((1000000) * (double)*cnt) / elapsed_ns;
+    mbps = ((8 * 1000) * (double)*bytes) / elapsed_ns;
+
+    /* We don't want to prints which are too close. */
+    if (elapsed_ns > 500000000U) {
         printf("rate: %f Kpss, %f Mbps\n", kpps, mbps);
-        if (elapsed_ns < 1000000000U) {
-                *limit *= 2;
-        } else if (elapsed_ns > 3 * 1000000000U) {
-                *limit /= 2;
-        }
+    }
+
+    if (elapsed_ns < 1000000000U) {
+            *bytes_limit *= 2;
+    } else if (elapsed_ns > 3 * 1000000000U && *bytes >= 1000) {
+            *bytes_limit /= 2;
+    }
+
+    if (*bytes >= 1000) {
         clock_gettime(CLOCK_MONOTONIC, ts);
+        *cnt = 0;
+        *bytes = 0;
+    }
 }
 
 static int
 perf_server(struct rinaperf *rp)
 {
     unsigned long long rate_cnt = 0;
-    unsigned long long rate_cnt_limit = 10;
+    unsigned long long rate_bytes_limit = 1000;
     unsigned long long rate_bytes = 0;
     struct timespec rate_ts;
     char buf[SDU_SIZE_MAX];
@@ -387,11 +398,8 @@ perf_server(struct rinaperf *rp)
         rate_bytes += n;
         rate_cnt++;
 
-        if (rate_cnt == rate_cnt_limit) {
-            rate_print(&rate_cnt_limit, &rate_ts,
-                       rate_bytes);
-            rate_cnt = 0;
-            rate_bytes = 0;
+        if (rate_bytes >= rate_bytes_limit) {
+            rate_print(&rate_bytes, &rate_cnt, &rate_bytes_limit, &rate_ts);
         }
     }
 
