@@ -167,6 +167,13 @@ struct rlite_flow_config {
 
 struct rlite_flow_spec {
     char cubename[32];  /* This is just temporary. */
+    uint64_t max_sdu_gap;       /* in SDUs */
+    uint64_t avg_bandwidth;     /* in bits per second */
+    uint32_t max_delay;         /* in microseconds */
+    uint32_t max_jitter;        /* in microseconds */
+    uint8_t in_order_delivery;  /* boolean */
+
+    uint8_t flow_control;       /* temporary, for debugging */
 };
 
 struct rl_flow_stats {

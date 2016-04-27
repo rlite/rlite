@@ -358,6 +358,12 @@ rl_flow_spec_default(struct rlite_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
     strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
+    spec->max_sdu_gap = -1;         /* unbounded allowed gap */
+    spec->avg_bandwidth = 0;        /* don't care about bandwidth */
+    spec->max_delay = 0;            /* don't care about delay */
+    spec->max_jitter = 0;           /* don't care about jitter */
+    spec->in_order_delivery = 0;    /* don't require that */
+    spec->flow_control = 0;         /* no flow control */
 }
 
 /* This is used by uipcp, not by applications. */

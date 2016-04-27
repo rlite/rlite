@@ -25,15 +25,18 @@
 using namespace std;
 
 
+/* Translate a local flow configuration into the standard
+ * representation to be used in the FlowRequest CDAP
+ * message. */
 static void
 flowcfg2policies(const struct rlite_flow_config *cfg,
-                 QosSpec &q,
-                 ConnPolicies& p)
+                 QosSpec &q, ConnPolicies& p)
 {
     q.partial_delivery = cfg->partial_delivery;
     /* req->flowcfg.incomplete_delivery ? */
     q.in_order_delivery = cfg->in_order_delivery;
     q.max_sdu_gap = cfg->max_sdu_gap;
+    q.avg_bw = cfg->dtcp.bandwidth;
 
     p.dtcp_present = cfg->dtcp_present;
     p.initial_a_timer = cfg->dtcp.initial_a; /* mismatch... */
@@ -63,14 +66,16 @@ flowcfg2policies(const struct rlite_flow_config *cfg,
                         cfg->dtcp.rtx.initial_tr;
 }
 
+/* Translate a standard flow policies specification from FlowRequest
+ * CDAP message into a local flow configuration. */
 static void
 policies2flowcfg(struct rlite_flow_config *cfg,
-                 const QosSpec &q,
-                 const ConnPolicies& p)
+                 const QosSpec &q, const ConnPolicies& p)
 {
     cfg->partial_delivery = q.partial_delivery;
-     cfg->in_order_delivery = q.in_order_delivery;
+    cfg->in_order_delivery = q.in_order_delivery;
     cfg->max_sdu_gap = q.max_sdu_gap;
+    cfg->dtcp.bandwidth = q.avg_bw;
 
     cfg->dtcp_present = p.dtcp_present;
     cfg->dtcp.initial_a = p.initial_a_timer;
@@ -97,6 +102,45 @@ policies2flowcfg(struct rlite_flow_config *cfg,
     cfg->dtcp.rtx.data_rxms_max =
                         p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max;
     cfg->dtcp.rtx.initial_tr = p.dtcp_cfg.rtx_ctrl_cfg.initial_tr;
+}
+
+static void
+flowspec2flowcfg(struct rlite_flow_spec *spec, struct rlite_flow_config *cfg)
+{
+    memset(cfg, 0, sizeof(*cfg));
+
+    cfg->max_sdu_gap = spec->max_sdu_gap;
+    cfg->in_order_delivery = spec->in_order_delivery;
+    cfg->dtcp.bandwidth = spec->avg_bandwidth;
+
+    if (spec->max_sdu_gap == 0) {
+        /* We need retransmission control. */
+        cfg->dtcp_present = 1;
+        cfg->in_order_delivery = 1;
+        cfg->dtcp.initial_a = 10;
+        cfg->dtcp.rtx_control = 1;
+        cfg->dtcp.rtx.max_time_to_retry = 15;
+        cfg->dtcp.rtx.data_rxms_max = 15;
+        cfg->dtcp.rtx.initial_tr = 10;
+    }
+
+    /* Delay and jitter ignored for now. */
+    (void)spec->max_delay;
+    (void)spec->max_jitter;
+
+    if (spec->flow_control) {
+        /* This is temporary used to test flow control */
+        cfg->dtcp_present = 1;
+        cfg->dtcp.initial_a = 10;
+        cfg->dtcp.flow_control = 1;
+        cfg->dtcp.fc.cfg.w.max_cwq_len = 100;
+        cfg->dtcp.fc.cfg.w.initial_credit = 60;
+        cfg->dtcp.fc.fc_type = RLITE_FC_T_WIN;
+    }
+
+    if (spec->avg_bandwidth) {
+        cfg->dtcp_present = 1;
+    }
 }
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
@@ -141,18 +185,23 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     freq.cur_conn_idx = 0;
     freq.state = true;
 
-    /* Translate the flow specification into a QoSCube.
-     * For now this is accomplished by just specifying the
-     * QoSCube name in the flow specification. */
-    cubename = string(req->flowspec.cubename);
-    qcmi = qos_cubes.find(cubename);
-    if (qcmi == qos_cubes.end()) {
-        UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
-           cubename.c_str());
-        rl_flow_cfg_default(&flowcfg);
+    if (0) {
+        /* Translate the flow specification into a local flow configuration. */
+        flowspec2flowcfg(&req->flowspec, &flowcfg);
     } else {
-        flowcfg = qcmi->second;
-        UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());
+        /* Translate the flow specification into a local flow configuration.
+         * For now this is accomplished by just specifying the
+         * QoSCube name in the flow specification. */
+        cubename = string(req->flowspec.cubename);
+        qcmi = qos_cubes.find(cubename);
+        if (qcmi == qos_cubes.end()) {
+            UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
+                    cubename.c_str());
+            rl_flow_cfg_default(&flowcfg);
+        } else {
+            flowcfg = qcmi->second;
+            UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());
+        }
     }
 
     flowcfg2policies(&flowcfg, freq.qos, freq.policies);
