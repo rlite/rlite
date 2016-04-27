@@ -462,6 +462,39 @@ sigint_handler(int signum)
 }
 
 static void
+parse_bandwidth(struct rlite_flow_spec *spec, const char *arg)
+{
+    size_t arglen = strlen(arg);
+
+    if (arglen < 2) {
+        goto err;
+    }
+
+    spec->avg_bandwidth = 1;
+    switch (arg[arglen-1]) {
+        case 'G':
+            spec->avg_bandwidth *= 1000;
+        case 'M':
+            spec->avg_bandwidth *= 1000;
+        case 'K':
+            spec->avg_bandwidth *= 1000;
+            break;
+        default:
+            if (arg[arglen-1] < '0' || arg[arglen-1] > '9') {
+                goto err;
+            }
+            break;
+    }
+
+    spec->avg_bandwidth *= strtoul(arg, NULL, 10);
+    PI("Parsed bandwidth %llu\n", (long long unsigned)spec->avg_bandwidth);
+
+    return;
+err:
+    PE("Invalid bandwidth format '%s'\n", arg);
+}
+
+static void
 usage(void)
 {
     printf("rinaperf [OPTIONS]\n"
@@ -477,7 +510,9 @@ usage(void)
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
-        "   -f QOSCUBENAME : specify QoS cube for this run\n"
+        "   -g NUM : max SDU gap to use for the data flow\n"
+        "   -B NUM : average bandwitdh for the data flow, in bits per second\n"
+        "   -f : enable flow control\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
         "   -a APNAME : application process name of the rinaperf client\n"
@@ -514,7 +549,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rl_flow_spec_default(&flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:a:A:z:Z:x")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:B:g:fb:a:A:z:Z:x")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -564,9 +599,16 @@ main(int argc, char **argv)
                 }
                 break;
 
-            case 'f':
-                /* Set the flow specification. */
-                strncpy(flowspec.cubename, optarg, sizeof(flowspec.cubename));
+            case 'g': /* Set max_sdu_gap flow specification parameter. */
+                flowspec.max_sdu_gap = atoll(optarg);
+                break;
+
+            case 'B': /* Set the average bandwidth parameter. */
+                parse_bandwidth(&flowspec, optarg);
+                break;
+
+            case 'f': /* Enable flow control. */
+                flowspec.flow_control = 1;
                 break;
 
             case 'b':
