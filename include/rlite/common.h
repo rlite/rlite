@@ -166,7 +166,6 @@ struct rlite_flow_config {
 } __attribute__((packed));
 
 struct rlite_flow_spec {
-    char cubename[32];  /* This is just temporary. */
     uint64_t max_sdu_gap;       /* in SDUs */
     uint64_t avg_bandwidth;     /* in bits per second */
     uint32_t max_delay;         /* in microseconds */

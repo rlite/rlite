@@ -357,7 +357,6 @@ void
 rl_flow_spec_default(struct rlite_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
-    strncpy(spec->cubename, "unrel", sizeof(spec->cubename));
     spec->max_sdu_gap = -1;         /* unbounded allowed gap */
     spec->avg_bandwidth = 0;        /* don't care about bandwidth */
     spec->max_delay = 0;            /* don't care about delay */
