@@ -21,5 +21,9 @@ target_link_libraries(rlite-uipcps rlite rlite-evloop uipcp-normal)
 
 # Installation directives
 install(TARGETS rlite-uipcps DESTINATION usr/bin)
-install(FILES uipcp-qoscubes.qos shim-inet4-dir DESTINATION etc/rlite)
+install(FILES shim-inet4-dir DESTINATION etc/rlite)
+
+if (USE_QOS_CUBES)
+    install(FILES uipcp-qoscubes.qos DESTINATION etc/rlite)
+endif()
 
