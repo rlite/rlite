@@ -240,8 +240,10 @@ struct uipcp_rib {
     std::map< std::string, FlowRequest > flow_reqs;
     std::map< unsigned int, FlowRequest > flow_reqs_tmp;
 
+#ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */
     std::map< std::string, struct rlite_flow_config > qos_cubes;
+#endif /* RL_USE_QOS_CUBES */
 
     /* Timer ID for age increment of LFDB entries. */
     int age_incr_tmrid;
@@ -297,7 +299,9 @@ struct uipcp_rib {
     int flows_handler_delete(const CDAPMessage *rm);
 
 private:
+#ifdef RL_USE_QOS_CUBES
     int load_qos_cubes(const char *);
+#endif /* RL_USE_QOS_CUBES */
 
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;

@@ -272,10 +272,12 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
         throw std::exception();
     }
 
+#ifdef RL_USE_QOS_CUBES
     if (load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos")) {
         close(mgmtfd);
         throw std::exception();
     }
+#endif /* RL_USE_QOS_CUBES */
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -327,6 +329,7 @@ uipcp_rib::dump() const
     stringstream ss;
     struct rl_ipcp *ipcp = ipcp_info();
 
+#ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
     for (map<string, struct rlite_flow_config>::const_iterator
                     i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
@@ -370,6 +373,7 @@ uipcp_rib::dump() const
                 static_cast<unsigned int>(c.dtcp.rtx.initial_tr) << endl;
             ss << "}" << endl;
     }
+#endif /* RL_USE_QOS_CUBES */
 
     ss << "Address: " << ipcp->addr << endl << endl;
 

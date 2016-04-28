@@ -26,6 +26,8 @@
 using namespace std;
 
 
+#ifdef RL_USE_QOS_CUBES
+
 /* Helper function that emulates Python's str.strip(). */
 static void
 string_strip(string& s)
@@ -190,6 +192,7 @@ update_qos_cube(struct rlite_flow_config& flowcfg, const string& param,
 
     return -1;
 }
+
 int
 uipcp_rib::load_qos_cubes(const char *filename)
 {
@@ -240,4 +243,4 @@ uipcp_rib::load_qos_cubes(const char *filename)
 
     return 0;
 }
-
+#endif /* RL_USE_QOS_CUBES */

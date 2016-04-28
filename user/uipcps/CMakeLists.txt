@@ -1,3 +1,8 @@
+option(USE_QOS_CUBES, "Use obsolete static QoS cubes, specified by configuration file" OFF)
+if (USE_QOS_CUBES)
+    add_definitions(-D RL_USE_QOS_CUBES)
+endif()
+
 file(GLOB UIPCP_GPB_PROTOFILES "uipcp-gpb/*.proto")
 
 # Protocol buffer processing

@@ -104,6 +104,7 @@ policies2flowcfg(struct rlite_flow_config *cfg,
     cfg->dtcp.rtx.initial_tr = p.dtcp_cfg.rtx_ctrl_cfg.initial_tr;
 }
 
+#ifndef RL_USE_QOS_CUBES
 static void
 flowspec2flowcfg(struct rlite_flow_spec *spec, struct rlite_flow_config *cfg)
 {
@@ -142,6 +143,7 @@ flowspec2flowcfg(struct rlite_flow_spec *spec, struct rlite_flow_config *cfg)
         cfg->dtcp_present = 1;
     }
 }
+#endif  /* RL_USE_QOS_CUBES */
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
@@ -155,7 +157,6 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     stringstream obj_name;
     string cubename;
     struct rlite_flow_config flowcfg;
-    map<string, struct rlite_flow_config>::iterator qcmi;
     int ret;
 
     ret = dft_lookup(dest_appl, remote_addr);
@@ -185,24 +186,26 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     freq.cur_conn_idx = 0;
     freq.state = true;
 
-    if (0) {
-        /* Translate the flow specification into a local flow configuration. */
-        flowspec2flowcfg(&req->flowspec, &flowcfg);
+#ifndef RL_USE_QOS_CUBES
+    /* Translate the flow specification into a local flow configuration. */
+    flowspec2flowcfg(&req->flowspec, &flowcfg);
+#else  /* RL_USE_QOS_CUBES */
+    map<string, struct rlite_flow_config>::iterator qcmi;
+
+    /* Translate the flow specification into a local flow configuration.
+     * For now this is accomplished by just specifying the
+     * QoSCube name in the flow specification. */
+    cubename = string(req->flowspec.cubename);
+    qcmi = qos_cubes.find(cubename);
+    if (qcmi == qos_cubes.end()) {
+        UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
+                cubename.c_str());
+        rl_flow_cfg_default(&flowcfg);
     } else {
-        /* Translate the flow specification into a local flow configuration.
-         * For now this is accomplished by just specifying the
-         * QoSCube name in the flow specification. */
-        cubename = string(req->flowspec.cubename);
-        qcmi = qos_cubes.find(cubename);
-        if (qcmi == qos_cubes.end()) {
-            UPI(uipcp, "Cannot find QoSCube '%s': Using default flow configuration\n",
-                    cubename.c_str());
-            rl_flow_cfg_default(&flowcfg);
-        } else {
-            flowcfg = qcmi->second;
-            UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());
-        }
+        flowcfg = qcmi->second;
+        UPI(uipcp, "QoSCube '%s' selected\n", qcmi->first.c_str());
     }
+#endif /* RL_USE_QOS_CUBES */
 
     flowcfg2policies(&flowcfg, freq.qos, freq.policies);
 
