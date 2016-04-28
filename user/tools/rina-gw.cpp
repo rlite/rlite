@@ -705,7 +705,11 @@ accept_inet_conn(struct rlite_evloop *loop, int lfd)
         return;
     }
 
-    strcpy(flowspec.cubename, "rel");
+    /* Ask for a reliable flow. */
+    rl_flow_spec_default(&flowspec);
+    flowspec.max_sdu_gap = 0;
+    flowspec.flow_control = 1;
+
     event_id = rl_ctrl_get_id(&loop->ctrl);
 
     /* Issue a non-blocking flow allocation request. */

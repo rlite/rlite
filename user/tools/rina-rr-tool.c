@@ -198,11 +198,11 @@ usage(void)
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
-        "   -f CONFIG_ENTRY[=VALUE] : set a flow config variable for this run\n"
         "   -a APNAME : application process name of the rlite_rr client\n"
         "   -A APNAME : application process instance of the rlite_rr client\n"
         "   -z APNAME : application process name of the rlite_rr server\n"
         "   -Z APNAME : application process instance of the rlite_rr server\n"
+        "   -g NUM : max SDU gap to use for the data flow\n"
           );
 }
 
@@ -223,7 +223,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rl_flow_spec_default(&rr.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:f:b:a:A:z:Z:x")) != -1) {
+    while ((opt = getopt(argc, argv, "hl:d:p:P:a:A:z:Z:g:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -245,11 +245,6 @@ main(int argc, char **argv)
                 ipcp_api = optarg;
                 break;
 
-            case 'f':
-                /* Set the flow specification. */
-                strncpy(rr.flowspec.cubename, optarg, sizeof(rr.flowspec.cubename));
-                break;
-
             case 'a':
                 cli_appl_apn = optarg;
                 break;
@@ -264,6 +259,10 @@ main(int argc, char **argv)
 
             case 'Z':
                 srv_appl_api = optarg;
+                break;
+
+            case 'g': /* Set max_sdu_gap flow specification parameter. */
+                rr.flowspec.max_sdu_gap = atoll(optarg);
                 break;
 
             default:
