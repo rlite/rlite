@@ -62,14 +62,14 @@ typedef uint16_t rl_msg_t;
 #define RLITE_ERR   1
 
 /* All the possible messages begin like this. */
-struct rlite_msg_base {
+struct rl_msg_base {
     rl_msg_t msg_type;
     uint32_t event_id;
 } __attribute__((packed));
 
 /* A simple response message layout that can be shared by many
  * different types. */
-struct rlite_msg_base_resp {
+struct rl_msg_base_resp {
     rl_msg_t msg_type;
     uint32_t event_id;
 
@@ -77,17 +77,17 @@ struct rlite_msg_base_resp {
 } __attribute__((packed));
 
 /* Some useful macros for casting. */
-#define RLITE_MB(m) (struct rlite_msg_base *)(m)
-#define RLITE_MBR(m) (struct rlite_msg_base_resp *)(m)
+#define RLITE_MB(m) (struct rl_msg_base *)(m)
+#define RLITE_MBR(m) (struct rl_msg_base_resp *)(m)
 
 /* Bind the flow identified by port_id to
- * this rlite_io device. */
+ * this rl_io device. */
 #define RLITE_IO_MODE_APPL_BIND    86
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
 #define RLITE_IO_MODE_IPCP_MGMT    88
 
-struct rlite_ioctl_info {
+struct rl_ioctl_info {
     uint8_t mode;
     rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
@@ -109,7 +109,7 @@ struct rlite_ioctl_info {
  * When reading a management SDU, the header will contain the local port
  * where the SDU was received and the source (remote) address that sent it.
  */
-struct rlite_mgmt_hdr {
+struct rl_mgmt_hdr {
     uint8_t type;
     rl_port_t local_port;
     rl_addr_t remote_addr;
@@ -155,7 +155,7 @@ struct dtcp_config {
     uint32_t bandwidth; /* in bps */
 } __attribute__((packed));
 
-struct rlite_flow_config {
+struct rl_flow_config {
     uint8_t partial_delivery;
     uint8_t incomplete_delivery;
     uint8_t in_order_delivery;
@@ -165,7 +165,7 @@ struct rlite_flow_config {
     int32_t fd;  /* Currently used but shim-inet4. */
 } __attribute__((packed));
 
-struct rlite_flow_spec {
+struct rl_flow_spec {
     uint64_t max_sdu_gap;       /* in SDUs */
     uint64_t avg_bandwidth;     /* in bits per second */
     uint32_t max_delay;         /* in microseconds */

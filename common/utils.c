@@ -196,9 +196,9 @@ deserialize_rina_name(const void **pptr, struct rina_name *name)
 }
 
 unsigned int
-rlite_msg_serlen(struct rlite_msg_layout *numtables,
+rl_msg_serlen(struct rl_msg_layout *numtables,
                 size_t num_entries,
-                const struct rlite_msg_base *msg)
+                const struct rl_msg_base *msg)
 {
     unsigned int ret;
     struct rina_name *name;
@@ -231,12 +231,12 @@ rlite_msg_serlen(struct rlite_msg_layout *numtables,
 
     return ret;
 }
-COMMON_EXPORT(rlite_msg_serlen);
+COMMON_EXPORT(rl_msg_serlen);
 
 /* Serialize msg into serbuf. */
 unsigned int
-serialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
-                   void *serbuf, const struct rlite_msg_base *msg)
+serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
+                   void *serbuf, const struct rl_msg_base *msg)
 {
     void *serptr = serbuf;
     unsigned int serlen;
@@ -279,11 +279,11 @@ COMMON_EXPORT(serialize_rlite_msg);
 
 /* Deserialize from serbuf into msgbuf. */
 int
-deserialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
+deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
                      const void *serbuf, unsigned int serbuf_len,
                      void *msgbuf, unsigned int msgbuf_len)
 {
-    struct rlite_msg_base *bmsg = RLITE_MB(serbuf);
+    struct rl_msg_base *bmsg = RLITE_MB(serbuf);
     struct rina_name *name;
     string_t *str;
     struct rl_buf_field *bf;
@@ -332,8 +332,8 @@ deserialize_rlite_msg(struct rlite_msg_layout *numtables, size_t num_entries,
 COMMON_EXPORT(deserialize_rlite_msg);
 
 void
-rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
-              struct rlite_msg_base *msg)
+rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
+              struct rl_msg_base *msg)
 {
     unsigned int copylen = numtables[msg->msg_type].copylen;
     struct rina_name *name;
@@ -360,9 +360,9 @@ rlite_msg_free(struct rlite_msg_layout *numtables, size_t num_entries,
         }
     }
 }
-COMMON_EXPORT(rlite_msg_free);
+COMMON_EXPORT(rl_msg_free);
 
-unsigned int rlite_numtables_max_size(struct rlite_msg_layout *numtables,
+unsigned int rl_numtables_max_size(struct rl_msg_layout *numtables,
                                      unsigned int n)
 {
     unsigned int max = 0;
@@ -635,7 +635,7 @@ rina_name_valid(const struct rina_name *name)
 COMMON_EXPORT(rina_name_valid);
 
 void
-flow_config_dump(const struct rlite_flow_config *c)
+flow_config_dump(const struct rl_flow_config *c)
 {
     if (!c) {
         return;

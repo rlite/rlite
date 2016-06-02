@@ -282,7 +282,7 @@ struct FlowRequest : public UipcpObject {
 
      /* Local storage. */
     int invoke_id;
-    struct rlite_flow_config flowcfg;
+    struct rl_flow_config flowcfg;
     bool initiator;  /* Was me the initiator? */
     /* End of local storage. */
 

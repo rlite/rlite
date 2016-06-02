@@ -38,7 +38,7 @@
 #include <net/sock.h>
 
 
-struct rlite_shim_inet4 {
+struct rl_shim_inet4 {
     struct ipcp_entry *ipcp;
     struct work_struct txw;
     spinlock_t txq_lock;
@@ -53,7 +53,7 @@ struct shim_inet4_flow {
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
 
-    struct rlite_buf *cur_rx_rb;
+    struct rl_buf *cur_rx_rb;
     uint16_t cur_rx_rblen;
     int cur_rx_buflen;
     bool cur_rx_hdr;
@@ -65,7 +65,7 @@ struct shim_inet4_flow {
 #define INET4_MAX_TXQ_LEN     64
 
 struct txq_entry {
-    struct rlite_buf *rb;
+    struct rl_buf *rb;
     struct shim_inet4_flow *flow_priv;
     struct list_head node;
 };
@@ -73,9 +73,9 @@ struct txq_entry {
 static void inet4_tx_worker(struct work_struct *w);
 
 static void *
-rlite_shim_inet4_create(struct ipcp_entry *ipcp)
+rl_shim_inet4_create(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_inet4 *priv;
+    struct rl_shim_inet4 *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -95,9 +95,9 @@ rlite_shim_inet4_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rlite_shim_inet4_destroy(struct ipcp_entry *ipcp)
+rl_shim_inet4_destroy(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_inet4 *priv = ipcp->priv;
+    struct rl_shim_inet4 *priv = ipcp->priv;
 
     kfree(priv);
 
@@ -160,7 +160,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
                 PE("Warning: zero lenght packet\n");
             } else {
                 priv->cur_rx_hdr = false;
-                priv->cur_rx_rb = rlite_buf_alloc(priv->cur_rx_rblen,
+                priv->cur_rx_rb = rl_buf_alloc(priv->cur_rx_rblen,
                                                   priv->flow->txrx.ipcp->depth,
                                                   GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
@@ -175,7 +175,7 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
         } else if (!priv->cur_rx_hdr && priv->cur_rx_buflen ==
                                             priv->cur_rx_rblen) {
             /* We have completely read the SDU. */
-            rlite_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
+            rl_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
 
             flow->stats.rx_pkt++;
             flow->stats.rx_byte += priv->cur_rx_rblen;
@@ -216,11 +216,11 @@ inet4_write_space(struct sock *sk)
 {
     struct shim_inet4_flow *priv = sk->sk_user_data;
 
-    rlite_write_restart_flow(priv->flow);
+    rl_write_restart_flow(priv->flow);
 }
 
 static int
-rlite_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rl_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct shim_inet4_flow *priv;
     struct socket *sock;
@@ -279,7 +279,7 @@ rlite_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-rlite_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
+rl_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
                                  struct flow_entry *flow)
 {
     struct shim_inet4_flow *priv = flow->priv;
@@ -313,7 +313,7 @@ rlite_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 
 static int
 inet4_xmit(struct shim_inet4_flow *flow_priv,
-           struct rlite_buf *rb)
+           struct rl_buf *rb)
 {
     struct msghdr msghdr;
     struct iovec iov[2];
@@ -360,7 +360,7 @@ inet4_xmit(struct shim_inet4_flow *flow_priv,
         spin_unlock_bh(&flow_priv->txstats_lock);
     }
 
-    rlite_buf_free(rb);
+    rl_buf_free(rb);
 
     return ret;
 }
@@ -368,8 +368,8 @@ inet4_xmit(struct shim_inet4_flow *flow_priv,
 static void
 inet4_tx_worker(struct work_struct *w)
 {
-    struct rlite_shim_inet4 *priv =
-            container_of(w, struct rlite_shim_inet4, txw);
+    struct rl_shim_inet4 *priv =
+            container_of(w, struct rl_shim_inet4, txw);
     int totlen;
 
     for (;;) {
@@ -392,7 +392,7 @@ inet4_tx_worker(struct work_struct *w)
         if (sk_stream_wspace(qe->flow_priv->sock->sk) < totlen + 2) {
             /* Cannot backpressure here, we have to drop */
             RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
-            rlite_buf_free(qe->rb);
+            rl_buf_free(qe->rb);
         } else {
             inet4_xmit(qe->flow_priv, qe->rb);
         }
@@ -403,12 +403,12 @@ inet4_tx_worker(struct work_struct *w)
 }
 
 static int
-rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
+rl_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
-                      struct rlite_buf *rb, bool maysleep)
+                      struct rl_buf *rb, bool maysleep)
 {
     struct shim_inet4_flow *flow_priv = flow->priv;
-    struct rlite_shim_inet4 *shim = ipcp->priv;
+    struct rl_shim_inet4 *shim = ipcp->priv;
     int totlen = rb->len + sizeof(uint16_t);
 
     if (sk_stream_wspace(flow_priv->sock->sk) < totlen + 2) {
@@ -421,7 +421,7 @@ rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
         bool drop = false;
 
         if (unlikely(!qe)) {
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             PE("Out of memory, dropping packet\n");
             return -ENOMEM;
         }
@@ -440,7 +440,7 @@ rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
 
         if (drop) {
             NPD(5, "Queue full, dropping PDU [len=%u]\n", rb->len);
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             return -ENOSPC;
         }
 
@@ -453,10 +453,10 @@ rlite_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
+rl_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
                        const char *param_value)
 {
-    struct rlite_shim_inet4 *priv = (struct rlite_shim_inet4 *)ipcp->priv;
+    struct rl_shim_inet4 *priv = (struct rl_shim_inet4 *)ipcp->priv;
     int ret = -EINVAL;
 
     (void)priv;
@@ -465,7 +465,7 @@ rlite_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
-rlite_shim_inet4_flow_get_stats(struct flow_entry *flow,
+rl_shim_inet4_flow_get_stats(struct flow_entry *flow,
                                 struct rl_flow_stats *stats)
 {
     struct shim_inet4_flow *priv = flow->priv;
@@ -483,30 +483,30 @@ static struct ipcp_factory shim_inet4_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .use_cep_ids = false,
-    .create = rlite_shim_inet4_create,
-    .ops.destroy = rlite_shim_inet4_destroy,
+    .create = rl_shim_inet4_create,
+    .ops.destroy = rl_shim_inet4_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rlite_shim_inet4_flow_init,
-    .ops.flow_deallocated = rlite_shim_inet4_flow_deallocated,
-    .ops.sdu_write = rlite_shim_inet4_sdu_write,
-    .ops.config = rlite_shim_inet4_config,
-    .ops.flow_get_stats = rlite_shim_inet4_flow_get_stats,
+    .ops.flow_init = rl_shim_inet4_flow_init,
+    .ops.flow_deallocated = rl_shim_inet4_flow_deallocated,
+    .ops.sdu_write = rl_shim_inet4_sdu_write,
+    .ops.config = rl_shim_inet4_config,
+    .ops.flow_get_stats = rl_shim_inet4_flow_get_stats,
 };
 
 static int __init
-rlite_shim_inet4_init(void)
+rl_shim_inet4_init(void)
 {
-    return rlite_ipcp_factory_register(&shim_inet4_factory);
+    return rl_ipcp_factory_register(&shim_inet4_factory);
 }
 
 static void __exit
-rlite_shim_inet4_fini(void)
+rl_shim_inet4_fini(void)
 {
-    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rlite_shim_inet4_init);
-module_exit(rlite_shim_inet4_fini);
+module_init(rl_shim_inet4_init);
+module_exit(rl_shim_inet4_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

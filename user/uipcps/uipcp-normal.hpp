@@ -242,7 +242,7 @@ struct uipcp_rib {
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */
-    std::map< std::string, struct rlite_flow_config > qos_cubes;
+    std::map< std::string, struct rl_flow_config > qos_cubes;
 #endif /* RL_USE_QOS_CUBES */
 
     /* Timer ID for age increment of LFDB entries. */
@@ -327,7 +327,7 @@ int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           const struct rina_name *neigh_name,
                           rl_port_t neigh_port_id, int neigh_fd);
 
-void age_incr_cb(struct rlite_evloop *loop, void *arg);
+void age_incr_cb(struct rl_evloop *loop, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 

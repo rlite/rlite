@@ -39,17 +39,17 @@
 #include <linux/spinlock.h>
 
 
-struct rlite_ctrl;
+struct rl_ctrl;
 
 /* The signature of a message handler. */
-typedef int (*rlite_msg_handler_t)(struct rlite_ctrl *rc,
-                                   struct rlite_msg_base *bmsg);
+typedef int (*rl_msg_handler_t)(struct rl_ctrl *rc,
+                                   struct rl_msg_base *bmsg);
 
 /* Data structure associated to the /dev/rlite file descriptor. */
-struct rlite_ctrl {
+struct rl_ctrl {
     char msgbuf[1024];
 
-    rlite_msg_handler_t *handlers;
+    rl_msg_handler_t *handlers;
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -72,7 +72,7 @@ struct registered_appl {
 
     /* The event-loop where the registered applications registered
      * (and where it can be reached by flow allocation requests). */
-    struct rlite_ctrl *rc;
+    struct rl_ctrl *rc;
 
     /* Event id used by the registration request, needed if the
      * the IPCP is partially implemented in userspace. */
@@ -93,7 +93,7 @@ struct registered_appl {
 #define PORT_ID_HASHTABLE_BITS  7
 #define CEP_ID_HASHTABLE_BITS  7
 
-struct rlite_dm {
+struct rl_dm {
     /* Bitmap to manage IPC process ids. */
     DECLARE_BITMAP(ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
 
@@ -131,12 +131,12 @@ struct rlite_dm {
     struct mutex general_lock;
 };
 
-static struct rlite_dm rlite_dm;
+static struct rl_dm rl_dm;
 
-#define FLOCK() spin_lock_bh(&rlite_dm.flows_lock)
-#define FUNLOCK() spin_unlock_bh(&rlite_dm.flows_lock)
-#define PLOCK() spin_lock_bh(&rlite_dm.ipcps_lock)
-#define PUNLOCK() spin_unlock_bh(&rlite_dm.ipcps_lock)
+#define FLOCK() spin_lock_bh(&rl_dm.flows_lock)
+#define FUNLOCK() spin_unlock_bh(&rl_dm.flows_lock)
+#define PLOCK() spin_lock_bh(&rl_dm.ipcps_lock)
+#define PUNLOCK() spin_unlock_bh(&rl_dm.ipcps_lock)
 #define RALOCK(_p) spin_lock_bh(&(_p)->regapp_lock)
 #define RAUNLOCK(_p) spin_unlock_bh(&(_p)->regapp_lock)
 
@@ -149,7 +149,7 @@ ipcp_factories_find(const char *dif_type)
         return NULL;
     }
 
-    list_for_each_entry(factory, &rlite_dm.ipcp_factories, node) {
+    list_for_each_entry(factory, &rl_dm.ipcp_factories, node) {
         if (strcmp(factory->dif_type, dif_type) == 0) {
             return factory;
         }
@@ -159,7 +159,7 @@ ipcp_factories_find(const char *dif_type)
 }
 
 int
-rlite_ipcp_factory_register(struct ipcp_factory *factory)
+rl_ipcp_factory_register(struct ipcp_factory *factory)
 {
     int ret = 0;
 
@@ -168,7 +168,7 @@ rlite_ipcp_factory_register(struct ipcp_factory *factory)
         return -EINVAL;
     }
 
-    mutex_lock(&rlite_dm.general_lock);
+    mutex_lock(&rl_dm.general_lock);
 
     if (ipcp_factories_find(factory->dif_type)) {
         ret = -EBUSY;
@@ -191,27 +191,27 @@ rlite_ipcp_factory_register(struct ipcp_factory *factory)
     /* Insert the new factory into the IPC process factories
      * list. Ownership is not passed, it stills remains to
      * the invoking IPCP module. */
-    list_add_tail(&factory->node, &rlite_dm.ipcp_factories);
+    list_add_tail(&factory->node, &rl_dm.ipcp_factories);
 
     PI("IPC processes factory '%s' registered\n",
             factory->dif_type);
 out:
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_unlock(&rl_dm.general_lock);
 
     return ret;
 }
-EXPORT_SYMBOL(rlite_ipcp_factory_register);
+EXPORT_SYMBOL(rl_ipcp_factory_register);
 
 int
-rlite_ipcp_factory_unregister(const char *dif_type)
+rl_ipcp_factory_unregister(const char *dif_type)
 {
     struct ipcp_factory *factory;
 
-    mutex_lock(&rlite_dm.general_lock);
+    mutex_lock(&rl_dm.general_lock);
 
     factory = ipcp_factories_find(dif_type);
     if (!factory) {
-        mutex_unlock(&rlite_dm.general_lock);
+        mutex_unlock(&rl_dm.general_lock);
         return -EINVAL;
     }
 
@@ -219,17 +219,17 @@ rlite_ipcp_factory_unregister(const char *dif_type)
      * the factory object. */
     list_del(&factory->node);
 
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_unlock(&rl_dm.general_lock);
 
     PI("IPC processes factory '%s' unregistered\n",
             dif_type);
 
     return 0;
 }
-EXPORT_SYMBOL(rlite_ipcp_factory_unregister);
+EXPORT_SYMBOL(rl_ipcp_factory_unregister);
 
 static int
-rlite_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
+rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg)
 {
     struct upqueue_entry *entry;
     unsigned int serlen;
@@ -242,14 +242,14 @@ rlite_upqueue_append(struct rlite_ctrl *rc, const struct rlite_msg_base *rmsg)
     }
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
-    serlen = rlite_msg_serlen(rlite_ker_numtables, RLITE_KER_MSG_MAX, rmsg);
+    serlen = rl_msg_serlen(rl_ker_numtables, RLITE_KER_MSG_MAX, rmsg);
     serbuf = kzalloc(serlen, GFP_KERNEL);
     if (!serbuf) {
         kfree(entry);
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    serlen = serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, rmsg);
 
     entry->sermsg = serbuf;
@@ -270,9 +270,9 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
 
     *err = 0;
 
-    spin_lock_bh(&rlite_dm.difs_lock);
+    spin_lock_bh(&rl_dm.difs_lock);
 
-    list_for_each_entry(cur, &rlite_dm.difs, node) {
+    list_for_each_entry(cur, &rl_dm.difs, node) {
         if (strcmp(cur->name, dif_name) == 0) {
             /* A DIF called 'dif_name' already exists. */
             if (strcmp(cur->ty, dif_type) == 0) {
@@ -313,12 +313,12 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
     cur->max_pdu_size = 8000;  /* Currently unused. */
     cur->max_pdu_life = MPL_MSECS_DEFAULT;
     cur->refcnt = 1;
-    list_add_tail(&cur->node, &rlite_dm.difs);
+    list_add_tail(&cur->node, &rl_dm.difs);
 
     PD("DIF %s [type '%s'] created\n", cur->name, cur->ty);
 
 out:
-    spin_unlock_bh(&rlite_dm.difs_lock);
+    spin_unlock_bh(&rl_dm.difs_lock);
 
     return cur;
 }
@@ -330,7 +330,7 @@ dif_put(struct dif *dif)
         return;
     }
 
-    spin_lock_bh(&rlite_dm.difs_lock);
+    spin_lock_bh(&rl_dm.difs_lock);
     dif->refcnt--;
     if (dif->refcnt) {
         goto out;
@@ -343,7 +343,7 @@ dif_put(struct dif *dif)
     kfree(dif);
 
 out:
-    spin_unlock_bh(&rlite_dm.difs_lock);
+    spin_unlock_bh(&rl_dm.difs_lock);
 }
 
 struct ipcp_entry *
@@ -354,7 +354,7 @@ __ipcp_get(rl_ipcp_id_t ipcp_id)
 
     PLOCK();
 
-    head = &rlite_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rlite_dm.ipcp_table))];
+    head = &rl_dm.ipcp_table[hash_min(ipcp_id, HASH_BITS(rl_dm.ipcp_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->id == ipcp_id) {
             entry->refcnt++;
@@ -391,7 +391,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
 
     /* Check if an IPC process with that name already exists.
      * This check is also performed by userspace. */
-    hash_for_each(rlite_dm.ipcp_table, bucket, cur, node) {
+    hash_for_each(rl_dm.ipcp_table, bucket, cur, node) {
         if (rina_name_cmp(&cur->name, &req->name) == 0) {
             PUNLOCK();
             kfree(entry);
@@ -408,10 +408,10 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
     }
 
     /* Try to alloc an IPC process id from the bitmap. */
-    entry->id = bitmap_find_next_zero_area(rlite_dm.ipcp_id_bitmap,
+    entry->id = bitmap_find_next_zero_area(rl_dm.ipcp_id_bitmap,
                             IPCP_ID_BITMAP_SIZE, 0, 1, 0);
     if (entry->id < IPCP_ID_BITMAP_SIZE) {
-        bitmap_set(rlite_dm.ipcp_id_bitmap, entry->id, 1);
+        bitmap_set(rl_dm.ipcp_id_bitmap, entry->id, 1);
         /* Build and insert an IPC process entry in the hash table. */
         rina_name_move(&entry->name, &req->name);
         entry->dif = dif;
@@ -426,7 +426,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         spin_lock_init(&entry->regapp_lock);
         init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
-        hash_add(rlite_dm.ipcp_table, &entry->node, entry->id);
+        hash_add(rl_dm.ipcp_table, &entry->node, entry->id);
         INIT_LIST_HEAD(&entry->rmtq);
         entry->rmtq_len = 0;
         spin_lock_init(&entry->rmtq_lock);
@@ -458,7 +458,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
 
     BUG_ON(entry == NULL);
 
-    mutex_lock(&rlite_dm.general_lock);
+    mutex_lock(&rl_dm.general_lock);
 
     factory = ipcp_factories_find(req->dif_type);
     if (!factory) {
@@ -494,7 +494,7 @@ out:
     if (ret) {
         ipcp_put(entry);
     }
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_unlock(&rl_dm.general_lock);
 
     return ret;
 }
@@ -585,7 +585,7 @@ ipcp_application_put(struct registered_appl *app)
 static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *appl_name,
-                     struct rlite_ctrl *rc,
+                     struct rl_ctrl *rc,
                      uint32_t event_id)
 {
     struct registered_appl *app, *newapp;
@@ -655,7 +655,7 @@ ipcp_application_del(struct ipcp_entry *ipcp,
 }
 
 static void
-application_del_by_rc(struct rlite_ctrl *rc)
+application_del_by_rc(struct rl_ctrl *rc)
 {
     struct ipcp_entry *ipcp;
     int bucket;
@@ -669,7 +669,7 @@ application_del_by_rc(struct rlite_ctrl *rc)
     PLOCK();
 
     /* For each IPC processes. */
-    hash_for_each(rlite_dm.ipcp_table, bucket, ipcp, node) {
+    hash_for_each(rl_dm.ipcp_table, bucket, ipcp, node) {
         RALOCK(ipcp);
 
         /* For each application registered to this IPC process. */
@@ -718,10 +718,10 @@ application_del_by_rc(struct rlite_ctrl *rc)
             ntfy.ipcp_id = app->ipcp->id;
             ntfy.reg = false;
             rina_name_move(&ntfy.appl_name, &app->name);
-            rlite_upqueue_append(app->ipcp->uipcp,
-                                (const struct rlite_msg_base *)&ntfy);
+            rl_upqueue_append(app->ipcp->uipcp,
+                                (const struct rl_msg_base *)&ntfy);
             rina_name_move(&app->name, &ntfy.appl_name);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(&ntfy));
         }
 
@@ -738,7 +738,7 @@ flow_get(rl_port_t port_id)
 
     FLOCK();
 
-    head = &rlite_dm.flow_table[hash_min(port_id, HASH_BITS(rlite_dm.flow_table))];
+    head = &rl_dm.flow_table[hash_min(port_id, HASH_BITS(rl_dm.flow_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->local_port == port_id) {
             entry->refcnt++;
@@ -761,8 +761,8 @@ flow_get_by_cep(unsigned int cep_id)
 
     FLOCK();
 
-    head = &rlite_dm.flow_table_by_cep[hash_min(cep_id,
-                                      HASH_BITS(rlite_dm.flow_table_by_cep))];
+    head = &rl_dm.flow_table_by_cep[hash_min(cep_id,
+                                      HASH_BITS(rl_dm.flow_table_by_cep))];
     hlist_for_each_entry(entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             entry->refcnt++;
@@ -804,7 +804,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          uint32_t event_id,
          const struct rina_name *local_appl,
          const struct rina_name *remote_appl,
-         const struct rlite_flow_config *flowcfg,
+         const struct rl_flow_config *flowcfg,
          struct flow_entry **pentry, gfp_t gfp)
 {
     struct flow_entry *entry;
@@ -819,11 +819,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     /* Try to alloc a port id and a cep id from the bitmaps, cep
      * ids being allocated only if needed. */
-    entry->local_port = bitmap_find_next_zero_area(rlite_dm.port_id_bitmap,
+    entry->local_port = bitmap_find_next_zero_area(rl_dm.port_id_bitmap,
                                                    PORT_ID_BITMAP_SIZE,
                                                    0, 1, 0);
     if (ipcp->use_cep_ids) {
-        entry->local_cep = bitmap_find_next_zero_area(rlite_dm.cep_id_bitmap,
+        entry->local_cep = bitmap_find_next_zero_area(rl_dm.cep_id_bitmap,
                                                       CEP_ID_BITMAP_SIZE,
                                                       0, 1, 0);
     } else {
@@ -832,10 +832,10 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
     if (entry->local_port < PORT_ID_BITMAP_SIZE &&
                 entry->local_cep < CEP_ID_BITMAP_SIZE) {
-        bitmap_set(rlite_dm.port_id_bitmap, entry->local_port, 1);
+        bitmap_set(rl_dm.port_id_bitmap, entry->local_port, 1);
 
         if (ipcp->use_cep_ids) {
-            bitmap_set(rlite_dm.cep_id_bitmap, entry->local_cep, 1);
+            bitmap_set(rl_dm.cep_id_bitmap, entry->local_cep, 1);
         }
 
         /* Build and insert a flow entry in the hash table. */
@@ -852,9 +852,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->sdu_rx_consumed = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
-        hash_add(rlite_dm.flow_table, &entry->node, entry->local_port);
+        hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
         if (ipcp->use_cep_ids) {
-            hash_add(rlite_dm.flow_table_by_cep, &entry->node_cep,
+            hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
                      entry->local_cep);
         }
         INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
@@ -889,8 +889,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 struct flow_entry *
 flow_put(struct flow_entry *entry)
 {
-    struct rlite_buf *rb;
-    struct rlite_buf *tmp;
+    struct rl_buf *rb;
+    struct rl_buf *tmp;
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
@@ -955,7 +955,7 @@ flow_put(struct flow_entry *entry)
 
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
         list_del(&rb->node);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     }
     entry->txrx.rx_qlen = 0;
 
@@ -985,8 +985,8 @@ flow_put(struct flow_entry *entry)
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
 
-        rlite_upqueue_append(ipcp->uipcp, (const struct rlite_msg_base *)&ntfy);
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&ntfy));
     }
 
@@ -1003,10 +1003,10 @@ flow_put(struct flow_entry *entry)
     hash_del(&entry->node);
     rina_name_free(&entry->local_appl);
     rina_name_free(&entry->remote_appl);
-    bitmap_clear(rlite_dm.port_id_bitmap, entry->local_port, 1);
+    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
     if (ipcp->use_cep_ids) {
         hash_del(&entry->node_cep);
-        bitmap_clear(rlite_dm.cep_id_bitmap, entry->local_cep, 1);
+        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
     PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
@@ -1018,25 +1018,25 @@ out:
 EXPORT_SYMBOL(flow_put);
 
 static void
-flow_rc_unbind(struct rlite_ctrl *rc)
+flow_rc_unbind(struct rl_ctrl *rc)
 {
     struct flow_entry *flow;
     struct hlist_node *tmp;
     int bucket;
 
-    hash_for_each_safe(rlite_dm.flow_table, bucket, tmp, flow, node) {
+    hash_for_each_safe(rl_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
             /* Since this 'rc' is going to disappear, we have to remove
              * the reference stored into this flow. */
             flow->upper.rc = NULL;
             if (flow->txrx.state == FLOW_STATE_PENDING) {
-                /* This flow is still pending. Since this rlite_ctrl
+                /* This flow is still pending. Since this rl_ctrl
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
                  * remove the flow. */
                 flow_put(flow);
             } else {
-                /* If no rlite_io device binds to this allocated flow,
+                /* If no rl_io device binds to this allocated flow,
                  * the associated memory will never be released.
                  * Two solutions:
                  *      (a) - When the flows transitions into allocated
@@ -1058,7 +1058,7 @@ flow_make_mortal(struct flow_entry *flow)
 
         if (flow->never_bound) {
             /* Here reference counter is (likely) 2. Reset it to 1, so that
-             * proper flow destruction happens in rlite_io_release(). If we
+             * proper flow destruction happens in rl_io_release(). If we
              * didn't do it, the flow would live forever with its refcount
              * set to 1. */
             flow->never_bound = false;
@@ -1072,7 +1072,7 @@ flow_make_mortal(struct flow_entry *flow)
 int
 __ipcp_put(struct ipcp_entry *entry)
 {
-    struct rlite_buf *rb, *tmp;
+    struct rl_buf *rb, *tmp;
 
     if (!entry) {
         return 0;
@@ -1087,7 +1087,7 @@ __ipcp_put(struct ipcp_entry *entry)
     }
 
     hash_del(&entry->node);
-    bitmap_clear(rlite_dm.ipcp_id_bitmap, entry->id, 1);
+    bitmap_clear(rl_dm.ipcp_id_bitmap, entry->id, 1);
 
     PUNLOCK();
 
@@ -1106,7 +1106,7 @@ __ipcp_put(struct ipcp_entry *entry)
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
         list_del(&rb->node);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     }
 
     /* If the module was refcounted for this IPC process instance,
@@ -1188,7 +1188,7 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
 {
     struct ipcp_entry *ipcp = ipcp_get(ipcp_id);
     struct rl_kmsg_ipcp_update upd;
-    struct rlite_ctrl *rcur;
+    struct rl_ctrl *rcur;
     int ret = 0;
 
     if (!ipcp) {
@@ -1202,14 +1202,14 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
         goto out;
     }
 
-    mutex_lock(&rlite_dm.general_lock);
-    list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
-        rlite_upqueue_append(rcur, RLITE_MB(&upd));
+    mutex_lock(&rl_dm.general_lock);
+    list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
+        rl_upqueue_append(rcur, RLITE_MB(&upd));
     }
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_unlock(&rl_dm.general_lock);
 
 out:
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&upd));
     ipcp_put(ipcp);
 
@@ -1217,7 +1217,7 @@ out:
 }
 
 static int
-rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_create *req = (struct rl_kmsg_ipcp_create *)bmsg;
     struct rl_kmsg_ipcp_create_resp resp;
@@ -1236,8 +1236,8 @@ rlite_ipcp_create(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rlite_upqueue_append(rc, RLITE_MB(&resp));
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    ret = rl_upqueue_append(rc, RLITE_MB(&resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
     if (ret) {
         goto err;
@@ -1261,7 +1261,7 @@ err:
 }
 
 static int
-rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_destroy *req =
                         (struct rl_kmsg_ipcp_destroy *)bmsg;
@@ -1277,7 +1277,7 @@ rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
             struct rl_kmsg_ipcp_update upd;
-            struct rlite_ctrl *rcur;
+            struct rl_ctrl *rcur;
 
             memset(&upd, 0, sizeof(upd));
             upd.msg_type = RLITE_KER_IPCP_UPDATE;
@@ -1286,13 +1286,13 @@ rlite_ipcp_destroy(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             /* All the other fields are zeroed, since they are
              * not useful to userspace. */
 
-            mutex_lock(&rlite_dm.general_lock);
-            list_for_each_entry(rcur, &rlite_dm.ctrl_devs, node) {
-                rlite_upqueue_append(rcur, RLITE_MB(&upd));
+            mutex_lock(&rl_dm.general_lock);
+            list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
+                rl_upqueue_append(rcur, RLITE_MB(&upd));
             }
-            mutex_unlock(&rlite_dm.general_lock);
+            mutex_unlock(&rl_dm.general_lock);
 
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(&upd));
         }
     }
@@ -1306,7 +1306,7 @@ struct flows_fetch_q_entry {
 };
 
 static int
-rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
+rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
 {
     struct flows_fetch_q_entry *fqe;
     struct flow_entry *entry;
@@ -1316,7 +1316,7 @@ rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
     FLOCK();
 
     if (list_empty(&rc->flows_fetch_q)) {
-        hash_for_each(rlite_dm.flow_table, bucket, entry, node) {
+        hash_for_each(rl_dm.flow_table, bucket, entry, node) {
             fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
             if (!fqe) {
                 PE("Out of memory\n");
@@ -1351,8 +1351,8 @@ rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
-        ret = rlite_upqueue_append(rc, RLITE_MB(&fqe->resp));
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp));
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&fqe->resp));
         kfree(fqe);
     }
@@ -1363,7 +1363,7 @@ rlite_flow_fetch(struct rlite_ctrl *rc, struct rlite_msg_base *req)
 }
 
 static int
-rlite_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_config *req =
                     (struct rl_kmsg_ipcp_config *)bmsg;
@@ -1411,7 +1411,7 @@ rlite_ipcp_config(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_pduft_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_pduft_set *req =
                     (struct rl_kmsg_ipcp_pduft_set *)bmsg;
@@ -1445,7 +1445,7 @@ rlite_ipcp_pduft_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_pduft_flush *req =
                     (struct rl_kmsg_ipcp_pduft_flush *)bmsg;
@@ -1470,7 +1470,7 @@ rlite_ipcp_pduft_flush(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_uipcp_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_uipcp_set *req =
                     (struct rl_kmsg_ipcp_uipcp_set *)bmsg;
@@ -1502,7 +1502,7 @@ rlite_ipcp_uipcp_set(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_ipcp_uipcp_wait(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_uipcp_wait *req =
                     (struct rl_kmsg_ipcp_uipcp_wait *)bmsg;
@@ -1520,7 +1520,7 @@ rlite_ipcp_uipcp_wait(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
     add_wait_queue(&entry->uipcp_wqh, &wait);
 
     while (1) {
-        struct rlite_ctrl *uipcp;
+        struct rl_ctrl *uipcp;
 
         current->state = TASK_INTERRUPTIBLE;
 
@@ -1549,7 +1549,7 @@ rlite_ipcp_uipcp_wait(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req =
                     (struct rl_kmsg_uipcp_fa_req_arrived *)bmsg;
@@ -1558,7 +1558,7 @@ rlite_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rlite_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
+        ret = rl_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
                                   req->remote_cep,
                                   req->remote_addr, &req->local_appl,
                                   &req->remote_appl, &req->flowcfg);
@@ -1570,8 +1570,8 @@ rlite_uipcp_fa_req_arrived(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
-                           struct rlite_msg_base *bmsg)
+rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc,
+                           struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req =
                     (struct rl_kmsg_uipcp_fa_resp_arrived *)bmsg;
@@ -1580,7 +1580,7 @@ rlite_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
 
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
-        ret = rlite_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
+        ret = rl_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
                                    req->remote_cep, req->remote_addr,
                                    req->response, &req->flowcfg);
     }
@@ -1590,8 +1590,8 @@ rlite_uipcp_fa_resp_arrived(struct rlite_ctrl *rc,
 }
 
 static int
-rlite_flow_dealloc(struct rlite_ctrl *rc,
-                  struct rlite_msg_base *bmsg)
+rl_flow_dealloc(struct rl_ctrl *rc,
+                  struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_flow_dealloc *req =
                 (struct rl_kmsg_flow_dealloc *)bmsg;
@@ -1622,18 +1622,18 @@ rlite_flow_dealloc(struct rlite_ctrl *rc,
 }
 
 static int
-rlite_barrier(struct rlite_ctrl *rc,
-              struct rlite_msg_base *bmsg)
+rl_barrier(struct rl_ctrl *rc,
+              struct rl_msg_base *bmsg)
 {
     bmsg->msg_type = RLITE_KER_BARRIER_RESP;
 
     /* Just reflect the message. */
-    return rlite_upqueue_append(rc, bmsg);
+    return rl_upqueue_append(rc, bmsg);
 }
 
 static int
-rlite_flow_get_stats(struct rlite_ctrl *rc,
-                     struct rlite_msg_base *bmsg)
+rl_flow_get_stats(struct rl_ctrl *rc,
+                     struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_flow_stats_req *req =
                 (struct rl_kmsg_flow_stats_req *)bmsg;
@@ -1655,16 +1655,16 @@ rlite_flow_get_stats(struct rlite_ctrl *rc,
     }
     flow_put(flow);
 
-    ret = rlite_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
+    ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ret;
 }
 
 /* Connect the upper IPCP which is using this flow
- * so that rlite_sdu_rx() can deliver SDU to the IPCP. */
+ * so that rl_sdu_rx() can deliver SDU to the IPCP. */
 static int
-upper_ipcp_flow_bind(struct rlite_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
+upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
                      struct flow_entry *flow)
 {
     struct ipcp_entry *upper_ipcp;
@@ -1692,7 +1692,7 @@ upper_ipcp_flow_bind(struct rlite_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
 }
 
 static int
-rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req =
                     (struct rl_kmsg_appl_register *)bmsg;
@@ -1716,8 +1716,8 @@ rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             /* Reflect to userspace this (un)registration, so that
              * userspace IPCP can take appropriate actions. */
             req->event_id = 0;
-            rlite_upqueue_append(ipcp->uipcp,
-                    (const struct rlite_msg_base *)req);
+            rl_upqueue_append(ipcp->uipcp,
+                    (const struct rl_msg_base *)req);
         }
 
         if (ret || !ipcp->uipcp || !req->reg) {
@@ -1732,8 +1732,8 @@ rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
             rina_name_move(&resp.appl_name, &req->appl_name);
 
-            rlite_upqueue_append(rc, (const struct rlite_msg_base *)&resp);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_upqueue_append(rc, (const struct rl_msg_base *)&resp);
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(&resp));
 
             if (!ret) {
@@ -1757,7 +1757,7 @@ rl_appl_register(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register_resp *resp =
                     (struct rl_kmsg_appl_register_resp *)bmsg;
@@ -1790,7 +1790,7 @@ rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
                 PI("Application process %s %sregistered to IPC process %u\n",
                         name_s, (resp->reg ? "" : "un"), resp->ipcp_id);
             }
-            rlite_upqueue_append(app->rc, (const struct rlite_msg_base *)resp);
+            rl_upqueue_append(app->rc, (const struct rl_msg_base *)resp);
         }
         ipcp_application_put(app);
     }
@@ -1805,7 +1805,7 @@ rl_appl_register_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
 }
 
 static int
-rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id,
+rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
                                        rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp_arrived resp;
@@ -1817,11 +1817,11 @@ rlite_append_allocate_flow_resp_arrived(struct rlite_ctrl *rc, uint32_t event_id
     resp.response = response;
 
     /* Enqueue the response into the upqueue. */
-    return rlite_upqueue_append(rc, RLITE_MB(&resp));
+    return rl_upqueue_append(rc, RLITE_MB(&resp));
 }
 
 static int
-rlite_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_fa_req *req =
                     (struct rl_kmsg_fa_req *)bmsg;
@@ -1869,8 +1869,8 @@ rlite_fa_req(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
             req->event_id = 0;
             req->local_port = flow_entry->local_port;
             req->local_cep = flow_entry->local_cep;
-            ret = rlite_upqueue_append(ipcp_entry->uipcp,
-                    (const struct rlite_msg_base *)req);
+            ret = rl_upqueue_append(ipcp_entry->uipcp,
+                    (const struct rl_msg_base *)req);
         }
     }
 
@@ -1891,11 +1891,11 @@ out:
     }
 
     /* Create a negative response message. */
-    return rlite_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
+    return rl_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
 }
 
 static int
-rlite_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
+rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_fa_resp *resp =
                     (struct rl_kmsg_fa_resp *)bmsg;
@@ -1950,8 +1950,8 @@ rlite_fa_resp(struct rlite_ctrl *rc, struct rlite_msg_base *bmsg)
              * Reflect the flow allocation response message to userspace. */
             resp->event_id = 0;
             resp->cep_id = flow_entry->local_cep;
-            ret = rlite_upqueue_append(ipcp->uipcp,
-                    (const struct rlite_msg_base *)resp);
+            ret = rl_upqueue_append(ipcp->uipcp,
+                    (const struct rl_msg_base *)resp);
         }
     }
 
@@ -1967,12 +1967,12 @@ out:
 
 /* This may be called from softirq context. */
 int
-rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
+rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                     rl_port_t remote_port, uint32_t remote_cep,
                     rl_addr_t remote_addr,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
-                    const struct rlite_flow_config *flowcfg)
+                    const struct rl_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_appl *app;
@@ -2016,27 +2016,27 @@ rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     }
 
     /* Enqueue the request into the upqueue. */
-    ret = rlite_upqueue_append(app->rc, RLITE_MB(&req));
+    ret = rl_upqueue_append(app->rc, RLITE_MB(&req));
     if (ret) {
         flow_put(flow_entry);
     }
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&req));
 out:
     ipcp_application_put(app);
 
     return ret;
 }
-EXPORT_SYMBOL(rlite_fa_req_arrived);
+EXPORT_SYMBOL(rl_fa_req_arrived);
 
 int
-rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
+rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      rl_port_t local_port,
                      rl_port_t remote_port,
                      uint32_t remote_cep,
                      rl_addr_t remote_addr,
                      uint8_t response,
-                     struct rlite_flow_config *flowcfg)
+                     struct rl_flow_config *flowcfg)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
@@ -2071,7 +2071,7 @@ rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
             "port-id %u, remote addr %llu\n", ipcp->id,
             local_port, (long long unsigned)remote_addr);
 
-    ret = rlite_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
+    ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
                                                  flow_entry->event_id,
                                                  local_port, response);
 
@@ -2085,43 +2085,43 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL(rlite_fa_resp_arrived);
+EXPORT_SYMBOL(rl_fa_resp_arrived);
 
 /* Share the same tx_wqh with other flows supported by the same IPCP. */
 void
-rlite_flow_share_tx_wqh(struct flow_entry *flow)
+rl_flow_share_tx_wqh(struct flow_entry *flow)
 {
     flow->txrx.tx_wqh = &flow->txrx.ipcp->tx_wqh;
 }
-EXPORT_SYMBOL(rlite_flow_share_tx_wqh);
+EXPORT_SYMBOL(rl_flow_share_tx_wqh);
 
 /* The table containing all the message handlers. */
-static rlite_msg_handler_t rlite_ctrl_handlers[] = {
-    [RLITE_KER_IPCP_CREATE] = rlite_ipcp_create,
-    [RLITE_KER_IPCP_DESTROY] = rlite_ipcp_destroy,
-    [RLITE_KER_FLOW_FETCH] = rlite_flow_fetch,
-    [RLITE_KER_IPCP_CONFIG] = rlite_ipcp_config,
-    [RLITE_KER_IPCP_PDUFT_SET] = rlite_ipcp_pduft_set,
-    [RLITE_KER_IPCP_PDUFT_FLUSH] = rlite_ipcp_pduft_flush,
+static rl_msg_handler_t rl_ctrl_handlers[] = {
+    [RLITE_KER_IPCP_CREATE] = rl_ipcp_create,
+    [RLITE_KER_IPCP_DESTROY] = rl_ipcp_destroy,
+    [RLITE_KER_FLOW_FETCH] = rl_flow_fetch,
+    [RLITE_KER_IPCP_CONFIG] = rl_ipcp_config,
+    [RLITE_KER_IPCP_PDUFT_SET] = rl_ipcp_pduft_set,
+    [RLITE_KER_IPCP_PDUFT_FLUSH] = rl_ipcp_pduft_flush,
     [RLITE_KER_APPL_REGISTER] = rl_appl_register,
     [RLITE_KER_APPL_REGISTER_RESP] = rl_appl_register_resp,
-    [RLITE_KER_FA_REQ] = rlite_fa_req,
-    [RLITE_KER_FA_RESP] = rlite_fa_resp,
-    [RLITE_KER_IPCP_UIPCP_SET] = rlite_ipcp_uipcp_set,
-    [RLITE_KER_IPCP_UIPCP_WAIT] = rlite_ipcp_uipcp_wait,
-    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rlite_uipcp_fa_req_arrived,
-    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rlite_uipcp_fa_resp_arrived,
-    [RLITE_KER_FLOW_DEALLOC] = rlite_flow_dealloc,
-    [RLITE_KER_BARRIER] = rlite_barrier,
-    [RLITE_KER_FLOW_STATS_REQ] = rlite_flow_get_stats,
+    [RLITE_KER_FA_REQ] = rl_fa_req,
+    [RLITE_KER_FA_RESP] = rl_fa_resp,
+    [RLITE_KER_IPCP_UIPCP_SET] = rl_ipcp_uipcp_set,
+    [RLITE_KER_IPCP_UIPCP_WAIT] = rl_ipcp_uipcp_wait,
+    [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rl_uipcp_fa_req_arrived,
+    [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rl_uipcp_fa_resp_arrived,
+    [RLITE_KER_FLOW_DEALLOC] = rl_flow_dealloc,
+    [RLITE_KER_BARRIER] = rl_barrier,
+    [RLITE_KER_FLOW_STATS_REQ] = rl_flow_get_stats,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
 static ssize_t
-rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
+rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 {
-    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
-    struct rlite_msg_base *bmsg;
+    struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
+    struct rl_msg_base *bmsg;
     char *kbuf;
     ssize_t ret;
 
@@ -2142,7 +2142,7 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
         return -EFAULT;
     }
 
-    ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
         kfree(kbuf);
@@ -2193,11 +2193,11 @@ rlite_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *pp
 }
 
 static ssize_t
-rlite_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
+rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 {
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
-    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
+    struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     int ret = 0;
 
@@ -2257,9 +2257,9 @@ rlite_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 }
 
 static unsigned int
-rlite_ctrl_poll(struct file *f, poll_table *wait)
+rl_ctrl_poll(struct file *f, poll_table *wait)
 {
-    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
+    struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
     unsigned int mask = 0;
 
     poll_wait(f, &rc->upqueue_wqh, wait);
@@ -2276,7 +2276,7 @@ rlite_ctrl_poll(struct file *f, poll_table *wait)
 }
 
 static int
-initial_ipcp_update(struct rlite_ctrl *rc)
+initial_ipcp_update(struct rl_ctrl *rc)
 {
     struct ipcp_entry *entry;
     int bucket;
@@ -2284,14 +2284,14 @@ initial_ipcp_update(struct rlite_ctrl *rc)
 
     PLOCK();
 
-    hash_for_each(rlite_dm.ipcp_table, bucket, entry, node) {
+    hash_for_each(rl_dm.ipcp_table, bucket, entry, node) {
         struct rl_kmsg_ipcp_update upd;
 
         ret = ipcp_update_fill(entry, &upd, RLITE_UPDATE_ADD);
 
-        rlite_upqueue_append(rc, (const struct rlite_msg_base *)&upd);
+        rl_upqueue_append(rc, (const struct rl_msg_base *)&upd);
 
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&upd));
     }
 
@@ -2305,9 +2305,9 @@ initial_ipcp_update(struct rlite_ctrl *rc)
 }
 
 static int
-rlite_ctrl_open(struct inode *inode, struct file *f)
+rl_ctrl_open(struct inode *inode, struct file *f)
 {
-    struct rlite_ctrl *rc;
+    struct rl_ctrl *rc;
 
     rc = kzalloc(sizeof(*rc), GFP_KERNEL);
     if (!rc) {
@@ -2321,11 +2321,11 @@ rlite_ctrl_open(struct inode *inode, struct file *f)
 
     INIT_LIST_HEAD(&rc->flows_fetch_q);
 
-    rc->handlers = rlite_ctrl_handlers;
+    rc->handlers = rl_ctrl_handlers;
 
-    mutex_lock(&rlite_dm.general_lock);
-    list_add_tail(&rc->node, &rlite_dm.ctrl_devs);
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_lock(&rl_dm.general_lock);
+    list_add_tail(&rc->node, &rl_dm.ctrl_devs);
+    mutex_unlock(&rl_dm.general_lock);
 
     /* Enqueue RLITE_KER_IPCP_UPDATE messages for all the
      * IPCPs in the system. */
@@ -2335,13 +2335,13 @@ rlite_ctrl_open(struct inode *inode, struct file *f)
 }
 
 static int
-rlite_ctrl_release(struct inode *inode, struct file *f)
+rl_ctrl_release(struct inode *inode, struct file *f)
 {
-    struct rlite_ctrl *rc = (struct rlite_ctrl *)f->private_data;
+    struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
 
-    mutex_lock(&rlite_dm.general_lock);
+    mutex_lock(&rl_dm.general_lock);
     list_del(&rc->node);
-    mutex_unlock(&rlite_dm.general_lock);
+    mutex_unlock(&rl_dm.general_lock);
 
     /* We must invalidate (e.g. unregister) all the
      * application names registered with this ctrl device. */
@@ -2354,52 +2354,52 @@ rlite_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
-static const struct file_operations rlite_ctrl_fops = {
+static const struct file_operations rl_ctrl_fops = {
     .owner          = THIS_MODULE,
-    .release        = rlite_ctrl_release,
-    .open           = rlite_ctrl_open,
-    .write          = rlite_ctrl_write,
-    .read           = rlite_ctrl_read,
-    .poll           = rlite_ctrl_poll,
+    .release        = rl_ctrl_release,
+    .open           = rl_ctrl_open,
+    .write          = rl_ctrl_write,
+    .read           = rl_ctrl_read,
+    .poll           = rl_ctrl_poll,
     .llseek         = noop_llseek,
 };
 
-static struct miscdevice rlite_ctrl_misc = {
+static struct miscdevice rl_ctrl_misc = {
     .minor = MISC_DYNAMIC_MINOR,
     .name = "rlite",
-    .fops = &rlite_ctrl_fops,
+    .fops = &rl_ctrl_fops,
 };
 
-extern struct miscdevice rlite_io_misc;
+extern struct miscdevice rl_io_misc;
 
 static int __init
-rlite_ctrl_init(void)
+rl_ctrl_init(void)
 {
     int ret;
 
-    bitmap_zero(rlite_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
-    hash_init(rlite_dm.ipcp_table);
-    bitmap_zero(rlite_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
-    hash_init(rlite_dm.flow_table);
-    bitmap_zero(rlite_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
-    hash_init(rlite_dm.flow_table_by_cep);
-    mutex_init(&rlite_dm.general_lock);
-    spin_lock_init(&rlite_dm.flows_lock);
-    spin_lock_init(&rlite_dm.ipcps_lock);
-    spin_lock_init(&rlite_dm.difs_lock);
-    INIT_LIST_HEAD(&rlite_dm.ipcp_factories);
-    INIT_LIST_HEAD(&rlite_dm.difs);
-    INIT_LIST_HEAD(&rlite_dm.ctrl_devs);
+    bitmap_zero(rl_dm.ipcp_id_bitmap, IPCP_ID_BITMAP_SIZE);
+    hash_init(rl_dm.ipcp_table);
+    bitmap_zero(rl_dm.port_id_bitmap, PORT_ID_BITMAP_SIZE);
+    hash_init(rl_dm.flow_table);
+    bitmap_zero(rl_dm.cep_id_bitmap, CEP_ID_BITMAP_SIZE);
+    hash_init(rl_dm.flow_table_by_cep);
+    mutex_init(&rl_dm.general_lock);
+    spin_lock_init(&rl_dm.flows_lock);
+    spin_lock_init(&rl_dm.ipcps_lock);
+    spin_lock_init(&rl_dm.difs_lock);
+    INIT_LIST_HEAD(&rl_dm.ipcp_factories);
+    INIT_LIST_HEAD(&rl_dm.difs);
+    INIT_LIST_HEAD(&rl_dm.ctrl_devs);
 
-    ret = misc_register(&rlite_ctrl_misc);
+    ret = misc_register(&rl_ctrl_misc);
     if (ret) {
         PE("Failed to register rlite misc device\n");
         return ret;
     }
 
-    ret = misc_register(&rlite_io_misc);
+    ret = misc_register(&rl_io_misc);
     if (ret) {
-        misc_deregister(&rlite_ctrl_misc);
+        misc_deregister(&rl_ctrl_misc);
         PE("Failed to register rlite-io misc device\n");
         return ret;
     }
@@ -2408,13 +2408,13 @@ rlite_ctrl_init(void)
 }
 
 static void __exit
-rlite_ctrl_fini(void)
+rl_ctrl_fini(void)
 {
-    misc_deregister(&rlite_io_misc);
-    misc_deregister(&rlite_ctrl_misc);
+    misc_deregister(&rl_io_misc);
+    misc_deregister(&rl_ctrl_misc);
 }
 
-module_init(rlite_ctrl_init);
-module_exit(rlite_ctrl_fini);
+module_init(rl_ctrl_init);
+module_exit(rl_ctrl_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

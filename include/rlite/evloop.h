@@ -36,21 +36,21 @@
 extern "C" {
 #endif
 
-struct rlite_evloop;
+struct rl_evloop;
 
 /* The signature of a response handler. */
-typedef int (*rlite_resp_handler_t)(struct rlite_evloop *loop,
-                                    const struct rlite_msg_base *b_resp,
-                                    const struct rlite_msg_base *b_req);
+typedef int (*rl_resp_handler_t)(struct rl_evloop *loop,
+                                    const struct rl_msg_base *b_resp,
+                                    const struct rl_msg_base *b_req);
 
 /* The signature of file descriptor callback. */
-typedef void (*rl_evloop_fdcb_t)(struct rlite_evloop *loop, int fd);
+typedef void (*rl_evloop_fdcb_t)(struct rl_evloop *loop, int fd);
 
 /* The signature of timer callback. */
-typedef void (*rlite_tmr_cb_t)(struct rlite_evloop *loop, void *arg);
+typedef void (*rl_tmr_cb_t)(struct rl_evloop *loop, void *arg);
 
-struct rlite_evloop {
-    struct rlite_ctrl ctrl;
+struct rl_evloop {
+    struct rl_ctrl ctrl;
 
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
@@ -62,7 +62,7 @@ struct rlite_evloop {
     int running;
 
     /* Table containing the kernel handlers. */
-    rlite_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
+    rl_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
 
     /* Synchronization variables used to implement mutual exclusion between the
      * event-loop thread and the user thead. */
@@ -80,77 +80,77 @@ struct rlite_evloop {
     int timer_events_cnt;
     int timer_next_id;
 
-    rlite_resp_handler_t usr_ipcp_update;
+    rl_resp_handler_t usr_ipcp_update;
 };
 
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
-struct rlite_msg_base *
-rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
+struct rl_msg_base *
+rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
                         size_t msg_len, int has_response,
                         unsigned int wait_for_completion, int *result);
 
 int
-rl_evloop_stop(struct rlite_evloop *loop);
+rl_evloop_stop(struct rl_evloop *loop);
 
 int
-rl_evloop_join(struct rlite_evloop *loop);
+rl_evloop_join(struct rl_evloop *loop);
 
 int
-rl_evloop_init(struct rlite_evloop *loop, const char *dev,
-               rlite_resp_handler_t *handlers,
+rl_evloop_init(struct rl_evloop *loop, const char *dev,
+               rl_resp_handler_t *handlers,
                unsigned int flags);
 
 int
-rl_evloop_fini(struct rlite_evloop *loop);
+rl_evloop_fini(struct rl_evloop *loop);
 
 int
-rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                         rlite_resp_handler_t handler);
+rl_evloop_set_handler(struct rl_evloop *loop, unsigned int index,
+                         rl_resp_handler_t handler);
 
 int
-rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd,
+rl_evloop_fdcb_add(struct rl_evloop *loop, int fd,
                       rl_evloop_fdcb_t cb);
 
 int
-rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd);
+rl_evloop_fdcb_del(struct rl_evloop *loop, int fd);
 
 int
-rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
-                      rlite_tmr_cb_t cb, void *arg);
+rl_evloop_schedule(struct rl_evloop *loop, unsigned long delta_ms,
+                      rl_tmr_cb_t cb, void *arg);
 
 int
-rl_evloop_schedule_canc(struct rlite_evloop *loop, int id);
+rl_evloop_schedule_canc(struct rl_evloop *loop, int id);
 
 struct rl_kmsg_appl_register_resp *
-rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
+rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
                     unsigned int wait_ms,
                     int reg, const char *dif_name,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name);
 
-int rl_evloop_register(struct rlite_evloop *loop,
+int rl_evloop_register(struct rl_evloop *loop,
                              int reg, const char *dif_name,
                              const struct rina_name *ipcp_name,
                              const struct rina_name *appl_name,
                              unsigned int wait_ms);
 
-int rl_evloop_flow_alloc(struct rlite_evloop *loop,
+int rl_evloop_flow_alloc(struct rl_evloop *loop,
                         uint32_t event_id,
                         const char *dif_name,
                         const struct rina_name *ipcp_name, /* Useful for testing. */
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
-                        const struct rlite_flow_spec *flowcfg,
+                        const struct rl_flow_spec *flowcfg,
                         rl_ipcp_id_t upper_ipcp_id,
                         rl_port_t *port_id, unsigned int wait_ms);
 
-int rl_evloop_fa_resp(struct rlite_evloop *loop,
+int rl_evloop_fa_resp(struct rl_evloop *loop,
                       uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
                       rl_ipcp_id_t upper_ipcp_id, rl_port_t port_id,
                       uint8_t response);
 
-int rl_evloop_ipcp_config(struct rlite_evloop *loop, rl_ipcp_id_t ipcp_id,
+int rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
                           const char *param_name, const char *param_value);
 
 #ifdef __cplusplus

@@ -70,14 +70,14 @@ struct rina_pci_ctrl {
     rl_seq_t my_rwe;
 } __attribute__((packed));
 
-struct rlite_rawbuf {
+struct rl_rawbuf {
     size_t size;
     atomic_t refcnt;
     uint8_t buf[0];
 };
 
-struct rlite_buf {
-    struct rlite_rawbuf  *raw;
+struct rl_buf {
+    struct rl_rawbuf  *raw;
     struct rina_pci    *pci;
     size_t              len;
 
@@ -87,16 +87,16 @@ struct rlite_buf {
     struct list_head    node;
 };
 
-struct rlite_buf *rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
+struct rl_buf *rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
 
-struct rlite_buf * rlite_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
+struct rl_buf * rl_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
 
-struct rlite_buf * rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp);
+struct rl_buf * rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
-void rlite_buf_free(struct rlite_buf *rb);
+void rl_buf_free(struct rl_buf *rb);
 
 static inline int
-rlite_buf_pci_pop(struct rlite_buf *rb)
+rl_buf_pci_pop(struct rl_buf *rb)
 {
     if (unlikely(rb->len < sizeof(struct rina_pci))) {
         RPD(5, "No enough data to pop another PCI\n");
@@ -110,7 +110,7 @@ rlite_buf_pci_pop(struct rlite_buf *rb)
 }
 
 static inline int
-rlite_buf_pci_push(struct rlite_buf *rb)
+rl_buf_pci_push(struct rl_buf *rb)
 {
     if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
         RPD(5, "No space to push another PCI\n");
@@ -123,7 +123,7 @@ rlite_buf_pci_push(struct rlite_buf *rb)
     return 0;
 }
 
-static inline int rlite_buf_custom_push(struct rlite_buf *rb, size_t len)
+static inline int rl_buf_custom_push(struct rl_buf *rb, size_t len)
 {
     if (unlikely((uint8_t *)(rb->pci) - len < &rb->raw->buf[0])) {
         RPD(5, "No space to push custom header\n");

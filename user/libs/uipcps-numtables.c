@@ -22,7 +22,7 @@
 #include "rlite/uipcps-msg.h"
 
 
-struct rlite_msg_layout rlite_uipcps_numtables[] = {
+struct rl_msg_layout rl_uipcps_numtables[] = {
     [RLITE_U_IPCP_REGISTER] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_register) -
                    1 * sizeof(struct rina_name) - 1 * sizeof(char *),
@@ -41,7 +41,7 @@ struct rlite_msg_layout rlite_uipcps_numtables[] = {
         .names = 2,
     },
     [RLITE_U_BASE_RESP] = {
-        .copylen = sizeof(struct rlite_msg_base_resp),
+        .copylen = sizeof(struct rl_msg_base_resp),
     },
     [RLITE_U_IPCP_RIB_SHOW_REQ] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_req) -

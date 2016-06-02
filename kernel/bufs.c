@@ -24,10 +24,10 @@
 #include "rlite/common.h"
 
 
-struct rlite_buf *
-rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
+struct rl_buf *
+rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 {
-    struct rlite_buf *rb;
+    struct rl_buf *rb;
     size_t real_size = size + num_pci * sizeof(struct rina_pci);
     uint8_t *kbuf;
 
@@ -44,7 +44,7 @@ rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
         return NULL;
     }
 
-    rb->raw = (struct rlite_rawbuf *)kbuf;
+    rb->raw = (struct rl_rawbuf *)kbuf;
     rb->raw->size = real_size;
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + num_pci * sizeof(struct rina_pci));
@@ -53,19 +53,19 @@ rlite_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
 
     return rb;
 }
-EXPORT_SYMBOL(rlite_buf_alloc);
+EXPORT_SYMBOL(rl_buf_alloc);
 
-struct rlite_buf *
-rlite_buf_alloc_ctrl(size_t num_pci, gfp_t gfp)
+struct rl_buf *
+rl_buf_alloc_ctrl(size_t num_pci, gfp_t gfp)
 {
-    return rlite_buf_alloc(sizeof(struct rina_pci_ctrl), num_pci, gfp);
+    return rl_buf_alloc(sizeof(struct rina_pci_ctrl), num_pci, gfp);
 }
-EXPORT_SYMBOL(rlite_buf_alloc_ctrl);
+EXPORT_SYMBOL(rl_buf_alloc_ctrl);
 
-struct rlite_buf *
-rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp)
+struct rl_buf *
+rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 {
-    struct rlite_buf *crb;
+    struct rl_buf *crb;
 
     crb = kmalloc(sizeof(*crb), gfp);
     if (unlikely(!crb)) {
@@ -83,17 +83,17 @@ rlite_buf_clone(struct rlite_buf *rb, gfp_t gfp)
 
     return crb;
 }
-EXPORT_SYMBOL(rlite_buf_clone);
+EXPORT_SYMBOL(rl_buf_clone);
 
 void
-rlite_buf_free(struct rlite_buf *rb)
+rl_buf_free(struct rl_buf *rb)
 {
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
         kfree(rb->raw);
     }
     kfree(rb);
 }
-EXPORT_SYMBOL(rlite_buf_free);
+EXPORT_SYMBOL(rl_buf_free);
 
 void
 rina_pci_dump(struct rina_pci *pci)

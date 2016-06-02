@@ -61,7 +61,7 @@ rl_ipcps_purge(struct list_head *ipcps)
 }
 
 int
-rl_ctrl_ipcp_update(struct rlite_ctrl *ctrl,
+rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
                     const struct rl_kmsg_ipcp_update *upd)
 {
     struct rl_ipcp *rl_ipcp = NULL;
@@ -139,7 +139,7 @@ out:
     return 0;
 }
 uint32_t
-rl_ctrl_get_id(struct rlite_ctrl *ctrl)
+rl_ctrl_get_id(struct rl_ctrl *ctrl)
 {
     uint32_t ret;
 
@@ -154,7 +154,7 @@ rl_ctrl_get_id(struct rlite_ctrl *ctrl)
 }
 
 int
-rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl)
+rl_ctrl_ipcps_print(struct rl_ctrl *ctrl)
 {
     struct rl_ipcp *rl_ipcp;
 
@@ -182,13 +182,13 @@ rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl)
     return 0;
 }
 
-struct rlite_msg_base *
+struct rl_msg_base *
 read_next_msg(int rfd)
 {
-    unsigned int max_resp_size = rlite_numtables_max_size(
-                rlite_ker_numtables,
-                sizeof(rlite_ker_numtables)/sizeof(struct rlite_msg_layout));
-    struct rlite_msg_base *resp;
+    unsigned int max_resp_size = rl_numtables_max_size(
+                rl_ker_numtables,
+                sizeof(rl_ker_numtables)/sizeof(struct rl_msg_layout));
+    struct rl_msg_base *resp;
     char serbuf[4096];
     int ret;
 
@@ -206,7 +206,7 @@ read_next_msg(int rfd)
     }
 
     /* Deserialize the message from serbuf into resp. */
-    ret = deserialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                 serbuf, ret, (void *)resp, max_resp_size);
     if (ret) {
         PE("Problems during deserialization [%d]\n", ret);
@@ -218,20 +218,20 @@ read_next_msg(int rfd)
 }
 
 int
-rl_write_msg(int rfd, struct rlite_msg_base *msg)
+rl_write_msg(int rfd, struct rl_msg_base *msg)
 {
     char serbuf[4096];
     unsigned int serlen;
     int ret;
 
     /* Serialize the message. */
-    serlen = rlite_msg_serlen(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+    serlen = rl_msg_serlen(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
     if (serlen > sizeof(serbuf)) {
         PE("Serialized message would be too long [%u]\n",
                     serlen);
         return -1;
     }
-    serlen = serialize_rlite_msg(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    serlen = serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                  serbuf, msg);
 
     ret = write(rfd, serbuf, serlen);
@@ -252,7 +252,7 @@ rl_write_msg(int rfd, struct rlite_msg_base *msg)
 }
 
 struct rl_ipcp *
-rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
+rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
                            const char *dif_name)
 {
     struct rl_ipcp *cur;
@@ -291,7 +291,7 @@ rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
 }
 
 struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
+rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
                             const struct rina_name *name)
 {
     struct rl_ipcp *ipcp;
@@ -314,7 +314,7 @@ rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
 }
 
 int
-rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
+rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
                                rl_addr_t *addr)
 {
     struct rl_ipcp *ipcp;
@@ -335,7 +335,7 @@ rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
 }
 
 struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
+rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id)
 {
     struct rl_ipcp *ipcp;
 
@@ -354,7 +354,7 @@ rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id)
 }
 
 void
-rl_flow_spec_default(struct rlite_flow_spec *spec)
+rl_flow_spec_default(struct rl_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
     spec->max_sdu_gap = -1;         /* unbounded allowed gap */
@@ -367,7 +367,7 @@ rl_flow_spec_default(struct rlite_flow_spec *spec)
 
 /* This is used by uipcp, not by applications. */
 void
-rl_flow_cfg_default(struct rlite_flow_config *cfg)
+rl_flow_cfg_default(struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->partial_delivery = 0;
@@ -381,7 +381,7 @@ rl_flow_cfg_default(struct rlite_flow_config *cfg)
 static int
 open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
 {
-    struct rlite_ioctl_info info;
+    struct rl_ioctl_info info;
     int fd;
     int ret;
 
@@ -495,7 +495,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rlite_flow_spec *flowspec,
+               const struct rl_flow_spec *flowspec,
                rl_ipcp_id_t upper_ipcp_id)
 {
     memset(req, 0, sizeof(*req));
@@ -547,10 +547,10 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
 }
 
 static int
-rl_ctrl_barrier(struct rlite_ctrl *ctrl)
+rl_ctrl_barrier(struct rl_ctrl *ctrl)
 {
-    struct rlite_msg_base req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base req;
+    struct rl_msg_base *resp;
     int ret;
 
     req.msg_type = RLITE_KER_BARRIER;
@@ -572,7 +572,7 @@ rl_ctrl_barrier(struct rlite_ctrl *ctrl)
 }
 
 int
-rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
+rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev)
 {
     int ret;
 
@@ -613,7 +613,7 @@ rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev)
 }
 
 int
-rl_ctrl_fini(struct rlite_ctrl *ctrl)
+rl_ctrl_fini(struct rl_ctrl *ctrl)
 {
     pthread_mutex_lock(&ctrl->lock);
     pending_queue_fini(&ctrl->pqueue);
@@ -628,11 +628,11 @@ rl_ctrl_fini(struct rlite_ctrl *ctrl)
 }
 
 static uint32_t
-rl_ctrl_fa_req_common(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_fa_req_common(struct rl_ctrl *ctrl, const char *dif_name,
                       const struct rina_name *ipcp_name,
                       const struct rina_name *local_appl,
                       const struct rina_name *remote_appl,
-                      const struct rlite_flow_spec *flowspec)
+                      const struct rl_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     struct rl_ipcp *rl_ipcp;
@@ -666,34 +666,34 @@ rl_ctrl_fa_req_common(struct rlite_ctrl *ctrl, const char *dif_name,
         event_id = 0;
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&req));
 
     return event_id;
 }
 
 uint32_t
-rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rlite_flow_spec *flowspec)
+               const struct rl_flow_spec *flowspec)
 {
     return rl_ctrl_fa_req_common(ctrl, dif_name, NULL, local_appl,
                                  remote_appl, flowspec);
 }
 
 uint32_t
-rl_ctrl_fa_req2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+rl_ctrl_fa_req2(struct rl_ctrl *ctrl, const struct rina_name *ipcp_name,
                 const struct rina_name *local_appl,
                 const struct rina_name *remote_appl,
-                const struct rlite_flow_spec *flowspec)
+                const struct rl_flow_spec *flowspec)
 {
     return rl_ctrl_fa_req_common(ctrl, NULL, ipcp_name, local_appl,
                                  remote_appl, flowspec);
 }
 
 static uint32_t
-rl_ctrl_reg_req_common(struct rlite_ctrl *ctrl, int reg,
+rl_ctrl_reg_req_common(struct rl_ctrl *ctrl, int reg,
                        const char *dif_name,
                        const struct rina_name *ipcp_name,
                        const struct rina_name *appl_name)
@@ -730,32 +730,32 @@ rl_ctrl_reg_req_common(struct rlite_ctrl *ctrl, int reg,
         event_id = 0;
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&req));
 
     return event_id;
 }
 
 uint32_t
-rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg, const char *dif_name,
+rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
                 const struct rina_name *appl_name)
 {
     return rl_ctrl_reg_req_common(ctrl, reg, dif_name, NULL, appl_name);
 }
 
 uint32_t
-rl_ctrl_reg_req2(struct rlite_ctrl *ctrl, int reg,
+rl_ctrl_reg_req2(struct rl_ctrl *ctrl, int reg,
                  const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name)
 {
     return rl_ctrl_reg_req_common(ctrl, reg, NULL, ipcp_name, appl_name);
 }
 
-static struct rlite_msg_base *
-rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
+static struct rl_msg_base *
+rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
                     uint32_t event_id)
 {
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     struct pending_entry *entry;
     fd_set rdfs;
     int ret;
@@ -814,7 +814,7 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
         switch (resp->msg_type) {
             case RLITE_KER_IPCP_UPDATE:
                 rl_ctrl_ipcp_update(ctrl, (struct rl_kmsg_ipcp_update *)resp);
-                rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+                rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                RLITE_MB(resp));
                 free(resp);
                 continue;
@@ -841,24 +841,24 @@ rl_ctrl_wait_common(struct rlite_ctrl *ctrl, unsigned int msg_type,
     return NULL;
 }
 
-struct rlite_msg_base *
-rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id)
+struct rl_msg_base *
+rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id)
 {
     return rl_ctrl_wait_common(ctrl, 0, event_id);
 }
 
-struct rlite_msg_base *
-rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type)
+struct rl_msg_base *
+rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type)
 {
     return rl_ctrl_wait_common(ctrl, msg_type, 0);
 }
 
 static int
-rl_ctrl_flow_alloc_common(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_flow_alloc_common(struct rl_ctrl *ctrl, const char *dif_name,
                           const struct rina_name *ipcp_name,
                           const struct rina_name *local_appl,
                           const struct rina_name *remote_appl,
-                          const struct rlite_flow_spec *flowspec)
+                          const struct rl_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_resp_arrived *resp;
     uint32_t event_id;
@@ -884,7 +884,7 @@ rl_ctrl_flow_alloc_common(struct rlite_ctrl *ctrl, const char *dif_name,
         fd = rl_open_appl_port(resp->port_id);
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
 
@@ -892,28 +892,28 @@ rl_ctrl_flow_alloc_common(struct rlite_ctrl *ctrl, const char *dif_name,
 }
 
 int
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_flow_alloc(struct rl_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec)
+                   const struct rl_flow_spec *flowspec)
 {
     return rl_ctrl_flow_alloc_common(ctrl, dif_name, NULL, local_appl,
                                      remote_appl, flowspec);
 }
 
 int
-rl_ctrl_flow_alloc2(struct rlite_ctrl *ctrl,
+rl_ctrl_flow_alloc2(struct rl_ctrl *ctrl,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
-                    const struct rlite_flow_spec *flowspec)
+                    const struct rl_flow_spec *flowspec)
 {
     return rl_ctrl_flow_alloc_common(ctrl, NULL, ipcp_name, local_appl,
                                      remote_appl, flowspec);
 }
 
 static int
-rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
+rl_ctrl_register_common(struct rl_ctrl *ctrl, int reg,
                         const char *dif_name,
                         const struct rina_name *ipcp_name,
                         const struct rina_name *appl_name)
@@ -941,7 +941,7 @@ rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
         ret = 0;
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
 
@@ -949,35 +949,35 @@ rl_ctrl_register_common(struct rlite_ctrl *ctrl, int reg,
 }
 
 int
-rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_register(struct rl_ctrl *ctrl, const char *dif_name,
                  const struct rina_name *appl_name)
 {
     return rl_ctrl_register_common(ctrl, 1, dif_name, NULL, appl_name);
 }
 
 int
-rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_unregister(struct rl_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *appl_name)
 {
     return rl_ctrl_register_common(ctrl, 0, dif_name, NULL, appl_name);
 }
 
 int
-rl_ctrl_register2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+rl_ctrl_register2(struct rl_ctrl *ctrl, const struct rina_name *ipcp_name,
                   const struct rina_name *appl_name)
 {
     return rl_ctrl_register_common(ctrl, 1, NULL, ipcp_name, appl_name);
 }
 
 int
-rl_ctrl_unregister2(struct rlite_ctrl *ctrl, const struct rina_name *ipcp_name,
+rl_ctrl_unregister2(struct rl_ctrl *ctrl, const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name)
 {
     return rl_ctrl_register_common(ctrl, 0, NULL, ipcp_name, appl_name);
 }
 
 int
-rl_ctrl_flow_accept(struct rlite_ctrl *ctrl)
+rl_ctrl_flow_accept(struct rl_ctrl *ctrl)
 {
     struct rl_kmsg_fa_req_arrived *req;
     struct rl_kmsg_fa_resp resp;
@@ -1006,9 +1006,9 @@ rl_ctrl_flow_accept(struct rlite_ctrl *ctrl)
     ret = rl_open_appl_port(req->port_id);
 
 out:
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(req));
     free(req);
 

@@ -48,7 +48,7 @@ struct rinaperf_test_config {
 };
 
 struct rinaperf {
-    struct rlite_ctrl ctrl;
+    struct rl_ctrl ctrl;
 
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
@@ -462,7 +462,7 @@ sigint_handler(int signum)
 }
 
 static void
-parse_bandwidth(struct rlite_flow_spec *spec, const char *arg)
+parse_bandwidth(struct rl_flow_spec *spec, const char *arg)
 {
     size_t arglen = strlen(arg);
 
@@ -535,7 +535,7 @@ main(int argc, char **argv)
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
-    struct rlite_flow_spec flowspec;
+    struct rl_flow_spec flowspec;
     int listen = 0;
     int cnt = 1;
     int size = 1;

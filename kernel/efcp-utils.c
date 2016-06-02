@@ -44,7 +44,7 @@ EXPORT_SYMBOL(dtp_init);
 void
 dtp_fini(struct dtp *dtp)
 {
-    struct rlite_buf *rb, *tmp;
+    struct rl_buf *rb, *tmp;
 
     spin_lock_bh(&dtp->lock);
 
@@ -55,21 +55,21 @@ dtp_fini(struct dtp *dtp)
     PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del(&rb->node);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     }
     dtp->cwq_len = 0;
 
     PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->seqq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
         list_del(&rb->node);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     }
     dtp->seqq_len = 0;
 
     PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del(&rb->node);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     }
     dtp->rtxq_len = 0;
 

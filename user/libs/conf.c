@@ -30,7 +30,7 @@
 
 /* Create an IPC process. */
 long int
-rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
+rl_conf_ipcp_create(struct rl_ctrl *ctrl,
                     const struct rina_name *name, const char *dif_type,
                     const char *dif_name)
 {
@@ -48,23 +48,23 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
     ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
         return -1;
     }
 
     resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id);
     if (!resp) {
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
         return -1;
     }
 
     ret = resp->ipcp_id;
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
 
@@ -73,7 +73,7 @@ rl_conf_ipcp_create(struct rlite_ctrl *ctrl,
 
 /* Wait for an uIPCP to show up. */
 int
-rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
+rl_conf_ipcp_uipcp_wait(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_wait msg;
     int ret;
@@ -88,7 +88,7 @@ rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
         PE("Failed to issue request to the kernel\n");
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
 
     return ret;
@@ -96,7 +96,7 @@ rl_conf_ipcp_uipcp_wait(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 
 /* Destroy an IPC process. */
 int
-rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
+rl_conf_ipcp_destroy(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;
@@ -111,7 +111,7 @@ rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
         PE("Failed to issue request to the kernel\n");
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
 
     return ret;
@@ -119,7 +119,7 @@ rl_conf_ipcp_destroy(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
 
 /* Configure an IPC process. */
 int
-rl_conf_ipcp_config(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
+rl_conf_ipcp_config(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value)
 {
     struct rl_kmsg_ipcp_config msg;
@@ -132,7 +132,7 @@ rl_conf_ipcp_config(struct rlite_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
         PE("Failed to issue request to the kernel\n");
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
 
     return ret;
@@ -142,7 +142,7 @@ static int
 flow_fetch_resp(struct list_head *flows,
                 const struct rl_kmsg_flow_fetch_resp *resp)
 {
-    struct rlite_flow *rlite_flow;
+    struct rl_flow *rl_flow;
 
     if (resp->end) {
         /* This response is just to say there are no
@@ -151,28 +151,28 @@ flow_fetch_resp(struct list_head *flows,
         return 0;
     }
 
-    rlite_flow = malloc(sizeof(*rlite_flow));
-    if (!rlite_flow) {
+    rl_flow = malloc(sizeof(*rl_flow));
+    if (!rl_flow) {
         PE("Out of memory\n");
         return 0;
     }
 
-    rlite_flow->ipcp_id = resp->ipcp_id;
-    rlite_flow->local_port = resp->local_port;
-    rlite_flow->remote_port = resp->remote_port;
-    rlite_flow->local_addr = resp->local_addr;
-    rlite_flow->remote_addr = resp->remote_addr;
+    rl_flow->ipcp_id = resp->ipcp_id;
+    rl_flow->local_port = resp->local_port;
+    rl_flow->remote_port = resp->remote_port;
+    rl_flow->local_addr = resp->local_addr;
+    rl_flow->remote_addr = resp->remote_addr;
 
-    list_add_tail(&rlite_flow->node, flows);
+    list_add_tail(&rl_flow->node, flows);
 
     return 0;
 }
 
 int
-rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
+rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
 {
     struct rl_kmsg_flow_fetch_resp *resp;
-    struct rlite_msg_base msg;
+    struct rl_msg_base msg;
     int end = 0;
 
     memset(&msg, 0, sizeof(msg));
@@ -201,13 +201,13 @@ rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
             flow_fetch_resp(flows, resp);
 
             end = resp->end;
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(resp));
             free(resp);
         }
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
 
     return 0;
@@ -216,17 +216,17 @@ rl_conf_flows_fetch(struct rlite_ctrl *ctrl, struct list_head *flows)
 void
 rl_conf_flows_purge(struct list_head *flows)
 {
-    struct rlite_flow *rlite_flow, *tmp;
+    struct rl_flow *rl_flow, *tmp;
 
     /* Purge the flows list. */
-    list_for_each_entry_safe(rlite_flow, tmp, flows, node) {
-        list_del(&rlite_flow->node);
-        free(rlite_flow);
+    list_for_each_entry_safe(rl_flow, tmp, flows, node) {
+        list_del(&rl_flow->node);
+        free(rl_flow);
     }
 }
 
 int
-rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, rl_port_t port_id,
+rl_conf_flow_get_stats(struct rl_ctrl *ctrl, rl_port_t port_id,
                        struct rl_flow_stats *stats)
 {
     struct rl_kmsg_flow_stats_req msg;
@@ -241,7 +241,7 @@ rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, rl_port_t port_id,
     ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
         return -1;
     }
@@ -253,9 +253,9 @@ rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, rl_port_t port_id,
 
     *stats = resp->stats;
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&msg));
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(resp));
     free(resp);
 
@@ -263,23 +263,23 @@ rl_conf_flow_get_stats(struct rlite_ctrl *ctrl, rl_port_t port_id,
 }
 
 int
-rl_conf_flows_print(struct rlite_ctrl *ctrl, struct list_head *flows)
+rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
 {
-    struct rlite_flow *rlite_flow;
+    struct rl_flow *rl_flow;
 
     PI_S("Flows table:\n");
-    list_for_each_entry(rlite_flow, flows, node) {
+    list_for_each_entry(rl_flow, flows, node) {
         struct rl_flow_stats stats;
         int ret;
 
         PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
              "local_addr = %llu, remote_addr = %llu\n",
-                rlite_flow->ipcp_id, rlite_flow->local_port,
-                rlite_flow->remote_port,
-                (long long unsigned int)rlite_flow->local_addr,
-                (long long unsigned int)rlite_flow->remote_addr);
+                rl_flow->ipcp_id, rl_flow->local_port,
+                rl_flow->remote_port,
+                (long long unsigned int)rl_flow->local_addr,
+                (long long unsigned int)rl_flow->remote_addr);
 
-        ret = rl_conf_flow_get_stats(ctrl, rlite_flow->local_port, &stats);
+        ret = rl_conf_flow_get_stats(ctrl, rl_flow->local_port, &stats);
         if (!ret) {
             PI_S("      tx_pkt: %lu, tx_byte: %lu, tx_err: %lu\n"
                  "      rx_pkt: %lu, rx_byte: %lu, rx_err: %lu\n\n",

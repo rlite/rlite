@@ -76,7 +76,7 @@ parse_flowcfg_int(const string& param, const string& value,
 }
 
 static int
-update_qos_cube(struct rlite_flow_config& flowcfg, const string& param,
+update_qos_cube(struct rl_flow_config& flowcfg, const string& param,
                    const string& value)
 {
     int field_int;

@@ -185,7 +185,7 @@ private:
 #define NUM_WORKERS     1
 
 struct Gateway {
-    struct rlite_evloop loop;
+    struct rl_evloop loop;
     struct rina_name appl_name;
 
     /* Used to map IP:PORT --> RLITE_NAME, when
@@ -547,9 +547,9 @@ parse_conf(const char *confname)
 }
 
 static int
-gw_fa_req_arrived(struct rlite_evloop *loop,
-                  const struct rlite_msg_base *b_resp,
-                  const struct rlite_msg_base *b_req)
+gw_fa_req_arrived(struct rl_evloop *loop,
+                  const struct rl_msg_base *b_resp,
+                  const struct rl_msg_base *b_req)
 {
     Gateway * gw = container_of(loop, struct Gateway, loop);
     struct rl_kmsg_fa_req_arrived *req =
@@ -613,7 +613,7 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
 
     rfd = rl_open_appl_port(req->port_id);
     if (rfd < 0) {
-        PE("rlite_open_appl_port() failed\n");
+        PE("rl_open_appl_port() failed\n");
         close(cfd);
         return 0;
     }
@@ -630,9 +630,9 @@ gw_fa_req_arrived(struct rlite_evloop *loop,
 }
 
 static int
-gw_fa_resp_arrived(struct rlite_evloop *loop,
-                   const struct rlite_msg_base *b_resp,
-                   const struct rlite_msg_base *b_req)
+gw_fa_resp_arrived(struct rl_evloop *loop,
+                   const struct rl_msg_base *b_resp,
+                   const struct rl_msg_base *b_req)
 {
     Gateway * gw = container_of(loop, struct Gateway, loop);
     struct rl_kmsg_fa_resp_arrived *resp =
@@ -679,13 +679,13 @@ gw_fa_resp_arrived(struct rlite_evloop *loop,
 }
 
 static void
-accept_inet_conn(struct rlite_evloop *loop, int lfd)
+accept_inet_conn(struct rl_evloop *loop, int lfd)
 {
     Gateway * gw = container_of(loop, struct Gateway, loop);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
     map<int, RinaName>::iterator mit;
-    struct rlite_flow_spec flowspec;
+    struct rl_flow_spec flowspec;
     unsigned int event_id;
     unsigned int unused;
     int cfd;

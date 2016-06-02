@@ -29,7 +29,7 @@ using namespace std;
  * representation to be used in the FlowRequest CDAP
  * message. */
 static void
-flowcfg2policies(const struct rlite_flow_config *cfg,
+flowcfg2policies(const struct rl_flow_config *cfg,
                  QosSpec &q, ConnPolicies& p)
 {
     q.partial_delivery = cfg->partial_delivery;
@@ -69,7 +69,7 @@ flowcfg2policies(const struct rlite_flow_config *cfg,
 /* Translate a standard flow policies specification from FlowRequest
  * CDAP message into a local flow configuration. */
 static void
-policies2flowcfg(struct rlite_flow_config *cfg,
+policies2flowcfg(struct rl_flow_config *cfg,
                  const QosSpec &q, const ConnPolicies& p)
 {
     cfg->partial_delivery = q.partial_delivery;
@@ -106,7 +106,7 @@ policies2flowcfg(struct rlite_flow_config *cfg,
 
 #ifndef RL_USE_QOS_CUBES
 static void
-flowspec2flowcfg(struct rlite_flow_spec *spec, struct rlite_flow_config *cfg)
+flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
 
@@ -156,7 +156,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     ConnId conn_id;
     stringstream obj_name;
     string cubename;
-    struct rlite_flow_config flowcfg;
+    struct rl_flow_config flowcfg;
     int ret;
 
     ret = dft_lookup(dest_appl, remote_addr);
@@ -190,7 +190,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     /* Translate the flow specification into a local flow configuration. */
     flowspec2flowcfg(&req->flowspec, &flowcfg);
 #else  /* RL_USE_QOS_CUBES */
-    map<string, struct rlite_flow_config>::iterator qcmi;
+    map<string, struct rl_flow_config>::iterator qcmi;
 
     /* Translate the flow specification into a local flow configuration.
      * For now this is accomplished by just specifying the
@@ -289,7 +289,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
 
     FlowRequest freq(objbuf, objlen);
     struct rina_name local_appl, remote_appl;
-    struct rlite_flow_config flowcfg;
+    struct rl_flow_config flowcfg;
     rl_addr_t dft_next_hop;
     int ret;
 

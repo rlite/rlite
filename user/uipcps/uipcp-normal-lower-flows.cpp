@@ -299,7 +299,7 @@ uipcp_rib::pduft_sync()
 }
 
 void
-age_incr_cb(struct rlite_evloop *loop, void *arg)
+age_incr_cb(struct rl_evloop *loop, void *arg)
 {
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
     ScopeLock(rib->lock);

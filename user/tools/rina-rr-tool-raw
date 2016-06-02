@@ -2,7 +2,7 @@
 
 # Written by: Vincenzo Maffione <v.maffione@gmail.com>
 
-from rlite_raw import *
+from rl_raw import *
 import argparse
 import select
 import sys
@@ -28,7 +28,7 @@ def buf2str(b):
 class RinaRRTool:
 
     def __init__(self):
-        self.rc = rlite_ctrl()
+        self.rc = rl_ctrl()
         ret = rl_ctrl_init(self.rc, None)
         if ret:
             raise Exception("Could not open rlite ctrl device")
@@ -37,7 +37,7 @@ class RinaRRTool:
         self.server_name = rina_name()
         self.dif = rina_name()
         self.ipcp_name = rina_name()
-        self.flow_spec = rlite_flow_spec()
+        self.flow_spec = rl_flow_spec()
         rl_flow_spec_default(self.flow_spec)
 
 
@@ -124,11 +124,11 @@ argparser.add_argument('-p', '--ipcp-apn', help = "IPCP APN (overwrites -d)",
 argparser.add_argument('-P', '--ipcp-api', help = "IPCP API (overwrites -d)",
                        type = str)
 argparser.add_argument('-a', '--client-apn', help = "client APN",
-                       type = str, default='rlite_rr-data')
+                       type = str, default='rl_rr-data')
 argparser.add_argument('-A', '--client-api', help = "client API",
                        type = str, default='client')
 argparser.add_argument('-z', '--server-apn', help = "server APN",
-                       type = str, default='rlite_rr-data')
+                       type = str, default='rl_rr-data')
 argparser.add_argument('-Z', '--server-api', help = "server API",
                        type = str, default='server')
 

@@ -172,7 +172,7 @@ NeighFlow::abort_enrollment()
 }
 
 static void
-keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
+keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     uipcp_rib *rib = nf->neigh->rib;
@@ -235,7 +235,7 @@ keepalive_timeout_cb(struct rlite_evloop *loop, void *arg)
 }
 
 static void
-enroll_timeout_cb(struct rlite_evloop *loop, void *arg)
+enroll_timeout_cb(struct rl_evloop *loop, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     ScopeLock(nf->neigh->rib->lock);

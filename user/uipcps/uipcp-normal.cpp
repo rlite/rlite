@@ -67,7 +67,7 @@ namespace obj_name {
 #define MGMTBUF_SIZE_MAX 4096
 
 static int
-mgmt_write(struct uipcp *uipcp, const struct rlite_mgmt_hdr *mhdr,
+mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
            void *buf, size_t buflen)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
@@ -108,7 +108,7 @@ int
 mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                          void *buf, size_t buflen)
 {
-    struct rlite_mgmt_hdr mhdr;
+    struct rl_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
@@ -121,7 +121,7 @@ int
 mgmt_write_to_dst_addr(struct uipcp *uipcp, rl_addr_t dst_addr,
                        void *buf, size_t buflen)
 {
-    struct rlite_mgmt_hdr mhdr;
+    struct rl_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
     mhdr.type = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
@@ -131,7 +131,7 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, rl_addr_t dst_addr,
 }
 
 static int
-rib_recv_msg(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
+rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     CDAPMessage *m = NULL;
@@ -220,12 +220,12 @@ rib_recv_msg(struct uipcp_rib *rib, struct rlite_mgmt_hdr *mhdr,
 }
 
 static void
-mgmt_fd_ready(struct rlite_evloop *loop, int fd)
+mgmt_fd_ready(struct rl_evloop *loop, int fd)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
-    struct rlite_mgmt_hdr *mhdr;
+    struct rl_mgmt_hdr *mhdr;
     int n;
 
     assert(fd == rib->mgmtfd);
@@ -244,7 +244,7 @@ mgmt_fd_ready(struct rlite_evloop *loop, int fd)
     }
 
     /* Grab the management header. */
-    mhdr = (struct rlite_mgmt_hdr *)mgmtbuf;
+    mhdr = (struct rl_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
     /* Hand off the message to the RIB. */
@@ -331,9 +331,9 @@ uipcp_rib::dump() const
 
 #ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
-    for (map<string, struct rlite_flow_config>::const_iterator
+    for (map<string, struct rl_flow_config>::const_iterator
                     i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
-            const struct rlite_flow_config& c = i->second;
+            const struct rl_flow_config& c = i->second;
 
             ss << i->first.c_str() << ": {" << endl;
             ss << "   partial_delivery=" << u82boolstr(c.partial_delivery)
@@ -635,9 +635,9 @@ uipcp_rib::remote_sync_obj_all(bool create, const string& obj_class,
 }
 
 static int
-normal_appl_register(struct rlite_evloop *loop,
-                     const struct rlite_msg_base *b_resp,
-                     const struct rlite_msg_base *b_req)
+normal_appl_register(struct rl_evloop *loop,
+                     const struct rl_msg_base *b_resp,
+                     const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
@@ -651,9 +651,9 @@ normal_appl_register(struct rlite_evloop *loop,
 }
 
 static int
-normal_fa_req(struct rlite_evloop *loop,
-             const struct rlite_msg_base *b_resp,
-             const struct rlite_msg_base *b_req)
+normal_fa_req(struct rl_evloop *loop,
+             const struct rl_msg_base *b_resp,
+             const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
@@ -669,9 +669,9 @@ normal_fa_req(struct rlite_evloop *loop,
 }
 
 static int
-neigh_fa_req_arrived(struct rlite_evloop *loop,
-                     const struct rlite_msg_base *b_resp,
-                     const struct rlite_msg_base *b_req)
+neigh_fa_req_arrived(struct rl_evloop *loop,
+                     const struct rl_msg_base *b_resp,
+                     const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req_arrived *req =
@@ -727,9 +727,9 @@ err:
 }
 
 static int
-normal_fa_resp(struct rlite_evloop *loop,
-              const struct rlite_msg_base *b_resp,
-              const struct rlite_msg_base *b_req)
+normal_fa_resp(struct rl_evloop *loop,
+              const struct rl_msg_base *b_resp,
+              const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_resp *resp =
@@ -746,9 +746,9 @@ normal_fa_resp(struct rlite_evloop *loop,
 }
 
 static int
-normal_flow_deallocated(struct rlite_evloop *loop,
-                       const struct rlite_msg_base *b_resp,
-                       const struct rlite_msg_base *b_req)
+normal_flow_deallocated(struct rl_evloop *loop,
+                       const struct rl_msg_base *b_resp,
+                       const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =

@@ -65,7 +65,7 @@ struct arpt_entry {
     struct list_head node;
 };
 
-struct rlite_shim_eth {
+struct rl_shim_eth {
     struct ipcp_entry *ipcp;
     struct net_device *netdev;
 
@@ -84,9 +84,9 @@ struct rlite_shim_eth {
 static void arp_resolver_cb(unsigned long arg);
 
 static void *
-rlite_shim_eth_create(struct ipcp_entry *ipcp)
+rl_shim_eth_create(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_eth *priv;
+    struct rl_shim_eth *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -111,9 +111,9 @@ rlite_shim_eth_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rlite_shim_eth_destroy(struct ipcp_entry *ipcp)
+rl_shim_eth_destroy(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
 
     spin_lock_bh(&priv->arpt_lock);
@@ -148,10 +148,10 @@ rlite_shim_eth_destroy(struct ipcp_entry *ipcp)
 }
 
 static int
-rlite_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
+rl_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
                        int reg)
 {
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
 
     if (reg) {
         int ret;
@@ -199,7 +199,7 @@ rlite_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
 
 /* To be called under arpt_lock. */
 static struct arpt_entry *
-arp_lookup_direct_b(struct rlite_shim_eth *priv, const char *dst_app,
+arp_lookup_direct_b(struct rl_shim_eth *priv, const char *dst_app,
                     int dst_app_len)
 {
     struct arpt_entry *entry;
@@ -216,7 +216,7 @@ arp_lookup_direct_b(struct rlite_shim_eth *priv, const char *dst_app,
 
 /* This function is taken after net/ipv4/arp.c:arp_create() */
 static struct sk_buff *
-arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
+arp_create(struct rl_shim_eth *priv, uint16_t op, const char *spa,
            int spa_len, const char *tpa, int tpa_len, const void *tha,
            gfp_t gfp)
 {
@@ -290,7 +290,7 @@ arp_create(struct rlite_shim_eth *priv, uint16_t op, const char *spa,
 static void
 arp_resolver_cb(unsigned long arg)
 {
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)arg;
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)arg;
     struct arpt_entry *entry;
     bool some_incomplete = false;
     struct sk_buff_head skbq;
@@ -355,14 +355,14 @@ arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
     entry->flow = flow;
     flow->priv = entry;
 
-    rlite_flow_share_tx_wqh(flow);
+    rl_flow_share_tx_wqh(flow);
 }
 
 static int
-rlite_shim_eth_fa_req(struct ipcp_entry *ipcp,
+rl_shim_eth_fa_req(struct ipcp_entry *ipcp,
                      struct flow_entry *flow)
 {
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry = NULL;
     struct sk_buff *skb;
     char *spa = NULL; /* Sender Protocol Address. */
@@ -397,7 +397,7 @@ rlite_shim_eth_fa_req(struct ipcp_entry *ipcp,
         kfree(tpa);
 
         if (ret == 0) {
-            rlite_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL);
+            rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL);
         }
 
         return ret;
@@ -466,13 +466,13 @@ nomem:
 }
 
 static int
-rlite_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
+rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
                       uint8_t response)
 {
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry;
     char *remote_app_s;
-    struct rlite_buf *rb, *tmp;
+    struct rl_buf *rb, *tmp;
     int ret = -ENXIO;
 
     remote_app_s = rina_name_to_string(&flow->remote_appl);
@@ -485,12 +485,12 @@ rlite_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     entry = arp_lookup_direct_b(priv, remote_app_s, strlen(remote_app_s));
     if (entry) {
-        /* Drain the temporary rx queue. Calling rlite_sdu_rx_flow() while
+        /* Drain the temporary rx queue. Calling rl_sdu_rx_flow() while
          * holding the ARP table spinlock it's not the best option, but
          * at least we don't introduce reordering due to race conditions
          * between the drain cycle and new PDUs coming. Previous
          * implementation used to move the PDUs into another temporary
-         * queue local to this function and calling rlite_sdu_rx_flow()
+         * queue local to this function and calling rl_sdu_rx_flow()
          * out of the critical section, but it used to suffer from
          * reordering. True is that shim-eth does not have to guarantee
          * in order delivery, but the reordering problem complicates
@@ -500,7 +500,7 @@ rlite_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 entry->rx_tmpq_len);
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
             list_del(&rb->node);
-            rlite_sdu_rx_flow(ipcp, flow, rb, true);
+            rl_sdu_rx_flow(ipcp, flow, rb, true);
         }
         entry->rx_tmpq_len = 0;
         arpt_flow_bind(entry, flow);
@@ -527,7 +527,7 @@ arp_name_len(const char *buf, size_t buflen)
 }
 
 static void
-shim_eth_arp_rx(struct rlite_shim_eth *priv, struct arphdr *arp, int len)
+shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
 {
     const char *sha = (const char *)(arp) + sizeof(*arp);
     const char *spa = (const char *)(arp) + sizeof(*arp) + arp->ar_hln;
@@ -635,7 +635,7 @@ out:
     if (flow) {
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
-        rlite_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0,
+        rl_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0,
                               0, NULL);
     }
 
@@ -646,9 +646,9 @@ out:
 }
 
 static void
-shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
+shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rlite_buf *rb = rlite_buf_alloc(skb->len, priv->ipcp->depth,
+    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->depth,
                                            GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
@@ -668,7 +668,7 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
     skb_copy_bits(skb, 0, RLITE_BUF_DATA(rb), skb->len);
 
     /* TODO This lookup could be (partially) avoided if core implements
-     * another version of rlite_sdu_rx_flow() that does not need the flow
+     * another version of rl_sdu_rx_flow() that does not need the flow
      * argument. */
     spin_lock_bh(&priv->arpt_lock);
 
@@ -686,7 +686,7 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
         entry->stats.rx_byte += rb->len;
         spin_unlock_bh(&priv->arpt_lock);
 
-        rlite_sdu_rx_flow(priv->ipcp, flow, rb, true);
+        rl_sdu_rx_flow(priv->ipcp, flow, rb, true);
 
         return;
     }
@@ -726,7 +726,7 @@ shim_eth_pdu_rx(struct rlite_shim_eth *priv, struct sk_buff *skb)
             goto drop;
         }
 
-        ret = rlite_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, &priv->upper_name,
+        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, &priv->upper_name,
                 &remote_app, NULL);
         rina_name_free(&remote_app);
 
@@ -754,14 +754,14 @@ enq:
 drop:
     entry->stats.rx_err++;
     spin_unlock_bh(&priv->arpt_lock);
-    rlite_buf_free(rb);
+    rl_buf_free(rb);
 }
 
 static rx_handler_result_t
 shim_eth_rx_handler(struct sk_buff **skbp)
 {
     struct sk_buff *skb = (*skbp);
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)
                 rcu_dereference(skb->dev->rx_handler_data);
     unsigned int ethertype = ntohs(skb->protocol);
 
@@ -802,7 +802,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     struct flow_entry *flow = (struct flow_entry *)
                               (skb_shinfo(skb)->destructor_arg);
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
     bool notify;
 
     spin_lock_bh(&priv->tx_lock);
@@ -811,17 +811,17 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     spin_unlock_bh(&priv->tx_lock);
 
     if (notify) {
-        rlite_write_restart_flows(ipcp);
+        rl_write_restart_flows(ipcp);
     }
 }
 
 static int
-rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
+rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
                          struct flow_entry *flow,
-                         struct rlite_buf *rb,
+                         struct rl_buf *rb,
                          bool maysleep)
 {
-    struct rlite_shim_eth *priv = ipcp->priv;
+    struct rl_shim_eth *priv = ipcp->priv;
     struct net_device *netdev = priv->netdev;
     int hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length */
     struct sk_buff *skb = NULL;
@@ -895,17 +895,17 @@ rlite_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         spin_unlock_bh(&priv->tx_lock);
     }
 
-    rlite_buf_free(rb);
+    rl_buf_free(rb);
 
     return 0;
 }
 
 static int
-rlite_shim_eth_config(struct ipcp_entry *ipcp,
+rl_shim_eth_config(struct ipcp_entry *ipcp,
                        const char *param_name,
                        const char *param_value)
 {
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)ipcp->priv;
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
     int ret = -EINVAL;
 
     if (strcmp(param_name, "netdev") == 0) {
@@ -964,16 +964,16 @@ rlite_shim_eth_config(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)ipcp->priv;
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
     struct arpt_entry *entry;
 
     spin_lock_bh(&priv->arpt_lock);
 
     list_for_each_entry(entry, &priv->arp_table, node) {
         if (entry->flow == flow) {
-            struct rlite_buf *rb, *tmp;
+            struct rl_buf *rb, *tmp;
 
             /* Unbind the flow from this ARP table entry. */
             PD("Unbinding from flow %p\n", entry->flow);
@@ -982,7 +982,7 @@ rlite_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow
             entry->fa_req_arrived = false;
             list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
                 list_del(&rb->node);
-                rlite_buf_free(rb);
+                rl_buf_free(rb);
             }
             entry->rx_tmpq_len = 0;
         }
@@ -994,11 +994,11 @@ rlite_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow
 }
 
 static int
-rlite_shim_eth_flow_get_stats(struct flow_entry *flow,
+rl_shim_eth_flow_get_stats(struct flow_entry *flow,
                               struct rl_flow_stats *stats)
 {
     struct arpt_entry *flow_priv = (struct arpt_entry *)flow->priv;
-    struct rlite_shim_eth *priv = (struct rlite_shim_eth *)flow->txrx.ipcp->priv;
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
 
     spin_lock_bh(&priv->tx_lock);
     stats->tx_pkt = flow_priv->stats.tx_pkt;
@@ -1021,30 +1021,30 @@ static struct ipcp_factory shim_eth_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .use_cep_ids = false,
-    .create = rlite_shim_eth_create,
-    .ops.destroy = rlite_shim_eth_destroy,
-    .ops.flow_allocate_req = rlite_shim_eth_fa_req,
-    .ops.flow_allocate_resp = rlite_shim_eth_fa_resp,
-    .ops.sdu_write = rlite_shim_eth_sdu_write,
-    .ops.config = rlite_shim_eth_config,
-    .ops.appl_register = rlite_shim_eth_register,
-    .ops.flow_deallocated = rlite_shim_eth_flow_deallocated,
-    .ops.flow_get_stats = rlite_shim_eth_flow_get_stats,
+    .create = rl_shim_eth_create,
+    .ops.destroy = rl_shim_eth_destroy,
+    .ops.flow_allocate_req = rl_shim_eth_fa_req,
+    .ops.flow_allocate_resp = rl_shim_eth_fa_resp,
+    .ops.sdu_write = rl_shim_eth_sdu_write,
+    .ops.config = rl_shim_eth_config,
+    .ops.appl_register = rl_shim_eth_register,
+    .ops.flow_deallocated = rl_shim_eth_flow_deallocated,
+    .ops.flow_get_stats = rl_shim_eth_flow_get_stats,
 };
 
 static int __init
-rlite_shim_eth_init(void)
+rl_shim_eth_init(void)
 {
-    return rlite_ipcp_factory_register(&shim_eth_factory);
+    return rl_ipcp_factory_register(&shim_eth_factory);
 }
 
 static void __exit
-rlite_shim_eth_fini(void)
+rl_shim_eth_fini(void)
 {
-    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rlite_shim_eth_init);
-module_exit(rlite_shim_eth_fini);
+module_init(rl_shim_eth_init);
+module_exit(rl_shim_eth_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

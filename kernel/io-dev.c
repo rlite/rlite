@@ -45,7 +45,7 @@ tx_completion_func(unsigned long arg)
     struct ipcp_entry *ipcp= (struct ipcp_entry *)arg;
 
     for (;;) {
-        struct rlite_buf *rb;
+        struct rl_buf *rb;
         int ret;
 
         spin_lock_bh(&ipcp->rmtq_lock);
@@ -54,7 +54,7 @@ tx_completion_func(unsigned long arg)
             break;
         }
 
-        rb = list_first_entry(&ipcp->rmtq, struct rlite_buf, node);
+        rb = list_first_entry(&ipcp->rmtq, struct rl_buf, node);
         list_del(&rb->node);
         ipcp->rmtq_len--;
         spin_unlock_bh(&ipcp->rmtq_lock);
@@ -85,8 +85,8 @@ tx_completion_func(unsigned long arg)
 /* Userspace queue threshold. */
 #define USR_Q_TH        128
 
-int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rlite_buf *rb, bool qlimit)
+int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                     struct rl_buf *rb, bool qlimit)
 {
     struct txrx *txrx;
     int ret = 0;
@@ -96,7 +96,7 @@ int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
         if (unlikely(rb->len < sizeof(struct rina_pci))) {
             RPD(5, "Dropping SDU shorter [%u] than PCI\n",
                     (unsigned int)rb->len);
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             ret = -EINVAL;
             goto out;
         }
@@ -106,23 +106,23 @@ int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                       RLITE_BUF_PCI(rb)->dst_addr == 0))) {
             /* Management PDU for this IPC process. Post it to the userspace
              * IPCP. */
-            struct rlite_mgmt_hdr *mhdr;
+            struct rl_mgmt_hdr *mhdr;
             rl_addr_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
 
             if (!flow->upper.ipcp->mgmt_txrx) {
                 PE("Missing mgmt_txrx\n");
-                rlite_buf_free(rb);
+                rl_buf_free(rb);
                 ret = -EINVAL;
                 goto out;
             }
             txrx = flow->upper.ipcp->mgmt_txrx;
-            ret = rlite_buf_pci_pop(rb);
+            ret = rl_buf_pci_pop(rb);
             BUG_ON(ret); /* We already check bounds above. */
             /* Push a management header using the room made available
-             * by rlite_buf_pci_pop(). */
-            ret = rlite_buf_custom_push(rb, sizeof(*mhdr));
+             * by rl_buf_pci_pop(). */
+            ret = rl_buf_custom_push(rb, sizeof(*mhdr));
             BUG_ON(ret);
-            mhdr = (struct rlite_mgmt_hdr *)RLITE_BUF_DATA(rb);
+            mhdr = (struct rl_mgmt_hdr *)RLITE_BUF_DATA(rb);
             mhdr->type = RLITE_MGMT_HDR_T_IN;
             mhdr->local_port = flow->local_port;
             mhdr->remote_addr = src_addr;
@@ -144,7 +144,7 @@ int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
         /* This is useful when flow control is not used on a flow. */
         RPD(5, "dropping PDU [length %lu] to avoid userspace rx queue "
                 "overrun\n", (long unsigned)rb->len);
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
     } else {
         list_add_tail(&rb->node, &txrx->rx_q);
         txrx->rx_qlen++;
@@ -156,28 +156,28 @@ out:
 
     return ret;
 }
-EXPORT_SYMBOL(rlite_sdu_rx_flow);
+EXPORT_SYMBOL(rl_sdu_rx_flow);
 
 int
-rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb, rl_port_t local_port)
+rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb, rl_port_t local_port)
 {
     struct flow_entry *flow = flow_get(local_port);
     int ret;
 
     if (!flow) {
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
         return -ENXIO;
     }
 
-    ret = rlite_sdu_rx_flow(ipcp, flow, rb, true);
+    ret = rl_sdu_rx_flow(ipcp, flow, rb, true);
     flow_put(flow);
 
     return ret;
 }
-EXPORT_SYMBOL(rlite_sdu_rx);
+EXPORT_SYMBOL(rl_sdu_rx);
 
 static void
-rlite_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
+rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
     spin_lock_bh(&ipcp->rmtq_lock);
 
@@ -195,42 +195,42 @@ rlite_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 }
 
 void
-rlite_write_restart_flow(struct flow_entry *flow)
+rl_write_restart_flow(struct flow_entry *flow)
 {
-    rlite_write_restart_wqh(flow->txrx.ipcp, flow->txrx.tx_wqh);
+    rl_write_restart_wqh(flow->txrx.ipcp, flow->txrx.tx_wqh);
 }
-EXPORT_SYMBOL(rlite_write_restart_flow);
+EXPORT_SYMBOL(rl_write_restart_flow);
 
 void
-rlite_write_restart_flows(struct ipcp_entry *ipcp)
+rl_write_restart_flows(struct ipcp_entry *ipcp)
 {
-    rlite_write_restart_wqh(ipcp, &ipcp->tx_wqh);
+    rl_write_restart_wqh(ipcp, &ipcp->tx_wqh);
 }
-EXPORT_SYMBOL(rlite_write_restart_flows);
+EXPORT_SYMBOL(rl_write_restart_flows);
 
 void
-rlite_write_restart_port(rl_port_t local_port)
+rl_write_restart_port(rl_port_t local_port)
 {
     struct flow_entry *flow;
 
     flow = flow_get(local_port);
     if (flow) {
-        rlite_write_restart_flow(flow);
+        rl_write_restart_flow(flow);
         flow_put(flow);
     }
 }
-EXPORT_SYMBOL(rlite_write_restart_port);
+EXPORT_SYMBOL(rl_write_restart_port);
 
-struct rlite_io {
+struct rl_io {
     uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
 };
 
 static int
-rlite_io_open(struct inode *inode, struct file *f)
+rl_io_open(struct inode *inode, struct file *f)
 {
-    struct rlite_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
+    struct rl_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
 
     if (!rio) {
         PE("Out of memory\n");
@@ -242,13 +242,13 @@ rlite_io_open(struct inode *inode, struct file *f)
 }
 
 static ssize_t
-rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
+rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 {
-    struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct rl_io *rio = (struct rl_io *)f->private_data;
     struct flow_entry *flow;
     struct ipcp_entry *ipcp;
-    struct rlite_buf *rb;
-    struct rlite_mgmt_hdr mhdr;
+    struct rl_buf *rb;
+    struct rl_mgmt_hdr mhdr;
     size_t orig_len = ulen;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     DECLARE_WAITQUEUE(wait, current);
@@ -278,7 +278,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         return -EINVAL;
     }
 
-    rb = rlite_buf_alloc(ulen, ipcp->depth, GFP_KERNEL);
+    rb = rl_buf_alloc(ulen, ipcp->depth, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }
@@ -286,7 +286,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
     /* Copy in the userspace SDU. */
     if (copy_from_user(RLITE_BUF_DATA(rb), ubuf, ulen)) {
         PE("copy_from_user(data)\n");
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
         return -EFAULT;
     }
 
@@ -296,7 +296,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 
         if (!ipcp->ops.mgmt_sdu_build) {
             RPD(3, "Missing mgmt_sdu_write() operation\n");
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             return -ENXIO;
         }
 
@@ -305,7 +305,7 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
         ret = ipcp->ops.mgmt_sdu_build(ipcp, &mhdr, rb, &lower_ipcp,
                                        &lower_flow);
         if (ret) {
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             return ret;
         }
 
@@ -356,9 +356,9 @@ rlite_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppo
 }
 
 static ssize_t
-rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
+rl_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 {
-    struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct rl_io *rio = (struct rl_io *)f->private_data;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
@@ -374,7 +374,7 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 
     while (len) {
         ssize_t copylen;
-        struct rlite_buf *rb;
+        struct rl_buf *rb;
 
         current->state = TASK_INTERRUPTIBLE;
 
@@ -403,7 +403,7 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
             continue;
         }
 
-        rb = list_first_entry(&txrx->rx_q, struct rlite_buf, node);
+        rb = list_first_entry(&txrx->rx_q, struct rl_buf, node);
         list_del(&rb->node);
         txrx->rx_qlen--;
         spin_unlock_bh(&txrx->rx_lock);
@@ -418,13 +418,13 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         }
 
         if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-            if (unlikely(rlite_buf_pci_push(rb))) {
+            if (unlikely(rl_buf_pci_push(rb))) {
                 BUG_ON(1);
             }
             rio->flow->sdu_rx_consumed(rio->flow, rb);
         }
 
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
 
         break;
     }
@@ -439,9 +439,9 @@ rlite_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
 }
 
 static unsigned int
-rlite_io_poll(struct file *f, poll_table *wait)
+rl_io_poll(struct file *f, poll_table *wait)
 {
-    struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct rl_io *rio = (struct rl_io *)f->private_data;
     struct txrx *txrx = rio->txrx;
     unsigned int mask = 0;
 
@@ -467,7 +467,7 @@ rlite_io_poll(struct file *f, poll_table *wait)
 }
 
 static long
-rlite_io_ioctl_bind(struct rlite_io *rio, struct rlite_ioctl_info *info)
+rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
 
@@ -488,7 +488,7 @@ rlite_io_ioctl_bind(struct rlite_io *rio, struct rlite_ioctl_info *info)
 }
 
 static long
-rlite_io_ioctl_mgmt(struct rlite_io *rio, struct rlite_ioctl_info *info)
+rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
 {
     struct ipcp_entry *ipcp;
 
@@ -513,7 +513,7 @@ rlite_io_ioctl_mgmt(struct rlite_io *rio, struct rlite_ioctl_info *info)
 }
 
 static int
-rlite_io_release_internal(struct rlite_io *rio)
+rl_io_release_internal(struct rl_io *rio)
 {
     BUG_ON(!rio);
     switch (rio->mode) {
@@ -549,11 +549,11 @@ rlite_io_release_internal(struct rlite_io *rio)
 }
 
 static long
-rlite_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-    struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct rl_io *rio = (struct rl_io *)f->private_data;
     void __user *argp = (void __user *)arg;
-    struct rlite_ioctl_info info;
+    struct rl_ioctl_info info;
     long ret = -EINVAL;
 
     /* We have only one command. This should be used and checked. */
@@ -563,21 +563,21 @@ rlite_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         return -EFAULT;
     }
 
-    rlite_io_release_internal(rio);
+    rl_io_release_internal(rio);
 
     switch (info.mode) {
         case RLITE_IO_MODE_APPL_BIND:
-            ret = rlite_io_ioctl_bind(rio, &info);
+            ret = rl_io_ioctl_bind(rio, &info);
             break;
 
         case RLITE_IO_MODE_IPCP_MGMT:
-            ret = rlite_io_ioctl_mgmt(rio, &info);
+            ret = rl_io_ioctl_mgmt(rio, &info);
             break;
     }
 
     if (ret == 0) {
         /* Set the mode only if the ioctl operation was successful.
-         * This is very important because rlite_io_release_internal()
+         * This is very important because rl_io_release_internal()
          * looks at the mode to perform its action, assuming some pointers
          * to be not NULL depending on the mode. */
         rio->mode = info.mode;
@@ -587,30 +587,30 @@ rlite_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 }
 
 static int
-rlite_io_release(struct inode *inode, struct file *f)
+rl_io_release(struct inode *inode, struct file *f)
 {
-    struct rlite_io *rio = (struct rlite_io *)f->private_data;
+    struct rl_io *rio = (struct rl_io *)f->private_data;
 
-    rlite_io_release_internal(rio);
+    rl_io_release_internal(rio);
 
     kfree(rio);
 
     return 0;
 }
 
-static const struct file_operations rlite_io_fops = {
+static const struct file_operations rl_io_fops = {
     .owner          = THIS_MODULE,
-    .release        = rlite_io_release,
-    .open           = rlite_io_open,
-    .write          = rlite_io_write,
-    .read           = rlite_io_read,
-    .poll           = rlite_io_poll,
-    .unlocked_ioctl = rlite_io_ioctl,
+    .release        = rl_io_release,
+    .open           = rl_io_open,
+    .write          = rl_io_write,
+    .read           = rl_io_read,
+    .poll           = rl_io_poll,
+    .unlocked_ioctl = rl_io_ioctl,
     .llseek         = noop_llseek,
 };
 
-struct miscdevice rlite_io_misc = {
+struct miscdevice rl_io_misc = {
     .minor = MISC_DYNAMIC_MINOR,
     .name = "rlite-io",
-    .fops = &rlite_io_fops,
+    .fops = &rl_io_fops,
 };

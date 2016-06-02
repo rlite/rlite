@@ -47,7 +47,7 @@ struct rl_ipcp {
     struct list_head node;
 };
 
-struct rlite_ctrl {
+struct rl_ctrl {
     /* File descriptor for the RLITE control device ("/dev/rlite") */
     int rfd;
 
@@ -67,31 +67,31 @@ struct rlite_ctrl {
 };
 
 uint32_t
-rl_ctrl_get_id(struct rlite_ctrl *ctrl);
+rl_ctrl_get_id(struct rl_ctrl *ctrl);
 
 int
-rl_ctrl_ipcps_print(struct rlite_ctrl *ctrl);
+rl_ctrl_ipcps_print(struct rl_ctrl *ctrl);
 
 struct rl_ipcp *
-rl_ctrl_select_ipcp_by_dif(struct rlite_ctrl *ctrl,
+rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
                          const char *dif_name);
 
 struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_name(struct rlite_ctrl *ctrl,
+rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
                           const struct rina_name *name);
 
 int
-rl_ctrl_lookup_ipcp_addr_by_id(struct rlite_ctrl *ctrl, unsigned int id,
+rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
                                rl_addr_t *addr);
 
 struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_id(struct rlite_ctrl *ctrl, unsigned int id);
+rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id);
 
 void
-rl_flow_spec_default(struct rlite_flow_spec *spec);
+rl_flow_spec_default(struct rl_flow_spec *spec);
 
 void
-rl_flow_cfg_default(struct rlite_flow_config *cfg);
+rl_flow_cfg_default(struct rl_flow_config *cfg);
 
 int
 rl_open_appl_port(rl_port_t port_id);
@@ -100,82 +100,82 @@ int
 rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
 
 int
-rl_write_msg(int rfd, struct rlite_msg_base *msg);
+rl_write_msg(int rfd, struct rl_msg_base *msg);
 
 int
-rl_ctrl_init(struct rlite_ctrl *ctrl, const char *dev);
+rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev);
 
 int
-rl_ctrl_fini(struct rlite_ctrl *ctrl);
+rl_ctrl_fini(struct rl_ctrl *ctrl);
 
 /* Asynchronous API. */
 
 uint32_t
-rl_ctrl_fa_req(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rlite_flow_spec *flowspec);
+               const struct rl_flow_spec *flowspec);
 
 uint32_t
-rl_ctrl_reg_req(struct rlite_ctrl *ctrl, int reg,
+rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg,
                 const char *dif_name,
                 const struct rina_name *appl_name);
 
-struct rlite_msg_base *
-rl_ctrl_wait(struct rlite_ctrl *ctrl, uint32_t event_id);
+struct rl_msg_base *
+rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id);
 
-struct rlite_msg_base *
-rl_ctrl_wait_any(struct rlite_ctrl *ctrl, unsigned int msg_type);
+struct rl_msg_base *
+rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type);
 
 /* Synchronous API (higher level, implemented by means of the
  * asynchronous API. */
 int
-rl_ctrl_flow_alloc(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_flow_alloc(struct rl_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec);
+                   const struct rl_flow_spec *flowspec);
 
 int
-rl_ctrl_register(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_register(struct rl_ctrl *ctrl, const char *dif_name,
                  const struct rina_name *appl_name);
 
 int
-rl_ctrl_unregister(struct rlite_ctrl *ctrl, const char *dif_name,
+rl_ctrl_unregister(struct rl_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *appl_name);
 
 int
-rl_ctrl_flow_accept(struct rlite_ctrl *ctrl);
+rl_ctrl_flow_accept(struct rl_ctrl *ctrl);
 
 /* Variant of the asynchronous API, mostly for testing purposes.
  * The IPCP name can be specified in place of the DIF name. */
 uint32_t
-rl_ctrl_fa_req2(struct rlite_ctrl *ctrl,
+rl_ctrl_fa_req2(struct rl_ctrl *ctrl,
                 const struct rina_name *ipcp_name,
                 const struct rina_name *local_appl,
                 const struct rina_name *remote_appl,
-                const struct rlite_flow_spec *flowspec);
+                const struct rl_flow_spec *flowspec);
 
 uint32_t
-rl_ctrl_reg_req2(struct rlite_ctrl *ctrl, int reg,
+rl_ctrl_reg_req2(struct rl_ctrl *ctrl, int reg,
                  const struct rina_name *ipcp_name,
                  const struct rina_name *appl_name);
 
 /* Variant of the synchronous API, mostly for testing purposes.
  * The IPCP name can be specified in place of the DIF name. */
 int
-rl_ctrl_flow_alloc2(struct rlite_ctrl *ctrl,
+rl_ctrl_flow_alloc2(struct rl_ctrl *ctrl,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *local_appl,
                     const struct rina_name *remote_appl,
-                    const struct rlite_flow_spec *flowspec);
+                    const struct rl_flow_spec *flowspec);
 
 int
-rl_ctrl_register2(struct rlite_ctrl *ctrl,
+rl_ctrl_register2(struct rl_ctrl *ctrl,
                   const struct rina_name *ipcp_name,
                   const struct rina_name *appl_name);
 
 int
-rl_ctrl_unregister2(struct rlite_ctrl *ctrl,
+rl_ctrl_unregister2(struct rl_ctrl *ctrl,
                     const struct rina_name *ipcp_name,
                     const struct rina_name *appl_name);
 

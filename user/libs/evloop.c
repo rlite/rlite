@@ -49,19 +49,19 @@ struct rl_evloop_fdcb {
     struct list_head node;
 };
 
-struct rlite_tmr_event {
+struct rl_tmr_event {
     int id;
     struct timespec exp;
-    rlite_tmr_cb_t cb;
+    rl_tmr_cb_t cb;
     void *arg;
 
     struct list_head node;
 };
 
 static int
-flow_allocate_resp_arrived(struct rlite_evloop *loop,
-                           const struct rlite_msg_base *b_resp,
-                           const struct rlite_msg_base *b_req)
+flow_allocate_resp_arrived(struct rl_evloop *loop,
+                           const struct rl_msg_base *b_resp,
+                           const struct rl_msg_base *b_req)
 {
     struct rl_kmsg_fa_req *req =
             (struct rl_kmsg_fa_req *)b_req;
@@ -95,9 +95,9 @@ flow_allocate_resp_arrived(struct rlite_evloop *loop,
 }
 
 static int
-appl_register_resp(struct rlite_evloop *loop,
-                   const struct rlite_msg_base *b_resp,
-                   const struct rlite_msg_base *b_req)
+appl_register_resp(struct rl_evloop *loop,
+                   const struct rl_msg_base *b_resp,
+                   const struct rl_msg_base *b_req)
 {
     struct rl_kmsg_appl_register_resp *resp =
             (struct rl_kmsg_appl_register_resp *)b_resp;
@@ -123,9 +123,9 @@ appl_register_resp(struct rlite_evloop *loop,
 }
 
 static int
-evloop_ipcp_update(struct rlite_evloop *loop,
-                   const struct rlite_msg_base *b_resp,
-                   const struct rlite_msg_base *b_req)
+evloop_ipcp_update(struct rl_evloop *loop,
+                   const struct rl_msg_base *b_resp,
+                   const struct rl_msg_base *b_req)
 {
     const struct rl_kmsg_ipcp_update *upd =
         (const struct rl_kmsg_ipcp_update *)b_resp;
@@ -144,9 +144,9 @@ evloop_ipcp_update(struct rlite_evloop *loop,
 }
 
 static int
-barrier_resp(struct rlite_evloop *loop,
-             const struct rlite_msg_base *b_resp,
-             const struct rlite_msg_base *b_req)
+barrier_resp(struct rl_evloop *loop,
+             const struct rl_msg_base *b_resp,
+             const struct rl_msg_base *b_req)
 {
     /* Nothing to do, this is just a synchronization point. */
     return 0;
@@ -186,11 +186,11 @@ time_cmp(const struct timespec *t1, const struct timespec *t2)
 static void *
 evloop_function(void *arg)
 {
-    struct rlite_evloop *loop = (struct rlite_evloop *)arg;
+    struct rl_evloop *loop = (struct rl_evloop *)arg;
     struct pending_entry *req_entry;
 
     for (;;) {
-        struct rlite_msg_base *resp;
+        struct rl_msg_base *resp;
         struct rl_evloop_fdcb *fdcb;
         struct timeval to;
         struct timeval *top = NULL;
@@ -215,13 +215,13 @@ evloop_function(void *arg)
              *        expire
              */
             struct timespec now;
-            struct rlite_tmr_event *te;
+            struct rl_tmr_event *te;
 
             pthread_mutex_lock(&loop->timer_lock);
 
             if (loop->timer_events_cnt) {
                 te = list_first_entry(&loop->timer_events,
-                                       struct rlite_tmr_event, node);
+                                       struct rl_tmr_event, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
                 if (time_cmp(&now, &te->exp) > 0) {
@@ -276,7 +276,7 @@ evloop_function(void *arg)
             struct timespec now;
             struct list_head expired;
             struct list_head *elem;
-            struct rlite_tmr_event *te;
+            struct rl_tmr_event *te;
 
             list_init(&expired);
 
@@ -284,7 +284,7 @@ evloop_function(void *arg)
 
             while (loop->timer_events_cnt) {
                 te = list_first_entry(&loop->timer_events,
-                                       struct rlite_tmr_event, node);
+                                       struct rl_tmr_event, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
                 if (time_cmp(&te->exp, &now) > 0) {
@@ -299,7 +299,7 @@ evloop_function(void *arg)
             pthread_mutex_unlock(&loop->timer_lock);
 
             while ((elem = list_pop_front(&expired))) {
-                te = container_of(elem, struct rlite_tmr_event, node);
+                te = container_of(elem, struct rl_tmr_event, node);
                 NPD("Exec timer callback [%d]\n", te->id);
                 te->cb(loop, te->arg);
                 free(te);
@@ -330,7 +330,7 @@ evloop_function(void *arg)
                 !loop->handlers[resp->msg_type]) {
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                           RLITE_MB(resp));
             free(resp);
             continue;
@@ -344,7 +344,7 @@ evloop_function(void *arg)
                 PE("Error while handling message type [%d]\n",
                                         resp->msg_type);
             }
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                           RLITE_MB(resp));
             free(resp);
             continue;
@@ -360,7 +360,7 @@ evloop_function(void *arg)
         if (!req_entry) {
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                           RLITE_MB(resp));
             free(resp);
             continue;
@@ -393,11 +393,11 @@ notify_requestor:
         } else {
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                           req_entry->msg);
             free(req_entry->msg);
             free(req_entry);
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                           RLITE_MB(resp));
             free(resp);
         }
@@ -408,7 +408,7 @@ notify_requestor:
 }
 
 static int
-rl_evloop_signal(struct rlite_evloop *loop, unsigned int code)
+rl_evloop_signal(struct rl_evloop *loop, unsigned int code)
 {
     uint64_t x = code;
     int n;
@@ -426,19 +426,19 @@ rl_evloop_signal(struct rlite_evloop *loop, unsigned int code)
 }
 
 int
-rl_evloop_stop(struct rlite_evloop *loop)
+rl_evloop_stop(struct rl_evloop *loop)
 {
     return rl_evloop_signal(loop, RL_SIGNAL_STOP);
 }
 
 /* Issue a request message to the kernel. Takes the ownership of
  * @msg. */
-struct rlite_msg_base *
-rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
+struct rl_msg_base *
+rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
                         size_t msg_len, int has_response,
                         unsigned int wait_for_completion, int *result)
 {
-    struct rlite_msg_base *resp = NULL;
+    struct rl_msg_base *resp = NULL;
     struct pending_entry *entry = NULL;
     int ret;
 
@@ -448,7 +448,7 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         /* It does not make any sense to wait if there is not going
          * to be a response to wait for. */
         PE("has_response == 0 --> wait_for_completion == 0\n");
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
         *result = -1;
         return NULL;
@@ -461,7 +461,7 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
          * the event loop not being able to find the pending request. */
         entry = malloc(sizeof(*entry));
         if (!entry) {
-            rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
             free(msg);
             PE("Out of memory\n");
             *result = -1;
@@ -494,7 +494,7 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
             free(entry);
         }
         *result = ret;
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
 
     } else if (has_response && entry->wait_for_completion) {
@@ -527,7 +527,7 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
         pthread_cond_destroy(&entry->op_complete_cond);
 
         /* Free the pending queue entry and the associated request message. */
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, entry->msg);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, entry->msg);
         free(entry->msg);
         resp = entry->resp;
         free(entry);
@@ -535,7 +535,7 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
     } else if (!has_response) {
         /* This request does not require a response, we can free the request
          * message immediately. */
-        rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX, msg);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
         free(msg);
     }
 
@@ -545,8 +545,8 @@ rl_evloop_issue_request(struct rlite_evloop *loop, struct rlite_msg_base *msg,
 }
 
 int
-rl_evloop_init(struct rlite_evloop *loop, const char *dev,
-               rlite_resp_handler_t *handlers,
+rl_evloop_init(struct rl_evloop *loop, const char *dev,
+               rl_resp_handler_t *handlers,
                unsigned int flags)
 {
     int ret;
@@ -608,7 +608,7 @@ rl_evloop_init(struct rlite_evloop *loop, const char *dev,
 }
 
 int
-rl_evloop_join(struct rlite_evloop *loop)
+rl_evloop_join(struct rl_evloop *loop)
 {
     if (loop->running) {
         int ret = pthread_join(loop->evloop_th, NULL);
@@ -625,7 +625,7 @@ rl_evloop_join(struct rlite_evloop *loop)
 }
 
 int
-rl_evloop_fini(struct rlite_evloop *loop)
+rl_evloop_fini(struct rl_evloop *loop)
 {
     /* Stop if nobody has already stopped. */
     rl_evloop_stop(loop);
@@ -644,7 +644,7 @@ rl_evloop_fini(struct rlite_evloop *loop)
 
     {
         /* Clean up the timer_events list. */
-        struct rlite_tmr_event *e, *tmp;
+        struct rl_tmr_event *e, *tmp;
 
         pthread_mutex_lock(&loop->timer_lock);
         list_for_each_entry_safe(e, tmp, &loop->timer_events, node) {
@@ -666,8 +666,8 @@ rl_evloop_fini(struct rlite_evloop *loop)
 }
 
 int
-rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
-                      rlite_resp_handler_t handler)
+rl_evloop_set_handler(struct rl_evloop *loop, unsigned int index,
+                      rl_resp_handler_t handler)
 {
     if (index >= RLITE_KER_MSG_MAX) {
         return -1;
@@ -683,7 +683,7 @@ rl_evloop_set_handler(struct rlite_evloop *loop, unsigned int index,
 }
 
 int
-rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rl_evloop_fdcb_t cb)
+rl_evloop_fdcb_add(struct rl_evloop *loop, int fd, rl_evloop_fdcb_t cb)
 {
     struct rl_evloop_fdcb *fdcb;
 
@@ -712,7 +712,7 @@ rl_evloop_fdcb_add(struct rlite_evloop *loop, int fd, rl_evloop_fdcb_t cb)
 }
 
 int
-rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
+rl_evloop_fdcb_del(struct rl_evloop *loop, int fd)
 {
     struct rl_evloop_fdcb *fdcb;
 
@@ -735,10 +735,10 @@ rl_evloop_fdcb_del(struct rlite_evloop *loop, int fd)
 #define TIMER_EVENTS_MAX    64
 
 int
-rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
-                   rlite_tmr_cb_t cb, void *arg)
+rl_evloop_schedule(struct rl_evloop *loop, unsigned long delta_ms,
+                   rl_tmr_cb_t cb, void *arg)
 {
-    struct rlite_tmr_event *e, *cur;
+    struct rl_tmr_event *e, *cur;
 
     if (!cb) {
         PE("NULL timer calback\n");
@@ -794,9 +794,9 @@ rl_evloop_schedule(struct rlite_evloop *loop, unsigned long delta_ms,
 }
 
 int
-rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
+rl_evloop_schedule_canc(struct rl_evloop *loop, int id)
 {
-    struct rlite_tmr_event *cur, *e = NULL;
+    struct rl_tmr_event *cur, *e = NULL;
     int ret = -1;
 
     pthread_mutex_lock(&loop->timer_lock);
@@ -823,12 +823,12 @@ rl_evloop_schedule_canc(struct rlite_evloop *loop, int id)
 }
 
 int
-rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
+rl_evloop_fa_resp(struct rl_evloop *loop, uint32_t kevent_id,
                   rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
                   rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     req = malloc(sizeof(*req));
@@ -849,7 +849,7 @@ rl_evloop_fa_resp(struct rlite_evloop *loop, uint32_t kevent_id,
 }
 
 struct rl_kmsg_appl_register_resp *
-rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
+rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
                     unsigned int wait_ms, int reg,
                     const char *dif_name,
                     const struct rina_name *ipcp_name,
@@ -886,7 +886,7 @@ rl_evloop_reg_req(struct rlite_evloop *loop, uint32_t event_id,
 }
 
 int
-rl_evloop_register(struct rlite_evloop *loop, int reg,
+rl_evloop_register(struct rl_evloop *loop, int reg,
                          const char *dif_name,
                          const struct rina_name *ipcp_name,
                          const struct rina_name *appl_name,
@@ -907,7 +907,7 @@ rl_evloop_register(struct rlite_evloop *loop, int reg,
         ret = -1;
     }
 
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                   RLITE_MB(resp));
     free(resp);
 
@@ -915,12 +915,12 @@ rl_evloop_register(struct rlite_evloop *loop, int reg,
 }
 
 int
-rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
+rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
                    const char *dif_name,
                    const struct rina_name *ipcp_name,
                    const struct rina_name *local_appl,
                    const struct rina_name *remote_appl,
-                   const struct rlite_flow_spec *flowspec,
+                   const struct rl_flow_spec *flowspec,
                    rl_ipcp_id_t upper_ipcp_id,
                    rl_port_t *port_id, unsigned int wait_ms)
 {
@@ -970,7 +970,7 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
                 kresp->response, kresp->port_id);
     result = kresp->response;
     *port_id = kresp->port_id;
-    rlite_msg_free(rlite_ker_numtables, RLITE_KER_MSG_MAX,
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(kresp));
     free(kresp);
 
@@ -978,11 +978,11 @@ rl_evloop_flow_alloc(struct rlite_evloop *loop, uint32_t event_id,
 }
 
 int
-rl_evloop_ipcp_config(struct rlite_evloop *loop, rl_ipcp_id_t ipcp_id,
+rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
                       const char *param_name, const char *param_value)
 {
     struct rl_kmsg_ipcp_config *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */

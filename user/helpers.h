@@ -31,19 +31,19 @@
 
 
 static inline int
-rlite_msg_write_fd(int sfd, struct rlite_msg_base *msg)
+rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
 {
     unsigned int serlen;
     char *serbuf;
     int n;
 
-    serlen = rlite_msg_serlen(rlite_uipcps_numtables, RLITE_U_MSG_MAX, msg);
+    serlen = rl_msg_serlen(rl_uipcps_numtables, RLITE_U_MSG_MAX, msg);
     serbuf = malloc(serlen);
     if (!serbuf) {
         return -1;
     }
 
-    serialize_rlite_msg(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
+    serialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
                        serbuf, msg);
 
     n = write(sfd, serbuf, serlen);

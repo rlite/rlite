@@ -22,7 +22,7 @@
 #include "rlite/kernel-msg.h"
 
 
-struct rlite_msg_layout rlite_ker_numtables[] = {
+struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_IPCP_CREATE] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_create) -
                    sizeof(struct rina_name) - 2 * sizeof(char *),
@@ -36,7 +36,7 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_destroy),
     },
     [RLITE_KER_FLOW_FETCH] = {
-        .copylen = sizeof(struct rlite_msg_base),
+        .copylen = sizeof(struct rl_msg_base),
     },
     [RLITE_KER_FLOW_FETCH_RESP] = {
         .copylen = sizeof(struct rl_kmsg_flow_fetch_resp),
@@ -103,10 +103,10 @@ struct rlite_msg_layout rlite_ker_numtables[] = {
         .copylen = sizeof(struct rl_kmsg_flow_dealloc),
     },
     [RLITE_KER_BARRIER] = {
-        .copylen = sizeof(struct rlite_msg_base),
+        .copylen = sizeof(struct rl_msg_base),
     },
     [RLITE_KER_BARRIER_RESP] = {
-        .copylen = sizeof(struct rlite_msg_base),
+        .copylen = sizeof(struct rl_msg_base),
     },
     [RLITE_KER_IPCP_UIPCP_WAIT] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_uipcp_wait),

@@ -37,7 +37,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                          const struct rl_kmsg_appl_register *req)
 {
     struct rl_kmsg_appl_register_resp *resp;
-    struct rlite_msg_base *fkresp;
+    struct rl_msg_base *fkresp;
     int result;
 
     /* Allocate and create a request message. */
@@ -70,7 +70,7 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                 rl_addr_t dst_addr, rl_port_t local_port)
 {
     struct rl_kmsg_ipcp_pduft_set *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -101,7 +101,7 @@ int
 uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_pduft_flush *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -132,10 +132,10 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_addr_t remote_addr,
                            const struct rina_name *local_appl,
                            const struct rina_name *remote_appl,
-                           const struct rlite_flow_config *flowcfg)
+                           const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -175,10 +175,10 @@ int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                             rl_port_t remote_port, uint32_t remote_cep,
                             rl_addr_t remote_addr,
-                            uint8_t response, const struct rlite_flow_config *flowcfg)
+                            uint8_t response, const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -217,7 +217,7 @@ int
 uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
 {
     struct rl_kmsg_flow_dealloc *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */
@@ -247,7 +247,7 @@ static int
 uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_set *req;
-    struct rlite_msg_base *resp;
+    struct rl_msg_base *resp;
     int result;
 
     /* Allocate and create a request message. */

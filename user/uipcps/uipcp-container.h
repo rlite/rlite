@@ -50,7 +50,7 @@ struct uipcps {
 
     struct list_head ipcp_nodes;
 
-    struct rlite_evloop loop;
+    struct rl_evloop loop;
 };
 
 #define RLITE_PERSISTENCE_FILE   "/var/rlite/uipcps-persist"
@@ -82,21 +82,21 @@ struct uipcp_ops {
 
     char * (*rib_show)(struct uipcp *);
 
-    int (*appl_register)(struct rlite_evloop *loop,
-                         const struct rlite_msg_base *b_resp,
-                         const struct rlite_msg_base *b_req);
+    int (*appl_register)(struct rl_evloop *loop,
+                         const struct rl_msg_base *b_resp,
+                         const struct rl_msg_base *b_req);
 
-    int (*fa_req)(struct rlite_evloop *loop,
-                  const struct rlite_msg_base *b_resp,
-                  const struct rlite_msg_base *b_req);
+    int (*fa_req)(struct rl_evloop *loop,
+                  const struct rl_msg_base *b_resp,
+                  const struct rl_msg_base *b_req);
 
-    int (*fa_resp)(struct rlite_evloop *loop,
-                   const struct rlite_msg_base *b_resp,
-                   const struct rlite_msg_base *b_req);
+    int (*fa_resp)(struct rl_evloop *loop,
+                   const struct rl_msg_base *b_resp,
+                   const struct rl_msg_base *b_req);
 
-    int (*flow_deallocated)(struct rlite_evloop *loop,
-                            const struct rlite_msg_base *b_resp,
-                            const struct rlite_msg_base *b_req);
+    int (*flow_deallocated)(struct rl_evloop *loop,
+                            const struct rl_msg_base *b_resp,
+                            const struct rl_msg_base *b_req);
 
     int (*get_enrollment_targets)(struct uipcp *, struct list_head *neighs);
 };
@@ -121,7 +121,7 @@ struct flow_edge {
 };
 
 struct uipcp {
-    struct rlite_evloop loop;
+    struct rl_evloop loop;
     struct uipcps *uipcps;
     rl_ipcp_id_t id;
 
@@ -165,12 +165,12 @@ int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_addr_t remote_addr,
                                const struct rina_name *local_appl,
                                const struct rina_name *remote_appl,
-                               const struct rlite_flow_config *flowcfg);
+                               const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                           rl_port_t remote_port, uint32_t remote_cep,
                           rl_addr_t remote_addr, uint8_t response,
-                          const struct rlite_flow_config *flowcfg);
+                          const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
 

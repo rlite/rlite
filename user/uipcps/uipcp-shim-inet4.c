@@ -218,7 +218,7 @@ open_bound_socket(struct shim_inet4 *shim, int *fd, struct sockaddr_in *addr)
     return 0;
 }
 
-static void accept_conn(struct rlite_evloop *loop, int lfd);
+static void accept_conn(struct rl_evloop *loop, int lfd);
 
 static int
 shim_inet4_appl_unregister(struct uipcp *uipcp,
@@ -259,9 +259,9 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
 }
 
 static int
-shim_inet4_appl_register(struct rlite_evloop *loop,
-                         const struct rlite_msg_base *b_resp,
-                         const struct rlite_msg_base *b_req)
+shim_inet4_appl_register(struct rl_evloop *loop,
+                         const struct rl_msg_base *b_resp,
+                         const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
@@ -329,15 +329,15 @@ err0:
 }
 
 static int
-shim_inet4_fa_req(struct rlite_evloop *loop,
-                  const struct rlite_msg_base *b_resp,
-                  const struct rlite_msg_base *b_req)
+shim_inet4_fa_req(struct rl_evloop *loop,
+                  const struct rl_msg_base *b_resp,
+                  const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     struct shim_inet4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
-    struct rlite_flow_config cfg;
+    struct rl_flow_config cfg;
     struct inet4_endpoint *ep;
     int ret;
 
@@ -408,7 +408,7 @@ lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
 }
 
 static void
-accept_conn(struct rlite_evloop *loop, int lfd)
+accept_conn(struct rl_evloop *loop, int lfd)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_inet4 *shim = SHIM(uipcp);
@@ -416,7 +416,7 @@ accept_conn(struct rlite_evloop *loop, int lfd)
     socklen_t addrlen = sizeof(remote_addr);
     struct rina_name remote_appl, local_appl;
     struct inet4_endpoint *ep;
-    struct rlite_flow_config cfg;
+    struct rl_flow_config cfg;
     int sfd;
 
     /* First of all let's call accept, so that we consume the event
@@ -501,9 +501,9 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, rl_port_t port_id)
 }
 
 static int
-shim_inet4_fa_resp(struct rlite_evloop *loop,
-                   const struct rlite_msg_base *b_resp,
-                   const struct rlite_msg_base *b_req)
+shim_inet4_fa_resp(struct rl_evloop *loop,
+                   const struct rl_msg_base *b_resp,
+                   const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_inet4 *shim = SHIM(uipcp);
@@ -538,9 +538,9 @@ shim_inet4_fa_resp(struct rlite_evloop *loop,
 }
 
 static int
-shim_inet4_flow_deallocated(struct rlite_evloop *loop,
-                       const struct rlite_msg_base *b_resp,
-                       const struct rlite_msg_base *b_req)
+shim_inet4_flow_deallocated(struct rl_evloop *loop,
+                       const struct rl_msg_base *b_resp,
+                       const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =

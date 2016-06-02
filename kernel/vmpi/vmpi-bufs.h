@@ -6,10 +6,10 @@
 #include "../rlite-bufs.h"
 
 
-#define vmpi_buf            rlite_buf
-#define vmpi_buf_alloc      rlite_buf_alloc
-#define vmpi_buf_clone      rlite_buf_clone
-#define vmpi_buf_free       rlite_buf_free
+#define vmpi_buf            rl_buf
+#define vmpi_buf_alloc      rl_buf_alloc
+#define vmpi_buf_clone      rl_buf_clone
+#define vmpi_buf_free       rl_buf_free
 #define vmpi_buf_data(_vb)  RLITE_BUF_DATA(_vb)
 
 

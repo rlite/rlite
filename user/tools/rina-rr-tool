@@ -98,11 +98,11 @@ argparser.add_argument('-d', '--dif',
 argparser.add_argument('-f', '--flow-spec', help = "Flow specification",
                        type = str, default='unrel')
 argparser.add_argument('-a', '--client-apn', help = "client APN",
-                       type = str, default='rlite_rr-data')
+                       type = str, default='rl_rr-data')
 argparser.add_argument('-A', '--client-api', help = "client API",
                        type = str, default='client')
 argparser.add_argument('-z', '--server-apn', help = "server APN",
-                       type = str, default='rlite_rr-data')
+                       type = str, default='rl_rr-data')
 argparser.add_argument('-Z', '--server-api', help = "server API",
                        type = str, default='server')
 

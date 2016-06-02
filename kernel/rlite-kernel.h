@@ -35,7 +35,7 @@
 
 struct ipcp_entry;
 struct flow_entry;
-struct rlite_ctrl;
+struct rl_ctrl;
 struct pduft_entry;
 
 struct ipcp_ops {
@@ -60,8 +60,8 @@ struct ipcp_ops {
                           struct rl_flow_stats *stats);
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rlite_buf *rb, bool maysleep);
-    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rlite_buf *rb);
+                     struct rl_buf *rb, bool maysleep);
+    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value);
     int (*pduft_set)(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
@@ -69,8 +69,8 @@ struct ipcp_ops {
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
-                          const struct rlite_mgmt_hdr *hdr,
-                          struct rlite_buf *rb, struct ipcp_entry **lower_ipcp,
+                          const struct rl_mgmt_hdr *hdr,
+                          struct rl_buf *rb, struct ipcp_entry **lower_ipcp,
                           struct flow_entry **lower_flow);
 };
 
@@ -110,7 +110,7 @@ struct ipcp_entry {
     uint8_t             depth;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
-    struct rlite_ctrl   *uipcp;
+    struct rl_ctrl   *uipcp;
     struct txrx         *mgmt_txrx;
 
     /* TX completion structures. */
@@ -147,7 +147,7 @@ enum {
 };
 
 struct upper_ref {
-    struct rlite_ctrl    *rc;
+    struct rl_ctrl    *rc;
     struct ipcp_entry   *ipcp;
 };
 
@@ -185,7 +185,7 @@ struct dtp {
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
-    struct rlite_buf *rtx_tmr_next;
+    struct rl_buf *rtx_tmr_next;
     struct tkbk tkbk;
 #define DTP_F_DRF_SET		(1<<0)
 #define DTP_F_DRF_EXPECTED	(1<<1)
@@ -204,10 +204,10 @@ struct flow_entry {
     uint32_t            event_id; /* requestor event id */
     struct txrx         txrx;
     struct dtp          dtp;
-    struct rlite_flow_config cfg;
+    struct rl_flow_config cfg;
 
     int (*sdu_rx_consumed)(struct flow_entry *flow,
-                           struct rlite_buf *rb);
+                           struct rl_buf *rb);
 
     struct list_head    pduft_entries;
 
@@ -244,37 +244,37 @@ struct ipcp_entry * __ipcp_get(rl_ipcp_id_t ipcp_id);
             tmp;                                                        \
         })
 
-int rlite_ipcp_factory_register(struct ipcp_factory *factory);
-int rlite_ipcp_factory_unregister(const char *dif_type);
+int rl_ipcp_factory_register(struct ipcp_factory *factory);
+int rl_ipcp_factory_unregister(const char *dif_type);
 
-int rlite_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
+int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                         rl_port_t remote_port, uint32_t remote_cep,
                         rl_addr_t remote_addr,
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
-                        const struct rlite_flow_config *flowcfg);
+                        const struct rl_flow_config *flowcfg);
 
-int rlite_fa_resp_arrived(struct ipcp_entry *ipcp,
+int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                          rl_port_t local_port,
                          rl_port_t remote_port,
                          uint32_t remote_cep,
                          rl_addr_t remote_addr,
                          uint8_t response,
-                         struct rlite_flow_config *flowcfg);
+                         struct rl_flow_config *flowcfg);
 
-int rlite_sdu_rx(struct ipcp_entry *ipcp, struct rlite_buf *rb,
+int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                 rl_port_t local_port);
 
-int rlite_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rlite_buf *rb, bool qlimit);
+int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                     struct rl_buf *rb, bool qlimit);
 
-void rlite_write_restart_port(rl_port_t local_port);
+void rl_write_restart_port(rl_port_t local_port);
 
-void rlite_write_restart_flow(struct flow_entry *flow);
+void rl_write_restart_flow(struct flow_entry *flow);
 
-void rlite_write_restart_flows(struct ipcp_entry *ipcp);
+void rl_write_restart_flows(struct ipcp_entry *ipcp);
 
-void rlite_flow_share_tx_wqh(struct flow_entry *flow);
+void rl_flow_share_tx_wqh(struct flow_entry *flow);
 
 struct flow_entry *flow_lookup(rl_port_t port_id);
 

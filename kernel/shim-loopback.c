@@ -34,7 +34,7 @@
 
 
 struct rx_entry {
-    struct rlite_buf *rb;
+    struct rl_buf *rb;
     struct flow_entry *tx_flow;
     struct flow_entry *rx_flow;
 };
@@ -42,7 +42,7 @@ struct rx_entry {
 #define RX_POW      8
 #define RX_ENTRIES  (1 << RX_POW)
 
-struct rlite_shim_loopback {
+struct rl_shim_loopback {
     struct ipcp_entry *ipcp;
 
     unsigned int drop_fract;
@@ -61,11 +61,11 @@ struct rlite_shim_loopback {
 static void
 rcv_work(struct work_struct *w)
 {
-    struct rlite_shim_loopback *priv =
-            container_of(w, struct rlite_shim_loopback, rcv);
+    struct rl_shim_loopback *priv =
+            container_of(w, struct rl_shim_loopback, rcv);
 
     for (;;) {
-        struct rlite_buf *rb = NULL;
+        struct rl_buf *rb = NULL;
         struct flow_entry *rx_flow;
         struct flow_entry *tx_flow;
         int ret;
@@ -88,7 +88,7 @@ rcv_work(struct work_struct *w)
             break;
         }
 
-        ret = rlite_sdu_rx_flow(priv->ipcp, rx_flow, rb, true);
+        ret = rl_sdu_rx_flow(priv->ipcp, rx_flow, rb, true);
         if (unlikely(ret)) {
             spin_lock_bh(&priv->lock);
             tx_flow->stats.tx_err++;
@@ -97,15 +97,15 @@ rcv_work(struct work_struct *w)
         }
         flow_put(rx_flow);
 
-        rlite_write_restart_flows(priv->ipcp);
+        rl_write_restart_flows(priv->ipcp);
         flow_put(tx_flow);
     }
 }
 
 static void *
-rlite_shim_loopback_create(struct ipcp_entry *ipcp)
+rl_shim_loopback_create(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_loopback *priv;
+    struct rl_shim_loopback *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -125,14 +125,14 @@ rlite_shim_loopback_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rlite_shim_loopback_destroy(struct ipcp_entry *ipcp)
+rl_shim_loopback_destroy(struct ipcp_entry *ipcp)
 {
-    struct rlite_shim_loopback *priv = ipcp->priv;
+    struct rl_shim_loopback *priv = ipcp->priv;
 
     cancel_work_sync(&priv->rcv);
 
     while (priv->rdh != priv->rdt) {
-        rlite_buf_free(priv->rxr[priv->rdh].rb);
+        rl_buf_free(priv->rxr[priv->rdh].rb);
         priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
     }
 
@@ -156,7 +156,7 @@ flow_allocate_req_work(struct work_struct *w)
                         struct flow_allocate_req_work, w);
     int ret;
 
-    ret = rlite_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0,
+    ret = rl_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0,
                               &faw->local_appl,
                               &faw->remote_appl, NULL);
     if (ret) {
@@ -167,7 +167,7 @@ flow_allocate_req_work(struct work_struct *w)
 }
 
 static int
-rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
+rl_shim_loopback_fa_req(struct ipcp_entry *ipcp,
                            struct flow_entry *flow)
 {
     struct flow_allocate_req_work *faw;
@@ -178,7 +178,7 @@ rlite_shim_loopback_fa_req(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    rlite_flow_share_tx_wqh(flow);
+    rl_flow_share_tx_wqh(flow);
 
     rina_name_copy(&faw->remote_appl, &flow->local_appl);
     rina_name_copy(&faw->local_appl, &flow->remote_appl);
@@ -205,7 +205,7 @@ flow_allocate_resp_work(struct work_struct *w)
                         struct flow_allocate_resp_work, w);
     int ret;
 
-    ret = rlite_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
+    ret = rl_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
                                 0, 0, farw->response, NULL);
     if (ret) {
         PE("failed to report flow allocation response\n");
@@ -215,7 +215,7 @@ flow_allocate_resp_work(struct work_struct *w)
 }
 
 static int
-rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
+rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
                             struct flow_entry *flow,
                             uint8_t response)
 {
@@ -227,7 +227,7 @@ rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    rlite_flow_share_tx_wqh(flow);
+    rl_flow_share_tx_wqh(flow);
 
     farw->ipcp = ipcp;
     farw->local_port = flow->remote_port;
@@ -240,12 +240,12 @@ rlite_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
+rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                              struct flow_entry *tx_flow,
-                             struct rlite_buf *rb,
+                             struct rl_buf *rb,
                              bool maysleep)
 {
-    struct rlite_shim_loopback *priv = ipcp->priv;
+    struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;
     int ret = 0;
 
@@ -260,14 +260,14 @@ rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         spin_unlock_bh(&priv->lock);
 
         if (drop) {
-            rlite_buf_free(rb);
+            rl_buf_free(rb);
             return 0;
         }
     }
 
     rx_flow = flow_get(tx_flow->remote_port);
     if (!rx_flow) {
-        rlite_buf_free(rb);
+        rl_buf_free(rb);
         return -ENXIO;
     }
 
@@ -296,7 +296,7 @@ rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
     } else {
         size_t len = rb->len;
 
-        ret = rlite_sdu_rx_flow(ipcp, rx_flow, rb, true);
+        ret = rl_sdu_rx_flow(ipcp, rx_flow, rb, true);
 
         spin_lock_bh(&priv->lock);
         if (unlikely(ret)) {
@@ -318,11 +318,11 @@ rlite_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_loopback_config(struct ipcp_entry *ipcp,
+rl_shim_loopback_config(struct ipcp_entry *ipcp,
                            const char *param_name,
                            const char *param_value)
 {
-    struct rlite_shim_loopback *priv = (struct rlite_shim_loopback *)ipcp->priv;
+    struct rl_shim_loopback *priv = (struct rl_shim_loopback *)ipcp->priv;
     int ret = -EINVAL;
 
     if (strcmp(param_name, "queued") == 0) {
@@ -358,10 +358,10 @@ rlite_shim_loopback_config(struct ipcp_entry *ipcp,
 }
 
 static int
-rlite_shim_loopback_flow_get_stats(struct flow_entry *flow,
+rl_shim_loopback_flow_get_stats(struct flow_entry *flow,
                                    struct rl_flow_stats *stats)
 {
-    struct rlite_shim_loopback *priv = flow->txrx.ipcp->priv;
+    struct rl_shim_loopback *priv = flow->txrx.ipcp->priv;
 
     spin_lock_bh(&priv->lock);
     *stats = flow->stats;
@@ -375,28 +375,28 @@ rlite_shim_loopback_flow_get_stats(struct flow_entry *flow,
 static struct ipcp_factory shim_loopback_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
-    .create = rlite_shim_loopback_create,
-    .ops.destroy = rlite_shim_loopback_destroy,
-    .ops.flow_allocate_req = rlite_shim_loopback_fa_req,
-    .ops.flow_allocate_resp = rlite_shim_loopback_fa_resp,
-    .ops.sdu_write = rlite_shim_loopback_sdu_write,
-    .ops.config = rlite_shim_loopback_config,
-    .ops.flow_get_stats = rlite_shim_loopback_flow_get_stats,
+    .create = rl_shim_loopback_create,
+    .ops.destroy = rl_shim_loopback_destroy,
+    .ops.flow_allocate_req = rl_shim_loopback_fa_req,
+    .ops.flow_allocate_resp = rl_shim_loopback_fa_resp,
+    .ops.sdu_write = rl_shim_loopback_sdu_write,
+    .ops.config = rl_shim_loopback_config,
+    .ops.flow_get_stats = rl_shim_loopback_flow_get_stats,
 };
 
 static int __init
-rlite_shim_loopback_init(void)
+rl_shim_loopback_init(void)
 {
-    return rlite_ipcp_factory_register(&shim_loopback_factory);
+    return rl_ipcp_factory_register(&shim_loopback_factory);
 }
 
 static void __exit
-rlite_shim_loopback_fini(void)
+rl_shim_loopback_fini(void)
 {
-    rlite_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rlite_shim_loopback_init);
-module_exit(rlite_shim_loopback_fini);
+module_init(rl_shim_loopback_init);
+module_exit(rl_shim_loopback_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

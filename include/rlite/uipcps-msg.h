@@ -42,7 +42,7 @@ enum {
 
 /* Numtables for rlite-ctl <==> uipcp-server messages exchange. */
 
-extern struct rlite_msg_layout rlite_uipcps_numtables[RLITE_U_MSG_MAX + 1];
+extern struct rl_msg_layout rl_uipcps_numtables[RLITE_U_MSG_MAX + 1];
 
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */

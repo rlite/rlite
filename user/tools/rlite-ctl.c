@@ -73,12 +73,12 @@ uipcps_disconnect(int sfd)
     return close(sfd);
 }
 
-typedef int (*response_handler_t )(struct rlite_msg_base_resp *);
+typedef int (*response_handler_t )(struct rl_msg_base_resp *);
 
 static int
 read_response(int sfd, response_handler_t handler)
 {
-    struct rlite_msg_base_resp *resp;
+    struct rl_msg_base_resp *resp;
     char msgbuf[4096];
     char serbuf[4096];
     int ret;
@@ -90,7 +90,7 @@ read_response(int sfd, response_handler_t handler)
         return -1;
     }
 
-    ret = deserialize_rlite_msg(rlite_uipcps_numtables, RLITE_U_MSG_MAX,
+    ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
                                serbuf, n, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("error while deserializing response [%d]\n",
@@ -111,7 +111,7 @@ read_response(int sfd, response_handler_t handler)
 }
 
 static int
-request_response(struct rlite_msg_base *req, response_handler_t handler)
+request_response(struct rl_msg_base *req, response_handler_t handler)
 {
     int fd;
     int ret;
@@ -121,7 +121,7 @@ request_response(struct rlite_msg_base *req, response_handler_t handler)
         return fd;
     }
 
-    ret = rlite_msg_write_fd(fd, req);
+    ret = rl_msg_write_fd(fd, req);
     if (ret) {
         return ret;
     }
@@ -135,7 +135,7 @@ request_response(struct rlite_msg_base *req, response_handler_t handler)
 }
 
 static int
-ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -175,7 +175,7 @@ ipcp_create(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -207,7 +207,7 @@ ipcp_destroy(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     const char *ipcp_apn;
     const char *ipcp_api;
@@ -243,7 +243,7 @@ ipcp_config(int argc, char **argv, struct rlite_ctrl *ctrl)
 
 static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
-                     struct rlite_ctrl *ctrl)
+                     struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_register req;
     const char *ipcp_apn;
@@ -273,19 +273,19 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 }
 
 static int
-ipcp_register(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_register(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     return ipcp_register_common(argc, argv, 1, ctrl);
 }
 
 static int
-ipcp_unregister(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_unregister(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     return ipcp_register_common(argc, argv, 0, ctrl);
 }
 
 static int
-ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_enroll req;
     const char *ipcp_apn;
@@ -321,7 +321,7 @@ ipcp_enroll(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_dft_set req;
     const char *ipcp_apn;
@@ -359,7 +359,7 @@ ipcp_dft_set(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-ipcps_show(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     rl_ctrl_ipcps_print(ctrl);
 
@@ -367,7 +367,7 @@ ipcps_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-flows_show(int argc, char **argv, struct rlite_ctrl *ctrl)
+flows_show(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct list_head flows;
 
@@ -380,7 +380,7 @@ flows_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
+ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
 {
     struct rl_cmsg_ipcp_rib_show_resp *resp =
         (struct rl_cmsg_ipcp_rib_show_resp *)b_resp;
@@ -393,7 +393,7 @@ ipcp_rib_show_handler(struct rlite_msg_base_resp *b_resp)
 }
 
 static int
-ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
+ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_rib_show_req req;
     const char *ipcp_apn;
@@ -419,7 +419,7 @@ ipcp_rib_show(int argc, char **argv, struct rlite_ctrl *ctrl)
 }
 
 static int
-test(struct rlite_ctrl *ctrl)
+test(struct rl_ctrl *ctrl)
 {
     struct rina_name name;
     long int lret;
@@ -457,7 +457,7 @@ struct cmd_descriptor {
     const char *name;
     const char *usage;
     unsigned int num_args;
-    int (*func)(int argc, char **argv, struct rlite_ctrl *ctrl);
+    int (*func)(int argc, char **argv, struct rl_ctrl *ctrl);
 };
 
 static struct cmd_descriptor cmd_descriptors[] = {
@@ -541,7 +541,7 @@ usage(int i)
 }
 
 static int
-process_args(int argc, char **argv, struct rlite_ctrl *ctrl)
+process_args(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     const char *cmd;
     int i;
@@ -583,7 +583,7 @@ sigint_handler(int signum)
 
 int main(int argc, char **argv)
 {
-    struct rlite_ctrl ctrl;
+    struct rl_ctrl ctrl;
     struct sigaction sa;
     int enable_testing = 0;
     int ret;
