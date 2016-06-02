@@ -1,0 +1,8 @@
+*.o
+*.ko
+*.mod.c
+*.cmd
+*.order
+*.symvers
+*tags
+*cscope.out
