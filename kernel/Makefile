@@ -13,13 +13,14 @@ rlite-normal-y := normal.o
 obj-m += rlite-shim-inet4.o
 rlite-shim-inet4-y := shim-inet4.o
 
-EXTRA_CFLAGS := -I$(PWD)/include
+# PWD must be the kernel/ directory
+EXTRA_CFLAGS := -I$(PWD)/../include
 
 ifeq ($(HAVE_VMPI),y)
 obj-m += rlite-shim-hv.o
 rlite-shim-hv-y := shim-hv.o shim-hv-numtables.o
 
-EXTRA_CFLAGS += -I\$(PWD)/kernel/vmpi
+EXTRA_CFLAGS += -I\$(PWD)/vmpi
 
 obj-y += vmpi/
 endif

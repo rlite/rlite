@@ -71,7 +71,7 @@ if [ $HAVE_VMPI == "y" ]; then
     sed -i '/vmpi-bufs/d' Makefile
     # Insert a line to set include directives
     sed -i '1 i \
-    EXTRA_CFLAGS := -I$(PWD)/include' Makefile
+    EXTRA_CFLAGS := -I$(PWD)/../include' Makefile
     cd ../..
 fi
 
