@@ -7,7 +7,7 @@ usr:
 	cd build && make
 
 ker:
-	make -C /lib/modules/$(KER)/build M=$(PWD)/kernel modules
+	make -C /lib/modules/$(KER)/build HAVE_VMPI=@HAVE_VMPI@ M=$(PWD)/kernel modules
 
 usr_count:
 	find common user include $(FINDCMD)
