@@ -3,11 +3,12 @@
 
 no_cmake() {
     echo "Cannot find CMake, required for build of userspace components"
-    exit 1
+    exit 255
 }
 
 
 HAVE_VMPI="n"
+INSTALL_PREFIX="/"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -17,8 +18,20 @@ do
         "--with-vmpi")
         HAVE_VMPI="y"
         ;;
+
+        "--prefix")
+        if [ -n "$2" ]; then
+            INSTALL_PREFIX=$2
+            shift
+        else
+            echo "--prefix requires a path argument"
+            exit 255
+        fi
+        ;;
+
         *)
         echo "Unknown option '$key'"
+        exit 255
         ;;
     esac
     shift
@@ -28,7 +41,7 @@ done
 if [ ! -d /lib/modules/`uname -r`/build ]; then
     echo "Cannot find '/lib/modules/$(uname -r)/build' directory"
     echo "Make sure headers for the running kernel are installed"
-    exit 1
+    exit 255
 fi
 
 # Make sure CMake is installed
@@ -36,11 +49,11 @@ which cmake || no_cmake
 
 # Configure CMake for out-of-tree build
 rm -rf build &> /dev/null
-mkdir build || exit 1
+mkdir build || exit 255
 
 (
 cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/ -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
 )
 
 # Generate the main Makefile (just a trivial copy)
