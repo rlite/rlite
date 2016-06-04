@@ -194,6 +194,7 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
 /* Logging macros. */
 #define PD_ON  /* Enable debug print. */
 #define PI_ON  /* Enable info print. */
+#undef PV_ON  /* Enable verbose debug print. */
 
 #ifdef __KERNEL__
 
@@ -236,6 +237,14 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
 #else
 #define PI(formt, ...)
 #define PI_S(FMT, ...)
+#endif
+
+#ifdef PV_ON
+#define PV(FMT, ...) PD(FMT, ##__VA_ARGS__)
+#define PV_S(FMT, ...) PD(FMT, ##__VA_ARGS__)
+#else
+#define PV(FMT, ...)
+#define PV_S(FMT, ...)
 #endif
 
 #define PE(FMT, ...) PRINTFUN2(K_ERR, "ERR", FMT, ##__VA_ARGS__)

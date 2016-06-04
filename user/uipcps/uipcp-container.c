@@ -87,12 +87,12 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     req->dst_addr = dst_addr;
     req->local_port = local_port;
 
-    UPD(uipcp, "Requesting IPCP pdu forwarding table set...\n");
+    UPV(uipcp, "Requesting IPCP pdu forwarding table set...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp);
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -116,12 +116,12 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
-    UPD(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
+    UPV(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req),
                                   sizeof(*req), 0, 0, &result);
     assert(!resp);
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }

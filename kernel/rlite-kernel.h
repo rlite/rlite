@@ -233,14 +233,14 @@ struct ipcp_entry * __ipcp_get(rl_ipcp_id_t ipcp_id);
 
 #define ipcp_put(_ie)                                                   \
         ({								\
-            if (_ie) PD("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt);     \
+            if (_ie) {PV("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt);}   \
             __ipcp_put(_ie);                                            \
         })
 
 #define ipcp_get(_id)                                                   \
         ({                                                              \
             struct ipcp_entry *tmp = __ipcp_get(_id);                   \
-            if (tmp) PD("REFCNT++ %u: %u\n", tmp->id, tmp->refcnt);     \
+            if (tmp) {PV("REFCNT++ %u: %u\n", tmp->id, tmp->refcnt);}   \
             tmp;                                                        \
         })
 

@@ -1436,7 +1436,7 @@ rl_ipcp_pduft_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp_put(ipcp);
 
     if (ret == 0) {
-        PD("Set IPC process %u PDUFT entry: %llu --> %u\n",
+        PV("Set IPC process %u PDUFT entry: %llu --> %u\n",
                 req->ipcp_id, (unsigned long long)req->dst_addr,
                 req->local_port);
     }
@@ -1463,7 +1463,7 @@ rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp_put(ipcp);
 
     if (ret == 0) {
-        PD("Flushed PDUFT for IPC process %u\n", req->ipcp_id);
+        PV("Flushed PDUFT for IPC process %u\n", req->ipcp_id);
     }
 
     return ret;

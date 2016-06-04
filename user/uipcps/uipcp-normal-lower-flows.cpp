@@ -160,15 +160,15 @@ SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
     }
 
 #if 1
-    PD_S("Graph [%lu]:\n", db.size());
+    PV_S("Graph [%lu]:\n", db.size());
     for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
-        PD_S("%lu: {", (long unsigned)g->first);
+        PV_S("%lu: {", (long unsigned)g->first);
         for (list<Edge>::iterator l = g->second.begin();
                                     l != g->second.end(); l++) {
-            PD_S("(%lu, %u), ", (long unsigned)l->to, l->cost);
+            PV_S("(%lu, %u), ", (long unsigned)l->to, l->cost);
         }
-        PD_S("}\n");
+        PV_S("}\n");
     }
 #endif
 
@@ -203,7 +203,7 @@ SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
 
         assert(min != UINT_MAX);
 
-        PD_S("Selecting node %lu\n", (long unsigned)min);
+        PV_S("Selecting node %lu\n", (long unsigned)min);
 
         list<Edge>& edges = graph[min];
         Info& info_min = info[min];
@@ -222,18 +222,18 @@ SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
         }
     }
 
-    PD_S("Dijkstra result:\n");
+    PV_S("Dijkstra result:\n");
     for (map<rl_addr_t, Info>::iterator i = info.begin();
                                     i != info.end(); i++) {
-        PD_S("    Address: %lu, Dist: %u, Visited %u\n",
+        PV_S("    Address: %lu, Dist: %u, Visited %u\n",
                 (long unsigned)i->first, i->second.dist,
                 (i->second.visited));
     }
 
-    PD_S("Routing table:\n");
+    PV_S("Routing table:\n");
     for (map<rl_addr_t, rl_addr_t>::iterator h = next_hops.begin();
                                         h != next_hops.end(); h++) {
-        PD_S("    Address: %lu, Next hop: %lu\n",
+        PV_S("    Address: %lu, Next hop: %lu\n",
              (long unsigned)h->first, (long unsigned)h->second);
     }
 
@@ -290,7 +290,7 @@ uipcp_rib::pduft_sync()
                 UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry\n",
                     (long unsigned)r->first, port_id);
             } else {
-                UPD(uipcp, "Add PDUFT entry %lu --> %u\n",
+                UPV(uipcp, "Add PDUFT entry %lu --> %u\n",
                     (long unsigned)r->first, port_id);
             }
     }
