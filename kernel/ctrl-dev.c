@@ -1243,7 +1243,7 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         goto err;
     }
 
-    PI("IPC process %s created\n", name_s);
+    PI("IPC process %s created (id=%u)\n", name_s, ipcp_id);
     if (name_s) {
         kfree(name_s);
     }

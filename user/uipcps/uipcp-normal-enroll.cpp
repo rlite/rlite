@@ -1145,7 +1145,8 @@ Neighbor::alloc_flow(const char *supp_dif)
         if (ipcp) {
             lower_ipcp_id_ = ipcp->id;
         } else {
-            UPI(rib->uipcp, "Failed to get lower ipcp id\n");
+            UPI(rib->uipcp, "Failed to get lower ipcp id in DIF %s\n",
+			    supp_dif);
             return -1;
         }
     }
