@@ -41,6 +41,9 @@ argparser.add_argument('-e', '--enrollment-strategy',
                        help = "Minimal uses a spanning tree of each DIF",
                        type = str, choices = ['minimal', 'full-mesh'],
                        default = 'minimal')
+argparser.add_argument('--ring',
+                       help = "Use ring topology with variable number of ndoes",
+                       type = int)
 args = argparser.parse_args()
 
 
@@ -56,6 +59,26 @@ sudo = ''
 
 vmimgpath = 'buildroot/rootfs.cpio'
 username = 'root'
+
+
+# Possibly autogenerate ring topology
+if args.ring != None and args.ring > 0:
+    print("Ignoring %s, generating ring topology" % (args.conf,))
+    fout = open('ring.conf', 'w')
+    for i in range(args.ring):
+        i_next = i + 1
+        if i_next == args.ring:
+            i_next = 0
+        fout.write('eth b%(i)s 0Mbps m%(i)s m%(inext)s\n' % {'i': i,
+                                                           'inext': i_next})
+    for i in range(args.ring):
+        i_prev = i - 1
+        if i_prev < 0:
+            i_prev = args.ring - 1
+        fout.write('dif n m%(i)s b%(i)s b%(iprev)s\n' % {'i': i,
+                                                         'iprev': i_prev})
+    fout.close()
+    args.conf = 'ring.conf'
 
 
 ############################# Parse demo.conf ##############################
@@ -416,7 +439,7 @@ for dif in dif_ordering:
                                   enrollment['enroller'],
                                   enrollment['lower_dif']))
 
-        outs += 'sleep 2\n' # important!!
+        outs += 'sleep 1\n' # important!!
         outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
