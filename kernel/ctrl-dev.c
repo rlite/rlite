@@ -1597,7 +1597,7 @@ rl_flow_dealloc(struct rl_ctrl *rc,
                 (struct rl_kmsg_flow_dealloc *)bmsg;
     struct ipcp_entry *ipcp;
     struct flow_entry *flow;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret = -ENXIO;  /* Report failure by default. */
 
     ipcp = ipcp_get(req->ipcp_id);
     flow = flow_get(req->port_id);

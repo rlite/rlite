@@ -236,7 +236,11 @@ rl_write_msg(int rfd, struct rl_msg_base *msg)
 
     ret = write(rfd, serbuf, serlen);
     if (ret < 0) {
-        perror("write(rfd)");
+        /* An uIPCP may try to deallocate an already deallocated
+         * flow. Be quiet just in case. */
+        if (!(errno == ENXIO && msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
+            perror("write(ctrlmsg)");
+        }
 
     } else if (ret != serlen) {
         /* This should never happen if kernel code is correct. */
