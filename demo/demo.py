@@ -53,12 +53,13 @@ which('qemu-system-x86_64')
 
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 
+# Some variables that could become options
 sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
           '-o IdentityFile=buildroot/buildroot_rsa'
 sudo = ''
-
 vmimgpath = 'buildroot/rootfs.cpio'
 username = 'root'
+wait_for_boot = 0
 
 
 # Possibly autogenerate ring topology
@@ -152,6 +153,12 @@ while 1:
 
 fin.close()
 
+if len(vms) > 8:
+    print("You want to run a lot of nodes, so it's better if I give "
+          "each node some time to boot (since the boot is CPU-intensive) "
+          "and a minimum amount of memory")
+    wait_for_boot = 10 # in seconds
+    args.memory = 128 # in megabytes
 
 ############ Compute registration/enrollment order for DIFs ###############
 
@@ -334,7 +341,7 @@ for vmname in sorted(vms):
             '-nographic '                                       \
             '-display none '                                    \
             '--enable-kvm '                                     \
-            '-smp 2 '                                           \
+            '-smp 1 '                                           \
             '-m %(memory)sM '                                   \
             '-device e1000,mac=%(mac)s,netdev=mgmt '            \
             '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '   \
@@ -354,7 +361,9 @@ for vmname in sorted(vms):
         '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,downscript=no '\
             % {'mac': mac, 'tap': tap, 'idx': port['idx']}
 
-    outs += '&\n\n'
+    outs += '&\n'
+    if wait_for_boot > 0:
+        outs += 'sleep %s\n' % wait_for_boot
 
     vmid += 1
 
