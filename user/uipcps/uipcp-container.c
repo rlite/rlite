@@ -357,6 +357,10 @@ uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
     uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
     pthread_mutex_lock(&uipcps->lock);
+    if (uipcp_lookup(uipcps, ipcp_id) != NULL) {
+        PE("uIPCP %u already created\n", ipcp_id);
+        goto errx;
+    }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
     pthread_mutex_unlock(&uipcps->lock);
 
@@ -408,6 +412,7 @@ err1:
 err0:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
+errx:
     pthread_mutex_unlock(&uipcps->lock);
     free(uipcp);
 
@@ -458,18 +463,8 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 int
 uipcps_print(struct uipcps *uipcps)
 {
-    struct uipcp *uipcp;
-
-    pthread_mutex_lock(&uipcps->lock);
-
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        /* This is just for debugging purposes. */
-        rl_ctrl_ipcps_print(&uipcp->loop.ctrl);
-        break;
-    }
-
-    pthread_mutex_unlock(&uipcps->lock);
-
+    /* This is just for debugging purposes. */
+    rl_ctrl_ipcps_print(&uipcps->loop.ctrl);
     return 0;
 }
 

@@ -111,9 +111,7 @@ track_ipcp_unregistration(struct uipcps *uipcps,
     struct registered_ipcp *ripcp;
 
     /* Try to remove a registration element from the persistent
-     * registration list. If 'dif_name' and 'ipcp_name' are specified,
-     * match the corresponding tuple fields. Otherwise match the
-     * by IPCP id. */
+     * registration list, matching by IPCP id. */
     list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
         if (ripcp->id == ipcp_id) {
             list_del(&ripcp->node);
@@ -373,7 +371,6 @@ uipcps_ipcp_update(struct rl_evloop *loop,
 {
     struct uipcps *uipcps = container_of(loop, struct uipcps, loop);
     struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
-    struct uipcp *uipcp;
     int ret = -1;
 
     switch (upd->update_type) {
@@ -385,19 +382,12 @@ uipcps_ipcp_update(struct rl_evloop *loop,
             break;
 
         case RLITE_UPDATE_DEL:
-            pthread_mutex_lock(&uipcps->lock);
-            uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
-            pthread_mutex_unlock(&uipcps->lock);
-            if (uipcp) {
-                /* Track all the unregistrations of the destroyed IPCP in
-                 * the persistent registrations list. */
-                track_ipcp_unregistration(uipcps, upd->ipcp_id);
-                ret = uipcp_put(uipcps, upd->ipcp_id);
+            /* Track all the unregistrations of the destroyed IPCP in
+             * the persistent registrations list.
+             * This can be an IPCP with no userspace implementation. */
+            track_ipcp_unregistration(uipcps, upd->ipcp_id);
+            ret = uipcp_put(uipcps, upd->ipcp_id);
 
-            } else {
-                /* This is an IPCP with no userspace implementation. */
-                ret = 0;
-            }
             break;
 
         default:
@@ -408,9 +398,9 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     if (ret) {
         PE("IPCP update synchronization failed\n");
     }
-
+#if 0
     uipcps_print(uipcps);
-
+#endif
     return 0;
 }
 
@@ -506,7 +496,7 @@ process_persistence_file(struct uipcps *uipcps)
 }
 
 static int
-uipcps_update(struct uipcps *uipcps)
+uipcps_init(struct uipcps *uipcps)
 {
     struct rl_ipcp *rl_ipcp;
     int ret = 0;
@@ -515,11 +505,6 @@ uipcps_update(struct uipcps *uipcps)
     if (ret) {
         return ret;
     }
-
-    rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
-                          uipcps_ipcp_update);
-
-    rl_ctrl_ipcps_print(&uipcps->loop.ctrl);
 
     /* Create an userspace IPCP for each existing IPCP. */
     pthread_mutex_lock(&uipcps->loop.lock);
@@ -535,8 +520,13 @@ uipcps_update(struct uipcps *uipcps)
     }
     pthread_mutex_unlock(&uipcps->loop.lock);
 
+    /* From now on the main control loop will take care of IPCP updates, to
+     * align userspace IPCPs with kernelspace ones. */
+    rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
+                          uipcps_ipcp_update);
+#if 0
     uipcps_print(uipcps);
-
+#endif
     process_persistence_file(uipcps);
 
     return 0;
@@ -748,7 +738,7 @@ int main(int argc, char **argv)
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
-    ret = uipcps_update(uipcps);
+    ret = uipcps_init(uipcps);
     if (ret) {
         PE("Failed to load userspace ipcps\n");
         exit(EXIT_FAILURE);
