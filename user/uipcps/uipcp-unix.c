@@ -229,10 +229,12 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                     (struct rl_cmsg_ipcp_rib_show_req *)b_req;
     struct rl_cmsg_ipcp_rib_show_resp resp;
     struct uipcp *uipcp;
+    char *dumpstr;
     int ret;
 
     resp.result = RLITE_ERR; /* Report failure by default. */
-    resp.dump = NULL;
+    resp.dump.buf = NULL;
+    resp.dump.len = 0;
 
     uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
     if (!uipcp) {
@@ -240,9 +242,11 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     }
 
     if (uipcp->ops.rib_show) {
-        resp.dump = uipcp->ops.rib_show(uipcp);
-        if (resp.dump) {
+        dumpstr = uipcp->ops.rib_show(uipcp);
+        if (dumpstr) {
             resp.result = RLITE_SUCC;
+            resp.dump.buf = dumpstr;
+            resp.dump.len = strlen(dumpstr) + 1; /* include terminator */
         }
     }
 
@@ -254,8 +258,8 @@ out:
 
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
 
-    if (resp.dump) {
-        free(resp.dump);
+    if (dumpstr) {
+        free(dumpstr);
     }
 
     return ret;

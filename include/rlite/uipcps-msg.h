@@ -94,7 +94,7 @@ struct rl_cmsg_ipcp_rib_show_resp {
     uint32_t event_id;
 
     uint8_t result;
-    char *dump;
+    struct rl_buf_field dump;
 } __attribute__((packed));
 
 #endif  /* __RLITE_U_MSG_H__ */

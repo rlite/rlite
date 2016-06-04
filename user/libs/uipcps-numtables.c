@@ -50,8 +50,8 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
     },
     [RLITE_U_IPCP_RIB_SHOW_RESP] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_rib_show_resp) -
-                   1 * sizeof(char *),
-        .strings = 1,
+                   1 * sizeof(struct rl_buf_field),
+        .buffers = 1,
     },
     [RLITE_U_MSG_MAX] = {
         .copylen = 0,

@@ -80,18 +80,40 @@ read_response(int sfd, response_handler_t handler)
 {
     struct rl_msg_base_resp *resp;
     char msgbuf[4096];
-    char serbuf[4096];
-    int ret;
+    char *serbuf = NULL;
+    int serbuf_size = 4096;
+    int read_ofs = 0;
+    int ret = -1;
     int n;
 
-    n = read(sfd, serbuf, sizeof(serbuf));
-    if (n < 0) {
-        PE("read() error [%d]\n", n);
-        return -1;
+    for (;;) {
+        char *sbold = serbuf;
+
+        serbuf = realloc(serbuf, serbuf_size);
+        if (!serbuf) {
+            PE("Out of memory\n");
+            if (sbold) {
+                free(sbold); /* Original buffer is not auto-freed. */
+            }
+            return -1;
+        }
+
+        n = read(sfd, serbuf + read_ofs, serbuf_size - read_ofs);
+        if (n < 0) {
+            PE("read() error [%d]\n", n);
+            return -1;
+        }
+
+        read_ofs += n;
+        ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
+                                    serbuf, read_ofs, msgbuf, sizeof(msgbuf));
+        if (ret == 0) {
+            break;
+        }
+        serbuf_size *= 2; /* Try with a bigger buffer. */
     }
 
-    ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                               serbuf, n, msgbuf, sizeof(msgbuf));
+    free(serbuf);
     if (ret) {
         PE("error while deserializing response [%d]\n",
                 ret);
@@ -385,8 +407,8 @@ ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
     struct rl_cmsg_ipcp_rib_show_resp *resp =
         (struct rl_cmsg_ipcp_rib_show_resp *)b_resp;
 
-    if (resp->dump) {
-        printf("%s\n", resp->dump);
+    if (resp->dump.len) {
+        printf("%s\n", (char *)resp->dump.buf);
     }
 
     return 0;
