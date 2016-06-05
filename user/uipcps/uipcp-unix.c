@@ -375,7 +375,7 @@ uipcps_ipcp_update(struct rl_evloop *loop,
 {
     struct uipcps *uipcps = container_of(loop, struct uipcps, loop);
     struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
-    int ret = -1;
+    int ret = 0;
 
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
@@ -391,11 +391,6 @@ uipcps_ipcp_update(struct rl_evloop *loop,
              * This can be an IPCP with no userspace implementation. */
             track_ipcp_unregistration(uipcps, upd->ipcp_id);
             ret = uipcp_put(uipcps, upd->ipcp_id);
-
-            break;
-
-        default:
-            ret = 0;
             break;
     }
 
