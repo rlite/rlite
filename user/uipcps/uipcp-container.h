@@ -177,26 +177,19 @@ int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
 #define UPRINT(_u, LEV, FMT, ...)    \
     DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->id, __func__, ##__VA_ARGS__)
 
-#ifdef PD_ON
-#define UPD(_u, FMT, ...)   UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
-#else
-#define UPD(_u, FMT, ...)
-#endif
+#define UPD(_u, FMT, ...)   \
+    if (rl_verbosity >= RL_VERB_DBG)    \
+        UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 
-#ifdef PI_ON
-#define UPI(_u, FMT, ...)   UPRINT(_u, "INF", FMT, ##__VA_ARGS__)
-#else
-#define UPI(_u, FMT, ...)
-#endif
+#define UPI(_u, FMT, ...)   \
+    if (rl_verbosity >= RL_VERB_INFO)   \
+        UPRINT(_u, "INF", FMT, ##__VA_ARGS__)
 
-#ifdef PV_ON
-#define UPV(_u, FMT, ...)   UPD(_u, FMT, ##__VA_ARGS__)
-#else
-#define UPV(_u, FMT, ...)
-#endif
+#define UPV(_u, FMT, ...)   \
+    if (rl_verbosity >= RL_VERB_VERY)   \
+        UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 
 #define UPE(_u, FMT, ...)   UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
-
 
 #ifdef __cplusplus
 }

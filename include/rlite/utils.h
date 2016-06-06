@@ -112,10 +112,10 @@ extern int rl_verbosity;
 
 #define PV(FMT, ...)    \
         if (rl_verbosity >= RL_VERB_VERY)    \
-            PD(FMT, ##__VA_ARGS__)
+            PRINTFUN2("DBG", FMT, ##__VA_ARGS__)
 #define PV_S(FMT, ...)  \
         if (rl_verbosity >= RL_VERB_VERY)    \
-            PD_S(FMT, ##__VA_ARGS__)
+            PRINTFUN1(FMT, ##__VA_ARGS__)
 
 #define PE(FMT, ...) PRINTFUN2("ERR", FMT, ##__VA_ARGS__)
 

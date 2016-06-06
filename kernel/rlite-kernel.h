@@ -45,7 +45,7 @@ extern int verbosity;
 
 #define PV(FMT, ...)    \
     if (verbosity >= RL_VERB_VERY)   \
-        DOPRINT(KERN_DEBUG, "VER", FMT, ##__VA_ARGS__)
+        DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
 
 #define PD(FMT, ...)    \
     if (verbosity >= RL_VERB_DBG)   \
