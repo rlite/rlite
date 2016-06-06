@@ -42,6 +42,9 @@
 #include "ctrl-utils.h"
 
 
+/* Global variable for the user to set verbosity. */
+int rl_verbosity = RL_VERB_DBG;
+
 static void
 rl_ipcps_purge(struct list_head *ipcps)
 {

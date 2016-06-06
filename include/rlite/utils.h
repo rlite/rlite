@@ -79,7 +79,47 @@ int __rina_name_fill(struct rina_name *name, const char *apn,
 char * __rina_name_to_string(const struct rina_name *name, int maysleep);
 int __rina_name_from_string(const char *str, struct rina_name *name,
                             int maysleep);
-#endif
+#else  /* !__KERNEL__ */
+
+/* Logging macros. */
+
+extern int rl_verbosity;
+
+#define DOPRINT(FMT, ...)               \
+    do {                                \
+        printf(FMT, ##__VA_ARGS__);     \
+        fflush(stdout);                 \
+    } while (0)
+
+#define PRINTFUN1(FMT, ...)                 \
+                DOPRINT(FMT, ##__VA_ARGS__)
+#define PRINTFUN2(LEV, FMT, ...)            \
+                DOPRINT("[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
+
+#define PD(FMT, ...) \
+        if (rl_verbosity >= RL_VERB_DBG) \
+            PRINTFUN2("DBG", FMT, ##__VA_ARGS__)
+#define PD_S(FMT, ...)  \
+        if (rl_verbosity >= RL_VERB_DBG) \
+            PRINTFUN1(FMT, ##__VA_ARGS__)
+
+#define PI(FMT, ...) \
+        if (rl_verbosity >= RL_VERB_INFO) \
+            PRINTFUN2("INF", FMT, ##__VA_ARGS__)
+#define PI_S(FMT, ...) \
+        if (rl_verbosity >= RL_VERB_INFO)    \
+            PRINTFUN1(FMT, ##__VA_ARGS__)
+
+#define PV(FMT, ...)    \
+        if (rl_verbosity >= RL_VERB_VERY)    \
+            PD(FMT, ##__VA_ARGS__)
+#define PV_S(FMT, ...)  \
+        if (rl_verbosity >= RL_VERB_VERY)    \
+            PD_S(FMT, ##__VA_ARGS__)
+
+#define PE(FMT, ...) PRINTFUN2("ERR", FMT, ##__VA_ARGS__)
+
+#endif /* !__KERNEL__ */
 
 #ifdef __cplusplus
 }

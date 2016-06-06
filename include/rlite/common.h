@@ -191,56 +191,6 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
 }
 
-/* Logging macros. */
-#define PD_ON  /* Enable debug print. */
-#define PI_ON  /* Enable info print. */
-#undef PV_ON  /* Enable verbose debug print. */
-
-#ifndef __KERNEL__
-
-#define K_DEBUG
-#define K_INFO
-#define K_ERR
-
-#define DOPRINT(FMT, ...)               \
-    do {                                \
-        printf(FMT, ##__VA_ARGS__);     \
-        fflush(stdout);                 \
-    } while (0)
-
-#define PRINTFUN1(KLEV, FMT, ...)                 \
-                DOPRINT(KLEV FMT, ##__VA_ARGS__)
-#define PRINTFUN2(KLEV, LEV, FMT, ...)            \
-                DOPRINT(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
-
-#ifdef PD_ON
-#define PD(FMT, ...) PRINTFUN2(K_DEBUG, "DBG", FMT, ##__VA_ARGS__)
-#define PD_S(FMT, ...) PRINTFUN1(K_DEBUG, FMT, ##__VA_ARGS__)
-#else
-#define PD(FMT, ...)
-#define PD_S(FMT, ...)
-#endif
-
-#ifdef PI_ON
-#define PI(FMT, ...) PRINTFUN2(K_INFO, "INF", FMT, ##__VA_ARGS__)
-#define PI_S(FMT, ...) PRINTFUN1(K_INFO, FMT, ##__VA_ARGS__)
-#else
-#define PI(formt, ...)
-#define PI_S(FMT, ...)
-#endif
-
-#ifdef PV_ON
-#define PV(FMT, ...) PD(FMT, ##__VA_ARGS__)
-#define PV_S(FMT, ...) PD(FMT, ##__VA_ARGS__)
-#else
-#define PV(FMT, ...)
-#define PV_S(FMT, ...)
-#endif
-
-#define PE(FMT, ...) PRINTFUN2(K_ERR, "ERR", FMT, ##__VA_ARGS__)
-
-#endif /* ! __KERNEL__ */
-
 #define NPD(FMT, ...)
 
 #define RL_VERB_QUIET   1
