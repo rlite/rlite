@@ -619,12 +619,23 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
+static void
+usage(void)
+{
+    printf("rlite-uipcps [OPTIONS]\n"
+        "   -h : show this help\n"
+        "   -v VERB_LEVEL: set verbosity LEVEL: QUIET, WARN, INFO, "
+                           "DBG (default), VERY\n"
+          );
+}
+
 int main(int argc, char **argv)
 {
     struct uipcps *uipcps = &guipcps;
     struct sockaddr_un server_address;
     struct sigaction sa;
-    int ret;
+    const char *verbosity = "DBG";
+    int ret, opt;
 
     /* We require root permissions. */
     if (geteuid() != 0) {
@@ -640,6 +651,36 @@ int main(int argc, char **argv)
     if (!char_device_exists(io_dev_name)) {
         PE("Device %s not found\n", io_dev_name);
         return -1;
+    }
+
+    while ((opt = getopt(argc, argv, "hv:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
+            case 'v':
+                verbosity = optarg;
+                break;
+
+            default:
+                printf("    Unrecognized option %c\n", opt);
+                usage();
+                return -1;
+        }
+    }
+
+    /* Set verbosity level. */
+    if (strcmp(verbosity, "VERY") == 0) {
+        rl_verbosity = RL_VERB_VERY;
+    } else if (strcmp(verbosity, "INFO") == 0) {
+        rl_verbosity = RL_VERB_INFO;
+    } else if (strcmp(verbosity, "WARN") == 0) {
+        rl_verbosity = RL_VERB_WARN;
+    } else if (strcmp(verbosity, "QUIET") == 0) {
+        rl_verbosity = RL_VERB_QUIET;
+    } else {
+        rl_verbosity = RL_VERB_DBG;
     }
 
     /* Open a Unix domain socket to listen to. */

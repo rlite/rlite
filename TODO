@@ -19,8 +19,4 @@
 
 - implement propagation of candidate neighbors
 
-- improve logging framework, with dynamic verbosity control. Use a module
-  parameter for kernelspace verbosity, a command-line argument for
-  uipcps verbosity, and probably a global variable for librlite
-
 - shim-inet4: use recvfrom(MSG_PEEK) to support UDP
