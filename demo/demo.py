@@ -42,8 +42,12 @@ argparser.add_argument('-e', '--enrollment-strategy',
                        type = str, choices = ['minimal', 'full-mesh'],
                        default = 'minimal')
 argparser.add_argument('--ring',
-                       help = "Use ring topology with variable number of ndoes",
+                       help = "Use ring topology with variable number of nodes",
                        type = int)
+argparser.add_argument('--verbosity',
+                       help = "Set verbosity level for kernel and userspace",
+                       choices = ['VERY', 'DBG', 'INFO', 'WARN', 'QUIET'],
+                       default = 'DBG')
 args = argparser.parse_args()
 
 
@@ -381,8 +385,10 @@ for vmname in sorted(vms):
             '\n' % {'name': vm['name'], 'ssh': vm['ssh'], 'username': username,
                     'sshopts': sshopts, 'sudo': sudo}
 
+    verbmap = {'QUIET': 1, 'WARN': 2, 'INFO': 3, 'DBG': 4, 'VERY': 5}
+
     # Load kernel modules
-    outs +=         '$SUDO modprobe rlite\n'\
+    outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
                     '$SUDO modprobe rlite-shim-inet4\n'\
                     '$SUDO modprobe rlite-normal\n'\
@@ -391,7 +397,9 @@ for vmname in sorted(vms):
                     '$SUDO mkdir -p /var/rlite\n'\
                     '$SUDO chmod -R a+rw /var/rlite\n'\
                     '\n'\
-                    '$SUDO rlite-uipcps &> uipcp.log &\n'
+                    '$SUDO rlite-uipcps -v %(verb)s &> uipcp.log &\n'\
+                        % {'verb': args.verbosity,
+                           'verbidx': verbmap[args.verbosity]}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
