@@ -15,4 +15,12 @@
 - CDAP: support a simple retransmission mechanism, in case the CDAP
   connection is not supported by a reliable flow
 
-- support RIB M_READ (and M_WRITE)
+- support generic RIB M_READ (and M_WRITE)
+
+- implement propagation of candidate neighbors
+
+- improve logging framework, with dynamic verbosity control. Use a module
+  parameter for kernelspace verbosity, a command-line argument for
+  uipcps verbosity, and probably a global variable for librlite
+
+- shim-inet4: use recvfrom(MSG_PEEK) to support UDP

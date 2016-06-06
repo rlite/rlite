@@ -22,7 +22,6 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/utils.h"
 #include "rlite-kernel.h"
-#include "rlite-bufs.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>

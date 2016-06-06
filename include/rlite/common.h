@@ -196,15 +196,7 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
 #define PI_ON  /* Enable info print. */
 #undef PV_ON  /* Enable verbose debug print. */
 
-#ifdef __KERNEL__
-
-#define K_DEBUG KERN_DEBUG
-#define K_INFO  KERN_INFO
-#define K_ERR   KERN_ERR
-
-#define DOPRINT(FMT, ...) printk(FMT, ##__VA_ARGS__)
-
-#else  /* ! __KERNEL__ */
+#ifndef __KERNEL__
 
 #define K_DEBUG
 #define K_INFO
@@ -215,8 +207,6 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
         printf(FMT, ##__VA_ARGS__);     \
         fflush(stdout);                 \
     } while (0)
-
-#endif /* ! __KERNEL__ */
 
 #define PRINTFUN1(KLEV, FMT, ...)                 \
                 DOPRINT(KLEV FMT, ##__VA_ARGS__)
@@ -249,25 +239,15 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
 
 #define PE(FMT, ...) PRINTFUN2(K_ERR, "ERR", FMT, ##__VA_ARGS__)
 
+#endif /* ! __KERNEL__ */
+
 #define NPD(FMT, ...)
 
-#ifdef __KERNEL__
-
-#define time_sec_cur     (jiffies_to_msecs(jiffies) / 1000U)
-
-/* Rate-limited version, LPS indicate how many per second. */
-#define RPD(LPS, FMT, ...)                              \
-    do {                                                \
-        static int t0, __cnt;                           \
-        if (t0 != time_sec_cur) {                       \
-            t0 = time_sec_cur;                          \
-            __cnt = 0;                                  \
-        }                                               \
-        if (__cnt++ < LPS)                              \
-        PD(FMT, ##__VA_ARGS__);                         \
-    } while (0)
-
-#endif
+#define RL_VERB_QUIET   1
+#define RL_VERB_WARN    2
+#define RL_VERB_INFO    3
+#define RL_VERB_DBG     4
+#define RL_VERB_VERY    5
 
 #ifdef __cplusplus
 }

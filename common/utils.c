@@ -25,6 +25,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include "rlite-kernel.h"
 
 #define COMMON_ALLOC(_sz, _sl)      kmalloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC)
 #define COMMON_FREE(_p)             kfree(_p)

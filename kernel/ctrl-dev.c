@@ -22,7 +22,6 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/utils.h"
 #include "rlite-kernel.h"
-#include "rlite-bufs.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -38,6 +37,10 @@
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
 
+
+int verbosity = RL_VERB_DBG;
+EXPORT_SYMBOL(verbosity);
+module_param(verbosity, int, 0644);
 
 struct rl_ctrl;
 

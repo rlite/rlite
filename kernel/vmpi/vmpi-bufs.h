@@ -3,7 +3,7 @@
 
 #include <linux/uio.h>
 #include <linux/list.h>
-#include "../rlite-bufs.h"
+#include "../rlite-kernel.h"
 
 
 #define vmpi_buf            rl_buf
