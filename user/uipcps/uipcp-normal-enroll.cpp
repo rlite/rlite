@@ -507,14 +507,23 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         enr_info.address = rib->address_allocate();
     }
 
-    /* Add the initiator to the set of candidate neighbors. */
     NeighborCandidate cand;
-
+    /* We have to add the initiator to the set of candidate neighbors here,
+     * because this is needed for neighbor address look-up (necessary when
+     * creating the lower-flow entry for the initiator). */
     cand.apn = ipcp_name.apn;
     cand.api = ipcp_name.api;
     cand.address = enr_info.address;
     cand.lower_difs = enr_info.lower_difs;
-    rib->cand_neighbors[static_cast<string>(ipcp_name)] = cand;
+    rib->neighbors_seen[static_cast<string>(ipcp_name)] = cand;
+    rib->neighbors_cand.insert(static_cast<string>(ipcp_name));
+
+    NeighborCandidateList ncl;
+     /* We also need to propagate the new NeighborCandidate object to the other
+     * neighbors already enrolled. */
+    ncl.candidates.push_back(cand);
+    rib->remote_sync_obj_excluding(nf->neigh, true, obj_class::neighbors,
+                                   obj_name::neighbors, &ncl);
 
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());
     m.obj_class = obj_class::enrollment;
@@ -533,7 +542,6 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     /* Send only a neighbor representing myself, because it's
      * required by the initiator to add_lower_flow(). */
-    NeighborCandidateList ncl;
     RinaName cand_name;
 
     ipcp = rib->ipcp_info();
@@ -543,10 +551,10 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     cand.api = cand_name.api;
     cand.address = ipcp->addr;
     cand.lower_difs = rib->lower_difs;
+    ncl.candidates.clear();
     ncl.candidates.push_back(cand);
 
-    remote_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors,
-                    &ncl);
+    remote_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors, &ncl);
 
     /* Stop the enrollment. */
     enr_info.start_early = true;
@@ -888,10 +896,10 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
     {
         bool sent_myself = false;
 
-        /* Scan all my neighbors. */
+        /* Scan all the neighbors I know about. */
         for (map<string, NeighborCandidate>::iterator cit =
-                rib->cand_neighbors.begin();
-                cit != rib->cand_neighbors.end();) {
+                rib->neighbors_seen.begin();
+                cit != rib->neighbors_seen.end();) {
             NeighborCandidateList ncl;
             unsigned int k = 0;
 
@@ -913,7 +921,8 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 k++;
             }
 
-            for (; k < limit && cit != rib->cand_neighbors.end(); cit++, k++) {
+            for (; k < limit && cit != rib->neighbors_seen.end();
+                                                        cit++, k++) {
                 ncl.candidates.push_back(cit->second);
             }
 
@@ -959,9 +968,9 @@ rl_addr_t
 uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
 {
     map< string, NeighborCandidate >::const_iterator
-            mit = cand_neighbors.find(static_cast<string>(neigh_name));
+            mit = neighbors_seen.find(static_cast<string>(neigh_name));
 
-    if (mit != cand_neighbors.end()) {
+    if (mit != neighbors_seen.end()) {
         return mit->second.address;
     }
 
@@ -973,7 +982,8 @@ uipcp_rib::lookup_neighbor_by_address(rl_addr_t address)
 {
     map<string, NeighborCandidate>::iterator nit;
 
-    for (nit = cand_neighbors.begin(); nit != cand_neighbors.end(); nit++) {
+    for (nit = neighbors_seen.begin();
+                        nit != neighbors_seen.end(); nit++) {
         if (nit->second.address == address) {
             return RinaName(nit->second.apn, nit->second.api,
                             string(), string());
@@ -1003,6 +1013,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
     struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
+    bool propagate = false;
     bool add = true;
 
     if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
@@ -1024,6 +1035,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
     ipcp = ipcp_info();
 
     NeighborCandidateList ncl(objbuf, objlen);
+    NeighborCandidateList prop_ncl;
     RinaName my_name = RinaName(&ipcp->name);
 
     for (list<NeighborCandidate>::iterator neigh = ncl.candidates.begin();
@@ -1031,7 +1043,8 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
         RinaName neigh_name = RinaName(neigh->apn, neigh->api, string(),
                                        string());
         string key = static_cast<string>(neigh_name);
-        map< string, NeighborCandidate >::iterator mit = cand_neighbors.find(key);
+        map< string, NeighborCandidate >::iterator
+                                    mit = neighbors_seen.find(key);
 
         if (neigh_name == my_name) {
             /* Skip myself (as a neighbor of the slave). */
@@ -1039,26 +1052,49 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (add) {
-            string common_dif = common_lower_dif(neigh->lower_difs, lower_difs);
+            if (mit != neighbors_seen.end()) {
+                /* We've already seen this one. */
+                continue;
+            }
+            neighbors_seen[key] = *neigh;
+            prop_ncl.candidates.push_back(*neigh);
+            propagate = true;
+
+            /* Check if it can be a candidate neighbor. */
+            string common_dif = common_lower_dif(neigh->lower_difs,
+                    lower_difs);
             if (common_dif == string()) {
                 UPD(uipcp, "Neighbor %s discarded because there are no lower DIFs in "
-                        "common with us\n", key.c_str());
+                           "common with us\n", key.c_str());
+            } else {
+                neighbors_cand.insert(key);
+                UPD(uipcp, "Candidate neighbor %s %s remotely\n", key.c_str(),
+                        (mit != neighbors_seen.end() ? "updated" : "added"));
+            }
+
+        } else {
+            if (mit == neighbors_seen.end()) {
+                UPI(uipcp, "Candidate neighbor does not exist\n");
                 continue;
             }
 
-            cand_neighbors[key] = *neigh;
-            UPD(uipcp, "Candidate neighbor %s %s remotely\n", key.c_str(),
-                    (mit != cand_neighbors.end() ? "updated" : "added"));
-
-        } else {
-            if (mit == cand_neighbors.end()) {
-                UPI(uipcp, "Candidate neighbor does not exist\n");
-            } else {
-                cand_neighbors.erase(mit);
-                UPD(uipcp, "Candidate neighbor %s removed remotely\n", key.c_str());
+            /* Let's forget about this neighbor. */
+            neighbors_seen.erase(mit);
+            prop_ncl.candidates.push_back(*neigh);
+            propagate = true;
+            if (neighbors_cand.count(key)) {
+                neighbors_cand.erase(key);
             }
-
+            UPD(uipcp, "Candidate neighbor %s removed remotely\n",
+                       key.c_str());
         }
+    }
+
+    if (propagate) {
+        /* Propagate the updated information to the other neighbors,
+         * so that they can update their Neighbor objects. */
+        remote_sync_obj_excluding(nf->neigh, add, obj_class::neighbors,
+                                  obj_name::neighbors, &prop_ncl);
     }
 
     return 0;

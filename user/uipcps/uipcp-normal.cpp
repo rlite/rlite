@@ -386,10 +386,16 @@ uipcp_rib::dump() const
 
     ss << "Candidate Neighbors:" << endl;
     for (map<string, NeighborCandidate>::const_iterator
-            mit = cand_neighbors.begin();
-                mit != cand_neighbors.end(); mit++) {
+            mit = neighbors_seen.begin();
+                mit != neighbors_seen.end(); mit++) {
         const NeighborCandidate& cand = mit->second;
+        RinaName neigh_name = RinaName(cand.apn, cand.api, string(), string());
 
+        if (!neighbors_cand.count(static_cast<string>(neigh_name))) {
+            /* Don't show NeighborCandidate objects corresponding to neighbors
+             * which don't have DIFs in common with us. */
+            continue;
+        }
         ss << "    Name: " << cand.apn << "/" << cand.api
             << ", Address: " << cand.address << ", Lower DIFs: {";
 

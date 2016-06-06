@@ -17,8 +17,6 @@
 
 - support generic RIB M_READ (and M_WRITE)
 
-- implement propagation of candidate neighbors
-
 - shim-inet4: use recvfrom(MSG_PEEK) to support UDP
 
 - demo.py: a good strategy to accelerate the boot of nodes could be

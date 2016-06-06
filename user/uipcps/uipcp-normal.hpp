@@ -221,9 +221,14 @@ struct uipcp_rib {
     /* Lower DIFs. */
     std::list< std::string > lower_difs;
 
-    /* Neighbors. */
+    /* Neighbors. We keep track of all the NeighborCandidate objects seen,
+     * even for candidates that have no lower DIF in common with us. This
+     * is used to implement propagation of the CandidateNeighbors information,
+     * so that all the IPCPs in the DIF know their potential candidate
+     * neighbors.*/
     std::map< std::string, Neighbor* > neighbors;
-    std::map< std::string, NeighborCandidate > cand_neighbors;
+    std::map< std::string, NeighborCandidate > neighbors_seen;
+    std::set< std::string > neighbors_cand;
 
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
