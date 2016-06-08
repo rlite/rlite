@@ -36,7 +36,6 @@ class RinaRRTool:
         self.client_name = rina_name()
         self.server_name = rina_name()
         self.dif = rina_name()
-        self.ipcp_name = rina_name()
         self.flow_spec = rl_flow_spec()
         rl_flow_spec_default(self.flow_spec)
 
@@ -46,13 +45,8 @@ class RinaRRTool:
 
 
     def client(self, args):
-        if rina_name_valid(self.ipcp_name):
-            fd = rl_ctrl_flow_alloc2(self.rc, self.ipcp_name,
-                                     self.client_name, self.server_name,
-                                     self.flow_spec)
-        else:
-            fd = rl_ctrl_flow_alloc(self.rc, self.dif, self.client_name,
-                                    self.server_name, self.flow_spec)
+        fd = rl_ctrl_flow_alloc(self.rc, self.dif, self.client_name,
+                                self.server_name, self.flow_spec)
 
         if fd < 0:
             return fd
@@ -76,11 +70,7 @@ class RinaRRTool:
 
 
     def server(self, args):
-        if rina_name_valid(self.ipcp_name):
-            ret = rl_ctrl_register2(self.rc, self.ipcp_name, self.server_name)
-        else:
-            ret = rl_ctrl_register(self.rc, self.dif, self.server_name)
-
+        ret = rl_ctrl_register(self.rc, self.dif, self.server_name)
         if ret:
             return ret
 
@@ -119,10 +109,6 @@ argparser.add_argument('-d', '--dif',
                        type = str)
 argparser.add_argument('-f', '--flow-spec', help = "Flow specification",
                        type = str, default='unrel')
-argparser.add_argument('-p', '--ipcp-apn', help = "IPCP APN (overwrites -d)",
-                       type = str)
-argparser.add_argument('-P', '--ipcp-api', help = "IPCP API (overwrites -d)",
-                       type = str)
 argparser.add_argument('-a', '--client-apn', help = "client APN",
                        type = str, default='rl_rr-data')
 argparser.add_argument('-A', '--client-api', help = "client API",
@@ -134,15 +120,11 @@ argparser.add_argument('-Z', '--server-api', help = "server API",
 
 args = argparser.parse_args()
 
-if args.ipcp_apn == None:
-    args.ipcp_api = None
-
 try:
     rr = RinaRRTool()
 
     rina_name_fill(rr.client_name, args.client_apn, args.client_api, None, None)
     rina_name_fill(rr.server_name, args.server_apn, args.server_api, None, None)
-    rina_name_fill(rr.ipcp_name, args.ipcp_apn, args.ipcp_api, None, None)
     rr.dif = args.dif
     rr.flow_spec.cubename = args.flow_spec
 
