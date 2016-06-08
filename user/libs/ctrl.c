@@ -498,8 +498,6 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, rl_ipcp_id_t ipcp_id,
-               const char *dif_name,
-               const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
                const struct rl_flow_spec *flowspec,
@@ -659,9 +657,8 @@ rl_ctrl_fa_req_common(struct rl_ctrl *ctrl, const char *dif_name,
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_fa_req_fill(&req, event_id, rl_ipcp->id,
-                         dif_name, ipcp_name, local_appl, remote_appl,
-                         flowspec, 0xffff);
+    ret = rl_fa_req_fill(&req, event_id, rl_ipcp->id, local_appl,
+                         remote_appl, flowspec, 0xffff);
     if (ret) {
         PE("Failed to fill flow allocation request\n");
         return 0;

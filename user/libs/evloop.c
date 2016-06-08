@@ -944,8 +944,8 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
         PE("Out of memory\n");
         return -1;
     }
-    rl_fa_req_fill(req, event_id, rl_ipcp->id, dif_name, ipcp_name,
-                   local_appl, remote_appl, flowspec, upper_ipcp_id);
+    rl_fa_req_fill(req, event_id, rl_ipcp->id, local_appl, remote_appl,
+                   flowspec, upper_ipcp_id);
 
     PD("Requesting flow allocation...\n");
 

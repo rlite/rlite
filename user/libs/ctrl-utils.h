@@ -66,8 +66,6 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, rl_ipcp_id_t ipcp_id,
-               const char *dif_name,
-               const struct rina_name *ipcp_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
                const struct rl_flow_spec *flowspec,
