@@ -4,6 +4,7 @@
 # Author: Vincenzo Maffione <v.maffione@gmail.com>
 #
 
+import multiprocessing
 import subprocess
 import argparse
 import json
@@ -67,7 +68,6 @@ sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
 sudo = ''
 vmimgpath = 'buildroot/rootfs.cpio'
 username = 'root'
-wait_for_boot = 0
 
 
 # Possibly autogenerate ring topology
@@ -161,11 +161,12 @@ while 1:
 
 fin.close()
 
+boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
+wait_for_boot = 12  # in seconds
 if len(vms) > 8:
     print("You want to run a lot of nodes, so it's better if I give "
           "each node some time to boot (since the boot is CPU-intensive) "
           "and a minimum amount of memory")
-    wait_for_boot = 10 # in seconds
     args.memory = 128 # in megabytes
 
 ############ Compute registration/enrollment order for DIFs ###############
@@ -325,6 +326,7 @@ for l in sorted(links):
 
 
 vmid = 1
+budget = boot_batch_size
 
 for vmname in sorted(vms):
     vm = vms[vmname]
@@ -371,8 +373,11 @@ for vmname in sorted(vms):
                'frontend': args.frontend}
 
     outs += '&\n'
-    if wait_for_boot > 0:
+
+    budget -= 1
+    if budget <= 0:
         outs += 'sleep %s\n' % wait_for_boot
+        budget = boot_batch_size
 
     vmid += 1
 
