@@ -714,8 +714,8 @@ accept_inet_conn(struct rl_evloop *loop, int lfd)
 
     /* Issue a non-blocking flow allocation request. */
     ret = rl_evloop_flow_alloc(loop, event_id, mit->second.dif_name_s.c_str(),
-                              NULL, &gw->appl_name, &mit->second.name_r,
-                              &flowspec, 0xffff, &unused, 0);
+                               &gw->appl_name, &mit->second.name_r,
+                               &flowspec, 0xffff, &unused, 0);
     if (ret) {
         PE("Flow allocation failed\n");
         return;
@@ -797,7 +797,7 @@ setup()
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
         rl_evloop_register(&gw.loop, 1, mit->first.dif_name_s.c_str(),
-                              NULL, &mit->first.name_r, 3000);
+                           &mit->first.name_r, 3000);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());

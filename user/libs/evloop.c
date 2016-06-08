@@ -850,19 +850,15 @@ rl_evloop_fa_resp(struct rl_evloop *loop, uint32_t kevent_id,
 
 struct rl_kmsg_appl_register_resp *
 rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
-                    unsigned int wait_ms, int reg,
-                    const char *dif_name,
-                    const struct rina_name *ipcp_name,
-                    const struct rina_name *appl_name)
+                  unsigned int wait_ms, int reg,
+                  const char *dif_name,
+                  const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register *req;
     struct rl_ipcp *rl_ipcp;
     int result;
 
-    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rl_ipcp) {
-        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
-    }
+    rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     if (!rl_ipcp) {
         PE("Could not find a suitable IPC process\n");
         return NULL;
@@ -887,17 +883,16 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
 
 int
 rl_evloop_register(struct rl_evloop *loop, int reg,
-                         const char *dif_name,
-                         const struct rina_name *ipcp_name,
-                         const struct rina_name *appl_name,
-                         unsigned int wait_ms)
+                   const char *dif_name,
+                   const struct rina_name *appl_name,
+                   unsigned int wait_ms)
 {
     struct rl_kmsg_appl_register_resp *resp;
     uint32_t event_id = rl_ctrl_get_id(&loop->ctrl);
     int ret = 0;
 
     resp = rl_evloop_reg_req(loop, event_id, wait_ms, reg, dif_name,
-                            ipcp_name, appl_name);
+                             appl_name);
 
     if (!resp) {
         return -1;
@@ -916,23 +911,19 @@ rl_evloop_register(struct rl_evloop *loop, int reg,
 
 int
 rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
-                   const char *dif_name,
-                   const struct rina_name *ipcp_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rl_flow_spec *flowspec,
-                   rl_ipcp_id_t upper_ipcp_id,
-                   rl_port_t *port_id, unsigned int wait_ms)
+                     const char *dif_name,
+                     const struct rina_name *local_appl,
+                     const struct rina_name *remote_appl,
+                     const struct rl_flow_spec *flowspec,
+                     rl_ipcp_id_t upper_ipcp_id,
+                     rl_port_t *port_id, unsigned int wait_ms)
 {
     struct rl_kmsg_fa_req *req;
     struct rl_kmsg_fa_resp_arrived *kresp;
     struct rl_ipcp *rl_ipcp;
     int result;
 
-    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&loop->ctrl, ipcp_name);
-    if (!rl_ipcp) {
-        rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
-    }
+    rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
     if (!rl_ipcp) {
         PE("No suitable IPCP found\n");
         return -1;

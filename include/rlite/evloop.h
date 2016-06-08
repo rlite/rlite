@@ -124,21 +124,18 @@ rl_evloop_schedule_canc(struct rl_evloop *loop, int id);
 
 struct rl_kmsg_appl_register_resp *
 rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
-                    unsigned int wait_ms,
-                    int reg, const char *dif_name,
-                    const struct rina_name *ipcp_name,
-                    const struct rina_name *appl_name);
+                  unsigned int wait_ms,
+                  int reg, const char *dif_name,
+                  const struct rina_name *appl_name);
 
 int rl_evloop_register(struct rl_evloop *loop,
-                             int reg, const char *dif_name,
-                             const struct rina_name *ipcp_name,
-                             const struct rina_name *appl_name,
-                             unsigned int wait_ms);
+                       int reg, const char *dif_name,
+                       const struct rina_name *appl_name,
+                       unsigned int wait_ms);
 
 int rl_evloop_flow_alloc(struct rl_evloop *loop,
                         uint32_t event_id,
                         const char *dif_name,
-                        const struct rina_name *ipcp_name, /* Useful for testing. */
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
                         const struct rl_flow_spec *flowcfg,

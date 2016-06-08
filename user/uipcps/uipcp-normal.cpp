@@ -804,7 +804,7 @@ normal_register_to_lower(struct uipcp *uipcp,
 
     /* Perform the registration. */
     ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
-                             NULL, &req->ipcp_name, 2000);
+                             &req->ipcp_name, 2000);
 
     if (ret) {
         return ret;

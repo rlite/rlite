@@ -1190,7 +1190,7 @@ Neighbor::alloc_flow(const char *supp_dif)
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
 
     /* Allocate a flow for the enrollment. */
-    ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif, NULL,
+    ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif,
                                &ipcp->name, &neigh_name, NULL,
                                ipcp->id, &port_id_, 2000);
     rina_name_free(&neigh_name);
