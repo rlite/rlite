@@ -47,7 +47,6 @@ struct rl_rr {
     struct rina_name client_appl_name;
     struct rina_name server_appl_name;
     char *dif_name;
-    struct rina_name ipcp_name;
     struct rl_flow_spec flowspec;
 };
 
@@ -62,15 +61,9 @@ client(struct rl_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    if (rina_name_valid(&rr->ipcp_name)) {
-        dfd = rl_ctrl_flow_alloc2(&rr->ctrl, &rr->ipcp_name,
-                                  &rr->client_appl_name,
-                                  &rr->server_appl_name, &rr->flowspec);
-    } else {
-        dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
+    dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
                                  &rr->client_appl_name,
                                  &rr->server_appl_name, &rr->flowspec);
-    }
     if (dfd < 0) {
         return dfd;
     }
@@ -123,14 +116,8 @@ server(struct rl_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    if (rina_name_valid(&rr->ipcp_name)) {
-        ret = rl_ctrl_register2(&rr->ctrl, &rr->ipcp_name,
-                                &rr->server_appl_name);
-    } else {
-        ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
+    ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
                                &rr->server_appl_name);
-    }
-
     if (ret) {
         return ret;
     }
@@ -212,7 +199,6 @@ main(int argc, char **argv)
     struct sigaction sa;
     struct rl_rr rr;
     const char *dif_name = NULL;
-    const char *ipcp_apn = NULL, *ipcp_api = NULL;
     const char *cli_appl_apn = "rl_rr-data", *cli_appl_api = "client";
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     struct rina_name client_ctrl_name, server_ctrl_name;
@@ -235,14 +221,6 @@ main(int argc, char **argv)
 
             case 'd':
                 dif_name = optarg;
-                break;
-
-            case 'p':
-                ipcp_apn = optarg;
-                break;
-
-            case 'P':
-                ipcp_api = optarg;
                 break;
 
             case 'a':
@@ -297,10 +275,6 @@ main(int argc, char **argv)
     rina_name_fill(&server_ctrl_name, "rl_rr-ctrl", "server", NULL, NULL);
     rina_name_fill(&rr.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
     rina_name_fill(&rr.server_appl_name, srv_appl_apn, srv_appl_api, NULL, NULL);
-    if (!ipcp_apn) {
-        ipcp_api = NULL;
-    }
-    rina_name_fill(&rr.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
 
     rr.dif_name = dif_name ? strdup(dif_name) : NULL;
 
