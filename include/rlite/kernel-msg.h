@@ -127,14 +127,14 @@ struct rl_kmsg_ipcp_update {
     char *dif_type;
 } __attribute__((packed));
 
-/* application --> kernel to register a RLITE name. */
+/* application --> kernel to register a name. */
 struct rl_kmsg_appl_register {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    rl_ipcp_id_t ipcp_id;
     uint8_t reg;
     struct rina_name appl_name;
+    char *dif_name;
 } __attribute__((packed));
 
 /* application <-- kernel report the result of (un)registration. */

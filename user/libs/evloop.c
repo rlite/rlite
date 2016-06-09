@@ -855,14 +855,7 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
                   const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register *req;
-    struct rl_ipcp *rl_ipcp;
     int result;
-
-    rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
-    if (!rl_ipcp) {
-        PE("Could not find a suitable IPC process\n");
-        return NULL;
-    }
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -871,8 +864,7 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
         return NULL;
     }
 
-    rl_register_req_fill(req, event_id, rl_ipcp->id, reg,
-                         appl_name);
+    rl_register_req_fill(req, event_id, dif_name, reg, appl_name);
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
 

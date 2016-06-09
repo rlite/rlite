@@ -61,7 +61,7 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
                     const struct rl_kmsg_ipcp_update *upd);
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     rl_ipcp_id_t ipcp_id, int reg,
+                     const char *dif_name, int reg,
                      const struct rina_name *appl_name);
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,

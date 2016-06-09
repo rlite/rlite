@@ -371,6 +371,36 @@ __ipcp_get(rl_ipcp_id_t ipcp_id)
     return NULL;
 }
 
+struct ipcp_entry *
+ipcp_select_by_dif(const char *dif_name)
+{
+    struct ipcp_entry *entry;
+    int bucket;
+
+    PLOCK();
+
+    /* Linear scan is not efficient, but let's stick to that for now. */
+    hash_for_each(rl_dm.ipcp_table, bucket, entry, node) {
+        if (!dif_name) {
+            /* The request does not specify a DIF: select any DIF,
+             * giving priority to normal DIFs. */
+            if (strcmp(entry->dif->ty, "normal") == 0) {
+                break;
+            }
+        } else if (strcmp(entry->dif->name, dif_name) == 0) {
+            break;
+        }
+    }
+
+    if (entry) {
+        entry->refcnt++;
+    }
+
+    PUNLOCK();
+
+    return entry;
+}
+
 void tx_completion_func(unsigned long arg);
 
 static int
@@ -718,14 +748,15 @@ application_del_by_rc(struct rl_ctrl *rc)
 
             ntfy.msg_type = RLITE_KER_APPL_REGISTER;
             ntfy.event_id = 0;
-            ntfy.ipcp_id = app->ipcp->id;
+            ntfy.dif_name = app->ipcp->dif->name; /* borrow the string */
             ntfy.reg = false;
             rina_name_move(&ntfy.appl_name, &app->name);
             rl_upqueue_append(app->ipcp->uipcp,
                                 (const struct rl_msg_base *)&ntfy);
             rina_name_move(&app->name, &ntfy.appl_name);
+            ntfy.dif_name = NULL;  /* return the borrowed string. */
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(&ntfy));
+                        RLITE_MB(&ntfy));
         }
 
         /* Remove. */
@@ -1704,8 +1735,8 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct ipcp_entry *ipcp;
     int ret = -EINVAL;  /* Report failure by default. */
 
-    /* Find the IPC process entry corresponding to req->ipcp_id. */
-    ipcp = ipcp_get(req->ipcp_id);
+    /* Find an IPC Process entry corresponding to req->dif_name. */
+    ipcp = ipcp_select_by_dif(req->dif_name);
     if (ipcp) {
         ret = 0;
 
@@ -1730,7 +1761,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
             resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
             resp.event_id = req->event_id;
-            resp.ipcp_id = req->ipcp_id;
+            resp.ipcp_id = ipcp->id;
             resp.reg = req->reg;
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
             rina_name_move(&resp.appl_name, &req->appl_name);
@@ -1741,7 +1772,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
             if (!ret) {
                 PI("Application process %s %sregistered to IPC process %u\n",
-                        name_s, (req->reg ? "" : "un"), req->ipcp_id);
+                        name_s, (req->reg ? "" : "un"), ipcp->id);
             }
 
             /* If ret != 0, we just appended a negative response, so the error

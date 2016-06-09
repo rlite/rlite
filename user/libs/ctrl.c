@@ -482,15 +482,19 @@ pending_queue_fini(struct list_head *list)
 }
 int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     rl_ipcp_id_t ipcp_id, int reg,
+                     const char *dif_name, int reg,
                      const struct rina_name *appl_name)
 {
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_APPL_REGISTER;
     req->event_id = event_id;
-    req->ipcp_id = ipcp_id;
+    req->dif_name = dif_name ? strdup(dif_name) : NULL;
     req->reg = reg;
     rina_name_copy(&req->appl_name, appl_name);
+
+    if (dif_name && !req->dif_name) {
+        return -1; /* Out of memory. */
+    }
 
     return 0;
 }
@@ -675,19 +679,12 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
                 const struct rina_name *appl_name)
 {
     struct rl_kmsg_appl_register req;
-    struct rl_ipcp *rl_ipcp;
     uint32_t event_id;
     int ret;
 
-    rl_ipcp = rl_ctrl_select_ipcp_by_dif(ctrl, dif_name);
-    if (!rl_ipcp) {
-        PE("Could not find a suitable IPC process\n");
-        return 0;
-    }
-
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_register_req_fill(&req, event_id, rl_ipcp->id,
+    ret = rl_register_req_fill(&req, event_id, dif_name,
                                reg, appl_name);
     if (ret) {
         PE("Failed to fill (un)register request\n");

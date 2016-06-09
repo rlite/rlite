@@ -18,3 +18,5 @@
 - support generic RIB M_READ (and M_WRITE)
 
 - shim-inet4: use recvfrom(MSG_PEEK) to support UDP
+
+- move IPCP lookup to kernelspace for applications (register and flow alloc)

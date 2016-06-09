@@ -49,8 +49,10 @@ struct rl_msg_layout rl_ker_numtables[] = {
     },
     [RLITE_KER_APPL_REGISTER] = {
         .copylen = sizeof(struct rl_kmsg_appl_register) -
-                    1 * sizeof(struct rina_name),
+                    1 * sizeof(struct rina_name) -
+                    1 * sizeof(char *),
         .names = 1,
+        .strings = 1,
     },
     [RLITE_KER_APPL_REGISTER_RESP] = {
         .copylen = sizeof(struct rl_kmsg_appl_register_resp) -
