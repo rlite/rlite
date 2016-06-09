@@ -61,8 +61,10 @@ struct rl_msg_layout rl_ker_numtables[] = {
     },
     [RLITE_KER_FA_REQ] = {
         .copylen = sizeof(struct rl_kmsg_fa_req) -
-                    2 * sizeof(struct rina_name),
+                    2 * sizeof(struct rina_name) -
+                    1 * sizeof(char *),
         .names = 2,
+        .strings = 1,
     },
     [RLITE_KER_FA_RESP_ARRIVED] = {
         .copylen = sizeof(struct rl_kmsg_fa_resp_arrived),

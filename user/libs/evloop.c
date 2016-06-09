@@ -912,14 +912,7 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
 {
     struct rl_kmsg_fa_req *req;
     struct rl_kmsg_fa_resp_arrived *kresp;
-    struct rl_ipcp *rl_ipcp;
     int result;
-
-    rl_ipcp = rl_ctrl_select_ipcp_by_dif(&loop->ctrl, dif_name);
-    if (!rl_ipcp) {
-        PE("No suitable IPCP found\n");
-        return -1;
-    }
 
     /* Allocate and create a request message. */
     req = malloc(sizeof(*req));
@@ -927,7 +920,7 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
         PE("Out of memory\n");
         return -1;
     }
-    rl_fa_req_fill(req, event_id, rl_ipcp->id, local_appl, remote_appl,
+    rl_fa_req_fill(req, event_id, dif_name, local_appl, remote_appl,
                    flowspec, upper_ipcp_id);
 
     PD("Requesting flow allocation...\n");

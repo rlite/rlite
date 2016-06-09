@@ -153,13 +153,13 @@ struct rl_kmsg_fa_req {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    rl_ipcp_id_t ipcp_id;
     rl_ipcp_id_t upper_ipcp_id;
     struct rl_flow_spec flowspec;
     rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
     struct rina_name local_appl;
     struct rina_name remote_appl;
+    char *dif_name;
 } __attribute__((packed));
 
 /* application <-- kernel to notify about an incoming flow response. */

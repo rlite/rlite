@@ -1864,13 +1864,15 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct upper_ref upper = {
             .rc = rc,
         };
+    rl_ipcp_id_t ipcp_id = -1;
     int ret = -EINVAL;
 
-    /* Find the IPC process entry corresponding to ipcp_id. */
-    ipcp_entry = ipcp_get(req->ipcp_id);
+    /* Look up an IPC process entry for the specified DIF. */
+    ipcp_entry = ipcp_select_by_dif(req->dif_name);
     if (!ipcp_entry) {
         goto out;
     }
+    ipcp_id = ipcp_entry->id;
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, req->event_id, &req->local_appl,
@@ -1917,7 +1919,7 @@ out:
 
     } else {
         PD("Flow allocation requested to IPC process %u, "
-               "port-id %u\n", req->ipcp_id, flow_entry->local_port);
+               "port-id %u\n", ipcp_id, flow_entry->local_port);
     }
 
     if (ret == 0) {
