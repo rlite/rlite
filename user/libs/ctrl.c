@@ -660,7 +660,11 @@ rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
 
     ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
     if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
+        if (errno == ENXIO) {
+            PE("Cannot find IPCP for DIF %s\n", dif_name);
+        } else {
+            PE("Failed to issue request to the kernel\n");
+        }
         event_id = 0;
     }
 
@@ -689,7 +693,11 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
 
     ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
     if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
+        if (errno == ENXIO) {
+            PE("Cannot find IPCP for DIF %s\n", dif_name);
+        } else {
+            PE("Failed to issue request to the kernel\n");
+        }
         event_id = 0;
     }
 

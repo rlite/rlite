@@ -19,4 +19,6 @@
 
 - shim-inet4: use recvfrom(MSG_PEEK) to support UDP
 
-- move IPCP lookup to kernelspace for applications (register and flow alloc)
+- BUG (normal): if name X is registered on node A, and someone tries to
+  register the same name on node B (failing), then on node B the DFT
+  entry corresponding to X (for node A) disappears.

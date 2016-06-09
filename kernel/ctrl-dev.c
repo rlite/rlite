@@ -1733,7 +1733,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rina_name *appl_name = &req->appl_name;
     char *name_s = rina_name_to_string(appl_name);
     struct ipcp_entry *ipcp;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret = -ENXIO;  /* Report failure by default. */
 
     /* Find an IPC Process entry corresponding to req->dif_name. */
     ipcp = ipcp_select_by_dif(req->dif_name);
@@ -1865,7 +1865,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             .rc = rc,
         };
     rl_ipcp_id_t ipcp_id = -1;
-    int ret = -EINVAL;
+    int ret = -ENXIO;
 
     /* Look up an IPC process entry for the specified DIF. */
     ipcp_entry = ipcp_select_by_dif(req->dif_name);
