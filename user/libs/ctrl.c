@@ -264,6 +264,11 @@ rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
 {
     struct rl_ipcp *cur;
 
+    if (!(ctrl->flags & RL_F_IPCPS)) {
+        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
+        return NULL;
+    }
+
     pthread_mutex_lock(&ctrl->lock);
 
     if (dif_name) {
@@ -303,6 +308,11 @@ rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
 {
     struct rl_ipcp *ipcp;
 
+    if (!(ctrl->flags & RL_F_IPCPS)) {
+        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
+        return NULL;
+    }
+
     pthread_mutex_lock(&ctrl->lock);
 
     if (rina_name_valid(name)) {
@@ -326,6 +336,11 @@ rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
 {
     struct rl_ipcp *ipcp;
 
+    if (!(ctrl->flags & RL_F_IPCPS)) {
+        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
+        return 0;
+    }
+
     pthread_mutex_lock(&ctrl->lock);
 
     list_for_each_entry(ipcp, &ctrl->ipcps, node) {
@@ -345,6 +360,11 @@ struct rl_ipcp *
 rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id)
 {
     struct rl_ipcp *ipcp;
+
+    if (!(ctrl->flags & RL_F_IPCPS)) {
+        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
+        return NULL;
+    }
 
     pthread_mutex_lock(&ctrl->lock);
 
@@ -584,7 +604,7 @@ rl_ctrl_barrier(struct rl_ctrl *ctrl)
 }
 
 int
-rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev)
+rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
 {
     int ret;
 
@@ -605,23 +625,38 @@ rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev)
         return ctrl->rfd;
     }
 
+    flags &= RL_F_ALL;
+    ctrl->flags = flags;
+    if (flags) {
+        ret = ioctl(ctrl->rfd, 0, flags);
+        if (ret) {
+            perror("ioctl(flags)");
+            goto clos;
+        }
+    }
+
     /* Set non-blocking operation for the RLITE control device, so that
      * we can synchronize with the kernel through select(). */
     ret = fcntl(ctrl->rfd, F_SETFL, O_NONBLOCK);
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
-        return ret;
+        goto clos;
     }
 
-    /* Issue a barrier operation, in order to process all
-     * pending RLITE_KER_IPCP_UPDATE messages before returing to the caller. */
-    ret = rl_ctrl_barrier(ctrl);
-    if (ret) {
-        PE("rl_ctrl_barrier() failed\n");
-        return ret;
+    if (flags & RL_F_IPCPS) {
+        /* Issue a barrier operation, in order to process all pending
+         * RLITE_KER_IPCP_UPDATE messages before returing to the caller. */
+        ret = rl_ctrl_barrier(ctrl);
+        if (ret) {
+            PE("rl_ctrl_barrier() failed\n");
+            goto clos;
+        }
     }
 
     return 0;
+clos:
+    close(ctrl->rfd);
+    return ret;
 }
 
 int

@@ -610,7 +610,7 @@ int main(int argc, char **argv)
     int enable_testing = 0;
     int ret;
 
-    ret = rl_ctrl_init(&ctrl, NULL);
+    ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
     if (ret) {
         return ret;
     }

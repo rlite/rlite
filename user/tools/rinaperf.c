@@ -674,7 +674,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE ctrl API. */
-    ret = rl_ctrl_init(&rp.ctrl, NULL);
+    ret = rl_ctrl_init(&rp.ctrl, NULL, 0);
     if (ret) {
         return ret;
     }

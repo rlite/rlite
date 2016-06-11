@@ -29,7 +29,7 @@ class RinaRRTool:
 
     def __init__(self):
         self.rc = rl_ctrl()
-        ret = rl_ctrl_init(self.rc, None)
+        ret = rl_ctrl_init(self.rc, None, 0)
         if ret:
             raise Exception("Could not open rlite ctrl device")
 

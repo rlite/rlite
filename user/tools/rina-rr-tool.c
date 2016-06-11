@@ -266,7 +266,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    ret = rl_ctrl_init(&rr.ctrl, NULL);
+    ret = rl_ctrl_init(&rr.ctrl, NULL, 0);
     if (ret) {
         return ret;
     }

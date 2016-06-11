@@ -47,7 +47,7 @@ class RliteCtrl:
 
     def __init__(self):
         self.rc = rl.rlite_ctrl()
-        ret = rl.rl_ctrl_init(self.rc, None)
+        ret = rl.rl_ctrl_init(self.rc, None, 0)
         if ret:
             raise Exception("Failed to open rlite ctrl device")
         self.registered = 0

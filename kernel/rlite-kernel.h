@@ -262,7 +262,7 @@ struct dif {
 };
 
 struct ipcp_entry {
-    rl_ipcp_id_t           id;    /* Key */
+    rl_ipcp_id_t        id;    /* Key */
     struct rina_name    name;
     struct dif          *dif;
     rl_addr_t           addr;
@@ -272,7 +272,7 @@ struct ipcp_entry {
     uint8_t             depth;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
-    struct rl_ctrl   *uipcp;
+    struct rl_ctrl      *uipcp;
     struct txrx         *mgmt_txrx;
 
     /* TX completion structures. */

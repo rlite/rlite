@@ -50,19 +50,23 @@ struct rl_ctrl {
     /* File descriptor for the RLITE control device ("/dev/rlite") */
     int rfd;
 
-    /* A FIFO queue that stores pending RLITE events. */
+    /* Keeps the list of IPCPs in the system. */
+    struct list_head ipcps;
+
+    /* Private fields follow. Don't access them from outside the library. */
+
     /* A FIFO queue that stores expired events, that can be
      * returned when user calls rl_ctrl_wait() or rl_ctrl_wait_any(). */
     struct list_head pqueue;
-
-    /* Keeps the list of IPCPs in the system. */
-    struct list_head ipcps;
 
     /* Lock to be used with ipcps list. */
     pthread_mutex_t lock;
 
     /* What event-id to use for the next request issued to the kernel. */
     uint32_t event_id_counter;
+
+    /* Flags used in the ioctl(). */
+    unsigned int flags;
 };
 
 uint32_t
@@ -102,7 +106,8 @@ int
 rl_write_msg(int rfd, struct rl_msg_base *msg);
 
 int
-rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev);
+rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev,
+             unsigned flags);
 
 int
 rl_ctrl_fini(struct rl_ctrl *ctrl);

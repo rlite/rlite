@@ -551,8 +551,6 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
 {
     int ret;
 
-    loop->flags = flags;
-
     if (handlers) {
         memcpy(loop->handlers, handlers, sizeof(loop->handlers));
     } else {
@@ -569,7 +567,7 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
     loop->running = 0;
     loop->usr_ipcp_update = NULL;
 
-    ret = rl_ctrl_init(&loop->ctrl, dev);
+    ret = rl_ctrl_init(&loop->ctrl, dev, flags);
     if (ret) {
         return ret;
     }

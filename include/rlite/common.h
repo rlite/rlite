@@ -80,6 +80,9 @@ struct rl_msg_base_resp {
 #define RLITE_MB(m) (struct rl_msg_base *)(m)
 #define RLITE_MBR(m) (struct rl_msg_base_resp *)(m)
 
+#define RL_F_IPCPS  (1 << 0)
+#define RL_F_ALL    RL_F_IPCPS
+
 /* Bind the flow identified by port_id to
  * this rl_io device. */
 #define RLITE_IO_MODE_APPL_BIND    86

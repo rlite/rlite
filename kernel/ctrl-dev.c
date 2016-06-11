@@ -61,6 +61,8 @@ struct rl_ctrl {
 
     struct list_head flows_fetch_q;
     struct list_head node;
+
+    unsigned flags;
 };
 
 struct upqueue_entry {
@@ -1238,7 +1240,9 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
 
     mutex_lock(&rl_dm.general_lock);
     list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
-        rl_upqueue_append(rcur, RLITE_MB(&upd));
+        if (rcur->flags & RL_F_IPCPS) {
+            rl_upqueue_append(rcur, RLITE_MB(&upd));
+        }
     }
     mutex_unlock(&rl_dm.general_lock);
 
@@ -2363,10 +2367,6 @@ rl_ctrl_open(struct inode *inode, struct file *f)
     list_add_tail(&rc->node, &rl_dm.ctrl_devs);
     mutex_unlock(&rl_dm.general_lock);
 
-    /* Enqueue RLITE_KER_IPCP_UPDATE messages for all the
-     * IPCPs in the system. */
-    initial_ipcp_update(rc);
-
     return 0;
 }
 
@@ -2390,6 +2390,29 @@ rl_ctrl_release(struct inode *inode, struct file *f)
     return 0;
 }
 
+static long
+rl_ctrl_ioctl(struct file *f, unsigned int cmd, unsigned long flags)
+{
+    struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
+    unsigned int changed = flags ^ rc->flags;
+
+    /* We have only one command, to change the flags. */
+    (void) cmd;
+
+    if (flags & ~RL_F_ALL) {
+        return -EINVAL;
+    }
+
+    if (changed & flags & RL_F_IPCPS) {
+        /* User turned on IPCP updates. Enqueue RLITE_KER_IPCP_UPDATE
+         * messages for all the IPCPs in the system. */
+        initial_ipcp_update(rc);
+    }
+    rc->flags = flags;
+
+    return 0;
+}
+
 static const struct file_operations rl_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rl_ctrl_release,
@@ -2397,6 +2420,7 @@ static const struct file_operations rl_ctrl_fops = {
     .write          = rl_ctrl_write,
     .read           = rl_ctrl_read,
     .poll           = rl_ctrl_poll,
+    .unlocked_ioctl = rl_ctrl_ioctl,
     .llseek         = noop_llseek,
 };
 

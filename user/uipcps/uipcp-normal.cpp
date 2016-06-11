@@ -312,7 +312,7 @@ uipcp_rib::ipcp_info() const
 {
     struct rl_ipcp *ipcp;
 
-    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->loop.ctrl, uipcp->id);
+    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->uipcps->loop.ctrl, uipcp->id);
     assert(ipcp);
 
     return ipcp;

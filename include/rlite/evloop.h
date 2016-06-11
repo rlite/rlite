@@ -55,9 +55,6 @@ struct rl_evloop {
     /* Handler for the event loop thread. */
     pthread_t evloop_th;
 
-    /* Flags used in rl_evloop_init(). */
-    unsigned int flags;
-
     /* Is the evloop running already?. */
     int running;
 

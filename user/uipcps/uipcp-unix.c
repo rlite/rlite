@@ -500,7 +500,7 @@ uipcps_init(struct uipcps *uipcps)
     struct rl_ipcp *rl_ipcp;
     int ret = 0;
 
-    ret = rl_evloop_init(&uipcps->loop, ctrl_dev_name, NULL, 0);
+    ret = rl_evloop_init(&uipcps->loop, ctrl_dev_name, NULL, RL_F_IPCPS);
     if (ret) {
         return ret;
     }

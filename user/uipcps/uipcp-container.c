@@ -364,6 +364,9 @@ uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
     list_add_tail(&uipcp->node, &uipcps->uipcps);
     pthread_mutex_unlock(&uipcps->lock);
 
+    /* We are not setting the RL_F_IPCPS flags, so we will need to
+     * use uipcp->uipcps->loop to get information about IPCPs in the
+     * system. */
     ret = rl_evloop_init(&uipcp->loop, NULL, NULL, 0);
     if (ret) {
         goto err0;
