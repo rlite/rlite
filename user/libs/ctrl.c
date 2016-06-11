@@ -75,8 +75,6 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
         upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
         upd->dif_name, upd->dif_type);
 
-    pthread_mutex_lock(&ctrl->lock);
-
     list_for_each_entry(cur, &ctrl->ipcps, node) {
         if (cur->id == upd->ipcp_id) {
             rl_ipcp = cur;
@@ -88,7 +86,7 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
         case RLITE_UPDATE_ADD:
             if (rl_ipcp) {
                 PE("UPDATE IPCP [ADD]: ipcp %u already exists\n", upd->ipcp_id);
-                goto out;
+                return 0;
             }
             break;
 
@@ -96,13 +94,13 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
         case RLITE_UPDATE_DEL:
             if (!rl_ipcp) {
                 PE("UPDATE IPCP [UPD/DEL]: ipcp %u does not exists\n", upd->ipcp_id);
-                goto out;
+                return 0;
             }
             break;
 
         default:
             PE("Invalid update type %u\n", upd->update_type);
-            goto out;
+            return 0;
     }
 
     if (upd->update_type == RLITE_UPDATE_UPD ||
@@ -123,7 +121,7 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
         rl_ipcp = malloc(sizeof(*rl_ipcp));
         if (!rl_ipcp) {
             PE("Out of memory\n");
-            goto out;
+            return 0;
         }
 
         rl_ipcp->id = upd->ipcp_id;
@@ -136,32 +134,23 @@ rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
         list_add_tail(&rl_ipcp->node, &ctrl->ipcps);
     }
 
-out:
-    pthread_mutex_unlock(&ctrl->lock);
-
     return 0;
 }
+
 uint32_t
 rl_ctrl_get_id(struct rl_ctrl *ctrl)
 {
-    uint32_t ret;
-
-    pthread_mutex_lock(&ctrl->lock);
     if (++ctrl->event_id_counter == (1 << 30)) {
         ctrl->event_id_counter = 1;
     }
-    ret = ctrl->event_id_counter;
-    pthread_mutex_unlock(&ctrl->lock);
 
-    return ret;
+    return ctrl->event_id_counter;
 }
 
 int
 rl_ctrl_ipcps_print(struct rl_ctrl *ctrl)
 {
     struct rl_ipcp *rl_ipcp;
-
-    pthread_mutex_lock(&ctrl->lock);
 
     PI_S("IPC Processes table:\n");
     list_for_each_entry(rl_ipcp, &ctrl->ipcps, node) {
@@ -179,8 +168,6 @@ rl_ctrl_ipcps_print(struct rl_ctrl *ctrl)
                     free(ipcp_name_s);
             }
     }
-
-    pthread_mutex_unlock(&ctrl->lock);
 
     return 0;
 }
@@ -269,13 +256,10 @@ rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
         return NULL;
     }
 
-    pthread_mutex_lock(&ctrl->lock);
-
     if (dif_name) {
         /* The request specifies a DIF: lookup that. */
         list_for_each_entry(cur, &ctrl->ipcps, node) {
             if (strcmp(cur->dif_name, dif_name) == 0) {
-                pthread_mutex_unlock(&ctrl->lock);
                 return cur;
             }
         }
@@ -292,12 +276,8 @@ rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
             }
         }
 
-        pthread_mutex_unlock(&ctrl->lock);
-
         return rl_ipcp;
     }
-
-    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
@@ -313,19 +293,14 @@ rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
         return NULL;
     }
 
-    pthread_mutex_lock(&ctrl->lock);
-
     if (rina_name_valid(name)) {
         list_for_each_entry(ipcp, &ctrl->ipcps, node) {
             if (rina_name_valid(&ipcp->name)
                     && rina_name_cmp(&ipcp->name, name) == 0) {
-                pthread_mutex_unlock(&ctrl->lock);
                 return ipcp;
             }
         }
     }
-
-    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
@@ -341,17 +316,12 @@ rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
         return 0;
     }
 
-    pthread_mutex_lock(&ctrl->lock);
-
     list_for_each_entry(ipcp, &ctrl->ipcps, node) {
         if (ipcp->id == id) {
             *addr = ipcp->addr;
-            pthread_mutex_unlock(&ctrl->lock);
             return 0;
         }
     }
-
-    pthread_mutex_unlock(&ctrl->lock);
 
     return -1;
 }
@@ -366,16 +336,11 @@ rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id)
         return NULL;
     }
 
-    pthread_mutex_lock(&ctrl->lock);
-
     list_for_each_entry(ipcp, &ctrl->ipcps, node) {
         if (rina_name_valid(&ipcp->name) && ipcp->id == id) {
-            pthread_mutex_unlock(&ctrl->lock);
             return ipcp;
         }
     }
-
-    pthread_mutex_unlock(&ctrl->lock);
 
     return NULL;
 }
@@ -614,7 +579,6 @@ rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
 
     list_init(&ctrl->pqueue);
     list_init(&ctrl->ipcps);
-    pthread_mutex_init(&ctrl->lock, NULL);
     ctrl->event_id_counter = 1;
 
     /* Open the RLITE control device. */
@@ -662,10 +626,8 @@ clos:
 int
 rl_ctrl_fini(struct rl_ctrl *ctrl)
 {
-    pthread_mutex_lock(&ctrl->lock);
     pending_queue_fini(&ctrl->pqueue);
     rl_ipcps_purge(&ctrl->ipcps);
-    pthread_mutex_unlock(&ctrl->lock);
 
     if (ctrl->rfd >= 0) {
         close(ctrl->rfd);
@@ -753,13 +715,11 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
 
     /* Try to match the msg_type or the event_id against a response that has
      * already been read. */
-    pthread_mutex_lock(&ctrl->lock);
     if (msg_type) {
         entry = pending_queue_remove_by_msg_type(&ctrl->pqueue, msg_type);
     } else {
         entry = pending_queue_remove_by_event_id(&ctrl->pqueue, event_id);
     }
-    pthread_mutex_unlock(&ctrl->lock);
 
     if (entry) {
         resp = RLITE_MB(entry->msg);
@@ -824,9 +784,7 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
         }
         memset(entry, 0, sizeof(*entry));
         entry->msg = RLITE_MB(resp);
-        pthread_mutex_lock(&ctrl->lock);
         list_add_tail(&entry->node, &ctrl->pqueue);
-        pthread_mutex_unlock(&ctrl->lock);
     }
 
     return NULL;

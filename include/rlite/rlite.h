@@ -23,7 +23,6 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <pthread.h>
 #include "rlite/kernel-msg.h"
 #include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
@@ -33,6 +32,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Some words about thead-safety. The current implementation is **not**
+ * thread-safe with respect to concurrent access to the same rlite_ctrl struct.
+ * Turning it into a thread-safe one would be easy, but it would also
+ * require a dependency on the pthread library. The current decision is
+ * therefore to let the user care about concurrency, and use locks if
+ * needed.
+ */
 
 struct rl_ipcp {
     /* IPCP attributes. */
@@ -58,9 +65,6 @@ struct rl_ctrl {
     /* A FIFO queue that stores expired events, that can be
      * returned when user calls rl_ctrl_wait() or rl_ctrl_wait_any(). */
     struct list_head pqueue;
-
-    /* Lock to be used with ipcps list. */
-    pthread_mutex_t lock;
 
     /* What event-id to use for the next request issued to the kernel. */
     uint32_t event_id_counter;

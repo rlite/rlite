@@ -296,7 +296,9 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
     struct rl_ipcp *rl_ipcp;
     struct uipcp *uipcp;
 
+    pthread_mutex_lock(&uipcps->loop.lock);
     rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&uipcps->loop.ctrl, ipcp_name);
+    pthread_mutex_unlock(&uipcps->loop.lock);
     if (!rl_ipcp) {
         char *s = rina_name_to_string(ipcp_name);
 
@@ -467,7 +469,9 @@ int
 uipcps_print(struct uipcps *uipcps)
 {
     /* This is just for debugging purposes. */
+    pthread_mutex_lock(&uipcps->loop.lock);
     rl_ctrl_ipcps_print(&uipcps->loop.ctrl);
+    pthread_mutex_unlock(&uipcps->loop.lock);
     return 0;
 }
 

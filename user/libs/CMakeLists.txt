@@ -7,7 +7,6 @@ add_library(rlite-evloop SHARED evloop.c)
 add_library(rlite-cdap SHARED cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 add_library(rlite-conf SHARED conf.c)
 
-target_link_libraries(rlite ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(rlite-evloop rlite ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(rlite-cdap rlite ${PROTOBUF_LIBRARY})
 target_link_libraries(rlite-conf rlite)

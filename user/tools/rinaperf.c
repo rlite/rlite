@@ -34,6 +34,7 @@
 #include <endian.h>
 #include <signal.h>
 #include <poll.h>
+#include <time.h>
 #include "rlite/utils.h"
 
 #include "rlite/rlite.h"

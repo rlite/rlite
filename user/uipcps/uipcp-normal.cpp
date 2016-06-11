@@ -312,8 +312,11 @@ uipcp_rib::ipcp_info() const
 {
     struct rl_ipcp *ipcp;
 
+    pthread_mutex_lock(&uipcp->uipcps->loop.lock);
     ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->uipcps->loop.ctrl, uipcp->id);
     assert(ipcp);
+    // XXX make a local copy
+    pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
 
     return ipcp;
 }

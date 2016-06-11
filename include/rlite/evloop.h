@@ -62,7 +62,7 @@ struct rl_evloop {
     rl_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
 
     /* Synchronization variables used to implement mutual exclusion between the
-     * event-loop thread and the user thead. */
+     * event-loop thread and the user thead (e.g. for the ipcps list). */
     pthread_mutex_t lock;
 
     /* Used to stop the event-loop. */

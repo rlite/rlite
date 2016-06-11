@@ -132,7 +132,9 @@ evloop_ipcp_update(struct rl_evloop *loop,
 
     (void)b_req;
 
+    pthread_mutex_lock(&loop->lock);
     rl_ctrl_ipcp_update(&loop->ctrl, upd);
+    pthread_mutex_unlock(&loop->lock);
 
     /* We do handler chaining here, because it's always necessary
      * to manage the RLITE_KER_IPCP_UPDATE message internally. */
@@ -658,7 +660,9 @@ rl_evloop_fini(struct rl_evloop *loop)
         close(loop->eventfd);
     }
 
+    pthread_mutex_lock(&loop->lock);
     rl_ctrl_fini(&loop->ctrl);
+    pthread_mutex_unlock(&loop->lock);
 
     return 0;
 }

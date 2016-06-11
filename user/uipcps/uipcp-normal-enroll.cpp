@@ -1176,8 +1176,10 @@ Neighbor::alloc_flow(const char *supp_dif)
     {
         struct rl_ipcp *ipcp;
 
+        pthread_mutex_lock(&rib->uipcp->uipcps->loop.lock);
         ipcp = rl_ctrl_select_ipcp_by_dif(&rib->uipcp->uipcps->loop.ctrl,
                                           supp_dif);
+        pthread_mutex_unlock(&rib->uipcp->uipcps->loop.lock);
         if (ipcp) {
             lower_ipcp_id_ = ipcp->id;
         } else {

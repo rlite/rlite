@@ -564,15 +564,18 @@ shim_inet4_init(struct uipcp *uipcp)
     struct rl_ipcp *rl_ipcp;
     struct shim_inet4 *shim;
 
+    pthread_mutex_lock(&uipcp->uipcps->loop.lock);
     rl_ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->uipcps->loop.ctrl,
                                         uipcp->id);
     if (!rl_ipcp) {
         PE("Cannot find kernelspace IPCP %u\n", uipcp->id);
+        pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
         return -1;
     }
 
     shim = malloc(sizeof(*shim));
     if (!shim) {
+        pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
         UPE(uipcp, "Out of memory\n");
         return -1;
     }
@@ -581,7 +584,8 @@ shim_inet4_init(struct uipcp *uipcp)
 
     /* Store the name of the DIF, it will be
      * used during the registration. */
-    shim->dif_name = strdup(rl_ipcp->dif_name);
+    shim->dif_name = strdup(rl_ipcp->dif_name); rl_ipcp = NULL;
+    pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
     if (!shim->dif_name) {
         UPE(uipcp, "Out of memory\n");
         free(shim);

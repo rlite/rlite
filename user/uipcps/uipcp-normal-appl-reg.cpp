@@ -85,11 +85,12 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
+    pthread_mutex_lock(&uipcp->uipcps->loop.lock);
     ret = rl_ctrl_lookup_ipcp_addr_by_id(&uipcp->uipcps->loop.ctrl,
                                          uipcp->id, &local_addr);
+    pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
     if (!ret) {
-        UPE(uipcp, "Failed to find address of IPCP %s\n",
-            static_cast<string>(appl_name).c_str());
+        UPE(uipcp, "Failed to find address of IPCP %u\n", uipcp->id);
         assert(false);
     }
 
