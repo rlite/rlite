@@ -45,98 +45,6 @@
 /* Global variable for the user to set verbosity. */
 int rl_verbosity = RL_VERB_DBG;
 
-static void
-rl_ipcps_purge(struct list_head *ipcps)
-{
-    struct rl_ipcp *rl_ipcp, *tmp;
-
-    /* Purge the IPCPs list. */
-
-    list_for_each_entry_safe(rl_ipcp, tmp, ipcps, node) {
-        if (rl_ipcp->dif_type) {
-            free(rl_ipcp->dif_type);
-        }
-        rina_name_free(&rl_ipcp->name);
-        free(rl_ipcp->dif_name);
-        list_del(&rl_ipcp->node);
-        free(rl_ipcp);
-    }
-}
-
-int
-rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
-                    const struct rl_kmsg_ipcp_update *upd)
-{
-    struct rl_ipcp *rl_ipcp = NULL;
-    struct rl_ipcp *cur;
-
-    NPD("UPDATE IPCP update_type=%d, id=%u, addr=%lu, depth=%u, dif_name=%s "
-       "dif_type=%s\n",
-        upd->update_type, upd->ipcp_id, upd->ipcp_addr, upd->depth,
-        upd->dif_name, upd->dif_type);
-
-    list_for_each_entry(cur, &ctrl->ipcps, node) {
-        if (cur->id == upd->ipcp_id) {
-            rl_ipcp = cur;
-            break;
-        }
-    }
-
-    switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
-            if (rl_ipcp) {
-                PE("UPDATE IPCP [ADD]: ipcp %u already exists\n", upd->ipcp_id);
-                return 0;
-            }
-            break;
-
-        case RLITE_UPDATE_UPD:
-        case RLITE_UPDATE_DEL:
-            if (!rl_ipcp) {
-                PE("UPDATE IPCP [UPD/DEL]: ipcp %u does not exists\n", upd->ipcp_id);
-                return 0;
-            }
-            break;
-
-        default:
-            PE("Invalid update type %u\n", upd->update_type);
-            return 0;
-    }
-
-    if (upd->update_type == RLITE_UPDATE_UPD ||
-            upd->update_type == RLITE_UPDATE_DEL) {
-        /* Free the entry. */
-        if (rl_ipcp->dif_type) {
-            free(rl_ipcp->dif_type);
-        }
-        rina_name_free(&rl_ipcp->name);
-        free(rl_ipcp->dif_name);
-        list_del(&rl_ipcp->node);
-        free(rl_ipcp);
-    }
-
-    if (upd->update_type == RLITE_UPDATE_ADD ||
-            upd->update_type == RLITE_UPDATE_UPD) {
-        /* Create a new entry. */
-        rl_ipcp = malloc(sizeof(*rl_ipcp));
-        if (!rl_ipcp) {
-            PE("Out of memory\n");
-            return 0;
-        }
-
-        rl_ipcp->id = upd->ipcp_id;
-        rl_ipcp->dif_type = strdup(upd->dif_type);
-        rl_ipcp->addr = upd->ipcp_addr;
-        rl_ipcp->depth = upd->depth;
-        rina_name_copy(&rl_ipcp->name, &upd->ipcp_name);
-        rl_ipcp->dif_name = strdup(upd->dif_name);
-
-        list_add_tail(&rl_ipcp->node, &ctrl->ipcps);
-    }
-
-    return 0;
-}
-
 uint32_t
 rl_ctrl_get_id(struct rl_ctrl *ctrl)
 {
@@ -145,31 +53,6 @@ rl_ctrl_get_id(struct rl_ctrl *ctrl)
     }
 
     return ctrl->event_id_counter;
-}
-
-int
-rl_ctrl_ipcps_print(struct rl_ctrl *ctrl)
-{
-    struct rl_ipcp *rl_ipcp;
-
-    PI_S("IPC Processes table:\n");
-    list_for_each_entry(rl_ipcp, &ctrl->ipcps, node) {
-            char *ipcp_name_s = NULL;
-
-            ipcp_name_s = rina_name_to_string(&rl_ipcp->name);
-            PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                    " address = %llu, depth = %u\n",
-                        rl_ipcp->id, ipcp_name_s, rl_ipcp->dif_type,
-                        rl_ipcp->dif_name,
-                        (long long unsigned int)rl_ipcp->addr,
-                        rl_ipcp->depth);
-
-            if (ipcp_name_s) {
-                    free(ipcp_name_s);
-            }
-    }
-
-    return 0;
 }
 
 struct rl_msg_base *
@@ -243,106 +126,6 @@ rl_write_msg(int rfd, struct rl_msg_base *msg)
     }
 
     return ret;
-}
-
-struct rl_ipcp *
-rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
-                           const char *dif_name)
-{
-    struct rl_ipcp *cur;
-
-    if (!(ctrl->flags & RL_F_IPCPS)) {
-        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
-        return NULL;
-    }
-
-    if (dif_name) {
-        /* The request specifies a DIF: lookup that. */
-        list_for_each_entry(cur, &ctrl->ipcps, node) {
-            if (strcmp(cur->dif_name, dif_name) == 0) {
-                return cur;
-            }
-        }
-
-    } else {
-        struct rl_ipcp *rl_ipcp = NULL;
-
-        /* The request does not specify a DIF: select any DIF,
-         * giving priority to normal DIFs. */
-        list_for_each_entry(cur, &ctrl->ipcps, node) {
-            if ((strcmp(cur->dif_type, "normal") == 0 ||
-                        !rl_ipcp)) {
-                rl_ipcp = cur;
-            }
-        }
-
-        return rl_ipcp;
-    }
-
-    return NULL;
-}
-
-struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
-                            const struct rina_name *name)
-{
-    struct rl_ipcp *ipcp;
-
-    if (!(ctrl->flags & RL_F_IPCPS)) {
-        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
-        return NULL;
-    }
-
-    if (rina_name_valid(name)) {
-        list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-            if (rina_name_valid(&ipcp->name)
-                    && rina_name_cmp(&ipcp->name, name) == 0) {
-                return ipcp;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-int
-rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
-                               rl_addr_t *addr)
-{
-    struct rl_ipcp *ipcp;
-
-    if (!(ctrl->flags & RL_F_IPCPS)) {
-        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
-        return 0;
-    }
-
-    list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-        if (ipcp->id == id) {
-            *addr = ipcp->addr;
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
-struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id)
-{
-    struct rl_ipcp *ipcp;
-
-    if (!(ctrl->flags & RL_F_IPCPS)) {
-        PE("RL_F_IPCPS not set: cannot lookup IPCPs\n");
-        return NULL;
-    }
-
-    list_for_each_entry(ipcp, &ctrl->ipcps, node) {
-        if (rina_name_valid(&ipcp->name) && ipcp->id == id) {
-            return ipcp;
-        }
-    }
-
-    return NULL;
 }
 
 void
@@ -543,6 +326,7 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
     return 0;
 }
 
+// TODO remove
 static int
 rl_ctrl_barrier(struct rl_ctrl *ctrl)
 {
@@ -558,7 +342,7 @@ rl_ctrl_barrier(struct rl_ctrl *ctrl)
         return -1;
     }
 
-    resp = RLITE_MB(rl_ctrl_wait(ctrl, req.event_id));
+    resp = RLITE_MB(rl_ctrl_wait(ctrl, req.event_id, ~0U));
     if (!resp) {
         return -1;
     }
@@ -578,7 +362,6 @@ rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
     }
 
     list_init(&ctrl->pqueue);
-    list_init(&ctrl->ipcps);
     ctrl->event_id_counter = 1;
 
     /* Open the RLITE control device. */
@@ -627,7 +410,6 @@ int
 rl_ctrl_fini(struct rl_ctrl *ctrl)
 {
     pending_queue_fini(&ctrl->pqueue);
-    rl_ipcps_purge(&ctrl->ipcps);
 
     if (ctrl->rfd >= 0) {
         close(ctrl->rfd);
@@ -706,12 +488,19 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
 
 static struct rl_msg_base *
 rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
-                    uint32_t event_id)
+                    uint32_t event_id, unsigned int wait_ms)
 {
     struct rl_msg_base *resp;
     struct pending_entry *entry;
+    struct timeval to, *to_p = NULL;
     fd_set rdfs;
     int ret;
+
+    if (wait_ms != ~0U) {
+        to.tv_sec = wait_ms / 1000;
+        to.tv_usec = wait_ms * 1000 - to.tv_sec * 1000000;
+        to_p = &to;
+    }
 
     /* Try to match the msg_type or the event_id against a response that has
      * already been read. */
@@ -732,7 +521,7 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
         FD_ZERO(&rdfs);
         FD_SET(ctrl->rfd, &rdfs);
 
-        ret = select(ctrl->rfd + 1, &rdfs, NULL, NULL, NULL);
+        ret = select(ctrl->rfd + 1, &rdfs, NULL, NULL, to_p);
 
         if (ret == -1) {
             /* Error. */
@@ -741,7 +530,6 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
 
         } else if (ret == 0) {
             /* Timeout */
-            PE("Unexpected timeout\n");
             break;
         }
 
@@ -761,19 +549,6 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
             return resp;
         }
 
-        /* Filter out and process certain types of message. */
-        switch (resp->msg_type) {
-            case RLITE_KER_IPCP_UPDATE:
-                rl_ctrl_ipcp_update(ctrl, (struct rl_kmsg_ipcp_update *)resp);
-                rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                               RLITE_MB(resp));
-                free(resp);
-                continue;
-
-            default:
-                break;
-        }
-
         /* Store the message for subsequent use. */
         entry = malloc(sizeof(*entry));
         if (!entry) {
@@ -791,15 +566,16 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
 }
 
 struct rl_msg_base *
-rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id)
+rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id, unsigned int wait_ms)
 {
-    return rl_ctrl_wait_common(ctrl, 0, event_id);
+    return rl_ctrl_wait_common(ctrl, 0, event_id, wait_ms);
 }
 
 struct rl_msg_base *
-rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type)
+rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
+                 unsigned int wait_ms)
 {
-    return rl_ctrl_wait_common(ctrl, msg_type, 0);
+    return rl_ctrl_wait_common(ctrl, msg_type, 0, wait_ms);
 }
 
 int
@@ -818,7 +594,7 @@ rl_ctrl_flow_alloc(struct rl_ctrl *ctrl, const char *dif_name,
         return -1;
     }
 
-    resp = (struct rl_kmsg_fa_resp_arrived *)rl_ctrl_wait(ctrl, event_id);
+    resp = (struct rl_kmsg_fa_resp_arrived *)rl_ctrl_wait(ctrl, event_id, ~0U);
     if (!resp) {
         return -1;
     }
@@ -852,7 +628,8 @@ rl_ctrl_register_common(struct rl_ctrl *ctrl, int reg,
         return -1;
     }
 
-    resp = (struct rl_kmsg_appl_register_resp *)rl_ctrl_wait(ctrl, event_id);
+    resp = (struct rl_kmsg_appl_register_resp *)rl_ctrl_wait(ctrl, event_id,
+                                                             ~0U);
     if (!resp) {
         return -1;
     }
@@ -893,7 +670,7 @@ rl_ctrl_flow_accept(struct rl_ctrl *ctrl)
     int ret;
 
     req = (struct rl_kmsg_fa_req_arrived *)
-          rl_ctrl_wait_any(ctrl, RLITE_KER_FA_REQ_ARRIVED);
+          rl_ctrl_wait_any(ctrl, RLITE_KER_FA_REQ_ARRIVED, ~0U);
 
     if (!req) {
         return -1;

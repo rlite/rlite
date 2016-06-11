@@ -123,29 +123,6 @@ appl_register_resp(struct rl_evloop *loop,
 }
 
 static int
-evloop_ipcp_update(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req)
-{
-    const struct rl_kmsg_ipcp_update *upd =
-        (const struct rl_kmsg_ipcp_update *)b_resp;
-
-    (void)b_req;
-
-    pthread_mutex_lock(&loop->lock);
-    rl_ctrl_ipcp_update(&loop->ctrl, upd);
-    pthread_mutex_unlock(&loop->lock);
-
-    /* We do handler chaining here, because it's always necessary
-     * to manage the RLITE_KER_IPCP_UPDATE message internally. */
-    if (loop->usr_ipcp_update) {
-        loop->usr_ipcp_update(loop, b_resp, b_req);
-    }
-
-    return 0;
-}
-
-static int
 barrier_resp(struct rl_evloop *loop,
              const struct rl_msg_base *b_resp,
              const struct rl_msg_base *b_req)
@@ -567,7 +544,6 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
     loop->eventfd = -1;
     loop->evloop_th = 0;
     loop->running = 0;
-    loop->usr_ipcp_update = NULL;
 
     ret = rl_ctrl_init(&loop->ctrl, dev, flags);
     if (ret) {
@@ -591,10 +567,6 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
     if (!loop->handlers[RLITE_KER_APPL_REGISTER_RESP]) {
          loop->handlers[RLITE_KER_APPL_REGISTER_RESP] = appl_register_resp;
     }
-
-    /* Handler for RLITE_KER_IPCP_UPDATE must be chained. */
-    loop->usr_ipcp_update = loop->handlers[RLITE_KER_IPCP_UPDATE];
-    loop->handlers[RLITE_KER_IPCP_UPDATE] = evloop_ipcp_update;
 
     /* Create and start the event-loop thread. */
     ret = pthread_create(&loop->evloop_th, NULL, evloop_function, loop);
@@ -675,11 +647,7 @@ rl_evloop_set_handler(struct rl_evloop *loop, unsigned int index,
         return -1;
     }
 
-    if (index == RLITE_KER_IPCP_UPDATE) {
-        loop->usr_ipcp_update = handler;
-    } else {
-        loop->handlers[index] = handler;
-    }
+    loop->handlers[index] = handler;
 
     return 0;
 }

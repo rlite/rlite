@@ -55,7 +55,7 @@ uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
                                     obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
-    spe.run(ipcp_info()->addr, lfdb);
+    spe.run(uipcp->addr, lfdb);
     pduft_sync();
 
     return ret;
@@ -64,7 +64,6 @@ uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
 int
 uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    struct rl_ipcp *ipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
@@ -85,11 +84,9 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
         return 0;
     }
 
-    ipcp = ipcp_info();
-
     LowerFlowList lfl(objbuf, objlen);
     LowerFlowList prop_lfl;
-    RinaName my_name = RinaName(&ipcp->name);
+    RinaName my_name = RinaName(&uipcp->name);
     bool modified = false;
 
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
@@ -125,7 +122,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        spe.run(ipcp_info()->addr, lfdb);
+        spe.run(uipcp->addr, lfdb);
         pduft_sync();
     }
 

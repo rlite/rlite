@@ -41,24 +41,9 @@ extern "C" {
  * needed.
  */
 
-struct rl_ipcp {
-    /* IPCP attributes. */
-    rl_ipcp_id_t id;
-    struct rina_name name;
-    rl_addr_t addr;
-    unsigned int depth;
-    char *dif_type;
-    char *dif_name;
-
-    struct list_head node;
-};
-
 struct rl_ctrl {
     /* File descriptor for the RLITE control device ("/dev/rlite") */
     int rfd;
-
-    /* Keeps the list of IPCPs in the system. */
-    struct list_head ipcps;
 
     /* Private fields follow. Don't access them from outside the library. */
 
@@ -75,24 +60,6 @@ struct rl_ctrl {
 
 uint32_t
 rl_ctrl_get_id(struct rl_ctrl *ctrl);
-
-int
-rl_ctrl_ipcps_print(struct rl_ctrl *ctrl);
-
-struct rl_ipcp *
-rl_ctrl_select_ipcp_by_dif(struct rl_ctrl *ctrl,
-                         const char *dif_name);
-
-struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_name(struct rl_ctrl *ctrl,
-                          const struct rina_name *name);
-
-int
-rl_ctrl_lookup_ipcp_addr_by_id(struct rl_ctrl *ctrl, unsigned int id,
-                               rl_addr_t *addr);
-
-struct rl_ipcp *
-rl_ctrl_lookup_ipcp_by_id(struct rl_ctrl *ctrl, unsigned int id);
 
 void
 rl_flow_spec_default(struct rl_flow_spec *spec);
@@ -130,10 +97,11 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg,
                 const struct rina_name *appl_name);
 
 struct rl_msg_base *
-rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id);
+rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id, unsigned int wait_ms);
 
 struct rl_msg_base *
-rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type);
+rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
+                 unsigned int wait_ms);
 
 /* Synchronous API (higher level, implemented by means of the
  * asynchronous API. */

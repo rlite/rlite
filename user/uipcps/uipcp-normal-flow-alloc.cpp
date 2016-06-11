@@ -180,7 +180,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     freq.dst_app = dest_appl;
     freq.src_port = req->local_port;
     freq.dst_port = 0;
-    freq.src_addr = ipcp_info()->addr;
+    freq.src_addr = uipcp->addr;
     freq.dst_addr = remote_addr;
     freq.connections.push_back(conn_id);
     freq.cur_conn_idx = 0;
@@ -309,7 +309,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
         return send_to_dst_addr(m, freq.src_addr, &freq);
     }
 
-    if (dft_next_hop != ipcp_info()->addr) {
+    if (dft_next_hop != uipcp->addr) {
         /* freq.dst_app is not registered with us, we have
          * to forward the request. TODO */
         CDAPMessage *m;
@@ -402,7 +402,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     /* Lookup the corresponding FlowRequest, and figure out whether we
      * were the initiator of the request. */
 
-    obj_name << obj_name::flows << "/" << ipcp_info()->addr
+    obj_name << obj_name::flows << "/" << uipcp->addr
                 << "-" << req->local_port_id;
 
     f = flow_reqs.find(obj_name.str() + string("L"));

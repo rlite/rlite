@@ -24,6 +24,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "../helpers.h"
+
 #include "rlite/utils.h"
 #include "rlite/uipcps-msg.h"
 
@@ -289,36 +291,38 @@ select_uipcp_ops(const char *dif_type)
     return NULL;
 }
 
-/* To be called under uipcps lock. */
+static int
+uipcp_is_kernelspace(struct uipcp *uipcp)
+{
+    return uipcp->ops.init == NULL;
+}
+
+/* To be called under uipcps lock. This function does not take into
+ * account kernel-space IPCPs. */
 struct uipcp *
 uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
 {
-    struct rl_ipcp *rl_ipcp;
     struct uipcp *uipcp;
+    char *s;
 
-    pthread_mutex_lock(&uipcps->loop.lock);
-    rl_ipcp = rl_ctrl_lookup_ipcp_by_name(&uipcps->loop.ctrl, ipcp_name);
-    pthread_mutex_unlock(&uipcps->loop.lock);
-    if (!rl_ipcp) {
-        char *s = rina_name_to_string(ipcp_name);
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        if (!uipcp_is_kernelspace(uipcp) && rina_name_valid(&uipcp->name) &&
+                        rina_name_cmp(&uipcp->name, ipcp_name) == 0) {
+            uipcp->refcnt++;
 
-        PE("No such IPCP '%s'\n", s);
-        if (s) free(s);
-        return NULL;
+            return uipcp;
+        }
     }
 
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup(uipcps, rl_ipcp->id);
-    if (!uipcp) {
-        PE("No uipcp for [%u]\n", rl_ipcp->id);
-    }
-    uipcp->refcnt++;
-    pthread_mutex_unlock(&uipcps->lock);
+    s = rina_name_to_string(ipcp_name);
+    PE("No such IPCP '%s'\n", s);
+    if (s) free(s);
 
-    return uipcp;
+    return NULL;
 }
 
-/* To be called under uipcps lock. */
+/* To be called under uipcps lock. This function takes into account
+ * kernel-space IPCPs*/
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
@@ -334,14 +338,43 @@ uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 }
 
 int
-uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
+uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {
-    const struct uipcp_ops *ops = select_uipcp_ops(dif_type);
+    struct uipcp *uipcp;
+
+    pthread_mutex_lock(&uipcps->lock);
+    uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
+    if (!uipcp) {
+        pthread_mutex_unlock(&uipcps->lock);
+        /* A shim IPCP. */
+        return 0;
+    }
+
+    if (uipcp->dif_type) free(uipcp->dif_type);
+    rina_name_free(&uipcp->name);
+    if (uipcp->dif_name) free(uipcp->dif_name);
+
+    uipcp->id = upd->ipcp_id;
+    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
+    uipcp->addr = upd->ipcp_addr;
+    uipcp->depth = upd->depth;
+    rina_name_move(&uipcp->name, &upd->ipcp_name);
+    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
+
+    pthread_mutex_unlock(&uipcps->lock);
+
+    return 0;
+}
+
+int
+uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
+{
+    const struct uipcp_ops *ops = select_uipcp_ops(upd->dif_type);
     struct uipcp *uipcp;
     int ret = -1;
 
-    if (!ops) {
-        PE("Could not find uIPCP ops for DIF type %s\n", dif_type);
+    if (type_has_uipcp(upd->dif_type) && !ops) {
+        PE("Could not find uIPCP ops for DIF type %s\n", upd->dif_type);
         return -1;
     }
 
@@ -352,19 +385,34 @@ uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
     }
     memset(uipcp, 0, sizeof(*uipcp));
 
-    uipcp->id = ipcp_id;
-    uipcp->uipcps = uipcps;
-    uipcp->ops = *ops;
-    uipcp->priv = NULL;
-    uipcp->refcnt = 1; /* Cogito, ergo sum. */
+    uipcp->id = upd->ipcp_id;
+    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
+    uipcp->addr = upd->ipcp_addr;
+    uipcp->depth = upd->depth;
+    rina_name_move(&uipcp->name, &upd->ipcp_name);
+    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
     pthread_mutex_lock(&uipcps->lock);
-    if (uipcp_lookup(uipcps, ipcp_id) != NULL) {
-        PE("uIPCP %u already created\n", ipcp_id);
+    if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
+        PE("uIPCP %u already created\n", upd->ipcp_id);
         goto errx;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
     pthread_mutex_unlock(&uipcps->lock);
+
+    uipcp->uipcps = uipcps;
+    uipcp->priv = NULL;
+    uipcp->refcnt = 1; /* Cogito, ergo sum. */
+
+    if (!ops) {
+            /* This is IPCP without userspace implementation.
+             * We have created an entry, there is nothing more
+             * to do. */
+            PD("Added entry for kernel-space IPCP %u\n", upd->ipcp_id);
+            return 0;
+    }
+
+    uipcp->ops = *ops;
 
     /* We are not setting the RL_F_IPCPS flags, so we will need to
      * use uipcp->uipcps->loop to get information about IPCPs in the
@@ -401,12 +449,12 @@ uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type)
     /* Tell the kernel what is the event loop to be associated to
      * the ipcp_id specified, so that reflected messages for that
      * IPCP are redirected to this uipcp. */
-    ret = uipcp_evloop_set(uipcp, ipcp_id);
+    ret = uipcp_evloop_set(uipcp, upd->ipcp_id);
     if (ret) {
         goto err2;
     }
 
-    PD("userspace IPCP %u created\n", ipcp_id);
+    PI("userspace IPCP %u created\n", upd->ipcp_id);
 
     return 0;
 
@@ -428,8 +476,9 @@ int
 uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *uipcp;
+    int kernelspace = 0;
     int destroy;
-    int ret;
+    int ret = 0;
 
     pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, ipcp_id);
@@ -452,26 +501,56 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         return 0;
     }
 
-    uipcp->ops.fini(uipcp);
+    kernelspace = uipcp_is_kernelspace(uipcp);
 
-    ret = rl_evloop_fini(&uipcp->loop);
+    if (!kernelspace) {
+        uipcp->ops.fini(uipcp);
+        ret = rl_evloop_fini(&uipcp->loop);
+    }
+
+    if (uipcp->dif_type) free(uipcp->dif_type);
+    rina_name_free(&uipcp->name);
+    if (uipcp->dif_name) free(uipcp->dif_name);
 
     free(uipcp);
 
     if (ret == 0) {
-        PD("userspace IPCP %u destroyed\n", ipcp_id);
+        if (!kernelspace) {
+            PI("userspace IPCP %u destroyed\n", ipcp_id);
+        } else {
+            PD("Removed entry of kernel-space IPCP %u\n", ipcp_id);
+        }
     }
 
     return ret;
 }
 
+/* This routine is for debugging purposes. */
 int
 uipcps_print(struct uipcps *uipcps)
 {
-    /* This is just for debugging purposes. */
-    pthread_mutex_lock(&uipcps->loop.lock);
-    rl_ctrl_ipcps_print(&uipcps->loop.ctrl);
-    pthread_mutex_unlock(&uipcps->loop.lock);
+    struct uipcp *uipcp;
+
+    pthread_mutex_lock(&uipcps->lock);
+    PD_S("IPC Processes table:\n");
+
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        char *ipcp_name_s = NULL;
+
+        ipcp_name_s = rina_name_to_string(&uipcp->name);
+        PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
+                " address = %llu, depth = %u\n",
+                uipcp->id, ipcp_name_s, uipcp->dif_type,
+                uipcp->dif_name,
+                (long long unsigned int)uipcp->addr,
+                uipcp->depth);
+
+        if (ipcp_name_s) {
+            free(ipcp_name_s);
+        }
+    }
+    pthread_mutex_unlock(&uipcps->lock);
+
     return 0;
 }
 
@@ -687,7 +766,7 @@ flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
 
 int
 uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
-                       unsigned int lower_id)
+                        unsigned int lower_id)
 {
     struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
     struct ipcp_node *lower= uipcps_node_get(uipcps, lower_id);

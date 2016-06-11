@@ -78,23 +78,12 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 {
     RinaName appl_name(&req->appl_name);
     map< string, DFTEntry >::iterator mit;
-    rl_addr_t local_addr;
     string name_str;
-    int ret;
     bool create = true;
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    pthread_mutex_lock(&uipcp->uipcps->loop.lock);
-    ret = rl_ctrl_lookup_ipcp_addr_by_id(&uipcp->uipcps->loop.ctrl,
-                                         uipcp->id, &local_addr);
-    pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
-    if (!ret) {
-        UPE(uipcp, "Failed to find address of IPCP %u\n", uipcp->id);
-        assert(false);
-    }
-
-    dft_entry.address = local_addr;
+    dft_entry.address = uipcp->addr;
     dft_entry.appl_name = appl_name;
     dft_entry.timestamp = time64();
     dft_entry.local = true;
@@ -107,7 +96,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
             UPE(uipcp, "Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", name_str.c_str(),
                     (long long unsigned)mit->second.address,
-                    (long long unsigned)local_addr);
+                    (long long unsigned)uipcp->addr);
             return uipcp_appl_register_resp(uipcp, uipcp->id,
                                             RLITE_ERR, req);
         }

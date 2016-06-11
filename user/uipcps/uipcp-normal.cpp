@@ -307,20 +307,6 @@ uipcp_rib::~uipcp_rib()
     pthread_mutex_destroy(&lock);
 }
 
-struct rl_ipcp *
-uipcp_rib::ipcp_info() const
-{
-    struct rl_ipcp *ipcp;
-
-    pthread_mutex_lock(&uipcp->uipcps->loop.lock);
-    ipcp = rl_ctrl_lookup_ipcp_by_id(&uipcp->uipcps->loop.ctrl, uipcp->id);
-    assert(ipcp);
-    // XXX make a local copy
-    pthread_mutex_unlock(&uipcp->uipcps->loop.lock);
-
-    return ipcp;
-}
-
 static inline string
 u82boolstr(uint8_t v) {
     return v != 0 ? string("true") : string("false");
@@ -330,7 +316,6 @@ char *
 uipcp_rib::dump() const
 {
     stringstream ss;
-    struct rl_ipcp *ipcp = ipcp_info();
 
 #ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
@@ -378,7 +363,7 @@ uipcp_rib::dump() const
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    ss << "Address: " << ipcp->addr << endl << endl;
+    ss << "Address: " << uipcp->addr << endl << endl;
 
     ss << "LowerDIFs: {";
     for (list<string>::const_iterator lit = lower_difs.begin();
@@ -503,7 +488,6 @@ int
 uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                             const UipcpObject *obj)
 {
-    struct rl_ipcp *ipcp;
     AData adata;
     CDAPMessage am;
     char objbuf[4096];
@@ -513,8 +497,6 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
     int aobjlen;
     size_t serlen;
     int ret;
-
-    ipcp = ipcp_info();
 
     if (obj) {
         objlen = obj->serialize(objbuf, sizeof(objbuf));
@@ -530,7 +512,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
 
     m->invoke_id = invoke_id_mgr.get_invoke_id();
 
-    if (dst_addr == ipcp->addr) {
+    if (dst_addr == uipcp->addr) {
         /* This is a message to be delivered to myself. */
         ret = cdap_dispatch(m, NULL);
         delete m;
@@ -538,7 +520,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
         return ret;
     }
 
-    adata.src_addr = ipcp->addr;
+    adata.src_addr = uipcp->addr;
     adata.dst_addr = dst_addr;
     adata.cdap = m; /* Ownership passing */
 

@@ -76,8 +76,6 @@ struct rl_evloop {
     pthread_mutex_t timer_lock;
     int timer_events_cnt;
     int timer_next_id;
-
-    rl_resp_handler_t usr_ipcp_update;
 };
 
 /* Issue a request message to the kernel. Takes the ownership of

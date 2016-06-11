@@ -67,6 +67,7 @@ struct enrolled_neigh {
 
 struct uipcp;
 
+/* All these callbacks must be non-null. */
 struct uipcp_ops {
     int (*init)(struct uipcp *);
 
@@ -121,22 +122,36 @@ struct flow_edge {
 };
 
 struct uipcp {
+    /* Parent object. */
     struct rl_evloop loop;
-    struct uipcps *uipcps;
-    rl_ipcp_id_t id;
 
+    /* Container object. */
+    struct uipcps *uipcps;
+
+    /* IPCP kernel attributes. */
+    rl_ipcp_id_t id;
+    struct rina_name name;
+    rl_addr_t addr;
+    unsigned int depth;
+    char *dif_type;
+    char *dif_name;
+
+    /* uIPCP implementation. */
     struct uipcp_ops ops;
     void *priv;
     unsigned int refcnt;
 
+    /* Siblings. */
     struct list_head node;
 };
 
 void *uipcp_server(void *arg);
 
-int uipcp_add(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, const char *dif_type);
+int uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
 int uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
+
+int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 

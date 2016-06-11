@@ -53,7 +53,8 @@ rl_conf_ipcp_create(struct rl_ctrl *ctrl,
         return -1;
     }
 
-    resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id);
+    resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id,
+                                                           3000);
     if (!resp) {
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
@@ -192,7 +193,7 @@ rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
         }
 
         resp = (struct rl_kmsg_flow_fetch_resp *)
-               rl_ctrl_wait(ctrl, msg.event_id);
+               rl_ctrl_wait(ctrl, msg.event_id, 3000);
         if (!resp) {
             end = 1;
 
@@ -246,7 +247,8 @@ rl_conf_flow_get_stats(struct rl_ctrl *ctrl, rl_port_t port_id,
         return -1;
     }
 
-    resp = (struct rl_kmsg_flow_stats_resp *)rl_ctrl_wait(ctrl, msg.event_id);
+    resp = (struct rl_kmsg_flow_stats_resp *)rl_ctrl_wait(ctrl, msg.event_id,
+                                                          3000);
     if (!resp) {
         return -1;
     }

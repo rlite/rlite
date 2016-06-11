@@ -377,12 +377,15 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
     int ret = 0;
 
+    if (!upd->dif_type || !upd->dif_name ||
+                    !rina_name_valid(&upd->ipcp_name)) {
+        PE("Invalid ipcp update\n");
+        return -1;
+    }
+
     switch (upd->update_type) {
         case RLITE_UPDATE_ADD:
-            if (upd->dif_type && type_has_uipcp(upd->dif_type)) {
-                /* We only care about IPCP with userspace implementation. */
-                ret = uipcp_add(uipcps, upd->ipcp_id, upd->dif_type);
-            }
+            ret = uipcp_add(uipcps, upd);
             break;
 
         case RLITE_UPDATE_DEL:
@@ -392,12 +395,16 @@ uipcps_ipcp_update(struct rl_evloop *loop,
             track_ipcp_unregistration(uipcps, upd->ipcp_id);
             ret = uipcp_put(uipcps, upd->ipcp_id);
             break;
+
+        case RLITE_UPDATE_UPD:
+            ret = uipcp_update(uipcps, upd);
+            break;
     }
 
     if (ret) {
         PE("IPCP update synchronization failed\n");
     }
-#if 0
+#if 1
     uipcps_print(uipcps);
 #endif
     return 0;
@@ -497,33 +504,22 @@ process_persistence_file(struct uipcps *uipcps)
 static int
 uipcps_init(struct uipcps *uipcps)
 {
-    struct rl_ipcp *rl_ipcp;
+    rl_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
     int ret = 0;
 
-    ret = rl_evloop_init(&uipcps->loop, ctrl_dev_name, NULL, RL_F_IPCPS);
+    memset(handlers, 0, sizeof(handlers));
+    handlers[RLITE_KER_IPCP_UPDATE] = uipcps_ipcp_update;
+
+    /* The main control loop will take care of IPCP updates, to
+     * align userspace IPCPs with kernelspace ones. */
+    ret = rl_evloop_init(&uipcps->loop, ctrl_dev_name, handlers, RL_F_IPCPS);
     if (ret) {
         return ret;
     }
 
-    /* Create an userspace IPCP for each existing IPCP. */
-    pthread_mutex_lock(&uipcps->loop.lock);
-    list_for_each_entry(rl_ipcp, &uipcps->loop.ctrl.ipcps, node) {
-        if (type_has_uipcp(rl_ipcp->dif_type)) {
-            ret = uipcp_add(uipcps, rl_ipcp->id,
-                            rl_ipcp->dif_type);
-            if (ret) {
-                pthread_mutex_unlock(&uipcps->loop.lock);
-                return ret;
-            }
-        }
-    }
-    pthread_mutex_unlock(&uipcps->loop.lock);
-
-    /* From now on the main control loop will take care of IPCP updates, to
-     * align userspace IPCPs with kernelspace ones. */
-    rl_evloop_set_handler(&uipcps->loop, RLITE_KER_IPCP_UPDATE,
-                          uipcps_ipcp_update);
-#if 0
+    /* At this point an userspace IPCP for each existing IPCP has been
+     * created. */
+#if 1
     uipcps_print(uipcps);
 #endif
     process_persistence_file(uipcps);
