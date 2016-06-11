@@ -13,9 +13,25 @@ import re
 import os
 
 
+def download_if_needed(locpath, url):
+    try:
+        import urllib.request
+        downloader = urllib.request
+    except:
+        import urllib
+        downloader = urllib
+
+    if os.path.isfile(locpath):
+        return
+
+    print('Downloading %s ...' % url)
+    fin = downloader.urlretrieve(url, locpath)
+    print('... download complete')
+
+
 def which(program):
     FNULL = open(os.devnull, 'w')
-    retcode = subprocess.call(['which', program], stdout = FNULL,
+    retcode = subprocess.call(['sudo', 'which', program], stdout = FNULL,
                               stderr = subprocess.STDOUT)
     if retcode != 0:
         print('Fatal error: Cannot find "%s" program' % program)
@@ -69,6 +85,8 @@ sudo = ''
 vmimgpath = 'buildroot/rootfs.cpio'
 username = 'root'
 
+download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rlite-images/downloads/rootfs.cpio')
+download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rlite-images/downloads/bzImage')
 
 # Possibly autogenerate ring topology
 if args.ring != None and args.ring > 0:
