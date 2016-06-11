@@ -377,10 +377,15 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
     int ret = 0;
 
-    if (!upd->dif_type || !upd->dif_name ||
+    switch (upd->update_type) {
+        case RLITE_UPDATE_ADD:
+        case RLITE_UPDATE_UPD:
+            if (!upd->dif_type || !upd->dif_name ||
                     !rina_name_valid(&upd->ipcp_name)) {
-        PE("Invalid ipcp update\n");
-        return -1;
+                PE("Invalid ipcp update\n");
+                return -1;
+            }
+        break;
     }
 
     switch (upd->update_type) {
