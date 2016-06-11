@@ -326,32 +326,6 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
     return 0;
 }
 
-// TODO remove
-static int
-rl_ctrl_barrier(struct rl_ctrl *ctrl)
-{
-    struct rl_msg_base req;
-    struct rl_msg_base *resp;
-    int ret;
-
-    req.msg_type = RLITE_KER_BARRIER;
-    req.event_id = rl_ctrl_get_id(ctrl);
-
-    ret = rl_write_msg(ctrl->rfd, &req);
-    if (ret < 0) {
-        return -1;
-    }
-
-    resp = RLITE_MB(rl_ctrl_wait(ctrl, req.event_id, ~0U));
-    if (!resp) {
-        return -1;
-    }
-
-    free(resp);
-
-    return 0;
-}
-
 int
 rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
 {
@@ -388,16 +362,6 @@ rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
     if (ret) {
         perror("fcntl(O_NONBLOCK)");
         goto clos;
-    }
-
-    if (flags & RL_F_IPCPS) {
-        /* Issue a barrier operation, in order to process all pending
-         * RLITE_KER_IPCP_UPDATE messages before returing to the caller. */
-        ret = rl_ctrl_barrier(ctrl);
-        if (ret) {
-            PE("rl_ctrl_barrier() failed\n");
-            goto clos;
-        }
     }
 
     return 0;

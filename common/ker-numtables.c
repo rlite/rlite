@@ -106,12 +106,6 @@ struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_FLOW_DEALLOC] = {
         .copylen = sizeof(struct rl_kmsg_flow_dealloc),
     },
-    [RLITE_KER_BARRIER] = {
-        .copylen = sizeof(struct rl_msg_base),
-    },
-    [RLITE_KER_BARRIER_RESP] = {
-        .copylen = sizeof(struct rl_msg_base),
-    },
     [RLITE_KER_IPCP_UIPCP_WAIT] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_uipcp_wait),
     },

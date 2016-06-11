@@ -404,7 +404,7 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     if (ret) {
         PE("IPCP update synchronization failed\n");
     }
-#if 1
+#if 0
     uipcps_print(uipcps);
 #endif
     return 0;
@@ -519,7 +519,7 @@ uipcps_init(struct uipcps *uipcps)
 
     /* At this point an userspace IPCP for each existing IPCP has been
      * created. */
-#if 1
+#if 0
     uipcps_print(uipcps);
 #endif
     process_persistence_file(uipcps);

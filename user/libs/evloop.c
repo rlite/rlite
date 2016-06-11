@@ -122,15 +122,6 @@ appl_register_resp(struct rl_evloop *loop,
     return 0;
 }
 
-static int
-barrier_resp(struct rl_evloop *loop,
-             const struct rl_msg_base *b_resp,
-             const struct rl_msg_base *b_req)
-{
-    /* Nothing to do, this is just a synchronization point. */
-    return 0;
-}
-
 #define ONEBILLION 1000000000ULL
 #define ONEMILLION 1000000ULL
 
@@ -557,10 +548,6 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
     }
 
     /* If not redefined, setup default handlers. */
-    if (!loop->handlers[RLITE_KER_BARRIER_RESP]) {
-        loop->handlers[RLITE_KER_BARRIER_RESP] = barrier_resp;
-    }
-
     if (!loop->handlers[RLITE_KER_FA_RESP_ARRIVED]) {
          loop->handlers[RLITE_KER_FA_RESP_ARRIVED] = flow_allocate_resp_arrived;
     }

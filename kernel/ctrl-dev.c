@@ -1660,16 +1660,6 @@ rl_flow_dealloc(struct rl_ctrl *rc,
 }
 
 static int
-rl_barrier(struct rl_ctrl *rc,
-              struct rl_msg_base *bmsg)
-{
-    bmsg->msg_type = RLITE_KER_BARRIER_RESP;
-
-    /* Just reflect the message. */
-    return rl_upqueue_append(rc, bmsg);
-}
-
-static int
 rl_flow_get_stats(struct rl_ctrl *rc,
                      struct rl_msg_base *bmsg)
 {
@@ -2152,7 +2142,6 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_UIPCP_FA_REQ_ARRIVED] = rl_uipcp_fa_req_arrived,
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rl_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rl_flow_dealloc,
-    [RLITE_KER_BARRIER] = rl_barrier,
     [RLITE_KER_FLOW_STATS_REQ] = rl_flow_get_stats,
     [RLITE_KER_MSG_MAX] = NULL,
 };
