@@ -1337,7 +1337,9 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
             mutex_lock(&rl_dm.general_lock);
             list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
-                rl_upqueue_append(rcur, RLITE_MB(&upd));
+                if (rcur->flags & RL_F_IPCPS) {
+                    rl_upqueue_append(rcur, RLITE_MB(&upd));
+                }
             }
             mutex_unlock(&rl_dm.general_lock);
 
