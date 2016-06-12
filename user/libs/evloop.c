@@ -799,7 +799,7 @@ rl_evloop_fa_resp(struct rl_evloop *loop, uint32_t kevent_id,
 
     resp = rl_evloop_issue_request(loop, RLITE_MB(req),
                          sizeof(*req), 0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     PD("result: %d\n", result);
 
     return result;
@@ -931,7 +931,7 @@ rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
 
     resp = rl_evloop_issue_request(loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     PD("result: %d\n", result);
 
     return result;

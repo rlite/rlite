@@ -519,6 +519,7 @@ test(struct rl_ctrl *ctrl)
     assert(!ret);
     ret = rl_conf_ipcp_destroy(ctrl, 0);
     assert(ret);
+    (void)ret; (void)lret;
 
     return 0;
 }

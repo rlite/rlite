@@ -229,7 +229,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                     (struct rl_cmsg_ipcp_rib_show_req *)b_req;
     struct rl_cmsg_ipcp_rib_show_resp resp;
     struct uipcp *uipcp;
-    char *dumpstr;
+    char *dumpstr = NULL;
     int ret;
 
     resp.result = RLITE_ERR; /* Report failure by default. */

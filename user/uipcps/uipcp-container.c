@@ -61,7 +61,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
     fkresp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(resp),
                                sizeof(*resp), 0, 0, &result);
-    assert(!fkresp);
+    assert(!fkresp); (void)fkresp;
     UPD(uipcp, "result: %d\n", result);
 
     return result;
@@ -93,7 +93,7 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPV(uipcp, "result: %d\n", result);
 
     return result;
@@ -122,7 +122,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req),
                                   sizeof(*req), 0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPV(uipcp, "result: %d\n", result);
 
     return result;
@@ -167,7 +167,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPD(uipcp, "result: %d\n", result);
 
     return result;
@@ -209,7 +209,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPD(uipcp, "result: %d\n", result);
 
     return result;
@@ -239,7 +239,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPD(uipcp, "result: %d\n", result);
 
     return result;
@@ -268,7 +268,7 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
-    assert(!resp);
+    assert(!resp); (void)resp;
     UPD(uipcp, "result: %d\n", result);
 
     return result;
