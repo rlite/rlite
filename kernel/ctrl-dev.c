@@ -522,7 +522,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
     }
 
     entry->ops = factory->ops;
-    entry->use_cep_ids = factory->use_cep_ids;
+    entry->flags |= factory->use_cep_ids ? RL_K_IPCP_USE_CEP_IDS : 0;
     *ipcp_id = entry->id;
 
 out:
@@ -858,7 +858,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     entry->local_port = bitmap_find_next_zero_area(rl_dm.port_id_bitmap,
                                                    PORT_ID_BITMAP_SIZE,
                                                    0, 1, 0);
-    if (ipcp->use_cep_ids) {
+    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
         entry->local_cep = bitmap_find_next_zero_area(rl_dm.cep_id_bitmap,
                                                       CEP_ID_BITMAP_SIZE,
                                                       0, 1, 0);
@@ -870,7 +870,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
                 entry->local_cep < CEP_ID_BITMAP_SIZE) {
         bitmap_set(rl_dm.port_id_bitmap, entry->local_port, 1);
 
-        if (ipcp->use_cep_ids) {
+        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
             bitmap_set(rl_dm.cep_id_bitmap, entry->local_cep, 1);
         }
 
@@ -889,7 +889,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
-        if (ipcp->use_cep_ids) {
+        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
             hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
                      entry->local_cep);
         }
@@ -1040,7 +1040,7 @@ flow_put(struct flow_entry *entry)
     rina_name_free(&entry->local_appl);
     rina_name_free(&entry->remote_appl);
     bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
-    if (ipcp->use_cep_ids) {
+    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
         hash_del(&entry->node_cep);
         bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
@@ -1179,8 +1179,19 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
         return -ENXIO;
     }
 
+
     ret = ipcp_put(entry); /* To match the ipcp_get(). */
-    ret = ipcp_put(entry); /* To remove the ipcp. */
+
+    if (entry->flags & RL_K_IPCP_ZOMBIE) {
+        /* If this happens it means that someone already asked for this IPCP to
+         * be destroy IPCP, so this cannot be allowed. The IPCP is still
+         * referenced in the system, and will be destroyed as soon as the last
+         * reference drops. */
+        return -ENXIO;
+    }
+    entry->flags |= RL_K_IPCP_ZOMBIE;
+
+    ret = ipcp_put(entry); /* To let the recount drop to 0. */
 
     return ret;
 }

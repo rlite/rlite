@@ -266,7 +266,11 @@ struct ipcp_entry {
     struct rina_name    name;
     struct dif          *dif;
     rl_addr_t           addr;
-    bool                use_cep_ids;
+
+#define RL_K_IPCP_USE_CEP_IDS   (1<<0)
+#define RL_K_IPCP_ZOMBIE        (1<<1)
+    uint32_t            flags;
+
     struct ipcp_ops     ops;
     void                *priv;
     uint8_t             depth;
