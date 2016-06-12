@@ -645,6 +645,11 @@ out:
     }
 }
 
+/* Fast MAC comparison. */
+#define mac_equal(m1, m2)   \
+    (*((uint16_t *)(m1) + 2) == *((uint16_t *)(m2) + 2) && \
+            *((uint32_t *)m1) == *((uint32_t *)m2))
+
 static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
@@ -673,8 +678,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     spin_lock_bh(&priv->arpt_lock);
 
     list_for_each_entry(entry, &priv->arp_table, node) {
-        if (entry->complete && memcmp(hh->h_source,
-                    entry->tha, sizeof(entry->tha)) == 0) {
+        if (entry->complete && mac_equal(hh->h_source, entry->tha)) {
             match = true;
             flow = entry->flow;
             break;
