@@ -209,19 +209,19 @@ ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
 
     ipcp_id = rl_conf_ipcp_create(ctrl, &ipcp_name, dif_type, dif_name);
 
-    if (ipcp_id >= 0) {
+    if (ipcp_id >= 0L) {
         PI("IPCP of type '%s' created, assigned id %u\n", dif_type,
            (unsigned int)ipcp_id);
-    }
 
-    if (type_has_uipcp(dif_type)) {
-        ret = rl_conf_ipcp_uipcp_wait(ctrl, (unsigned int)ipcp_id);
-        if (ret) {
-            PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
-            rl_conf_ipcp_destroy(ctrl, (unsigned int)ipcp_id);
+        if (type_has_uipcp(dif_type)) {
+            ret = rl_conf_ipcp_uipcp_wait(ctrl, (unsigned int)ipcp_id);
+            if (ret) {
+                PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
+                rl_conf_ipcp_destroy(ctrl, (unsigned int)ipcp_id);
 
-        } else {
-            PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
+            } else {
+                PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
+            }
         }
     }
 

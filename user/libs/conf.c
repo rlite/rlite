@@ -50,7 +50,7 @@ rl_conf_ipcp_create(struct rl_ctrl *ctrl,
         PE("Failed to issue request to the kernel\n");
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
-        return -1;
+        return ret;
     }
 
     resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id,
@@ -58,7 +58,7 @@ rl_conf_ipcp_create(struct rl_ctrl *ctrl,
     if (!resp) {
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
-        return -1;
+        return -1L;
     }
 
     ret = resp->ipcp_id;

@@ -497,7 +497,7 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
 
     factory = ipcp_factories_find(req->dif_type);
     if (!factory) {
-        ret = -EINVAL;
+        ret = -ENXIO;
         goto out;
     }
 
