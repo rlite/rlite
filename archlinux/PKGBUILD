@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r1198.d0b6ef1
+pkgver=r57.be61446
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -11,7 +11,7 @@ license=('BSD')
 depends=('linux' 'glibc')
 makedepends=('git' 'linux-headers' 'fakeroot')
 install="rlite.install"
-source=("rlite.install" "rlite.conf" "rlite.service" "git+https://bitbucket.org/vmaffione/rlite.git")
+source=("rlite.install" "rlite.conf" "rlite.service" "git+https://github.com/vmaffione/rlite.git")
 noextract=()
 md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "f42f582e7be0c99ed67a3cbe9e56c3ba" "ecaab3e792c1c36048a069334337b380" "SKIP")
 
@@ -62,7 +62,6 @@ package() {
 
     # Install configuration files
     mkdir -p "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/uipcps/uipcp-qoscubes.qos "$pkgdir/etc/rlite"
     cp $srcdir/$_gitname/user/uipcps/shim-inet4-dir "$pkgdir/etc/rlite"
 
     # Install other system files

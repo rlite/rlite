@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=0.3
+pkgver=0.9
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -71,7 +71,6 @@ package() {
 
     # Install configuration files
     mkdir -p "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/uipcps/uipcp-qoscubes.qos "$pkgdir/etc/rlite"
     cp $srcdir/$_gitname/user/uipcps/shim-inet4-dir "$pkgdir/etc/rlite"
 
     # Install other system files
