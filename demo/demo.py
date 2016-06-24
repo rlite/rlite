@@ -69,6 +69,8 @@ argparser.add_argument('-f', '--frontend',
                        help = "Choose which emulated NIC the nodes will use",
                        type = str, choices = ['virtio-net-pci', 'e1000'],
                        default = 'virtio-net-pci')
+argparser.add_argument('--vhost', action='store_true',
+                       help = "Use vhost acceleration for virtio-net frontend")
 args = argparser.parse_args()
 
 
@@ -386,9 +388,11 @@ for vmname in sorted(vms):
 
         outs += ''                                                      \
         '-device %(frontend)s,mac=%(mac)s,netdev=data%(idx)s '          \
-        '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,downscript=no '\
+        '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,'          \
+        'downscript=no%(vhost)s '\
             % {'mac': mac, 'tap': tap, 'idx': port['idx'],
-               'frontend': args.frontend}
+               'frontend': args.frontend,
+               'vhost': ',vhost=on' if args.vhost else ''}
 
     outs += '&\n'
 
