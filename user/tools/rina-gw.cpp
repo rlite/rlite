@@ -188,14 +188,14 @@ struct Gateway {
     struct rl_evloop loop;
     struct rina_name appl_name;
 
-    /* Used to map IP:PORT --> RLITE_NAME, when
+    /* Used to map IP:PORT --> RINA NAME, when
      * receiving TCP connection requests from the INET world
-     * towards the RLITE world. */
+     * towards the RINA world. */
     map<InetName, RinaName> srv_map;
     map<int, RinaName> srv_fd_map;
 
-    /* Used to map RLITE_NAME --> IP:PORT, when
-     * receiving flow allocation requests from the RLITE world
+    /* Used to map RINA NAME --> IP:PORT, when
+     * receiving flow allocation requests from the RINA world
      * towards the INET world. */
     map<RinaName, InetName> dst_map;
 
@@ -486,6 +486,11 @@ parse_conf(const char *confname)
 
             while (iss >> token) {
                 tokens.push_back(token);
+            }
+
+            if (tokens.size() > 0 && tokens[0][0] == '#') {
+                /* Ignore comments */
+                continue;
             }
 
             if (tokens.size() < 5) {
