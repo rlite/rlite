@@ -227,7 +227,7 @@ Worker::Worker(int idx_) : idx(idx_)
     syncfd = eventfd(0, 0);
     if (syncfd < 0) {
         perror("eventfd()");
-        throw std::exception();
+        exit(EXIT_FAILURE);
     }
     pthread_create(&th, NULL, worker_function, this);
     pthread_mutex_init(&lock, NULL);
@@ -429,14 +429,14 @@ Worker::run()
 
 Gateway::Gateway()
 {
-    for (int i=0; i<NUM_WORKERS; i++) {
-        workers.push_back(new Worker(i));
-    }
-
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
     if (rl_evloop_init(&loop, NULL, NULL, 0)) {
-        throw std::exception();
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i=0; i<NUM_WORKERS; i++) {
+        workers.push_back(new Worker(i));
     }
 }
 
