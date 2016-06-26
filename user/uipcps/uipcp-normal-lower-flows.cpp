@@ -99,8 +99,8 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
                 lfdb[key] = *f;
                 modified = true;
                 prop_lfl.flows.push_back(*f);
+                UPD(uipcp, "Lower flow %s added remotely\n", key.c_str());
             }
-            UPD(uipcp, "Lower flow %s added remotely\n", key.c_str());
 
         } else {
             if (mit == lfdb.end()) {

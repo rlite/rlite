@@ -27,10 +27,12 @@
 using namespace std;
 
 
+/* Timeout intervals are expressed in milliseconds. */
 #define NEIGH_KEEPALIVE_INTVAL      5000
 #define NEIGH_KEEPALIVE_THRESH      3
 #define NEIGH_ENROLL_TO             1500
 #define NEIGH_ENROLL_MAX_ATTEMPTS   3
+#define NEIGH_SYNC_INTVAL           30000
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
@@ -38,9 +40,9 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   port_id(pid), flow_fd(ffd),
                                   lower_ipcp_id(lid), conn(NULL),
                                   enroll_tmrid(0),
+                                  enrollment_state(NEIGH_NONE),
                                   keepalive_tmrid(0),
-                                  pending_keepalive_reqs(0),
-                                  enrollment_state(NEIGH_NONE)
+                                  pending_keepalive_reqs(0)
 {
     pthread_cond_init(&enrollment_stopped, NULL);
     assert(neigh);
@@ -182,7 +184,7 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
 
     nf->keepalive_tmrid = 0;
 
-    NPD(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
+    UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(nf->neigh->ipcp_name).c_str());
 
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
@@ -250,8 +252,8 @@ void
 NeighFlow::enroll_tmr_start()
 {
     enroll_tmrid = rl_evloop_schedule(&neigh->rib->uipcp->loop,
-                                           NEIGH_ENROLL_TO,
-                                           enroll_timeout_cb, this);
+                                      NEIGH_ENROLL_TO,
+                                      enroll_timeout_cb, this);
 }
 
 void
@@ -289,6 +291,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = -1;
+    sync_tmrid = 0;
     enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
     enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
     enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
@@ -301,6 +304,8 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
 
 Neighbor::~Neighbor()
 {
+    sync_tmr_stop();
+
     for (map<rl_port_t, NeighFlow *>::iterator mit = flows.begin();
                                             mit != flows.end(); mit++) {
         delete mit->second;
@@ -691,6 +696,8 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 
         remote_sync_rib(nf);
 
+        nf->neigh->sync_tmr_start();
+
         pthread_cond_signal(&nf->enrollment_stopped);
 
     } else {
@@ -745,6 +752,8 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     rib->commit_lower_flow(rib->uipcp->addr, *this);
 
     remote_sync_rib(nf);
+
+    nf->neigh->sync_tmr_start();
 
     pthread_cond_signal(&nf->enrollment_stopped);
 
@@ -934,6 +943,40 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
     return ret;
 }
 
+static void
+sync_timeout_cb(struct rl_evloop *loop, void *arg)
+{
+    Neighbor *neigh = static_cast<Neighbor *>(arg);
+    uipcp_rib *rib = neigh->rib;
+    ScopeLock(rib->lock);
+    CDAPMessage m;
+
+    neigh->sync_tmrid = 0;
+
+    UPV(rib->uipcp, "Syncing lower flows with neighbor '%s'\n",
+        static_cast<string>(neigh->ipcp_name).c_str());
+
+    neigh->remote_sync_lower_flows(neigh->mgmt_conn());
+
+    neigh->sync_tmr_start();
+}
+
+void
+Neighbor::sync_tmr_start()
+{
+    sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop, NEIGH_SYNC_INTVAL,
+                                    sync_timeout_cb, this);
+}
+
+void
+Neighbor::sync_tmr_stop()
+{
+    if (sync_tmrid > 0) {
+        rl_evloop_schedule_canc(&rib->uipcp->loop, sync_tmrid);
+        sync_tmrid = 0;
+    }
+}
+
 Neighbor *
 uipcp_rib::get_neighbor(const struct rina_name *neigh_name, bool initiator)
 {
@@ -1110,7 +1153,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
          * is alive on this flow. */
         nf->pending_keepalive_reqs = 0;
 
-        NPD(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
+        UPV(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
             static_cast<string>(nf->neigh->ipcp_name).c_str());
         return 0;
     }

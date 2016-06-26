@@ -90,10 +90,11 @@ struct NeighFlow {
     CDAPConn *conn;
 
     int enroll_tmrid;
-    int keepalive_tmrid;
-    int pending_keepalive_reqs;
     pthread_cond_t enrollment_stopped;
     enum state_t enrollment_state;
+
+    int keepalive_tmrid;
+    int pending_keepalive_reqs;
 
     NeighFlow(Neighbor *n, const std::string& supp_dif, unsigned int pid,
               int ffd, unsigned int lid);
@@ -123,6 +124,8 @@ struct Neighbor {
     bool initiator;
 
     int enroll_attempts;
+
+    int sync_tmrid;
 
     std::map<rl_port_t, NeighFlow *> flows;
     rl_port_t mgmt_port_id;
@@ -156,6 +159,9 @@ struct Neighbor {
     int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
     int enrolled(NeighFlow *nf, const CDAPMessage *rm);
+
+    void sync_tmr_start();
+    void sync_tmr_stop();
 
     int remote_sync_obj(NeighFlow *nf, bool create,
                         const std::string& obj_class,
