@@ -163,6 +163,7 @@ struct Neighbor {
                         const UipcpObject *obj_value) const;
 
     int remote_sync_rib(NeighFlow *nf) const;
+    int remote_sync_lower_flows(NeighFlow *nf) const;
 };
 
 /* Shortest Path algorithm. */

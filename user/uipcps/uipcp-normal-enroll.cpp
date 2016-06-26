@@ -845,6 +845,27 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
     return ret;
 }
 
+int Neighbor::remote_sync_lower_flows(NeighFlow *nf) const
+{
+    unsigned int limit = 10;
+    int ret = 0;
+
+    for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
+            mit != rib->lfdb.end();) {
+        LowerFlowList lfl;
+
+        for (unsigned int k = 0; k < limit && mit != rib->lfdb.end();
+                mit++, k++) {
+            lfl.flows.push_back(mit->second);
+        }
+
+        ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
+                &lfl);
+    }
+
+    return ret;
+}
+
 int Neighbor::remote_sync_rib(NeighFlow *nf) const
 {
     unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
@@ -853,20 +874,8 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
     UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
         static_cast<string>(ipcp_name).c_str());
 
-    {
-        for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
-                                              mit != rib->lfdb.end();) {
-            LowerFlowList lfl;
 
-            for (unsigned int k = 0; k < limit && mit != rib->lfdb.end();
-                                                            mit++, k++) {
-                    lfl.flows.push_back(mit->second);
-            }
-
-            ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
-                                   &lfl);
-        }
-    }
+    ret |= remote_sync_lower_flows(nf);
 
     {
         for (map< string, DFTEntry >::iterator e = rib->dft.begin();
