@@ -176,7 +176,7 @@ struct Neighbor {
 class SPEngine {
 public:
     SPEngine() {};
-    int run(rl_addr_t, const std::map<std::string, LowerFlow >& db);
+    int run(rl_addr_t, struct uipcp_rib *rib);
 
     /* The routing table computed by run(). */
     std::map<rl_addr_t, rl_addr_t> next_hops;
@@ -241,7 +241,7 @@ struct uipcp_rib {
     std::map< std::string, DFTEntry > dft;
 
     /* Lower Flow Database. */
-    std::map< std::string, LowerFlow > lfdb;
+    std::map< rl_addr_t, std::map<rl_addr_t, LowerFlow > > lfdb;
 
     SPEngine spe;
 
@@ -282,6 +282,11 @@ struct uipcp_rib {
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
     rl_addr_t address_allocate() const;
+
+    const LowerFlow *lfdb_find(rl_addr_t local_addr,
+                               rl_addr_t remote_addr) const;
+    void lfdb_add(const LowerFlow &lf);
+    void lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
 
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);

@@ -409,14 +409,17 @@ uipcp_rib::dump() const
     ss << endl;
 
     ss << "Lower Flow Database:" << endl;
-    for (map<string, LowerFlow>::const_iterator
-            mit = lfdb.begin(); mit != lfdb.end(); mit++) {
-        const LowerFlow& flow = mit->second;
+    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::const_iterator
+            it = lfdb.begin(); it != lfdb.end(); it++) {
+        for (map<rl_addr_t, LowerFlow>::const_iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+        const LowerFlow& flow = jt->second;
 
         ss << "    LocalAddr: " << flow.local_addr << ", RemoteAddr: "
             << flow.remote_addr << ", Cost: " << flow.cost <<
                 ", Seqnum: " << flow.seqnum << ", State: " << flow.state
                     << ", Age: " << flow.age << endl;
+        }
     }
 
     ss << endl;

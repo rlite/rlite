@@ -25,6 +25,57 @@
 using namespace std;
 
 
+const LowerFlow *
+uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
+{
+    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::const_iterator it
+                                            = lfdb.find(local_addr);
+    map<rl_addr_t, LowerFlow>::const_iterator jt;
+
+    if (it == lfdb.end()) {
+        return NULL;
+    }
+
+    jt = it->second.find(remote_addr);
+
+    return jt == it->second.end() ? NULL : &jt->second;
+}
+
+/* The add method has overwrite semantic. */
+void
+uipcp_rib::lfdb_add(const LowerFlow &lf)
+{
+    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
+                                            = lfdb.find(lf.local_addr);
+
+    if (it == lfdb.end()) {
+        lfdb[lf.local_addr][lf.remote_addr] = lf;
+        return;
+    }
+
+    it->second[lf.remote_addr] = lf;
+}
+
+void
+uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
+{
+    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
+                                            = lfdb.find(local_addr);
+    map<rl_addr_t, LowerFlow>::iterator jt;
+
+    if (it == lfdb.end()) {
+        return;
+    }
+
+    jt = it->second.find(remote_addr);
+
+    if (jt == it->second.end()) {
+        return;
+    }
+
+    it->second.erase(jt);
+}
+
 int
 uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
 {
@@ -45,7 +96,7 @@ uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
     lf.seqnum = 1;
     lf.state = true;
     lf.age = 0;
-    lfdb[static_cast<string>(lf)] = lf;
+    lfdb_add(lf);
 
     LowerFlowList lfl;
 
@@ -55,7 +106,7 @@ uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
                                     obj_name::lfdb, &lfl);
 
     /* Update the routing table. */
-    spe.run(uipcp->addr, lfdb);
+    spe.run(uipcp->addr, this);
     pduft_sync();
 
     return ret;
@@ -92,22 +143,22 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
                                 f != lfl.flows.end(); f++) {
         string key = static_cast<string>(*f);
-        map< string, LowerFlow >::iterator mit = lfdb.find(key);
+        const LowerFlow *lf = lfdb_find(f->local_addr, f->remote_addr);
 
         if (add) {
-            if (mit == lfdb.end() || f->seqnum > mit->second.seqnum) {
-                lfdb[key] = *f;
+            if (lf == NULL || f->seqnum > lf->seqnum) {
+                lfdb_add(*f);
                 modified = true;
                 prop_lfl.flows.push_back(*f);
                 UPD(uipcp, "Lower flow %s added remotely\n", key.c_str());
             }
 
         } else {
-            if (mit == lfdb.end()) {
+            if (lf == NULL) {
                 UPI(uipcp, "Lower flow %s does not exist\n", key.c_str());
 
             } else {
-                lfdb.erase(mit);
+                lfdb_del(f->local_addr, f->remote_addr);
                 modified = true;
                 prop_lfl.flows.push_back(*f);
                 UPD(uipcp, "Lower flow %s removed remotely\n", key.c_str());
@@ -122,7 +173,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        spe.run(uipcp->addr, lfdb);
+        spe.run(uipcp->addr, this);
         pduft_sync();
     }
 
@@ -130,7 +181,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 int
-SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
+SPEngine::run(rl_addr_t local_addr, struct uipcp_rib *rib)
 {
     /* Clean up state left from the previous run. */
     next_hops.clear();
@@ -138,26 +189,27 @@ SPEngine::run(rl_addr_t local_addr, const map<string, LowerFlow >& db)
     info.clear();
 
     /* Build the graph from the Lower Flow Database. */
-    for (map<string, LowerFlow>::const_iterator f = db.begin();
-                                            f != db.end(); f++) {
-        LowerFlow rev;
-        map<string, LowerFlow>::const_iterator revit;
+    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::const_iterator it
+                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+        for (map<rl_addr_t, LowerFlow>::const_iterator jt
+                    = it->second.begin(); jt != it->second.end(); jt++) {
+            const LowerFlow *revlf;
 
-        rev.local_addr = f->second.remote_addr;
-        rev.remote_addr = f->second.local_addr;
-        revit = db.find(static_cast<string>(rev));
+            revlf = rib->lfdb_find(jt->second.local_addr,
+                                   jt->second.remote_addr);
 
-        if (revit == db.end() || revit->second.cost != f->second.cost) {
-            /* Something is wrong, this could be malicious or erroneous. */
-            continue;
+            if (revlf == NULL || revlf->cost != jt->second.cost) {
+                /* Something is wrong, this could be malicious or erroneous. */
+                continue;
+            }
+
+            graph[jt->second.local_addr].push_back(Edge(jt->second.remote_addr,
+                        jt->second.cost));
         }
-
-        graph[f->second.local_addr].push_back(Edge(f->second.remote_addr,
-                                                   f->second.cost));
     }
 
 #if 1
-    PV_S("Graph [%lu]:\n", db.size());
+    PV_S("Graph [%lu]:\n", rib->lfdb.size());
     for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         PV_S("%lu: {", (long unsigned)g->first);
@@ -301,9 +353,12 @@ age_incr_cb(struct rl_evloop *loop, void *arg)
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
     ScopeLock(rib->lock);
 
-    for (map<string, LowerFlow>::iterator mit = rib->lfdb.begin();
-                                        mit != rib->lfdb.end(); mit++) {
-        mit->second.age += RL_AGE_INCR_INTERVAL;
+    for (map<rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it
+                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+        for (map<rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+            jt->second.age += RL_AGE_INCR_INTERVAL;
+        }
     }
 
     /* Reschedule */
