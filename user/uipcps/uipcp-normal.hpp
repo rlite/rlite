@@ -147,6 +147,7 @@ struct Neighbor {
     const char *enrollment_state_repr(state_t s) const;
 
     NeighFlow *mgmt_conn();
+    const NeighFlow *mgmt_conn() const;
     bool has_mgmt_flow() const { return flows.size() > 0; }
     bool is_enrolled();
     int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
@@ -165,13 +166,13 @@ struct Neighbor {
     void sync_tmr_start();
     void sync_tmr_stop();
 
-    int remote_sync_obj(NeighFlow *nf, bool create,
+    int remote_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
 
     int remote_sync_rib(NeighFlow *nf) const;
-    int remote_sync_lower_flows(NeighFlow *nf) const;
+    int remote_refresh_lower_flows() const;
 };
 
 /* Shortest Path algorithm. */

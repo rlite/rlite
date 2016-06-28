@@ -347,6 +347,17 @@ Neighbor::enrollment_state_repr(state_t s) const
     return NULL;
 }
 
+const NeighFlow *
+Neighbor::mgmt_conn() const
+{
+    map<rl_port_t, NeighFlow*>::const_iterator mit;
+
+    mit = flows.find(mgmt_port_id);
+    assert(mit != flows.end());
+
+    return mit->second;
+}
+
 NeighFlow *
 Neighbor::mgmt_conn()
 {
@@ -824,7 +835,7 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
     return ret;
 }
 
-int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
+int Neighbor::remote_sync_obj(const NeighFlow *nf, bool create,
                               const string& obj_class,
                               const string& obj_name,
                               const UipcpObject *obj_value) const
@@ -833,8 +844,8 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
     int ret;
 
     if (!nf) {
-        assert(const_cast<Neighbor*>(this)->has_mgmt_flow());
-        nf = const_cast<Neighbor*>(this)->mgmt_conn();
+        assert(has_mgmt_flow());
+        nf = mgmt_conn();
     }
 
     if (create) {
@@ -854,37 +865,30 @@ int Neighbor::remote_sync_obj(NeighFlow *nf, bool create,
     return ret;
 }
 
-int Neighbor::remote_sync_lower_flows(NeighFlow *nf) const
+int Neighbor::remote_refresh_lower_flows() const
 {
     map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
     map< rl_addr_t, LowerFlow >::iterator jt;
+    const NeighFlow *nf = mgmt_conn();
     unsigned int limit = 10;
-    LowerFlowList lfl;
     int ret = 0;
 
-    it = rib->lfdb.begin();
-    if (it == rib->lfdb.end()) {
-        return 0;
-    }
-    jt = it->second.begin();
+    /* Fetch the map containing all the LFDB entries with the local
+     * address corresponding to me. */
+    it = rib->lfdb.find(rib->uipcp->addr);
+    assert(it != rib->lfdb.end());
 
-    for (;;) {
+    for (map< rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+                                        jt != it->second.end();) {
+        LowerFlowList lfl;
+
+        while (lfl.flows.size() < limit && jt != it->second.end()) {
+                jt->second.seqnum ++;
                 lfl.flows.push_back(jt->second);
                 jt ++;
-                if (jt == it->second.end()) {
-                    if (++it != rib->lfdb.end()) {
-                        jt = it->second.begin();
-                    }
-                }
-
-                if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
-                    ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
-                            &lfl);
-                    lfl.flows.clear();
-                    if (it == rib->lfdb.end()) {
-                        break;
-                    }
-                }
+        }
+        ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
+                &lfl);
     }
 
     return ret;
@@ -898,17 +902,47 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
     UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
         static_cast<string>(ipcp_name).c_str());
 
+    {
+        /* Synchronize lower flow database. */
+        map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
+        map< rl_addr_t, LowerFlow >::iterator jt;
+        LowerFlowList lfl;
 
-    ret |= remote_sync_lower_flows(nf);
+        it = rib->lfdb.begin();
+        if (it == rib->lfdb.end()) {
+            return 0;
+        }
+        jt = it->second.begin();
+
+        for (;;) {
+                    lfl.flows.push_back(jt->second);
+                    jt ++;
+                    if (jt == it->second.end()) {
+                        if (++it != rib->lfdb.end()) {
+                            jt = it->second.begin();
+                        }
+                    }
+
+                    if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
+                        ret |= remote_sync_obj(nf, true, obj_class::lfdb,
+                                               obj_name::lfdb, &lfl);
+                        lfl.flows.clear();
+                        if (it == rib->lfdb.end()) {
+                            break;
+                        }
+                    }
+        }
+    }
 
     {
+        /* Synchronize Directory Forwarding Table. */
         for (map< string, DFTEntry >::iterator e = rib->dft.begin();
                                                e != rib->dft.end();) {
             DFTSlice dft_slice;
 
-            for (unsigned int k = 0; k < limit && e != rib->dft.end();
-                                                            e++, k++) {
+            while (dft_slice.entries.size() < limit && e != rib->dft.end()) {
                 dft_slice.entries.push_back(e->second);
+                e ++;
             }
 
             ret |= remote_sync_obj(nf, true, obj_class::dft, obj_name::dft,
@@ -924,7 +958,6 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 rib->neighbors_seen.begin();
                 cit != rib->neighbors_seen.end();) {
             NeighborCandidateList ncl;
-            unsigned int k = 0;
 
             if (!sent_myself) {
                 NeighborCandidate cand;
@@ -939,12 +972,12 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 ncl.candidates.push_back(cand);
 
                 sent_myself = true;
-                k++;
             }
 
-            for (; k < limit && cit != rib->neighbors_seen.end();
-                                                        cit++, k++) {
+            while (ncl.candidates.size() < limit &&
+                            cit != rib->neighbors_seen.end()) {
                 ncl.candidates.push_back(cit->second);
+                cit ++;
             }
 
             ret |= remote_sync_obj(nf, true, obj_class::neighbors,
@@ -966,13 +999,11 @@ sync_timeout_cb(struct rl_evloop *loop, void *arg)
     ScopeLock(rib->lock);
     CDAPMessage m;
 
-    neigh->sync_tmrid = 0;
-
     UPV(rib->uipcp, "Syncing lower flows with neighbor '%s'\n",
         static_cast<string>(neigh->ipcp_name).c_str());
 
-    neigh->remote_sync_lower_flows(neigh->mgmt_conn());
-
+    neigh->sync_tmrid = 0;
+    neigh->remote_refresh_lower_flows();
     neigh->sync_tmr_start();
 }
 
@@ -1029,7 +1060,7 @@ uipcp_rib::lookup_neighbor_address(const RinaName& neigh_name) const
         return mit->second.address;
     }
 
-    return 0;
+    return 0; /* Zero means no address was found. */
 }
 
 RinaName
