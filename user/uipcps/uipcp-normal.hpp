@@ -63,8 +63,10 @@ namespace obj_name {
 
 /* Time interval (in seconds) between two consecutive increments
  * of the age of LFDB entries. */
-
 #define RL_AGE_INCR_INTERVAL    2
+
+/* Max age (in seconds) for an LFDB entry not to be discarded. */
+#define RL_AGE_MAX              40
 
 enum state_t {
     NEIGH_NONE = 0,
@@ -285,6 +287,7 @@ struct uipcp_rib {
 
     const LowerFlow *lfdb_find(rl_addr_t local_addr,
                                rl_addr_t remote_addr) const;
+    LowerFlow *lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr);
     void lfdb_add(const LowerFlow &lf);
     void lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
 

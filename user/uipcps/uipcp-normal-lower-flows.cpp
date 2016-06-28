@@ -25,6 +25,22 @@
 using namespace std;
 
 
+LowerFlow *
+uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr)
+{
+    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
+                                            = lfdb.find(local_addr);
+    map<rl_addr_t, LowerFlow>::iterator jt;
+
+    if (it == lfdb.end()) {
+        return NULL;
+    }
+
+    jt = it->second.find(remote_addr);
+
+    return jt == it->second.end() ? NULL : &jt->second;
+}
+
 const LowerFlow *
 uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
 {
@@ -143,10 +159,13 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
                                 f != lfl.flows.end(); f++) {
         string key = static_cast<string>(*f);
-        const LowerFlow *lf = lfdb_find(f->local_addr, f->remote_addr);
+        LowerFlow *lf = lfdb_find(f->local_addr, f->remote_addr);
 
         if (add) {
-            if (lf == NULL || f->seqnum > lf->seqnum) {
+                /* Just reset the age. */
+            if (lf != NULL && f->seqnum == lf->seqnum) {
+                lf->age = 0;
+            } else if (lf == NULL || f->seqnum > lf->seqnum) {
                 lfdb_add(*f);
                 modified = true;
                 prop_lfl.flows.push_back(*f);
@@ -352,13 +371,35 @@ age_incr_cb(struct rl_evloop *loop, void *arg)
 {
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
     ScopeLock(rib->lock);
+    bool discarded = false;
 
     for (map<rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it
                 = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+        list<map<rl_addr_t, LowerFlow >::iterator> discard_list;
+
         for (map<rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
                                                 jt != it->second.end(); jt++) {
             jt->second.age += RL_AGE_INCR_INTERVAL;
+
+            if (jt->second.age > RL_AGE_MAX) {
+                /* Insert this into the list of entries to be discarded. */
+                discard_list.push_back(jt);
+                discarded = true;
+            }
         }
+
+        for (list<map<rl_addr_t, LowerFlow >::iterator>::iterator dit
+                    = discard_list.begin(); dit != discard_list.end(); dit++) {
+            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+                            static_cast<string>((*dit)->second).c_str());
+            it->second.erase(*dit);
+        }
+    }
+
+    if (discarded) {
+        /* Update the routing table. */
+        rib->spe.run(rib->uipcp->addr, rib);
+        rib->pduft_sync();
     }
 
     /* Reschedule */
