@@ -292,17 +292,21 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     age_incr_tmrid = rl_evloop_schedule(&uipcp->loop,
                                         RL_AGE_INCR_INTERVAL * 1000,
                                         age_incr_cb, this);
+    sync_tmrid = rl_evloop_schedule(&uipcp->loop, NEIGH_SYNC_INTVAL,
+                                    sync_timeout_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
 {
+    rl_evloop_schedule_canc(&uipcp->loop, sync_tmrid);
+    rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
+
     for (map<string, Neighbor*>::iterator mit = neighbors.begin();
                                     mit != neighbors.end(); mit++) {
         delete mit->second;
     }
 
     rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
-    rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }

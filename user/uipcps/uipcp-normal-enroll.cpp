@@ -32,7 +32,6 @@ using namespace std;
 #define NEIGH_KEEPALIVE_THRESH      3
 #define NEIGH_ENROLL_TO             1500
 #define NEIGH_ENROLL_MAX_ATTEMPTS   3
-#define NEIGH_SYNC_INTVAL           30000
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
@@ -291,7 +290,6 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = -1;
-    sync_tmrid = 0;
     enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
     enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
     enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
@@ -304,8 +302,6 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
 
 Neighbor::~Neighbor()
 {
-    sync_tmr_stop();
-
     for (map<rl_port_t, NeighFlow *>::iterator mit = flows.begin();
                                             mit != flows.end(); mit++) {
         delete mit->second;
@@ -707,8 +703,6 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
 
         remote_sync_rib(nf);
 
-        nf->neigh->sync_tmr_start();
-
         pthread_cond_signal(&nf->enrollment_stopped);
 
     } else {
@@ -763,8 +757,6 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     rib->commit_lower_flow(rib->uipcp->addr, *this);
 
     remote_sync_rib(nf);
-
-    nf->neigh->sync_tmr_start();
 
     pthread_cond_signal(&nf->enrollment_stopped);
 
@@ -860,35 +852,6 @@ int Neighbor::remote_sync_obj(const NeighFlow *nf, bool create,
     ret = nf->send_to_port_id(&m, 0, obj_value);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-    }
-
-    return ret;
-}
-
-int Neighbor::remote_refresh_lower_flows() const
-{
-    map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
-    map< rl_addr_t, LowerFlow >::iterator jt;
-    const NeighFlow *nf = mgmt_conn();
-    unsigned int limit = 10;
-    int ret = 0;
-
-    /* Fetch the map containing all the LFDB entries with the local
-     * address corresponding to me. */
-    it = rib->lfdb.find(rib->uipcp->addr);
-    assert(it != rib->lfdb.end());
-
-    for (map< rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
-                                        jt != it->second.end();) {
-        LowerFlowList lfl;
-
-        while (lfl.flows.size() < limit && jt != it->second.end()) {
-                jt->second.seqnum ++;
-                lfl.flows.push_back(jt->second);
-                jt ++;
-        }
-        ret |= remote_sync_obj(nf, true, obj_class::lfdb, obj_name::lfdb,
-                &lfl);
     }
 
     return ret;
@@ -991,36 +954,47 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
     return ret;
 }
 
-static void
+void
 sync_timeout_cb(struct rl_evloop *loop, void *arg)
 {
-    Neighbor *neigh = static_cast<Neighbor *>(arg);
-    uipcp_rib *rib = neigh->rib;
+    uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
     ScopeLock(rib->lock);
     CDAPMessage m;
 
-    UPV(rib->uipcp, "Syncing lower flows with neighbor '%s'\n",
-        static_cast<string>(neigh->ipcp_name).c_str());
+    UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
-    neigh->sync_tmrid = 0;
-    neigh->remote_refresh_lower_flows();
-    neigh->sync_tmr_start();
+    rib->remote_refresh_lower_flows();
+    rib->sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop, NEIGH_SYNC_INTVAL,
+                                         sync_timeout_cb, rib);
 }
 
-void
-Neighbor::sync_tmr_start()
+int
+uipcp_rib::remote_refresh_lower_flows()
 {
-    sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop, NEIGH_SYNC_INTVAL,
-                                    sync_timeout_cb, this);
-}
+    map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
+    map< rl_addr_t, LowerFlow >::iterator jt;
+    unsigned int limit = 10;
+    int ret = 0;
 
-void
-Neighbor::sync_tmr_stop()
-{
-    if (sync_tmrid > 0) {
-        rl_evloop_schedule_canc(&rib->uipcp->loop, sync_tmrid);
-        sync_tmrid = 0;
+    /* Fetch the map containing all the LFDB entries with the local
+     * address corresponding to me. */
+    it = lfdb.find(uipcp->addr);
+    assert(it != lfdb.end());
+
+    for (map< rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+                                        jt != it->second.end();) {
+        LowerFlowList lfl;
+
+        while (lfl.flows.size() < limit && jt != it->second.end()) {
+                jt->second.seqnum ++;
+                lfl.flows.push_back(jt->second);
+                jt ++;
+        }
+        ret |= remote_sync_obj_all(true, obj_class::lfdb,
+				   obj_name::lfdb, &lfl);
     }
+
+    return ret;
 }
 
 Neighbor *

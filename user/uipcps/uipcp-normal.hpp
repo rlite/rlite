@@ -68,6 +68,10 @@ namespace obj_name {
 /* Max age (in seconds) for an LFDB entry not to be discarded. */
 #define RL_AGE_MAX              40
 
+/* Time interval (in seconds) between two consecutive periodic
+ * RIB synchronizations. */
+#define NEIGH_SYNC_INTVAL           30000
+
 enum state_t {
     NEIGH_NONE = 0,
     NEIGH_I_WAIT_CONNECT_R,
@@ -127,8 +131,6 @@ struct Neighbor {
 
     int enroll_attempts;
 
-    int sync_tmrid;
-
     std::map<rl_port_t, NeighFlow *> flows;
     rl_port_t mgmt_port_id;
 
@@ -163,16 +165,12 @@ struct Neighbor {
     int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
     int enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
-    void sync_tmr_start();
-    void sync_tmr_stop();
-
     int remote_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
 
     int remote_sync_rib(NeighFlow *nf) const;
-    int remote_refresh_lower_flows() const;
 };
 
 /* Shortest Path algorithm. */
@@ -248,6 +246,8 @@ struct uipcp_rib {
 
     SPEngine spe;
 
+    int sync_tmrid;
+
     /* For A-DATA messages. */
     InvokeIdMgr invoke_id_mgr;
 
@@ -295,7 +295,7 @@ struct uipcp_rib {
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);
 
-    /* Synchronize neighbors. */
+    /* Synchronize with neighbors. */
     int remote_sync_obj_excluding(const Neighbor *exclude, bool create,
                               const std::string& obj_class,
                               const std::string& obj_name,
@@ -303,6 +303,7 @@ struct uipcp_rib {
     int remote_sync_obj_all(bool create, const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
+    int remote_refresh_lower_flows();
 
     /* Receive info from neighbors. */
     int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
@@ -348,6 +349,7 @@ int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                           rl_port_t neigh_port_id, int neigh_fd);
 
 void age_incr_cb(struct rl_evloop *loop, void *arg);
+void sync_timeout_cb(struct rl_evloop *loop, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 
