@@ -609,10 +609,8 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        assert(const_cast<Neighbor*>(neigh->second)->
-                        has_mgmt_flow());
-        if (const_cast<Neighbor*>(neigh->second)->
-                        mgmt_conn()->enrollment_state != NEIGH_ENROLLED) {
+        assert(neigh->second->has_mgmt_flow());
+        if (neigh->second->mgmt_conn()->enrollment_state != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet. */
             continue;
         }
