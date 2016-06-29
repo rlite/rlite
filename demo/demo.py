@@ -98,13 +98,13 @@ if args.ring != None and args.ring > 0:
         i_next = i + 1
         if i_next == args.ring:
             i_next = 0
-        fout.write('eth b%(i)s 0Mbps m%(i)s m%(inext)s\n' % {'i': i+1,
+        fout.write('eth b%(i)s 0Mbps m%(i)03d m%(inext)03d\n' % {'i': i+1,
                                                            'inext': i_next+1})
     for i in range(args.ring):
         i_prev = i - 1
         if i_prev < 0:
             i_prev = args.ring - 1
-        fout.write('dif n m%(i)s b%(i)s b%(iprev)s\n' % {'i': i+1,
+        fout.write('dif n m%(i)03d b%(i)s b%(iprev)s\n' % {'i': i+1,
                                                          'iprev': i_prev+1})
     fout.close()
     args.conf = 'ring.conf'
