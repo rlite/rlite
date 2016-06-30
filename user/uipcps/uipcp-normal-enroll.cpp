@@ -344,7 +344,7 @@ Neighbor::enrollment_state_repr(state_t s) const
 }
 
 const NeighFlow *
-Neighbor::mgmt_conn() const
+Neighbor::_mgmt_conn() const
 {
     map<rl_port_t, NeighFlow*>::const_iterator mit;
 
@@ -357,12 +357,8 @@ Neighbor::mgmt_conn() const
 NeighFlow *
 Neighbor::mgmt_conn()
 {
-    map<rl_port_t, NeighFlow*>::iterator mit;
-
-    mit = flows.find(mgmt_port_id);
-    assert(mit != flows.end());
-
-    return mit->second;
+    const NeighFlow *nf = _mgmt_conn();
+    return const_cast<NeighFlow *>(nf);
 }
 
 int

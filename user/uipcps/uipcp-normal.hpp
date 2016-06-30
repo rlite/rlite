@@ -149,7 +149,7 @@ struct Neighbor {
     const char *enrollment_state_repr(state_t s) const;
 
     NeighFlow *mgmt_conn();
-    const NeighFlow *mgmt_conn() const;
+    const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_mgmt_flow() const { return flows.size() > 0; }
     bool is_enrolled();
     int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
@@ -171,6 +171,9 @@ struct Neighbor {
                         const UipcpObject *obj_value) const;
 
     int remote_sync_rib(NeighFlow *nf) const;
+
+private:
+    const NeighFlow *_mgmt_conn() const;
 };
 
 /* Shortest Path algorithm. */
@@ -287,7 +290,9 @@ struct uipcp_rib {
     rl_addr_t address_allocate() const;
 
     const LowerFlow *lfdb_find(rl_addr_t local_addr,
-                               rl_addr_t remote_addr) const;
+                               rl_addr_t remote_addr) const {
+        return _lfdb_find(local_addr, remote_addr);
+    };
     LowerFlow *lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr);
     void lfdb_add(const LowerFlow &lf);
     void lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
@@ -324,6 +329,8 @@ private:
     int load_qos_cubes(const char *);
 #endif /* RL_USE_QOS_CUBES */
 
+    const LowerFlow *_lfdb_find(rl_addr_t local_addr,
+                                rl_addr_t remote_addr) const;
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 };

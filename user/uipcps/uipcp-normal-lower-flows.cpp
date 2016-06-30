@@ -25,25 +25,15 @@
 using namespace std;
 
 
-// TODO reuse the one below
 LowerFlow *
 uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr)
 {
-    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
-                                            = lfdb.find(local_addr);
-    map<rl_addr_t, LowerFlow>::iterator jt;
-
-    if (it == lfdb.end()) {
-        return NULL;
-    }
-
-    jt = it->second.find(remote_addr);
-
-    return jt == it->second.end() ? NULL : &jt->second;
+    const LowerFlow *lf = _lfdb_find(local_addr, remote_addr);
+    return const_cast<LowerFlow *>(lf);
 }
 
 const LowerFlow *
-uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
+uipcp_rib::_lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
 {
     map<rl_addr_t, map<rl_addr_t, LowerFlow> >::const_iterator it
                                             = lfdb.find(local_addr);
