@@ -209,7 +209,8 @@ struct ipcp_ops {
     /* Invoked by the core to notify the IPCP about a new
      * flow allocation request from the upper layer. */
     int (*flow_allocate_req)(struct ipcp_entry *ipcp,
-                             struct flow_entry *flow);
+                             struct flow_entry *flow,
+                             struct rl_flow_spec *spec);
 
     /* Invoked by the core to notify the IPCP about a
      * flow allocation response from the upper layer. */

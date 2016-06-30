@@ -169,7 +169,7 @@ struct rl_flow_config {
 } __attribute__((packed));
 
 struct rl_flow_spec {
-    uint64_t max_sdu_gap;       /* in SDUs */
+    rl_seq_t max_sdu_gap;       /* in SDUs */
     uint64_t avg_bandwidth;     /* in bits per second */
     uint32_t max_delay;         /* in microseconds */
     uint32_t max_jitter;        /* in microseconds */
@@ -177,6 +177,13 @@ struct rl_flow_spec {
 
     uint8_t flow_control;       /* temporary, for debugging */
 };
+
+/* Does a flow specification correspond to best effort QoS? */
+static inline int rl_flow_spec_best_effort(struct rl_flow_spec *spec) {
+    return spec->max_sdu_gap == ((rl_seq_t)-1) && !spec->avg_bandwidth
+            && !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery
+            && !spec->flow_control;
+}
 
 struct rl_flow_stats {
     uint64_t tx_pkt;

@@ -1899,7 +1899,8 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ipcp_entry->ops.flow_allocate_req) {
         /* This IPCP handles the flow allocation in kernel-space. This is
          * currently true for shim IPCPs. */
-        ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry);
+        ret = ipcp_entry->ops.flow_allocate_req(ipcp_entry, flow_entry,
+                                                &req->flowspec);
     } else {
         if (!ipcp_entry->uipcp) {
             /* No userspace IPCP to use, this happens when no uipcp is assigned
