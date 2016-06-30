@@ -964,7 +964,8 @@ sync_timeout_cb(struct rl_evloop *loop, void *arg)
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
     rib->remote_refresh_lower_flows();
-    rib->sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop, NEIGH_SYNC_INTVAL,
+    rib->sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop,
+					 RL_NEIGH_SYNC_INTVAL * 1000,
                                          sync_timeout_cb, rib);
 }
 

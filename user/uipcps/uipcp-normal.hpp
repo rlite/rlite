@@ -66,11 +66,11 @@ namespace obj_name {
 #define RL_AGE_INCR_INTERVAL    2
 
 /* Max age (in seconds) for an LFDB entry not to be discarded. */
-#define RL_AGE_MAX              40
+#define RL_AGE_MAX              120
 
 /* Time interval (in seconds) between two consecutive periodic
  * RIB synchronizations. */
-#define NEIGH_SYNC_INTVAL           30000
+#define RL_NEIGH_SYNC_INTVAL           30
 
 enum state_t {
     NEIGH_NONE = 0,

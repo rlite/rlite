@@ -292,7 +292,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
     age_incr_tmrid = rl_evloop_schedule(&uipcp->loop,
                                         RL_AGE_INCR_INTERVAL * 1000,
                                         age_incr_cb, this);
-    sync_tmrid = rl_evloop_schedule(&uipcp->loop, NEIGH_SYNC_INTVAL,
+    sync_tmrid = rl_evloop_schedule(&uipcp->loop, RL_NEIGH_SYNC_INTVAL * 1000,
                                     sync_timeout_cb, this);
 }
 
