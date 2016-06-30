@@ -376,6 +376,7 @@ __ipcp_get(rl_ipcp_id_t ipcp_id)
 struct ipcp_entry *
 ipcp_select_by_dif(const char *dif_name)
 {
+    struct ipcp_entry *selected = NULL;
     struct ipcp_entry *entry;
     int bucket;
 
@@ -386,21 +387,24 @@ ipcp_select_by_dif(const char *dif_name)
         if (!dif_name) {
             /* The request does not specify a DIF: select any DIF,
              * giving priority to normal DIFs. */
-            if (strcmp(entry->dif->ty, "normal") == 0) {
-                break;
+            if (!selected || (strcmp(entry->dif->ty, "normal") == 0 &&
+                    (strcmp(selected->dif->ty, "normal") != 0 ||
+                     entry->depth > selected->depth))) {
+                selected = entry;
             }
         } else if (strcmp(entry->dif->name, dif_name) == 0) {
+            selected = entry;
             break;
         }
     }
 
-    if (entry) {
-        entry->refcnt++;
+    if (selected) {
+        selected->refcnt++;
     }
 
     PUNLOCK();
 
-    return entry;
+    return selected;
 }
 
 void tx_completion_func(unsigned long arg);
