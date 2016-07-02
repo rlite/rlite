@@ -1,7 +1,10 @@
 /*
  * Serialization tables for shim-hv management.
  *
- * Copyright (C) 2016 Vincenzo Maffione <v.maffione@gmail.com>
+ * Copyright (C) 2015-2016 Nextworks
+ * Author: Vincenzo Maffione <v.maffione@gmail.com>
+ *
+ * This file is part of rlite.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

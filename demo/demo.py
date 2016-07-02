@@ -39,7 +39,7 @@ def which(program):
 
 
 description = "Python script to generate rlite deployments based on light VMs"
-epilog = "2016 Vincenzo Maffione <v.maffione@gmail.com>"
+epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
                                     epilog = epilog)

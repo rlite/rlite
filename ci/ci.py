@@ -18,7 +18,7 @@ def bts(b):
 
 
 description = "Continuous integration for rlite"
-epilog = "2016 Vincenzo Maffione <v.maffione@gmail.com>"
+epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
 argparser = argparse.ArgumentParser(description = description,
                                     epilog = epilog)

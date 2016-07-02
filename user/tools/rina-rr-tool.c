@@ -1,5 +1,8 @@
 /*
- * Copyright (c) 2016, Vincenzo Maffione <v.maffione@gmail.com>
+ * Copyright (C) 2015-2016 Nextworks
+ * Author: Vincenzo Maffione <v.maffione@gmail.com>
+ *
+ * This file is part of rlite.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
