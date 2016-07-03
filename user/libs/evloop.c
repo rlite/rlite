@@ -304,7 +304,7 @@ evloop_function(void *arg)
             PE("Invalid message type [%d] received\n",
                     resp->msg_type);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_MB(resp));
+                        RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -318,7 +318,7 @@ evloop_function(void *arg)
                                         resp->msg_type);
             }
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_MB(resp));
+                        RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -334,7 +334,7 @@ evloop_function(void *arg)
             PE("No pending request matching event-id [%u]\n",
                     resp->event_id);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_MB(resp));
+                        RLITE_MB(resp));
             free(resp);
             continue;
         }
@@ -367,11 +367,11 @@ notify_requestor:
             /* Free the pending queue entry and the associated request message,
              * and the response message. */
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                          req_entry->msg);
+                        req_entry->msg);
             free(req_entry->msg);
             free(req_entry);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                          RLITE_MB(resp));
+                        RLITE_MB(resp));
             free(resp);
         }
         pthread_mutex_unlock(&loop->lock);

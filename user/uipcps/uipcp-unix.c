@@ -22,6 +22,7 @@
  */
 
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -281,8 +282,10 @@ static rl_req_handler_t rl_config_handlers[] = {
 };
 
 struct worker_info {
-    struct uipcps *uipcps;
-    int cfd;
+    pthread_t           th;
+    struct uipcps       *uipcps;
+    int                 cfd;
+    struct list_head    node;
 };
 
 static void *
@@ -335,8 +338,6 @@ worker_fn(void *opaque)
     /* Close the connection. */
     close(wi->cfd);
 
-    free(wi);
-
     PD("Worker %p stopped\n", wi);
 
     return NULL;
@@ -346,12 +347,30 @@ worker_fn(void *opaque)
 static int
 unix_server(struct uipcps *uipcps)
 {
+    struct list_head threads;
+
+    list_init(&threads);
+
     for (;;) {
         struct sockaddr_un client_address;
         socklen_t client_address_len = sizeof(client_address);
-        struct worker_info *wi;
-        pthread_t wth;
+        struct worker_info *wi, *tmp;
         int ret;
+
+        /* Try to clean up previously terminated worker threads. */
+        list_for_each_entry_safe(wi, tmp, &threads, node) {
+            ret = pthread_tryjoin_np(wi->th, NULL);
+            if (ret == EBUSY) {
+                /* Skip this since it has not finished yet. */
+                continue;
+            } else if (ret) {
+                PE("pthread_tryjoin_np() failed: %d\n", ret);
+            }
+
+            PD("Worker %p cleaned-up\n", wi);
+            list_del(&wi->node);
+            free(wi);
+        }
 
         wi = malloc(sizeof(*wi));
         wi->uipcps = uipcps;
@@ -360,12 +379,14 @@ unix_server(struct uipcps *uipcps)
         wi->cfd = accept(uipcps->lfd, (struct sockaddr *)&client_address,
                          &client_address_len);
 
-        ret = pthread_create(&wth, NULL, worker_fn, wi);
+        ret = pthread_create(&wi->th, NULL, worker_fn, wi);
         if (ret) {
             PE("pthread_create() failed [%d]\n", errno);
             close(wi->cfd);
             free(wi);
         }
+
+        list_add_tail(&wi->node, &threads);
     }
 
     return 0;
