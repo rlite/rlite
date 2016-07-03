@@ -298,7 +298,7 @@ worker_fn(void *opaque)
     int ret;
     int n;
 
-    PD("Worker %p started\n", wi);
+    PV("Worker %p started\n", wi);
 
     /* Read the request message in serialized form. */
     n = read(wi->cfd, serbuf, sizeof(serbuf));
@@ -338,7 +338,7 @@ worker_fn(void *opaque)
     /* Close the connection. */
     close(wi->cfd);
 
-    PD("Worker %p stopped\n", wi);
+    PV("Worker %p stopped\n", wi);
 
     return NULL;
 }
@@ -348,6 +348,8 @@ static int
 unix_server(struct uipcps *uipcps)
 {
     struct list_head threads;
+    int threads_cnt = 0;
+#define RL_MAX_THREADS     16
 
     list_init(&threads);
 
@@ -357,19 +359,32 @@ unix_server(struct uipcps *uipcps)
         struct worker_info *wi, *tmp;
         int ret;
 
-        /* Try to clean up previously terminated worker threads. */
-        list_for_each_entry_safe(wi, tmp, &threads, node) {
-            ret = pthread_tryjoin_np(wi->th, NULL);
-            if (ret == EBUSY) {
-                /* Skip this since it has not finished yet. */
-                continue;
-            } else if (ret) {
-                PE("pthread_tryjoin_np() failed: %d\n", ret);
+        for (;;) {
+            /* Try to clean up previously terminated worker threads. */
+            list_for_each_entry_safe(wi, tmp, &threads, node) {
+                ret = pthread_tryjoin_np(wi->th, NULL);
+                if (ret == EBUSY) {
+                    /* Skip this since it has not finished yet. */
+                    continue;
+                } else if (ret) {
+                    PE("pthread_tryjoin_np() failed: %d\n", ret);
+                }
+
+                PV("Worker %p cleaned-up\n", wi);
+                list_del(&wi->node);
+                free(wi);
+                threads_cnt --;
             }
 
-            PD("Worker %p cleaned-up\n", wi);
-            list_del(&wi->node);
-            free(wi);
+            if (threads_cnt < RL_MAX_THREADS) {
+                /* We have not reached the maximum, let's go ahead. */
+                break;
+            }
+
+            /* Too many threads, let's wait a bit and try again to free up
+             * resources. */
+            PD("Too many active threads, wait to free up some\n");
+            usleep(50000);
         }
 
         wi = malloc(sizeof(*wi));
@@ -387,9 +402,11 @@ unix_server(struct uipcps *uipcps)
         }
 
         list_add_tail(&wi->node, &threads);
+        threads_cnt ++;
     }
 
     return 0;
+#undef RL_MAX_THREADS
 }
 
 static int
