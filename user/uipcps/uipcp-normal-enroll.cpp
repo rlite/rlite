@@ -976,6 +976,11 @@ uipcp_rib::remote_refresh_lower_flows()
     unsigned int limit = 10;
     int ret = 0;
 
+    if (lfdb.size() == 0) {
+        /* Still not enrolled to anyone, nothing to do. */
+        return 0;
+    }
+
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
     it = lfdb.find(uipcp->addr);
