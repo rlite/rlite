@@ -45,7 +45,7 @@ struct rl_normal {
     /* Implementation of the PDU Forwarding Table (PDUFT). */
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
 
-    spinlock_t pduft_lock;
+    rwlock_t pduft_lock;
 };
 
 static void *
@@ -60,7 +60,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
-    spin_lock_init(&priv->pduft_lock);
+    rwlock_init(&priv->pduft_lock);
 
     PD("New IPC created [%p]\n", priv);
 
@@ -366,9 +366,9 @@ pduft_lookup(struct rl_normal *priv, rl_addr_t dst_addr)
 {
     struct pduft_entry *entry;
 
-    spin_lock_bh(&priv->pduft_lock);
+    read_lock_bh(&priv->pduft_lock);
     entry = pduft_lookup_internal(priv, dst_addr);
-    spin_unlock_bh(&priv->pduft_lock);
+    read_unlock_bh(&priv->pduft_lock);
 
     return entry ? entry->flow : NULL;
 }
@@ -700,7 +700,7 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
-    spin_lock_bh(&priv->pduft_lock);
+    write_lock_bh(&priv->pduft_lock);
 
     entry = pduft_lookup_internal(priv, dst_addr);
 
@@ -721,7 +721,7 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
     entry->flow = flow;
     entry->address = dst_addr;
 
-    spin_unlock_bh(&priv->pduft_lock);
+    write_unlock_bh(&priv->pduft_lock);
 
     return 0;
 }
@@ -734,7 +734,7 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
     struct hlist_node *tmp;
     int bucket;
 
-    spin_lock_bh(&priv->pduft_lock);
+    write_lock_bh(&priv->pduft_lock);
 
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
         list_del(&entry->fnode);
@@ -742,7 +742,7 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
         kfree(entry);
     }
 
-    spin_unlock_bh(&priv->pduft_lock);
+    write_unlock_bh(&priv->pduft_lock);
 
     return 0;
 }
@@ -752,10 +752,10 @@ rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
-    spin_lock_bh(&priv->pduft_lock);
+    write_lock_bh(&priv->pduft_lock);
     list_del(&entry->fnode);
     hash_del(&entry->node);
-    spin_unlock_bh(&priv->pduft_lock);
+    write_unlock_bh(&priv->pduft_lock);
 
     kfree(entry);
 
