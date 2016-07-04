@@ -262,8 +262,6 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     unsigned long mpl = 0;
     unsigned long r;
 
-    flow_config_dump(&flow->cfg);
-
     dtp_snd_reset(flow);
     dtp_rcv_reset(flow);
 
