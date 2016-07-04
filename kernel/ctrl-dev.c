@@ -455,10 +455,6 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         rina_name_move(&entry->name, &req->name);
         entry->dif = dif;
         entry->addr = 0;
-        entry->priv = NULL;
-        entry->owner = NULL;
-        entry->uipcp = NULL;
-        entry->mgmt_txrx = NULL;
         entry->refcnt = 1;
         entry->depth = RLITE_DEFAULT_LAYERS;
         INIT_LIST_HEAD(&entry->registered_appls);
@@ -888,8 +884,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
         entry->never_bound = true;
-        entry->priv = NULL;
-        entry->sdu_rx_consumed = NULL;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
@@ -1034,11 +1028,18 @@ flow_put(struct flow_entry *entry)
      * removal. This is done for either the IPCP which supports
      * the flow (entry->txrx.ipcp) and the IPCP which uses the
      * flow (entry->upper.ipcp). */
-    ipcp_put(ipcp);
 
     if (entry->upper.ipcp) {
+        mutex_lock(&ipcp->lock);
+        ipcp->shortcut_flows--;
+        if (ipcp->shortcut_flows == 0) {
+            ipcp->shortcut = NULL;
+        }
+        mutex_unlock(&ipcp->lock);
+
         ipcp_put(entry->upper.ipcp);
     }
+    ipcp_put(ipcp);
 
     hash_del(&entry->node);
     rina_name_free(&entry->local_appl);
@@ -1712,6 +1713,7 @@ static int
 upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
                      struct flow_entry *flow)
 {
+    struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct ipcp_entry *upper_ipcp;
 
     /* Lookup the IPCP user of 'flow'. */
@@ -1732,6 +1734,18 @@ upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
     }
 
     flow->upper.ipcp = upper_ipcp;
+
+    mutex_lock(&ipcp->lock);
+    /* The ipcp->upper_ipcp field must be set only while there is one and
+     * only one upper IPCP. */
+    if (ipcp->shortcut_flows == 0) {
+        /* Reuse the reference, without increasing the reference counter. */
+        ipcp->shortcut = upper_ipcp;
+    } else if (upper_ipcp != ipcp->shortcut) {
+        ipcp->shortcut = NULL;
+    }
+    ipcp->shortcut_flows ++;
+    mutex_unlock(&ipcp->lock);
 
     return 0;
 }

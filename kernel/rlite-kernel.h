@@ -275,6 +275,10 @@ struct ipcp_entry {
 #define RL_K_IPCP_ZOMBIE        (1<<1)
     uint32_t            flags;
 
+    /* Receive side optimization. The 'uppers' field is protected by 'lock'. */
+    struct ipcp_entry   *shortcut;
+    int                 shortcut_flows;
+
     struct ipcp_ops     ops;
     void                *priv;
     uint8_t             depth;
@@ -433,10 +437,12 @@ int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                          struct rl_flow_config *flowcfg);
 
 int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
-                rl_port_t local_port);
+              rl_port_t local_port);
 
 int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rl_buf *rb, bool qlimit);
+                   struct rl_buf *rb, bool qlimit);
+
+int rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
 
 void rl_write_restart_port(rl_port_t local_port);
 

@@ -175,6 +175,25 @@ rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb, rl_port_t local_port)
 }
 EXPORT_SYMBOL(rl_sdu_rx);
 
+/* This does not take the ownership of the packet. */
+int
+rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
+{
+    struct ipcp_entry *shortcut = ipcp->shortcut;
+
+    if (unlikely(shortcut == NULL || rb->len < sizeof(struct rina_pci) ||
+                 RLITE_BUF_PCI(rb)->pdu_type == PDU_T_MGMT)) {
+        /* We cannot take the shortcut optimization. */
+        return 1;
+    }
+
+    shortcut->ops.sdu_rx(shortcut, rb);
+
+    return 0;
+
+}
+EXPORT_SYMBOL(rl_sdu_rx_shortcut);
+
 static void
 rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {

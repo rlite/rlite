@@ -680,9 +680,16 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 
     skb_copy_bits(skb, 0, RLITE_BUF_DATA(rb), skb->len);
 
-    /* TODO This lookup could be (partially) avoided if core implements
-     * another version of rl_sdu_rx_flow() that does not need the flow
-     * argument. */
+    /* Try to shortcut the packet to the upper IPCP. */
+    if (!rl_sdu_rx_shortcut(priv->ipcp, rb)) {
+        entry->stats.rx_pkt++;
+        entry->stats.rx_byte += rb->len;
+        return;
+    }
+
+    /* Shortcutting was not possible, we have to lookup the flow from
+     * the source MAC address. */
+
     spin_lock_bh(&priv->arpt_lock);
 
     list_for_each_entry(entry, &priv->arp_table, node) {
