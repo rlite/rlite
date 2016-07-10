@@ -66,7 +66,7 @@ type_has_uipcp(const char *dif_type)
         return 1;
     }
 
-    if (strcmp(dif_type, "shim-inet4") == 0) {
+    if (strcmp(dif_type, "shim-tcp4") == 0) {
         return 1;
     }
 

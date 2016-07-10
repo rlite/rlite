@@ -71,7 +71,7 @@ A separate module for each type of IPCP:
 * **rlite-normal**, implementing the kernel-space part of the regular IPCPs.
                     Includes EFCP and RMT.
 * **rlite-shim-eth**, implementing the Shim IPCP over Ethernet.
-* **rlite-shim-inet4**, implementing the kernel-space part of the Shim IPCP
+* **rlite-shim-tcp4**, implementing the kernel-space part of the Shim IPCP
                         over TCP/UDP and IPv4.
 * **rlite-shim-hv**, implementing the Shim IPCP over VMPI.
 * **rlite-shim-loopback**, implementing a loopback Shim IPCP.
@@ -81,7 +81,7 @@ A separate module for each type of IPCP:
 #############################################################################
 
 A daemon program, **rlite-uipcps**, which implements the user-space part of
-the normal IPCP and of the shim-inet4 IPCP. A main thread listens on a UNIX
+the normal IPCP and of the shim-tcp4 IPCP. A main thread listens on a UNIX
 socket to serve incoming requests from the **rlite-ctl** control tool.
 A different thread is used for each IPCP running in the system.
 

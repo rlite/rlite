@@ -168,7 +168,7 @@ struct rl_flow_config {
     rl_seq_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
-    int32_t fd;  /* Currently used but shim-inet4. */
+    int32_t fd;  /* Currently used but shim-tcp4. */
 } __attribute__((packed));
 
 struct rl_flow_spec {

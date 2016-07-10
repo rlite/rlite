@@ -33,7 +33,7 @@ argparser.add_argument('-l', '--levels',
                        type = int, default = 1)
 argparser.add_argument('-t', '--type',
                        help = "",
-                       choices = ['eth', 'inet4', 'null'], default = 'eth')
+                       choices = ['eth', 'tcp4', 'null'], default = 'eth')
 argparser.add_argument('-c', '--conf',
                        help = "Configuration file for the testsuites",
                        type = str, default = 'testsuite.conf')

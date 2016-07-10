@@ -71,7 +71,7 @@ package() {
 
     # Install configuration files
     mkdir -p "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/uipcps/shim-inet4-dir "$pkgdir/etc/rlite"
+    cp $srcdir/$_gitname/user/uipcps/shim-tcp4-dir "$pkgdir/etc/rlite"
 
     # Install other system files
     mkdir -p "$pkgdir/var/rlite"

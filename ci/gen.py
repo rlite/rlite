@@ -22,7 +22,7 @@ argparser.add_argument('-l', '--levels',
                        type = int, default = 1)
 argparser.add_argument('-t', '--type',
                        help = "",
-                       choices = ['eth', 'inet4', 'null'], default = 'eth')
+                       choices = ['eth', 'tcp4', 'null'], default = 'eth')
 argparser.add_argument('-c', '--conf',
                        help = "Path to the topology configuration file", type = str,
                        default = 'gen.conf')
@@ -167,7 +167,7 @@ for i in sorted(vms):
 
     vmid += 1
 
-inet4_dir = []
+tcp4_dir = []
 
 for i in sorted(vms):
     vm = vms[i]
@@ -211,11 +211,11 @@ for i in sorted(vms):
                 'rlite-ctl ipcp-create e.%(brid)s.IPCP %(idx)s shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
         if args.type == 'eth':
                 outs += 'rlite-ctl ipcp-config e.%(brid)s.IPCP %(idx)s netdev $PORT\n' % vars_dict
-        elif args.type == 'inet4':
+        elif args.type == 'tcp4':
                 outs += 'sudo ip addr add 10.71.%(brid)s.%(id)s/24 dev $PORT\n' % vars_dict
                 entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.DIF' % vars_dict
-                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
-                inet4_dir.append(entry)
+                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-tcp4-dir\'\n' % (entry, )
+                tcp4_dir.append(entry)
         outs += 'rlite-ctl ipcp-register e.%(brid)s.DIF n.1.IPCP %(id)s\n'\
                 '\n' % vars_dict
 
@@ -230,8 +230,8 @@ for i in sorted(vms):
             '   fi\n'\
             'done\n\n' % {'id': vm['id'], 'levels': args.levels}
 
-if args.type == 'inet4':
-    print(inet4_dir)
+if args.type == 'tcp4':
+    print(tcp4_dir)
 
     for i in vms:
         vm = vms[i]
@@ -241,8 +241,8 @@ if args.type == 'inet4':
                 'while [ $DONE != "0" ]; do\n'\
                 '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
-        for entry in inet4_dir:
-                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-inet4-dir\'\n' % (entry, )
+        for entry in tcp4_dir:
+                outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-tcp4-dir\'\n' % (entry, )
 
         outs += 'true\n'\
                 'ENDSSH\n'\

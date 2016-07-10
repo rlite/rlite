@@ -422,7 +422,7 @@ for vmname in sorted(vms):
     # Load kernel modules
     outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
-                    '$SUDO modprobe rlite-shim-inet4\n'\
+                    '$SUDO modprobe rlite-shim-tcp4\n'\
                     '$SUDO modprobe rlite-normal\n'\
                     '$SUDO chmod a+rwx /dev/rlite\n'\
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\

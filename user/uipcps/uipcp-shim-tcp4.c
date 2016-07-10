@@ -1,5 +1,5 @@
 /*
- * Management part of shim-inet4 IPCPs.
+ * Management part of shim-tcp4 IPCPs.
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
@@ -34,7 +34,7 @@
 #include "uipcp-container.h"
 
 
-struct inet4_bindpoint {
+struct tcp4_bindpoint {
     int fd;
     struct sockaddr_in addr;
     char *appl_name_s;
@@ -42,7 +42,7 @@ struct inet4_bindpoint {
     struct list_head node;
 };
 
-struct inet4_endpoint {
+struct tcp4_endpoint {
     int fd;
     struct sockaddr_in addr;
     rl_port_t port_id;
@@ -51,7 +51,7 @@ struct inet4_endpoint {
     struct list_head node;
 };
 
-struct shim_inet4 {
+struct shim_tcp4 {
     struct uipcp *uipcp;
     char *dif_name;  /* Name of my DIF. */
     struct list_head endpoints;
@@ -59,14 +59,14 @@ struct shim_inet4 {
     uint32_t kevent_id_cnt;
 };
 
-#define SHIM(_u)    ((struct shim_inet4 *)((_u)->priv))
+#define SHIM(_u)    ((struct shim_tcp4 *)((_u)->priv))
 
 static int
-parse_directory(struct shim_inet4 *shim, int appl2sock,
+parse_directory(struct shim_tcp4 *shim, int appl2sock,
                 struct sockaddr_in *addr, struct rina_name *appl_name)
 {
     char *appl_name_s = NULL;
-    const char *dirfile = "/etc/rlite/shim-inet4-dir";
+    const char *dirfile = "/etc/rlite/shim-tcp4-dir";
     FILE *fin;
     char *linebuf = NULL;
     size_t sz;
@@ -177,7 +177,7 @@ parse_directory(struct shim_inet4 *shim, int appl2sock,
 }
 
 static int
-appl_name_to_sock_addr(struct shim_inet4 *shim,
+appl_name_to_sock_addr(struct shim_tcp4 *shim,
                        const struct rina_name *appl_name,
                        struct sockaddr_in *addr)
 {
@@ -186,7 +186,7 @@ appl_name_to_sock_addr(struct shim_inet4 *shim,
 }
 
 static int
-sock_addr_to_appl_name(struct shim_inet4 *shim, const struct sockaddr_in *addr,
+sock_addr_to_appl_name(struct shim_tcp4 *shim, const struct sockaddr_in *addr,
                        struct rina_name *appl_name)
 {
     return parse_directory(shim, 0, (struct sockaddr_in *)addr,
@@ -194,7 +194,7 @@ sock_addr_to_appl_name(struct shim_inet4 *shim, const struct sockaddr_in *addr,
 }
 
 static int
-open_bound_socket(struct shim_inet4 *shim, int *fd, struct sockaddr_in *addr)
+open_bound_socket(struct shim_tcp4 *shim, int *fd, struct sockaddr_in *addr)
 {
     int enable = 1;
 
@@ -224,12 +224,12 @@ open_bound_socket(struct shim_inet4 *shim, int *fd, struct sockaddr_in *addr)
 static void accept_conn(struct rl_evloop *loop, int lfd);
 
 static int
-shim_inet4_appl_unregister(struct uipcp *uipcp,
+shim_tcp4_appl_unregister(struct uipcp *uipcp,
                            struct rl_kmsg_appl_register *req)
 {
     char *appl_name_s = rina_name_to_string(&req->appl_name);
-    struct shim_inet4 *shim = SHIM(uipcp);
-    struct inet4_bindpoint *bp;
+    struct shim_tcp4 *shim = SHIM(uipcp);
+    struct tcp4_bindpoint *bp;
     int ret = -1;
 
     if (!appl_name_s) {
@@ -262,20 +262,20 @@ shim_inet4_appl_unregister(struct uipcp *uipcp,
 }
 
 static int
-shim_inet4_appl_register(struct rl_evloop *loop,
+shim_tcp4_appl_register(struct rl_evloop *loop,
                          const struct rl_msg_base *b_resp,
                          const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
                 (struct rl_kmsg_appl_register *)b_resp;
-    struct shim_inet4 *shim = SHIM(uipcp);
-    struct inet4_bindpoint *bp;
+    struct shim_tcp4 *shim = SHIM(uipcp);
+    struct tcp4_bindpoint *bp;
     int ret;
 
     if (!req->reg) {
         /* Process the unregistration. */
-        return shim_inet4_appl_unregister(uipcp, req);
+        return shim_tcp4_appl_unregister(uipcp, req);
     }
 
     /* Process the registration. */
@@ -294,7 +294,7 @@ shim_inet4_appl_register(struct rl_evloop *loop,
 
     ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr);
     if (ret) {
-        UPE(uipcp, "Failed to get inet4 address from appl_name '%s'\n",
+        UPE(uipcp, "Failed to get tcp4 address from appl_name '%s'\n",
            bp->appl_name_s);
         goto err2;
     }
@@ -332,16 +332,16 @@ err0:
 }
 
 static int
-shim_inet4_fa_req(struct rl_evloop *loop,
+shim_tcp4_fa_req(struct rl_evloop *loop,
                   const struct rl_msg_base *b_resp,
                   const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
-    struct shim_inet4 *shim = SHIM(uipcp);
+    struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     struct rl_flow_config cfg;
-    struct inet4_endpoint *ep;
+    struct tcp4_endpoint *ep;
     int ret;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
@@ -360,7 +360,7 @@ shim_inet4_fa_req(struct rl_evloop *loop,
     /* This lookup is needed for the connect(). */
     ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr);
     if (ret) {
-        UPE(uipcp, "Failed to get inet4 address for remote appl\n");
+        UPE(uipcp, "Failed to get tcp4 address for remote appl\n");
         goto err1;
     }
 
@@ -397,9 +397,9 @@ err1:
 }
 
 static int
-lfd_to_appl_name(struct shim_inet4 *shim, int lfd, struct rina_name *name)
+lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, struct rina_name *name)
 {
-    struct inet4_bindpoint *ep;
+    struct tcp4_bindpoint *ep;
 
     list_for_each_entry(ep, &shim->bindpoints, node) {
         if (lfd == ep->fd) {
@@ -414,11 +414,11 @@ static void
 accept_conn(struct rl_evloop *loop, int lfd)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct shim_inet4 *shim = SHIM(uipcp);
+    struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
     struct rina_name remote_appl, local_appl;
-    struct inet4_endpoint *ep;
+    struct tcp4_endpoint *ep;
     struct rl_flow_config cfg;
     int sfd;
 
@@ -470,10 +470,10 @@ accept_conn(struct rl_evloop *loop, int lfd)
     rina_name_free(&remote_appl);
 }
 
-static struct inet4_endpoint *
-get_endpoint_by_kevent_id(struct shim_inet4 *shim, uint32_t kevent_id)
+static struct tcp4_endpoint *
+get_endpoint_by_kevent_id(struct shim_tcp4 *shim, uint32_t kevent_id)
 {
-    struct inet4_endpoint *ep;
+    struct tcp4_endpoint *ep;
 
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (kevent_id == ep->kevent_id) {
@@ -485,9 +485,9 @@ get_endpoint_by_kevent_id(struct shim_inet4 *shim, uint32_t kevent_id)
 }
 
 static int
-remove_endpoint_by_port_id(struct shim_inet4 *shim, rl_port_t port_id)
+remove_endpoint_by_port_id(struct shim_tcp4 *shim, rl_port_t port_id)
 {
-    struct inet4_endpoint *ep;
+    struct tcp4_endpoint *ep;
 
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (port_id == ep->port_id) {
@@ -504,14 +504,14 @@ remove_endpoint_by_port_id(struct shim_inet4 *shim, rl_port_t port_id)
 }
 
 static int
-shim_inet4_fa_resp(struct rl_evloop *loop,
+shim_tcp4_fa_resp(struct rl_evloop *loop,
                    const struct rl_msg_base *b_resp,
                    const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct shim_inet4 *shim = SHIM(uipcp);
+    struct shim_tcp4 *shim = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
-    struct inet4_endpoint *ep;
+    struct tcp4_endpoint *ep;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
@@ -541,14 +541,14 @@ shim_inet4_fa_resp(struct rl_evloop *loop,
 }
 
 static int
-shim_inet4_flow_deallocated(struct rl_evloop *loop,
+shim_tcp4_flow_deallocated(struct rl_evloop *loop,
                        const struct rl_msg_base *b_resp,
                        const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)b_resp;
-    struct shim_inet4 *shim = SHIM(uipcp);
+    struct shim_tcp4 *shim = SHIM(uipcp);
     int ret;
 
     /* Close the TCP/UDP connection associated to this flow. */
@@ -562,9 +562,9 @@ shim_inet4_flow_deallocated(struct rl_evloop *loop,
 }
 
 static int
-shim_inet4_init(struct uipcp *uipcp)
+shim_tcp4_init(struct uipcp *uipcp)
 {
-    struct shim_inet4 *shim;
+    struct shim_tcp4 *shim;
 
     shim = malloc(sizeof(*shim));
     if (!shim) {
@@ -594,12 +594,12 @@ shim_inet4_init(struct uipcp *uipcp)
 }
 
 static int
-shim_inet4_fini(struct uipcp *uipcp)
+shim_tcp4_fini(struct uipcp *uipcp)
 {
-    struct shim_inet4 *shim = SHIM(uipcp);
+    struct shim_tcp4 *shim = SHIM(uipcp);
 
     {
-        struct inet4_bindpoint *bp, *tmp;
+        struct tcp4_bindpoint *bp, *tmp;
 
         list_for_each_entry_safe(bp, tmp, &shim->bindpoints, node) {
             list_del(&bp->node);
@@ -610,7 +610,7 @@ shim_inet4_fini(struct uipcp *uipcp)
     }
 
     {
-        struct inet4_endpoint *ep, *tmp;
+        struct tcp4_endpoint *ep, *tmp;
 
         list_for_each_entry_safe(ep, tmp, &shim->endpoints, node) {
             list_del(&ep->node);
@@ -626,12 +626,12 @@ shim_inet4_fini(struct uipcp *uipcp)
     return 0;
 }
 
-struct uipcp_ops shim_inet4_ops = {
-    .init = shim_inet4_init,
-    .fini = shim_inet4_fini,
-    .appl_register = shim_inet4_appl_register,
-    .fa_req = shim_inet4_fa_req,
-    .fa_resp = shim_inet4_fa_resp,
-    .flow_deallocated = shim_inet4_flow_deallocated,
+struct uipcp_ops shim_tcp4_ops = {
+    .init = shim_tcp4_init,
+    .fini = shim_tcp4_fini,
+    .appl_register = shim_tcp4_appl_register,
+    .fa_req = shim_tcp4_fa_req,
+    .fa_resp = shim_tcp4_fa_resp,
+    .flow_deallocated = shim_tcp4_flow_deallocated,
 };
 

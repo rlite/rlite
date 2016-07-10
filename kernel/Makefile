@@ -10,8 +10,8 @@ rlite-shim-eth-y := shim-eth.o
 obj-m += rlite-normal.o
 rlite-normal-y := normal.o
 
-obj-m += rlite-shim-inet4.o
-rlite-shim-inet4-y := shim-inet4.o
+obj-m += rlite-shim-tcp4.o
+rlite-shim-tcp4-y := shim-tcp4.o
 
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include

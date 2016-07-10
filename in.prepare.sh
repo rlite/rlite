@@ -6,7 +6,7 @@ sudo insmod kernel/rlite.ko
 sudo insmod kernel/rlite-shim-loopback.ko
 sudo insmod kernel/rlite-shim-eth.ko
 sudo insmod kernel/rlite-normal.ko
-sudo insmod kernel/rlite-shim-inet4.ko
+sudo insmod kernel/rlite-shim-tcp4.ko
 
 if [ HAVE_VMPI == "y" ]; then
     # prepare VMPI-KVM

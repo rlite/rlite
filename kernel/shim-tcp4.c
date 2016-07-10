@@ -41,7 +41,7 @@
 #include <net/sock.h>
 
 
-struct rl_shim_inet4 {
+struct rl_shim_tcp4 {
     struct ipcp_entry *ipcp;
     struct work_struct txw;
     spinlock_t txq_lock;
@@ -49,7 +49,7 @@ struct rl_shim_inet4 {
     struct list_head txq;
 };
 
-struct shim_inet4_flow {
+struct shim_tcp4_flow {
     struct flow_entry *flow;
     struct socket *sock;
     struct work_struct rxw;
@@ -69,16 +69,16 @@ struct shim_inet4_flow {
 
 struct txq_entry {
     struct rl_buf *rb;
-    struct shim_inet4_flow *flow_priv;
+    struct shim_tcp4_flow *flow_priv;
     struct list_head node;
 };
 
-static void inet4_tx_worker(struct work_struct *w);
+static void tcp4_tx_worker(struct work_struct *w);
 
 static void *
-rl_shim_inet4_create(struct ipcp_entry *ipcp)
+rl_shim_tcp4_create(struct ipcp_entry *ipcp)
 {
-    struct rl_shim_inet4 *priv;
+    struct rl_shim_tcp4 *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -89,7 +89,7 @@ rl_shim_inet4_create(struct ipcp_entry *ipcp)
 
     priv->txq_len = 0;
     INIT_LIST_HEAD(&priv->txq);
-    INIT_WORK(&priv->txw, inet4_tx_worker);
+    INIT_WORK(&priv->txw, tcp4_tx_worker);
     spin_lock_init(&priv->txq_lock);
 
     PD("New IPCP created [%p]\n", priv);
@@ -98,9 +98,9 @@ rl_shim_inet4_create(struct ipcp_entry *ipcp)
 }
 
 static void
-rl_shim_inet4_destroy(struct ipcp_entry *ipcp)
+rl_shim_tcp4_destroy(struct ipcp_entry *ipcp)
 {
-    struct rl_shim_inet4 *priv = ipcp->priv;
+    struct rl_shim_tcp4 *priv = ipcp->priv;
 
     kfree(priv);
 
@@ -109,7 +109,7 @@ rl_shim_inet4_destroy(struct ipcp_entry *ipcp)
 
 /* This must be called in process context. */
 static void
-inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
+tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 {
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
@@ -195,18 +195,18 @@ inet4_drain_socket_rxq(struct shim_inet4_flow *priv)
 }
 
 static void
-inet4_rx_worker(struct work_struct *w)
+tcp4_rx_worker(struct work_struct *w)
 {
-    struct shim_inet4_flow *priv =
-            container_of(w, struct shim_inet4_flow, rxw);
+    struct shim_tcp4_flow *priv =
+            container_of(w, struct shim_tcp4_flow, rxw);
 
-    inet4_drain_socket_rxq(priv);
+    tcp4_drain_socket_rxq(priv);
 }
 
 static void
-inet4_data_ready(struct sock *sk)
+tcp4_data_ready(struct sock *sk)
 {
-    struct shim_inet4_flow *priv = sk->sk_user_data;
+    struct shim_tcp4_flow *priv = sk->sk_user_data;
 
     /* We cannot receive skbs in softirq context, so we use a work
      * queue item to execute the work in process context.
@@ -215,17 +215,17 @@ inet4_data_ready(struct sock *sk)
 }
 
 static void
-inet4_write_space(struct sock *sk)
+tcp4_write_space(struct sock *sk)
 {
-    struct shim_inet4_flow *priv = sk->sk_user_data;
+    struct shim_tcp4_flow *priv = sk->sk_user_data;
 
     rl_write_restart_flow(priv->flow);
 }
 
 static int
-rl_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
-    struct shim_inet4_flow *priv;
+    struct shim_tcp4_flow *priv;
     struct socket *sock;
     int err;
 
@@ -246,8 +246,8 @@ rl_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready = sock->sk->sk_data_ready;
     priv->sk_write_space = sock->sk->sk_write_space;
-    sock->sk->sk_data_ready = inet4_data_ready;
-    sock->sk->sk_write_space = inet4_write_space;
+    sock->sk->sk_data_ready = tcp4_data_ready;
+    sock->sk->sk_write_space = tcp4_write_space;
     sock->sk->sk_user_data = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
@@ -256,7 +256,7 @@ rl_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     PD("Got socket %p\n", sock);
 
     priv->sock = sock;
-    INIT_WORK(&priv->rxw, inet4_rx_worker);
+    INIT_WORK(&priv->rxw, tcp4_rx_worker);
     mutex_init(&priv->rxw_lock);
     spin_lock_init(&priv->txstats_lock);
 
@@ -276,16 +276,16 @@ rl_shim_inet4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
      * queue, so we can just drain the queue here. This situation
      * usually happens on the "server" side of an TCP/UDP endpoint.
      */
-    inet4_drain_socket_rxq(priv);
+    tcp4_drain_socket_rxq(priv);
 
     return 0;
 }
 
 static int
-rl_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
+rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
                                  struct flow_entry *flow)
 {
-    struct shim_inet4_flow *priv = flow->priv;
+    struct shim_tcp4_flow *priv = flow->priv;
     struct socket *sock;
 
     if (!priv) {
@@ -315,7 +315,7 @@ rl_shim_inet4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-inet4_xmit(struct shim_inet4_flow *flow_priv,
+tcp4_xmit(struct shim_tcp4_flow *flow_priv,
            struct rl_buf *rb)
 {
     struct msghdr msghdr;
@@ -369,10 +369,10 @@ inet4_xmit(struct shim_inet4_flow *flow_priv,
 }
 
 static void
-inet4_tx_worker(struct work_struct *w)
+tcp4_tx_worker(struct work_struct *w)
 {
-    struct rl_shim_inet4 *priv =
-            container_of(w, struct rl_shim_inet4, txw);
+    struct rl_shim_tcp4 *priv =
+            container_of(w, struct rl_shim_tcp4, txw);
     int totlen;
 
     for (;;) {
@@ -397,7 +397,7 @@ inet4_tx_worker(struct work_struct *w)
             RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
         } else {
-            inet4_xmit(qe->flow_priv, qe->rb);
+            tcp4_xmit(qe->flow_priv, qe->rb);
         }
 
         flow_put(qe->flow_priv->flow);
@@ -406,12 +406,12 @@ inet4_tx_worker(struct work_struct *w)
 }
 
 static int
-rl_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
+rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rl_buf *rb, bool maysleep)
 {
-    struct shim_inet4_flow *flow_priv = flow->priv;
-    struct rl_shim_inet4 *shim = ipcp->priv;
+    struct shim_tcp4_flow *flow_priv = flow->priv;
+    struct rl_shim_tcp4 *shim = ipcp->priv;
     int totlen = rb->len + sizeof(uint16_t);
 
     if (sk_stream_wspace(flow_priv->sock->sk) < totlen + 2) {
@@ -452,14 +452,14 @@ rl_shim_inet4_sdu_write(struct ipcp_entry *ipcp,
         return 0;
     }
 
-    return inet4_xmit(flow_priv, rb);
+    return tcp4_xmit(flow_priv, rb);
 }
 
 static int
-rl_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
+rl_shim_tcp4_config(struct ipcp_entry *ipcp, const char *param_name,
                        const char *param_value)
 {
-    struct rl_shim_inet4 *priv = (struct rl_shim_inet4 *)ipcp->priv;
+    struct rl_shim_tcp4 *priv = (struct rl_shim_tcp4 *)ipcp->priv;
     int ret = -EINVAL;
 
     (void)priv;
@@ -468,10 +468,10 @@ rl_shim_inet4_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
-rl_shim_inet4_flow_get_stats(struct flow_entry *flow,
+rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
                                 struct rl_flow_stats *stats)
 {
-    struct shim_inet4_flow *priv = flow->priv;
+    struct shim_tcp4_flow *priv = flow->priv;
 
     spin_lock_bh(&priv->txstats_lock);
     *stats = flow->stats;
@@ -480,36 +480,36 @@ rl_shim_inet4_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
-#define SHIM_DIF_TYPE   "shim-inet4"
+#define SHIM_DIF_TYPE   "shim-tcp4"
 
-static struct ipcp_factory shim_inet4_factory = {
+static struct ipcp_factory shim_tcp4_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .use_cep_ids = false,
-    .create = rl_shim_inet4_create,
-    .ops.destroy = rl_shim_inet4_destroy,
+    .create = rl_shim_tcp4_create,
+    .ops.destroy = rl_shim_tcp4_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rl_shim_inet4_flow_init,
-    .ops.flow_deallocated = rl_shim_inet4_flow_deallocated,
-    .ops.sdu_write = rl_shim_inet4_sdu_write,
-    .ops.config = rl_shim_inet4_config,
-    .ops.flow_get_stats = rl_shim_inet4_flow_get_stats,
+    .ops.flow_init = rl_shim_tcp4_flow_init,
+    .ops.flow_deallocated = rl_shim_tcp4_flow_deallocated,
+    .ops.sdu_write = rl_shim_tcp4_sdu_write,
+    .ops.config = rl_shim_tcp4_config,
+    .ops.flow_get_stats = rl_shim_tcp4_flow_get_stats,
 };
 
 static int __init
-rl_shim_inet4_init(void)
+rl_shim_tcp4_init(void)
 {
-    return rl_ipcp_factory_register(&shim_inet4_factory);
+    return rl_ipcp_factory_register(&shim_tcp4_factory);
 }
 
 static void __exit
-rl_shim_inet4_fini(void)
+rl_shim_tcp4_fini(void)
 {
     rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rl_shim_inet4_init);
-module_exit(rl_shim_inet4_fini);
+module_init(rl_shim_tcp4_init);
+module_exit(rl_shim_tcp4_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");
