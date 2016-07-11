@@ -70,6 +70,10 @@ type_has_uipcp(const char *dif_type)
         return 1;
     }
 
+    if (strcmp(dif_type, "shim-udp4") == 0) {
+        return 1;
+    }
+
     return 0;
 }
 
