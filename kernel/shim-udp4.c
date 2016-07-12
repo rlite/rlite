@@ -1,7 +1,7 @@
 /*
- * Shim IPCP over TCP/IPv4.
+ * Shim IPCP over UDP/IPv4.
  *
- * Copyright (C) 2015-2016 Nextworks
+ * Copyright (C) 2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
  *
  * This file is part of rlite.
@@ -41,7 +41,7 @@
 #include <net/sock.h>
 
 
-struct rl_shim_tcp4 {
+struct rl_shim_udp4 {
     struct ipcp_entry *ipcp;
     struct work_struct txw;
     spinlock_t txq_lock;
@@ -49,17 +49,12 @@ struct rl_shim_tcp4 {
     struct list_head txq;
 };
 
-struct shim_tcp4_flow {
+struct shim_udp4_flow {
     struct flow_entry *flow;
     struct socket *sock;
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
-
-    struct rl_buf *cur_rx_rb;
-    uint16_t cur_rx_rblen;
-    int cur_rx_buflen;
-    bool cur_rx_hdr;
 
     struct mutex rxw_lock;
     spinlock_t txstats_lock;
@@ -69,16 +64,16 @@ struct shim_tcp4_flow {
 
 struct txq_entry {
     struct rl_buf *rb;
-    struct shim_tcp4_flow *flow_priv;
+    struct shim_udp4_flow *flow_priv;
     struct list_head node;
 };
 
-static void tcp4_tx_worker(struct work_struct *w);
+static void udp4_tx_worker(struct work_struct *w);
 
 static void *
-rl_shim_tcp4_create(struct ipcp_entry *ipcp)
+rl_shim_udp4_create(struct ipcp_entry *ipcp)
 {
-    struct rl_shim_tcp4 *priv;
+    struct rl_shim_udp4 *priv;
 
     priv = kzalloc(sizeof(*priv), GFP_KERNEL);
     if (!priv) {
@@ -89,53 +84,47 @@ rl_shim_tcp4_create(struct ipcp_entry *ipcp)
 
     priv->txq_len = 0;
     INIT_LIST_HEAD(&priv->txq);
-    INIT_WORK(&priv->txw, tcp4_tx_worker);
+    INIT_WORK(&priv->txw, udp4_tx_worker);
     spin_lock_init(&priv->txq_lock);
-
-    PD("New IPCP created [%p]\n", priv);
 
     return priv;
 }
 
 static void
-rl_shim_tcp4_destroy(struct ipcp_entry *ipcp)
+rl_shim_udp4_destroy(struct ipcp_entry *ipcp)
 {
-    struct rl_shim_tcp4 *priv = ipcp->priv;
+    struct rl_shim_udp4 *priv = ipcp->priv;
 
     kfree(priv);
-
-    PD("IPCP [%p] destroyed\n", priv);
 }
 
 /* This must be called in process context. */
 static void
-tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
+udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 {
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
-    struct msghdr msghdr;
-    struct iovec iov;
-    int ret;
 
     mutex_lock(&priv->rxw_lock);
 
     for (;;) {
-        memset(&msghdr, 0, sizeof(msghdr));
-        msghdr.msg_flags = MSG_DONTWAIT;
+        struct msghdr msghdr;
+        struct rl_buf *rb;
+        struct iovec iov;
+        int ret;
 
-        if (priv->cur_rx_hdr) {
-            /* We're reading the 2-bytes header containing the SDU length. */
-            iov.iov_base = &priv->cur_rx_rblen;
-            iov.iov_len = sizeof(priv->cur_rx_rblen);
-
-        } else {
-            /* We're reading the SDU. */
-            iov.iov_base = RLITE_BUF_DATA(priv->cur_rx_rb);
-            iov.iov_len = priv->cur_rx_rblen;
+        rb = rl_buf_alloc(1600, priv->flow->txrx.ipcp->depth,
+                GFP_ATOMIC);
+        if (unlikely(!rb)) {
+            flow->stats.rx_err++;
+            PE("Out of memory\n");
+            break;
         }
 
-        iov.iov_base += priv->cur_rx_buflen;
-        iov.iov_len -= priv->cur_rx_buflen;
+        memset(&msghdr, 0, sizeof(msghdr));
+        msghdr.msg_flags = MSG_DONTWAIT;
+        iov.iov_base = RLITE_BUF_DATA(rb);
+        iov.iov_len = rb->len;
 
         ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
                              iov.iov_len, msghdr.msg_flags);
@@ -151,62 +140,30 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
             break;
         }
 
-        NPD("read %d bytes\n", ret);
+        PD("read %d bytes\n", ret);
 
-        priv->cur_rx_buflen += ret;
+        rl_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
 
-        if (priv->cur_rx_hdr && priv->cur_rx_buflen ==
-                                    sizeof(priv->cur_rx_rblen)) {
-            /* We have completely read the 2-bytes header. */
-            priv->cur_rx_rblen = ntohs(priv->cur_rx_rblen);
-            if (unlikely(!priv->cur_rx_rblen)) {
-                PE("Warning: zero lenght packet\n");
-            } else {
-                priv->cur_rx_hdr = false;
-                priv->cur_rx_rb = rl_buf_alloc(priv->cur_rx_rblen,
-                                                  priv->flow->txrx.ipcp->depth,
-                                                  GFP_ATOMIC);
-                if (unlikely(!priv->cur_rx_rb)) {
-                    flow->stats.rx_err++;
-                    PE("Out of memory\n");
-                    break;
-                }
-            }
-
-            priv->cur_rx_buflen = 0;
-
-        } else if (!priv->cur_rx_hdr && priv->cur_rx_buflen ==
-                                            priv->cur_rx_rblen) {
-            /* We have completely read the SDU. */
-            rl_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
-
-            flow->stats.rx_pkt++;
-            flow->stats.rx_byte += priv->cur_rx_rblen;
-
-            priv->cur_rx_rb = NULL;
-            priv->cur_rx_hdr = true;
-            priv->cur_rx_rblen = 0;
-
-            priv->cur_rx_buflen = 0;
-        }
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
     }
 
     mutex_unlock(&priv->rxw_lock);
 }
 
 static void
-tcp4_rx_worker(struct work_struct *w)
+udp4_rx_worker(struct work_struct *w)
 {
-    struct shim_tcp4_flow *priv =
-            container_of(w, struct shim_tcp4_flow, rxw);
+    struct shim_udp4_flow *priv =
+            container_of(w, struct shim_udp4_flow, rxw);
 
-    tcp4_drain_socket_rxq(priv);
+    udp4_drain_socket_rxq(priv);
 }
 
 static void
-tcp4_data_ready(struct sock *sk)
+udp4_data_ready(struct sock *sk)
 {
-    struct shim_tcp4_flow *priv = sk->sk_user_data;
+    struct shim_udp4_flow *priv = sk->sk_user_data;
 
     /* We cannot receive skbs in softirq context, so we use a work
      * queue item to execute the work in process context.
@@ -215,17 +172,17 @@ tcp4_data_ready(struct sock *sk)
 }
 
 static void
-tcp4_write_space(struct sock *sk)
+udp4_write_space(struct sock *sk)
 {
-    struct shim_tcp4_flow *priv = sk->sk_user_data;
+    struct shim_udp4_flow *priv = sk->sk_user_data;
 
     rl_write_restart_flow(priv->flow);
 }
 
 static int
-rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
-    struct shim_tcp4_flow *priv;
+    struct shim_udp4_flow *priv;
     struct socket *sock;
     int err;
 
@@ -246,8 +203,8 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready = sock->sk->sk_data_ready;
     priv->sk_write_space = sock->sk->sk_write_space;
-    sock->sk->sk_data_ready = tcp4_data_ready;
-    sock->sk->sk_write_space = tcp4_write_space;
+    sock->sk->sk_data_ready = udp4_data_ready;
+    sock->sk->sk_write_space = udp4_write_space;
     sock->sk->sk_user_data = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
@@ -256,15 +213,9 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     PD("Got socket %p\n", sock);
 
     priv->sock = sock;
-    INIT_WORK(&priv->rxw, tcp4_rx_worker);
+    INIT_WORK(&priv->rxw, udp4_rx_worker);
     mutex_init(&priv->rxw_lock);
     spin_lock_init(&priv->txstats_lock);
-
-    /* Initialize TCP reader state machine. */
-    priv->cur_rx_rb = NULL;
-    priv->cur_rx_rblen = 0;
-    priv->cur_rx_buflen = 0;
-    priv->cur_rx_hdr = true;
 
     priv->flow = flow;
     flow->priv = priv;
@@ -274,18 +225,18 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
      * have the chance to intercept that data with the sk_data_ready()
      * callback. This data is however stored in the socket receive
      * queue, so we can just drain the queue here. This situation
-     * usually happens on the "server" side of an TCP/UDP endpoint.
+     * usually happens on the "server" side of a UDP endpoint.
      */
-    tcp4_drain_socket_rxq(priv);
+    udp4_drain_socket_rxq(priv);
 
     return 0;
 }
 
 static int
-rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
+rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp,
                                  struct flow_entry *flow)
 {
-    struct shim_tcp4_flow *priv = flow->priv;
+    struct shim_udp4_flow *priv = flow->priv;
     struct socket *sock;
 
     if (!priv) {
@@ -315,33 +266,29 @@ rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-tcp4_xmit(struct shim_tcp4_flow *flow_priv,
+udp4_xmit(struct shim_udp4_flow *flow_priv,
            struct rl_buf *rb)
 {
     struct msghdr msghdr;
-    struct iovec iov[2];
-    uint16_t lenhdr = htons(rb->len);
-    int totlen = rb->len + sizeof(lenhdr);
+    struct iovec iov;
     int ret;
 
     memset(&msghdr, 0, sizeof(msghdr));
-    iov[0].iov_base = &lenhdr;
-    iov[0].iov_len = sizeof(lenhdr);
-    iov[1].iov_base = RLITE_BUF_DATA(rb);
-    iov[1].iov_len = rb->len;
+    iov.iov_base = RLITE_BUF_DATA(rb);
+    iov.iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
-    iov_iter_init(&msghdr.msg_iter, WRITE, iov, 2,
-                  totlen);
+    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 1,
+                  rb->len);
 #else
     msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 2;
+    msghdr.msg_iovlen = 1;
 #endif
-    ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)iov, 2,
-                         totlen);
+    ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)&iov, 1,
+                         rb->len);
 
-    if (unlikely(ret != totlen)) {
+    if (unlikely(ret != rb->len)) {
         PD("wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
                                  sock_wspace(flow_priv->sock->sk));
         if (ret < 0) {
@@ -369,11 +316,10 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv,
 }
 
 static void
-tcp4_tx_worker(struct work_struct *w)
+udp4_tx_worker(struct work_struct *w)
 {
-    struct rl_shim_tcp4 *priv =
-            container_of(w, struct rl_shim_tcp4, txw);
-    int totlen;
+    struct rl_shim_udp4 *priv =
+            container_of(w, struct rl_shim_udp4, txw);
 
     for (;;) {
         struct txq_entry *qe = NULL;
@@ -390,14 +336,12 @@ tcp4_tx_worker(struct work_struct *w)
             break;
         }
 
-        totlen = qe->rb->len + sizeof(uint16_t);
-
-        if (sk_stream_wspace(qe->flow_priv->sock->sk) < totlen + 2) {
+        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len) {
             /* Cannot backpressure here, we have to drop */
             RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
         } else {
-            tcp4_xmit(qe->flow_priv, qe->rb);
+            udp4_xmit(qe->flow_priv, qe->rb);
         }
 
         flow_put(qe->flow_priv->flow);
@@ -406,15 +350,14 @@ tcp4_tx_worker(struct work_struct *w)
 }
 
 static int
-rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
+rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
                       struct rl_buf *rb, bool maysleep)
 {
-    struct shim_tcp4_flow *flow_priv = flow->priv;
-    struct rl_shim_tcp4 *shim = ipcp->priv;
-    int totlen = rb->len + sizeof(uint16_t);
+    struct shim_udp4_flow *flow_priv = flow->priv;
+    struct rl_shim_udp4 *shim = ipcp->priv;
 
-    if (sk_stream_wspace(flow_priv->sock->sk) < totlen + 2) {
+    if (sk_stream_wspace(flow_priv->sock->sk) < rb->len) {
         /* Backpressure: We will be called again. */
         return -EAGAIN;
     }
@@ -452,26 +395,21 @@ rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
         return 0;
     }
 
-    return tcp4_xmit(flow_priv, rb);
+    return udp4_xmit(flow_priv, rb);
 }
 
 static int
-rl_shim_tcp4_config(struct ipcp_entry *ipcp, const char *param_name,
+rl_shim_udp4_config(struct ipcp_entry *ipcp, const char *param_name,
                        const char *param_value)
 {
-    struct rl_shim_tcp4 *priv = (struct rl_shim_tcp4 *)ipcp->priv;
-    int ret = -EINVAL;
-
-    (void)priv;
-
-    return ret;
+    return -EINVAL;
 }
 
 static int
-rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
+rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
                                 struct rl_flow_stats *stats)
 {
-    struct shim_tcp4_flow *priv = flow->priv;
+    struct shim_udp4_flow *priv = flow->priv;
 
     spin_lock_bh(&priv->txstats_lock);
     *stats = flow->stats;
@@ -480,36 +418,36 @@ rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
-#define SHIM_DIF_TYPE   "shim-tcp4"
+#define SHIM_DIF_TYPE   "shim-udp4"
 
-static struct ipcp_factory shim_tcp4_factory = {
+static struct ipcp_factory shim_udp4_factory = {
     .owner = THIS_MODULE,
     .dif_type = SHIM_DIF_TYPE,
     .use_cep_ids = false,
-    .create = rl_shim_tcp4_create,
-    .ops.destroy = rl_shim_tcp4_destroy,
+    .create = rl_shim_udp4_create,
+    .ops.destroy = rl_shim_udp4_destroy,
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rl_shim_tcp4_flow_init,
-    .ops.flow_deallocated = rl_shim_tcp4_flow_deallocated,
-    .ops.sdu_write = rl_shim_tcp4_sdu_write,
-    .ops.config = rl_shim_tcp4_config,
-    .ops.flow_get_stats = rl_shim_tcp4_flow_get_stats,
+    .ops.flow_init = rl_shim_udp4_flow_init,
+    .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
+    .ops.sdu_write = rl_shim_udp4_sdu_write,
+    .ops.config = rl_shim_udp4_config,
+    .ops.flow_get_stats = rl_shim_udp4_flow_get_stats,
 };
 
 static int __init
-rl_shim_tcp4_init(void)
+rl_shim_udp4_init(void)
 {
-    return rl_ipcp_factory_register(&shim_tcp4_factory);
+    return rl_ipcp_factory_register(&shim_udp4_factory);
 }
 
 static void __exit
-rl_shim_tcp4_fini(void)
+rl_shim_udp4_fini(void)
 {
     rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
 }
 
-module_init(rl_shim_tcp4_init);
-module_exit(rl_shim_tcp4_fini);
+module_init(rl_shim_udp4_init);
+module_exit(rl_shim_udp4_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");

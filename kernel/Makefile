@@ -13,6 +13,9 @@ rlite-normal-y := normal.o
 obj-m += rlite-shim-tcp4.o
 rlite-shim-tcp4-y := shim-tcp4.o
 
+obj-m += rlite-shim-udp4.o
+rlite-shim-udp4-y := shim-udp4.o
+
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include
 
