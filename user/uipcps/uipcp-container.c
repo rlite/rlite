@@ -279,6 +279,7 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 
 extern struct uipcp_ops normal_ops;
 extern struct uipcp_ops shim_tcp4_ops;
+extern struct uipcp_ops shim_udp4_ops;
 
 static const struct uipcp_ops *
 select_uipcp_ops(const char *dif_type)
@@ -289,6 +290,10 @@ select_uipcp_ops(const char *dif_type)
 
     if (strcmp(dif_type, "shim-tcp4") == 0) {
         return &shim_tcp4_ops;
+    }
+
+    if (strcmp(dif_type, "shim-udp4") == 0) {
+        return &shim_udp4_ops;
     }
 
     return NULL;
@@ -377,7 +382,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     int ret = -1;
 
     if (type_has_uipcp(upd->dif_type) && !ops) {
-        PE("Could not find uIPCP ops for DIF type %s\n", upd->dif_type);
+        PE("Could not find uipcp ops for DIF type %s\n", upd->dif_type);
         return -1;
     }
 
@@ -397,7 +402,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
-        PE("uIPCP %u already created\n", upd->ipcp_id);
+        PE("uipcp %u already created\n", upd->ipcp_id);
         goto errx;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
