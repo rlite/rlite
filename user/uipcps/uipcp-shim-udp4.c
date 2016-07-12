@@ -67,7 +67,7 @@ struct shim_udp4 {
 static void
 strrepchar(char *s, char old, char new)
 {
-    for (; s != '\0'; s++) {
+    for (; *s != '\0'; s++) {
         if (*s == old) {
             *s = new;
         }
@@ -96,22 +96,26 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
     hints.ai_socktype = SOCK_DGRAM;
 
     ret = getaddrinfo(name_s, NULL, &hints, &resaddrlist);
-    free(name_s);
     if (ret) {
         UPE(shim->uipcp, "getaddrinfo() failed [%d]\n", errno);
-        return -1;
+        goto err;
     }
 
     if (resaddrlist == NULL) {
         UPE(shim->uipcp, "Could not find IP address for %s\n", name_s);
-        return -1;
+        goto err;
     }
+
+    free(name_s);
 
     /* Only consider the first element of the list. */
     memcpy(addr, resaddrlist->ai_addr, sizeof(*addr));
     freeaddrinfo(resaddrlist);
 
     return 0;
+err:
+    free(name_s);
+    return -1;
 }
 
 /* Use socket API to translate an IP address into a RINA name. */
