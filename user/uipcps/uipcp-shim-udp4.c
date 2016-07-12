@@ -97,7 +97,7 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
 
     ret = getaddrinfo(name_s, NULL, &hints, &resaddrlist);
     if (ret) {
-        UPE(shim->uipcp, "getaddrinfo() failed [%d]\n", errno);
+        UPE(shim->uipcp, "getaddrinfo() failed: %s\n", gai_strerror(ret));
         goto err;
     }
 
