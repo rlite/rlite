@@ -242,8 +242,8 @@ shim_udp4_fa_req(struct rl_evloop *loop,
      * the socket file descriptor and the remote address. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
-    cfg.dst_ip = ep->remote_addr.sin_addr.s_addr;
-    cfg.dst_port = ep->remote_addr.sin_port;
+    cfg.inet_ip = ep->remote_addr.sin_addr.s_addr;
+    cfg.inet_port = ep->remote_addr.sin_port;
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
     return 0;
@@ -315,8 +315,8 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
         /* Push the file descriptor and source address down to kernelspace. */
         memset(&cfg, 0, sizeof(cfg));
         cfg.fd = ep->fd;
-        cfg.dst_ip = ep->remote_addr.sin_addr.s_addr;
-        cfg.dst_port = ep->remote_addr.sin_port;
+        cfg.inet_ip = ep->remote_addr.sin_addr.s_addr;
+        cfg.inet_port = ep->remote_addr.sin_port;
         uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                    &local_appl, &remote_appl, &cfg);
 skip:
@@ -325,9 +325,24 @@ skip:
     }
 
     if (ep) {
-        /* Forward the packet to the receive queue associated to ep->fd. */
         struct sockaddr_in dstaddr;
 
+        if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
+            struct rl_flow_config cfg;
+
+            /* We need to update the flow configuration in kernel-space. */
+            ep->remote_addr.sin_port = ep->remote_addr.sin_port;
+            memset(&cfg, 0, sizeof(cfg));
+            cfg.fd = ep->fd;
+            cfg.inet_ip = ep->remote_addr.sin_addr.s_addr;
+            cfg.inet_port = ep->remote_addr.sin_port;
+            if (uipcp_issue_flow_cfg_update(uipcp, ep->port_id, &cfg)) {
+                UPE(uipcp, "flow_cfg_update() failed\n");
+                return;
+            }
+        }
+
+        /* Forward the packet to the receive queue associated to ep->fd. */
         addrlen = sizeof(dstaddr);
         if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
             UPE(uipcp, "getsockname() failed [%d]\n", errno);

@@ -172,8 +172,8 @@ struct rl_flow_config {
 
      /* Currently used by shim-tcp4 and shim-udp4. */
     int32_t fd;
-    uint32_t dst_ip;
-    uint16_t dst_port;
+    uint32_t inet_ip;
+    uint16_t inet_port;
 } __attribute__((packed));
 
 struct rl_flow_spec {

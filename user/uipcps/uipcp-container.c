@@ -248,6 +248,38 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
     return result;
 }
 
+int
+uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
+                            const struct rl_flow_config *flowcfg)
+{
+    struct rl_kmsg_flow_cfg_update *req;
+    struct rl_msg_base *resp;
+    int result;
+
+    /* Allocate and create a request message. */
+    req = malloc(sizeof(*req));
+    if (!req) {
+        UPE(uipcp, "Out of memory\n");
+        return ENOMEM;
+    }
+
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_FLOW_CFG_UPDATE;
+    req->event_id = 1;
+    req->ipcp_id = uipcp->id;
+    req->port_id = port_id;
+    memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+
+    UPD(uipcp, "Issuing FLOW_CFG_UPDATE message...\n");
+
+    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
+                                   0, 0, &result);
+    assert(!resp); (void)resp;
+    UPD(uipcp, "result: %d\n", result);
+
+    return result;
+}
+
 static int
 uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {

@@ -210,8 +210,8 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     memset(&priv->remote_addr, 0, sizeof(priv->remote_addr));
     priv->remote_addr.sin_family = AF_INET;
-    priv->remote_addr.sin_port = flow->cfg.dst_port;
-    priv->remote_addr.sin_addr.s_addr = flow->cfg.dst_ip;
+    priv->remote_addr.sin_port = flow->cfg.inet_port;
+    priv->remote_addr.sin_addr.s_addr = flow->cfg.inet_ip;
 
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready = sock->sk->sk_data_ready;
@@ -432,7 +432,7 @@ rl_shim_udp4_flow_cfg_update(struct flow_entry *flow,
     struct shim_udp4_flow *priv = flow->priv;
 
     /* We only need to update the port. */
-    priv->remote_addr.sin_port = cfg->dst_port;
+    priv->remote_addr.sin_port = cfg->inet_port;
 
     return 0;
 }

@@ -192,6 +192,9 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
 
+int uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
+                                const struct rl_flow_config *flowcfg);
+
 #define UPRINT(_u, LEV, FMT, ...)    \
     DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->id, __func__, ##__VA_ARGS__)
 
