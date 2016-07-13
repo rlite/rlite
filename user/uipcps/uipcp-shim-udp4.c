@@ -42,7 +42,7 @@
 
 struct udp4_endpoint {
     int fd;
-    int rawfd;
+    int fwdfd;
     struct sockaddr_in remote_addr;
     rl_port_t port_id;
     uint32_t kevent_id;
@@ -162,36 +162,47 @@ shim_udp4_appl_register(struct rl_evloop *loop,
     return 0;
 }
 
-/* Open an UDP socket and connect to the remote address.
- * This function expects ep->remote_addr to be initialized. */
-static int
-udp4_endpoint_open(struct shim_udp4 *shim, struct udp4_endpoint *ep)
+/* Open an UDP socket and add it to the list of endpoints. */
+static struct udp4_endpoint *
+udp4_endpoint_open(struct shim_udp4 *shim)
 {
-    int enable = 1;
+    struct udp4_endpoint *ep = malloc(sizeof(*ep));
+
+    if (!ep) {
+        UPE(shim->uipcp, "Out of memory\n");
+        return NULL;
+    }
+    memset(ep, 0, sizeof(*ep));
 
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
         UPE(shim->uipcp, "socket() failed [%d]\n", errno);
-        return -1;
+        free(ep);
+        return NULL;
     }
 
-    if (setsockopt(ep->fd, SOL_SOCKET, SO_REUSEADDR, &enable,
-                   sizeof(enable))) {
-        UPE(shim->uipcp, "setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
+    /* Another UDP socket used to forward UDP packets to ep->fd
+     * receive queue. Maybe we can use ep->fd itself ? XXX */
+    ep->fwdfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (ep->fwdfd < 0) {
+        UPE(shim->uipcp, "socket(SOCK_RAW failed [%d]\n)", errno);
         close(ep->fd);
-        return -1;
-    }
-
-    if (connect(ep->fd, (const struct sockaddr *)&ep->remote_addr,
-                sizeof(ep->remote_addr))) {
-        UPE(shim->uipcp, "Failed to connect to remote addr [%d]\n", errno);
-        close(ep->fd);
-        return -1;
+        free(ep);
+        return NULL;
     }
 
     list_add_tail(&ep->node, &shim->endpoints);
 
-    return 0;
+    return ep;
+}
+
+static void
+udp4_endpoint_close(struct udp4_endpoint *ep)
+{
+    close(ep->fwdfd);
+    close(ep->fd);
+    list_del(&ep->node);
+    free(ep);
 }
 
 static int
@@ -209,42 +220,37 @@ shim_udp4_fa_req(struct rl_evloop *loop,
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ep = malloc(sizeof(*ep));
+    /* Open an UDP socket. */
+    ep = udp4_endpoint_open(shim);
     if (!ep) {
-        UPE(uipcp, "Out of memory\n");
         return -1;
     }
-    memset(ep, 0, sizeof(*ep));
 
     ep->port_id = req->local_port;
 
     /* Resolve the destination name into an IP address. */
     if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
-        goto err;
+        udp4_endpoint_close(ep);
+        return -1;
     }
 
-    /* Open a connected UDP socket towards the resolved IP address. */
-    if (udp4_endpoint_open(shim, ep)) {
-        goto err;
-    }
+    /* The port will be the mgmt one until we receive an UDP packet
+     * from the other side. */
+    ep->remote_addr.sin_port = htons(RL_SHIM_UDP_PORT);
 
-    /* Issue a positive flow allocation response. */
+    /* Issue a positive flow allocation response, pushing to the kernel
+     * the socket file descriptor and the remote address. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
+    cfg.dst_ip = ep->remote_addr.sin_addr.s_addr;
+    cfg.dst_port = ep->remote_addr.sin_port;
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
     return 0;
-
-err:
-    free(ep);
-
-    return -1;
 }
 
-/* Lookup the specified remote address among the existing socket endpoints.
- * If a match is found, the file descriptor associated to the socket is
- * returned. Otherwise, this function returns -1.
- */
+/* Lookup the specified remote IP address among the existing socket
+ * endpoints. */
 static struct udp4_endpoint *
 udp4_endpoint_lookup(struct shim_udp4 *shim,
                      const struct sockaddr_in *remote_addr)
@@ -267,14 +273,12 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
     struct shim_udp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
-#define HDRSIZE (sizeof(struct iphdr) + sizeof(struct udphdr))
-    uint8_t pktbuf[HDRSIZE + 65536];
+    uint8_t pktbuf[65536];
     struct udp4_endpoint *ep;
     int payload_len;
 
     /* Read the packet from the mgmtfd. */
-    payload_len = recvfrom(shim->mgmtfd, pktbuf + HDRSIZE,
-                           sizeof(pktbuf) - HDRSIZE, 0,
+    payload_len = recvfrom(shim->mgmtfd, pktbuf, sizeof(pktbuf), 0,
                            (struct sockaddr *)&remote_addr, &addrlen);
     if (payload_len < 0) {
         UPE(uipcp, "recvfrom() failed [%d]\n", errno);
@@ -299,34 +303,20 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
             goto skip;
         }
 
-        ep = malloc(sizeof(*ep));
+        /* Open an UDP socket. */
+        ep = udp4_endpoint_open(shim);
         if (!ep) {
-            UPE(uipcp, "Out of memory\n");
             goto skip;
         }
-        memset(ep, 0, sizeof(*ep));
+
         ep->kevent_id = shim->kevent_id_cnt++;
         memcpy(&ep->remote_addr, &remote_addr, sizeof(remote_addr));
 
-        /* Open a connected UDP socket towards the source IP address. */
-        if (udp4_endpoint_open(shim, ep)) {
-            free(ep);
-            ep = NULL;
-            goto skip;
-        }
-
-        ep->rawfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-        if (ep->rawfd < 0) {
-            UPE(uipcp, "socket(SOCK_RAW failed [%d]\n)", errno);
-            close(ep->fd);
-            free(ep);
-            ep = NULL;
-            goto skip;
-        }
-
-        /* Push the file descriptor down to kernelspace. */
+        /* Push the file descriptor and source address down to kernelspace. */
         memset(&cfg, 0, sizeof(cfg));
         cfg.fd = ep->fd;
+        cfg.dst_ip = ep->remote_addr.sin_addr.s_addr;
+        cfg.dst_port = ep->remote_addr.sin_port;
         uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                    &local_appl, &remote_appl, &cfg);
 skip:
@@ -334,20 +324,9 @@ skip:
         rina_name_free(&remote_appl);
     }
 
-    if (ep >= 0) {
-        struct iphdr *iph = (struct iphdr *)pktbuf;
-        struct udphdr *udph = (struct udphdr *)(iph + 1);
+    if (ep) {
+        /* Forward the packet to the receive queue associated to ep->fd. */
         struct sockaddr_in dstaddr;
-        unsigned long csum = 0;
-        unsigned short *words;
-        int nwords;
-        struct {
-            uint32_t src_addr;
-            uint32_t dst_addr;
-            uint8_t zero;
-            uint8_t protocol;
-            uint16_t len;
-        } pseudo;
 
         addrlen = sizeof(dstaddr);
         if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
@@ -355,44 +334,7 @@ skip:
             return;
         }
 
-        iph->ihl = 5;
-        iph->version = 4;
-        iph->tos = 0;
-        iph->tot_len = htons(HDRSIZE + payload_len);
-        iph->id = 0;
-        iph->frag_off = htons(0x4000); /* DF */
-        iph->ttl = 32;
-        iph->protocol = IPPROTO_UDP;
-        iph->check = 0;
-        iph->saddr = ep->remote_addr.sin_addr.s_addr; /* spoof the source IP */
-        iph->daddr = dstaddr.sin_addr.s_addr;
-
-        udph->source = ep->remote_addr.sin_port;
-        udph->dest = dstaddr.sin_port;
-        udph->len = htons(sizeof(*udph) + payload_len);
-        udph->check = 0;
-
-        /* Compute UDP header checksum. */
-        pseudo.src_addr = iph->saddr;
-        pseudo.dst_addr = iph->daddr;
-        pseudo.zero = 0;
-        pseudo.protocol = iph->protocol;
-        pseudo.len = udph->len;
-        words = (unsigned short *)&pseudo;
-        nwords = sizeof(pseudo)/sizeof(*words);
-        while (--nwords >= 0) csum += *words++;
-        words = (unsigned short *)udph;
-        nwords = (sizeof(*udph) + payload_len + 1) / sizeof(*words);
-        pktbuf[HDRSIZE + payload_len] = 0; /* pad */
-        while (--nwords >= 0) csum += *words++;
-        csum = (csum >> 16) + (csum & 0xffff);
-        csum += (csum >> 16);
-        udph->check = ~csum;
-
-        dstaddr.sin_port = 0; /* Zeroed, as not meaningful. */
-
-        /* Forward the packet to the receive queue associated to ep->fd. */
-        if (sendto(ep->rawfd, pktbuf, HDRSIZE + payload_len, 0,
+        if (sendto(ep->fwdfd, pktbuf, payload_len, 0,
                 (struct sockaddr *)&dstaddr, sizeof(dstaddr))) {
             UPE(uipcp, "sendto() failed [%d]\n", errno);
         } else {
@@ -414,15 +356,6 @@ get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
     }
 
     return NULL;
-}
-
-static void
-udp4_endpoint_close(struct udp4_endpoint *ep)
-{
-    close(ep->rawfd);
-    close(ep->fd);
-    list_del(&ep->node);
-    free(ep);
 }
 
 static int
@@ -472,7 +405,7 @@ shim_udp4_flow_deallocated(struct rl_evloop *loop,
     struct shim_udp4 *shim = SHIM(uipcp);
     struct udp4_endpoint *ep;
 
-    /* Close the UDP connection associated to this flow. */
+    /* Close the UDP socket associated to this flow. */
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
             UPD(shim->uipcp, "Removing endpoint [port=%u,kevent_id=%u,"

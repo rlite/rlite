@@ -55,6 +55,7 @@ struct shim_udp4_flow {
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk);
     void (*sk_write_space)(struct sock *sk);
+    struct sockaddr_in remote_addr;
 
     struct mutex rxw_lock;
     spinlock_t txstats_lock;
@@ -108,7 +109,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
     mutex_lock(&priv->rxw_lock);
 
     for (;;) {
-        struct msghdr msghdr;
+        struct msghdr msg;
         struct rl_buf *rb;
         struct iovec iov;
         int ret;
@@ -121,13 +122,13 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        memset(&msghdr, 0, sizeof(msghdr));
-        msghdr.msg_flags = MSG_DONTWAIT;
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_flags = MSG_DONTWAIT;
         iov.iov_base = RLITE_BUF_DATA(rb);
         iov.iov_len = rb->len;
 
-        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
-                             iov.iov_len, msghdr.msg_flags);
+        ret = kernel_recvmsg(sock, &msg, (struct kvec *)&iov, 1,
+                             iov.iov_len, msg.msg_flags);
         if (ret == -EAGAIN) {
             break;
         } else if (unlikely(ret <= 0)) {
@@ -200,6 +201,18 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         return err;
     }
 
+    flow->priv = priv;
+    priv->flow = flow;
+    priv->sock = sock;
+    INIT_WORK(&priv->rxw, udp4_rx_worker);
+    mutex_init(&priv->rxw_lock);
+    spin_lock_init(&priv->txstats_lock);
+
+    memset(&priv->remote_addr, 0, sizeof(priv->remote_addr));
+    priv->remote_addr.sin_family = AF_INET;
+    priv->remote_addr.sin_port = flow->cfg.dst_port;
+    priv->remote_addr.sin_addr.s_addr = flow->cfg.dst_ip;
+
     write_lock_bh(&sock->sk->sk_callback_lock);
     priv->sk_data_ready = sock->sk->sk_data_ready;
     priv->sk_write_space = sock->sk->sk_write_space;
@@ -211,14 +224,6 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     sock_reset_flag(sock->sk, SOCK_USE_WRITE_QUEUE);
 
     PD("Got socket %p\n", sock);
-
-    priv->sock = sock;
-    INIT_WORK(&priv->rxw, udp4_rx_worker);
-    mutex_init(&priv->rxw_lock);
-    spin_lock_init(&priv->txstats_lock);
-
-    priv->flow = flow;
-    flow->priv = priv;
 
     /* It often happens then the remote endpoint sent some data before
      * this flow_init() function is called, and therefore before we
@@ -266,26 +271,28 @@ rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-udp4_xmit(struct shim_udp4_flow *flow_priv,
-           struct rl_buf *rb)
+udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
 {
-    struct msghdr msghdr;
+    struct msghdr msg;
     struct iovec iov;
     int ret;
 
-    memset(&msghdr, 0, sizeof(msghdr));
     iov.iov_base = RLITE_BUF_DATA(rb);
     iov.iov_len = rb->len;
 
-    msghdr.msg_flags = MSG_DONTWAIT;
+    msg.msg_name = (struct sockaddr *)&flow_priv->remote_addr;
+    msg.msg_namelen = sizeof(flow_priv->remote_addr);
+    msg.msg_control = NULL;
+    msg.msg_controllen = 0;
+    msg.msg_flags = MSG_DONTWAIT;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
-    iov_iter_init(&msghdr.msg_iter, WRITE, &iov, 1,
-                  rb->len);
+    iov_iter_init(&msg.msg_iter, WRITE, &iov, 1, rb->len);
 #else
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 1;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
 #endif
-    ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)&iov, 1,
+    /* XXX sock_sendmsg() ? */
+    ret = kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1,
                          rb->len);
 
     if (unlikely(ret != rb->len)) {

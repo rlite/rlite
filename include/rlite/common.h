@@ -162,13 +162,18 @@ struct dtcp_config {
 } __attribute__((packed));
 
 struct rl_flow_config {
+    /* Used by normal IPCP. */
     uint8_t partial_delivery;
     uint8_t incomplete_delivery;
     uint8_t in_order_delivery;
     rl_seq_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
-    int32_t fd;  /* Currently used but shim-tcp4. */
+
+     /* Currently used by shim-tcp4 and shim-udp4. */
+    int32_t fd;
+    uint32_t dst_ip;
+    uint16_t dst_port;
 } __attribute__((packed));
 
 struct rl_flow_spec {
