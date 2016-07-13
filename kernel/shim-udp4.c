@@ -425,6 +425,18 @@ rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
+static int
+rl_shim_udp4_flow_cfg_update(struct flow_entry *flow,
+                             const struct rl_flow_config *cfg)
+{
+    struct shim_udp4_flow *priv = flow->priv;
+
+    /* We only need to update the port. */
+    priv->remote_addr.sin_port = cfg->dst_port;
+
+    return 0;
+}
+
 #define SHIM_DIF_TYPE   "shim-udp4"
 
 static struct ipcp_factory shim_udp4_factory = {
@@ -436,6 +448,7 @@ static struct ipcp_factory shim_udp4_factory = {
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
     .ops.flow_init = rl_shim_udp4_flow_init,
+    .ops.flow_cfg_update = rl_shim_udp4_flow_cfg_update,
     .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
     .ops.sdu_write = rl_shim_udp4_sdu_write,
     .ops.config = rl_shim_udp4_config,

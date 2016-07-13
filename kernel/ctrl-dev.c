@@ -1707,6 +1707,27 @@ rl_flow_get_stats(struct rl_ctrl *rc,
     return ret;
 }
 
+static int
+rl_flow_cfg_update(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_flow_cfg_update *req =
+            (struct rl_kmsg_flow_cfg_update *)bmsg;
+    struct flow_entry *flow;
+    int ret = 0;
+
+    flow = flow_get(req->port_id);
+    if (!flow) {
+        return -EINVAL;
+    }
+
+    if (flow->txrx.ipcp->ops.flow_cfg_update) {
+        ret = flow->txrx.ipcp->ops.flow_cfg_update(flow, &req->flowcfg);
+    }
+    flow_put(flow);
+
+    return ret;
+}
+
 /* Connect the upper IPCP which is using this flow
  * so that rl_sdu_rx() can deliver SDU to the IPCP. */
 static int
@@ -2175,6 +2196,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_UIPCP_FA_RESP_ARRIVED] = rl_uipcp_fa_resp_arrived,
     [RLITE_KER_FLOW_DEALLOC] = rl_flow_dealloc,
     [RLITE_KER_FLOW_STATS_REQ] = rl_flow_get_stats,
+    [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 

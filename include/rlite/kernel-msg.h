@@ -54,6 +54,7 @@ enum {
     RLITE_KER_IPCP_UIPCP_WAIT, /* 21 */
     RLITE_KER_FLOW_STATS_REQ, /* 22 */
     RLITE_KER_FLOW_STATS_RESP, /* 23 */
+    RLITE_KER_FLOW_CFG_UPDATE, /* 24 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -273,6 +274,17 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     uint8_t response;
     struct rl_flow_config flowcfg;
 } __attribute__((packed));
+
+/* uipcp (application) --> kernel to update the configuration
+ * of a flow */
+struct rl_kmsg_flow_cfg_update {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    rl_ipcp_id_t ipcp_id;
+    rl_port_t port_id;
+    struct rl_flow_config flowcfg;
+};
 
 /* uipcp (application) <-- kernel to inform an uipcp that
  * a flow has been deallocated locally. */

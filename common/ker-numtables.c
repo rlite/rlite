@@ -118,6 +118,9 @@ struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_FLOW_STATS_RESP] = {
         .copylen = sizeof(struct rl_kmsg_flow_stats_resp),
     },
+    [RLITE_KER_FLOW_CFG_UPDATE] = {
+        .copylen = sizeof(struct rl_kmsg_flow_cfg_update),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

@@ -221,6 +221,8 @@ struct ipcp_ops {
                               uint8_t response);
 
     int (*flow_init)(struct ipcp_entry *ipcp, struct flow_entry *flow);
+    int (*flow_cfg_update)(struct flow_entry *flow,
+                           const struct rl_flow_config *cfg);
     int (*flow_deallocated)(struct ipcp_entry *ipcp, struct flow_entry *flow);
     int (*flow_get_stats)(struct flow_entry *flow,
                           struct rl_flow_stats *stats);
