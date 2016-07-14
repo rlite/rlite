@@ -40,6 +40,8 @@
 
 #define RL_SHIM_UDP_PORT    0x0d1f
 
+/* Structure associated to a flow, contains information about the
+ * remote UDP endpoint. */
 struct udp4_endpoint {
     int fd;
     struct sockaddr_in remote_addr;
@@ -49,19 +51,23 @@ struct udp4_endpoint {
     struct list_head node;
 };
 
+/* Structure associated to a registered application or to a flow
+ * requestor, contains an UDP socket bound to the IP address
+ * corresponding to the application name. */
+struct udp4_bindpoint {
+    int fd;
+    struct list_head node;
+};
+
 struct shim_udp4 {
     struct uipcp        *uipcp;
-
-    /* Name of the socket that receives (implicit) flow
-     * allocation requests. */
-    struct sockaddr_in  mgmtaddr;
-    int                 mgmtfd;
 
     /* An UDP socket used to forward UDP packets to the receive queues
      * of endpoints. */
     int fwdfd;
 
     struct list_head    endpoints;
+    struct list_head    bindpoints;
     uint32_t            kevent_id_cnt;
 };
 
@@ -166,14 +172,30 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, struct rina_name *name,
     return ret;
 }
 
-static int
-shim_udp4_appl_register(struct rl_evloop *loop,
-                        const struct rl_msg_base *b_resp,
-                        const struct rl_msg_base *b_req)
+static void
+udp4_flow_config_fill(struct udp4_endpoint *ep, struct rl_flow_config *cfg)
 {
-    /* TODO We should update the DDNS here. For now we rely on
-     *      static /etc/hosts configuration. */
-    return 0;
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->fd = ep->fd;
+    cfg->inet_ip = ep->remote_addr.sin_addr.s_addr;
+    cfg->inet_port = ep->remote_addr.sin_port;
+}
+
+/* Lookup the specified remote IP address among the existing socket
+ * endpoints. */
+static struct udp4_endpoint *
+udp4_endpoint_lookup(struct shim_udp4 *shim,
+                     const struct sockaddr_in *remote_addr)
+{
+    struct udp4_endpoint *ep;
+
+    list_for_each_entry(ep, &shim->endpoints, node) {
+        if (memcmp(remote_addr, &ep->remote_addr, sizeof(*remote_addr)) == 0) {
+            return ep;
+        }
+    }
+
+    return NULL;
 }
 
 /* Open an UDP socket and add it to the list of endpoints. */
@@ -209,74 +231,7 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
 }
 
 static void
-udp4_flow_config_fill(struct udp4_endpoint *ep, struct rl_flow_config *cfg)
-{
-    memset(cfg, 0, sizeof(*cfg));
-    cfg->fd = ep->fd;
-    cfg->inet_ip = ep->remote_addr.sin_addr.s_addr;
-    cfg->inet_port = ep->remote_addr.sin_port;
-}
-
-static int
-shim_udp4_fa_req(struct rl_evloop *loop,
-                 const struct rl_msg_base *b_resp,
-                 const struct rl_msg_base *b_req)
-{
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
-    struct shim_udp4 *shim = SHIM(uipcp);
-    struct rl_flow_config cfg;
-    struct udp4_endpoint *ep;
-
-    assert(b_req == NULL);
-
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    /* Open an UDP socket. */
-    ep = udp4_endpoint_open(shim);
-    if (!ep) {
-        return -1;
-    }
-
-    ep->port_id = req->local_port;
-
-    /* Resolve the destination name into an IP address. */
-    if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
-        udp4_endpoint_close(ep);
-        return -1;
-    }
-
-    /* The port will be the mgmt one until we receive an UDP packet
-     * from the other side. */
-    ep->remote_addr.sin_port = htons(RL_SHIM_UDP_PORT);
-
-    /* Issue a positive flow allocation response, pushing to the kernel
-     * the socket file descriptor and the remote address. */
-    udp4_flow_config_fill(ep, &cfg);
-    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
-
-    return 0;
-}
-
-/* Lookup the specified remote IP address among the existing socket
- * endpoints. */
-static struct udp4_endpoint *
-udp4_endpoint_lookup(struct shim_udp4 *shim,
-                     const struct sockaddr_in *remote_addr)
-{
-    struct udp4_endpoint *ep;
-
-    list_for_each_entry(ep, &shim->endpoints, node) {
-        if (memcmp(remote_addr, &ep->remote_addr, sizeof(*remote_addr)) == 0) {
-            return ep;
-        }
-    }
-
-    return NULL;
-}
-
-static void
-udp4_recv_dgram(struct rl_evloop *loop, int lfd)
+udp4_recv_dgram(struct rl_evloop *loop, int bfd)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_udp4 *shim = SHIM(uipcp);
@@ -286,8 +241,8 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
     struct udp4_endpoint *ep;
     int payload_len;
 
-    /* Read the packet from the mgmtfd. */
-    payload_len = recvfrom(shim->mgmtfd, pktbuf, sizeof(pktbuf), 0,
+    /* Read the packet from the bound UDP socket. */
+    payload_len = recvfrom(bfd, pktbuf, sizeof(pktbuf), 0,
                            (struct sockaddr *)&remote_addr, &addrlen);
     if (payload_len < 0) {
         UPE(uipcp, "recvfrom() failed [%d]\n", errno);
@@ -297,14 +252,21 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
     ep = udp4_endpoint_lookup(shim, &remote_addr);
     if (!ep) {
         struct rina_name remote_appl, local_appl;
+        struct sockaddr_in bpaddr;
         struct rl_flow_config cfg;
         int ret;
+
+        addrlen = sizeof(bpaddr);
+        if (getsockname(bfd, (struct sockaddr *)&bpaddr, &addrlen)) {
+            UPE(uipcp, "getsockname() failed [%d]\n", errno);
+            return;
+        }
 
         memset(&local_appl, 0, sizeof(local_appl));
         memset(&remote_appl, 0, sizeof(remote_appl));
         /* Lookup the local application from the packet destination IP
          * address. */
-        if (ipaddr_to_rina_name(shim, &local_appl, &shim->mgmtaddr)) {
+        if (ipaddr_to_rina_name(shim, &local_appl, &bpaddr)) {
             goto skip;
         }
 
@@ -367,6 +329,76 @@ skip:
     }
 }
 
+static struct udp4_bindpoint *
+udp4_bindpoint_open(struct shim_udp4 *shim, const struct rina_name *local_name)
+{
+    struct uipcp *uipcp = shim->uipcp;
+    struct sockaddr_in bpaddr;
+    struct udp4_bindpoint *bp;
+
+    /* TODO We should update the DDNS here. For now we rely on
+     *      static /etc/hosts configuration. */
+
+    /* Look-up the IP address corresponding to the application name. */
+    if (rina_name_to_ipaddr(shim, local_name, &bpaddr)) {
+        return NULL;
+    }
+
+    bp = malloc(sizeof(*bp));
+    if (!bp) {
+        UPE(uipcp, "Out of memory\n");
+        return NULL;
+    }
+    memset(bp, 0, sizeof(*bp));
+
+    /* Init the bound UDP socket, where implicit flow allocation
+     * requests will be received for the req->appl_name. */
+    bp->fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (bp->fd < 0) {
+        UPE(uipcp, "socket() failed [%d]\n", errno);
+        goto err;
+    }
+#if 0
+    if (setsockopt(bp->fd, SOL_SOCKET, SO_REUSEADDR, &enable,
+                   sizeof(enable))) {
+        UPE(uipcp, "setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
+        goto err;
+    }
+#endif
+
+    /* Bind to the UDP port reserved for incoming implicit flow allocations. */
+    bpaddr.sin_port = htons(RL_SHIM_UDP_PORT);
+
+    if (bind(bp->fd, (struct sockaddr *)&bpaddr, sizeof(bpaddr))) {
+        UPE(uipcp, "bind() failed [%d]\n", errno);
+        goto err;
+    }
+
+    /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
+     * for port 0x0D1F. */
+    if (rl_evloop_fdcb_add(&uipcp->loop, bp->fd, udp4_recv_dgram)) {
+        UPE(uipcp, "evloop_fdcb_add() failed\n");
+        goto err;
+    }
+
+    list_add_tail(&bp->node, &shim->bindpoints);
+
+    return bp;
+
+err:
+    if (bp->fd >= 0) close(bp->fd);
+    free(bp);
+    return NULL;
+}
+
+static void
+udp4_bindpoint_close(struct udp4_bindpoint *bp)
+{
+    close(bp->fd);
+    list_del(&bp->node);
+    free(bp);
+}
+
 static struct udp4_endpoint *
 get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
 {
@@ -379,6 +411,68 @@ get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
     }
 
     return NULL;
+}
+
+static int
+shim_udp4_appl_register(struct rl_evloop *loop,
+                        const struct rl_msg_base *b_resp,
+                        const struct rl_msg_base *b_req)
+{
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
+    struct rl_kmsg_appl_register *req =
+                (struct rl_kmsg_appl_register *)b_resp;
+
+    return udp4_bindpoint_open(SHIM(uipcp), &req->appl_name) ? 0 : -1;
+}
+
+static int
+shim_udp4_fa_req(struct rl_evloop *loop,
+                 const struct rl_msg_base *b_resp,
+                 const struct rl_msg_base *b_req)
+{
+    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
+    struct shim_udp4 *shim = SHIM(uipcp);
+    struct rl_flow_config cfg;
+    struct udp4_bindpoint *bp;
+    struct udp4_endpoint *ep;
+
+    assert(b_req == NULL);
+
+    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+
+    /* Create the bindpoint to be able to complete the flow allocation. */
+    bp = udp4_bindpoint_open(shim, &req->local_appl);
+    if (!bp) {
+        return -1;
+    }
+
+    /* Open an UDP socket. */
+    ep = udp4_endpoint_open(shim);
+    if (!ep) {
+        udp4_bindpoint_close(bp);
+        return -1;
+    }
+
+    ep->port_id = req->local_port;
+
+    /* Resolve the destination name into an IP address. */
+    if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
+        udp4_bindpoint_close(bp);
+        udp4_endpoint_close(ep);
+        return -1;
+    }
+
+    /* The port will be the bindpoint one until we receive an UDP packet
+     * from the other side. */
+    ep->remote_addr.sin_port = htons(RL_SHIM_UDP_PORT);
+
+    /* Issue a positive flow allocation response, pushing to the kernel
+     * the socket file descriptor and the remote address. */
+    udp4_flow_config_fill(ep, &cfg);
+    uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
+
+    return 0;
 }
 
 static int
@@ -447,7 +541,6 @@ static int
 shim_udp4_init(struct uipcp *uipcp)
 {
     struct shim_udp4 *shim;
-    int enable = 1;
 
     shim = malloc(sizeof(*shim));
     if (!shim) {
@@ -458,15 +551,8 @@ shim_udp4_init(struct uipcp *uipcp)
     uipcp->priv = shim;
     shim->uipcp = uipcp;
     list_init(&shim->endpoints);
+    list_init(&shim->bindpoints);
     shim->kevent_id_cnt = 1;
-
-    /* Init the management UDP socket, where implicit flow allocation
-     * requests will be received. */
-    shim->mgmtfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (shim->mgmtfd < 0) {
-        UPE(uipcp, "socket() failed [%d]\n", errno);
-        return -1;
-    }
 
     shim->fwdfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (shim->fwdfd < 0) {
@@ -474,34 +560,9 @@ shim_udp4_init(struct uipcp *uipcp)
         goto err;
     }
 
-    if (setsockopt(shim->mgmtfd, SOL_SOCKET, SO_REUSEADDR, &enable,
-                   sizeof(enable))) {
-        UPE(uipcp, "setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
-        goto err;
-    }
-
-    memset(&shim->mgmtaddr, 0, sizeof(shim->mgmtaddr));
-    shim->mgmtaddr.sin_family = AF_INET;
-    shim->mgmtaddr.sin_port = htons(RL_SHIM_UDP_PORT);
-    shim->mgmtaddr.sin_addr.s_addr = INADDR_ANY;
-
-    if (bind(shim->mgmtfd, (struct sockaddr *)&shim->mgmtaddr,
-             sizeof(shim->mgmtaddr))) {
-        UPE(shim->uipcp, "bind() failed [%d]\n", errno);
-        goto err;
-    }
-
-    /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
-     * for port 0x0D1F. */
-    if (rl_evloop_fdcb_add(&uipcp->loop, shim->mgmtfd, udp4_recv_dgram)) {
-        UPE(shim->uipcp, "evloop_fdcb_add() failed\n");
-        goto err;
-    }
-
     return 0;
 err:
     close(shim->fwdfd);
-    close(shim->mgmtfd);
     return -1;
 }
 
@@ -511,13 +572,20 @@ shim_udp4_fini(struct uipcp *uipcp)
     struct shim_udp4 *shim = SHIM(uipcp);
 
     close(shim->fwdfd);
-    close(shim->mgmtfd);
 
     {
         struct udp4_endpoint *ep, *tmp;
 
         list_for_each_entry_safe(ep, tmp, &shim->endpoints, node) {
             udp4_endpoint_close(ep);
+        }
+    }
+
+    {
+        struct udp4_bindpoint *bp, *tmp;
+
+        list_for_each_entry_safe(bp, tmp, &shim->bindpoints, node) {
+            udp4_bindpoint_close(bp);
         }
     }
 
