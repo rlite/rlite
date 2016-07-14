@@ -106,11 +106,16 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
         goto err;
     }
 
-    free(name_s);
-
     /* Only consider the first element of the list. */
     memcpy(addr, resaddrlist->ai_addr, sizeof(*addr));
     freeaddrinfo(resaddrlist);
+    {
+        char strbuf[INET_ADDRSTRLEN];
+        UPD(shim->uipcp, "'%s' --> '%s'\n", name_s,
+            inet_ntop(AF_INET, &addr->sin_addr, strbuf, sizeof(strbuf)));
+    }
+
+    free(name_s);
 
     return 0;
 err:
@@ -139,6 +144,12 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, struct rina_name *name,
         free(host);
         UPE(shim->uipcp, "getnameinfo() failed [%s]\n", gai_strerror(ret));
         return -1;
+    }
+
+    {
+        char strbuf[INET_ADDRSTRLEN];
+        UPD(shim->uipcp, "'%s' --> '%s'\n", inet_ntop(AF_INET, &addr->sin_addr,
+            strbuf, sizeof(strbuf)), host);
     }
 
     strrepchar(host, '.', '/');
@@ -295,6 +306,7 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
     if (!ep) {
         struct rina_name remote_appl, local_appl;
         struct rl_flow_config cfg;
+        int ret;
 
         memset(&local_appl, 0, sizeof(local_appl));
         memset(&remote_appl, 0, sizeof(remote_appl));
@@ -320,11 +332,15 @@ udp4_recv_dgram(struct rl_evloop *loop, int lfd)
 
         /* Push the file descriptor and source address down to kernelspace. */
         udp4_flow_config_fill(ep, &cfg);
-        uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
-                                   &local_appl, &remote_appl, &cfg);
+        ret = uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
+                                         &local_appl, &remote_appl, &cfg);
 skip:
         rina_name_free(&local_appl);
         rina_name_free(&remote_appl);
+        if (ret) {
+            UPE(uipcp, "uipcp_fa_req_arrived() failed\n");
+            return;
+        }
     }
 
     if (ep) {
