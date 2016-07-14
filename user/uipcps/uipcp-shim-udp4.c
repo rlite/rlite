@@ -56,6 +56,8 @@ struct udp4_endpoint {
  * corresponding to the application name. */
 struct udp4_bindpoint {
     int fd;
+    struct rina_name appl_name; /* Used to at unregister time. */
+    rl_port_t port_id; /* Used at flow dealloc time. */
     struct list_head node;
 };
 
@@ -330,7 +332,7 @@ skip:
 }
 
 static struct udp4_bindpoint *
-udp4_bindpoint_open(struct shim_udp4 *shim, const struct rina_name *local_name)
+udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
 {
     struct uipcp *uipcp = shim->uipcp;
     struct sockaddr_in bpaddr;
@@ -358,13 +360,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, const struct rina_name *local_name)
         UPE(uipcp, "socket() failed [%d]\n", errno);
         goto err;
     }
-#if 0
-    if (setsockopt(bp->fd, SOL_SOCKET, SO_REUSEADDR, &enable,
-                   sizeof(enable))) {
-        UPE(uipcp, "setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
-        goto err;
-    }
-#endif
+
+    rina_name_move(&bp->appl_name, local_name);
 
     /* Bind to the UDP port reserved for incoming implicit flow allocations. */
     bpaddr.sin_port = htons(RL_SHIM_UDP_PORT);
@@ -396,6 +393,7 @@ udp4_bindpoint_close(struct udp4_bindpoint *bp)
 {
     close(bp->fd);
     list_del(&bp->node);
+    rina_name_free(&bp->appl_name);
     free(bp);
 }
 
@@ -421,8 +419,21 @@ shim_udp4_appl_register(struct rl_evloop *loop,
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
                 (struct rl_kmsg_appl_register *)b_resp;
+    struct shim_udp4 *shim = SHIM(uipcp);
+    struct udp4_bindpoint *bp;
 
-    return udp4_bindpoint_open(SHIM(uipcp), &req->appl_name) ? 0 : -1;
+    if (req->reg) {
+        return udp4_bindpoint_open(shim, &req->appl_name) ? 0 : -1;
+    }
+
+    list_for_each_entry(bp, &shim->bindpoints, node) {
+        if (rina_name_cmp(&bp->appl_name, &req->appl_name) == 0) {
+            udp4_bindpoint_close(bp);
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 static int
@@ -454,7 +465,7 @@ shim_udp4_fa_req(struct rl_evloop *loop,
         return -1;
     }
 
-    ep->port_id = req->local_port;
+    ep->port_id = bp->port_id = req->local_port;
 
     /* Resolve the destination name into an IP address. */
     if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
@@ -520,12 +531,23 @@ shim_udp4_flow_deallocated(struct rl_evloop *loop,
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)b_resp;
     struct shim_udp4 *shim = SHIM(uipcp);
+    struct udp4_bindpoint *bp;
     struct udp4_endpoint *ep;
 
-    /* Close the UDP socket associated to this flow. */
+    /* Close UDP endpoint and bindpoint associated to this flow. */
+
+    list_for_each_entry(bp, &shim->bindpoints, node) {
+        if (req->local_port_id == bp->port_id) {
+            UPD(uipcp, "Removing bindpoint [port=%u,bfd=%d]\n",
+                bp->port_id, bp->fd);
+            udp4_bindpoint_close(bp);
+            break;
+        }
+    }
+
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
-            UPD(shim->uipcp, "Removing endpoint [port=%u,kevent_id=%u,"
+            UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,"
                 "sfd=%d]\n", ep->port_id, ep->kevent_id, ep->fd);
             udp4_endpoint_close(ep);
             return 0;
