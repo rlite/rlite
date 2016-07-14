@@ -42,7 +42,6 @@
 
 struct udp4_endpoint {
     int fd;
-    int fwdfd;
     struct sockaddr_in remote_addr;
     rl_port_t port_id;
     uint32_t kevent_id;
@@ -57,6 +56,10 @@ struct shim_udp4 {
      * allocation requests. */
     struct sockaddr_in  mgmtaddr;
     int                 mgmtfd;
+
+    /* An UDP socket used to forward UDP packets to the receive queues
+     * of endpoints. */
+    int fwdfd;
 
     struct list_head    endpoints;
     uint32_t            kevent_id_cnt;
@@ -192,16 +195,6 @@ udp4_endpoint_open(struct shim_udp4 *shim)
         return NULL;
     }
 
-    /* Another UDP socket used to forward UDP packets to ep->fd
-     * receive queue. Maybe we can use ep->fd itself ? XXX */
-    ep->fwdfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (ep->fwdfd < 0) {
-        UPE(shim->uipcp, "socket(SOCK_RAW failed [%d]\n)", errno);
-        close(ep->fd);
-        free(ep);
-        return NULL;
-    }
-
     list_add_tail(&ep->node, &shim->endpoints);
 
     return ep;
@@ -210,7 +203,6 @@ udp4_endpoint_open(struct shim_udp4 *shim)
 static void
 udp4_endpoint_close(struct udp4_endpoint *ep)
 {
-    close(ep->fwdfd);
     close(ep->fd);
     list_del(&ep->node);
     free(ep);
@@ -365,7 +357,7 @@ skip:
             return;
         }
 
-        if (sendto(ep->fwdfd, pktbuf, payload_len, 0,
+        if (sendto(shim->fwdfd, pktbuf, payload_len, 0,
                 (struct sockaddr *)&dstaddr, sizeof(dstaddr))) {
             UPE(uipcp, "sendto() failed [%d]\n", errno);
         } else {
@@ -476,6 +468,12 @@ shim_udp4_init(struct uipcp *uipcp)
         return -1;
     }
 
+    shim->fwdfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (shim->fwdfd < 0) {
+        UPE(shim->uipcp, "socket(SOCK_RAW failed [%d]\n)", errno);
+        goto err;
+    }
+
     if (setsockopt(shim->mgmtfd, SOL_SOCKET, SO_REUSEADDR, &enable,
                    sizeof(enable))) {
         UPE(uipcp, "setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
@@ -502,6 +500,7 @@ shim_udp4_init(struct uipcp *uipcp)
 
     return 0;
 err:
+    close(shim->fwdfd);
     close(shim->mgmtfd);
     return -1;
 }
@@ -511,6 +510,7 @@ shim_udp4_fini(struct uipcp *uipcp)
 {
     struct shim_udp4 *shim = SHIM(uipcp);
 
+    close(shim->fwdfd);
     close(shim->mgmtfd);
 
     {
