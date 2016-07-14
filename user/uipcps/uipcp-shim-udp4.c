@@ -58,6 +58,7 @@ struct udp4_bindpoint {
     int fd;
     struct rina_name appl_name; /* Used to at unregister time. */
     rl_port_t port_id; /* Used at flow dealloc time. */
+    struct rl_evloop *loop;
     struct list_head node;
 };
 
@@ -205,6 +206,7 @@ static struct udp4_endpoint *
 udp4_endpoint_open(struct shim_udp4 *shim)
 {
     struct udp4_endpoint *ep = malloc(sizeof(*ep));
+    struct sockaddr_in addr;
 
     if (!ep) {
         UPE(shim->uipcp, "Out of memory\n");
@@ -215,6 +217,17 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
         UPE(shim->uipcp, "socket() failed [%d]\n", errno);
+        free(ep);
+        return NULL;
+    }
+
+    /* Ask the kernel to allocate an ephemeral UDP port for us. */
+    addr.sin_family = AF_INET;
+    addr.sin_port = 0;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    if (bind(ep->fd, (const struct sockaddr *)&addr, sizeof(addr))) {
+        UPE(shim->uipcp, "bind() failed [%d]\n", errno);
+        close(ep->fd);
         free(ep);
         return NULL;
     }
@@ -321,12 +334,17 @@ skip:
             return;
         }
 
+        dstaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        {
+            char strbuf[INET_ADDRSTRLEN];
+            UPD(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", payload_len,
+                inet_ntop(AF_INET, &dstaddr.sin_addr, strbuf, sizeof(strbuf)),
+                ntohs(dstaddr.sin_port));
+        }
+
         if (sendto(shim->fwdfd, pktbuf, payload_len, 0,
-                (struct sockaddr *)&dstaddr, sizeof(dstaddr))) {
+                (const struct sockaddr *)&dstaddr, sizeof(dstaddr)) < 0) {
             UPE(uipcp, "sendto() failed [%d]\n", errno);
-        } else {
-            UPD(uipcp, "Forwarded %d bytes to UDP endpoint %d\n",
-                payload_len, ep->fd);
         }
     }
 }
@@ -352,6 +370,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
         return NULL;
     }
     memset(bp, 0, sizeof(*bp));
+
+    bp->loop = &uipcp->loop;
 
     /* Init the bound UDP socket, where implicit flow allocation
      * requests will be received for the req->appl_name. */
@@ -391,6 +411,7 @@ err:
 static void
 udp4_bindpoint_close(struct udp4_bindpoint *bp)
 {
+    rl_evloop_fdcb_del(bp->loop, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
     rina_name_free(&bp->appl_name);

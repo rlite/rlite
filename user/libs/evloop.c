@@ -222,7 +222,7 @@ evloop_function(void *arg)
         if (ret == -1) {
             /* Error. */
             perror("select()");
-            continue;
+            break;
 
         }
 
