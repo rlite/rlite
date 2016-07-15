@@ -169,6 +169,7 @@ udp4_data_ready(struct sock *sk)
     /* We cannot receive skbs in softirq context, so we use a work
      * queue item to execute the work in process context.
      */
+    PD("sock %p, data ready\n", priv->sock);
     schedule_work(&priv->rxw);
 }
 
@@ -223,7 +224,8 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     sock_reset_flag(sock->sk, SOCK_USE_WRITE_QUEUE);
 
-    PD("Got socket %p\n", sock);
+    PD("Got socket %p, IP %08x, port %u\n", sock, ntohl(flow->cfg.inet_ip),
+                                            ntohs(flow->cfg.inet_port));
 
     /* It often happens then the remote endpoint sent some data before
      * this flow_init() function is called, and therefore before we
@@ -310,7 +312,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
         flow_priv->flow->stats.tx_err++;
         spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
-        NPD("kernel_sendmsg(%d + 2)\n", (int)rb->len);
+        PD("kernel_sendmsg(%d)\n", (int)rb->len);
         spin_lock_bh(&flow_priv->txstats_lock);
         flow_priv->flow->stats.tx_pkt++;
         flow_priv->flow->stats.tx_byte += rb->len;
@@ -433,6 +435,7 @@ rl_shim_udp4_flow_cfg_update(struct flow_entry *flow,
 
     /* We only need to update the port. */
     priv->remote_addr.sin_port = cfg->inet_port;
+    PD("sock %p updated with port %u\n", priv->sock, ntohs(cfg->inet_port));
 
     return 0;
 }

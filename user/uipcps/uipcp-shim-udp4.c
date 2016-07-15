@@ -40,13 +40,21 @@
 
 #define RL_SHIM_UDP_PORT    0x0d1f
 
+struct udp4_sdu {
+    struct list_head    node;
+    int                 len;
+    uint8_t             buf[0];
+};
+
 /* Structure associated to a flow, contains information about the
  * remote UDP endpoint. */
 struct udp4_endpoint {
-    int fd;
-    struct sockaddr_in remote_addr;
-    rl_port_t port_id;
-    uint32_t kevent_id;
+    int                 fd;
+    struct sockaddr_in  remote_addr;
+    rl_port_t           port_id;
+    uint32_t            kevent_id;
+    int                 alloc_complete;
+    struct list_head    sdus;
 
     struct list_head node;
 };
@@ -214,6 +222,8 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     }
     memset(ep, 0, sizeof(*ep));
 
+    list_init(&ep->sdus);
+
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
         UPE(shim->uipcp, "socket() failed [%d]\n", errno);
@@ -240,9 +250,58 @@ udp4_endpoint_open(struct shim_udp4 *shim)
 static void
 udp4_endpoint_close(struct udp4_endpoint *ep)
 {
+    struct udp4_sdu *sdu, *tmp;
+
+    list_for_each_entry_safe(sdu, tmp, &ep->sdus, node) {
+        list_del(&sdu->node);
+        free(sdu);
+    }
+
     close(ep->fd);
     list_del(&ep->node);
     free(ep);
+}
+
+static int
+udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
+             const uint8_t *buf, int len)
+{
+    struct sockaddr_in dstaddr;
+    socklen_t addrlen = sizeof(dstaddr);
+
+    if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
+        struct rl_flow_config cfg;
+
+        /* We need to update the flow configuration in kernel-space. */
+        ep->remote_addr.sin_port = ep->remote_addr.sin_port;
+        udp4_flow_config_fill(ep, &cfg);
+        if (uipcp_issue_flow_cfg_update(shim->uipcp, ep->port_id, &cfg)) {
+            UPE(shim->uipcp, "flow_cfg_update() failed\n");
+            return -1;
+        }
+    }
+
+    /* Forward the packet to the receive queue associated to ep->fd. */
+    if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
+        UPE(shim->uipcp, "getsockname() failed [%d]\n", errno);
+        return -1;
+    }
+
+    dstaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    {
+        char strbuf[INET_ADDRSTRLEN];
+        UPD(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", len,
+            inet_ntop(AF_INET, &dstaddr.sin_addr, strbuf, sizeof(strbuf)),
+            ntohs(dstaddr.sin_port));
+    }
+
+    if (sendto(shim->fwdfd, buf, len, 0, (const struct sockaddr *)&dstaddr,
+               sizeof(dstaddr)) < 0) {
+        UPE(shim->uipcp, "sendto() failed [%d]\n", errno);
+        return -1;
+    }
+
+    return 0;
 }
 
 static void
@@ -252,12 +311,12 @@ udp4_recv_dgram(struct rl_evloop *loop, int bfd)
     struct shim_udp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
-    uint8_t pktbuf[65536];
+    uint8_t payload[65536];
     struct udp4_endpoint *ep;
     int payload_len;
 
     /* Read the packet from the bound UDP socket. */
-    payload_len = recvfrom(bfd, pktbuf, sizeof(pktbuf), 0,
+    payload_len = recvfrom(bfd, payload, sizeof(payload), 0,
                            (struct sockaddr *)&remote_addr, &addrlen);
     if (payload_len < 0) {
         UPE(uipcp, "recvfrom() failed [%d]\n", errno);
@@ -310,42 +369,30 @@ skip:
             UPE(uipcp, "uipcp_fa_req_arrived() failed\n");
             return;
         }
+
+        if (!ep) {
+            UPE(uipcp, "Failed to create endpoint\n");
+            return;
+        }
     }
 
-    if (ep) {
-        struct sockaddr_in dstaddr;
+    if (!ep->alloc_complete) {
+        /* Put the SDU in a temporary queue. */
+        struct udp4_sdu *sdu;
 
-        if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
-            struct rl_flow_config cfg;
-
-            /* We need to update the flow configuration in kernel-space. */
-            ep->remote_addr.sin_port = ep->remote_addr.sin_port;
-            udp4_flow_config_fill(ep, &cfg);
-            if (uipcp_issue_flow_cfg_update(uipcp, ep->port_id, &cfg)) {
-                UPE(uipcp, "flow_cfg_update() failed\n");
-                return;
-            }
-        }
-
-        /* Forward the packet to the receive queue associated to ep->fd. */
-        addrlen = sizeof(dstaddr);
-        if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
-            UPE(uipcp, "getsockname() failed [%d]\n", errno);
+        sdu = malloc(sizeof(*sdu) + payload_len);
+        if (!sdu) {
+            UPE(uipcp, "Out of memory\n");
             return;
         }
 
-        dstaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-        {
-            char strbuf[INET_ADDRSTRLEN];
-            UPD(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", payload_len,
-                inet_ntop(AF_INET, &dstaddr.sin_addr, strbuf, sizeof(strbuf)),
-                ntohs(dstaddr.sin_port));
-        }
+        sdu->len = payload_len;
+        memcpy(sdu->buf, payload, payload_len);
+        list_add_tail(&sdu->node, &ep->sdus);
 
-        if (sendto(shim->fwdfd, pktbuf, payload_len, 0,
-                (const struct sockaddr *)&dstaddr, sizeof(dstaddr)) < 0) {
-            UPE(uipcp, "sendto() failed [%d]\n", errno);
-        }
+        UPD(uipcp, "Queuing %d bytes\n", sdu->len);
+    } else {
+        udp4_fwd_sdu(shim, ep, payload, payload_len);
     }
 }
 
@@ -504,6 +551,8 @@ shim_udp4_fa_req(struct rl_evloop *loop,
     udp4_flow_config_fill(ep, &cfg);
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
+    ep->alloc_complete = 1;
+
     return 0;
 }
 
@@ -515,6 +564,7 @@ shim_udp4_fa_resp(struct rl_evloop *loop,
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_udp4 *shim = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
+    struct udp4_sdu *sdu, *tmp;
     struct udp4_endpoint *ep;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
@@ -530,15 +580,25 @@ shim_udp4_fa_resp(struct rl_evloop *loop,
 
     ep->port_id = resp->port_id;
 
-    if (!resp->response) {
-        /* If response is positive, there is nothing to do here. */
+
+    if (resp->response) {
+        /* Negative response, we have to close the endpoint. */
+        UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
+                ep->port_id, ep->kevent_id, ep->fd);
+        udp4_endpoint_close(ep);
+
         return 0;
     }
 
-    /* Negative response, we have to close the endpoint. */
-    UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
-            ep->port_id, ep->kevent_id, ep->fd);
-    udp4_endpoint_close(ep);
+    /* Response is positive, allocation is now complete. */
+    ep->alloc_complete = 1;
+
+    /* Foward any pending SDUs. */
+    list_for_each_entry_safe(sdu, tmp, &ep->sdus, node) {
+        udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
+        list_del(&sdu->node);
+        free(sdu);
+    }
 
     return 0;
 }
