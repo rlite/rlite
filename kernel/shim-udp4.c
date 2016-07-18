@@ -99,10 +99,29 @@ rl_shim_udp4_destroy(struct ipcp_entry *ipcp)
     kfree(priv);
 }
 
+/* Taken from drivers/vhost/net.c. */
+static inline int
+peek_head_len(struct sock *sk)
+{
+    struct sk_buff *head;
+    unsigned long flags;
+    int len = 0;
+
+    spin_lock_irqsave(&sk->sk_receive_queue.lock, flags);
+    head = skb_peek(&sk->sk_receive_queue);
+    if (likely(head)) {
+        len = head->len;
+    }
+    spin_unlock_irqrestore(&sk->sk_receive_queue.lock, flags);
+
+    return len;
+}
+
 /* This must be called in process context. */
 static void
 udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 {
+    bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
     struct msghdr msg = {
@@ -112,7 +131,6 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             .msg_namelen = 0,
             .msg_flags = MSG_DONTWAIT,
         };
-    bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
 
     mutex_lock(&priv->rxw_lock);
 
@@ -122,8 +140,12 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         struct iovec iov;
         int ret;
 
-        rb = rl_buf_alloc(1600, priv->flow->txrx.ipcp->depth,
-                GFP_ATOMIC);
+        ret = peek_head_len(sock->sk);
+        if (!ret) {
+            break;
+        }
+
+        rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->depth, GFP_ATOMIC);
         if (unlikely(!rb)) {
             flow->stats.rx_err++;
             PE("Out of memory\n");
