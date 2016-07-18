@@ -331,13 +331,6 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv,
     iov[1].iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
-    iov_iter_init(&msghdr.msg_iter, WRITE, iov, 2,
-                  totlen);
-#else
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 2;
-#endif
     ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)iov, 2,
                          totlen);
 

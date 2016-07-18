@@ -124,7 +124,6 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         }
 
         memset(&msg, 0, sizeof(msg));
-        memset(&remote_addr, 0, sizeof(remote_addr));
         msg.msg_name = &remote_addr;
         msg.msg_namelen = sizeof(remote_addr);
         msg.msg_flags = MSG_DONTWAIT;
@@ -296,13 +295,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
     msg.msg_flags = MSG_DONTWAIT;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,19,0)
-    iov_iter_init(&msg.msg_iter, WRITE, &iov, 1, rb->len);
-#else
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-#endif
-    /* XXX sock_sendmsg() ? */
+
     ret = kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1,
                          rb->len);
 
