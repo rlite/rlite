@@ -317,8 +317,7 @@ shim_tcp4_appl_register(struct rl_evloop *loop,
     list_add_tail(&bp->node, &shim->bindpoints);
 
     /* Registration requires a response, while unregistrations doesn't. */
-    return uipcp_appl_register_resp(uipcp, uipcp->id,
-                                    RLITE_SUCC, req);
+    return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_SUCC, req);
 
 err3:
     close(bp->fd);

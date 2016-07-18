@@ -428,7 +428,9 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
         goto err;
     }
 
-    rina_name_move(&bp->appl_name, local_name);
+    if (rina_name_copy(&bp->appl_name, local_name)) {
+        goto err;
+    }
 
     /* Bind to the UDP port reserved for incoming implicit flow allocations. */
     bpaddr.sin_port = htons(RL_SHIM_UDP_PORT);
@@ -450,6 +452,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
     return bp;
 
 err:
+    rina_name_free(&bp->appl_name);
     if (bp->fd >= 0) close(bp->fd);
     free(bp);
     return NULL;
@@ -491,7 +494,9 @@ shim_udp4_appl_register(struct rl_evloop *loop,
     struct udp4_bindpoint *bp;
 
     if (req->reg) {
-        return udp4_bindpoint_open(shim, &req->appl_name) ? 0 : -1;
+        bp = udp4_bindpoint_open(shim, &req->appl_name);
+        return uipcp_appl_register_resp(uipcp, uipcp->id,
+                        bp ? RLITE_SUCC : RLITE_ERR, req);
     }
 
     list_for_each_entry(bp, &shim->bindpoints, node) {
