@@ -52,7 +52,8 @@ struct udp4_endpoint {
     rl_port_t           port_id;
     uint32_t            kevent_id;
     int                 alloc_complete;
-    struct list_head    sdus;
+    struct list_head    sduq;
+    int                 sduq_len;
 
     struct list_head node;
 };
@@ -220,7 +221,8 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     }
     memset(ep, 0, sizeof(*ep));
 
-    list_init(&ep->sdus);
+    list_init(&ep->sduq);
+    ep->sduq_len = 0;
 
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
@@ -250,7 +252,7 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
 {
     struct udp4_sdu *sdu, *tmp;
 
-    list_for_each_entry_safe(sdu, tmp, &ep->sdus, node) {
+    list_for_each_entry_safe(sdu, tmp, &ep->sduq, node) {
         list_del(&sdu->node);
         free(sdu);
     }
@@ -366,6 +368,11 @@ skip:
         /* Put the SDU in a temporary queue. */
         struct udp4_sdu *sdu;
 
+        if (ep->sduq_len > 64) {
+            UPD(uipcp, "Queue overrun, dropping\n");
+            return;
+        }
+
         sdu = malloc(sizeof(*sdu) + payload_len);
         if (!sdu) {
             UPE(uipcp, "Out of memory\n");
@@ -374,7 +381,8 @@ skip:
 
         sdu->len = payload_len;
         memcpy(sdu->buf, payload, payload_len);
-        list_add_tail(&sdu->node, &ep->sdus);
+        list_add_tail(&sdu->node, &ep->sduq);
+        ep->sduq_len ++;
 
         UPD(uipcp, "Queuing %d bytes\n", sdu->len);
     } else {
@@ -585,9 +593,10 @@ shim_udp4_fa_resp(struct rl_evloop *loop,
     ep->alloc_complete = 1;
 
     /* Foward any pending SDUs. */
-    list_for_each_entry_safe(sdu, tmp, &ep->sdus, node) {
+    list_for_each_entry_safe(sdu, tmp, &ep->sduq, node) {
         udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
         list_del(&sdu->node);
+        ep->sduq_len --;
         free(sdu);
     }
 
