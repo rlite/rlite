@@ -105,12 +105,19 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 {
     struct flow_entry *flow = priv->flow;
     struct socket *sock = priv->sock;
+    struct msghdr msg = {
+            .msg_control = NULL,
+            .msg_controllen = 0,
+            .msg_name = NULL,
+            .msg_namelen = 0,
+            .msg_flags = MSG_DONTWAIT,
+        };
+    bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
 
     mutex_lock(&priv->rxw_lock);
 
     for (;;) {
         struct sockaddr_in remote_addr;
-        struct msghdr msg;
         struct rl_buf *rb;
         struct iovec iov;
         int ret;
@@ -123,10 +130,10 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        memset(&msg, 0, sizeof(msg));
-        msg.msg_name = &remote_addr;
-        msg.msg_namelen = sizeof(remote_addr);
-        msg.msg_flags = MSG_DONTWAIT;
+        if (unlikely(update_port)) {
+            msg.msg_name = &remote_addr;
+            msg.msg_namelen = sizeof(remote_addr);
+        }
         iov.iov_base = RLITE_BUF_DATA(rb);
         iov.iov_len = rb->len;
 
@@ -144,10 +151,13 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        if (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
+        if (unlikely(update_port)) {
             priv->remote_addr.sin_port = remote_addr.sin_port;
             PD("sock %p updated with port %u\n", priv->sock,
                  ntohs(priv->remote_addr.sin_port));
+            update_port = false;
+            msg.msg_name = NULL;
+            msg.msg_namelen = 0;
         }
 
         NPD("read %d bytes\n", ret);
