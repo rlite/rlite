@@ -209,6 +209,8 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
 }
 
+#define RL_SHIM_UDP_PORT    0x0d1f
+
 #define NPD(FMT, ...)
 
 #define RL_VERB_QUIET   1

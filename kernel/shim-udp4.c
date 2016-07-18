@@ -109,6 +109,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
     mutex_lock(&priv->rxw_lock);
 
     for (;;) {
+        struct sockaddr_in remote_addr;
         struct msghdr msg;
         struct rl_buf *rb;
         struct iovec iov;
@@ -123,6 +124,9 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         }
 
         memset(&msg, 0, sizeof(msg));
+        memset(&remote_addr, 0, sizeof(remote_addr));
+        msg.msg_name = &remote_addr;
+        msg.msg_namelen = sizeof(remote_addr);
         msg.msg_flags = MSG_DONTWAIT;
         iov.iov_base = RLITE_BUF_DATA(rb);
         iov.iov_len = rb->len;
@@ -141,8 +145,14 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        PD("read %d bytes\n", ret);
+        if (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
+            priv->remote_addr.sin_port = remote_addr.sin_port;
+            PD("sock %p updated with port %u\n", priv->sock,
+                 ntohs(priv->remote_addr.sin_port));
+        }
 
+        NPD("read %d bytes\n", ret);
+        rb->len = ret;
         rl_sdu_rx_flow(flow->txrx.ipcp, flow, rb, true);
 
         flow->stats.rx_pkt++;
@@ -169,7 +179,6 @@ udp4_data_ready(struct sock *sk)
     /* We cannot receive skbs in softirq context, so we use a work
      * queue item to execute the work in process context.
      */
-    PD("sock %p, data ready\n", priv->sock);
     schedule_work(&priv->rxw);
 }
 
@@ -312,7 +321,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
         flow_priv->flow->stats.tx_err++;
         spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
-        PD("kernel_sendmsg(%d)\n", (int)rb->len);
+        NPD("kernel_sendmsg(%d)\n", (int)rb->len);
         spin_lock_bh(&flow_priv->txstats_lock);
         flow_priv->flow->stats.tx_pkt++;
         flow_priv->flow->stats.tx_byte += rb->len;
@@ -427,19 +436,6 @@ rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
-static int
-rl_shim_udp4_flow_cfg_update(struct flow_entry *flow,
-                             const struct rl_flow_config *cfg)
-{
-    struct shim_udp4_flow *priv = flow->priv;
-
-    /* We only need to update the port. */
-    priv->remote_addr.sin_port = cfg->inet_port;
-    PD("sock %p updated with port %u\n", priv->sock, ntohs(cfg->inet_port));
-
-    return 0;
-}
-
 #define SHIM_DIF_TYPE   "shim-udp4"
 
 static struct ipcp_factory shim_udp4_factory = {
@@ -451,7 +447,6 @@ static struct ipcp_factory shim_udp4_factory = {
     .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
     .ops.flow_init = rl_shim_udp4_flow_init,
-    .ops.flow_cfg_update = rl_shim_udp4_flow_cfg_update,
     .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
     .ops.sdu_write = rl_shim_udp4_sdu_write,
     .ops.config = rl_shim_udp4_config,

@@ -38,8 +38,6 @@
 #include "uipcp-container.h"
 
 
-#define RL_SHIM_UDP_PORT    0x0d1f
-
 struct udp4_sdu {
     struct list_head    node;
     int                 len;
@@ -278,7 +276,7 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
     dstaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     {
         char strbuf[INET_ADDRSTRLEN];
-        UPD(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", len,
+        UPV(shim->uipcp, "Forwarding %d bytes to to %s:%u\n", len,
             inet_ntop(AF_INET, &dstaddr.sin_addr, strbuf, sizeof(strbuf)),
             ntohs(dstaddr.sin_port));
     }
@@ -380,18 +378,6 @@ skip:
 
         UPD(uipcp, "Queuing %d bytes\n", sdu->len);
     } else {
-        if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
-            struct rl_flow_config cfg;
-
-            /* We need to update the flow configuration in kernel-space. */
-            ep->remote_addr.sin_port = remote_addr.sin_port;
-            udp4_flow_config_fill(ep, &cfg);
-            if (uipcp_issue_flow_cfg_update(shim->uipcp, ep->port_id, &cfg)) {
-                UPE(shim->uipcp, "flow_cfg_update() failed\n");
-                return;
-            }
-        }
-
         udp4_fwd_sdu(shim, ep, payload, payload_len);
     }
 }
