@@ -201,7 +201,7 @@ udp4_endpoint_lookup(struct shim_udp4 *shim,
     struct udp4_endpoint *ep;
 
     list_for_each_entry(ep, &shim->endpoints, node) {
-        if (memcmp(remote_addr, &ep->remote_addr, sizeof(*remote_addr)) == 0) {
+        if (remote_addr->sin_addr.s_addr == ep->remote_addr.sin_addr.s_addr) {
             return ep;
         }
     }
@@ -268,18 +268,6 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
 {
     struct sockaddr_in dstaddr;
     socklen_t addrlen = sizeof(dstaddr);
-
-    if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
-        struct rl_flow_config cfg;
-
-        /* We need to update the flow configuration in kernel-space. */
-        ep->remote_addr.sin_port = ep->remote_addr.sin_port;
-        udp4_flow_config_fill(ep, &cfg);
-        if (uipcp_issue_flow_cfg_update(shim->uipcp, ep->port_id, &cfg)) {
-            UPE(shim->uipcp, "flow_cfg_update() failed\n");
-            return -1;
-        }
-    }
 
     /* Forward the packet to the receive queue associated to ep->fd. */
     if (getsockname(ep->fd, (struct sockaddr *)&dstaddr, &addrlen)) {
@@ -392,6 +380,18 @@ skip:
 
         UPD(uipcp, "Queuing %d bytes\n", sdu->len);
     } else {
+        if (ep->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT)) {
+            struct rl_flow_config cfg;
+
+            /* We need to update the flow configuration in kernel-space. */
+            ep->remote_addr.sin_port = remote_addr.sin_port;
+            udp4_flow_config_fill(ep, &cfg);
+            if (uipcp_issue_flow_cfg_update(shim->uipcp, ep->port_id, &cfg)) {
+                UPE(shim->uipcp, "flow_cfg_update() failed\n");
+                return;
+            }
+        }
+
         udp4_fwd_sdu(shim, ep, payload, payload_len);
     }
 }
