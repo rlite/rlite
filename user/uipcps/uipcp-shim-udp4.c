@@ -191,7 +191,7 @@ udp4_flow_config_fill(struct udp4_endpoint *ep, struct rl_flow_config *cfg)
     cfg->inet_port = ep->remote_addr.sin_port;
 }
 
-/* Lookup the specified remote IP address among the existing socket
+/* Lookup the specified remote IP address and port among the existing socket
  * endpoints. */
 static struct udp4_endpoint *
 udp4_endpoint_lookup(struct shim_udp4 *shim,
@@ -200,7 +200,7 @@ udp4_endpoint_lookup(struct shim_udp4 *shim,
     struct udp4_endpoint *ep;
 
     list_for_each_entry(ep, &shim->endpoints, node) {
-        if (remote_addr->sin_addr.s_addr == ep->remote_addr.sin_addr.s_addr) {
+        if (memcmp(remote_addr, &ep->remote_addr, sizeof(*remote_addr)) == 0) {
             return ep;
         }
     }
@@ -512,31 +512,22 @@ shim_udp4_fa_req(struct rl_evloop *loop,
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
     struct shim_udp4 *shim = SHIM(uipcp);
     struct rl_flow_config cfg;
-    struct udp4_bindpoint *bp;
     struct udp4_endpoint *ep;
 
     assert(b_req == NULL);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    /* Create the bindpoint to be able to complete the flow allocation. */
-    bp = udp4_bindpoint_open(shim, &req->local_appl);
-    if (!bp) {
-        return -1;
-    }
-
     /* Open an UDP socket. */
     ep = udp4_endpoint_open(shim);
     if (!ep) {
-        udp4_bindpoint_close(bp);
         return -1;
     }
 
-    ep->port_id = bp->port_id = req->local_port;
+    ep->port_id = req->local_port;
 
     /* Resolve the destination name into an IP address. */
     if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
-        udp4_bindpoint_close(bp);
         udp4_endpoint_close(ep);
         return -1;
     }
@@ -550,7 +541,7 @@ shim_udp4_fa_req(struct rl_evloop *loop,
     udp4_flow_config_fill(ep, &cfg);
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
-    ep->alloc_complete = 1;
+    ep->alloc_complete = 1;  /* Actually useless for the client. */
 
     return 0;
 }
@@ -612,19 +603,9 @@ shim_udp4_flow_deallocated(struct rl_evloop *loop,
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)b_resp;
     struct shim_udp4 *shim = SHIM(uipcp);
-    struct udp4_bindpoint *bp;
     struct udp4_endpoint *ep;
 
     /* Close UDP endpoint and bindpoint associated to this flow. */
-
-    list_for_each_entry(bp, &shim->bindpoints, node) {
-        if (req->local_port_id == bp->port_id) {
-            UPD(uipcp, "Removing bindpoint [port=%u,bfd=%d]\n",
-                bp->port_id, bp->fd);
-            udp4_bindpoint_close(bp);
-            break;
-        }
-    }
 
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
