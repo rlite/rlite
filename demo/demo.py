@@ -38,6 +38,75 @@ def which(program):
         quit(1)
 
 
+def join_keys(d1, d2):
+    k = []
+    for d in d1:
+        k.append(d)
+    for d in d2:
+        k.append(d)
+    return k
+
+
+# @prefix is a string
+def prefix_parse(prefix):
+    m = re.match('^(\d+)\.(\d+)\.(\d+)\.(\d+)/(\d+)$', prefix)
+    if not m:
+        return None, None, None
+
+    a = int(m.group(1))
+    b = int(m.group(2))
+    c = int(m.group(3))
+    d = int(m.group(4))
+    m = int(m.group(5))
+
+    v = lambda x: x >= 0 and x <= 255
+    if not v(a) or not v(b) or not v(c) or not v(d) or m < 0 or m > 32:
+        return None, None, None
+
+    num = (a << 24) + (b << 16) + (c << 8) + d
+    mask = ((1 << m) - 1) << (32 - m)
+
+    return (num, mask, m)
+
+
+# @prefix is a string
+def prefix_is_valid(prefix):
+    num, mask, size = prefix_parse(prefix)
+
+    if num == None or mask == None:
+        return False
+
+    return True
+
+
+def prefix_prune_size(prefix):
+    return prefix[:prefix.rfind('/')]
+
+
+def num_to_ip(num, size, nomask):
+    a = (num >> 24) & 0xFF
+    b = (num >> 16) & 0xFF
+    c = (num >> 8)  & 0xFF
+    d = (num >> 0)  & 0xFF
+
+    if nomask:
+        return '%s.%s.%s.%s' % (a, b, c, d)
+
+    return '%s.%s.%s.%s/%s' % (a, b, c, d, size)
+
+
+def ip_in_prefix(prefix, i, nomask = False):
+    num, mask, size = prefix_parse(prefix)
+    if num == None or mask == None:
+        return None
+
+    if i & mask != 0:
+        return None
+
+    ip_num = num + i
+
+    return num_to_ip(ip_num, size, nomask)
+
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -119,6 +188,8 @@ links = []
 difs = dict()
 enrollments = dict()
 dif_graphs = dict()
+dns_mappings = dict()
+ips = dict()
 
 linecnt = 0
 
@@ -146,7 +217,7 @@ while 1:
             continue
 
         shims[shim] = {'name': shim, 'speed': speed,
-                       'speed_unit': speed_unit}
+                       'speed_unit': speed_unit, 'type': 'eth'}
 
         for vm in vm_list:
             if vm not in vms:
@@ -156,6 +227,34 @@ while 1:
         #for i in range(len(vm_list)-1):
         #    for j in range(i + 1, len(vm_list)):
         #        print(vm_list[i], vm_list[j])
+        continue
+
+    m = re.match(r'\s*udp4\s+(\w+)\s+(\w.*)$', line)
+    if m:
+        shim = m.group(1)
+        members = m.group(2).split()
+
+        if shim in shims:
+            print('Error: Line %d: udp4 %s already defined' \
+                                            % (linecnt, shim))
+            continue
+
+        shims[shim] = {'name': shim, 'type': 'udp4'}
+
+        ips[shim] = dict()
+
+        for member in members:
+            vm, ip = member.split(':')
+
+            if not prefix_is_valid(ip):
+                print('Error: Line %d: ip %s is not valid' \
+                                                % (linecnt, ip))
+                continue
+
+            if vm not in vms:
+                vms[vm] = {'name': vm, 'ports': []}
+            links.append((shim, vm))
+            ips[shim][vm] = ip
         continue
 
     m = re.match(r'\s*dif\s+(\w+)\s+(\w+)\s+(\w.*)$', line)
@@ -330,7 +429,7 @@ for l in sorted(links):
             'sudo brctl addif %(br)s %(tap)s\n\n'           \
                 % {'tap': tap, 'br': shim}
 
-    if shims[shim]['speed'] > 0:
+    if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
         speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
         # Rate limit the traffic transmitted on the TAP interface
         outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
@@ -342,7 +441,7 @@ for l in sorted(links):
                 % {'tap': tap, 'speed': speed}
 
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
-                             'shim': shim})
+                             'ip': ips[shim][vm] if shim in ips else None})
 
 
 vmid = 1
@@ -403,6 +502,22 @@ for vmname in sorted(vms):
 
     vmid += 1
 
+# Compute DNS mappings
+for vmname in sorted(vms):
+    vm = vms[vmname]
+    for dif in dif_ordering:
+        if dif in shims or vmname not in difs[dif]:
+            continue
+
+        # Scan all the lower DIFs of the current DIF, for the current node
+        for lower_dif in difs[dif][vmname]:
+            if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
+                vars_dict = {'dif': dif, 'id': vm['id']}
+                dns_mappings['%(dif)s.%(id)s.IPCP-%(id)s--' % vars_dict] = ips[lower_dif][vmname]
+                del vars_dict
+
+
+# Generate per-VM setup script
 for vmname in sorted(vms):
     vm = vms[vmname]
 
@@ -422,7 +537,7 @@ for vmname in sorted(vms):
     # Load kernel modules
     outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
-                    '$SUDO modprobe rlite-shim-tcp4\n'\
+                    '$SUDO modprobe rlite-shim-udp4\n'\
                     '$SUDO modprobe rlite-normal\n'\
                     '$SUDO chmod a+rwx /dev/rlite\n'\
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\
@@ -435,14 +550,19 @@ for vmname in sorted(vms):
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
+        shim = shims[port['shim']]
         vars_dict = {'mac': port['mac'], 'idx': port['idx'],
                      'shim': port['shim'], 'id': vm['id'],
-                     'shimtype': 'eth'}
+                     'shimtype': shim['type']}
         outs +=     'PORT=$(mac2ifname %(mac)s)\n'\
                     '$SUDO ip link set $PORT up\n'\
                     '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP %(idx)s shim-%(shimtype)s %(shim)s.DIF\n'\
-                    '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP %(idx)s netdev $PORT\n'\
                     % vars_dict
+        if shim['type'] == 'eth':
+                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP %(idx)s netdev $PORT\n'\
+                % vars_dict
+        elif shim['type'] == 'udp4':
+                outs += '$SUDO ip addr add %s dev $PORT\n' % (port['ip'])
         del vars_dict
 
     # Create normal IPCPs
@@ -451,6 +571,11 @@ for vmname in sorted(vms):
             outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP %(id)s normal %(dif)s.DIF\n'\
                     '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP %(id)s address %(id)d\n'\
                         % {'dif': dif, 'id': vm['id']}
+
+    # Update /etc/hosts file with DIF mappings
+    for ipcp in dns_mappings:
+        outs += 'echo "%(ip)s %(ipcp)s" >> /etc/hosts\n' \
+                % {'ip': prefix_prune_size(dns_mappings[ipcp]), 'ipcp': ipcp}
 
     # Carry out registrations following the DIF ordering
     for dif in dif_ordering:
@@ -464,8 +589,10 @@ for vmname in sorted(vms):
 
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in difs[dif][vmname]:
+            vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
             outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP %(id)s\n'\
-                        % {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
+                        % vars_dict
+            del vars_dict
 
     outs +=         '\n'\
                     'sleep 1\n'\
@@ -476,6 +603,9 @@ for vmname in sorted(vms):
             '       sleep 1\n'\
             '   fi\n'\
             'done\n\n' % {'vmname': vm['name']}
+
+if len(dns_mappings) > 0:
+    print("DNS mappings: %s" % (dns_mappings))
 
 
 # Run the enrollment operations in an order which respect the dependencies

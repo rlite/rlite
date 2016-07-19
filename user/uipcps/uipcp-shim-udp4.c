@@ -108,7 +108,7 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
         return -1;
     }
 
-    strrepchar(name_s, '/', '.');
+    strrepchar(name_s, '/', '-');
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -171,7 +171,7 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, struct rina_name *name,
             strbuf, sizeof(strbuf)), host);
     }
 
-    strrepchar(host, '.', '/');
+    strrepchar(host, '-', '/');
 
     ret = rina_name_from_string(host, name);
     free(host);
