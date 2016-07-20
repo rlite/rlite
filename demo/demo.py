@@ -189,7 +189,6 @@ difs = dict()
 enrollments = dict()
 dif_graphs = dict()
 dns_mappings = dict()
-ips = dict()
 
 linecnt = 0
 
@@ -241,7 +240,7 @@ while 1:
 
         shims[shim] = {'name': shim, 'type': 'udp4'}
 
-        ips[shim] = dict()
+        dns_mappings[shim] = dict()
 
         for member in members:
             vm, ip = member.split(':')
@@ -254,7 +253,7 @@ while 1:
             if vm not in vms:
                 vms[vm] = {'name': vm, 'ports': []}
             links.append((shim, vm))
-            ips[shim][vm] = ip
+            dns_mappings[shim][vm] = {'ip': ip}
         continue
 
     m = re.match(r'\s*dif\s+(\w+)\s+(\w+)\s+(\w.*)$', line)
@@ -441,7 +440,7 @@ for l in sorted(links):
                 % {'tap': tap, 'speed': speed}
 
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
-                             'ip': ips[shim][vm] if shim in ips else None})
+                             'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None})
 
 
 vmid = 1
@@ -513,7 +512,7 @@ for vmname in sorted(vms):
         for lower_dif in difs[dif][vmname]:
             if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
                 vars_dict = {'dif': dif, 'id': vm['id']}
-                dns_mappings['%(dif)s.%(id)s.IPCP-%(id)s--' % vars_dict] = ips[lower_dif][vmname]
+                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP-%(id)s--' % vars_dict
                 del vars_dict
 
 
@@ -573,9 +572,10 @@ for vmname in sorted(vms):
                         % {'dif': dif, 'id': vm['id']}
 
     # Update /etc/hosts file with DIF mappings
-    for ipcp in dns_mappings:
-        outs += 'echo "%(ip)s %(ipcp)s" >> /etc/hosts\n' \
-                % {'ip': prefix_prune_size(dns_mappings[ipcp]), 'ipcp': ipcp}
+    for sh in dns_mappings:
+        for nm in dns_mappings[sh]:
+            outs += 'echo "%(ip)s %(name)s" >> /etc/hosts\n' \
+                    % {'ip': prefix_prune_size(dns_mappings[sh][nm]['ip']), 'name': dns_mappings[sh][nm]['name']}
 
     # Carry out registrations following the DIF ordering
     for dif in dif_ordering:
