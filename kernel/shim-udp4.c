@@ -332,16 +332,14 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
                          rb->len);
 
     if (unlikely(ret != rb->len)) {
-        PD("wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
+        RPD(1, "wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
                                  sock_wspace(flow_priv->sock->sk));
-        if (ret < 0) {
-            PE("kernel_sendmsg(): failed [%d]\n", ret);
-
-        } else {
-            PI("kernel_sendmsg(): partial write %d/%d\n",
-               ret, (int)rb->len);
+        if (ret == -EAGAIN) {
+            /* Backpressure. Don't destroy the packet, we will called again. */
+            return -EAGAIN;
         }
 
+        PE("kernel_sendmsg(%d): failed [%d]\n", (int)rb->len, ret);
         spin_lock_bh(&flow_priv->txstats_lock);
         flow_priv->flow->stats.tx_err++;
         spin_unlock_bh(&flow_priv->txstats_lock);
@@ -379,12 +377,11 @@ udp4_tx_worker(struct work_struct *w)
             break;
         }
 
-        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len) {
+        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len
+                || udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
             /* Cannot backpressure here, we have to drop */
             RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
-        } else {
-            udp4_xmit(qe->flow_priv, qe->rb);
         }
 
         flow_put(qe->flow_priv->flow);
