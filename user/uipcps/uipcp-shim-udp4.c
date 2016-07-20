@@ -316,7 +316,7 @@ udp4_recv_dgram(struct rl_evloop *loop, int bfd)
         struct rina_name remote_appl, local_appl;
         struct sockaddr_in bpaddr;
         struct rl_flow_config cfg;
-        int ret;
+        int ret = 0;
 
         addrlen = sizeof(bpaddr);
         if (getsockname(bfd, (struct sockaddr *)&bpaddr, &addrlen)) {
