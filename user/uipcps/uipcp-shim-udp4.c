@@ -58,9 +58,9 @@ struct udp4_endpoint {
     struct list_head node;
 };
 
-/* Structure associated to a registered application or to a flow
- * requestor, contains an UDP socket bound to the IP address
- * corresponding to the application name. */
+/* Structure associated to a registered application, it contains an
+ * UDP socket bound to the IP address corresponding to the application
+ * name. */
 struct udp4_bindpoint {
     int fd;
     struct rina_name appl_name; /* Used to at unregister time. */
@@ -415,7 +415,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
     bp->loop = &uipcp->loop;
 
     /* Init the bound UDP socket, where implicit flow allocation
-     * requests will be received for the req->appl_name. */
+     * requests will be received for local_name. */
     bp->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (bp->fd < 0) {
         UPE(uipcp, "socket() failed [%d]\n", errno);
@@ -532,8 +532,9 @@ shim_udp4_fa_req(struct rl_evloop *loop,
         return -1;
     }
 
-    /* The port will be the bindpoint one until we receive an UDP packet
-     * from the other side. */
+    /* We don't know the remote UDP port right now, so we specify
+     * the flow allocation port. The kernel will learn the remote port
+     * when the first packet is received from the other side. */
     ep->remote_addr.sin_port = htons(RL_SHIM_UDP_PORT);
 
     /* Issue a positive flow allocation response, pushing to the kernel
@@ -605,8 +606,7 @@ shim_udp4_flow_deallocated(struct rl_evloop *loop,
     struct shim_udp4 *shim = SHIM(uipcp);
     struct udp4_endpoint *ep;
 
-    /* Close UDP endpoint and bindpoint associated to this flow. */
-
+    /* Close the UDP endpoint associated to this flow. */
     list_for_each_entry(ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
             UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,"
