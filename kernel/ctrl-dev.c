@@ -182,8 +182,7 @@ rl_ipcp_factory_register(struct ipcp_factory *factory)
 
     /* Check if IPCP ops are ok. */
     if (!factory->ops.destroy ||
-        !factory->ops.sdu_write ||
-        !factory->ops.config) {
+        !factory->ops.sdu_write) {
         ret = -EINVAL;
         goto out;
     }
@@ -1445,7 +1444,9 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
         } else {
             mutex_lock(&entry->lock);
-            ret = entry->ops.config(entry, req->name, req->value);
+            if (entry->ops.config) {
+                ret = entry->ops.config(entry, req->name, req->value);
+            }
             mutex_unlock(&entry->lock);
         }
     }

@@ -58,7 +58,6 @@ struct shim_udp4_flow {
     struct sockaddr_in remote_addr;
 
     struct mutex rxw_lock;
-    spinlock_t txstats_lock;
 };
 
 #define INET4_MAX_TXQ_LEN     64
@@ -247,7 +246,6 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     priv->sock = sock;
     INIT_WORK(&priv->rxw, udp4_rx_worker);
     mutex_init(&priv->rxw_lock);
-    spin_lock_init(&priv->txstats_lock);
 
     memset(&priv->remote_addr, 0, sizeof(priv->remote_addr));
     priv->remote_addr.sin_family = AF_INET;
@@ -340,15 +338,11 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
         }
 
         PE("kernel_sendmsg(%d): failed [%d]\n", (int)rb->len, ret);
-        spin_lock_bh(&flow_priv->txstats_lock);
         flow_priv->flow->stats.tx_err++;
-        spin_unlock_bh(&flow_priv->txstats_lock);
     } else {
         NPD("kernel_sendmsg(%d)\n", (int)rb->len);
-        spin_lock_bh(&flow_priv->txstats_lock);
         flow_priv->flow->stats.tx_pkt++;
         flow_priv->flow->stats.tx_byte += rb->len;
-        spin_unlock_bh(&flow_priv->txstats_lock);
     }
 
     rl_buf_free(rb);
@@ -439,22 +433,10 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rl_shim_udp4_config(struct ipcp_entry *ipcp, const char *param_name,
-                       const char *param_value)
-{
-    return -EINVAL;
-}
-
-static int
 rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
                                 struct rl_flow_stats *stats)
 {
-    struct shim_udp4_flow *priv = flow->priv;
-
-    spin_lock_bh(&priv->txstats_lock);
     *stats = flow->stats;
-    spin_unlock_bh(&priv->txstats_lock);
-
     return 0;
 }
 
@@ -471,7 +453,6 @@ static struct ipcp_factory shim_udp4_factory = {
     .ops.flow_init = rl_shim_udp4_flow_init,
     .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
     .ops.sdu_write = rl_shim_udp4_sdu_write,
-    .ops.config = rl_shim_udp4_config,
     .ops.flow_get_stats = rl_shim_udp4_flow_get_stats,
 };
 
