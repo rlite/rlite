@@ -70,14 +70,14 @@ A separate module for each type of IPCP:
 
 * **rlite-normal**, implementing the kernel-space part of the regular IPCPs.
                     Includes EFCP and RMT.
-* **rlite-shim-eth**, implementing the Shim IPCP over Ethernet.
-* **rlite-shim-udp4**, implementing the kernel-space part of the Shim IPCP
+* **rlite-shim-eth**, implementing the shim IPCP over Ethernet.
+* **rlite-shim-udp4**, implementing the kernel-space part of the shim IPCP
                        over UDP and IPv4.
-* **rlite-shim-tcp4**, implementing the kernel-space part of the Shim IPCP
+* **rlite-shim-tcp4**, implementing the kernel-space part of the shim IPCP
                        over TCP and IPv4. This follows an older specification
-                       and it is deprecated in favour of the UDP Shim IPCP.
-* **rlite-shim-hv**, implementing the Shim IPCP over VMPI.
-* **rlite-shim-loopback**, implementing a loopback Shim IPCP.
+                       and it is deprecated in favour of the UDP shim IPCP.
+* **rlite-shim-hv**, implementing the shim IPCP over VMPI.
+* **rlite-shim-loopback**, implementing a loopback shim IPCP.
 
 
 ### 3.2. Userspace IPCPs daemon
@@ -189,7 +189,7 @@ The **rina-rr-tool** script is an example written using these bindings.
 #############################################################################
 
 The demonstrator is a tool written in Python which allows you to deploy
-arbitrarily complex networks, in your PC, using light Virtual Machines.
+arbitrarily complex RINA networks, in your PC, using light Virtual Machines.
 
 Enter the demo directory in the repository and run
 
@@ -272,7 +272,7 @@ daemon (in the example the daemon is run in foreground):
     $ sudo modprobe rlite-shim-eth
     $ sudo rlite-uipcps
 
-On node A, set-up the interface towards B and create a Shim IPCP
+On node A, set-up the interface towards B and create a shim IPCP
 over Ethernet:
 
     $ sudo ip link set eth0 up
@@ -341,7 +341,7 @@ It is also possible to check the list of IPCPs running in the local system:
     $ sudo rlite-ctl ipcps-show
 
 or see the flows allocated in the local system (in this case the 0-flows
-provided by the Shim DIFs, which are being used by the normal DIF):
+provided by the shim DIFs, which are being used by the normal DIF):
 
     $ sudo rlite-ctl flows-show
 
@@ -359,4 +359,136 @@ On node A:
 On node C:
 
     $ rinaperf -d n.DIF -t perf -s 1400 -c 100000
+
+
+
+#############################################################################
+## 5. Configuration of IPC Processes                                        #
+#############################################################################
+
+Each type of IPC Process has different configuration needs. shim IPC
+Processes, in particular, wrap a legacy transport technology; their
+configuration is closely related to the corresponding technology.
+
+### 5.1. shim-eth IPC Process
+#############################################################################
+
+The shim DIF over Ethernet wraps an L2 Ethernet network. A shim-eth IPCP
+must be configured with the O.S. name of the Ethernet Network Interface Card
+(NIC) that is attached to the network.
+
+In the following example
+
+    $ sudo rlite-ctl ipcp-config ether3 181 netdev eth2
+
+a shim IPCP called ether3/181 is assigned a network interface called eth2.
+
+
+### 5.2. shim-udp4 IPC Process
+#############################################################################
+
+The shim DIF over UDP/IPv4 wraps an arbitrary IPv4 network that supports UDP
+as a transport protocol. As a lower level mechanisms, regular UDP sockets are
+used to transmit/receive PDUs. For an application to use (register, allocate
+flows) this shim DIF, a mapping must be defined between IP addresses and
+application name. Each IP address univocally identifies a network interface
+of a node in the shim IPCP, and therefore it also univocally identifies the
+node itself. An IP address must be mapped to a single application name, so
+that all flow allocation requests (UDP packets) arriving to that IP are
+forwarded to that application. The mappings must be stored in the standard
+/etc/hosts file of each node taking part in the shim DIF, or in a DNS
+server.
+
+An example of /etc/hosts configuration is the following:
+
+    127.0.0.1       localhost.localdomain   localhost
+    ::1             localhost.localdomain   localhost
+    8.12.97.231     xyz-abc--
+    8.12.97.230     asd-63--
+
+In this example, the IP 8.12.97.231 is mapped to an application called
+xyz/abc//, while the IP 8.12.97.230 is mapped to another application
+called asd/63//. This means that this shim UDP implements a tunnel
+between two nodes. The first endpoint node has a network interface configured
+with the address 8.12.97.231 (with some netmask), and a RINA application
+called xyz/abc// can register to the local shim UDP IPCP. The other endpoint
+node has a network interface configured with the address 8.12.97.232, and a
+RINA application called asd/63// can register to the local shim UDP IPCP.
+
+Note that while an IP address corresponds to one and only one application
+name, an application name may correspond to multiple IP addresses. This
+simply means that the same application is available at different network
+interfaces (which could be useful for load balancing and high availability).
+
+The /etc/hosts file (or DNS records) must be configured before any application
+registration or flow allocation operation can be performed.
+The current implementation does not dynamically update the
+/etc/hosts file nor the DNS servers. Configuration has to be done
+statically. This is not usually a real limitation, since you may probably
+want to use the shim UDP to create a tunnel (over the Internet) between two
+or a few RINA-only networks, in a VPN-like fashion. In this case a few lines
+in /etc/hosts on each host which act as a tunnel endpoints will suffice.
+
+Note that because of its nature, a single shim UDP IPCP for each node is
+enough for any need. In other words, creating more shim IPCPs on the same node
+is pointless.
+
+
+### 5.3. shim-tcp4 IPC Process
+#############################################################################
+
+In spite of the name being similar, the shim DIF over TCP/IPv4 is fundamentally
+different from its UDP counterpart. While the name of an application running
+over the shim UDP is mapped to an IP address, the name of an application
+running over the shim TCP is mapped to a couple (IP address, TCP port).
+The difference is explained by the fact that the shim UDP automatically
+allocates a new local UDP port for each flow to allocate.
+Nevertheless, both shims use sockets as an underlying transport technology,
+and the use cases are similar.
+
+As a consequence, the configuration for the shim TCP is not specified using
+a standard configuration file (e.g. /etc/hosts). An ad-hoc configuration
+file is stored at /etc/rlite/shim-tcp4-dir.
+
+An example configuration is the following:
+
+    rinaperf-data/client// 10.0.0.1 6789 i.DIF
+    rinaperf-data/server// 10.0.0.2 6788 i.DIF
+
+where the application named rinaperf-data/client// is mapped (bound) to the
+TCP socket with address 10.0.0.1:6789 and rinaperf-data/server// is mapped
+to the TCP socket 10.0.0.1:6788. These mappings are valid for a shim DIF
+called i.DIF.
+
+Note that the shim DIF over UDP should be preferred over the TCP one, for
+two reasons:
+    - Configuration does not use a standard file, and allocation of TCP ports
+      must be done statically.
+    - SDU serialization is needed, since TCP is not message (datagram)
+      oriented, but stream oriented; SDU length has to be encoded in the
+      stream, and this adds overhead and is more error prone
+    - TCP handshake, retransmission and flow control mechanism add overhead
+      and latency, introduces latency; moreover, these tasks should be
+      carried out by EFCP.
+
+In conclusion, the shim TCP is to be considered legacy, and future developments
+are not expected to focus on it. It is strongly recommended to always use the
+UDP shim when interfacing *rlite* with IP networks.
+
+
+### 5.3. Normal IPC Process
+#############################################################################
+
+In the current implementation a normal IPC Process needs to be configured
+with an address which is unique in its DIF. This step will eventually
+become unnecessary (and not allowed anymore), once a first address space
+management strategy is implemented for the normal DIF (e.g. distributed or
+centralized address allocation).
+
+In the following example
+
+    $ sudo rlite-ctl ipcp-config normal1 xyz address 7382
+
+a normal IPCP called normal1/xyz// is given the address 7382 to be used
+in its DIF.
 
