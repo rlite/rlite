@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 # Requires the following packages
 #  math/py-matplotlib
@@ -12,13 +12,13 @@ import re
 
 # Input arguments
 if len(sys.argv) < 2:
-    print "USAGE: cmd INPUTFILE"
+    print("USAGE: cmd INPUTFILE")
     quit()
 
 try:
     fin = open(sys.argv[1], "r")
 except IOError:
-    print sys.argv[1], ": no such file"
+    print(sys.argv[1], ": no such file")
     quit()
 
 # set default values
@@ -65,7 +65,7 @@ pl = plt.plot(x, y, '.-', linewidth=2,
 leg.append(pl[0])
 lab.append('lines of code')
 
-plt.legend(leg, lab, legend, prop={'size': 16})
+plt.legend(leg, lab, loc=legend, prop={'size': 16})
 plt.show()  #debug
 #outfn = sys.argv[1].rsplit('.',1)[0]
 #plt.savefig(outfn + '.eps')
