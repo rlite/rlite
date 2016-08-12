@@ -148,7 +148,7 @@ NeighFlow::abort_enrollment()
         return;
     }
 
-    enrollment_state = NEIGH_NONE;
+    enrollment_state_set(NEIGH_NONE);
 
     m.m_release(gpb::F_NO_FLAGS);
 
@@ -173,6 +173,22 @@ NeighFlow::abort_enrollment()
         neigh->enroll_attempts = 0;
         pthread_cond_signal(&enrollment_stopped);
     }
+}
+
+void
+NeighFlow::enrollment_state_set(enroll_state_t st)
+{
+    enroll_state_t old = enrollment_state;
+
+    enrollment_state = st;
+
+    if (old != NEIGH_ENROLLED && st == NEIGH_ENROLLED) {
+        neigh->rib->enrolled ++;
+    } else if (old == NEIGH_ENROLLED && st == NEIGH_NONE) {
+        neigh->rib->enrolled --;
+    }
+
+    assert(neigh->rib->enrolled >= 0);
 }
 
 static void
@@ -300,7 +316,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     enroll_fsm_handlers[NEIGH_S_WAIT_STOP_R] = &Neighbor::s_wait_stop_r;
     enroll_fsm_handlers[NEIGH_I_WAIT_STOP] = &Neighbor::i_wait_stop;
     enroll_fsm_handlers[NEIGH_I_WAIT_START] = &Neighbor::i_wait_start;
-    enroll_fsm_handlers[NEIGH_ENROLLED] = &Neighbor::enrolled;
+    enroll_fsm_handlers[NEIGH_ENROLLED] = &Neighbor::fsm_enrolled;
 }
 
 Neighbor::~Neighbor()
@@ -425,7 +441,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     nf->enroll_tmr_start();
-    nf->enrollment_state = next_state;
+    nf->enrollment_state_set(next_state);
 
     return 0;
 }
@@ -463,7 +479,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 
     nf->enroll_tmr_stop();
     nf->enroll_tmr_start();
-    nf->enrollment_state = NEIGH_I_WAIT_START_R;
+    nf->enrollment_state_set(NEIGH_I_WAIT_START_R);
 
     return 0;
 }
@@ -575,7 +591,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     nf->enroll_tmr_stop();
     nf->enroll_tmr_start();
-    nf->enrollment_state = NEIGH_S_WAIT_STOP_R;
+    nf->enrollment_state_set(NEIGH_S_WAIT_STOP_R);
 
     return 0;
 }
@@ -624,7 +640,7 @@ Neighbor::i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
 
     nf->enroll_tmr_stop();
     nf->enroll_tmr_start();
-    nf->enrollment_state = NEIGH_I_WAIT_STOP;
+    nf->enrollment_state_set(NEIGH_I_WAIT_STOP);
 
     return 0;
 }
@@ -694,7 +710,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         UPI(rib->uipcp, "Initiator is allowed to start early\n");
         nf->enroll_tmr_stop();
         nf->keepalive_tmr_start();
-        nf->enrollment_state = NEIGH_ENROLLED;
+        nf->enrollment_state_set(NEIGH_ENROLLED);
 
         /* Add a new LowerFlow entry to the RIB, corresponding to
          * the new neighbor. */
@@ -708,7 +724,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         UPI(rib->uipcp, "Initiator is not allowed to start early\n");
         nf->enroll_tmr_stop();
         nf->enroll_tmr_start();
-        nf->enrollment_state = NEIGH_I_WAIT_START;
+        nf->enrollment_state_set(NEIGH_I_WAIT_START);
     }
 
     return 0;
@@ -749,7 +765,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
 
     nf->enroll_tmr_stop();
     nf->keepalive_tmr_start();
-    nf->enrollment_state = NEIGH_ENROLLED;
+    nf->enrollment_state_set(NEIGH_ENROLLED);
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
@@ -771,7 +787,7 @@ Neighbor::i_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 }
 
 int
-Neighbor::enrolled(NeighFlow *nf, const CDAPMessage *rm)
+Neighbor::fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm)
 {
     if (rm->op_code == gpb::M_START && rm->obj_class == obj_class::status
                 && rm->obj_name == obj_name::status) {
@@ -788,7 +804,7 @@ Neighbor::enrolled(NeighFlow *nf, const CDAPMessage *rm)
 
 /* Did we complete the enrollment procedure with the neighbor? */
 bool
-Neighbor::is_enrolled()
+Neighbor::enrollment_complete() const
 {
     return has_mgmt_flow() && mgmt_conn()->enrollment_state == NEIGH_ENROLLED;
 }
@@ -799,7 +815,7 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
     enroll_state_t old_state = nf->enrollment_state;
     int ret;
 
-    if (is_enrolled() && nf != mgmt_conn() && nf->enrollment_starting(rm)) {
+    if (enrollment_complete() && nf != mgmt_conn() && nf->enrollment_starting(rm)) {
         /* We thought we were already enrolled to this neighbor, but
          * he is trying to start again the enrollment procedure on a
          * different flow. We therefore assume that the neighbor

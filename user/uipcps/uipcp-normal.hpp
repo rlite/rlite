@@ -116,6 +116,8 @@ struct NeighFlow {
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
+    void enrollment_state_set(enroll_state_t st);
+
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj) const;
 };
@@ -154,7 +156,7 @@ struct Neighbor {
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_mgmt_flow() const { return flows.size() > 0; }
-    bool is_enrolled();
+    bool enrollment_complete() const;
     int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
     int alloc_flow(const char *supp_dif_name);
 
@@ -166,7 +168,7 @@ struct Neighbor {
     int i_wait_stop(NeighFlow *nf, const CDAPMessage *rm);
     int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
-    int enrolled(NeighFlow *nf, const CDAPMessage *rm);
+    int fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
     int remote_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,
@@ -223,6 +225,7 @@ struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
 
+    /* File descriptor used to receive and send mgmt PDUs. */
     int mgmtfd;
 
     /* RIB lock. */
@@ -231,6 +234,12 @@ struct uipcp_rib {
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             NeighFlow *nf);
     std::map< std::string, rib_handler_t > handlers;
+
+    /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
+     * When we allocate a flow towards a candidate neighbor, we don't
+     * have to carry out the whole enrollment procedure if we are already
+     * enrolled. */
+    int enrolled;
 
     /* Lower DIFs. */
     std::list< std::string > lower_difs;

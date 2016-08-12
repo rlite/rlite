@@ -255,7 +255,7 @@ mgmt_fd_ready(struct rl_evloop *loop, int fd)
                  n - sizeof(*mhdr));
 }
 
-uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u)
+uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0)
 {
     int ret;
 
