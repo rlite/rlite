@@ -39,6 +39,7 @@ enum {
     RLITE_U_BASE_RESP,          /* 4 */
     RLITE_U_IPCP_RIB_SHOW_REQ,  /* 5 */
     RLITE_U_IPCP_RIB_SHOW_RESP, /* 6 */
+    RLITE_U_IPCP_FLOW_ALLOC,    /* 7 */
 
     RLITE_U_MSG_MAX,
 };
@@ -62,7 +63,7 @@ struct rl_cmsg_ipcp_register {
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to enroll an IPC process
- * to another IPC process */
+ * to another IPC process, or to only alloc a flow. */
 struct rl_cmsg_ipcp_enroll {
     rl_msg_t msg_type;
     uint32_t event_id;

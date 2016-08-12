@@ -342,7 +342,8 @@ ipcp_unregister(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
+                   rl_msg_t msg_type)
 {
     struct rl_cmsg_ipcp_enroll req;
     const char *ipcp_apn;
@@ -368,13 +369,25 @@ ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
         return -1;
     }
 
-    req.msg_type = RLITE_U_IPCP_ENROLL;
+    req.msg_type = msg_type;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
     rina_name_fill(&req.neigh_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
     req.supp_dif_name = strdup(supp_dif_name);
 
     return request_response(RLITE_MB(&req), NULL);
+}
+
+static int
+ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
+{
+    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_ENROLL);
+}
+
+static int
+ipcp_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl)
+{
+    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_FLOW_ALLOC);
 }
 
 static int
@@ -607,6 +620,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
         .num_args = 6,
         .func = ipcp_enroll,
+    },
+    {
+        .name = "ipcp-flow-alloc",
+        .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
+        .num_args = 6,
+        .func = ipcp_flow_alloc,
     },
     {
         .name = "ipcp-dft-set",
