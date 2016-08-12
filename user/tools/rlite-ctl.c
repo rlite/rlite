@@ -505,42 +505,6 @@ ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-test(struct rl_ctrl *ctrl)
-{
-    struct rina_name name;
-    long int lret;
-    int ret;
-
-    /* Create an IPC process of type shim-loopback. */
-    rina_name_fill(&name, "test-shim-loopback.IPCP", "1", NULL, NULL);
-    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
-                                "test-shim-loopback.DIF");
-    assert(lret >= 0);
-    rina_name_free(&name);
-
-    rina_name_fill(&name, "test-shim-loopback.IPCP", "2", NULL, NULL);
-    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
-                              "test-shim-loopback.DIF");
-    assert(lret >= 0);
-
-    lret = rl_conf_ipcp_create(ctrl, &name, "shim-loopback",
-                              "test-shim-loopback.DIF");
-    assert(lret < 0);
-    rina_name_free(&name);
-
-    /* Destroy the IPCPs. */
-    ret = rl_conf_ipcp_destroy(ctrl, 0);
-    assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 1);
-    assert(!ret);
-    ret = rl_conf_ipcp_destroy(ctrl, 0);
-    assert(ret);
-    (void)ret; (void)lret;
-
-    return 0;
-}
-
-static int
 ipcps_load(struct rl_ctrl *ctrl)
 {
     int ret = 0;
@@ -715,7 +679,6 @@ int main(int argc, char **argv)
 {
     struct rl_ctrl ctrl;
     struct sigaction sa;
-    int enable_testing = 0;
     int ret;
 
     ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
@@ -742,11 +705,6 @@ int main(int argc, char **argv)
     if (ret) {
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
-    }
-
-    if (enable_testing) {
-        /* Run the hardwired test script. */
-        test(&ctrl);
     }
 
     ret = process_args(argc, argv, &ctrl);
