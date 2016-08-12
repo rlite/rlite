@@ -56,7 +56,7 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
                    1 * sizeof(struct rl_buf_field),
         .buffers = 1,
     },
-    [RLITE_U_IPCP_FLOW_ALLOC] = {
+    [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = {
         .copylen = sizeof(struct rl_cmsg_ipcp_enroll) -
                    2 * sizeof(struct rina_name) - 2 * sizeof(char *),
         .names = 2,

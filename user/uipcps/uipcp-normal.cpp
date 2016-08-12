@@ -839,6 +839,7 @@ struct uipcp_ops normal_ops = {
     .fini = normal_fini,
     .register_to_lower = normal_register_to_lower,
     .enroll = normal_ipcp_enroll,
+    .lower_flow_alloc = normal_ipcp_enroll,
     .dft_set = normal_ipcp_dft_set,
     .rib_show = normal_ipcp_rib_show,
     .appl_register = normal_appl_register,

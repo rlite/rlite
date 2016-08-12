@@ -312,7 +312,7 @@ Neighbor::~Neighbor()
 }
 
 const char *
-Neighbor::enrollment_state_repr(state_t s) const
+Neighbor::enrollment_state_repr(enroll_state_t s) const
 {
     switch (s) {
         case NEIGH_NONE:
@@ -369,7 +369,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
 {
     CDAPMessage m;
     int ret;
-    state_t next_state;
+    enroll_state_t next_state;
     int invoke_id = 0;
 
     if (rm == NULL) {
@@ -545,7 +545,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     /* Send only a neighbor representing myself, because it's
-     * required by the initiator to add_lower_flow(). */
+     * required by the initiator to commit_lower_flow(). */
     RinaName cand_name;
 
     cand = NeighborCandidate();
@@ -796,11 +796,11 @@ Neighbor::is_enrolled()
 int
 Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
 {
-    state_t old_state = nf->enrollment_state;
+    enroll_state_t old_state = nf->enrollment_state;
     int ret;
 
     if (is_enrolled() && nf != mgmt_conn() && nf->enrollment_starting(rm)) {
-        /* We thought we were already enrolled with this neighbor, but
+        /* We thought we were already enrolled to this neighbor, but
          * he is trying to start again the enrollment procedure on a
          * different flow. We therefore assume that the neighbor
          * crashed before we could detect it, and select the new flow
@@ -1325,7 +1325,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 
     } else {
         /* Start the enrollment procedure as initiator. This will move
-         * the internal state to  NEIGH_I_WAIT_CONNECT_R. */
+         * the internal state to NEIGH_I_WAIT_CONNECT_R. */
         neigh->enroll_fsm_run(nf, NULL);
     }
 

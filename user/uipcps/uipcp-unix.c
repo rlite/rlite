@@ -201,6 +201,27 @@ rl_u_ipcp_enroll(struct uipcps *uipcps, int sfd,
 }
 
 static int
+rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
+                           const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
+    struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
+
+    resp.result = RLITE_ERR;
+
+    /* Find the userspace part of the requestor IPCP. */
+    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    if (uipcp && uipcp->ops.lower_flow_alloc) {
+        resp.result = uipcp->ops.lower_flow_alloc(uipcp, req, 1);
+    }
+
+    uipcp_put(uipcps, uipcp->id);
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
+static int
 rl_u_ipcp_dft_set(struct uipcps *uipcps, int sfd,
                        const struct rl_msg_base *b_req)
 {
@@ -276,6 +297,7 @@ typedef int (*rl_req_handler_t)(struct uipcps *uipcps, int sfd,
 static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_REGISTER] = rl_u_ipcp_register,
     [RLITE_U_IPCP_ENROLL] = rl_u_ipcp_enroll,
+    [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = rl_u_ipcp_lower_flow_alloc,
     [RLITE_U_IPCP_DFT_SET] = rl_u_ipcp_dft_set,
     [RLITE_U_IPCP_RIB_SHOW_REQ] = rl_u_ipcp_rib_show,
     [RLITE_U_MSG_MAX] = NULL,

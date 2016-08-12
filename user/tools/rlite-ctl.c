@@ -385,9 +385,9 @@ ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-ipcp_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_lower_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl)
 {
-    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_FLOW_ALLOC);
+    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_LOWER_FLOW_ALLOC);
 }
 
 static int
@@ -586,10 +586,10 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func = ipcp_enroll,
     },
     {
-        .name = "ipcp-flow-alloc",
+        .name = "ipcp-lower-flow-alloc",
         .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
         .num_args = 6,
-        .func = ipcp_flow_alloc,
+        .func = ipcp_lower_flow_alloc,
     },
     {
         .name = "ipcp-dft-set",

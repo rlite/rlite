@@ -38,7 +38,7 @@ extern "C" {
 /* User IPCP data model. */
 struct uipcps {
     /* Unix domain socket file descriptor used to accept request from
-     * applications. */
+     * control/management applications. */
     int lfd;
 
     /* List of userspace IPCPs: There is one for each non-shim IPCP. */
@@ -81,6 +81,10 @@ struct uipcp_ops {
 
     int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *,
                   int wait_for_completion);
+
+    int (*lower_flow_alloc)(struct uipcp *,
+                            const struct rl_cmsg_ipcp_enroll *,
+                            int wait_for_completion);
 
     int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
 

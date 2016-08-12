@@ -75,7 +75,7 @@ namespace obj_name {
  * RIB synchronizations. */
 #define RL_NEIGH_SYNC_INTVAL           30
 
-enum state_t {
+enum enroll_state_t {
     NEIGH_NONE = 0,
     NEIGH_I_WAIT_CONNECT_R,
     NEIGH_S_WAIT_START,
@@ -100,7 +100,7 @@ struct NeighFlow {
 
     int enroll_tmrid;
     pthread_cond_t enrollment_stopped;
-    enum state_t enrollment_state;
+    enum enroll_state_t enrollment_state;
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -149,7 +149,7 @@ struct Neighbor {
         { return !(*this == other); }
     ~Neighbor();
 
-    const char *enrollment_state_repr(state_t s) const;
+    const char *enrollment_state_repr(enroll_state_t s) const;
 
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
