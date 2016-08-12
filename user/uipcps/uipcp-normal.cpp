@@ -52,6 +52,7 @@ namespace obj_class {
     string flows = "flows"; /* Supported flows */
     string flow = "flow";
     string keepalive = "keepalive";
+    string lowerflow = "lowerflow";
 };
 
 namespace obj_name {
@@ -65,6 +66,7 @@ namespace obj_name {
     string whatevercast = "/daf/mgmt/naming/whatevercast";
     string flows = "/dif/ra/fa/" + obj_class::flows;
     string keepalive = "/daf/mgmt/" + obj_class::keepalive;
+    string lowerflow = "/daf/mgmt/" + obj_class::lowerflow;
 };
 
 #define MGMTBUF_SIZE_MAX 4096
