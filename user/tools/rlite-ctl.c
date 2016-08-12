@@ -635,7 +635,7 @@ usage(int i)
 }
 
 static int
-process_args(int argc, char **argv, struct rl_ctrl *ctrl)
+process_args(int argc, char **argv)
 {
     const char *cmd;
     int i;
@@ -650,6 +650,9 @@ process_args(int argc, char **argv, struct rl_ctrl *ctrl)
 
     for (i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
+            struct rl_ctrl ctrl;
+            int ret;
+
             assert(cmd_descriptors[i].func);
 
             if (argc - 2 < cmd_descriptors[i].num_args) {
@@ -659,11 +662,27 @@ process_args(int argc, char **argv, struct rl_ctrl *ctrl)
                 return -1;
             }
 
-            return cmd_descriptors[i].func(argc - 2, argv + 2, ctrl);
+            ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
+            if (ret) {
+                return ret;
+            }
+
+            ret = ipcps_load(&ctrl);
+            if (ret) {
+                return ret;
+            }
+
+            ret = cmd_descriptors[i].func(argc - 2, argv + 2, &ctrl);
+
+            rl_ctrl_fini(&ctrl);
+
+            return ret;
         }
     }
 
-    PE("Unknown command '%s'\n", cmd);
+    if (strcmp(cmd, "-h") != 0 && strcmp(cmd, "--help") != 0) {
+        PE("Unknown command '%s'\n", cmd);
+    }
     usage(-1);
 
     return -1;
@@ -677,19 +696,8 @@ sigint_handler(int signum)
 
 int main(int argc, char **argv)
 {
-    struct rl_ctrl ctrl;
     struct sigaction sa;
     int ret;
-
-    ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
-    if (ret) {
-        return ret;
-    }
-
-    ret = ipcps_load(&ctrl);
-    if (ret) {
-        return ret;
-    }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the uipcp server. */
@@ -707,9 +715,5 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    ret = process_args(argc, argv, &ctrl);
-
-    rl_ctrl_fini(&ctrl);
-
-    return ret;
+    return process_args(argc, argv);
 }
