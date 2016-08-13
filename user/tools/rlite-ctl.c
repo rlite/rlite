@@ -194,21 +194,19 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
 static int
 ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
 {
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *ipcp_name_s;
     struct rina_name ipcp_name;
     const char *dif_type;
     const char *dif_name;
     long int ipcp_id;
     int ret;
 
-    assert(argc >= 4);
-    ipcp_apn = argv[0];
-    ipcp_api = argv[1];
-    dif_type = argv[2];
-    dif_name = argv[3];
+    assert(argc >= 3);
+    ipcp_name_s = argv[0];
+    dif_type = argv[1];
+    dif_name = argv[2];
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &ipcp_name);
 
     ipcp_id = rl_conf_ipcp_create(ctrl, &ipcp_name, dif_type, dif_name);
 
@@ -234,17 +232,15 @@ ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
 static int
 ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl)
 {
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *ipcp_name_s;
     struct rina_name ipcp_name;
     struct ipcp_attrs *attrs;
     int ret = -1;
 
-    assert(argc >= 2);
-    ipcp_apn = argv[0];
-    ipcp_api = argv[1];
+    assert(argc >= 1);
+    ipcp_name_s = argv[0];
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &ipcp_name);
 
     /* Does the request specifies an existing IPC process ? */
     attrs = lookup_ipcp_by_name(&ipcp_name);
@@ -266,21 +262,19 @@ ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl)
 static int
 ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl)
 {
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *ipcp_name_s;
     const char *param_name;
     const char *param_value;
     struct rina_name ipcp_name;
     struct ipcp_attrs *attrs;
     int ret = -1;  /* Report failure by default. */
 
-    assert(argc >= 4);
-    ipcp_apn = argv[0];
-    ipcp_api = argv[1];
-    param_name = argv[2];
-    param_value = argv[3];
+    assert(argc >= 3);
+    ipcp_name_s = argv[0];
+    param_name = argv[1];
+    param_value = argv[2];
 
-    rina_name_fill(&ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &ipcp_name);
 
     /* The request specifies an IPCP: lookup that. */
     attrs = lookup_ipcp_by_name(&ipcp_name);
@@ -303,17 +297,16 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
                      struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_register req;
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *ipcp_name_s;
     const char *dif_name;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 3);
+    assert(argc >= 2);
     dif_name = argv[0];
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
+    ipcp_name_s = argv[1];
 
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &req.ipcp_name);
+
     /* Lookup the id of the registering IPCP. */
     attrs = lookup_ipcp_by_name(&req.ipcp_name);
     if (!attrs) {
@@ -346,23 +339,19 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
                    rl_msg_t msg_type)
 {
     struct rl_cmsg_ipcp_enroll req;
-    const char *ipcp_apn;
-    const char *ipcp_api;
-    const char *neigh_ipcp_apn;
-    const char *neigh_ipcp_api;
+    const char *ipcp_name_s;
+    const char *neigh_ipcp_name_s;
     const char *dif_name;
     const char *supp_dif_name;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 6);
+    assert(argc >= 4);
     dif_name = argv[0];
-    ipcp_apn = argv[1];
-    ipcp_api = argv[2];
-    neigh_ipcp_apn = argv[3];
-    neigh_ipcp_api = argv[4];
-    supp_dif_name = argv[5];
+    ipcp_name_s = argv[1];
+    neigh_ipcp_name_s = argv[2];
+    supp_dif_name = argv[3];
 
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &req.ipcp_name);
     attrs = lookup_ipcp_by_name(&req.ipcp_name);
     if (!attrs) {
         PE("Could not find enrolling IPC process\n");
@@ -372,7 +361,7 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
     req.msg_type = msg_type;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
-    rina_name_fill(&req.neigh_name, neigh_ipcp_apn, neigh_ipcp_api, NULL, NULL);
+    rina_name_from_string(neigh_ipcp_name_s, &req.neigh_name);
     req.supp_dif_name = strdup(supp_dif_name);
 
     return request_response(RLITE_MB(&req), NULL);
@@ -394,26 +383,22 @@ static int
 ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_dft_set req;
-    const char *ipcp_apn;
-    const char *ipcp_api;
-    const char *appl_apn;
-    const char *appl_api;
+    const char *ipcp_name_s;
+    const char *appl_name_s;
     unsigned long remote_addr;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 5);
-    ipcp_apn = argv[0];
-    ipcp_api = argv[1];
-    appl_apn = argv[2];
-    appl_api = argv[3];
+    assert(argc >= 3);
+    ipcp_name_s = argv[0];
+    appl_name_s = argv[1];
     errno = 0;
-    remote_addr = strtoul(argv[4], NULL, 10);
+    remote_addr = strtoul(argv[2], NULL, 10);
     if (errno) {
-        PE("Invalid address %s\n", argv[4]);
+        PE("Invalid address %s\n", argv[2]);
         return -1;
     }
 
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &req.ipcp_name);
     attrs = lookup_ipcp_by_name(&req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process\n");
@@ -422,7 +407,7 @@ ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl)
 
     req.msg_type = RLITE_U_IPCP_DFT_SET;
     req.event_id = 0;
-    rina_name_fill(&req.appl_name, appl_apn, appl_api, NULL, NULL);
+    rina_name_from_string(appl_name_s, &req.appl_name);
     req.remote_addr = remote_addr;
 
     return request_response(RLITE_MB(&req), NULL);
@@ -482,15 +467,13 @@ static int
 ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl)
 {
     struct rl_cmsg_ipcp_rib_show_req req;
-    const char *ipcp_apn;
-    const char *ipcp_api;
+    const char *ipcp_name_s;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 2);
-    ipcp_apn = argv[0];
-    ipcp_api = argv[1];
+    assert(argc >= 1);
+    ipcp_name_s = argv[0];
 
-    rina_name_fill(&req.ipcp_name, ipcp_apn, ipcp_api, NULL, NULL);
+    rina_name_from_string(ipcp_name_s, &req.ipcp_name);
     attrs = lookup_ipcp_by_name(&req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process\n");
@@ -551,50 +534,50 @@ struct cmd_descriptor {
 static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "ipcp-create",
-        .usage = "IPCP_APN IPCP_API DIF_TYPE DIF_NAME",
-        .num_args = 4,
+        .usage = "IPCP_NAME DIF_TYPE DIF_NAME",
+        .num_args = 3,
         .func = ipcp_create,
     },
     {
         .name = "ipcp-destroy",
-        .usage = "IPCP_APN IPCP_API",
-        .num_args = 2,
+        .usage = "IPCP_NAME",
+        .num_args = 1,
         .func = ipcp_destroy,
     },
     {
         .name = "ipcp-config",
-        .usage = "IPCP_APN IPCP_API PARAM_NAME PARAM_VALUE",
-        .num_args = 4,
+        .usage = "IPCP_NAME PARAM_NAME PARAM_VALUE",
+        .num_args = 3,
         .func = ipcp_config,
     },
     {
         .name = "ipcp-register",
-        .usage = "DIF_NAME IPCP_APN IPCP_API",
-        .num_args = 3,
+        .usage = "DIF_NAME IPCP_NAME",
+        .num_args = 2,
         .func = ipcp_register,
     },
     {
         .name = "ipcp-unregister",
-        .usage = "DIF_NAME IPCP_APN IPCP_API",
-        .num_args = 3,
+        .usage = "DIF_NAME IPCP_NAME",
+        .num_args = 2,
         .func = ipcp_unregister,
     },
     {
         .name = "ipcp-enroll",
-        .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
-        .num_args = 6,
+        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
+        .num_args = 4,
         .func = ipcp_enroll,
     },
     {
         .name = "ipcp-lower-flow-alloc",
-        .usage = "DIF_NAME IPCP_APN IPCP_API NEIGH_IPCP_APN NEIGH_IPCP_API SUPP_DIF_NAME",
-        .num_args = 6,
+        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
+        .num_args = 4,
         .func = ipcp_lower_flow_alloc,
     },
     {
         .name = "ipcp-dft-set",
-        .usage = "IPCP_APN IPCP_API APPL_APN APPL_API REMOTE_ADDR",
-        .num_args = 5,
+        .usage = "IPCP_NAME APPL_NAME REMOTE_ADDR",
+        .num_args = 3,
         .func = ipcp_dft_set,
     },
     {
@@ -605,8 +588,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "ipcp-rib-show",
-        .usage = "IPCP_APN IPCP_API",
-        .num_args = 2,
+        .usage = "IPCP_NAME",
+        .num_args = 1,
         .func = ipcp_rib_show,
     },
     {

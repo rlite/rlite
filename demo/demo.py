@@ -555,10 +555,10 @@ for vmname in sorted(vms):
                      'shimtype': shim['type']}
         outs +=     'PORT=$(mac2ifname %(mac)s)\n'\
                     '$SUDO ip link set $PORT up\n'\
-                    '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP %(idx)s shim-%(shimtype)s %(shim)s.DIF\n'\
+                    '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP/%(idx)s// shim-%(shimtype)s %(shim)s.DIF\n'\
                     % vars_dict
         if shim['type'] == 'eth':
-                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP %(idx)s netdev $PORT\n'\
+                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP/%(idx)s// netdev $PORT\n'\
                 % vars_dict
         elif shim['type'] == 'udp4':
                 outs += '$SUDO ip addr add %s dev $PORT\n' % (port['ip'])
@@ -567,8 +567,8 @@ for vmname in sorted(vms):
     # Create normal IPCPs
     for dif in difs:
         if vmname in difs[dif]:
-            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP %(id)s normal %(dif)s.DIF\n'\
-                    '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP %(id)s address %(id)d\n'\
+            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP/%(id)s// normal %(dif)s.DIF\n'\
+                    '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP/%(id)s// address %(id)d\n'\
                         % {'dif': dif, 'id': vm['id']}
 
     # Update /etc/hosts file with DIF mappings
@@ -590,7 +590,7 @@ for vmname in sorted(vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in difs[dif][vmname]:
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP %(id)s\n'\
+            outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP/%(id)s//\n'\
                         % vars_dict
             del vars_dict
 
@@ -625,8 +625,8 @@ for dif in dif_ordering:
             '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'SUDO=%(sudo)s\n'\
-            '$SUDO rlite-ctl ipcp-enroll %(dif)s.DIF %(dif)s.%(id)s.IPCP %(id)s '\
-                            '%(dif)s.%(pvid)s.IPCP %(pvid)s %(ldif)s.DIF\n'\
+            '$SUDO rlite-ctl ipcp-enroll %(dif)s.DIF %(dif)s.%(id)s.IPCP/%(id)s// '\
+                            '%(dif)s.%(pvid)s.IPCP/%(pvid)s// %(ldif)s.DIF\n'\
             'sleep 1\n'\
             'true\n'\
             'ENDSSH\n'\
