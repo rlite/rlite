@@ -483,14 +483,12 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 
         m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
                   0, 0, string());
-        UPE(rib->uipcp, "GOING NORMAL\n");
     } else {
         /* This is not a complete enrollment, but only the allocation
          * of a lower flow. */
         next_state = NEIGH_I_LF_WAIT_START_R;
         m.m_start(gpb::F_NO_FLAGS, obj_class::lowerflow, obj_name::lowerflow,
                   0, 0, string());
-        UPE(rib->uipcp, "GOING LOWER\n");
     }
 
     ret = nf->send_to_port_id(&m, 0, obj);
@@ -840,9 +838,6 @@ Neighbor::s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     /* No need to check op_code, obj_class and obj_name, they were
      * already checked by the caller. */
-
-    UPE(rib->uipcp, "GOING LOWER\n");
-
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());
     m.obj_class = obj_class::lowerflow;
     m.obj_name = obj_name::lowerflow;
