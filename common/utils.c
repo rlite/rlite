@@ -569,7 +569,9 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
     aen = strsep(strp, "/");
     aei = strsep(strp, "/");
 
-    if (!apn || !api || !aen || !aei) {
+    if (!apn) {
+        /* The '/' are not necessary if some of the api, aen, aei
+         * are not present. */
         COMMON_FREE(strc_orig);
         return -1;
     }
