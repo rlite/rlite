@@ -478,8 +478,10 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
     if (reg) {
         if (lit != lower_difs.end()) {
-            UPE(uipcp, "DIF %s already registered\n", lower_dif.c_str());
-            return -1;
+            UPI(uipcp, "DIF %s was already registered\n", lower_dif.c_str());
+            /* We already registered into this DIF, so there is
+             * nothing to do. */
+            return 0;
         }
 
         lower_difs.push_back(lower_dif);

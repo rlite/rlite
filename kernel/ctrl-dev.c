@@ -625,8 +625,27 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     struct registered_appl *app, *newapp;
     int ret = 0;
 
+    RALOCK(ipcp);
+    app = __ipcp_application_get(ipcp, appl_name);
+    if (app) {
+        struct rl_ctrl *old_rc = app->rc;
+
+        RAUNLOCK(ipcp);
+        ipcp_application_put(app);
+        if (old_rc == rc) {
+            /* This registration was already asked on this
+             * control device. There is nothing to do,
+             * inform the caller. */
+            return 1;
+        }
+
+        /* Application was already registered on a different
+         * control device. */
+        return -EINVAL;
+    }
+
     /* Create a new registered application. */
-    newapp = kzalloc(sizeof(*newapp), GFP_KERNEL);
+    newapp = kzalloc(sizeof(*newapp), GFP_ATOMIC);
     if (!newapp) {
         return -ENOMEM;
     }
@@ -637,20 +656,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     newapp->refcnt = 1;
     newapp->ipcp = ipcp;
     INIT_WORK(&newapp->remove, app_remove_work);
-
-    RALOCK(ipcp);
-
-    app = __ipcp_application_get(ipcp, appl_name);
-    if (app) {
-            /* Application was already registered. */
-            RAUNLOCK(ipcp);
-            ipcp_application_put(app);
-            /* Rollback memory allocation. */
-            rina_name_free(&newapp->name);
-            kfree(newapp);
-            return -EINVAL;
-    }
-
     list_add_tail(&newapp->node, &ipcp->registered_appls);
 
     RAUNLOCK(ipcp);
@@ -1805,6 +1810,12 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             /* Complete the (un)registration immediately notifying the
              * requesting application. */
             struct rl_kmsg_appl_register_resp resp;
+
+            if (ret > 0) {
+                /* ipcp_application_add() returned a positive result.
+                 * This is not an error. */
+                ret = 0;
+            }
 
             resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
             resp.event_id = req->event_id;
