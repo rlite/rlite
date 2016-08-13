@@ -80,13 +80,13 @@ namespace obj_name {
 enum enroll_state_t {
     NEIGH_NONE = 0,
     NEIGH_I_WAIT_CONNECT_R,
-    NEIGH_S_WAIT_START_OR_WRITE,
+    NEIGH_S_WAIT_START,
     NEIGH_I_WAIT_START_R,
     NEIGH_S_WAIT_STOP_R,
     NEIGH_I_WAIT_STOP,
     NEIGH_I_WAIT_START,
 
-    NEIGH_I_LF_WAIT_WRITE_R,
+    NEIGH_I_LF_WAIT_START_R,
 
     NEIGH_ENROLLED,
 
@@ -169,14 +169,14 @@ struct Neighbor {
     /* Enrollment state machine handlers. */
     int none(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm);
-    int s_wait_start_or_write(NeighFlow *nf, const CDAPMessage *rm);
+    int s_wait_start(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_stop(NeighFlow *nf, const CDAPMessage *rm);
     int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
     int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
 
-    int s_lf_wait_write(NeighFlow *nf, const CDAPMessage *rm);
-    int i_lf_wait_write_r(NeighFlow *nf, const CDAPMessage *rm);
+    int s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm);
+    int i_lf_wait_start_r(NeighFlow *nf, const CDAPMessage *rm);
 
     int fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm);
 

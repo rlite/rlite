@@ -130,7 +130,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 bool
 NeighFlow::enrollment_starting(const CDAPMessage *rm) const
 {
-    return enrollment_state == NEIGH_S_WAIT_START_OR_WRITE &&
+    return enrollment_state == NEIGH_S_WAIT_START &&
            rm->op_code == gpb::M_START &&
            rm->obj_name == obj_name::enrollment &&
            rm->obj_class == obj_class::enrollment;
@@ -311,13 +311,13 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     mgmt_port_id = -1;
     enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
     enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
-    enroll_fsm_handlers[NEIGH_S_WAIT_START_OR_WRITE] = &Neighbor::s_wait_start_or_write;
+    enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
     enroll_fsm_handlers[NEIGH_I_WAIT_START_R] = &Neighbor::i_wait_start_r;
     enroll_fsm_handlers[NEIGH_S_WAIT_STOP_R] = &Neighbor::s_wait_stop_r;
     enroll_fsm_handlers[NEIGH_I_WAIT_STOP] = &Neighbor::i_wait_stop;
     enroll_fsm_handlers[NEIGH_I_WAIT_START] = &Neighbor::i_wait_start;
 
-    enroll_fsm_handlers[NEIGH_I_LF_WAIT_WRITE_R] = &Neighbor::i_lf_wait_write_r;
+    enroll_fsm_handlers[NEIGH_I_LF_WAIT_START_R] = &Neighbor::i_lf_wait_start_r;
 
     enroll_fsm_handlers[NEIGH_ENROLLED] = &Neighbor::fsm_enrolled;
 }
@@ -340,8 +340,8 @@ Neighbor::enrollment_state_repr(enroll_state_t s) const
         case NEIGH_I_WAIT_CONNECT_R:
             return "I_WAIT_CONNECT_R";
 
-        case NEIGH_S_WAIT_START_OR_WRITE:
-            return "S_WAIT_START_OR_WRITE";
+        case NEIGH_S_WAIT_START:
+            return "S_WAIT_START";
 
         case NEIGH_I_WAIT_START_R:
             return "I_WAIT_START_R";
@@ -357,6 +357,9 @@ Neighbor::enrollment_state_repr(enroll_state_t s) const
 
         case NEIGH_ENROLLED:
             return "ENROLLED";
+
+        case NEIGH_I_LF_WAIT_START_R:
+            return "I_LF_WAIT_START_R";
 
         default:
             assert(0);
@@ -432,7 +435,7 @@ Neighbor::none(NeighFlow *nf, const CDAPMessage *rm)
         }
 
         invoke_id = rm->invoke_id;
-        next_state = NEIGH_S_WAIT_START_OR_WRITE;
+        next_state = NEIGH_S_WAIT_START;
     }
 
     ret = nf->send_to_port_id(&m, invoke_id, NULL);
@@ -454,7 +457,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
     /* (2) I <-- S: M_CONNECT_R
      * (3) I --> S: M_START
      *     or
-     * (3LF) I --> S: M_WRITE */
+     * (3LF) I --> S: M_START */
     enroll_state_t next_state;
     EnrollmentInfo enr_info;
     UipcpObject *obj = NULL;
@@ -484,8 +487,8 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
     } else {
         /* This is not a complete enrollment, but only the allocation
          * of a lower flow. */
-        next_state = NEIGH_I_LF_WAIT_WRITE_R;
-        m.m_write(gpb::F_NO_FLAGS, obj_class::lowerflow, obj_name::lowerflow,
+        next_state = NEIGH_I_LF_WAIT_START_R;
+        m.m_start(gpb::F_NO_FLAGS, obj_class::lowerflow, obj_name::lowerflow,
                   0, 0, string());
         UPE(rib->uipcp, "GOING LOWER\n");
     }
@@ -505,7 +508,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
 }
 
 int
-Neighbor::s_wait_start_or_write(NeighFlow *nf, const CDAPMessage *rm)
+Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 {
     /* (3) S <-- I: M_START
      * (4) S --> I: M_START_R
@@ -516,16 +519,17 @@ Neighbor::s_wait_start_or_write(NeighFlow *nf, const CDAPMessage *rm)
     bool has_address;
     int ret;
 
-    if (rm->op_code == gpb::M_WRITE) {
-        /* This is not a complete enrollment, but only a lower flow
-         * allocation. */
-        return s_lf_wait_write(nf, rm);
-    }
-
     if (rm->op_code != gpb::M_START) {
         UPE(rib->uipcp, "M_START expected\n");
         nf->abort_enrollment();
         return 0;
+    }
+
+    if (rm->obj_class == obj_class::lowerflow &&
+                rm->obj_name == obj_name::lowerflow) {
+        /* This is not a complete enrollment, but only a lower flow
+         * allocation. */
+        return s_lf_wait_start(nf, rm);
     }
 
     if (rm->obj_class != obj_class::enrollment ||
@@ -827,30 +831,19 @@ Neighbor::fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm)
 }
 
 int
-Neighbor::s_lf_wait_write(NeighFlow *nf, const CDAPMessage *rm)
+Neighbor::s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 {
-    /* (3LF) S <-- I: M_WRITE
-     * (4LF) S --> I: M_WRITE_R */
+    /* (3LF) S <-- I: M_START
+     * (4LF) S --> I: M_START_R */
+    CDAPMessage m;
     int ret;
 
+    /* No need to check op_code, obj_class and obj_name, they were
+     * already checked by the caller. */
+
     UPE(rib->uipcp, "GOING LOWER\n");
-    if (rm->op_code != gpb::M_WRITE) {
-        UPE(rib->uipcp, "M_WRITE expected\n");
-        nf->abort_enrollment();
-        return 0;
-    }
 
-    if (rm->obj_class != obj_class::lowerflow ||
-            rm->obj_name != obj_name::lowerflow) {
-        UPE(rib->uipcp, "%s:%s object expected\n",
-            obj_name::lowerflow.c_str(), obj_class::lowerflow.c_str());
-        nf->abort_enrollment();
-        return 0;
-    }
-
-    CDAPMessage m;
-
-    m.m_write_r(gpb::F_NO_FLAGS, 0, string());
+    m.m_start_r(gpb::F_NO_FLAGS, 0, string());
     m.obj_class = obj_class::lowerflow;
     m.obj_name = obj_name::lowerflow;
 
@@ -862,7 +855,7 @@ Neighbor::s_lf_wait_write(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     nf->enroll_tmr_stop();
-    nf->enroll_tmr_start();
+    nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
@@ -874,11 +867,11 @@ Neighbor::s_lf_wait_write(NeighFlow *nf, const CDAPMessage *rm)
 }
 
 int
-Neighbor::i_lf_wait_write_r(NeighFlow *nf, const CDAPMessage *rm)
+Neighbor::i_lf_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
 {
-    /* (4LF) I <-- S: M_WRITE_R */
+    /* (4LF) I <-- S: M_START_R */
 
-    if (rm->op_code != gpb::M_WRITE_R) {
+    if (rm->op_code != gpb::M_START_R) {
         UPE(rib->uipcp, "M_START_R expected\n");
         nf->abort_enrollment();
         return 0;
@@ -900,7 +893,7 @@ Neighbor::i_lf_wait_write_r(NeighFlow *nf, const CDAPMessage *rm)
     }
 
     nf->enroll_tmr_stop();
-    nf->enroll_tmr_start();
+    nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
