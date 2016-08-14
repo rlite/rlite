@@ -45,18 +45,10 @@ struct uipcps {
     struct list_head uipcps;
     pthread_mutex_t lock;
 
-    /* Each element of this list corresponds to the registration of
-     * and IPCP within a DIF. This is useful to implement the persistent
-     * IPCP registration feature, where the "persistence" is to be intended
-     * across subsequent uipcps restarts. */
-    struct list_head ipcps_registrations;
-
     struct list_head ipcp_nodes;
 
     struct rl_evloop loop;
 };
-
-#define RLITE_PERSISTENCE_FILE   "/var/rlite/uipcps-persist"
 
 struct enrolled_neigh {
     // TODO these can be serialized names

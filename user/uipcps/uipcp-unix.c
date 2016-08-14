@@ -81,53 +81,6 @@ rl_u_response(int sfd, struct rl_msg_base *req,
     return rl_msg_write_fd(sfd, RLITE_MB(resp));
 }
 
-static void
-track_ipcp_registration(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id,
-                        const struct rl_cmsg_ipcp_register *req)
-{
-    struct registered_ipcp *ripcp;
-
-    /* Append a successful registration to the persistent
-     * registration list. */
-    list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-        if (strcmp(ripcp->dif_name, req->dif_name) == 0 &&
-                rina_name_cmp(&ripcp->name, &req->ipcp_name) == 0) {
-            return;
-        }
-    }
-
-    ripcp = malloc(sizeof(*ripcp));
-    if (!ripcp) {
-        PE("ripcp allocation failed\n");
-        return;
-    }
-
-    memset(ripcp, 0, sizeof(*ripcp));
-    ripcp->dif_name = strdup(req->dif_name);
-    ripcp->id = ipcp_id;
-    rina_name_copy(&ripcp->name, &req->ipcp_name);
-    list_add_tail(&ripcp->node, &uipcps->ipcps_registrations);
-}
-
-static void
-track_ipcp_unregistration(struct uipcps *uipcps,
-                          rl_ipcp_id_t ipcp_id)
-{
-    struct registered_ipcp *ripcp;
-
-    /* Try to remove a registration element from the persistent
-     * registration list, matching by IPCP id. */
-    list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-        if (ripcp->id == ipcp_id) {
-            list_del(&ripcp->node);
-            free(ripcp->dif_name);
-            rina_name_free(&ripcp->name);
-            free(ripcp);
-            break;
-        }
-    }
-}
-
 static int
 ipcp_register(struct uipcps *uipcps,
               const struct rl_cmsg_ipcp_register *req)
@@ -143,16 +96,6 @@ ipcp_register(struct uipcps *uipcps,
 
     if (uipcp->ops.register_to_lower) {
         result = uipcp->ops.register_to_lower(uipcp, req);
-
-        if (result == RLITE_SUCC) {
-            /* Track the (un)registration in the persistent registration
-             * list. */
-            if (req->reg) {
-                track_ipcp_registration(uipcps, uipcp->id, req);
-            } else {
-                track_ipcp_unregistration(uipcps, uipcp->id);
-            }
-        }
     }
 
     uipcp_put(uipcps, uipcp->id, 1);
@@ -458,10 +401,7 @@ uipcps_ipcp_update(struct rl_evloop *loop,
             break;
 
         case RLITE_UPDATE_DEL:
-            /* Track all the unregistrations of the destroyed IPCP in
-             * the persistent registrations list.
-             * This can be an IPCP with no userspace implementation. */
-            track_ipcp_unregistration(uipcps, upd->ipcp_id);
+            /* This can be an IPCP with no userspace implementation. */
             ret = uipcp_put(uipcps, upd->ipcp_id, 1);
             break;
 
@@ -477,97 +417,6 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     uipcps_print(uipcps);
 #endif
     return 0;
-}
-
-static void
-process_persistence_file(struct uipcps *uipcps)
-{
-    /* Read the persistent IPCP registration file into
-     * the ipcps_registrations list. */
-    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "r");
-    char line[4096];
-
-    if (!fpreg) {
-        PD("Persistence file %s not found\n", RLITE_PERSISTENCE_FILE);
-        return;
-    }
-
-    PD("Persistence file %s opened\n", RLITE_PERSISTENCE_FILE);
-
-    while (fgets(line, sizeof(line), fpreg)) {
-        char *s0 = NULL;
-        char *s1 = NULL;
-        char *s2 = NULL;
-        char *s3 = NULL;
-        char *s4 = NULL;
-
-        s0 = strchr(line, '\n');
-        if (s0) {
-            *s0 = '\0';
-        }
-
-        s0 = strtok(line, " ");
-        s1 = strtok(0, " ");
-        s2 = strtok(0, " ");
-        s3 = strtok(0, " ");
-        s4 = strtok(0, " ");
-
-        if (strncmp(s0, "REG", 3) == 0) {
-            /* Redo an ipcp registration. */
-            struct rl_cmsg_ipcp_register msg;
-            int ret = 0;
-
-            if (!s1 || !s2) {
-                PE("Invalid REG line");
-                continue;
-            }
-
-            msg.reg = 1;
-            ret |= rina_name_from_string(s2, &msg.ipcp_name);
-            msg.dif_name = strdup(s1);
-            if (ret || !msg.dif_name) {
-                PE("Out of memory\n");
-                rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                               RLITE_MB(&msg));
-                continue;
-            }
-
-            ret = ipcp_register(uipcps, &msg);
-            PI("Automatic re-registration for %s --> %s\n",
-                    s2, (ret == RLITE_SUCC) ? "DONE" : "FAILED");
-            rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                           RLITE_MB(&msg));
-
-        } else if (strncmp(s0, "ENR", 3) == 0) {
-            /* Redo an enrollment. */
-            struct rl_cmsg_ipcp_enroll msg;
-            int ret = 0;
-
-            if (!s1 || !s2 || !s3 || !s4) {
-                PE("Invalid ENR line");
-                continue;
-            }
-
-            ret |= rina_name_from_string(s2, &msg.ipcp_name);
-            ret |= rina_name_from_string(s3, &msg.neigh_name);
-            msg.dif_name = strdup(s1);
-            msg.supp_dif_name = strdup(s4);
-            if (ret || !msg.dif_name || !msg.supp_dif_name) {
-                PE("Out of memory\n");
-                rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                               RLITE_MB(&msg));
-                continue;
-            }
-
-            ret = ipcp_enroll(uipcps, &msg);
-            PI("Automatic re-enrollment for %s in DIF %s --> %s\n", s2, s1,
-               (ret == RLITE_SUCC) ? "DONE" : "FAILED");
-            rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                           RLITE_MB(&msg));
-        }
-    }
-
-    fclose(fpreg);
 }
 
 static int
@@ -591,73 +440,8 @@ uipcps_init(struct uipcps *uipcps)
 #if 0
     uipcps_print(uipcps);
 #endif
-    process_persistence_file(uipcps);
 
     return 0;
-}
-
-static void
-dump_persistence_file(struct uipcps *uipcps)
-{
-    FILE *fpreg = fopen(RLITE_PERSISTENCE_FILE, "w");
-    struct registered_ipcp *ripcp;
-    struct uipcp *uipcp;
-
-    if (!fpreg) {
-        PE("Cannot open persistence file (%s)\n",
-                RLITE_PERSISTENCE_FILE);
-        return;
-    }
-
-    /* Dump the ipcps_registrations list, so that
-     * subsequent uipcps invocations can redo the registrations. */
-    list_for_each_entry(ripcp, &uipcps->ipcps_registrations, node) {
-        char *ipcp_s;
-
-        ipcp_s = rina_name_to_string(&ripcp->name);
-        if (ipcp_s) {
-            fprintf(fpreg, "REG %s %s\n", ripcp->dif_name, ipcp_s);
-        } else {
-            PE("Error in rina_name_to_string()\n");
-        }
-        if (ipcp_s) free(ipcp_s);
-    }
-
-    /* Dump to a file the list of enrolled ipcps for which we were initiator,
-     * so that subsequent uipcps invocations can redo the registrations. */
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        char *ipcp_s, *neigh_s;
-        struct enrolled_neigh *en, *tmp;
-        struct list_head neighs;
-
-        if (!uipcp->ops.get_enrollment_targets) {
-            continue;
-        }
-
-        if (uipcp->ops.get_enrollment_targets(uipcp, &neighs)) {
-            PE("get_enrolled_neighs() failed for uipcp [%u]\n",
-               uipcp->id);
-            continue;
-        }
-
-        list_for_each_entry_safe(en, tmp, &neighs, node) {
-            ipcp_s = rina_name_to_string(&en->ipcp_name);
-            neigh_s = rina_name_to_string(&en->neigh_name);
-
-            if (ipcp_s && neigh_s) {
-                fprintf(fpreg, "ENR %s %s %s %s\n", en->dif_name, ipcp_s,
-                        neigh_s, en->supp_dif);
-
-            } else {
-                PE("Error in rina_name_to_string()\n");
-            }
-
-            if (ipcp_s) free(ipcp_s);
-            if (neigh_s) free(neigh_s);
-        }
-    }
-
-    fclose(fpreg);
 }
 
 static void
@@ -811,7 +595,6 @@ int main(int argc, char **argv)
 
     list_init(&uipcps->uipcps);
     pthread_mutex_init(&uipcps->lock, NULL);
-    list_init(&uipcps->ipcps_registrations);
     list_init(&uipcps->ipcp_nodes);
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
