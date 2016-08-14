@@ -84,7 +84,7 @@ dtp_snd_reset(struct flow_entry *flow)
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     struct dtp *dtp = &flow->dtp;
 
-    dtp->flags = DTP_F_DRF_SET | DTP_F_DRF_EXPECTED;
+    dtp->flags |= DTP_F_DRF_SET;
     /* InitialSeqNumPolicy */
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
@@ -102,6 +102,7 @@ dtp_rcv_reset(struct flow_entry *flow)
     struct fc_config *fc = &flow->cfg.dtcp.fc;
     struct dtp *dtp = &flow->dtp;
 
+    dtp->flags |= DTP_F_DRF_EXPECTED;
     dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
     dtp->last_snd_data_ack = 0;
@@ -546,14 +547,18 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
     pci->conn_id.dst_cep = flow->remote_cep;
     pci->conn_id.src_cep = flow->local_cep;
     pci->pdu_type = PDU_T_DT;
-    pci->pdu_flags = dtp->flags & DTP_F_DRF_SET;
+    pci->pdu_flags = 0;
     pci->pdu_len = rb->len;
     pci->seqnum = dtp->next_seq_num_to_send++;
 
     flow->stats.tx_pkt++;
     flow->stats.tx_byte += rb->len;
 
-    dtp->flags &= ~DTP_F_DRF_SET;
+    if (unlikely(dtp->flags & DTP_F_DRF_SET)) {
+        dtp->flags &= ~DTP_F_DRF_SET;
+        pci->pdu_flags |= PDU_F_DRF;
+    }
+
     if (!dtcp_present) {
         /* DTCP not present */
         dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
@@ -1101,11 +1106,16 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         mod_timer(&dtp->rcv_inact_tmr, jiffies + 2 * dtp->mpl_r_a);
     }
 
-    if (pci->pdu_flags & 1) {
-        /* DRF is set: either first PDU or new run. */
+    if ((dtp->flags & DTP_F_DRF_EXPECTED) || (pci->pdu_flags & PDU_F_DRF)) {
+        /* If we expect DRF being set (new PDU run) we pretend it's there
+         * even if it's not int pci->pdu_flags. This is done to avoid that
+         * the loss of the DRF PDU causes the loss of all the subsequent
+         * packets that arrive before the transmitter realizes the DRF
+         * packet was lost and can retransmit it. */
 
         /* Flush reassembly queue */
 
+        dtp->flags &= ~DTP_F_DRF_EXPECTED;
         dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
 

@@ -81,6 +81,10 @@ extern int verbosity;
 
 #define RLITE_DEFAULT_LAYERS    3
 
+/* PDU flags */
+#define PDU_F_ECN           0x01
+#define PDU_F_DRF           0x80
+
 /* PDU type definitions. */
 #define PDU_T_MGMT          0x40    /* Management PDU */
 #define PDU_T_DT            0x80    /* Data Transfer PDU */
