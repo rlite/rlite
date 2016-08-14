@@ -187,6 +187,7 @@ shims = dict()
 links = []
 difs = dict()
 enrollments = dict()
+lowerflowallocs = dict()
 dif_graphs = dict()
 dns_mappings = dict()
 
@@ -370,37 +371,41 @@ for dif in difs:
                     dif_graphs[dif][vm1].append((vm2, lower_dif))
 
     enrollments[dif] = []
-    if args.enrollment_strategy == 'minimal':
-        # To generate the list of enrollments, we simulate one,
-        # using breadth-first trasversal.
-        enrolled = set([first])
-        frontier = set([first])
-        while len(frontier):
-            cur = frontier.pop()
-            for edge in dif_graphs[dif][cur]:
-                if edge[0] not in enrolled:
-                    enrolled.add(edge[0])
-                    enrollments[dif].append({'enrollee': edge[0],
-                                             'enroller': cur,
-                                             'lower_dif': edge[1]})
-                    frontier.add(edge[0])
-    elif args.enrollment_strategy == 'full-mesh':
+    # To generate the list of enrollments, we simulate one,
+    # using breadth-first trasversal.
+    enrolled = set([first])
+    frontier = set([first])
+    edges_covered = set()
+    while len(frontier):
+        cur = frontier.pop()
+        for edge in dif_graphs[dif][cur]:
+            if edge[0] not in enrolled:
+                enrolled.add(edge[0])
+                edges_covered.add((edge[0], cur))
+                enrollments[dif].append({'enrollee': edge[0],
+                                         'enroller': cur,
+                                         'lower_dif': edge[1]})
+                frontier.add(edge[0])
+
+    lowerflowallocs[dif] = []
+    if args.enrollment_strategy == 'full-mesh':
         for cur in dif_graphs[dif]:
             for edge in dif_graphs[dif][cur]:
                 if cur < edge[0]:
-                    enrollments[dif].append({'enrollee': cur,
-                                             'enroller': edge[0],
-                                             'lower_dif': edge[1]})
-    else:
-        # This is a bug
-        assert(False)
+                    if (cur, edge[0]) not in edges_covered and \
+                            (edge[0], cur) not in edges_covered:
+                        lowerflowallocs[dif].append({'enrollee': cur,
+                                                     'enroller': edge[0],
+                                                     'lower_dif': edge[1]})
+                        edges_covered.add((cur, edge[0]))
 
     #print(neighsets)
     #print(dif_graphs[dif])
 
 shim_id = 1
 for shim in shims:
-    enrollments[shim] = dict()
+    enrollments[shim] = []
+    lowerflowallocs[shim] = []
     shims[shim]['id'] = shim_id
     shim_id += 1
 
@@ -610,11 +615,17 @@ if len(dns_mappings) > 0:
 
 # Run the enrollment operations in an order which respect the dependencies
 for dif in dif_ordering:
-    for enrollment in enrollments[dif]:
+    enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+    for enrollment in enrollments_list:
         vm = vms[enrollment['enrollee']]
 
-        print('I am going to enroll %s to DIF %s against neighbor %s, through '\
-                'lower DIF %s' % (enrollment['enrollee'], dif,
+        if enrollment in lowerflowallocs[dif]:
+            oper = 'lower-flow-alloc'
+        else:
+            oper = 'enroll'
+
+        print("%s %s to DIF %s against neighbor %s, through "\
+                "lower DIF %s" % (oper, enrollment['enrollee'], dif,
                                   enrollment['enroller'],
                                   enrollment['lower_dif']))
 
@@ -625,7 +636,7 @@ for dif in dif_ordering:
             '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'SUDO=%(sudo)s\n'\
-            '$SUDO rlite-ctl ipcp-enroll %(dif)s.DIF %(dif)s.%(id)s.IPCP/%(id)s// '\
+            '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.DIF %(dif)s.%(id)s.IPCP/%(id)s// '\
                             '%(dif)s.%(pvid)s.IPCP/%(pvid)s// %(ldif)s.DIF\n'\
             'sleep 1\n'\
             'true\n'\
@@ -639,7 +650,8 @@ for dif in dif_ordering:
                           'username': username,
                           'vmname': vm['name'],
                           'dif': dif, 'ldif': enrollment['lower_dif'],
-                          'sshopts': sshopts, 'sudo': sudo}
+                          'sshopts': sshopts, 'sudo': sudo,
+                          'oper': oper}
 
 fout.write(outs)
 
