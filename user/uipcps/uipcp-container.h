@@ -152,11 +152,17 @@ struct uipcp {
     struct list_head node;
 };
 
+static inline int
+uipcp_is_kernelspace(struct uipcp *uipcp)
+{
+    return uipcp->ops.init == NULL;
+}
+
 void *uipcp_server(void *arg);
 
 int uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
-int uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
+int uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked);
 
 int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 

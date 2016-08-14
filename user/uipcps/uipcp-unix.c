@@ -46,6 +46,7 @@
 #include "rlite/list.h"
 #include "rlite/evloop.h"
 #include "rlite/evloop.h"
+#include "rlite/conf.h"
 
 #include "../helpers.h"
 #include "uipcp-container.h"
@@ -154,7 +155,7 @@ ipcp_register(struct uipcps *uipcps,
         }
     }
 
-    uipcp_put(uipcps, uipcp->id);
+    uipcp_put(uipcps, uipcp->id, 1);
 
     return result;
 }
@@ -183,7 +184,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
         ret = uipcp->ops.enroll(uipcp, req, 1);
     }
 
-    uipcp_put(uipcps, uipcp->id);
+    uipcp_put(uipcps, uipcp->id, 1);
 
     return ret;
 }
@@ -216,7 +217,7 @@ rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.lower_flow_alloc(uipcp, req, 1);
     }
 
-    uipcp_put(uipcps, uipcp->id);
+    uipcp_put(uipcps, uipcp->id, 1);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
@@ -240,7 +241,7 @@ rl_u_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.dft_set(uipcp, req);
     }
 
-    uipcp_put(uipcps, uipcp->id);
+    uipcp_put(uipcps, uipcp->id, 1);
 
 out:
     return rl_u_response(sfd, RLITE_MB(req), &resp);
@@ -275,7 +276,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         }
     }
 
-    uipcp_put(uipcps, uipcp->id);
+    uipcp_put(uipcps, uipcp->id, 1);
 
 out:
     resp.msg_type = RLITE_U_IPCP_RIB_SHOW_RESP;
@@ -461,7 +462,7 @@ uipcps_ipcp_update(struct rl_evloop *loop,
              * the persistent registrations list.
              * This can be an IPCP with no userspace implementation. */
             track_ipcp_unregistration(uipcps, upd->ipcp_id);
-            ret = uipcp_put(uipcps, upd->ipcp_id);
+            ret = uipcp_put(uipcps, upd->ipcp_id, 1);
             break;
 
         case RLITE_UPDATE_UPD:
@@ -663,13 +664,19 @@ static void
 sigint_handler(int signum)
 {
     struct uipcps *uipcps = &guipcps;
+    struct uipcp *uipcp, *tmp;
 
+    /* Destroy all the IPCPs. */
     pthread_mutex_lock(&uipcps->lock);
-    dump_persistence_file(uipcps);
-    pthread_mutex_unlock(&uipcps->lock);
+    list_for_each_entry_safe(uipcp, tmp, &uipcps->uipcps, node) {
+        if (!uipcp_is_kernelspace(uipcp)) {
+            rl_ipcp_id_t uid = uipcp->id;
 
-    /* TODO Here we should free all the dynamically allocated memory
-     * referenced by uipcps. */
+            uipcp_put(uipcps, uid, 0);
+            rl_conf_ipcp_destroy(&uipcps->loop.ctrl, uid);
+        }
+    }
+    pthread_mutex_unlock(&uipcps->lock);
 
     unlink(RLITE_UIPCPS_UNIX_NAME);
     exit(EXIT_SUCCESS);

@@ -331,13 +331,7 @@ select_uipcp_ops(const char *dif_type)
     return NULL;
 }
 
-static int
-uipcp_is_kernelspace(struct uipcp *uipcp)
-{
-    return uipcp->ops.init == NULL;
-}
-
-/* To be called under uipcps lock. This function does not take into
+/* This function takes the uipcps lock and does not take into
  * account kernel-space IPCPs. */
 struct uipcp *
 uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
@@ -345,14 +339,17 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
     struct uipcp *uipcp;
     char *s;
 
+    pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         if (!uipcp_is_kernelspace(uipcp) && rina_name_valid(&uipcp->name) &&
                         rina_name_cmp(&uipcp->name, ipcp_name) == 0) {
             uipcp->refcnt++;
+            pthread_mutex_unlock(&uipcps->lock);
 
             return uipcp;
         }
     }
+    pthread_mutex_unlock(&uipcps->lock);
 
     s = rina_name_to_string(ipcp_name);
     PE("No such IPCP '%s'\n", s);
@@ -361,16 +358,16 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
     return NULL;
 }
 
-/* To be called under uipcps lock. This function takes into account
+/* Called under uipcps lock. This function does not take into account
  * kernel-space IPCPs*/
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
-    struct uipcp *cur;
+    struct uipcp *uipcp;
 
-    list_for_each_entry(cur, &uipcps->uipcps, node) {
-        if (cur->id == ipcp_id) {
-            return cur;
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        if (uipcp->id == ipcp_id) {
+            return uipcp;
         }
     }
 
@@ -513,17 +510,17 @@ errx:
 }
 
 int
-uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
+uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
 {
     struct uipcp *uipcp;
     int kernelspace = 0;
     int destroy;
     int ret = 0;
 
-    pthread_mutex_lock(&uipcps->lock);
+    if (locked) pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
-        pthread_mutex_unlock(&uipcps->lock);
+        if (locked) pthread_mutex_unlock(&uipcps->lock);
         /* The specified IPCP is a Shim IPCP. */
         return 0;
     }
@@ -535,7 +532,7 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         list_del(&uipcp->node);
     }
 
-    pthread_mutex_unlock(&uipcps->lock);
+    if (locked) pthread_mutex_unlock(&uipcps->lock);
 
     if (!destroy) {
         return 0;
