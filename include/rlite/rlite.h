@@ -61,8 +61,15 @@ struct rl_ctrl {
     unsigned int flags;
 };
 
-uint32_t
-rl_ctrl_get_id(struct rl_ctrl *ctrl);
+/*
+ * API for initialization.
+ */
+
+int
+rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags);
+
+int
+rl_ctrl_fini(struct rl_ctrl *ctrl);
 
 void
 rl_flow_spec_default(struct rl_flow_spec *spec);
@@ -73,20 +80,10 @@ rl_flow_cfg_default(struct rl_flow_config *cfg);
 int
 rl_open_appl_port(rl_port_t port_id);
 
-int
-rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
 
-int
-rl_write_msg(int rfd, struct rl_msg_base *msg);
-
-int
-rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev,
-             unsigned flags);
-
-int
-rl_ctrl_fini(struct rl_ctrl *ctrl);
-
-/* Asynchronous API. */
+/*
+ * Asynchronous API.
+ */
 
 uint32_t
 rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
@@ -106,8 +103,15 @@ struct rl_msg_base *
 rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
                  unsigned int wait_ms);
 
-/* Synchronous API (higher level, implemented by means of the
- * asynchronous API. */
+uint32_t
+rl_ctrl_get_id(struct rl_ctrl *ctrl);
+
+
+/*
+ * Synchronous API (higher level, implemented by means of the
+ * asynchronous API).
+ */
+
 int
 rl_ctrl_flow_alloc(struct rl_ctrl *ctrl, const char *dif_name,
                    const struct rina_name *local_appl,
@@ -124,6 +128,14 @@ rl_ctrl_unregister(struct rl_ctrl *ctrl, const char *dif_name,
 
 int
 rl_ctrl_flow_accept(struct rl_ctrl *ctrl);
+
+
+/*
+ * API calls for userspace IPCPs, not to be used by applications.
+ */
+
+int
+rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
 
 #ifdef __cplusplus
 }
