@@ -988,7 +988,9 @@ flow_put(struct flow_entry *entry)
         ipcp->ops.flow_deallocated(ipcp, entry);
     }
 
-    dtp_dump(dtp);
+    if (verbosity >= RL_VERB_VERY) {
+        dtp_dump(dtp);
+    }
     dtp_fini(dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {

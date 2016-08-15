@@ -121,6 +121,8 @@ snd_inact_tmr_cb(long unsigned arg)
 
     spin_lock_bh(&dtp->lock);
 
+    dtp_dump(dtp);
+
     /* Re-initialize send-side state variables. */
     dtp_snd_reset(flow);
 
@@ -190,6 +192,10 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_lock_bh(&dtp->lock);
 
+    if (timer_pending(&dtp->snd_inact_tmr)) {
+        del_timer(&dtp->snd_inact_tmr);
+    }
+
     if (likely(dtp->rtx_tmr_next)) {
         /* I couldn't figure out how to implement this with the macros in
          * list.h, so I went for a custom loop.
@@ -246,6 +252,10 @@ rtx_tmr_cb(long unsigned arg)
                 (long unsigned)pci->seqnum);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
+
+    spin_lock_bh(&dtp->lock);
+    mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
+    spin_unlock_bh(&dtp->lock);
 }
 
 static int rl_normal_sdu_rx_consumed(struct flow_entry *flow,
@@ -483,8 +493,8 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
 static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp,
-                      struct flow_entry *flow,
-                      struct rl_buf *rb, bool maysleep)
+                    struct flow_entry *flow,
+                    struct rl_buf *rb, bool maysleep)
 {
     struct rina_pci *pci;
     struct dtp *dtp = &flow->dtp;
@@ -493,15 +503,20 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
 
     spin_lock_bh(&dtp->lock);
 
-    if (dtcp_present) {
-        mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
-    }
-
     /* Token bucket traffic shaping. */
     if (flow->cfg.dtcp.bandwidth) {
         while (dtp->tkbk.bucket_size < rb->len) {
             ktime_t now;
             unsigned long us;
+
+            if (!maysleep) {
+                spin_unlock_bh(&dtp->lock);
+                return -EAGAIN;
+            }
+
+            if (timer_pending(&dtp->snd_inact_tmr)) {
+                del_timer(&dtp->snd_inact_tmr);
+            }
 
             spin_unlock_bh(&dtp->lock);
             msleep(dtp->tkbk.intval_ms);
@@ -530,6 +545,10 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
         /* Backpressure. Don't drop the PDU, we will be
          * invoked again. */
         return -EAGAIN;
+    }
+
+    if (dtcp_present) {
+        mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
     }
 
     if (unlikely(rl_buf_pci_push(rb))) {

@@ -83,13 +83,10 @@ EXPORT_SYMBOL(dtp_fini);
 void
 dtp_dump(struct dtp *dtp)
 {
-    if (verbosity < RL_VERB_VERY) {
-        return;
-    }
-    printk("DTP: flags=%x,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
+    printk("DTP(%p): flags=%x,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
             "last_seq_num_sent=%lu,rcv_lwe=%lu,rcv_rwe=%lu,"
             "max_seq_num_rcvd=%lu,last_snd_data_ack=%lu,"
-            "next_snd_ctl_seq=%lu,last_ctrl_seq_num_rcvd=%lu\n",
+            "next_snd_ctl_seq=%lu,last_ctrl_seq_num_rcvd=%lu\n", dtp,
             dtp->flags, (long unsigned)dtp->snd_lwe,
             (long unsigned)dtp->snd_rwe,
             (long unsigned)dtp->next_seq_num_to_send,
