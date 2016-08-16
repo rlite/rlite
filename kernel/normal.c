@@ -149,6 +149,10 @@ snd_inact_tmr_cb(long unsigned arg)
     /* Notify user flow that there has been no activity for a while */
 
     spin_unlock_bh(&dtp->lock);
+
+    /* Wake up processes sleeping on write(), since cwq and rtxq have been
+     * emptied. */
+    rl_write_restart_flow(flow);
 }
 
 static void
@@ -547,10 +551,6 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
         return -EAGAIN;
     }
 
-    if (dtcp_present) {
-        mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
-    }
-
     if (unlikely(rl_buf_pci_push(rb))) {
         flow->stats.tx_err++;
         spin_unlock_bh(&dtp->lock);
@@ -617,6 +617,12 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
 
                 return ret;
             }
+        }
+    }
+
+    if (dtcp_present) {
+        if (!timer_pending(&dtp->rtx_tmr)) {
+            mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
         }
     }
 

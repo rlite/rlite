@@ -51,9 +51,9 @@ dtp_fini(struct dtp *dtp)
 
     spin_lock_bh(&dtp->lock);
 
-    del_timer(&dtp->snd_inact_tmr);
-    del_timer(&dtp->rcv_inact_tmr);
-    del_timer(&dtp->rtx_tmr);
+    del_timer_sync(&dtp->snd_inact_tmr);
+    del_timer_sync(&dtp->rcv_inact_tmr);
+    del_timer_sync(&dtp->rtx_tmr);
 
     PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
