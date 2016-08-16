@@ -121,6 +121,8 @@ snd_inact_tmr_cb(long unsigned arg)
 
     spin_lock_bh(&dtp->lock);
 
+    del_timer(&dtp->rtx_tmr);
+
     dtp_dump(dtp);
 
     /* Re-initialize send-side state variables. */
