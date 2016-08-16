@@ -198,9 +198,10 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_lock_bh(&dtp->lock);
 
-    if (timer_pending(&dtp->snd_inact_tmr)) {
-        del_timer(&dtp->snd_inact_tmr);
-    }
+    /* Stop the sender inactivity timer, will be restarted
+     * at the end of the function, after the burst of
+     * retransmissions. */
+    del_timer(&dtp->snd_inact_tmr);
 
     if (likely(dtp->rtx_tmr_next)) {
         /* I couldn't figure out how to implement this with the macros in
@@ -254,8 +255,7 @@ rtx_tmr_cb(long unsigned arg)
     list_for_each_entry_safe(crb, tmp, &rrbq, node) {
         struct rina_pci *pci = RLITE_BUF_PCI(crb);
 
-        PD("sending [%lu] from rtxq\n",
-                (long unsigned)pci->seqnum);
+        RPD(3, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
 
@@ -308,6 +308,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     /* MPL + R + A */
     dtp->mpl_r_a = mpl + r + msecs_to_jiffies(flow->cfg.dtcp.initial_a);
+    PD("MPL+R+A = %u ms\n", jiffies_to_msecs(dtp->mpl_r_a));
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->snd_inact_tmr.data = (unsigned long)flow;
@@ -520,9 +521,9 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
                 return -EAGAIN;
             }
 
-            if (timer_pending(&dtp->snd_inact_tmr)) {
-                del_timer(&dtp->snd_inact_tmr);
-            }
+            /* We are going to sleep, stop the inactivity timer
+             * (see below). */
+            del_timer(&dtp->snd_inact_tmr);
 
             spin_unlock_bh(&dtp->lock);
             msleep(dtp->tkbk.intval_ms);
@@ -546,6 +547,11 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
                         (flow->cfg.dtcp.rtx_control &&
                             dtp->rtxq_len >= dtp->max_rtxq_len)) {
         /* POL: FlowControlOverrun */
+
+        /* Stop the sender inactivity timer. It will be
+         * started again when we will be invoked again. */
+        del_timer(&dtp->snd_inact_tmr);
+
         spin_unlock_bh(&dtp->lock);
 
         /* Backpressure. Don't drop the PDU, we will be
@@ -554,6 +560,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (unlikely(rl_buf_pci_push(rb))) {
+        PE("pci_push() failed\n");
         flow->stats.tx_err++;
         spin_unlock_bh(&dtp->lock);
         rl_buf_free(rb);
@@ -620,12 +627,8 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
                 return ret;
             }
         }
-    }
 
-    if (dtcp_present) {
-        if (!timer_pending(&dtp->rtx_tmr)) {
-            mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
-        }
+        mod_timer(&dtp->snd_inact_tmr, jiffies + 3 * dtp->mpl_r_a);
     }
 
     spin_unlock_bh(&dtp->lock);
