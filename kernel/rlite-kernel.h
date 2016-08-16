@@ -492,6 +492,4 @@ void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
 
-#define MPL_MSECS_DEFAULT   1000
-
 #endif  /* __RLITE_KERNEL_H__ */

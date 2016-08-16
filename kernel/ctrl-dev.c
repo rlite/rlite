@@ -315,7 +315,7 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
     }
 
     cur->max_pdu_size = 8000;  /* Currently unused. */
-    cur->max_pdu_life = MPL_MSECS_DEFAULT;
+    cur->max_pdu_life = RL_MPL_MSECS_DFLT;
     cur->refcnt = 1;
     list_add_tail(&cur->node, &rl_dm.difs);
 

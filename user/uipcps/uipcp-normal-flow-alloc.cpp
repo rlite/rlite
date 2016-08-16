@@ -123,9 +123,9 @@ flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
         cfg->in_order_delivery = 1;
         cfg->dtcp.initial_a = 10;
         cfg->dtcp.rtx_control = 1;
-        cfg->dtcp.rtx.max_time_to_retry = 15;
-        cfg->dtcp.rtx.data_rxms_max = 15;
-        cfg->dtcp.rtx.initial_tr = 10;
+        cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
+        cfg->dtcp.rtx.data_rxms_max = RL_DATA_RXMS_MAX_DFLT;
+        cfg->dtcp.rtx.initial_tr = RL_RTX_MSECS_DFLT;
     }
 
     /* Delay and jitter ignored for now. */
@@ -146,7 +146,7 @@ flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
         cfg->dtcp_present = 1;
     }
 }
-#endif  /* RL_USE_QOS_CUBES */
+#endif  /* !RL_USE_QOS_CUBES */
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int

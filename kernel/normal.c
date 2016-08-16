@@ -267,8 +267,6 @@ rtx_tmr_cb(long unsigned arg)
 static int rl_normal_sdu_rx_consumed(struct flow_entry *flow,
                                        struct rl_buf *rb);
 
-#define RTX_MSECS_DEFAULT       1000
-#define DATA_RXMS_MAX_DEFAULT   10
 #define TKBK_INTVAL_MSEC        2
 
 static int
@@ -287,20 +285,20 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (!mpl) {
-        PI("fixing MPL to %u ms\n", MPL_MSECS_DEFAULT);
-        mpl = msecs_to_jiffies(MPL_MSECS_DEFAULT);
+        PI("fixing MPL to %u ms\n", RL_MPL_MSECS_DFLT);
+        mpl = msecs_to_jiffies(RL_MPL_MSECS_DFLT);
     }
 
     if (flow->cfg.dtcp.rtx_control && ! flow->cfg.dtcp.rtx.initial_tr) {
         PI("fixing initial_tr parameter to %u ms\n",
-                RTX_MSECS_DEFAULT);
-        flow->cfg.dtcp.rtx.initial_tr = RTX_MSECS_DEFAULT;
+                RL_RTX_MSECS_DFLT);
+        flow->cfg.dtcp.rtx.initial_tr = RL_RTX_MSECS_DFLT;
     }
 
     if (flow->cfg.dtcp.rtx_control && ! flow->cfg.dtcp.rtx.data_rxms_max) {
         PI("fixing data_rxms_max parameter to %u\n",
-                DATA_RXMS_MAX_DEFAULT);
-        flow->cfg.dtcp.rtx.data_rxms_max = DATA_RXMS_MAX_DEFAULT;
+                RL_DATA_RXMS_MAX_DFLT);
+        flow->cfg.dtcp.rtx.data_rxms_max = RL_DATA_RXMS_MAX_DFLT;
     }
 
     r = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr) *

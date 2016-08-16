@@ -176,6 +176,10 @@ struct rl_flow_config {
     uint16_t inet_port;
 } __attribute__((packed));
 
+#define RL_MPL_MSECS_DFLT       1000
+#define RL_RTX_MSECS_DFLT       1000
+#define RL_DATA_RXMS_MAX_DFLT   10
+
 struct rl_flow_spec {
     rl_seq_t max_sdu_gap;       /* in SDUs */
     uint64_t avg_bandwidth;     /* in bits per second */
