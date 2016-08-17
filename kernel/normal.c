@@ -89,7 +89,7 @@ dtp_snd_reset(struct flow_entry *flow)
     dtp->next_seq_num_to_send = 0;
     dtp->snd_lwe = dtp->snd_rwe = dtp->next_seq_num_to_send;
     dtp->last_seq_num_sent = -1;
-    dtp->next_snd_ctl_seq = 0;
+    dtp->last_ctrl_seq_num_rcvd = 0;
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->snd_rwe += fc->cfg.w.initial_credit;
     }
@@ -106,7 +106,7 @@ dtp_rcv_reset(struct flow_entry *flow)
     dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
     dtp->last_snd_data_ack = 0;
-    dtp->last_ctrl_seq_num_rcvd = 0;
+    dtp->next_snd_ctl_seq = 0;
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }

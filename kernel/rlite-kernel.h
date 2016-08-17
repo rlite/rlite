@@ -341,25 +341,18 @@ struct tkbk {
 struct dtp {
     spinlock_t lock;
 
+    unsigned long mpl_r_a;  /* MPL + R + A */
+
+    /* Sender state. */
     rl_seq_t snd_lwe;
     rl_seq_t snd_rwe;
     rl_seq_t next_seq_num_to_send;
     rl_seq_t last_seq_num_sent;
-    rl_seq_t rcv_lwe;
-    rl_seq_t rcv_lwe_priv;
-    rl_seq_t rcv_rwe;
-    rl_seq_t max_seq_num_rcvd;
-    rl_seq_t last_snd_data_ack;
-    rl_seq_t next_snd_ctl_seq;
     rl_seq_t last_ctrl_seq_num_rcvd;
-    struct timer_list snd_inact_tmr;
-    struct timer_list rcv_inact_tmr;
-    unsigned long mpl_r_a;  /* MPL + R + A */
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
-    struct list_head seqq;
-    unsigned int seqq_len;
+    struct timer_list snd_inact_tmr;
     struct list_head rtxq;
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
@@ -367,6 +360,18 @@ struct dtp {
     unsigned long rtx_tmr_int;
     struct rl_buf *rtx_tmr_next;
     struct tkbk tkbk;
+
+    /* Receiver state. */
+    rl_seq_t rcv_lwe;
+    rl_seq_t rcv_lwe_priv;
+    rl_seq_t rcv_rwe;
+    rl_seq_t max_seq_num_rcvd;
+    rl_seq_t last_snd_data_ack; /* almost unused */
+    rl_seq_t next_snd_ctl_seq;
+    struct timer_list rcv_inact_tmr;
+    struct list_head seqq;
+    unsigned int seqq_len;
+
 #define DTP_F_DRF_SET		(1<<0)
 #define DTP_F_DRF_EXPECTED	(1<<1)
     uint8_t flags;
