@@ -463,9 +463,11 @@ void rl_write_restart_flows(struct ipcp_entry *ipcp);
 
 void rl_flow_share_tx_wqh(struct flow_entry *flow);
 
-struct flow_entry *flow_lookup(rl_port_t port_id);
+struct flow_entry *__flow_put(struct flow_entry *flow);
 
 struct flow_entry *flow_put(struct flow_entry *flow);
+
+struct flow_entry *flow_lookup(rl_port_t port_id);
 
 struct flow_entry *flow_get(rl_port_t port_id);
 
@@ -474,6 +476,8 @@ struct flow_entry *flow_get_by_cep(unsigned int cep_id);
 void flow_get_ref(struct flow_entry *flow);
 
 void flow_make_mortal(struct flow_entry *flow);
+
+void rl_flow_shutdown(struct flow_entry *flow);
 
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)

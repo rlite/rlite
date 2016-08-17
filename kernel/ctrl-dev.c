@@ -770,26 +770,36 @@ application_del_by_rc(struct rl_ctrl *rc)
     }
 }
 
+/* To be called under FLOCK. */
 struct flow_entry *
-flow_get(rl_port_t port_id)
+flow_lookup(rl_port_t port_id)
 {
     struct flow_entry *entry;
     struct hlist_head *head;
-
-    FLOCK();
-
     head = &rl_dm.flow_table[hash_min(port_id, HASH_BITS(rl_dm.flow_table))];
     hlist_for_each_entry(entry, head, node) {
         if (entry->local_port == port_id) {
-            entry->refcnt++;
-            FUNLOCK();
             return entry;
         }
     }
 
+    return NULL;
+}
+EXPORT_SYMBOL(flow_lookup);
+
+struct flow_entry *
+flow_get(rl_port_t port_id)
+{
+    struct flow_entry *flow;
+
+    FLOCK();
+    flow = flow_lookup(port_id);
+    if (flow) {
+        flow->refcnt++;
+    }
     FUNLOCK();
 
-    return NULL;
+    return flow;
 }
 EXPORT_SYMBOL(flow_get);
 
@@ -925,7 +935,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 }
 
 struct flow_entry *
-flow_put(struct flow_entry *entry)
+__flow_put(struct flow_entry *entry)
 {
     struct rl_buf *rb;
     struct rl_buf *tmp;
@@ -939,8 +949,6 @@ flow_put(struct flow_entry *entry)
         return NULL;
     }
     dtp = &entry->dtp;
-
-    FLOCK();
 
     entry->refcnt--;
     if (entry->refcnt) {
@@ -1058,9 +1066,18 @@ flow_put(struct flow_entry *entry)
     PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 out:
+    return ret;
+}
+EXPORT_SYMBOL(__flow_put);
+
+struct flow_entry *
+flow_put(struct flow_entry *flow)
+{
+    FLOCK();
+    flow = __flow_put(flow);
     FUNLOCK();
 
-    return ret;
+    return flow;
 }
 EXPORT_SYMBOL(flow_put);
 
@@ -1653,34 +1670,42 @@ rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc,
     return ret;
 }
 
+/* May be called under FLOCK. */
+void
+rl_flow_shutdown(struct flow_entry *flow)
+{
+    int deallocated = 0;
+
+    spin_lock_bh(&flow->txrx.rx_lock);
+    if (flow->txrx.state == FLOW_STATE_ALLOCATED) {
+        /* Set the EOF condition on the flow. */
+        flow->txrx.state = FLOW_STATE_DEALLOCATED;
+        deallocated = 1;
+    }
+    spin_unlock_bh(&flow->txrx.rx_lock);
+
+    if (deallocated) {
+        /* Wake up readers and pollers, so that they can read the EOF. */
+        wake_up_interruptible_poll(&flow->txrx.rx_wqh, POLLIN |
+                POLLRDNORM | POLLRDBAND);
+    }
+}
+EXPORT_SYMBOL(rl_flow_shutdown);
+
 static int
-rl_flow_dealloc(struct rl_ctrl *rc,
-                  struct rl_msg_base *bmsg)
+rl_flow_dealloc(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_flow_dealloc *req =
                 (struct rl_kmsg_flow_dealloc *)bmsg;
-    struct ipcp_entry *ipcp;
     struct flow_entry *flow;
-    int ret = -ENXIO;  /* Report failure by default. */
+    int ret = -ENXIO;
 
-    ipcp = ipcp_get(req->ipcp_id);
     flow = flow_get(req->port_id);
-    if (ipcp && flow) {
-        spin_lock_bh(&flow->txrx.rx_lock);
-        if (flow->txrx.state == FLOW_STATE_ALLOCATED) {
-            /* Set the EOF condition on the flow. */
-            flow->txrx.state = FLOW_STATE_DEALLOCATED;
-            ret = 0;
-        }
-        spin_unlock_bh(&flow->txrx.rx_lock);
-        if (ret == 0) {
-            /* Wake up readers and pollers, so that they can read the EOF. */
-            wake_up_interruptible_poll(&flow->txrx.rx_wqh, POLLIN |
-                                       POLLRDNORM | POLLRDBAND);
-        }
+    if (flow) {
+        rl_flow_shutdown(flow);
+        ret = 0;
     }
     flow_put(flow);
-    ipcp_put(ipcp);
 
     return ret;
 }

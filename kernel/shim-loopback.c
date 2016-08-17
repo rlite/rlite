@@ -246,6 +246,19 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
     return 0;
 }
 
+/* Called under FLOCK. */
+static int
+rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
+{
+    struct flow_entry *remote_flow = flow_lookup(flow->remote_port);
+
+    if (remote_flow) {
+        rl_flow_shutdown(remote_flow);
+    }
+
+    return 0;
+}
+
 static int
 rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
                              struct flow_entry *tx_flow,
@@ -386,6 +399,7 @@ static struct ipcp_factory shim_loopback_factory = {
     .ops.destroy = rl_shim_loopback_destroy,
     .ops.flow_allocate_req = rl_shim_loopback_fa_req,
     .ops.flow_allocate_resp = rl_shim_loopback_fa_resp,
+    .ops.flow_deallocated = rl_shim_loopback_flow_deallocated,
     .ops.sdu_write = rl_shim_loopback_sdu_write,
     .ops.config = rl_shim_loopback_config,
     .ops.flow_get_stats = rl_shim_loopback_flow_get_stats,
