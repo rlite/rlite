@@ -106,7 +106,10 @@ dtp_rcv_reset(struct flow_entry *flow)
     dtp->rcv_lwe = dtp->rcv_lwe_priv = dtp->rcv_rwe = 0;
     dtp->max_seq_num_rcvd = -1;
     dtp->last_snd_data_ack = 0;
+#if 0
+    /* This is reset in the receive datapath (see rl_normal_sdu_rx) */
     dtp->next_snd_ctl_seq = 0;
+#endif
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }
@@ -587,7 +590,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
 
     if (!dtcp_present) {
         /* DTCP not present */
-        dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* NIS */
+        dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* WFS */
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
@@ -961,7 +964,10 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
             (long unsigned)pcic->base.seqnum);
     } else if (unlikely(dtp->last_ctrl_seq_num_rcvd &&
                     pcic->base.seqnum <= dtp->last_ctrl_seq_num_rcvd)) {
-        /* Duplicated control PDU: just drop it. */
+        /* Duplicated control PDU: just drop it.
+         * Note that if last_ctrl_seq_num_rcvd is zero we accept
+         * pcic->base.seqnum as the first valid control sequence
+         * number. This solution is temporary (WFS). */
         RPD(5, "Duplicated control PDU [%lu], last [%lu]\n",
             (long unsigned)pcic->base.seqnum,
             (long unsigned)dtp->last_ctrl_seq_num_rcvd);
@@ -1146,6 +1152,21 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         dtp->flags &= ~DTP_F_DRF_EXPECTED;
         dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
+
+        if (pci->pdu_flags & PDU_F_DRF) {
+            /* If the DRF is set, we know the sender has reset its state,
+             * including last_ctrl_seq_num_rcvd. We can then reset
+             * next_snd_ctl_seq safely. If the DRF is not set, we assume
+             * the sender did not reset its state, and so we keep using
+             * the old next_snd_ctl_seq; this is necessary to prevent the
+             * sender from dropping all the control PDUs sent by us (the
+             * receiver), which would think they are duplicated. This
+             * solution is temporary (WFS). */
+            dtp->next_snd_ctl_seq = 0;
+            PV("Reset control sequence number\n");
+        } else {
+            PV("Keep old control sequence number %llu\n", dtp->next_snd_ctl_seq);
+        }
 
         crb = sdu_rx_sv_update(ipcp, flow);
 
