@@ -288,7 +288,7 @@ perf_client(struct rinaperf *rp)
         }
 
         if (interval && --cdown == 0) {
-            if (interval > 15) {
+            if (interval > 50) { /* slack default is 50 us*/
                 usleep(interval);
             } else {
                 gettimeofday(&w1, NULL);
@@ -409,6 +409,65 @@ perf_server(struct rinaperf *rp)
     return 0;
 }
 
+static int
+endless_client(struct rinaperf *rp)
+{
+    int ret;
+    char buf[SDU_SIZE_MAX];
+    int size = rp->test_config.size;
+    unsigned int interval = rp->interval;
+    unsigned int i = 0;
+
+    if (size > sizeof(buf)) {
+        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
+        size = sizeof(buf);
+    }
+
+    memset(buf, 'x', size);
+
+    for (i = 0; i < rp->test_config.cnt; i++) {
+        ret = write(rp->dfd, buf, size);
+        if (ret != size) {
+            printf("write() error: %d/%d\n", ret, size);
+            break;
+        }
+        if (interval) {
+            usleep(interval);
+        }
+    }
+
+    close(rp->dfd);
+
+    printf("Sent %u packets and closed the stream\n", i);
+
+    return 0;
+}
+
+static int
+endless_server(struct rinaperf *rp)
+{
+    char buf[SDU_SIZE_MAX];
+    unsigned int i;
+    int n;
+
+    for (i = 0;; i++) {
+        n = read(rp->dfd, buf, sizeof(buf));
+        if (n < 0) {
+            perror("read(flow)");
+            return -1;
+
+        } else if (n == 0) {
+            PI("Flow deallocated remotely\n");
+            break;
+        }
+    }
+
+    printf("Session broken, calling close() anyway\n");
+    close(rp->dfd);
+
+    return 0;
+}
+
 struct perf_function_desc {
     const char *name;
     perf_function_t client_function;
@@ -424,6 +483,11 @@ static struct perf_function_desc descs[] = {
     {   .name = "perf",
         .client_function = perf_client,
         .server_function = perf_server,
+    },
+    {
+        .name = "endless",
+        .client_function = endless_client,
+        .server_function = endless_server,
     }
 };
 
