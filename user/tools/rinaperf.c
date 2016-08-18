@@ -45,6 +45,8 @@
 
 #define SDU_SIZE_MAX    65535
 
+static int stop = 0; /* Used to stop tests on SIGINT. */
+
 struct rinaperf_test_config {
     uint32_t ty;
     uint32_t size;
@@ -168,7 +170,7 @@ ping_client(struct rinaperf *rp)
 
     gettimeofday(&t_start, NULL);
 
-    for (i = 0; !limit || i < limit; i++) {
+    for (i = 0; !stop && (!limit || i < limit); i++) {
         if (verb) {
             gettimeofday(&t1, NULL);
         }
@@ -300,7 +302,7 @@ perf_client(struct rinaperf *rp)
 
     gettimeofday(&t_start, NULL);
 
-    for (i = 0; !limit || i < limit; i++) {
+    for (i = 0; !stop && (!limit || i < limit); i++) {
         ret = write(rp->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
@@ -335,8 +337,8 @@ perf_client(struct rinaperf *rp)
 
     if (us) {
         printf("Throughput: %.3f Kpps, %.3f Mbps\n",
-                ((float)limit) * 1000.0 / us,
-                ((float)size) * 8 * limit / us);
+                ((float)i) * 1000.0 / us,
+                ((float)size) * 8 * i / us);
     }
 
     close(rp->dfd);
@@ -432,66 +434,6 @@ perf_server(struct rinaperf *rp)
     return 0;
 }
 
-static int
-endless_client(struct rinaperf *rp)
-{
-    char buf[SDU_SIZE_MAX];
-    int size = rp->test_config.size;
-    unsigned int interval = rp->interval;
-    unsigned limit = rp->test_config.cnt;
-    unsigned int i = 0;
-    int ret;
-
-    if (size > sizeof(buf)) {
-        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
-        size = sizeof(buf);
-    }
-
-    memset(buf, 'x', size);
-
-    for (i = 0; !limit || i < limit; i++) {
-        ret = write(rp->dfd, buf, size);
-        if (ret != size) {
-            printf("write() error: %d/%d\n", ret, size);
-            break;
-        }
-        if (interval) {
-            usleep(interval);
-        }
-    }
-
-    close(rp->dfd);
-
-    printf("Sent %u packets and closed the flow\n", i);
-
-    return 0;
-}
-
-static int
-endless_server(struct rinaperf *rp)
-{
-    char buf[SDU_SIZE_MAX];
-    unsigned int i;
-    int n;
-
-    for (i = 0;; i++) {
-        n = read(rp->dfd, buf, sizeof(buf));
-        if (n < 0) {
-            perror("read(flow)");
-            return -1;
-
-        } else if (n == 0) {
-            printf("Flow deallocated remotely\n");
-            break;
-        }
-    }
-
-    printf("Session broken, calling close() anyway\n");
-    close(rp->dfd);
-
-    return 0;
-}
-
 struct perf_function_desc {
     const char *name;
     perf_function_t client_function;
@@ -513,11 +455,6 @@ static struct perf_function_desc descs[] = {
         .client_function = perf_client,
         .server_function = perf_server,
     },
-    {
-        .name = "endless",
-        .client_function = endless_client,
-        .server_function = endless_server,
-    }
 };
 
 static int
@@ -552,7 +489,13 @@ clos:
 }
 
 static void
-sigint_handler(int signum)
+sigint_handler_client(int signum)
+{
+    stop = 1;
+}
+
+static void
+sigint_handler_server(int signum)
 {
     exit(EXIT_SUCCESS);
 }
@@ -632,7 +575,6 @@ main(int argc, char **argv)
     struct rina_name client_ctrl_name, server_ctrl_name;
     struct rl_flow_spec flowspec;
     int interval_specified = 0;
-    int count_specified = 0;
     int listen = 0;
     int cnt = 0;
     int size = 1;
@@ -670,7 +612,6 @@ main(int argc, char **argv)
                     printf("    Invalid 'cnt' %d\n", cnt);
                     return -1;
                 }
-                count_specified = 1;
                 break;
 
             case 's':
@@ -744,8 +685,6 @@ main(int argc, char **argv)
      *     specify the interval explicitly.
      *   - Set rp.ping variable to distinguish between ping and rr tests,
      *     which share the same functions.
-     *   - Use -c 10000 for rr tests, if the user did not specify the
-     *     option explicitly.
      */
     if (strcmp(type, "ping") == 0) {
         if (!interval_specified) {
@@ -754,9 +693,6 @@ main(int argc, char **argv)
         rp.ping = 1;
 
     } else if (strcmp(type, "rr") == 0) {
-        if (!count_specified) {
-            cnt = 10000;
-        }
         rp.ping = 0;
     }
 
@@ -784,7 +720,7 @@ main(int argc, char **argv)
     }
 
     /* Set some signal handler */
-    sa.sa_handler = sigint_handler;
+    sa.sa_handler = listen ? sigint_handler_server : sigint_handler_client;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     ret = sigaction(SIGINT, &sa, NULL);
