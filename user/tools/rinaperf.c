@@ -163,6 +163,16 @@ ping_client(struct rinaperf *rp)
         size = sizeof(buf);
     }
 
+    if (!verb) {
+        printf("Starting request-response test; message size: %d, "
+               " number of messages: ", size);
+        if (limit) {
+            printf("%d\n", limit);
+        } else {
+            printf("inf\n");
+        }
+    }
+
     pfd.fd = rp->dfd;
     pfd.events = POLLIN;
 
@@ -219,7 +229,7 @@ ping_client(struct rinaperf *rp)
     us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
             (t_end.tv_usec - t_start.tv_usec);
 
-    if (i) {
+    if (!verb && i) {
         printf("SDU size: %d bytes, avg latency: %lu us\n", ret,
                 (us/i) - interval);
     }
@@ -296,6 +306,14 @@ perf_client(struct rinaperf *rp)
     if (size > sizeof(buf)) {
         printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
+    }
+
+    printf("Starting unidirectional throughput test; message size: %d, "
+            " number of messages: ", size);
+    if (limit) {
+        printf("%d\n", limit);
+    } else {
+        printf("inf\n");
     }
 
     memset(buf, 'x', size);
