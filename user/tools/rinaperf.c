@@ -195,29 +195,29 @@ ping_client(struct rinaperf *rp)
             break;
         }
 
-        ret = poll(&pfd, 1, 3000);
+        ret = poll(&pfd, 1, 2000);
         if (ret < 0) {
             perror("poll(flow)");
-        } else if (ret == 0) {
-            /* Timeout */
-            printf("timeout occurred\n");
-            break;
         }
 
-        /* Ready to read. */
-        ret = read(rp->dfd, buf, sizeof(buf));
-        if (ret <= 0) {
-            if (ret) {
-                perror("read(buf");
+        if (ret > 0) {
+            /* Ready to read. */
+            ret = read(rp->dfd, buf, sizeof(buf));
+            if (ret <= 0) {
+                if (ret) {
+                    perror("read(buf");
+                }
+                break;
             }
-            break;
-        }
 
-        if (verb) {
-            gettimeofday(&t2, NULL);
-            us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
-            printf("%d bytes from server: rtt = %.3f ms\n", ret,
-                   ((float)us)/1000.0);
+            if (verb) {
+                gettimeofday(&t2, NULL);
+                us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
+                printf("%d bytes from server: rtt = %.3f ms\n", ret,
+                       ((float)us)/1000.0);
+            }
+        } else {
+            printf("%d bytes packet lost\n", size);
         }
 
         if (interval) {
