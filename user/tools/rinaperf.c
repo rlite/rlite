@@ -141,7 +141,7 @@ server_test_config(struct rinaperf *rp)
 }
 
 static int
-echo_client(struct rinaperf *rp)
+ping_client(struct rinaperf *rp)
 {
     struct timeval t_start, t_end;
     unsigned long us;
@@ -210,7 +210,7 @@ echo_client(struct rinaperf *rp)
 }
 
 static int
-echo_server(struct rinaperf *rp)
+ping_server(struct rinaperf *rp)
 {
     int n, ret;
     unsigned int i;
@@ -476,9 +476,9 @@ struct perf_function_desc {
 
 static struct perf_function_desc descs[] = {
     {
-        .name = "echo",
-        .client_function = echo_client,
-        .server_function = echo_server,
+        .name = "ping",
+        .client_function = ping_client,
+        .server_function = ping_server,
     },
     {   .name = "perf",
         .client_function = perf_client,
@@ -568,7 +568,7 @@ usage(void)
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
         "   -t TEST : specify the type of the test to be performed "
-            "(ping, perf)\n"
+            "(ping, perf, endless)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
         "   -c NUM : number of SDUs to send during the test\n"
         "   -s NUM : size of the SDUs that are sent during the test\n"
@@ -595,7 +595,7 @@ main(int argc, char **argv)
 {
     struct sigaction sa;
     struct rinaperf rp;
-    const char *type = "echo";
+    const char *type = "ping";
     const char *dif_name = NULL;
     const char *cli_appl_apn = "rinaperf-data", *cli_appl_api = "client";
     const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";

@@ -20,5 +20,3 @@
   every 2-10 milliseconds
 
 - install: don't overwrite config files
-
-- kernel: flow deallocation: check when we should raise SIGPIPE
