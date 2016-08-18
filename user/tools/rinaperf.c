@@ -60,6 +60,7 @@ struct rinaperf {
 
     unsigned int interval;
     unsigned int burst;
+    int ping;
 
     struct rinaperf_test_config test_config;
 };
@@ -81,7 +82,7 @@ client_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("write(buf)");
         } else {
-            PE("partial write %d/%lu\n", ret,
+            printf("partial write %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -110,7 +111,7 @@ server_test_config(struct rinaperf *rp)
             return ret;
 
         case 0:
-            PI("timeout while waiting for server test configuration\n");
+            printf("timeout while waiting for server test configuration\n");
             return -1;
 
         default:
@@ -122,7 +123,7 @@ server_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("read(buf");
         } else {
-            PE("partial read %d/%lu\n", ret,
+            printf("partial read %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -140,20 +141,23 @@ server_test_config(struct rinaperf *rp)
     return 0;
 }
 
+/* Used for both ping and rr tests. */
 static int
 ping_client(struct rinaperf *rp)
 {
-    struct timeval t_start, t_end;
-    unsigned long us;
-    int ret = 0;
-    char buf[SDU_SIZE_MAX];
-    int size = rp->test_config.size;
+    unsigned int limit = rp->test_config.cnt;
+    struct timeval t_start, t_end, t1, t2;
     unsigned int interval = rp->interval;
+    int size = rp->test_config.size;
+    char buf[SDU_SIZE_MAX];
+    int verb = rp->ping;
     unsigned int i = 0;
+    unsigned long us;
     struct pollfd pfd;
+    int ret = 0;
 
     if (size > sizeof(buf)) {
-        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
+        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
 
@@ -164,7 +168,11 @@ ping_client(struct rinaperf *rp)
 
     gettimeofday(&t_start, NULL);
 
-    for (i = 0; i < rp->test_config.cnt; i++) {
+    for (i = 0; !limit || i < limit; i++) {
+        if (verb) {
+            gettimeofday(&t1, NULL);
+        }
+
         ret = write(rp->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
@@ -180,14 +188,24 @@ ping_client(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (ret == 0) {
             /* Timeout */
-            PI("timeout occurred\n");
+            printf("timeout occurred\n");
             break;
         }
 
         /* Ready to read. */
         ret = read(rp->dfd, buf, sizeof(buf));
-        if (ret < 0) {
-            perror("read(buf");
+        if (ret <= 0) {
+            if (ret) {
+                perror("read(buf");
+            }
+            break;
+        }
+
+        if (verb) {
+            gettimeofday(&t2, NULL);
+            us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
+            printf("%d bytes from server: rtt = %.3f ms\n", ret,
+                   ((float)us)/1000.0);
         }
 
         if (interval) {
@@ -200,8 +218,8 @@ ping_client(struct rinaperf *rp)
             (t_end.tv_usec - t_start.tv_usec);
 
     if (i) {
-        printf("SDU size: %d bytes, latency: %lu us\n", ret,
-                us/i);
+        printf("SDU size: %d bytes, avg latency: %lu us\n", ret,
+                (us/i) - interval);
     }
 
     close(rp->dfd);
@@ -209,26 +227,26 @@ ping_client(struct rinaperf *rp)
     return 0;
 }
 
+/* Used for both ping and rr tests. */
 static int
 ping_server(struct rinaperf *rp)
 {
-    int n, ret;
-    unsigned int i;
+    unsigned int limit = rp->test_config.cnt;
     char buf[SDU_SIZE_MAX];
     struct pollfd pfd;
+    unsigned int i;
+    int n, ret;
 
     pfd.fd = rp->dfd;
     pfd.events = POLLIN;
 
-    for (i = 0; i < rp->test_config.cnt; i++) {
+    for (i = 0; !limit || i < limit; i++) {
         n = poll(&pfd, 1, 3000);
         if (n < 0) {
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            PI("timeout occurred\n");
-            PI("received %u PDUs out of %u\n",
-                    i, rp->test_config.cnt);
+            printf("timeout occurred\n");
             break;
         }
 
@@ -237,6 +255,9 @@ ping_server(struct rinaperf *rp)
         if (n < 0) {
             perror("read(flow)");
             return -1;
+        } else if (n == 0) {
+            printf("Flow deallocated remotely\n");
+            break;
         }
 
         ret = write(rp->dfd, buf, n);
@@ -250,25 +271,28 @@ ping_server(struct rinaperf *rp)
         }
     }
 
+    printf("received %u PDUs out of %u\n", i, limit);
+
     return 0;
 }
 
 static int
 perf_client(struct rinaperf *rp)
 {
-    struct timeval t_start, t_end;
-    struct timeval w1, w2;
-    unsigned long us;
-    int ret;
-    char buf[SDU_SIZE_MAX];
+    unsigned limit = rp->test_config.cnt;
     int size = rp->test_config.size;
     unsigned int interval = rp->interval;
-    unsigned int i = 0;
     unsigned int burst = rp->burst;
     unsigned int cdown = burst;
+    struct timeval t_start, t_end;
+    struct timeval w1, w2;
+    char buf[SDU_SIZE_MAX];
+    unsigned long us;
+    unsigned int i = 0;
+    int ret;
 
     if (size > sizeof(buf)) {
-        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
+        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
 
@@ -276,7 +300,7 @@ perf_client(struct rinaperf *rp)
 
     gettimeofday(&t_start, NULL);
 
-    for (i = 0; i < rp->test_config.cnt; i++) {
+    for (i = 0; !limit || i < limit; i++) {
         ret = write(rp->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
@@ -311,8 +335,8 @@ perf_client(struct rinaperf *rp)
 
     if (us) {
         printf("Throughput: %.3f Kpps, %.3f Mbps\n",
-                ((float)rp->test_config.cnt) * 1000.0 / us,
-                ((float)size) * 8 * rp->test_config.cnt / us);
+                ((float)limit) * 1000.0 / us,
+                ((float)size) * 8 * limit / us);
     }
 
     close(rp->dfd);
@@ -358,6 +382,7 @@ rate_print(unsigned long long *bytes, unsigned long long *cnt,
 static int
 perf_server(struct rinaperf *rp)
 {
+    unsigned limit = rp->test_config.cnt;
     unsigned long long rate_cnt = 0;
     unsigned long long rate_bytes_limit = 1000;
     unsigned long long rate_bytes = 0;
@@ -372,16 +397,14 @@ perf_server(struct rinaperf *rp)
 
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
 
-    for (i = 0; i < rp->test_config.cnt; i++) {
+    for (i = 0; !limit || i < limit; i++) {
         n = poll(&pfd, 1, 3000);
         if (n < 0) {
             perror("poll(flow)");
 
         } else if (n == 0) {
             /* Timeout */
-            PI("Timeout occurred\n");
-            PI("Received %u PDUs out of %u\n",
-                    i, rp->test_config.cnt);
+            printf("Timeout occurred\n");
             break;
         }
 
@@ -391,10 +414,8 @@ perf_server(struct rinaperf *rp)
             perror("read(flow)");
             return -1;
 
-        } else if (n==0) {
-            PI("Flow deallocated remotely\n");
-            PI("Received %u PDUs out of %u\n",
-                    i, rp->test_config.cnt);
+        } else if (n == 0) {
+            printf("Flow deallocated remotely\n");
             break;
         }
 
@@ -406,26 +427,29 @@ perf_server(struct rinaperf *rp)
         }
     }
 
+    printf("Received %u PDUs out of %u\n", i, limit);
+
     return 0;
 }
 
 static int
 endless_client(struct rinaperf *rp)
 {
-    int ret;
     char buf[SDU_SIZE_MAX];
     int size = rp->test_config.size;
     unsigned int interval = rp->interval;
+    unsigned limit = rp->test_config.cnt;
     unsigned int i = 0;
+    int ret;
 
     if (size > sizeof(buf)) {
-        PI("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
+        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
         size = sizeof(buf);
     }
 
     memset(buf, 'x', size);
 
-    for (i = 0; i < rp->test_config.cnt; i++) {
+    for (i = 0; !limit || i < limit; i++) {
         ret = write(rp->dfd, buf, size);
         if (ret != size) {
             printf("write() error: %d/%d\n", ret, size);
@@ -438,7 +462,7 @@ endless_client(struct rinaperf *rp)
 
     close(rp->dfd);
 
-    printf("Sent %u packets and closed the stream\n", i);
+    printf("Sent %u packets and closed the flow\n", i);
 
     return 0;
 }
@@ -457,7 +481,7 @@ endless_server(struct rinaperf *rp)
             return -1;
 
         } else if (n == 0) {
-            PI("Flow deallocated remotely\n");
+            printf("Flow deallocated remotely\n");
             break;
         }
     }
@@ -477,6 +501,11 @@ struct perf_function_desc {
 static struct perf_function_desc descs[] = {
     {
         .name = "ping",
+        .client_function = ping_client,
+        .server_function = ping_server,
+    },
+    {
+        .name = "rr",
         .client_function = ping_client,
         .server_function = ping_server,
     },
@@ -554,11 +583,11 @@ parse_bandwidth(struct rl_flow_spec *spec, const char *arg)
     }
 
     spec->avg_bandwidth *= strtoul(arg, NULL, 10);
-    PI("Parsed bandwidth %llu\n", (long long unsigned)spec->avg_bandwidth);
+    printf("Parsed bandwidth %llu\n", (long long unsigned)spec->avg_bandwidth);
 
     return;
 err:
-    PE("Invalid bandwidth format '%s'\n", arg);
+    printf("Invalid bandwidth format '%s'\n", arg);
 }
 
 static void
@@ -602,8 +631,10 @@ main(int argc, char **argv)
     perf_function_t perf_function = NULL;
     struct rina_name client_ctrl_name, server_ctrl_name;
     struct rl_flow_spec flowspec;
+    int interval_specified = 0;
+    int count_specified = 0;
     int listen = 0;
-    int cnt = 1;
+    int cnt = 0;
     int size = 1;
     int interval = 0;
     int burst = 1;
@@ -639,6 +670,7 @@ main(int argc, char **argv)
                     printf("    Invalid 'cnt' %d\n", cnt);
                     return -1;
                 }
+                count_specified = 1;
                 break;
 
             case 's':
@@ -655,6 +687,7 @@ main(int argc, char **argv)
                     printf("    Invalid 'interval' %d\n", interval);
                     return -1;
                 }
+                interval_specified = 1;
                 break;
 
             case 'g': /* Set max_sdu_gap flow specification parameter. */
@@ -695,7 +728,7 @@ main(int argc, char **argv)
 
             case 'x':
                 have_ctrl = 1;
-                PI("Warning: Control connection support is incomplete\n");
+                printf("Warning: Control connection support is incomplete\n");
                 break;
 
             default:
@@ -705,6 +738,33 @@ main(int argc, char **argv)
         }
     }
 
+    /*
+     * Fixups:
+     *   - Use 1 second interval for ping tests, if the user did not
+     *     specify the interval explicitly.
+     *   - Set rp.ping variable to distinguish between ping and rr tests,
+     *     which share the same functions.
+     *   - Use -c 10000 for rr tests, if the user did not specify the
+     *     option explicitly.
+     */
+    if (strcmp(type, "ping") == 0) {
+        if (!interval_specified) {
+            interval = 1000000;
+        }
+        rp.ping = 1;
+
+    } else if (strcmp(type, "rr") == 0) {
+        if (!count_specified) {
+            cnt = 10000;
+        }
+        rp.ping = 0;
+    }
+
+    /* Set defaults. */
+    rp.interval = interval;
+    rp.burst = burst;
+
+    /* Function selection. */
     if (!listen) {
         for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
             if (strcmp(descs[i].name, type) == 0) {
@@ -722,9 +782,6 @@ main(int argc, char **argv)
         rp.test_config.cnt = cnt;
         rp.test_config.size = size;
     }
-
-    rp.interval = interval;
-    rp.burst = burst;
 
     /* Set some signal handler */
     sa.sa_handler = sigint_handler;
