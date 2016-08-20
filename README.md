@@ -1,4 +1,28 @@
 #############################################################################
+## Table of contents                                                        #
+#############################################################################
+
+* 1. Software requirements
+* 2. Build instructions
+* 3. Overview of the software components
+    * 3.1. Kernel modules
+    * 3.2. Userspace IPCPs daemon
+    * 3.3. Libraries
+    * 3.4. Control tool
+    * 3.5. Other tools
+    * 3.6. Python bindings
+* 4. Tutorials
+    * 4.1 Using the demonstrator
+    * 4.2 Hands-on tutorial
+* 5. Configuration of IPC Processes
+    * 5.1. shim-eth IPC Process
+    * 5.2. shim-udp4 IPC Process
+    * 5.3. shim-tcp4 IPC Process
+    * 5.4. shim-loopback IPC Process
+    * 5.5. Normal IPC Process
+
+
+#############################################################################
 ## 1. Software requirements                                                 #
 #############################################################################
 
@@ -52,7 +76,7 @@ Install *rlite* on the system
 
 
 #############################################################################
-## 3. Overview of the software components                                      #
+## 3. Overview of the software components                                   #
 #############################################################################
 
 This section briefly describes the software components of *rlite*.
@@ -76,7 +100,8 @@ A separate module for each type of IPCP:
 * **rlite-shim-tcp4**, implementing the kernel-space part of the shim IPCP
                        over TCP and IPv4. This follows an older specification
                        and it is deprecated in favour of the UDP shim IPCP.
-* **rlite-shim-hv**, implementing the shim IPCP over VMPI.
+* **rlite-shim-hv**, implementing the shim IPCP over VMPI, to be used with
+                     Virtual Machines.
 * **rlite-shim-loopback**, implementing a loopback shim IPCP.
 
 
@@ -370,6 +395,7 @@ Each type of IPC Process has different configuration needs. shim IPC
 Processes, in particular, wrap a legacy transport technology; their
 configuration is closely related to the corresponding technology.
 
+
 ### 5.1. shim-eth IPC Process
 #############################################################################
 
@@ -476,7 +502,26 @@ are not expected to focus on it. It is strongly recommended to always use the
 UDP shim when interfacing *rlite* with IP networks.
 
 
-### 5.3. Normal IPC Process
+### 5.4. shim-loopback IPC Process
+#############################################################################
+
+The shim-loopback conceptually wraps a loopback network device. SDUs sent on
+a flow supported by this shim are forwarded to another flow supported by the
+same shim. It is mostly used for testing purpose and as a stub module for
+the other software components, since the normal IPCP support the
+same functionalities (i.e. self-flows). However, it may be used for local
+IPC without the need of the uipcp server.
+
+It supports two configuration parameter:
+ * **queued**: if 0, SDUs written are immediately forwarded (e.g. in process
+    context to the destination flow; if different from 0, SDUs written are
+    fowarded in a deferred context (a Linux workqueue in the current
+    implementation).
+ * **drop_fract**: if different from 0, an SDU packet is dropped every
+                    **drop_fract** SDUs.
+
+
+### 5.5. Normal IPC Process
 #############################################################################
 
 In the current implementation a normal IPC Process needs to be configured
