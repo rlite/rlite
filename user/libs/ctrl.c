@@ -105,6 +105,7 @@ rl_write_msg(int rfd, struct rl_msg_base *msg)
     if (serlen > sizeof(serbuf)) {
         PE("Serialized message would be too long [%u]\n",
                     serlen);
+        errno = EINVAL;
         return -1;
     }
     serlen = serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -666,4 +667,191 @@ out:
     free(req);
 
     return ret;
+}
+
+
+/*
+ * POSIX-like API
+ */
+
+#include "rlite/api.h"
+
+int
+rl_open(const char *devname)
+{
+    if (!devname) {
+        devname = "/dev/rlite";
+    }
+
+    return open(devname, O_RDWR);
+}
+
+static int
+rl_register_common(int fd, const char *dif_name, const char *local_appl,
+                   int reg)
+{
+    struct rl_kmsg_appl_register req;
+    struct rl_kmsg_appl_register_resp *resp;
+    struct rina_name appl_name;
+    unsigned int response;
+    uint32_t event_id = 1;
+    int ret;
+
+    ret = rina_name_from_string(local_appl, &appl_name);
+    if (ret) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    ret = rl_register_req_fill(&req, event_id, dif_name,
+                               reg, &appl_name);
+    rina_name_free(&appl_name);
+    if (ret) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    ret = rl_write_msg(fd, RLITE_MB(&req));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&req));
+    if (ret < 0) {
+        return -1;
+    }
+
+    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(fd);
+    if (!resp) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    assert(resp->msg_type == RLITE_KER_APPL_REGISTER_RESP);
+    assert(resp->event_id == event_id);
+    response = resp->response;
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
+    free(resp);
+
+    if (response) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+rl_register(int fd, const char *dif_name, const char *local_appl)
+{
+    return rl_register_common(fd, dif_name, local_appl, 1);
+}
+
+int
+rl_unregister(int fd, const char *dif_name, const char *local_appl)
+{
+    return rl_register_common(fd, dif_name, local_appl, 0);
+}
+
+int
+rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
+              const char *remote_appl_s, const struct rl_flow_spec *flowspec)
+{
+    struct rl_kmsg_fa_req req;
+    struct rl_kmsg_fa_resp_arrived *resp;
+    struct rina_name local_appl;
+    struct rina_name remote_appl;
+    uint32_t event_id = 1;
+    int ffd;
+    int ret;
+
+    ret = rina_name_from_string(local_appl_s, &local_appl);
+    if (ret) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    ret = rina_name_from_string(remote_appl_s, &remote_appl);
+    if (ret) {
+        rina_name_free(&local_appl);
+        errno = ENOMEM;
+        return -1;
+    }
+
+    ret = rl_fa_req_fill(&req, event_id, dif_name, &local_appl,
+                         &remote_appl, flowspec, 0xffff);
+    rina_name_free(&local_appl);
+    rina_name_free(&remote_appl);
+    if (ret) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    ret = rl_write_msg(fd, RLITE_MB(&req));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
+    if (ret < 0) {
+        return -1;
+    }
+
+    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(fd);
+    if (!resp) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    assert(resp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
+    assert(resp->event_id == event_id);
+
+    if (resp->response) {
+        errno = EINVAL;
+        ffd = -1;
+    } else {
+        ffd = rl_open_appl_port(resp->port_id);
+    }
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
+    free(resp);
+
+    return ffd;
+}
+
+int
+rl_flow_accept(int fd, const char **remote_appl)
+{
+    struct rl_kmsg_fa_req_arrived *req;
+    struct rl_kmsg_fa_resp resp;
+    int ffd = -1;
+    int ret;
+
+    if (remote_appl) {
+        /* TODO to be filled with appropriate value */
+        *remote_appl = NULL;
+    }
+
+    req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
+    if (!req) {
+        return -1;
+    }
+
+    assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
+
+    ret = rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
+                          req->port_id, RLITE_SUCC);
+    if (ret) {
+        errno = ENOMEM;
+        goto out;
+    }
+
+    ret = rl_write_msg(fd, RLITE_MB(&resp));
+    if (ret < 0) {
+        goto out;
+    }
+
+    ffd = rl_open_appl_port(req->port_id);
+
+out:
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(req));
+    free(req);
+
+    return ffd;
 }

@@ -40,7 +40,7 @@
 #include <time.h>
 #include "rlite/utils.h"
 
-#include "rlite/rlite.h"
+#include "rlite/api.h"
 
 
 #define SDU_SIZE_MAX    65535
@@ -54,10 +54,9 @@ struct rinaperf_test_config {
 };
 
 struct rinaperf {
-    struct rl_ctrl ctrl;
-
-    struct rina_name client_appl_name;
-    struct rina_name server_appl_name;
+    int cfd;
+    const char *cli_appl_name;
+    const char *srv_appl_name;
     int dfd;
 
     unsigned int interval;
@@ -482,9 +481,10 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rl_ctrl_flow_accept(&rp->ctrl);
+        rp->dfd = rl_flow_accept(rp->cfd, NULL);
         if (rp->dfd < 0) {
-            continue;
+            perror("rl_flow_accept()");
+            break;
         }
 
         ret = server_test_config(rp);
@@ -587,10 +587,7 @@ main(int argc, char **argv)
     struct rinaperf rp;
     const char *type = "ping";
     const char *dif_name = NULL;
-    const char *cli_appl_apn = "rinaperf-data", *cli_appl_api = "client";
-    const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
     perf_function_t perf_function = NULL;
-    struct rina_name client_ctrl_name, server_ctrl_name;
     struct rl_flow_spec flowspec;
     int interval_specified = 0;
     int listen = 0;
@@ -602,6 +599,9 @@ main(int argc, char **argv)
     int ret;
     int opt;
     int i;
+
+    rp.cli_appl_name = "rinaperf-data/client";
+    rp.srv_appl_name = "rinaperf-data/server";
 
     /* Start with a default flow configuration (unreliable flow). */
     rl_flow_spec_default(&flowspec);
@@ -670,19 +670,11 @@ main(int argc, char **argv)
                 break;
 
             case 'a':
-                cli_appl_apn = optarg;
-                break;
-
-            case 'A':
-                cli_appl_api = optarg;
+                rp.cli_appl_name = optarg;
                 break;
 
             case 'z':
-                srv_appl_apn = optarg;
-                break;
-
-            case 'Z':
-                srv_appl_api = optarg;
+                rp.srv_appl_name = optarg;
                 break;
 
             case 'x':
@@ -753,31 +745,27 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE ctrl API. */
-    ret = rl_ctrl_init(&rp.ctrl, NULL, 0);
-    if (ret) {
-        return ret;
+    rp.cfd = rl_open(NULL);
+    if (rp.cfd < 0) {
+        perror("rl_open()");
+        return rp.cfd;
     }
-
-    /* Rinaperf-specific initialization. */
-    rina_name_fill(&client_ctrl_name, "rinaperf-ctrl", "client", NULL, NULL);
-    rina_name_fill(&server_ctrl_name, "rinaperf-ctrl", "server", NULL, NULL);
-    rina_name_fill(&rp.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
-    rina_name_fill(&rp.server_appl_name, srv_appl_apn, srv_appl_api, NULL, NULL);
 
     if (listen) {
         /* Server-side initializations. */
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rl_ctrl_register(&rp.ctrl, dif_name, &server_ctrl_name);
+            ret = rl_register(rp.cfd, dif_name, "rinaperf-ctrl/server");
             if (ret) {
+                perror("rl_register()");
                 return ret;
             }
         }
 
-        ret = rl_ctrl_register(&rp.ctrl, dif_name,
-                                   &rp.server_appl_name);
+        ret = rl_register(rp.cfd, dif_name, rp.srv_appl_name);
         if (ret) {
+            perror("rl_register()");
             return ret;
         }
 
@@ -785,10 +773,10 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rl_ctrl_flow_alloc(&rp.ctrl, dif_name,
-                                        &rp.client_appl_name,
-                                        &rp.server_appl_name, &flowspec);
+        rp.dfd = rl_flow_alloc(rp.cfd, dif_name, rp.cli_appl_name,
+                               rp.srv_appl_name, &flowspec);
         if (rp.dfd < 0) {
+            perror("rl_flow_alloc()");
             return rp.dfd;
         }
 
@@ -800,5 +788,5 @@ main(int argc, char **argv)
         perf_function(&rp);
     }
 
-    return rl_ctrl_fini(&rp.ctrl);
+    return close(rp.cfd);
 }
