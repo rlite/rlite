@@ -45,7 +45,8 @@
 
 #define SDU_SIZE_MAX    65535
 
-static int stop = 0; /* Used to stop tests on SIGINT. */
+static int stop = 0; /* Used to stop client on SIGINT. */
+static int cli_flow_allocated = 0; /* Avoid to get stuck in rl_flow_alloc(). */
 
 struct rinaperf_test_config {
     uint32_t ty;
@@ -509,6 +510,9 @@ clos:
 static void
 sigint_handler_client(int signum)
 {
+    if (!cli_flow_allocated) {
+        exit(EXIT_SUCCESS);
+    }
     stop = 1;
 }
 
@@ -744,7 +748,7 @@ main(int argc, char **argv)
         return ret;
     }
 
-    /* Initialization of RLITE ctrl API. */
+    /* Open control file descriptor. */
     rp.cfd = rl_open(NULL);
     if (rp.cfd < 0) {
         perror("rl_open()");
@@ -775,6 +779,7 @@ main(int argc, char **argv)
         /* We're the client: allocate a flow and run the perf function. */
         rp.dfd = rl_flow_alloc(rp.cfd, dif_name, rp.cli_appl_name,
                                rp.srv_appl_name, &flowspec);
+        cli_flow_allocated = 1;
         if (rp.dfd < 0) {
             perror("rl_flow_alloc()");
             return rp.dfd;
