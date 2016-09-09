@@ -576,10 +576,8 @@ usage(void)
         "   -f : enable flow control\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
-        "   -a APNAME : application process name of the rinaperf client\n"
-        "   -A APNAME : application process instance of the rinaperf client\n"
-        "   -z APNAME : application process name of the rinaperf server\n"
-        "   -Z APNAME : application process instance of the rinaperf server\n"
+        "   -a APNAME : application process name/instance of the rinaperf client\n"
+        "   -z APNAME : application process name/instance of the rinaperf server\n"
         "   -x : use a separate control connection\n"
           );
 }

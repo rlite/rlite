@@ -39,16 +39,15 @@
 #include <poll.h>
 
 #include "rlite/utils.h"
-#include "rlite/rlite.h"
+#include "rlite/api.h"
 
 
 #define SDU_SIZE_MAX    65535
 
 struct rl_rr {
-    struct rl_ctrl ctrl;
-
-    struct rina_name client_appl_name;
-    struct rina_name server_appl_name;
+    int cfd;
+    const char *cli_appl_name;
+    const char *srv_appl_name;
     char *dif_name;
     struct rl_flow_spec flowspec;
 };
@@ -64,10 +63,10 @@ client(struct rl_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rl_ctrl_flow_alloc(&rr->ctrl, rr->dif_name,
-                                 &rr->client_appl_name,
-                                 &rr->server_appl_name, &rr->flowspec);
+    dfd = rl_flow_alloc(rr->cfd, rr->dif_name, rr->cli_appl_name,
+                        rr->srv_appl_name, &rr->flowspec);
     if (dfd < 0) {
+        perror("rl_flow_alloc()");
         return dfd;
     }
 
@@ -119,15 +118,16 @@ server(struct rl_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rl_ctrl_register(&rr->ctrl, rr->dif_name,
-                               &rr->server_appl_name);
+    ret = rl_register(rr->cfd, rr->dif_name, rr->srv_appl_name);
     if (ret) {
+        perror("rl_register()");
         return ret;
     }
 
     for (;;) {
-        dfd = rl_ctrl_flow_accept(&rr->ctrl);
+        dfd = rl_flow_accept(rr->cfd, NULL);
         if (dfd < 0) {
+            perror("rl_flow_accept()");
             continue;
         }
 
@@ -188,10 +188,8 @@ usage(void)
                 "overrides what is specified by the -d option (debug only)\n"
         "   -P APNAME : application process instance of the IPC process that "
                 "overrides what is specified by the -d option (debug only)\n"
-        "   -a APNAME : application process name of the rl_rr client\n"
-        "   -A APNAME : application process instance of the rl_rr client\n"
-        "   -z APNAME : application process name of the rl_rr server\n"
-        "   -Z APNAME : application process instance of the rl_rr server\n"
+        "   -a APNAME : application process name/instance of the rl_rr client\n"
+        "   -z APNAME : application process name/instance of the rl_rr server\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
           );
 }
@@ -202,17 +200,17 @@ main(int argc, char **argv)
     struct sigaction sa;
     struct rl_rr rr;
     const char *dif_name = NULL;
-    const char *cli_appl_apn = "rl_rr-data", *cli_appl_api = "client";
-    const char *srv_appl_apn = cli_appl_apn, *srv_appl_api = "server";
-    struct rina_name client_ctrl_name, server_ctrl_name;
     int listen = 0;
     int ret;
     int opt;
 
+    rr.cli_appl_name = "rl_rr-data/client";
+    rr.srv_appl_name = "rl_rr-data/server";
+
     /* Start with a default flow configuration (unreliable flow). */
     rl_flow_spec_default(&rr.flowspec);
 
-    while ((opt = getopt(argc, argv, "hl:d:p:P:a:A:z:Z:g:")) != -1) {
+    while ((opt = getopt(argc, argv, "hld:p:P:a:z:g:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -227,19 +225,11 @@ main(int argc, char **argv)
                 break;
 
             case 'a':
-                cli_appl_apn = optarg;
-                break;
-
-            case 'A':
-                cli_appl_api = optarg;
+                rr.cli_appl_name = optarg;
                 break;
 
             case 'z':
-                srv_appl_apn = optarg;
-                break;
-
-            case 'Z':
-                srv_appl_api = optarg;
+                rr.srv_appl_name = optarg;
                 break;
 
             case 'g': /* Set max_sdu_gap flow specification parameter. */
@@ -269,15 +259,11 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    ret = rl_ctrl_init(&rr.ctrl, NULL, 0);
-    if (ret) {
-        return ret;
+    rr.cfd = rl_open(NULL);
+    if (rr.cfd < 0) {
+        perror("rl_open()");
+        return rr.cfd;
     }
-
-    rina_name_fill(&client_ctrl_name, "rl_rr-ctrl", "client", NULL, NULL);
-    rina_name_fill(&server_ctrl_name, "rl_rr-ctrl", "server", NULL, NULL);
-    rina_name_fill(&rr.client_appl_name, cli_appl_apn, cli_appl_api, NULL, NULL);
-    rina_name_fill(&rr.server_appl_name, srv_appl_apn, srv_appl_api, NULL, NULL);
 
     rr.dif_name = dif_name ? strdup(dif_name) : NULL;
 
@@ -288,5 +274,5 @@ main(int argc, char **argv)
         client(&rr);
     }
 
-    return rl_ctrl_fini(&rr.ctrl);
+    return close(rr.cfd);
 }
