@@ -105,29 +105,6 @@ rl_ctrl_get_id(struct rl_ctrl *ctrl);
 
 
 /*
- * Synchronous API (higher level, implemented by means of the
- * asynchronous API).
- */
-
-int
-rl_ctrl_flow_alloc(struct rl_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *local_appl,
-                   const struct rina_name *remote_appl,
-                   const struct rl_flow_spec *flowspec);
-
-int
-rl_ctrl_register(struct rl_ctrl *ctrl, const char *dif_name,
-                 const struct rina_name *appl_name);
-
-int
-rl_ctrl_unregister(struct rl_ctrl *ctrl, const char *dif_name,
-                   const struct rina_name *appl_name);
-
-int
-rl_ctrl_flow_accept(struct rl_ctrl *ctrl);
-
-
-/*
  * API calls for userspace IPCPs, not to be used by applications.
  */
 
