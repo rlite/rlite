@@ -72,9 +72,6 @@ int
 rl_ctrl_fini(struct rl_ctrl *ctrl);
 
 void
-rl_flow_spec_default(struct rl_flow_spec *spec);
-
-void
 rl_flow_cfg_default(struct rl_flow_config *cfg);
 
 int

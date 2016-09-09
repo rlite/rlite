@@ -38,7 +38,6 @@
 #include <signal.h>
 #include <poll.h>
 
-#include "rlite/utils.h"
 #include "rlite/api.h"
 
 
@@ -90,7 +89,7 @@ client(struct rl_rr *rr)
         perror("poll(flow)");
     } else if (ret == 0) {
         /* Timeout */
-        PI("timeout occurred\n");
+        printf("timeout occurred\n");
         return -1;
     }
 
@@ -103,7 +102,7 @@ client(struct rl_rr *rr)
 
     close(dfd);
 
-    PI("Response: '%s'\n", buf);
+    printf("Response: '%s'\n", buf);
 
     return 0;
 }
@@ -139,7 +138,7 @@ server(struct rl_rr *rr)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            PI("timeout occurred\n");
+            printf("timeout occurred\n");
             return -1;
         }
 
@@ -151,7 +150,7 @@ server(struct rl_rr *rr)
         }
 
         buf[n] = '\0';
-        PI("Request: '%s'\n", buf);
+        printf("Request: '%s'\n", buf);
 
         ret = write(dfd, buf, n);
         if (ret != n) {
@@ -165,7 +164,7 @@ server(struct rl_rr *rr)
 
         close(dfd);
 
-        PI("Response sent back\n");
+        printf("Response sent back\n");
     }
 
     return 0;

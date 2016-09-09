@@ -38,7 +38,6 @@
 #include <signal.h>
 #include <poll.h>
 #include <time.h>
-#include "rlite/utils.h"
 
 #include "rlite/api.h"
 

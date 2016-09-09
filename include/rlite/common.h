@@ -35,6 +35,8 @@
 #include <stdint.h>
 #endif
 
+#include "rlite/api.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -179,16 +181,6 @@ struct rl_flow_config {
 #define RL_MPL_MSECS_DFLT       1000
 #define RL_RTX_MSECS_DFLT       1000
 #define RL_DATA_RXMS_MAX_DFLT   10
-
-struct rl_flow_spec {
-    rl_seq_t max_sdu_gap;       /* in SDUs */
-    uint64_t avg_bandwidth;     /* in bits per second */
-    uint32_t max_delay;         /* in microseconds */
-    uint32_t max_jitter;        /* in microseconds */
-    uint8_t in_order_delivery;  /* boolean */
-
-    uint8_t flow_control;       /* temporary, for debugging */
-};
 
 /* Does a flow specification correspond to best effort QoS? */
 static inline int rl_flow_spec_best_effort(struct rl_flow_spec *spec) {

@@ -45,7 +45,6 @@
 #include <poll.h>
 #include <signal.h>
 
-#include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/evloop.h"
 
