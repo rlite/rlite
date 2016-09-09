@@ -2,9 +2,9 @@
 
 # Written by: Vincenzo Maffione <v.maffione@gmail.com>
 
-from rlite import *
 import argparse
 import select
+import rlite
 import sys
 import os
 
@@ -28,15 +28,15 @@ def buf2str(b):
 class RinaRRTool:
 
     def __init__(self):
-        self.cfd = rl_open(None)
+        self.cfd = rlite.open(None)
         if self.cfd < 0:
             raise Exception("Could not open rlite ctrl device")
 
         self.client_name = ''
         self.server_name = ''
         self.dif = ''
-        self.flow_spec = rl_flow_spec()
-        rl_flow_spec_default(self.flow_spec)
+        self.flow_spec = rlite.flow_spec()
+        rlite.flow_spec_default(self.flow_spec)
 
 
     def __del__(self):
@@ -44,7 +44,7 @@ class RinaRRTool:
 
 
     def client(self, args):
-        fd = rl_flow_alloc(self.cfd, self.dif, self.client_name,
+        fd = rlite.flow_alloc(self.cfd, self.dif, self.client_name,
                                 self.server_name, self.flow_spec)
 
         if fd < 0:
@@ -69,12 +69,12 @@ class RinaRRTool:
 
 
     def server(self, args):
-        ret = rl_register(self.cfd, self.dif, self.server_name)
+        ret = rlite.register(self.cfd, self.dif, self.server_name)
         if ret:
             return ret
 
         while 1:
-            fd = rl_flow_accept(self.cfd, None)
+            fd = rlite.flow_accept(self.cfd, None)
             if fd < 0:
                 continue
 
