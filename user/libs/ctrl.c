@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <signal.h>
@@ -563,6 +564,27 @@ rl_open(const char *devname)
 }
 
 static int
+wait_for_next_msg(int fd)
+{
+    struct pollfd pfd;
+    int ret;
+
+    /* Wait for the event with select. This is necessary when the fd
+     * is nonblocking. */
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, -1);
+    if (ret <= 0) {
+        if (ret == 0) {
+            errno = EAGAIN;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 rl_register_common(int fd, const char *dif_name, const char *local_appl,
                    int reg)
 {
@@ -592,6 +614,11 @@ rl_register_common(int fd, const char *dif_name, const char *local_appl,
                    RLITE_MB(&req));
     if (ret < 0) {
         return -1;
+    }
+
+    ret = wait_for_next_msg(fd);
+    if (ret) {
+        return ret;
     }
 
     resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(fd);
@@ -664,6 +691,11 @@ rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
     if (ret < 0) {
         return -1;
+    }
+
+    ret = wait_for_next_msg(fd);
+    if (ret) {
+        return ret;
     }
 
     resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(fd);
