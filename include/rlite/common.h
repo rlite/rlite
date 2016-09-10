@@ -90,15 +90,20 @@ struct rl_msg_base_resp {
 
 /* Bind the flow identified by port_id to
  * this rl_io device. */
-#define RLITE_IO_MODE_APPL_BIND    86
+#define RLITE_IO_MODE_APPL_BIND     86
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
-#define RLITE_IO_MODE_IPCP_MGMT    88
+#define RLITE_IO_MODE_IPCP_MGMT     88
+
+/* Temporary, partial hack to limit the PDU size.
+ * It will go away once EFCP supports
+ * fragmentation and reassembly. */
+#define RLITE_IO_MODE_MAX_SDU_SIZE  90
 
 struct rl_ioctl_info {
-    uint8_t mode;
-    rl_port_t port_id;
-    rl_ipcp_id_t ipcp_id;
+    uint8_t         mode;
+    rl_port_t       port_id;
+    rl_ipcp_id_t    ipcp_id;
 } __attribute__((packed));
 
 #define RLITE_MGMT_HDR_T_OUT_LOCAL_PORT      1

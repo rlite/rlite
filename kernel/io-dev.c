@@ -243,6 +243,7 @@ struct rl_io {
     uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
+    size_t max_sdu_size; /* temporary */
 };
 
 static int
@@ -254,9 +255,38 @@ rl_io_open(struct inode *inode, struct file *f)
         PE("Out of memory\n");
         return -ENOMEM;
     }
+
+    rio->max_sdu_size = ~0U; /* Hack disabled by default */
     f->private_data = rio;
 
     return 0;
+}
+
+static ssize_t rl_io_write(struct file *f, const char __user *ubuf,
+                           size_t ulen, loff_t *ppos);
+static ssize_t
+splitted_sdu_write(struct file *f, const char __user *ubuf, size_t ulen,
+                     loff_t *ppos, size_t max_sdu_size)
+{
+        ssize_t tot = 0;
+
+        RPD(1, "Fragmented SDU write hack\n");
+
+        while (ulen) {
+            size_t fraglen = min(max_sdu_size, ulen);
+            ssize_t ret;
+
+            ret = rl_io_write(f, ubuf, fraglen, ppos);
+            if (ret < 0) {
+                break;
+            }
+
+            ubuf += fraglen;
+            ulen -= fraglen;
+            tot += ret;
+        }
+
+        return tot;
 }
 
 static ssize_t
@@ -277,8 +307,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         return -ENXIO;
     }
 
-    /* Assume an application write, by default. If this is a management
-     * write, rio->flow is NULL. */
+    /* If this is a management SDU write, rio->flow is NULL. */
     ipcp = rio->txrx->ipcp;
     flow = rio->flow;
 
@@ -291,9 +320,10 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         ubuf += sizeof(mhdr);
         ulen -= sizeof(mhdr);
 
-    } else if (unlikely(rio->mode != RLITE_IO_MODE_APPL_BIND)) {
-        RPD(3, "Unknown mode, this should not happen\n");
-        return -EINVAL;
+    } else if (unlikely(ulen > rio->max_sdu_size)) {
+        /* Temporary, partial hack, it will go away once
+         * EFCP implements fragmentation and reassembly. */
+        return splitted_sdu_write(f, ubuf, ulen, ppos, rio->max_sdu_size);
     }
 
     rb = rl_buf_alloc(ulen, ipcp->depth, GFP_KERNEL);
@@ -581,6 +611,12 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         return -EFAULT;
     }
 
+    if (info.mode == RLITE_IO_MODE_MAX_SDU_SIZE) {
+        /* temporary, info->port_id contains the max SDU size. */
+        rio->max_sdu_size = (size_t)info.port_id;
+        return 0;
+    }
+
     rl_io_release_internal(rio);
 
     switch (info.mode) {
@@ -591,6 +627,7 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
         case RLITE_IO_MODE_IPCP_MGMT:
             ret = rl_io_ioctl_mgmt(rio, &info);
             break;
+
     }
 
     if (ret == 0) {
