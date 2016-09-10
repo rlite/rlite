@@ -553,6 +553,21 @@ parse_conf(const char *confname)
     return 0;
 }
 
+#include <sys/ioctl.h>
+
+static int
+gw_open_appl_port(rl_port_t port_id, unsigned int max_sdu_size)
+{
+    int fd = rl_open_appl_port(port_id);
+
+    if (fd >= 0) { /* Enable splitted sdu_write hack. */
+        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
+        ioctl(fd, 0, data);
+    }
+
+    return fd;
+}
+
 static int
 gw_fa_req_arrived(struct rl_evloop *loop,
                   const struct rl_msg_base *b_resp,
@@ -618,7 +633,7 @@ gw_fa_req_arrived(struct rl_evloop *loop,
         return 0;
     }
 
-    rfd = rl_open_appl_port(req->port_id);
+    rfd = gw_open_appl_port(req->port_id, max_sdu_size);
     if (rfd < 0) {
         PE("rl_open_appl_port() failed\n");
         close(cfd);
@@ -667,7 +682,7 @@ gw_fa_resp_arrived(struct rl_evloop *loop,
         return 0;
     }
 
-    rfd = rl_open_appl_port(resp->port_id);
+    rfd = gw_open_appl_port(resp->port_id, max_sdu_size);
     if (rfd < 0) {
         PE("Failed to open application port\n");
         close(cfd);

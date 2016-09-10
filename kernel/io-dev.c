@@ -270,8 +270,6 @@ splitted_sdu_write(struct file *f, const char __user *ubuf, size_t ulen,
 {
         ssize_t tot = 0;
 
-        RPD(1, "Fragmented SDU write hack\n");
-
         while (ulen) {
             size_t fraglen = min(max_sdu_size, ulen);
             ssize_t ret;
