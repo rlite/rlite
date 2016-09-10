@@ -561,7 +561,7 @@ usage(void)
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
         "   -t TEST : specify the type of the test to be performed "
-            "(ping, perf, endless)\n"
+            "(ping, perf, rr)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
         "   -c NUM : number of SDUs to send during the test\n"
         "   -s NUM : size of the SDUs that are sent during the test\n"
