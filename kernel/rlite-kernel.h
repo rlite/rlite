@@ -178,10 +178,25 @@ rl_buf_pci_push(struct rl_buf *rb)
     return 0;
 }
 
-static inline int rl_buf_custom_push(struct rl_buf *rb, size_t len)
+static inline int
+rl_buf_custom_pop(struct rl_buf *rb, size_t len)
+{
+    if (unlikely(rb->len < len)) {
+        RPD(5, "No enough data to pop %d bytes\n", (int)len);
+        return -1;
+    }
+
+    rb->pci = (struct rina_pci *)(((uint8_t *)rb->pci) + len);
+    rb->len -= len;
+
+    return 0;
+}
+
+static inline int
+rl_buf_custom_push(struct rl_buf *rb, size_t len)
 {
     if (unlikely((uint8_t *)(rb->pci) - len < &rb->raw->buf[0])) {
-        RPD(5, "No space to push custom header\n");
+        RPD(5, "No space to push %d bytes\n", (int)len);
         return -1;
     }
 

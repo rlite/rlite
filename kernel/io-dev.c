@@ -402,7 +402,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 }
 
 static ssize_t
-rl_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
+rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 {
     struct rl_io *rio = (struct rl_io *)f->private_data;
     bool blocking = !(f->f_flags & O_NONBLOCK);
@@ -418,8 +418,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         add_wait_queue(&txrx->rx_wqh, &wait);
     }
 
-    while (len) {
-        ssize_t copylen;
+    while (ulen) {
         struct rl_buf *rb;
 
         current->state = TASK_INTERRUPTIBLE;
@@ -450,27 +449,38 @@ rl_io_read(struct file *f, char __user *ubuf, size_t len, loff_t *ppos)
         }
 
         rb = list_first_entry(&txrx->rx_q, struct rl_buf, node);
-        list_del(&rb->node);
-        txrx->rx_qlen--;
-        spin_unlock_bh(&txrx->rx_lock);
 
-        copylen = rb->len;
-        if (copylen > len) {
-            copylen = len;
-        }
-        ret = copylen;
-        if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), copylen))) {
-            ret = -EFAULT;
-        }
-
-        if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-            if (unlikely(rl_buf_pci_push(rb))) {
-                BUG_ON(1);
+	if (unlikely(ulen < rb->len)) {
+            /* Partial SDU read, don't consume the rb. */
+            ret = ulen;
+            if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), ret))) {
+                ret = -EFAULT;
             }
-            rio->flow->sdu_rx_consumed(rio->flow, rb);
-        }
 
-        rl_buf_free(rb);
+            rl_buf_custom_pop(rb, ulen);
+
+            spin_unlock_bh(&txrx->rx_lock);
+
+        } else {
+            /* Complete SDU read, consume the rb. */
+            list_del(&rb->node);
+            txrx->rx_qlen--;
+            spin_unlock_bh(&txrx->rx_lock);
+
+            ret = rb->len;
+            if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), ret))) {
+                ret = -EFAULT;
+            }
+
+            if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
+                if (unlikely(rl_buf_pci_push(rb))) {
+                    BUG_ON(1);
+                }
+                rio->flow->sdu_rx_consumed(rio->flow, rb);
+            }
+
+            rl_buf_free(rb);
+        }
 
         break;
     }
