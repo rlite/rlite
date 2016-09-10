@@ -774,7 +774,7 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rl_flow_alloc(rp.cfd, dif_name, rp.cli_appl_name,
+        rp.dfd = rl_flow_alloc(dif_name, rp.cli_appl_name,
                                rp.srv_appl_name, &flowspec);
         cli_flow_allocated = 1;
         if (rp.dfd < 0) {

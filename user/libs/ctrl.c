@@ -654,7 +654,7 @@ rl_unregister(int fd, const char *dif_name, const char *local_appl)
 }
 
 int
-rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
+rl_flow_alloc(const char *dif_name, const char *local_appl_s,
               const char *remote_appl_s, const struct rl_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
@@ -662,8 +662,7 @@ rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
     struct rina_name local_appl;
     struct rina_name remote_appl;
     uint32_t event_id = 1;
-    int ffd;
-    int ret;
+    int rfd, ret;
 
     ret = rina_name_from_string(local_appl_s, &local_appl);
     if (ret) {
@@ -687,21 +686,27 @@ rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
         return -1;
     }
 
-    ret = rl_write_msg(fd, RLITE_MB(&req));
+    rfd = rl_open(NULL);
+    if (rfd < 0) {
+        return rfd;
+    }
+
+    ret = rl_write_msg(rfd, RLITE_MB(&req));
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
     if (ret < 0) {
-        return -1;
+        goto out;
     }
 
-    ret = wait_for_next_msg(fd);
+    ret = wait_for_next_msg(rfd);
     if (ret) {
-        return ret;
+        goto out;
     }
 
-    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(fd);
+    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(rfd);
     if (!resp) {
         errno = ENOMEM;
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     assert(resp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
@@ -709,15 +714,17 @@ rl_flow_alloc(int fd, const char *dif_name, const char *local_appl_s,
 
     if (resp->response) {
         errno = EINVAL;
-        ffd = -1;
+        ret = -1;
     } else {
-        ffd = rl_open_appl_port(resp->port_id);
+        ret = rl_open_appl_port(resp->port_id);
     }
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     free(resp);
+out:
+    close(rfd);
 
-    return ffd;
+    return ret;
 }
 
 int

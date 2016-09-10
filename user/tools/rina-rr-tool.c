@@ -62,7 +62,7 @@ client(struct rl_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rl_flow_alloc(rr->cfd, rr->dif_name, rr->cli_appl_name,
+    dfd = rl_flow_alloc(rr->dif_name, rr->cli_appl_name,
                         rr->srv_appl_name, &rr->flowspec);
     if (dfd < 0) {
         perror("rl_flow_alloc()");
