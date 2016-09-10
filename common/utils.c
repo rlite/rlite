@@ -564,10 +564,10 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
         return -1;
     }
 
-    apn = strsep(strp, "/");
-    api = strsep(strp, "/");
-    aen = strsep(strp, "/");
-    aei = strsep(strp, "/");
+    apn = strsep(strp, "/|");
+    api = strsep(strp, "/|");
+    aen = strsep(strp, "/|");
+    aei = strsep(strp, "/|");
 
     if (!apn) {
         /* The '/' are not necessary if some of the api, aen, aei
