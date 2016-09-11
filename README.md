@@ -180,16 +180,16 @@ Run the server, registering on a DIF called *n.DIF*:
 
     $ rinaperf -l -d n.DIF
 
-Note that the server can only manage requests one by one.
+Note that the rinaperf server can only manage requests one by one.
 
 Run the client in ping mode, asking a DIF called *n.DIF* to allocate a flow:
 
-    $ rinaperf -d -n.DIF
+    $ rinaperf -t ping -d n.DIF
 
 Run the client in perf mode, asking a DIF called *n.DIF* to allocate a flow,
-using 1200 bytes sized SDUs:
+and using 1200 bytes sized SDUs:
 
-    $ rinaperf -d -n.DIF -s 1200
+    $ rinaperf -t perf -d -n.DIF -s 1200
 
 
 ### 3.6. Python bindings
@@ -228,9 +228,9 @@ configuration files are interchangeable. The documentation contained
 in the README.md file of the latter repository is still valid, with the
 following differences:
 
-1. The **policy** directive is not supported
+1. The **policy** and **appmap** directives are not supported
 2. The name of **eth** instances does not need to be a valid VLAN id
-3. The legacy mode is not supported, only the buildroot mode is supported
+3. The legacy mode is not supported, only the buildroot mode is
 
 
 #### 4.1.1 Mini-tutorial
