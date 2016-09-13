@@ -42,8 +42,8 @@
 #include "rlite/conf.h"
 
 
+/* IPCP attributes. */
 struct ipcp_attrs {
-    /* IPCP attributes. */
     rl_ipcp_id_t id;
     struct rina_name name;
     rl_addr_t addr;
@@ -57,6 +57,14 @@ struct ipcp_attrs {
 /* Keeps the list of IPCPs in the system. */
 static struct list_head ipcps;
 
+struct cmd_descriptor {
+    const char *name;
+    const char *usage;
+    unsigned int num_args;
+    int (*func)(int argc, char **argv, struct rl_ctrl *ctrl,
+                struct cmd_descriptor *cd);
+};
+
 static struct ipcp_attrs *
 lookup_ipcp_by_name(const struct rina_name *name)
 {
@@ -68,6 +76,20 @@ lookup_ipcp_by_name(const struct rina_name *name)
                     && rina_name_cmp(&attrs->name, name) == 0) {
                 return attrs;
             }
+        }
+    }
+
+    return NULL;
+}
+
+static struct ipcp_attrs *
+ipcp_by_dif(const char *dif_name)
+{
+    struct ipcp_attrs *attrs;
+
+    list_for_each_entry(attrs, &ipcps, node) {
+        if (strcmp(attrs->dif_name, dif_name) == 0) {
+            return attrs;
         }
     }
 
@@ -192,7 +214,8 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
 }
 
 static int
-ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl,
+            struct cmd_descriptor *cd)
 {
     const char *ipcp_name_s;
     struct rina_name ipcp_name;
@@ -230,7 +253,8 @@ ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl,
+             struct cmd_descriptor *cd)
 {
     const char *ipcp_name_s;
     struct rina_name ipcp_name;
@@ -260,7 +284,8 @@ ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl,
+            struct cmd_descriptor *cd)
 {
     const char *ipcp_name_s;
     const char *param_name;
@@ -294,7 +319,7 @@ ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl)
 
 static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
-                     struct rl_ctrl *ctrl)
+                     struct rl_ctrl *ctrl, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_register req;
     const char *ipcp_name_s;
@@ -307,7 +332,6 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     rina_name_from_string(ipcp_name_s, &req.ipcp_name);
 
-    /* Lookup the id of the registering IPCP. */
     attrs = lookup_ipcp_by_name(&req.ipcp_name);
     if (!attrs) {
         PE("Could not find the IPC process to register\n");
@@ -323,15 +347,17 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 }
 
 static int
-ipcp_register(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_register(int argc, char **argv, struct rl_ctrl *ctrl,
+              struct cmd_descriptor *cd)
 {
-    return ipcp_register_common(argc, argv, 1, ctrl);
+    return ipcp_register_common(argc, argv, 1, ctrl, cd);
 }
 
 static int
-ipcp_unregister(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_unregister(int argc, char **argv, struct rl_ctrl *ctrl,
+                struct cmd_descriptor *cd)
 {
-    return ipcp_register_common(argc, argv, 0, ctrl);
+    return ipcp_register_common(argc, argv, 0, ctrl, cd);
 }
 
 static int
@@ -368,19 +394,22 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl,
+            struct cmd_descriptor *cd)
 {
     return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_ENROLL);
 }
 
 static int
-ipcp_lower_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_lower_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl,
+                      struct cmd_descriptor *cd)
 {
     return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_LOWER_FLOW_ALLOC);
 }
 
 static int
-ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl,
+             struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_dft_set req;
     const char *ipcp_name_s;
@@ -414,7 +443,8 @@ ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl,
+           struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
 
@@ -438,7 +468,8 @@ ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl)
 }
 
 static int
-flows_show(int argc, char **argv, struct rl_ctrl *ctrl)
+flows_show(int argc, char **argv, struct rl_ctrl *ctrl,
+           struct cmd_descriptor *cd)
 {
     struct list_head flows;
 
@@ -464,20 +495,30 @@ ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
 }
 
 static int
-ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl)
+ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl,
+              struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_rib_show_req req;
-    const char *ipcp_name_s;
+    const char *name_s;
     struct ipcp_attrs *attrs;
 
     assert(argc >= 1);
-    ipcp_name_s = argv[0];
+    name_s = argv[0];
 
-    rina_name_from_string(ipcp_name_s, &req.ipcp_name);
-    attrs = lookup_ipcp_by_name(&req.ipcp_name);
-    if (!attrs) {
-        PE("Could not find IPC process\n");
-        return -1;
+    if (strcmp(cd->name, "dif-rib-show") == 0) {
+        attrs = ipcp_by_dif(name_s);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", name_s);
+            return -1;
+        }
+        rina_name_copy(&req.ipcp_name, &attrs->name);
+    } else {
+        rina_name_from_string(name_s, &req.ipcp_name);
+        attrs = lookup_ipcp_by_name(&req.ipcp_name);
+        if (!attrs) {
+            PE("Could not find IPC process %s\n", name_s);
+            return -1;
+        }
     }
 
     req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
@@ -523,13 +564,6 @@ ipcps_load(struct rl_ctrl *ctrl)
 
     return ret;
 }
-
-struct cmd_descriptor {
-    const char *name;
-    const char *usage;
-    unsigned int num_args;
-    int (*func)(int argc, char **argv, struct rl_ctrl *ctrl);
-};
 
 static struct cmd_descriptor cmd_descriptors[] = {
     {
@@ -589,6 +623,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "ipcp-rib-show",
         .usage = "IPCP_NAME",
+        .num_args = 1,
+        .func = ipcp_rib_show,
+    },
+    {
+        .name = "dif-rib-show",
+        .usage = "DIF_NAME",
         .num_args = 1,
         .func = ipcp_rib_show,
     },
@@ -655,7 +695,8 @@ process_args(int argc, char **argv)
                 return ret;
             }
 
-            ret = cmd_descriptors[i].func(argc - 2, argv + 2, &ctrl);
+            ret = cmd_descriptors[i].func(argc - 2, argv + 2, &ctrl,
+                                          cmd_descriptors + i);
 
             rl_ctrl_fini(&ctrl);
 
