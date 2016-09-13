@@ -86,6 +86,11 @@ struct registered_appl {
     /* The IPCP where the application is registered. */
     struct ipcp_entry *ipcp;
 
+#define APPL_REG_PENDING    0x1
+#define APPL_REG_COMPLETE   0x2
+    /* Is registration complete or are we waiting for uipcp response? */
+    uint8_t state;
+
     unsigned int refcnt;
     struct work_struct remove;
     struct list_head node;
@@ -620,7 +625,8 @@ static int
 ipcp_application_add(struct ipcp_entry *ipcp,
                      struct rina_name *appl_name,
                      struct rl_ctrl *rc,
-                     uint32_t event_id)
+                     uint32_t event_id,
+                     bool uipcp)
 {
     struct registered_appl *app, *newapp;
     int ret = 0;
@@ -655,6 +661,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     newapp->event_id = event_id;
     newapp->refcnt = 1;
     newapp->ipcp = ipcp;
+    newapp->state = uipcp ? APPL_REG_PENDING : APPL_REG_COMPLETE;
     INIT_WORK(&newapp->remove, app_remove_work);
     list_add_tail(&newapp->node, &ipcp->registered_appls);
 
@@ -748,8 +755,8 @@ application_del_by_rc(struct rl_ctrl *rc)
                 "unregistered\n",  s);
         kfree(s);
 
-        /* Notify userspace IPCP if required. */
-        if (app->ipcp->uipcp) {
+        /* Notify userspace IPCP if needed. */
+        if (app->state == APPL_REG_COMPLETE && app->ipcp->uipcp) {
             struct rl_kmsg_appl_register ntfy;
 
             ntfy.msg_type = RLITE_KER_APPL_REGISTER;
@@ -1820,7 +1827,8 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         ret = 0;
 
         if (req->reg) {
-            ret = ipcp_application_add(ipcp, appl_name, rc, req->event_id);
+            ret = ipcp_application_add(ipcp, appl_name, rc, req->event_id,
+                                       ipcp->uipcp != NULL);
         } else {
             ret = ipcp_application_del(ipcp, appl_name);
         }
@@ -1906,6 +1914,7 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                 ipcp_application_put(app);
 
             } else {
+                app->state = APPL_REG_COMPLETE;
                 PI("Application process %s %sregistered to IPC process %u\n",
                         name_s, (resp->reg ? "" : "un"), resp->ipcp_id);
             }
