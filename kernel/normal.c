@@ -1140,7 +1140,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         mod_timer(&dtp->rcv_inact_tmr, jiffies + 2 * dtp->mpl_r_a);
     }
 
-    if ((dtp->flags & DTP_F_DRF_EXPECTED) || (pci->pdu_flags & PDU_F_DRF)) {
+    if (unlikely((dtp->flags & DTP_F_DRF_EXPECTED) ||
+                 (pci->pdu_flags & PDU_F_DRF))) {
         /* If we expect DRF being set (new PDU run) we pretend it's there
          * even if it's not int pci->pdu_flags. This is done to avoid that
          * the loss of the DRF PDU causes the loss of all the subsequent
@@ -1150,7 +1151,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         /* Flush reassembly queue */
 
         dtp->flags &= ~DTP_F_DRF_EXPECTED;
-        dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
+        dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
 
         if (pci->pdu_flags & PDU_F_DRF) {
@@ -1168,7 +1169,10 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
             PV("Keep old control sequence number %llu\n", dtp->next_snd_ctl_seq);
         }
 
-        crb = sdu_rx_sv_update(ipcp, flow);
+        if (flow->upper.ipcp) {
+            dtp->rcv_lwe = dtp->rcv_lwe_priv;
+            crb = sdu_rx_sv_update(ipcp, flow);
+        }
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
@@ -1270,6 +1274,11 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
 
         seqq_pop_many(dtp, flow->cfg.max_sdu_gap, &qrbs);
 
+        /* If this flow is used by an application, this SDU will be acked
+         * when the application reads it, since rl_normal_sdu_rx_consumed()
+         * is called. Otherwise the flow is used by an upper IPCP, and we
+         * have to ACK here, since rl_normal_sdu_rx_consumed() won't be
+         * called. */
         if (flow->upper.ipcp) {
             dtp->rcv_lwe = dtp->rcv_lwe_priv;
             crb = sdu_rx_sv_update(ipcp, flow);
@@ -1306,20 +1315,17 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         RPD(5, "dropping PDU [%lu] to meet QoS requirements\n",
                 (long unsigned)seqnum);
         rl_buf_free(rb);
-
+        crb = sdu_rx_sv_update(ipcp, flow);
         flow->stats.rx_err++;
 
     } else {
-        /* What is not dropped nor delivered goes in the
-         * sequencing queue.
-         */
+        /* What is not dropped nor delivered goes in the sequencing queue.
+         * Don't ack here, we have to wait for the gap to be filled. */
         seqq_push(dtp, rb);
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
     }
-
-    crb = sdu_rx_sv_update(ipcp, flow);
 
     spin_unlock_bh(&dtp->lock);
 

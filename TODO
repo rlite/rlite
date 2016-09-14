@@ -13,5 +13,3 @@
 
 - DTCP: compute RTT and use it to program the RTX timer
 - DTCP: implement A timer and coalesced ACKs
-- DTCP: check that control rb is not sent twice for each packet (once
-  in rl_normal_sdu_rx and once in rl_normal_sdu_rx_consumed).
