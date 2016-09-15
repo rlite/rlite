@@ -186,6 +186,8 @@ rcv_inact_tmr_cb(long unsigned arg)
 static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
                   struct rl_buf *rb, bool maysleep);
 
+#define RTT_TO_RTX(t) (t << 2)
+
 void
 rtx_tmr_cb(long unsigned arg)
 {
@@ -225,7 +227,7 @@ rtx_tmr_cb(long unsigned arg)
                 /* This rb should be retransmitted. We also invalidate
                  * rb->tx_jiffies, so that RTT is not updated on
                  * retransmitted packets. */
-                rb->rtx_jiffies += dtp->rtx_tmr_int;
+                rb->rtx_jiffies += RTT_TO_RTX(dtp->rtt);
                 rb->tx_jiffies = 0;
 
                 crb = rl_buf_clone(rb, GFP_ATOMIC);
@@ -323,8 +325,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr_next = NULL;
-    dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
-    dtp->rtt = dtp->rtx_tmr_int;
+    dtp->rtt = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -486,7 +487,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Record the rtx expiration time and current time. */
     crb->tx_jiffies = jiffies;
-    crb->rtx_jiffies = crb->tx_jiffies + dtp->rtx_tmr_int;
+    crb->rtx_jiffies = crb->tx_jiffies + RTT_TO_RTX(dtp->rtt);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -1051,7 +1052,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                             }
                             /* RTT <== RTT * (112/128) + SAMPLE * (16/128)*/
                             dtp->rtt = (dtp->rtt * 112 + (cur_rtt << 4)) >> 7;
-                            RPD(1, "RTT est %u\n", jiffies_to_msecs(dtp->rtt));
+                            RPD(1, "RTT est %u %u\n", dtp->rtt, jiffies_to_msecs(dtp->rtt));
                         }
 
                         rl_buf_free(cur);

@@ -373,9 +373,8 @@ struct dtp {
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
-    unsigned long rtx_tmr_int;
     struct rl_buf *rtx_tmr_next;
-    unsigned rtt; /* Estimated round trip time. */
+    unsigned rtt; /* Estimated round trip time, in jiffies. */
     struct tkbk tkbk;
 
     /* Receiver state. */
