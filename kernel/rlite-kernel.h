@@ -478,8 +478,6 @@ void rl_write_restart_flows(struct ipcp_entry *ipcp);
 
 void rl_flow_share_tx_wqh(struct flow_entry *flow);
 
-struct flow_entry *__flow_put(struct flow_entry *flow);
-
 struct flow_entry *flow_put(struct flow_entry *flow);
 
 struct flow_entry *flow_lookup(rl_port_t port_id);

@@ -871,102 +871,8 @@ flow_get_ref(struct flow_entry *flow)
 }
 EXPORT_SYMBOL(flow_get_ref);
 
-static void
-remove_flow_work(struct work_struct *work)
-{
-    struct flow_entry *flow = container_of(work, struct flow_entry,
-                                           remove.work);
-
-    flow_put(flow);
-}
-
-static int
-flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
-         uint32_t event_id,
-         const struct rina_name *local_appl,
-         const struct rina_name *remote_appl,
-         const struct rl_flow_config *flowcfg,
-         struct flow_entry **pentry, gfp_t gfp)
-{
-    struct flow_entry *entry;
-    int ret = 0;
-
-    *pentry = entry = kzalloc(sizeof(*entry), gfp);
-    if (!entry) {
-        return -ENOMEM;
-    }
-
-    FLOCK();
-
-    /* Try to alloc a port id and a cep id from the bitmaps, cep
-     * ids being allocated only if needed. */
-    entry->local_port = bitmap_find_next_zero_area(rl_dm.port_id_bitmap,
-                                                   PORT_ID_BITMAP_SIZE,
-                                                   0, 1, 0);
-    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-        entry->local_cep = bitmap_find_next_zero_area(rl_dm.cep_id_bitmap,
-                                                      CEP_ID_BITMAP_SIZE,
-                                                      0, 1, 0);
-    } else {
-        entry->local_cep = 0;
-    }
-
-    if (entry->local_port < PORT_ID_BITMAP_SIZE &&
-                entry->local_cep < CEP_ID_BITMAP_SIZE) {
-        bitmap_set(rl_dm.port_id_bitmap, entry->local_port, 1);
-
-        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-            bitmap_set(rl_dm.cep_id_bitmap, entry->local_cep, 1);
-        }
-
-        /* Build and insert a flow entry in the hash table. */
-        rina_name_copy(&entry->local_appl, local_appl);
-        rina_name_copy(&entry->remote_appl, remote_appl);
-        entry->remote_port = 0;  /* Not valid. */
-        entry->remote_cep = 0;   /* Not valid. */
-        entry->remote_addr = 0;  /* Not valid. */
-        entry->upper = upper;
-        entry->event_id = event_id;
-        entry->refcnt = 1;  /* Cogito, ergo sum. */
-        entry->never_bound = true;
-        INIT_LIST_HEAD(&entry->pduft_entries);
-        txrx_init(&entry->txrx, ipcp, false);
-        hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
-        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-            hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
-                     entry->local_cep);
-        }
-        INIT_DELAYED_WORK(&entry->remove, remove_flow_work);
-        rl_flow_stats_init(&entry->stats);
-        dtp_init(&entry->dtp);
-        FUNLOCK();
-
-        PLOCK();
-        ipcp->refcnt++;
-        PUNLOCK();
-
-        if (flowcfg) {
-            memcpy(&entry->cfg, flowcfg, sizeof(entry->cfg));
-            if (ipcp->ops.flow_init) {
-                /* Let the IPCP do some
-                 * specific initialization. */
-                ipcp->ops.flow_init(ipcp, entry);
-            }
-        }
-    } else {
-        FUNLOCK();
-
-        kfree(entry);
-        *pentry = NULL;
-        ret = -ENOSPC;
-    }
-
-
-    return ret;
-}
-
-struct flow_entry *
-__flow_put(struct flow_entry *entry)
+static struct flow_entry *
+__flow_put(struct flow_entry *entry, bool maysleep)
 {
     struct rl_buf *rb;
     struct rl_buf *tmp;
@@ -979,6 +885,9 @@ __flow_put(struct flow_entry *entry)
     if (unlikely(!entry)) {
         return NULL;
     }
+
+    FLOCK();
+
     dtp = &entry->dtp;
 
     entry->refcnt--;
@@ -987,9 +896,9 @@ __flow_put(struct flow_entry *entry)
         goto out;
     }
 
-    if (entry->cfg.dtcp_present && !work_busy(&entry->remove.work)) {
+    if (entry->cfg.dtcp_present && !maysleep) {
         /* If DTCP is present, check if we should postopone flow
-         * removal. The work_busy() function is invoked to make sure
+         * removal. We check mauusleep to make sure
          * that this flow_entry() invocation is not due to a postponed
          * removal, so that we avoid postponing forever. */
 
@@ -1008,12 +917,12 @@ __flow_put(struct flow_entry *entry)
         spin_unlock_bh(&dtp->lock);
     }
 
-    if (!work_busy(&entry->remove.work)) {
+    if (!maysleep) {
         schedule_delayed_work(&entry->remove, postpone);
         /* Reference counter is zero here, but since the delayed
          * worker is going to use the flow, we reset the reference
          * counter to 1. The delayed worker will invoke flow_put()
-         * after having performed is work.
+         * after having performed its work.
          */
         entry->refcnt++;
         goto out;
@@ -1097,20 +1006,109 @@ __flow_put(struct flow_entry *entry)
     PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 out:
+    FUNLOCK();
     return ret;
 }
-EXPORT_SYMBOL(__flow_put);
 
 struct flow_entry *
 flow_put(struct flow_entry *flow)
 {
-    FLOCK();
-    flow = __flow_put(flow);
-    FUNLOCK();
-
-    return flow;
+    return __flow_put(flow, false);
 }
 EXPORT_SYMBOL(flow_put);
+
+static void
+flow_del_func(struct work_struct *work)
+{
+    struct flow_entry *flow = container_of(work, struct flow_entry,
+                                           remove.work);
+    __flow_put(flow, true);
+}
+
+static int
+flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
+         uint32_t event_id,
+         const struct rina_name *local_appl,
+         const struct rina_name *remote_appl,
+         const struct rl_flow_config *flowcfg,
+         struct flow_entry **pentry, gfp_t gfp)
+{
+    struct flow_entry *entry;
+    int ret = 0;
+
+    *pentry = entry = kzalloc(sizeof(*entry), gfp);
+    if (!entry) {
+        return -ENOMEM;
+    }
+
+    FLOCK();
+
+    /* Try to alloc a port id and a cep id from the bitmaps, cep
+     * ids being allocated only if needed. */
+    entry->local_port = bitmap_find_next_zero_area(rl_dm.port_id_bitmap,
+                                                   PORT_ID_BITMAP_SIZE,
+                                                   0, 1, 0);
+    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
+        entry->local_cep = bitmap_find_next_zero_area(rl_dm.cep_id_bitmap,
+                                                      CEP_ID_BITMAP_SIZE,
+                                                      0, 1, 0);
+    } else {
+        entry->local_cep = 0;
+    }
+
+    if (entry->local_port < PORT_ID_BITMAP_SIZE &&
+                entry->local_cep < CEP_ID_BITMAP_SIZE) {
+        bitmap_set(rl_dm.port_id_bitmap, entry->local_port, 1);
+
+        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
+            bitmap_set(rl_dm.cep_id_bitmap, entry->local_cep, 1);
+        }
+
+        /* Build and insert a flow entry in the hash table. */
+        rina_name_copy(&entry->local_appl, local_appl);
+        rina_name_copy(&entry->remote_appl, remote_appl);
+        entry->remote_port = 0;  /* Not valid. */
+        entry->remote_cep = 0;   /* Not valid. */
+        entry->remote_addr = 0;  /* Not valid. */
+        entry->upper = upper;
+        entry->event_id = event_id;
+        entry->refcnt = 1;  /* Cogito, ergo sum. */
+        entry->never_bound = true;
+        INIT_LIST_HEAD(&entry->pduft_entries);
+        txrx_init(&entry->txrx, ipcp, false);
+        hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
+        if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
+            hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
+                     entry->local_cep);
+        }
+        INIT_DELAYED_WORK(&entry->remove, flow_del_func);
+        rl_flow_stats_init(&entry->stats);
+        dtp_init(&entry->dtp);
+        FUNLOCK();
+
+        PLOCK();
+        ipcp->refcnt++;
+        PUNLOCK();
+
+        if (flowcfg) {
+            memcpy(&entry->cfg, flowcfg, sizeof(entry->cfg));
+            if (ipcp->ops.flow_init) {
+                /* Let the IPCP do some
+                 * specific initialization. */
+                ipcp->ops.flow_init(ipcp, entry);
+            }
+        }
+    } else {
+        FUNLOCK();
+
+        kfree(entry);
+        *pentry = NULL;
+        ret = -ENOSPC;
+    }
+
+
+    return ret;
+}
 
 static void
 flow_rc_unbind(struct rl_ctrl *rc)
