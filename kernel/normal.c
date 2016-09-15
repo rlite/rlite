@@ -222,8 +222,11 @@ rtx_tmr_cb(long unsigned arg)
             rb = list_entry(cur, struct rl_buf, node);
 
             if (jiffies >= rb->rtx_jiffies) {
-                /* This rb should be retransmitted. */
+                /* This rb should be retransmitted. We also invalidate
+                 * rb->tx_jiffies, so that RTT is not updated on
+                 * retransmitted packets. */
                 rb->rtx_jiffies += dtp->rtx_tmr_int;
+                rb->tx_jiffies = 0;
 
                 crb = rl_buf_clone(rb, GFP_ATOMIC);
                 if (unlikely(!crb)) {
@@ -321,6 +324,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr_next = NULL;
     dtp->rtx_tmr_int = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
+    dtp->rtt = dtp->rtx_tmr_int;
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -480,8 +484,9 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
         return -ENOMEM;
     }
 
-    /* Record the rtx expiration time. */
-    crb->rtx_jiffies = jiffies + dtp->rtx_tmr_int;
+    /* Record the rtx expiration time and current time. */
+    crb->tx_jiffies = jiffies;
+    crb->rtx_jiffies = crb->tx_jiffies + dtp->rtx_tmr_int;
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -1016,6 +1021,8 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     if (pcic->base.pdu_type & PDU_T_ACK_BIT) {
         struct rl_buf *cur, *tmp;
+        unsigned now = jiffies;
+        unsigned cur_rtt;
 
         switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
             case PDU_T_ACK:
@@ -1035,6 +1042,18 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                              * rtxq). */
                             dtp->rtx_tmr_next = NULL;
                         }
+
+                        if (cur->tx_jiffies) {
+                            /* Update our RTT estimate. */
+                            cur_rtt = now - cur->tx_jiffies;
+                            if (!cur_rtt) {
+                                cur_rtt = 1;
+                            }
+                            /* RTT <== RTT * (112/128) + SAMPLE * (16/128)*/
+                            dtp->rtt = (dtp->rtt * 112 + (cur_rtt << 4)) >> 7;
+                            RPD(1, "RTT est %u\n", jiffies_to_msecs(dtp->rtt));
+                        }
+
                         rl_buf_free(cur);
                     } else {
                         /* The rtxq is sorted by seqnum, so we can safely

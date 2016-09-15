@@ -132,11 +132,12 @@ struct rl_rawbuf {
 };
 
 struct rl_buf {
-    struct rl_rawbuf  *raw;
-    struct rina_pci    *pci;
+    struct rl_rawbuf    *raw;
+    struct rina_pci     *pci;
     size_t              len;
 
-    unsigned long       rtx_jiffies;
+    unsigned            rtx_jiffies;
+    unsigned            tx_jiffies;
 
     struct flow_entry   *tx_compl_flow;
     struct list_head    node;
@@ -374,6 +375,7 @@ struct dtp {
     struct timer_list rtx_tmr;
     unsigned long rtx_tmr_int;
     struct rl_buf *rtx_tmr_next;
+    unsigned rtt; /* Estimated round trip time. */
     struct tkbk tkbk;
 
     /* Receiver state. */
