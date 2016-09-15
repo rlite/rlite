@@ -92,7 +92,6 @@ struct registered_appl {
     uint8_t state;
 
     unsigned int refcnt;
-    struct work_struct remove;
     struct list_head node;
 };
 
@@ -139,6 +138,11 @@ struct rl_dm {
 
     /* Lock for ipcp_factories and ctrl_devs list */
     struct mutex general_lock;
+
+    /* Data structures for deferred removal of registered_appl structs. */
+    struct list_head appl_removeq;
+    struct work_struct appl_removew;
+    spinlock_t appl_removeq_lock;
 };
 
 static struct rl_dm rl_dm;
@@ -568,10 +572,8 @@ ipcp_application_get(struct ipcp_entry *ipcp,
 }
 
 static void
-app_remove_work(struct work_struct *w)
+appl_del(struct registered_appl *app)
 {
-    struct registered_appl *app = container_of(w,
-                            struct registered_appl, remove);
     struct ipcp_entry *ipcp = app->ipcp;
 
     if (ipcp->ops.appl_register) {
@@ -586,6 +588,26 @@ app_remove_work(struct work_struct *w)
      * that we don't need locks. */
     rina_name_free(&app->name);
     kfree(app);
+}
+
+static void
+appl_removew_func(struct work_struct *w)
+{
+    struct registered_appl *app, *tmp;
+    struct list_head removeq;
+
+    INIT_LIST_HEAD(&removeq);
+
+    spin_lock_bh(&rl_dm.appl_removeq_lock);
+    list_for_each_entry_safe(app, tmp, &rl_dm.appl_removeq, node) {
+        list_del(&app->node);
+        list_add_tail(&app->node, &removeq);
+    }
+    spin_unlock_bh(&rl_dm.appl_removeq_lock);
+
+    list_for_each_entry_safe(app, tmp, &removeq, node) {
+        appl_del(app);
+    }
 }
 
 static void
@@ -614,10 +636,13 @@ ipcp_application_put(struct registered_appl *app)
     if (ipcp->ops.appl_register) {
         /* Perform cleanup operation in process context, because we need
          * to take the per-ipcp mutex. */
-        schedule_work(&app->remove);
+        spin_lock_bh(&rl_dm.appl_removeq_lock);
+        list_add_tail(&app->node, &rl_dm.appl_removeq);
+        spin_unlock_bh(&rl_dm.appl_removeq_lock);
+        schedule_work(&rl_dm.appl_removew);
     } else {
         /* No mutex required, perform the removal in current context. */
-        app_remove_work(&app->remove);
+        appl_del(app);
     }
 }
 
@@ -662,7 +687,6 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     newapp->refcnt = 1;
     newapp->ipcp = ipcp;
     newapp->state = uipcp ? APPL_REG_PENDING : APPL_REG_COMPLETE;
-    INIT_WORK(&newapp->remove, app_remove_work);
     list_add_tail(&newapp->node, &ipcp->registered_appls);
 
     RAUNLOCK(ipcp);
@@ -2538,9 +2562,12 @@ rl_ctrl_init(void)
     spin_lock_init(&rl_dm.flows_lock);
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
+    spin_lock_init(&rl_dm.appl_removeq_lock);
     INIT_LIST_HEAD(&rl_dm.ipcp_factories);
     INIT_LIST_HEAD(&rl_dm.difs);
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);
+    INIT_LIST_HEAD(&rl_dm.appl_removeq);
+    INIT_WORK(&rl_dm.appl_removew, appl_removew_func);
 
     ret = misc_register(&rl_ctrl_misc);
     if (ret) {
