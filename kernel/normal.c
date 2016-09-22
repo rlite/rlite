@@ -197,7 +197,7 @@ rtx_tmr_cb(long unsigned arg)
     struct list_head rrbq;
     struct list_head *cur;
 
-    PD("\n");
+    RPD(1, "\n");
 
     INIT_LIST_HEAD(&rrbq);
 
@@ -232,7 +232,7 @@ rtx_tmr_cb(long unsigned arg)
 
                 crb = rl_buf_clone(rb, GFP_ATOMIC);
                 if (unlikely(!crb)) {
-                    PE("Out of memory\n");
+                    RPD(1, "OOM\n");
                 } else {
                     list_add_tail(&crb->node, &rrbq);
                 }
@@ -439,8 +439,21 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
         ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow,
                                         rb, maysleep);
 
-        if (unlikely(ret == -EAGAIN)) {
-            if (!maysleep) {
+        if (ret == -EAGAIN) {
+
+            if (maysleep) {
+                if (signal_pending(current)) {
+                    rl_buf_free(rb);
+                    rb = NULL;
+                    ret = -ERESTARTSYS;
+                    break;
+                }
+
+                /* No room to write, let's sleep. */
+                schedule();
+                continue;
+
+            } else {
                 /* Enqueue in the RMT queue, if possible. */
 
                 spin_lock_bh(&lower_ipcp->rmtq_lock);
@@ -453,13 +466,6 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                     rl_buf_free(rb);
                 }
                 spin_unlock_bh(&lower_ipcp->rmtq_lock);
-
-            } else {
-                /* Cannot restart system call from here... */
-
-                /* No room to write, let's sleep. */
-                schedule();
-                continue;
             }
         }
 

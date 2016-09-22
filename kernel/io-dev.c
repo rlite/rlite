@@ -371,8 +371,10 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
 
         ret = ipcp->ops.sdu_write(ipcp, flow, rb, blocking);
 
-        if (unlikely(ret == -EAGAIN)) {
+        if (ret == -EAGAIN) {
             if (signal_pending(current)) {
+                rl_buf_free(rb);
+                rb = NULL;
                 ret = -ERESTARTSYS;
                 break;
             }
