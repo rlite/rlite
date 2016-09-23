@@ -445,7 +445,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 if (signal_pending(current)) {
                     rl_buf_free(rb);
                     rb = NULL;
-                    ret = -ERESTARTSYS;
+                    ret = -EINTR; /* -ERESTARTSYS */
                     break;
                 }
 

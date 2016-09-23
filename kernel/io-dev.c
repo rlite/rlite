@@ -375,7 +375,11 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
             if (signal_pending(current)) {
                 rl_buf_free(rb);
                 rb = NULL;
-                ret = -ERESTARTSYS;
+		/* We avoid restarting the system call, because the other
+		 * end could have shutdown the flow, ops.sdu_write()
+		 * could keep returning -EAGAIN forever, and appication could
+		 * get stuck in the write() syscall forever. */
+                ret = -EINTR;
                 break;
             }
 
@@ -436,7 +440,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
             spin_unlock_bh(&txrx->rx_lock);
             if (signal_pending(current)) {
-                ret = -ERESTARTSYS;
+                ret = -EINTR; /* -ERESTARTSYS */
                 break;
             }
 
