@@ -1058,7 +1058,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                             }
                             /* RTT <== RTT * (112/128) + SAMPLE * (16/128)*/
                             dtp->rtt = (dtp->rtt * 112 + (cur_rtt << 4)) >> 7;
-                            RPD(1, "RTT est %u %u\n", dtp->rtt, jiffies_to_msecs(dtp->rtt));
+                            NPD(1, "RTT est %u msecs\n", jiffies_to_msecs(dtp->rtt));
                         }
 
                         rl_buf_free(cur);
