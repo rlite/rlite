@@ -186,7 +186,7 @@ rcv_inact_tmr_cb(long unsigned arg)
 static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
                   struct rl_buf *rb, bool maysleep);
 
-#define RTT_TO_RTX(t) (t << 2)
+#define RTT_TO_RTX(dtp) ((dtp)->rtt + ((dtp)->rtt_stddev << 1))
 
 void
 rtx_tmr_cb(long unsigned arg)
@@ -227,7 +227,7 @@ rtx_tmr_cb(long unsigned arg)
                 /* This rb should be retransmitted. We also invalidate
                  * rb->tx_jiffies, so that RTT is not updated on
                  * retransmitted packets. */
-                rb->rtx_jiffies += RTT_TO_RTX(dtp->rtt);
+                rb->rtx_jiffies += RTT_TO_RTX(dtp);
                 rb->tx_jiffies = 0;
 
                 crb = rl_buf_clone(rb, GFP_ATOMIC);
@@ -326,6 +326,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr.data = (unsigned long)flow;
     dtp->rtx_tmr_next = NULL;
     dtp->rtt = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
+    dtp->rtt_stddev = 1;
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -493,7 +494,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Record the rtx expiration time and current time. */
     crb->tx_jiffies = jiffies;
-    crb->rtx_jiffies = crb->tx_jiffies + RTT_TO_RTX(dtp->rtt);
+    crb->rtx_jiffies = crb->tx_jiffies + RTT_TO_RTX(dtp);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -1030,6 +1031,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         struct rl_buf *cur, *tmp;
         unsigned now = jiffies;
         unsigned cur_rtt;
+        int cur_rttdev;
 
         switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
             case PDU_T_ACK:
@@ -1056,9 +1058,19 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                             if (!cur_rtt) {
                                 cur_rtt = 1;
                             }
+                            cur_rttdev = (int)cur_rtt - dtp->rtt;
+                            if (cur_rttdev < 0) {
+                                cur_rttdev = -cur_rttdev;
+                            } else if (!cur_rttdev) {
+                                cur_rttdev = 1;
+                            }
+
                             /* RTT <== RTT * (112/128) + SAMPLE * (16/128)*/
                             dtp->rtt = (dtp->rtt * 112 + (cur_rtt << 4)) >> 7;
-                            NPD(1, "RTT est %u msecs\n", jiffies_to_msecs(dtp->rtt));
+                            dtp->rtt_stddev = (dtp->rtt_stddev * 3 + cur_rttdev) >> 2;
+                            NPD(1, "RTT est %u msecs +/- %u msecs\n",
+                                   jiffies_to_msecs(dtp->rtt),
+                                   jiffies_to_msecs(dtp->rtt_stddev));
                         }
 
                         rl_buf_free(cur);

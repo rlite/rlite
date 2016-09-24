@@ -375,6 +375,7 @@ struct dtp {
     struct timer_list rtx_tmr;
     struct rl_buf *rtx_tmr_next;
     unsigned rtt; /* Estimated round trip time, in jiffies. */
+    unsigned rtt_stddev;
     struct tkbk tkbk;
 
     /* Receiver state. */

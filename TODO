@@ -11,5 +11,5 @@
 
 - install: don't overwrite config files
 
-- DTCP: compute RTT and use it to program the RTX timer
+- DTCP: RTT estimate should happen using ktime_t variables
 - DTCP: implement A timer and coalesced ACKs
