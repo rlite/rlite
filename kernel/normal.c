@@ -210,8 +210,19 @@ a_tmr_cb(long unsigned arg)
     }
 }
 
+/*
+ * Compute the RTX timeout interval using the estimate of RTT mean
+ * and standard deviation. However, we have to make sure that the
+ * interval is bigger than the A timeout interval, otherwise the
+ * sender will incur into unnecessary retransmits.
+ */
+static inline unsigned long
+rtt_to_rtx(struct dtp *dtp)
+{
+    unsigned long x = dtp->rtt + (dtp->rtt_stddev << 1);
 
-#define RTT_TO_RTX(dtp) ((dtp)->rtt + ((dtp)->rtt_stddev << 1))
+    return x > RL_A_MSECS_DFLT ? x : RL_A_MSECS_DFLT;
+}
 
 static void
 rtx_tmr_cb(long unsigned arg)
@@ -252,7 +263,7 @@ rtx_tmr_cb(long unsigned arg)
                 /* This rb should be retransmitted. We also invalidate
                  * rb->tx_jiffies, so that RTT is not updated on
                  * retransmitted packets. */
-                rb->rtx_jiffies += RTT_TO_RTX(dtp);
+                rb->rtx_jiffies += rtt_to_rtx(dtp);
                 rb->tx_jiffies = 0;
 
                 crb = rl_buf_clone(rb, GFP_ATOMIC);
@@ -522,7 +533,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Record the rtx expiration time and current time. */
     crb->tx_jiffies = jiffies;
-    crb->rtx_jiffies = crb->tx_jiffies + RTT_TO_RTX(dtp);
+    crb->rtx_jiffies = crb->tx_jiffies + rtt_to_rtx(dtp);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */

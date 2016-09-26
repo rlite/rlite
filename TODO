@@ -12,4 +12,3 @@
 - install: don't overwrite config files
 
 - DTCP: RTT estimate should happen using ktime_t variables
-- DTCP: implement A timer and coalesced ACKs

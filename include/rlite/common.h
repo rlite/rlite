@@ -185,7 +185,7 @@ struct rl_flow_config {
 
 #define RL_MPL_MSECS_DFLT       1000
 #define RL_RTX_MSECS_DFLT       1000
-#define RL_A_MSECS_DFLT         0
+#define RL_A_MSECS_DFLT         30
 #define RL_DATA_RXMS_MAX_DFLT   10
 
 /* Does a flow specification correspond to best effort QoS? */
