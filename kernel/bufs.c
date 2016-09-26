@@ -71,7 +71,6 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 
     crb = kmalloc(sizeof(*crb), gfp);
     if (unlikely(!crb)) {
-        PE("Out of memory\n");
         return NULL;
     }
 

@@ -120,9 +120,9 @@ struct rina_pci_ctrl {
     rl_seq_t last_ctrl_seq_num_rcvd;
     rl_seq_t ack_nack_seq_num;
     rl_seq_t new_rwe;
-    rl_seq_t new_lwe;
-    rl_seq_t my_lwe;
-    rl_seq_t my_rwe;
+    rl_seq_t new_lwe; /* sent but unused */
+    rl_seq_t my_lwe;  /* sent but unused */
+    rl_seq_t my_rwe;  /* sent but unused */
 } __attribute__((packed));
 
 struct rl_rawbuf {
@@ -385,9 +385,11 @@ struct dtp {
     rl_seq_t max_seq_num_rcvd;
     rl_seq_t last_snd_data_ack; /* almost unused */
     rl_seq_t next_snd_ctl_seq;
+    rl_seq_t last_lwe_sent;
     struct timer_list rcv_inact_tmr;
     struct list_head seqq;
     unsigned int seqq_len;
+    struct timer_list a_tmr;
 
 #define DTP_F_DRF_SET		(1<<0)
 #define DTP_F_DRF_EXPECTED	(1<<1)

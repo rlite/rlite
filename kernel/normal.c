@@ -113,6 +113,7 @@ dtp_rcv_reset(struct flow_entry *flow)
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->rcv_rwe += fc->cfg.w.initial_credit;
     }
+    dtp->last_lwe_sent = 0;
 }
 
 static void
@@ -186,9 +187,33 @@ rcv_inact_tmr_cb(long unsigned arg)
 static int rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr,
                   struct rl_buf *rb, bool maysleep);
 
+static struct rl_buf *
+sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                 bool ack_immediate);
+
+static void
+a_tmr_cb(long unsigned arg)
+{
+    struct flow_entry *flow = (struct flow_entry *)arg;
+    struct ipcp_entry *ipcp = flow->txrx.ipcp;
+    struct dtp *dtp = &flow->dtp;
+    struct rl_buf *crb;
+
+    RPD(1, "A tmr callback\n");
+
+    spin_lock_bh(&dtp->lock);
+    crb = sdu_rx_sv_update(ipcp, flow, true);
+    spin_unlock_bh(&dtp->lock);
+
+    if (crb) {
+        rmt_tx(ipcp, flow->remote_addr, crb, false);
+    }
+}
+
+
 #define RTT_TO_RTX(dtp) ((dtp)->rtt + ((dtp)->rtt_stddev << 1))
 
-void
+static void
 rtx_tmr_cb(long unsigned arg)
 {
     struct flow_entry *flow = (struct flow_entry *)arg;
@@ -327,6 +352,9 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     dtp->rtx_tmr_next = NULL;
     dtp->rtt = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
     dtp->rtt_stddev = 1;
+
+    dtp->a_tmr.function = a_tmr_cb;
+    dtp->a_tmr.data = (unsigned long)flow;
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
@@ -488,7 +516,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     struct rl_buf *crb = rl_buf_clone(rb, GFP_ATOMIC);
 
     if (unlikely(!crb)) {
-        PE("Out of memory\n");
+        RPD(1, "OOM\n");
         return -ENOMEM;
     }
 
@@ -832,7 +860,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic->last_ctrl_seq_num_rcvd = flow->dtp.last_ctrl_seq_num_rcvd;
         pcic->ack_nack_seq_num = ack_nack_seq_num;
         pcic->new_rwe = flow->dtp.rcv_rwe;
-        pcic->new_lwe = flow->dtp.rcv_lwe;
+        pcic->new_lwe = flow->dtp.last_lwe_sent = flow->dtp.rcv_lwe;
         pcic->my_rwe = flow->dtp.snd_rwe;
         pcic->my_lwe = flow->dtp.snd_lwe;
     }
@@ -844,32 +872,39 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
  * updated.
  */
 static struct rl_buf *
-sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
+sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                 bool ack_immediate)
 {
     const struct dtcp_config *cfg = &flow->cfg.dtcp;
-    uint8_t pdu_type = 0;
+    unsigned int a = flow->cfg.dtcp.initial_a;
     rl_seq_t ack_nack_seq_num = 0;
+    uint8_t pdu_type = 0;
 
     if (cfg->flow_control) {
         /* POL: RcvrFlowControl */
         if (cfg->fc.fc_type == RLITE_FC_T_WIN) {
+            rl_seq_t win_size = cfg->fc.cfg.w.initial_credit;
+
             NPD("rcv_rwe [%lu] --> [%lu]\n",
                     (long unsigned)flow->dtp.rcv_rwe,
-                    (long unsigned)(flow->dtp.rcv_lwe +
-                        flow->cfg.dtcp.fc.cfg.w.initial_credit));
-            /* We should not unconditionally increment the receiver RWE,
-             * but instead use some logic related to buffer management
-             * (e.g. see the amount of receiver buffer available). */
-            flow->dtp.rcv_rwe = flow->dtp.rcv_lwe +
-                            flow->cfg.dtcp.fc.cfg.w.initial_credit;
+                    (long unsigned)(flow->dtp.rcv_lwe + win_size));
+            flow->dtp.rcv_rwe = flow->dtp.rcv_lwe + win_size;
+
+            if ((flow->dtp.rcv_lwe < flow->dtp.last_lwe_sent +
+                                (win_size >> 1)) && !ack_immediate && a) {
+                NPD("ACK delayed %lu %lu %lu\n", (long unsigned)flow->dtp.last_lwe_sent,
+                   (long unsigned)flow->dtp.rcv_lwe, (long unsigned)(flow->dtp.last_lwe_sent + (win_size >> 1)));
+                goto no_ack;
+            }
+            NPD("ACK immediate %lu %lu %lu\n", (long unsigned)flow->dtp.last_lwe_sent,
+               (long unsigned)flow->dtp.rcv_lwe, (long unsigned)(flow->dtp.last_lwe_sent + (win_size >> 1)));
         }
     }
 
-    /* I know, the following code can obviously be simplified, but this
+    /* I know, the following code can be easily simplified, but this
      * way policies are more visible. */
     if (cfg->rtx_control) {
         /* POL: RcvrAck */
-        /* Do this here or using the A timeout ? */
         ack_nack_seq_num = flow->dtp.rcv_lwe - 1;
         pdu_type = PDU_T_CTRL_MASK | PDU_T_ACK_BIT | PDU_T_ACK;
         if (cfg->flow_control) {
@@ -883,7 +918,18 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (pdu_type) {
+        /* Stop the A timer, we are going to send an ACK. */
+        del_timer(&flow->dtp.a_tmr);
         return ctrl_pdu_alloc(ipcp, flow, pdu_type, ack_nack_seq_num);
+    }
+
+no_ack:
+    /* We are not sending an immediate ACK, so we need
+     * to start the A timer (if it was not already
+     * started) */
+    if (a && !timer_pending(&flow->dtp.a_tmr)) {
+        mod_timer(&flow->dtp.a_tmr, jiffies + msecs_to_jiffies(a));
+        RPD(1, "start A timer\n");
     }
 
     return NULL;
@@ -1209,7 +1255,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
 
         if (flow->upper.ipcp) {
             dtp->rcv_lwe = dtp->rcv_lwe_priv;
-            crb = sdu_rx_sv_update(ipcp, flow);
+            crb = sdu_rx_sv_update(ipcp, flow, false);
         }
 
         flow->stats.rx_pkt++;
@@ -1319,7 +1365,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
          * called. */
         if (flow->upper.ipcp) {
             dtp->rcv_lwe = dtp->rcv_lwe_priv;
-            crb = sdu_rx_sv_update(ipcp, flow);
+            crb = sdu_rx_sv_update(ipcp, flow, false);
         }
 
         flow->stats.rx_pkt++;
@@ -1353,7 +1399,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         RPD(5, "dropping PDU [%lu] to meet QoS requirements\n",
                 (long unsigned)seqnum);
         rl_buf_free(rb);
-        crb = sdu_rx_sv_update(ipcp, flow);
+        crb = sdu_rx_sv_update(ipcp, flow, false);
         flow->stats.rx_err++;
 
     } else {
@@ -1389,7 +1435,7 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow,
 
     /* Update the advertised RCVLWE and send an ACK control PDU. */
     dtp->rcv_lwe = RLITE_BUF_PCI(rb)->seqnum + 1;
-    crb = sdu_rx_sv_update(ipcp, flow);
+    crb = sdu_rx_sv_update(ipcp, flow, false);
 
     spin_unlock_bh(&dtp->lock);
 

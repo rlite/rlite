@@ -42,7 +42,7 @@ flowcfg2policies(const struct rl_flow_config *cfg,
     q.avg_bw = cfg->dtcp.bandwidth;
 
     p.dtcp_present = cfg->dtcp_present;
-    p.initial_a_timer = cfg->dtcp.initial_a; /* mismatch... */
+    p.initial_a_timer = cfg->dtcp.initial_a; /* name mismatch... */
 
     p.dtcp_cfg.flow_ctrl = cfg->dtcp.flow_control;
     p.dtcp_cfg.rtx_ctrl = cfg->dtcp.rtx_control;
@@ -121,11 +121,11 @@ flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
         /* We need retransmission control. */
         cfg->dtcp_present = 1;
         cfg->in_order_delivery = 1;
-        cfg->dtcp.initial_a = 10;
         cfg->dtcp.rtx_control = 1;
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max = RL_DATA_RXMS_MAX_DFLT;
         cfg->dtcp.rtx.initial_tr = RL_RTX_MSECS_DFLT;
+        cfg->dtcp.initial_a = RL_A_MSECS_DFLT;
     }
 
     /* Delay and jitter ignored for now. */
@@ -135,11 +135,11 @@ flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
     if (spec->flow_control) {
         /* This is temporary used to test flow control */
         cfg->dtcp_present = 1;
-        cfg->dtcp.initial_a = 10;
         cfg->dtcp.flow_control = 1;
         cfg->dtcp.fc.cfg.w.max_cwq_len = 100;
         cfg->dtcp.fc.cfg.w.initial_credit = 60;
         cfg->dtcp.fc.fc_type = RLITE_FC_T_WIN;
+        cfg->dtcp.initial_a = RL_A_MSECS_DFLT;
     }
 
     if (spec->avg_bandwidth) {

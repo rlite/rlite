@@ -41,6 +41,7 @@ dtp_init(struct dtp *dtp)
     INIT_LIST_HEAD(&dtp->rtxq);
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
     init_timer(&dtp->rtx_tmr);
+    init_timer(&dtp->a_tmr);
 }
 EXPORT_SYMBOL(dtp_init);
 
@@ -54,6 +55,7 @@ dtp_fini(struct dtp *dtp)
     del_timer_sync(&dtp->snd_inact_tmr);
     del_timer_sync(&dtp->rcv_inact_tmr);
     del_timer_sync(&dtp->rtx_tmr);
+    del_timer_sync(&dtp->a_tmr);
 
     PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
