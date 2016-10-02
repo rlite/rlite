@@ -145,13 +145,14 @@ for i in sorted(vms):
             '-smp 2 '                                                   \
             '-m %(memory)sM '                                                  \
             '-device e1000,mac=%(mac)s,netdev=mgmt '                    \
-            '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '           \
+            '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22,hostfwd=tcp::%(fwdw)s-:80,hostfwd=tcp::%(fwds)s-:2200 '           \
             '-vga std '                                                 \
             '-pidfile rina-%(id)s.pid '                                 \
             '-display none '                                            \
             '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '\
              % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000,
-                'img': args.image, 'memory': args.vm_memory}
+                'img': args.image, 'memory': args.vm_memory,
+                'fwdw': fwdp + 20000, 'fwds': fwdp + 30000}
 
     for port in vm['ports']:
         tap = port['tap']
