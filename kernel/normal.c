@@ -642,7 +642,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
 
     if (!dtcp_present) {
         /* DTCP not present */
-        dtp->snd_lwe = flow->dtp.next_seq_num_to_send; /* WFS */
+        dtp->snd_lwe = dtp->next_seq_num_to_send; /* WFS */
         dtp->last_seq_num_sent = pci->seqnum;
 
     } else {
@@ -660,7 +660,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
             } else {
                 /* PDU in the sender window. */
                 /* POL: TxControl. */
-                dtp->snd_lwe = flow->dtp.next_seq_num_to_send;
+                dtp->snd_lwe = dtp->next_seq_num_to_send;
                 dtp->last_seq_num_sent = pci->seqnum;
                 NPD("sending [%lu] through sender window\n",
                         (long unsigned)pci->seqnum);
