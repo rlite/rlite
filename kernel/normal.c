@@ -1445,7 +1445,6 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, struct rina_pci *pci)
 
     /* Update the advertised RCVLWE and send an ACK control PDU. */
     dtp->rcv_lwe = pci->seqnum + 1;
-    PD("seqnum %llu\n", (long long unsigned) pci->seqnum);
     crb = sdu_rx_sv_update(ipcp, flow, false);
 
     spin_unlock_bh(&dtp->lock);
