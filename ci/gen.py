@@ -149,8 +149,8 @@ for i in sorted(vms):
             '-vga std '                                                 \
             '-pidfile rina-%(id)s.pid '                                 \
             '-display none '                                            \
-            '-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '\
-             % {'fwdp': fwdp, 'id': vmid, 'mac': mac, 'fwdc': fwdp + 10000,
+            '-serial file:%(id)s.log '\
+             % {'fwdp': fwdp, 'id': vmid, 'mac': mac,
                 'img': args.image, 'memory': args.vm_memory,
                 'fwdw': fwdp + 20000, 'fwds': fwdp + 30000}
 
