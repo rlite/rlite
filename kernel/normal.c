@@ -309,7 +309,7 @@ rtx_tmr_cb(long unsigned arg)
 }
 
 static int rl_normal_sdu_rx_consumed(struct flow_entry *flow,
-                                       struct rl_buf *rb);
+                                       struct rina_pci *pci);
 
 #define TKBK_INTVAL_MSEC        2
 
@@ -1242,12 +1242,17 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
          * the loss of the DRF PDU causes the loss of all the subsequent
          * packets that arrive before the transmitter realizes the DRF
          * packet was lost and can retransmit it. */
+        dtp->flags &= ~DTP_F_DRF_EXPECTED;
 
         /* Flush reassembly queue */
 
-        dtp->flags &= ~DTP_F_DRF_EXPECTED;
-        dtp->rcv_lwe_priv = seqnum + 1;
+        /* Init receiver state. We need to call sdu_rx_sv_update in order
+         * to update rcv_rwe, but we should send a ctrl PDU only if
+         * flow->upper.ipcp != NULL. To implement this we should split
+         * the function. */
+        dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
+        crb = sdu_rx_sv_update(ipcp, flow, false);
 
         if (pci->pdu_flags & PDU_F_DRF) {
             /* If the DRF is set, we know the sender has reset its state,
@@ -1262,11 +1267,6 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
             PV("Reset control sequence number\n");
         } else {
             PV("Keep old control sequence number %llu\n", dtp->next_snd_ctl_seq);
-        }
-
-        if (flow->upper.ipcp) {
-            dtp->rcv_lwe = dtp->rcv_lwe_priv;
-            crb = sdu_rx_sv_update(ipcp, flow, false);
         }
 
         flow->stats.rx_pkt++;
@@ -1435,8 +1435,7 @@ snd_crb:
 }
 
 static int
-rl_normal_sdu_rx_consumed(struct flow_entry *flow,
-                            struct rl_buf *rb)
+rl_normal_sdu_rx_consumed(struct flow_entry *flow, struct rina_pci *pci)
 {
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct dtp *dtp = &flow->dtp;
@@ -1445,7 +1444,8 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow,
     spin_lock_bh(&dtp->lock);
 
     /* Update the advertised RCVLWE and send an ACK control PDU. */
-    dtp->rcv_lwe = RLITE_BUF_PCI(rb)->seqnum + 1;
+    dtp->rcv_lwe = pci->seqnum + 1;
+    PD("seqnum %llu\n", (long long unsigned) pci->seqnum);
     crb = sdu_rx_sv_update(ipcp, flow, false);
 
     spin_unlock_bh(&dtp->lock);

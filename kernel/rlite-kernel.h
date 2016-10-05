@@ -268,6 +268,7 @@ struct txrx {
     unsigned int        rx_qlen;
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
+    struct rina_pci     *rx_cur_pci;
     bool                mgmt;
     uint8_t             state;
 
@@ -411,7 +412,7 @@ struct flow_entry {
     struct rl_flow_config cfg;
 
     int (*sdu_rx_consumed)(struct flow_entry *flow,
-                           struct rl_buf *rb);
+                           struct rina_pci *pci);
 
     struct list_head    pduft_entries;
 
@@ -502,6 +503,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     spin_lock_init(&txrx->rx_lock);
     INIT_LIST_HEAD(&txrx->rx_q);
     txrx->rx_qlen = 0;
+    txrx->rx_cur_pci = NULL;
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->__tx_wqh);

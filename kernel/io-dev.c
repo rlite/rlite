@@ -456,6 +456,10 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
         rb = list_first_entry(&txrx->rx_q, struct rl_buf, node);
 
+        if (txrx->rx_cur_pci == NULL) {
+            txrx->rx_cur_pci = rb->pci - 1;
+        }
+
 	if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
             ret = ulen;
@@ -468,9 +472,13 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             spin_unlock_bh(&txrx->rx_lock);
 
         } else {
+            struct rina_pci *pci;
+
             /* Complete SDU read, consume the rb. */
             list_del(&rb->node);
             txrx->rx_qlen--;
+            pci = txrx->rx_cur_pci;
+            txrx->rx_cur_pci = NULL;
             spin_unlock_bh(&txrx->rx_lock);
 
             ret = rb->len;
@@ -479,10 +487,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             }
 
             if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-                if (unlikely(rl_buf_pci_push(rb))) {
-                    BUG_ON(1);
-                }
-                rio->flow->sdu_rx_consumed(rio->flow, rb);
+                rio->flow->sdu_rx_consumed(rio->flow, pci);
             }
 
             rl_buf_free(rb);
