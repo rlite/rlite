@@ -374,7 +374,7 @@ udp4_tx_worker(struct work_struct *w)
         if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len
                 || udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
             /* Cannot backpressure here, we have to drop */
-            RPD(5, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
+            RPD(2, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
         }
 
@@ -419,7 +419,7 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
         spin_unlock_bh(&shim->txq_lock);
 
         if (drop) {
-            NPD(5, "Queue full, dropping PDU [len=%u]\n", rb->len);
+            NPD(2, "Queue full, dropping PDU [len=%u]\n", rb->len);
             rl_buf_free(rb);
             return -ENOSPC;
         }

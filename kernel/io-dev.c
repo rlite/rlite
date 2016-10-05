@@ -93,7 +93,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (flow->upper.ipcp) {
         /* The flow on which the PDU is received is used by an IPCP. */
         if (unlikely(rb->len < sizeof(struct rina_pci))) {
-            RPD(5, "Dropping SDU shorter [%u] than PCI\n",
+            RPD(2, "Dropping SDU shorter [%u] than PCI\n",
                     (unsigned int)rb->len);
             rl_buf_free(rb);
             ret = -EINVAL;
@@ -141,7 +141,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     spin_lock_bh(&txrx->rx_lock);
     if (unlikely(qlimit && txrx->rx_qlen >= USR_Q_TH)) {
         /* This is useful when flow control is not used on a flow. */
-        RPD(5, "dropping PDU [length %lu] to avoid userspace rx queue "
+        RPD(2, "dropping PDU [length %lu] to avoid userspace rx queue "
                 "overrun\n", (long unsigned)rb->len);
         rl_buf_free(rb);
     } else {
@@ -341,7 +341,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         struct flow_entry *lower_flow;
 
         if (!ipcp->ops.mgmt_sdu_build) {
-            RPD(3, "Missing mgmt_sdu_write() operation\n");
+            RPD(2, "Missing mgmt_sdu_write() operation\n");
             rl_buf_free(rb);
             return -ENXIO;
         }
