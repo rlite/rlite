@@ -1246,13 +1246,17 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
 
         /* Flush reassembly queue */
 
-        /* Init receiver state. We need to call sdu_rx_sv_update in order
-         * to update rcv_rwe, but we should send a ctrl PDU only if
-         * flow->upper.ipcp != NULL. To implement this we should split
-         * the function. */
+        /* Init receiver state. The rcv_rwe is not initialized here, but the
+	 * first time sdu_rx_sv_update is called. */
         dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
-        crb = sdu_rx_sv_update(ipcp, flow, false);
+
+	if (flow->upper.ipcp) {
+		crb = sdu_rx_sv_update(ipcp, flow, false);
+	}
+
+        flow->stats.rx_pkt++;
+        flow->stats.rx_byte += rb->len;
 
         if (pci->pdu_flags & PDU_F_DRF) {
             /* If the DRF is set, we know the sender has reset its state,
@@ -1268,9 +1272,6 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         } else {
             PV("Keep old control sequence number %llu\n", dtp->next_snd_ctl_seq);
         }
-
-        flow->stats.rx_pkt++;
-        flow->stats.rx_byte += rb->len;
 
         spin_unlock_bh(&dtp->lock);
 
