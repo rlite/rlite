@@ -56,6 +56,7 @@ struct rl_ctrl {
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
+    unsigned int upqueue_len;
     spinlock_t upqueue_lock;
     wait_queue_head_t upqueue_wqh;
 
@@ -263,12 +264,21 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg)
         return -ENOMEM;
     }
     serlen = serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                                serbuf, rmsg);
+                                 serbuf, rmsg);
 
     entry->sermsg = serbuf;
     entry->serlen = serlen;
+
     spin_lock(&rc->upqueue_lock);
+    if (rc->upqueue_len >= 64) {
+        spin_unlock(&rc->upqueue_lock);
+        RPD(1, "upqueue overrun, dropping\n");
+        kfree(serbuf);
+        kfree(entry);
+        return -ENOMEM;
+    }
     list_add_tail(&entry->node, &rc->upqueue);
+    rc->upqueue_len ++;
     wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
                                POLLRDBAND);
     spin_unlock(&rc->upqueue_lock);
@@ -2393,6 +2403,7 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 
             /* Unlink and free the upqueue entry and the associated message. */
             list_del(&entry->node);
+            rc->upqueue_len --;
             kfree(entry->sermsg);
             kfree(entry);
         }
@@ -2469,6 +2480,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
 
     f->private_data = rc;
     INIT_LIST_HEAD(&rc->upqueue);
+    rc->upqueue_len = 0;
     spin_lock_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
