@@ -596,9 +596,9 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
 
     if (unlikely((fc->fc_type == RLITE_FC_T_WIN &&
                  dtp->next_seq_num_to_send > dtp->snd_rwe &&
-                    dtp->cwq_len >= dtp->max_cwq_len)) ||
+                    dtp->cwq_len >= dtp->max_cwq_len) ||
                         (flow->cfg.dtcp.rtx_control &&
-                            dtp->rtxq_len >= dtp->max_rtxq_len)) {
+                            dtp->rtxq_len >= dtp->max_rtxq_len))) {
         /* POL: FlowControlOverrun */
 
         /* Stop the sender inactivity timer. It will be
