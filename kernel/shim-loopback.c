@@ -259,11 +259,26 @@ rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *fl
     return 0;
 }
 
+static bool
+rl_shim_loopback_flow_writeable(struct flow_entry *flow)
+{
+    struct rl_shim_loopback *priv = flow->txrx.ipcp->priv;
+    bool ret = true;
+
+    if (priv->queued) {
+        spin_lock_bh(&priv->lock);
+        ret = (((priv->rdt + 1) & (RX_ENTRIES - 1)) != priv->rdh);
+        spin_unlock_bh(&priv->lock);
+    }
+
+    return ret;
+}
+
 static int
 rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
-                             struct flow_entry *tx_flow,
-                             struct rl_buf *rb,
-                             bool maysleep)
+                           struct flow_entry *tx_flow,
+                           struct rl_buf *rb,
+                           bool maysleep)
 {
     struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;
@@ -295,7 +310,7 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         unsigned int next;
 
         spin_lock_bh(&priv->lock);
-        next = (priv->rdt + 1) & (RX_ENTRIES -1);
+        next = (priv->rdt + 1) & (RX_ENTRIES - 1);
         if (unlikely(next == priv->rdh)) {
             ret = -EAGAIN;
         } else {
@@ -403,6 +418,7 @@ static struct ipcp_factory shim_loopback_factory = {
     .ops.sdu_write = rl_shim_loopback_sdu_write,
     .ops.config = rl_shim_loopback_config,
     .ops.flow_get_stats = rl_shim_loopback_flow_get_stats,
+    .ops.flow_writeable = rl_shim_loopback_flow_writeable,
 };
 
 static int __init

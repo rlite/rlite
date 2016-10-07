@@ -834,11 +834,26 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     }
 }
 
+#define flow_can_write(_p)  ((_p)->ntu != (_p)->ntp)
+
+static bool
+rl_shim_eth_flow_writeable(struct flow_entry *flow)
+{
+    struct rl_shim_eth *priv = (struct rl_shim_eth *)flow->txrx.ipcp->priv;
+    bool ret;
+
+    spin_lock_bh(&priv->tx_lock);
+    ret = flow_can_write(priv);
+    spin_unlock_bh(&priv->tx_lock);
+
+    return ret;
+}
+
 static int
 rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
-                         struct flow_entry *flow,
-                         struct rl_buf *rb,
-                         bool maysleep)
+                      struct flow_entry *flow,
+                      struct rl_buf *rb,
+                      bool maysleep)
 {
     struct rl_shim_eth *priv = ipcp->priv;
     struct net_device *netdev = priv->netdev;
@@ -859,7 +874,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     spin_lock_bh(&priv->tx_lock);
 
-    if (unlikely(priv->ntu == priv->ntp)) {
+    if (unlikely(!flow_can_write(priv))) {
         /* Double-check not necessary here, we are using locks,
          * not memory barriers. */
         spin_unlock_bh(&priv->tx_lock);
@@ -1049,6 +1064,7 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.appl_register = rl_shim_eth_register,
     .ops.flow_deallocated = rl_shim_eth_flow_deallocated,
     .ops.flow_get_stats = rl_shim_eth_flow_get_stats,
+    .ops.flow_writeable = rl_shim_eth_flow_writeable,
 };
 
 static int __init

@@ -224,6 +224,7 @@ struct rl_ctrl;
 struct pduft_entry;
 
 struct ipcp_ops {
+    bool (*flow_writeable)(struct flow_entry *flow);
     void (*destroy)(struct ipcp_entry *ipcp);
 
     int (*appl_register)(struct ipcp_entry *ipcp,

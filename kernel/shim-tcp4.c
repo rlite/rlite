@@ -398,6 +398,14 @@ tcp4_tx_worker(struct work_struct *w)
     }
 }
 
+static bool
+rl_shim_tcp4_flow_writeable(struct flow_entry *flow)
+{
+    struct shim_tcp4_flow *flow_priv = flow->priv;
+
+    return sk_stream_wspace(flow_priv->sock->sk) > 0;
+}
+
 static int
 rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
                       struct flow_entry *flow,
@@ -475,6 +483,7 @@ static struct ipcp_factory shim_tcp4_factory = {
     .ops.flow_deallocated = rl_shim_tcp4_flow_deallocated,
     .ops.sdu_write = rl_shim_tcp4_sdu_write,
     .ops.flow_get_stats = rl_shim_tcp4_flow_get_stats,
+    .ops.flow_writeable = rl_shim_tcp4_flow_writeable,
 };
 
 static int __init

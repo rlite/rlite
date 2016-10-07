@@ -551,6 +551,22 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     return 0;
 }
 
+static inline bool
+flow_blocked(struct rl_flow_config *cfg, struct dtp *dtp)
+{
+    return (cfg->dtcp.fc.fc_type == RLITE_FC_T_WIN &&
+                 dtp->next_seq_num_to_send > dtp->snd_rwe &&
+                    dtp->cwq_len >= dtp->max_cwq_len) ||
+                        (cfg->dtcp.rtx_control &&
+                            dtp->rtxq_len >= dtp->max_rtxq_len);
+}
+
+static bool
+rl_normal_flow_writeable(struct flow_entry *flow)
+{
+    return !flow_blocked(&flow->cfg, &flow->dtp);
+}
+
 static int
 rl_normal_sdu_write(struct ipcp_entry *ipcp,
                     struct flow_entry *flow,
@@ -594,11 +610,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
         dtp->tkbk.bucket_size -= rb->len;
     }
 
-    if (unlikely((fc->fc_type == RLITE_FC_T_WIN &&
-                 dtp->next_seq_num_to_send > dtp->snd_rwe &&
-                    dtp->cwq_len >= dtp->max_cwq_len) ||
-                        (flow->cfg.dtcp.rtx_control &&
-                            dtp->rtxq_len >= dtp->max_rtxq_len))) {
+    if (unlikely(flow_blocked(&flow->cfg, dtp))) {
         /* POL: FlowControlOverrun */
 
         /* Stop the sender inactivity timer. It will be
@@ -1489,6 +1501,7 @@ static struct ipcp_factory normal_factory = {
     .ops.mgmt_sdu_build = rl_normal_mgmt_sdu_build,
     .ops.sdu_rx = rl_normal_sdu_rx,
     .ops.flow_get_stats = rl_normal_flow_get_stats,
+    .ops.flow_writeable = rl_normal_flow_writeable,
 };
 
 static int __init
