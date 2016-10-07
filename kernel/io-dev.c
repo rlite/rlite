@@ -512,6 +512,7 @@ rl_io_poll(struct file *f, poll_table *wait)
 {
     struct rl_io *rio = (struct rl_io *)f->private_data;
     struct txrx *txrx = rio->txrx;
+    struct ipcp_entry *ipcp = txrx->ipcp;
     unsigned int mask = 0;
 
     if (unlikely(!txrx)) {
@@ -530,7 +531,10 @@ rl_io_poll(struct file *f, poll_table *wait)
     }
     spin_unlock_bh(&txrx->rx_lock);
 
-    mask |= POLLOUT | POLLWRNORM;
+    if (!rio->flow || !ipcp->ops.flow_writeable ||
+                ipcp->ops.flow_writeable(rio->flow)) {
+        mask |= POLLOUT | POLLWRNORM;
+    }
 
     return mask;
 }
