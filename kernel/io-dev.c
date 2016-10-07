@@ -384,6 +384,8 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
             }
 
             if (!blocking) {
+                rl_buf_free(rb);
+                rb = NULL;
                 break;
             }
 
