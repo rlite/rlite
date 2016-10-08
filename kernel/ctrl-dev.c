@@ -2499,6 +2499,7 @@ static int
 rl_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
+    struct upqueue_entry *ue, *uet;
 
     mutex_lock(&rl_dm.general_lock);
     list_del(&rc->node);
@@ -2508,6 +2509,13 @@ rl_ctrl_release(struct inode *inode, struct file *f)
      * application names registered with this ctrl device. */
     application_del_by_rc(rc);
     flow_rc_unbind(rc);
+
+    /* Drain upqueue. */
+    list_for_each_entry_safe(ue, uet, &rc->upqueue, node) {
+        list_del(&ue->node);
+        kfree(ue->sermsg);
+        kfree(ue);
+    }
 
     kfree(rc);
     f->private_data = NULL;
