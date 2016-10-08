@@ -464,7 +464,8 @@ for vmname in sorted(vms):
 
     vars_dict = {'fwdp': fwdp, 'id': vmid, 'mac': mac,
                  'vmimgpath': vmimgpath, 'fwdc': fwdc,
-                 'memory': args.memory, 'frontend': args.frontend}
+                 'memory': args.memory, 'frontend': args.frontend,
+                 'vmname': vmname}
 
     #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
     outs += 'qemu-system-x86_64 '
@@ -480,6 +481,7 @@ for vmname in sorted(vms):
             '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '   \
             '-vga std '                                         \
             '-pidfile rina-%(id)s.pid '                         \
+            '-serial file:%(vmname)s.log '                          \
                         % vars_dict
 
     del vars_dict
