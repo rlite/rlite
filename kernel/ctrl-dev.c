@@ -1470,8 +1470,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
         ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp));
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                       RLITE_MB(&fqe->resp));
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
         kfree(fqe);
     }
 
@@ -2499,7 +2498,6 @@ static int
 rl_ctrl_release(struct inode *inode, struct file *f)
 {
     struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
-    struct upqueue_entry *ue, *uet;
 
     mutex_lock(&rl_dm.general_lock);
     list_del(&rc->node);
@@ -2511,10 +2509,26 @@ rl_ctrl_release(struct inode *inode, struct file *f)
     flow_rc_unbind(rc);
 
     /* Drain upqueue. */
-    list_for_each_entry_safe(ue, uet, &rc->upqueue, node) {
-        list_del(&ue->node);
-        kfree(ue->sermsg);
-        kfree(ue);
+    {
+        struct upqueue_entry *ue, *uet;
+
+        list_for_each_entry_safe(ue, uet, &rc->upqueue, node) {
+            list_del(&ue->node);
+            kfree(ue->sermsg);
+            kfree(ue);
+        }
+    }
+
+    /* Drain flows-fetch queue. */
+    {
+        struct flows_fetch_q_entry *fqe, *fqet;
+
+        list_for_each_entry_safe(fqe, fqet, &rc->flows_fetch_q, node) {
+            list_del(&fqe->node);
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                        RLITE_MB(&fqe->resp));
+            kfree(fqe);
+        }
     }
 
     kfree(rc);
