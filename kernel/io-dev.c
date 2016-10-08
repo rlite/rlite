@@ -589,6 +589,18 @@ static int
 rl_io_release_internal(struct rl_io *rio)
 {
     BUG_ON(!rio);
+
+    if (rio->txrx) {
+        /* Drain rx queue. */
+        struct rl_buf *rb, *tmp;
+
+        list_for_each_entry_safe(rb, tmp, &rio->txrx->rx_q, node) {
+            list_del(&rb->node);
+            rl_buf_free(rb);
+        }
+        rio->txrx->rx_qlen = 0;
+    }
+
     switch (rio->mode) {
         case RLITE_IO_MODE_APPL_BIND:
             /* A previous flow was bound to this file descriptor,
