@@ -486,16 +486,6 @@ for l in sorted(links):
                                 '1:11 htb rate %(speed)s\n'         \
                 % {'tap': tap, 'speed': speed}
 
-    if shim in netems:
-        if vm in netems[shim]:
-            if not netem_validate(netems[shim][vm]['args']):
-                print('Warning: line %(linecnt)s is invalid and '\
-                      'will be ignored' % netems[shim][vm])
-                continue
-            outs += 'sudo tc qdisc add dev %(tap)s root netem '\
-                    '%(args)s\n'\
-                    % {'tap': tap, 'args': netems[shim][vm]['args']}
-
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
                              'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None})
 
@@ -706,6 +696,26 @@ for dif in dif_ordering:
                           'dif': dif, 'ldif': enrollment['lower_dif'],
                           'sshopts': sshopts, 'sudo': sudo,
                           'oper': oper}
+
+
+# Apply netem rules. For now this step is done after enrollment in order to
+# avoid artificial packet losses during the enrollment phase. This would
+# be a problem since shim DIFs do not provide reliable flows, and so some
+# enrollments could fail. The enrollment procedure is retried for some
+# times by the uipcps daemon (to cope with losses), but with many nodes
+# the likelyhood of some enrollment failing many times is quite high.
+for shim in shims:
+    if shim not in netems:
+        continue
+    for vm in netems[shim]:
+        if not netem_validate(netems[shim][vm]['args']):
+            print('Warning: line %(linecnt)s is invalid and '\
+                  'will be ignored' % netems[shim][vm])
+            continue
+        outs += 'sudo tc qdisc add dev %(tap)s root netem '\
+                '%(args)s\n'\
+                % {'tap': tap, 'args': netems[shim][vm]['args']}
+
 
 fout.write(outs)
 
