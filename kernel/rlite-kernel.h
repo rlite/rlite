@@ -375,8 +375,8 @@ struct dtp {
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
-    struct rl_buf *rtx_tmr_next;
-    unsigned rtt; /* Estimated round trip time, in jiffies. */
+    struct rl_buf *rtx_tmr_next; /* the packet is going to expire next */
+    unsigned rtt; /* estimated round trip time, in jiffies. */
     unsigned rtt_stddev;
     struct tkbk tkbk;
 

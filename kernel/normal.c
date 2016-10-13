@@ -231,7 +231,7 @@ rtx_tmr_cb(long unsigned arg)
     struct dtp *dtp = &flow->dtp;
     struct rl_buf *rb, *crb, *tmp;
     struct list_head rrbq;
-    struct list_head *cur;
+    long unsigned next_exp = ~0U;
 
     RPD(1, "\n");
 
@@ -244,52 +244,31 @@ rtx_tmr_cb(long unsigned arg)
      * retransmissions. */
     del_timer(&dtp->snd_inact_tmr);
 
-    if (likely(dtp->rtx_tmr_next)) {
-        /* I couldn't figure out how to implement this with the macros in
-         * list.h, so I went for a custom loop.
-         * Here we scan the circular list starting from dtp->rtx_tmr_next,
-         * rather than starting from the list head, so that we process
-         * the PDU in ascending expiration time order. */
-        for (cur = &dtp->rtx_tmr_next->node; 1; cur = cur->next) {
-            if (cur == &dtp->rtxq) {
-                /* This is the head, it's not contained in an rl_buf: let's
-                 * skip it. */
-                continue;
-            }
+    /* We scan all the retransmission list, since it is order by
+     * ascending sequence number, not by ascending expiration time. */
+    list_for_each_entry(rb, &dtp->rtxq, node) {
+        if (jiffies >= rb->rtx_jiffies) {
+            /* This rb should be retransmitted. We also invalidate
+             * rb->tx_jiffies, so that RTT is not updated on
+             * retransmitted packets. */
+            rb->rtx_jiffies += rtt_to_rtx(dtp);
+            rb->tx_jiffies = 0;
 
-            rb = list_entry(cur, struct rl_buf, node);
-
-            if (jiffies >= rb->rtx_jiffies) {
-                /* This rb should be retransmitted. We also invalidate
-                 * rb->tx_jiffies, so that RTT is not updated on
-                 * retransmitted packets. */
-                rb->rtx_jiffies += rtt_to_rtx(dtp);
-                rb->tx_jiffies = 0;
-
-                crb = rl_buf_clone(rb, GFP_ATOMIC);
-                if (unlikely(!crb)) {
-                    RPD(1, "OOM\n");
-                } else {
-                    list_add_tail(&crb->node, &rrbq);
-                }
-
+            crb = rl_buf_clone(rb, GFP_ATOMIC);
+            if (unlikely(!crb)) {
+                RPD(1, "OOM\n");
             } else {
-                if (rb != dtp->rtx_tmr_next) {
-                    NPD("Forward rtx timer by %u\n",
-                            jiffies_to_msecs(rb->rtx_jiffies - jiffies));
-                    dtp->rtx_tmr_next = rb;
-                    mod_timer(&dtp->rtx_tmr, rb->rtx_jiffies);
-                }
-                break;
+                list_add_tail(&crb->node, &rrbq);
             }
 
-            if (unlikely(cur->next == &dtp->rtx_tmr_next->node)) {
-                /* This wrap around condition should never happen (it should be
-                 * prevented by the else branch above), but it is technically
-                 * possible, so it's better to check and exit the loop. */
-                break;
-            }
+        } else if (rb->rtx_jiffies < next_exp) {
+            next_exp = rb->rtx_jiffies;
         }
+    }
+
+    if (next_exp != ~0U) {
+        NPD("Forward rtx timer by %u\n", jiffies_to_msecs(next_exp - jiffies));
+        mod_timer(&dtp->rtx_tmr, next_exp);
     }
 
     spin_unlock_bh(&dtp->lock);
@@ -360,7 +339,6 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     dtp->rtx_tmr.function = rtx_tmr_cb;
     dtp->rtx_tmr.data = (unsigned long)flow;
-    dtp->rtx_tmr_next = NULL;
     dtp->rtt = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr);
     dtp->rtt_stddev = 1;
 
@@ -542,7 +520,6 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
                 jiffies_to_msecs(crb->rtx_jiffies - jiffies));
-        dtp->rtx_tmr_next = crb;
         mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
     }
     NPD("cloning [%lu] into rtxq\n",
@@ -1112,14 +1089,6 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                                 (long unsigned)pci->seqnum);
                         list_del(&cur->node);
                         dtp->rtxq_len--;
-                        if (cur == dtp->rtx_tmr_next) {
-                            /* If we acked the PDU that would have expired
-                             * earliest, reset the pointer. It will be
-                             * set in the else branch (if this ack does not
-                             * cause the removal of all elements in the
-                             * rtxq). */
-                            dtp->rtx_tmr_next = NULL;
-                        }
 
                         if (cur->tx_jiffies) {
                             /* Update our RTT estimate. */
@@ -1147,12 +1116,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         /* The rtxq is sorted by seqnum, so we can safely
                          * stop here. Let's update the rtx timer
                          * expiration time, if necessary. */
-                        if (likely(!dtp->rtx_tmr_next)) {
-                            NPD("Forward rtx timer by %u\n",
-                                jiffies_to_msecs(cur->rtx_jiffies - jiffies));
-                            dtp->rtx_tmr_next = cur;
-                            mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
-                        }
+                        NPD("Forward rtx timer by %u\n",
+                            jiffies_to_msecs(cur->rtx_jiffies - jiffies));
+                        mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
                         break;
                     }
                 }
