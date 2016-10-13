@@ -134,8 +134,13 @@ server_test_config(struct rinaperf *rp)
     cfg.cnt = le32toh(cfg.cnt);
     cfg.size = le32toh(cfg.size);
 
+    if (cfg.size < sizeof(uint16_t)) {
+        printf("Invalid test configuration: size %d is invalid\n", cfg.size);
+        return -1;
+    }
+
     printf("Configuring test type %u, SDU count %u, SDU size %u\n",
-                cfg.ty, cfg.cnt, cfg.size);
+           cfg.ty, cfg.cnt, cfg.size);
 
     rp->test_config = cfg;
 
@@ -151,6 +156,7 @@ ping_client(struct rinaperf *rp)
     unsigned int interval = rp->interval;
     int size = rp->test_config.size;
     char buf[SDU_SIZE_MAX];
+    volatile uint16_t *seqnum = (uint16_t *)buf;
     int verb = rp->ping;
     unsigned int i = 0;
     unsigned long us;
@@ -184,6 +190,8 @@ ping_client(struct rinaperf *rp)
             gettimeofday(&t1, NULL);
         }
 
+        *seqnum = (uint16_t)i;
+
         ret = write(rp->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
@@ -193,13 +201,15 @@ ping_client(struct rinaperf *rp)
             }
             break;
         }
-
+repoll:
         ret = poll(&pfd, 1, 2000);
         if (ret < 0) {
             perror("poll(flow)");
         }
 
-        if (ret > 0) {
+        if (ret == 0) {
+            printf("Timeout: %d bytes lost\n", size);
+        } else {
             /* Ready to read. */
             ret = read(rp->dfd, buf, sizeof(buf));
             if (ret <= 0) {
@@ -210,13 +220,19 @@ ping_client(struct rinaperf *rp)
             }
 
             if (verb) {
-                gettimeofday(&t2, NULL);
-                us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
-                printf("%d bytes from server: rtt = %.3f ms\n", ret,
-                       ((float)us)/1000.0);
+                if (*seqnum == i) {
+                    gettimeofday(&t2, NULL);
+                    us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
+                    printf("%d bytes from server: rtt = %.3f ms\n", ret,
+                           ((float)us)/1000.0);
+                } else {
+                    printf("Packet lost or out of order: got %u, "
+                           "expected %u\n", *seqnum, i);
+                    if (*seqnum < i) {
+                        goto repoll;
+                    }
+                }
             }
-        } else {
-            printf("%d bytes packet lost\n", size);
         }
 
         if (interval) {
@@ -252,7 +268,7 @@ ping_server(struct rinaperf *rp)
     pfd.events = POLLIN;
 
     for (i = 0; !limit || i < limit; i++) {
-        n = poll(&pfd, 1, 3000);
+        n = poll(&pfd, 1, 4000);
         if (n < 0) {
             perror("poll(flow)");
         } else if (n == 0) {
@@ -593,7 +609,7 @@ main(int argc, char **argv)
     int interval_specified = 0;
     int listen = 0;
     int cnt = 0;
-    int size = 1;
+    int size = sizeof(uint16_t);
     int interval = 0;
     int burst = 1;
     int have_ctrl = 0;
@@ -635,7 +651,7 @@ main(int argc, char **argv)
 
             case 's':
                 size = atoi(optarg);
-                if (size <= 0) {
+                if (size < sizeof(uint16_t)) {
                     printf("    Invalid 'size' %d\n", size);
                     return -1;
                 }
