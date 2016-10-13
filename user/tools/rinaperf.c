@@ -83,7 +83,7 @@ client_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("write(buf)");
         } else {
-            printf("partial write %d/%lu\n", ret,
+            printf("Partial write %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
         }
         return -1;
@@ -124,8 +124,8 @@ server_test_config(struct rinaperf *rp)
         if (ret < 0) {
             perror("read(buf");
         } else {
-            printf("partial read %d/%lu\n", ret,
-                    (unsigned long int)sizeof(cfg));
+            printf("Error reading test configuration: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(cfg));
         }
         return -1;
     }
@@ -276,7 +276,7 @@ ping_server(struct rinaperf *rp)
             if (ret < 0) {
                 perror("write(flow)");
             } else {
-                printf("partial write");
+                printf("Partial write");
             }
             return -1;
         }
