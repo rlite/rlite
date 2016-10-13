@@ -107,6 +107,26 @@ def ip_in_prefix(prefix, i, nomask = False):
 
     return num_to_ip(ip_num, size, nomask)
 
+
+def netem_validate(netem_args):
+    ret = True
+
+    try:
+        fdevnull = open(os.devnull, 'w')
+        subprocess.check_call('sudo ip tuntap add mode tap name tapiratiprobe'.split())
+        subprocess.check_call(('sudo tc qdisc add dev '\
+                               'tapiratiprobe root netem %s'\
+                                % netem_args).split(), stdout=fdevnull,
+                                stderr=fdevnull)
+        fdevnull.close()
+    except:
+        ret = False
+
+    subprocess.call('sudo ip tuntap del mode tap name tapiratiprobe'.split())
+
+    return ret
+
+
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -190,6 +210,7 @@ enrollments = dict()
 lowerflowallocs = dict()
 dif_graphs = dict()
 dns_mappings = dict()
+netems = dict()
 
 linecnt = 0
 
@@ -277,6 +298,19 @@ while 1:
         difs[dif][vm] = dif_list
 
         continue
+
+    m = re.match(r'\s*netem\s+(\w+)\s+(\w+)\s+(\w.*)$', line)
+    if m:
+        dif = m.group(1)
+        vmname = m.group(2)
+        netem_args = m.group(3)
+
+        if dif not in netems:
+            netems[dif] = dict()
+        netems[dif][vmname] = {'args': netem_args, 'linecnt': linecnt}
+
+        continue
+
 
 fin.close()
 
@@ -435,6 +469,14 @@ for l in sorted(links):
 
     if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
         speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
+        if shim not in netems:
+            netems[shim] = dict()
+        if vm not in netems[shim]:
+            netems[shim][vm] = {'args': '', 'linecnt': 0}
+
+        # Rate limit the traffic transmitted on the TAP interface
+        netems[shim][vm]['args'] += ' rate %s' % (speed,)
+
         # Rate limit the traffic transmitted on the TAP interface
         outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
                                 'htb default 11\n'                  \
@@ -443,6 +485,16 @@ for l in sorted(links):
                 'sudo tc class add dev %(tap)s parent 1:1 classid ' \
                                 '1:11 htb rate %(speed)s\n'         \
                 % {'tap': tap, 'speed': speed}
+
+    if shim in netems:
+        if vm in netems[shim]:
+            if not netem_validate(netems[shim][vm]['args']):
+                print('Warning: line %(linecnt)s is invalid and '\
+                      'will be ignored' % netems[shim][vm])
+                continue
+            outs += 'sudo tc qdisc add dev %(tap)s root netem '\
+                    '%(args)s\n'\
+                    % {'tap': tap, 'args': netems[shim][vm]['args']}
 
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
                              'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None})
