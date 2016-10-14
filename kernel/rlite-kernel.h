@@ -88,7 +88,7 @@ extern int verbosity;
 /* PDU type definitions. */
 #define PDU_T_MGMT          0x40    /* Management PDU */
 #define PDU_T_DT            0x80    /* Data Transfer PDU */
-#define PDU_T_CTRL_MASK     0xC0
+#define PDU_T_CTRL          0xC0    /* Control PDU */
 #define PDU_T_ACK_BIT       0x04
 #define PDU_T_FC_BIT        0x08
 #define PDU_T_ACK_MASK      0x03

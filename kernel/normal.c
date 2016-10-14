@@ -906,15 +906,15 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
     if (cfg->rtx_control) {
         /* POL: RcvrAck */
         ack_nack_seq_num = flow->dtp.rcv_lwe - 1;
-        pdu_type = PDU_T_CTRL_MASK | PDU_T_ACK_BIT | PDU_T_ACK;
+        pdu_type = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
         if (cfg->flow_control) {
-            pdu_type |= PDU_T_CTRL_MASK | PDU_T_FC_BIT;
+            pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
         }
 
     } else if (cfg->flow_control) {
         /* POL: ReceivingFlowControl */
         /* Send a flow control only control PDU. */
-        pdu_type = PDU_T_CTRL_MASK | PDU_T_FC_BIT;
+        pdu_type = PDU_T_CTRL | PDU_T_FC_BIT;
     }
 
     if (pdu_type) {
@@ -1004,8 +1004,8 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct list_head qrbs;
     struct rl_buf *qrb, *tmp;
 
-    if (unlikely((pcic->base.pdu_type & PDU_T_CTRL_MASK)
-                != PDU_T_CTRL_MASK)) {
+    if (unlikely((pcic->base.pdu_type & PDU_T_CTRL)
+                != PDU_T_CTRL)) {
         PE("Unknown PDU type %X\n", pcic->base.pdu_type);
         rl_buf_free(rb);
         return 0;
@@ -1275,7 +1275,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
         if (flow->cfg.dtcp.flow_control &&
                 dtp->rcv_lwe >= dtp->last_snd_data_ack) {
             /* Send ACK flow control PDU */
-            crb = ctrl_pdu_alloc(ipcp, flow, PDU_T_CTRL_MASK |
+            crb = ctrl_pdu_alloc(ipcp, flow, PDU_T_CTRL |
                                  PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
                                  dtp->rcv_lwe);
             if (crb) {
