@@ -713,7 +713,7 @@ rl_flow_alloc(const char *dif_name, const char *local_appl_s,
     assert(resp->event_id == event_id);
 
     if (resp->response) {
-        errno = EINVAL;
+        errno = EPERM;
         ret = -1;
     } else {
         ret = rl_open_appl_port(resp->port_id);
