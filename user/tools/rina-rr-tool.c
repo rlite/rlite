@@ -258,7 +258,7 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    rr.cfd = rl_open(NULL);
+    rr.cfd = rl_open();
     if (rr.cfd < 0) {
         perror("rl_open()");
         return rr.cfd;

@@ -554,13 +554,9 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
 #include "rlite/api.h"
 
 int
-rl_open(const char *devname)
+rl_open()
 {
-    if (!devname) {
-        devname = "/dev/rlite";
-    }
-
-    return open(devname, O_RDWR);
+    return open("/dev/rlite", O_RDWR);
 }
 
 static int
@@ -686,7 +682,7 @@ rl_flow_alloc(const char *dif_name, const char *local_appl_s,
         return -1;
     }
 
-    rfd = rl_open(NULL);
+    rfd = rl_open();
     if (rfd < 0) {
         return rfd;
     }

@@ -15,7 +15,7 @@ struct rl_flow_spec {
     uint8_t flow_control;       /* temporary, for debugging */
 };
 
-int rl_open(const char *devname);
+int rl_open(void);
 
 int rl_register(int fd, const char *dif_name, const char *local_appl);
 

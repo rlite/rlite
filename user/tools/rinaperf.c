@@ -762,7 +762,7 @@ main(int argc, char **argv)
     }
 
     /* Open control file descriptor. */
-    rp.cfd = rl_open(NULL);
+    rp.cfd = rl_open();
     if (rp.cfd < 0) {
         perror("rl_open()");
         return rp.cfd;
