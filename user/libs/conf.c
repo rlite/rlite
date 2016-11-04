@@ -146,7 +146,7 @@ static int
 flow_fetch_resp(struct list_head *flows,
                 const struct rl_kmsg_flow_fetch_resp *resp)
 {
-    struct rl_flow *rl_flow;
+    struct rl_flow *rl_flow, *scan;
 
     if (resp->end) {
         /* This response is just to say there are no
@@ -167,7 +167,16 @@ flow_fetch_resp(struct list_head *flows,
     rl_flow->local_addr = resp->local_addr;
     rl_flow->remote_addr = resp->remote_addr;
 
-    list_add_tail(&rl_flow->node, flows);
+    /* Insert the flow into the list sorting by IPCP id first
+     * and then by local port id. */
+    list_for_each_entry(scan, flows, node) {
+        if (rl_flow->ipcp_id < scan->ipcp_id ||
+                (rl_flow->ipcp_id == scan->ipcp_id &&
+                    rl_flow->local_port < scan->local_port)) {
+            break;
+        }
+    }
+    list_add_tail(&rl_flow->node, &scan->node);
 
     return 0;
 }
