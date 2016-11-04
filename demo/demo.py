@@ -290,7 +290,7 @@ while 1:
         if dif not in difs:
             difs[dif] = dict()
 
-        if vm in difs[dif]:
+        if vm in sorted(difs[dif]):
             print('Error: Line %d: vm %s in dif %s already specified' \
                                             % (linecnt, vm, dif))
             continue
@@ -327,16 +327,16 @@ if len(vms) > 8:
 # Compute DIFs dependency graph, as both adjacency and incidence list.
 difsdeps_adj = dict()
 difsdeps_inc = dict()
-for dif in difs:
+for dif in sorted(difs):
     difsdeps_inc[dif] = set()
     difsdeps_adj[dif] = set()
 for shim in shims:
     difsdeps_inc[shim] = set()
     difsdeps_adj[shim] = set()
 
-for dif in difs:
-    for vmname in difs[dif]:
-        for lower_dif in difs[dif][vmname]:
+for dif in sorted(difs):
+    for vmname in sorted(difs[dif]):
+        for lower_dif in sorted(difs[dif][vmname]):
             difsdeps_inc[dif].add(lower_dif)
             difsdeps_adj[lower_dif].add(dif)
 
@@ -377,7 +377,7 @@ if len(circular_set):
 
 
 ####################### Compute DIF graphs #######################
-for dif in difs:
+for dif in sorted(difs):
     neighsets = dict()
     dif_graphs[dif] = dict()
     first = None
@@ -386,12 +386,12 @@ for dif in difs:
     # share such N-1-DIF. This set will be called the 'neighset' of
     # the N-1-DIF for the current DIF.
 
-    for vmname in difs[dif]:
+    for vmname in sorted(difs[dif]):
         dif_graphs[dif][vmname] = [] # init for later use
         if first == None: # pick any node for later use
             first = vmname
         first = vmname
-        for lower_dif in difs[dif][vmname]:
+        for lower_dif in sorted(difs[dif][vmname]):
             if lower_dif not in neighsets:
                 neighsets[lower_dif] = []
             neighsets[lower_dif].append(vmname)
@@ -558,7 +558,7 @@ for vmname in sorted(vms):
             continue
 
         # Scan all the lower DIFs of the current DIF, for the current node
-        for lower_dif in difs[dif][vmname]:
+        for lower_dif in sorted(difs[dif][vmname]):
             if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
                 vars_dict = {'dif': dif, 'id': vm['id']}
                 dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP-%(id)s--' % vars_dict
@@ -614,7 +614,7 @@ for vmname in sorted(vms):
         del vars_dict
 
     # Create normal IPCPs
-    for dif in difs:
+    for dif in sorted(difs):
         if vmname in difs[dif]:
             outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP/%(id)s// normal %(dif)s.DIF\n'\
                     '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP/%(id)s// address %(id)d\n'\
@@ -637,7 +637,7 @@ for vmname in sorted(vms):
             continue
 
         # Scan all the lower DIFs of the current DIF, for the current node
-        for lower_dif in difs[dif][vmname]:
+        for lower_dif in sorted(difs[dif][vmname]):
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
             outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP/%(id)s//\n'\
                         % vars_dict
@@ -789,7 +789,7 @@ if args.graphviz:
 
         gvizg = pydot.Dot(graph_type = 'graph')
         i = 0
-        for dif in difs:
+        for dif in sorted(difs):
             for vmname in dif_graphs[dif]:
                 node = pydot.Node(dif + vmname,
                                   label = "%s(%s)" % (vmname, dif),
