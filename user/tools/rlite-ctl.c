@@ -528,6 +528,7 @@ ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl,
                             ipcp_rib_show_handler);
 }
 
+/* Build the list of IPCPs running in the system, ordered by id. */
 static int
 ipcps_load(struct rl_ctrl *ctrl)
 {
@@ -537,7 +538,7 @@ ipcps_load(struct rl_ctrl *ctrl)
 
     for (;;) {
         struct rl_kmsg_ipcp_update *upd;
-        struct ipcp_attrs *attrs;
+        struct ipcp_attrs *attrs, *scan;
 
         upd = (struct rl_kmsg_ipcp_update *)
               rl_ctrl_wait_any(ctrl, RLITE_KER_IPCP_UPDATE, 0);
@@ -559,7 +560,12 @@ ipcps_load(struct rl_ctrl *ctrl)
         attrs->addr = upd->ipcp_addr;
         attrs->depth = upd->depth;
 
-        list_add_tail(&attrs->node, &ipcps);
+        list_for_each_entry(scan, &ipcps, node) {
+            if (attrs->id < scan->id) {
+                break;
+            }
+        }
+        list_add_tail(&attrs->node, &scan->node);
     }
 
     return ret;
@@ -685,6 +691,8 @@ process_args(int argc, char **argv)
                 return -1;
             }
 
+            /* We init an rlite control device, with IPCP updates
+             * enabled. */
             ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
             if (ret) {
                 return ret;
