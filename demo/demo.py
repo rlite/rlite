@@ -126,6 +126,34 @@ def netem_validate(netem_args):
 
     return ret
 
+# For the sake of reproducibility we need a set with a deterministic pop()
+# method. This one is basically a FIFO queue with logarithmic lookup cost.
+class FrontierSet:
+    def __init__(self, li = []):
+        self.belong = set()
+        self.queue = []
+
+        for x in li:
+            self.add(x)
+
+    def empty(self):
+        return len(self.belong) == 0
+
+    def add(self, x):
+        if x in self.belong:
+            return
+        self.belong.add(x)
+        self.queue.append(x)
+
+    def pop(self):
+        if self.empty():
+            return None # We may throw an exception
+
+        x = self.queue.pop(0)
+        self.belong.remove(x)
+
+        return x
+
 
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
@@ -352,13 +380,13 @@ del difsdeps_inc
 #print(difsdeps_inc_inc)
 
 # Run Kahn's algorithm to compute topological ordering on the DIFs graph.
-frontier = set()
+frontier = FrontierSet()
 dif_ordering = []
 for dif in difsdeps_inc_cnt:
     if difsdeps_inc_cnt[dif] == 0:
         frontier.add(dif)
 
-while len(frontier):
+while not frontier.empty():
     cur = frontier.pop()
     dif_ordering.append(cur)
     for nxt in difsdeps_adj[cur]:
@@ -408,9 +436,9 @@ for dif in sorted(difs):
     # To generate the list of enrollments, we simulate one,
     # using breadth-first trasversal.
     enrolled = set([first])
-    frontier = set([first])
+    frontier = FrontierSet([first])
     edges_covered = set()
-    while len(frontier):
+    while not frontier.empty():
         cur = frontier.pop()
         for edge in dif_graphs[dif][cur]:
             if edge[0] not in enrolled:
