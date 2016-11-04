@@ -1,5 +1,5 @@
 /*
- * librlite API for applications, core functionalities.
+ * rlite control device functionalities
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>

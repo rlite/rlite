@@ -24,7 +24,7 @@
 #ifndef __RLITE_CONF_H__
 #define __RLITE_CONF_H__
 
-#include "rlite.h"
+#include "ctrl.h"
 #include "list.h"
 
 

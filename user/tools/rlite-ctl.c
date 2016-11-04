@@ -38,7 +38,7 @@
 #include "../helpers.h"
 #include "rlite/list.h"
 #include "rlite/uipcps-msg.h"
-#include "rlite/rlite.h"
+#include "rlite/ctrl.h"
 #include "rlite/conf.h"
 
 

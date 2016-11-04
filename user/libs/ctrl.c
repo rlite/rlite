@@ -41,7 +41,7 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
-#include "rlite/rlite.h"
+#include "rlite/ctrl.h"
 
 #include "ctrl-utils.h"
 

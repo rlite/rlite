@@ -32,7 +32,7 @@
 #include "rlite/utils.h"
 
 #include "list.h"
-#include "rlite.h"
+#include "ctrl.h"
 
 
 #ifdef __cplusplus
