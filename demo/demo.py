@@ -641,9 +641,9 @@ for vmname in sorted(vms):
                 outs += '$SUDO ip addr add %s dev $PORT\n' % (port['ip'])
         del vars_dict
 
-    # Create normal IPCPs
-    for dif in sorted(difs):
-        if vmname in difs[dif]:
+    # Create normal IPCPs (it's handy to do it in topological DIF order)
+    for dif in dif_ordering:
+        if dif not in shims and vmname in difs[dif]:
             outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP/%(id)s// normal %(dif)s.DIF\n'\
                     '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP/%(id)s// address %(id)d\n'\
                         % {'dif': dif, 'id': vm['id']}
