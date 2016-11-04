@@ -382,14 +382,14 @@ del difsdeps_inc
 # Run Kahn's algorithm to compute topological ordering on the DIFs graph.
 frontier = FrontierSet()
 dif_ordering = []
-for dif in difsdeps_inc_cnt:
+for dif in sorted(difsdeps_inc_cnt):
     if difsdeps_inc_cnt[dif] == 0:
         frontier.add(dif)
 
 while not frontier.empty():
     cur = frontier.pop()
     dif_ordering.append(cur)
-    for nxt in difsdeps_adj[cur]:
+    for nxt in sorted(difsdeps_adj[cur]):
         difsdeps_inc_cnt[nxt] -= 1
         if difsdeps_inc_cnt[nxt] == 0:
             frontier.add(nxt)
