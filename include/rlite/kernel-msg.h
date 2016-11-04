@@ -156,7 +156,7 @@ struct rl_kmsg_fa_req {
     uint32_t event_id;
 
     rl_ipcp_id_t upper_ipcp_id;
-    struct rl_flow_spec flowspec;
+    struct rina_flow_spec flowspec;
     rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
     struct rina_name local_appl;

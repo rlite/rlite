@@ -189,7 +189,7 @@ struct rl_flow_config {
 #define RL_DATA_RXMS_MAX_DFLT   10
 
 /* Does a flow specification correspond to best effort QoS? */
-static inline int rl_flow_spec_best_effort(struct rl_flow_spec *spec) {
+static inline int rina_flow_spec_best_effort(struct rina_flow_spec *spec) {
     return spec->max_sdu_gap == ((rl_seq_t)-1) && !spec->avg_bandwidth
             && !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery
             && !spec->flow_control;

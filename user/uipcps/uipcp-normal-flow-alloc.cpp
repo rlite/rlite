@@ -109,7 +109,7 @@ policies2flowcfg(struct rl_flow_config *cfg,
 
 #ifndef RL_USE_QOS_CUBES
 static void
-flowspec2flowcfg(struct rl_flow_spec *spec, struct rl_flow_config *cfg)
+flowspec2flowcfg(struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
 

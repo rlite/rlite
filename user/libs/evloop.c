@@ -824,7 +824,7 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
         return NULL;
     }
 
-    rl_register_req_fill(req, event_id, dif_name, reg, appl_name);
+    rina_register_req_fill(req, event_id, dif_name, reg, appl_name);
 
     PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
 
@@ -866,7 +866,7 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
                      const char *dif_name,
                      const struct rina_name *local_appl,
                      const struct rina_name *remote_appl,
-                     const struct rl_flow_spec *flowspec,
+                     const struct rina_flow_spec *flowspec,
                      rl_ipcp_id_t upper_ipcp_id,
                      rl_port_t *port_id, unsigned int wait_ms)
 {

@@ -635,7 +635,7 @@ gw_fa_req_arrived(struct rl_evloop *loop,
 
     rfd = gw_open_appl_port(req->port_id, max_sdu_size);
     if (rfd < 0) {
-        PE("rl_open_appl_port() failed\n");
+        PE("rina_open_appl_port() failed\n");
         close(cfd);
         return 0;
     }
@@ -707,7 +707,7 @@ accept_inet_conn(struct rl_evloop *loop, int lfd)
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
     map<int, RinaName>::iterator mit;
-    struct rl_flow_spec flowspec;
+    struct rina_flow_spec flowspec;
     unsigned int event_id;
     unsigned int unused;
     int cfd;
@@ -728,7 +728,7 @@ accept_inet_conn(struct rl_evloop *loop, int lfd)
     }
 
     /* Ask for a reliable flow. */
-    rl_flow_spec_default(&flowspec);
+    rina_flow_spec_default(&flowspec);
     flowspec.max_sdu_gap = 0;
     flowspec.flow_control = 1;
 

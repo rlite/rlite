@@ -48,7 +48,7 @@ struct rl_rr {
     const char *cli_appl_name;
     const char *srv_appl_name;
     char *dif_name;
-    struct rl_flow_spec flowspec;
+    struct rina_flow_spec flowspec;
 };
 
 static int
@@ -62,10 +62,10 @@ client(struct rl_rr *rr)
     int dfd;
 
     /* We're the client: allocate a flow and run the perf function. */
-    dfd = rl_flow_alloc(rr->dif_name, rr->cli_appl_name,
+    dfd = rina_flow_alloc(rr->dif_name, rr->cli_appl_name,
                         rr->srv_appl_name, &rr->flowspec);
     if (dfd < 0) {
-        perror("rl_flow_alloc()");
+        perror("rina_flow_alloc()");
         return dfd;
     }
 
@@ -117,16 +117,16 @@ server(struct rl_rr *rr)
     /* Server-side initializations. */
 
     /* In listen mode also register the application names. */
-    ret = rl_register(rr->cfd, rr->dif_name, rr->srv_appl_name);
+    ret = rina_register(rr->cfd, rr->dif_name, rr->srv_appl_name);
     if (ret) {
-        perror("rl_register()");
+        perror("rina_register()");
         return ret;
     }
 
     for (;;) {
-        dfd = rl_flow_accept(rr->cfd, NULL);
+        dfd = rina_flow_accept(rr->cfd, NULL);
         if (dfd < 0) {
-            perror("rl_flow_accept()");
+            perror("rina_flow_accept()");
             continue;
         }
 
@@ -207,7 +207,7 @@ main(int argc, char **argv)
     rr.srv_appl_name = "rl_rr-data/server";
 
     /* Start with a default flow configuration (unreliable flow). */
-    rl_flow_spec_default(&rr.flowspec);
+    rina_flow_spec_default(&rr.flowspec);
 
     while ((opt = getopt(argc, argv, "hld:p:P:a:z:g:")) != -1) {
         switch (opt) {
@@ -258,9 +258,9 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    rr.cfd = rl_open();
+    rr.cfd = rina_open();
     if (rr.cfd < 0) {
-        perror("rl_open()");
+        perror("rina_open()");
         return rr.cfd;
     }
 

@@ -86,7 +86,7 @@ uint32_t
 rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rl_flow_spec *flowspec);
+               const struct rina_flow_spec *flowspec);
 
 uint32_t
 rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg,

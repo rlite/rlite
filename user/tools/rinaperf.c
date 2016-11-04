@@ -45,7 +45,7 @@
 #define SDU_SIZE_MAX    65535
 
 static int stop = 0; /* Used to stop client on SIGINT. */
-static int cli_flow_allocated = 0; /* Avoid to get stuck in rl_flow_alloc(). */
+static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
 
 struct rinaperf_test_config {
     uint32_t ty;
@@ -497,9 +497,9 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rl_flow_accept(rp->cfd, NULL);
+        rp->dfd = rina_flow_accept(rp->cfd, NULL);
         if (rp->dfd < 0) {
-            perror("rl_flow_accept()");
+            perror("rina_flow_accept()");
             break;
         }
 
@@ -538,7 +538,7 @@ sigint_handler_server(int signum)
 }
 
 static void
-parse_bandwidth(struct rl_flow_spec *spec, const char *arg)
+parse_bandwidth(struct rina_flow_spec *spec, const char *arg)
 {
     size_t arglen = strlen(arg);
 
@@ -605,7 +605,7 @@ main(int argc, char **argv)
     const char *type = "ping";
     const char *dif_name = NULL;
     perf_function_t perf_function = NULL;
-    struct rl_flow_spec flowspec;
+    struct rina_flow_spec flowspec;
     int interval_specified = 0;
     int listen = 0;
     int cnt = 0;
@@ -621,7 +621,7 @@ main(int argc, char **argv)
     rp.srv_appl_name = "rinaperf-data/server";
 
     /* Start with a default flow configuration (unreliable flow). */
-    rl_flow_spec_default(&flowspec);
+    rina_flow_spec_default(&flowspec);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:B:g:fb:a:A:z:Z:x")) != -1) {
         switch (opt) {
@@ -762,9 +762,9 @@ main(int argc, char **argv)
     }
 
     /* Open control file descriptor. */
-    rp.cfd = rl_open();
+    rp.cfd = rina_open();
     if (rp.cfd < 0) {
-        perror("rl_open()");
+        perror("rina_open()");
         return rp.cfd;
     }
 
@@ -773,16 +773,16 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rl_register(rp.cfd, dif_name, "rinaperf-ctrl/server");
+            ret = rina_register(rp.cfd, dif_name, "rinaperf-ctrl/server");
             if (ret) {
-                perror("rl_register()");
+                perror("rina_register()");
                 return ret;
             }
         }
 
-        ret = rl_register(rp.cfd, dif_name, rp.srv_appl_name);
+        ret = rina_register(rp.cfd, dif_name, rp.srv_appl_name);
         if (ret) {
-            perror("rl_register()");
+            perror("rina_register()");
             return ret;
         }
 
@@ -790,11 +790,11 @@ main(int argc, char **argv)
 
     } else {
         /* We're the client: allocate a flow and run the perf function. */
-        rp.dfd = rl_flow_alloc(dif_name, rp.cli_appl_name,
+        rp.dfd = rina_flow_alloc(dif_name, rp.cli_appl_name,
                                rp.srv_appl_name, &flowspec);
         cli_flow_allocated = 1;
         if (rp.dfd < 0) {
-            perror("rl_flow_alloc()");
+            perror("rina_flow_alloc()");
             return rp.dfd;
         }
 

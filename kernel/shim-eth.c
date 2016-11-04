@@ -363,7 +363,7 @@ arpt_flow_bind(struct arpt_entry *entry, struct flow_entry *flow)
 
 static int
 rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                   struct rl_flow_spec *spec)
+                   struct rina_flow_spec *spec)
 {
     struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry = NULL;
@@ -375,7 +375,7 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -ENXIO;
     }
 
-    if (!rl_flow_spec_best_effort(spec)) {
+    if (!rina_flow_spec_best_effort(spec)) {
         /* We don't support this QoS request. */
         return -EINVAL;
     }

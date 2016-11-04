@@ -171,11 +171,11 @@ flow_allocate_req_work(struct work_struct *w)
 
 static int
 rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                        struct rl_flow_spec *spec)
+                        struct rina_flow_spec *spec)
 {
     struct flow_allocate_req_work *faw;
 
-    if (!rl_flow_spec_best_effort(spec)) {
+    if (!rina_flow_spec_best_effort(spec)) {
         return EINVAL;
     }
 

@@ -182,11 +182,11 @@ rl_shim_hv_destroy(struct ipcp_entry *ipcp)
 
 static int
 rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                  struct rl_flow_spec *spec)
+                  struct rina_flow_spec *spec)
 {
     struct rl_hmsg_fa_req req;
 
-    if (!rl_flow_spec_best_effort(spec)) {
+    if (!rina_flow_spec_best_effort(spec)) {
         /* We don't support this QoS request. */
         return -EINVAL;
     }

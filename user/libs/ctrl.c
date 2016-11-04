@@ -134,7 +134,7 @@ rl_write_msg(int rfd, struct rl_msg_base *msg)
 }
 
 void
-rl_flow_spec_default(struct rl_flow_spec *spec)
+rina_flow_spec_default(struct rina_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
     spec->max_sdu_gap = (rl_seq_t)-1;  /* unbounded allowed gap */
@@ -254,7 +254,7 @@ pending_queue_fini(struct list_head *list)
     }
 }
 int
-rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
+rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
                      const struct rina_name *appl_name)
 {
@@ -277,7 +277,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, const char *dif_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rl_flow_spec *flowspec,
+               const struct rina_flow_spec *flowspec,
                rl_ipcp_id_t upper_ipcp_id)
 {
     memset(req, 0, sizeof(*req));
@@ -291,7 +291,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     if (flowspec) {
         memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
     } else {
-        rl_flow_spec_default(&req->flowspec);
+        rina_flow_spec_default(&req->flowspec);
     }
     rina_name_copy(&req->local_appl, local_appl);
     rina_name_copy(&req->remote_appl, remote_appl);
@@ -391,7 +391,7 @@ uint32_t
 rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
                const struct rina_name *local_appl,
                const struct rina_name *remote_appl,
-               const struct rl_flow_spec *flowspec)
+               const struct rina_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     uint32_t event_id;
@@ -432,7 +432,7 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
 
     event_id = rl_ctrl_get_id(ctrl);
 
-    ret = rl_register_req_fill(&req, event_id, dif_name,
+    ret = rina_register_req_fill(&req, event_id, dif_name,
                                reg, appl_name);
     if (ret) {
         PE("Failed to fill (un)register request\n");
@@ -554,7 +554,7 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
 #include "rlite/api.h"
 
 int
-rl_open()
+rina_open()
 {
     return open("/dev/rlite", O_RDWR);
 }
@@ -581,7 +581,7 @@ wait_for_next_msg(int fd)
 }
 
 static int
-rl_register_common(int fd, const char *dif_name, const char *local_appl,
+rina_register_common(int fd, const char *dif_name, const char *local_appl,
                    int reg)
 {
     struct rl_kmsg_appl_register req;
@@ -597,7 +597,7 @@ rl_register_common(int fd, const char *dif_name, const char *local_appl,
         return -1;
     }
 
-    ret = rl_register_req_fill(&req, event_id, dif_name,
+    ret = rina_register_req_fill(&req, event_id, dif_name,
                                reg, &appl_name);
     rina_name_free(&appl_name);
     if (ret) {
@@ -638,20 +638,20 @@ rl_register_common(int fd, const char *dif_name, const char *local_appl,
 }
 
 int
-rl_register(int fd, const char *dif_name, const char *local_appl)
+rina_register(int fd, const char *dif_name, const char *local_appl)
 {
-    return rl_register_common(fd, dif_name, local_appl, 1);
+    return rina_register_common(fd, dif_name, local_appl, 1);
 }
 
 int
-rl_unregister(int fd, const char *dif_name, const char *local_appl)
+rina_unregister(int fd, const char *dif_name, const char *local_appl)
 {
-    return rl_register_common(fd, dif_name, local_appl, 0);
+    return rina_register_common(fd, dif_name, local_appl, 0);
 }
 
 int
-rl_flow_alloc(const char *dif_name, const char *local_appl_s,
-              const char *remote_appl_s, const struct rl_flow_spec *flowspec)
+rina_flow_alloc(const char *dif_name, const char *local_appl_s,
+              const char *remote_appl_s, const struct rina_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     struct rl_kmsg_fa_resp_arrived *resp;
@@ -682,7 +682,7 @@ rl_flow_alloc(const char *dif_name, const char *local_appl_s,
         return -1;
     }
 
-    rfd = rl_open();
+    rfd = rina_open();
     if (rfd < 0) {
         return rfd;
     }
@@ -724,7 +724,7 @@ out:
 }
 
 int
-rl_flow_accept(int fd, const char **remote_appl)
+rina_flow_accept(int fd, const char **remote_appl)
 {
     struct rl_kmsg_fa_req_arrived *req;
     struct rl_kmsg_fa_resp resp;

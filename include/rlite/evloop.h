@@ -136,7 +136,7 @@ int rl_evloop_flow_alloc(struct rl_evloop *loop,
                         const char *dif_name,
                         const struct rina_name *local_appl,
                         const struct rina_name *remote_appl,
-                        const struct rl_flow_spec *flowcfg,
+                        const struct rina_flow_spec *flowcfg,
                         rl_ipcp_id_t upper_ipcp_id,
                         rl_port_t *port_id, unsigned int wait_ms);
 
