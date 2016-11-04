@@ -2580,7 +2580,7 @@ static struct miscdevice rl_ctrl_misc = {
 extern struct miscdevice rl_io_misc;
 
 static int __init
-rl_ctrl_init(void)
+rlite_init(void)
 {
     int ret;
 
@@ -2618,13 +2618,13 @@ rl_ctrl_init(void)
 }
 
 static void __exit
-rl_ctrl_fini(void)
+rlite_fini(void)
 {
     misc_deregister(&rl_io_misc);
     misc_deregister(&rl_ctrl_misc);
 }
 
-module_init(rl_ctrl_init);
-module_exit(rl_ctrl_fini);
+module_init(rlite_init);
+module_exit(rlite_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Vincenzo Maffione <v.maffione@gmail.com>");
