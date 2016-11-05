@@ -309,6 +309,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const struct rina_name *name,
     ipcp_name = RinaName(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
     mgmt_port_id = -1;
+    unheard_since = time(NULL);
     enroll_fsm_handlers[NEIGH_NONE] = &Neighbor::none;
     enroll_fsm_handlers[NEIGH_I_WAIT_CONNECT_R] = &Neighbor::i_wait_connect_r;
     enroll_fsm_handlers[NEIGH_S_WAIT_START] = &Neighbor::s_wait_start;
@@ -1290,6 +1291,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
         /* Reset the keepalive request counter, we know the neighbor
          * is alive on this flow. */
         nf->pending_keepalive_reqs = 0;
+        nf->neigh->unheard_since = time(NULL);
 
         UPV(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
             static_cast<string>(nf->neigh->ipcp_name).c_str());

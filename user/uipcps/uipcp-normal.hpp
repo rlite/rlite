@@ -27,6 +27,7 @@
 #include <string>
 #include <map>
 #include <list>
+#include <ctime>
 #include <pthread.h>
 
 #include "rlite/common.h"
@@ -144,6 +145,10 @@ struct Neighbor {
 
     std::map<rl_port_t, NeighFlow *> flows;
     rl_port_t mgmt_port_id;
+
+    /* Last time we received a keepalive response from this neighbor.
+     * We don't consider requests, as timeout on responses. */
+    time_t unheard_since;
 
     typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
                                                   const CDAPMessage *rm);

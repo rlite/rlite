@@ -386,13 +386,19 @@ uipcp_rib::dump() const
             mit = neighbors_seen.begin();
                 mit != neighbors_seen.end(); mit++) {
         const NeighborCandidate& cand = mit->second;
-        RinaName neigh_name = RinaName(cand.apn, cand.api, string(), string());
+        string neigh_name = static_cast<string>(
+                                RinaName(cand.apn, cand.api,
+                                         string(), string()));
+        map<string, Neighbor*>::const_iterator neigh;
 
-        if (!neighbors_cand.count(static_cast<string>(neigh_name))) {
+        if (!neighbors_cand.count(neigh_name)) {
             /* Don't show NeighborCandidate objects corresponding to neighbors
              * which don't have DIFs in common with us. */
             continue;
         }
+
+        neigh = neighbors.find(neigh_name);
+
         ss << "    Name: " << cand.apn << "/" << cand.api
             << ", Address: " << cand.address << ", Lower DIFs: {";
 
@@ -400,7 +406,16 @@ uipcp_rib::dump() const
                     lit != cand.lower_difs.end(); lit++) {
             ss << *lit << ", ";
         }
-        ss << "}" << endl;
+        ss << "} ";
+        if (neigh != neighbors.end()) {
+            ss << "[Connected, last heard " <<
+                static_cast<int>(time(NULL) - neigh->second->unheard_since)
+                    << " seconds ago]";
+
+        } else {
+            ss << "[Disconnected]";
+        }
+        ss << endl;
     }
 
     ss << endl;
