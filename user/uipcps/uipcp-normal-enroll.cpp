@@ -211,10 +211,8 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
     ret = nf->send_to_port_id(&m, 0, NULL);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
-
-    } else {
-        nf->pending_keepalive_reqs++;
     }
+    nf->pending_keepalive_reqs++;
 
     if (nf->pending_keepalive_reqs > NEIGH_KEEPALIVE_THRESH) {
         bool delete_neighbor;
