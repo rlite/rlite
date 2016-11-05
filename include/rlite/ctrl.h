@@ -45,7 +45,7 @@ extern "C" {
  */
 
 struct rl_ctrl {
-    /* File descriptor for the RLITE control device ("/dev/rlite") */
+    /* File descriptor for the rlite control device (RLITE_CTRLDEV_NAME) */
     int rfd;
 
     /* Private fields follow. Don't access them from outside the library. */
@@ -66,7 +66,7 @@ struct rl_ctrl {
  */
 
 int
-rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags);
+rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags);
 
 int
 rl_ctrl_fini(struct rl_ctrl *ctrl);

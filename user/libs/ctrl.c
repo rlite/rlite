@@ -165,9 +165,10 @@ open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
     int fd;
     int ret;
 
-    fd = open("/dev/rlite-io", O_RDWR);
+    fd = open(RLITE_IODEV_NAME, O_RDWR);
     if (fd < 0) {
-        perror("open(/dev/rlite-io)");
+        fprintf(stderr, "open(%s) failed: %s\n", RLITE_IODEV_NAME,
+                strerror(errno));
         return -1;
     }
 
@@ -177,7 +178,8 @@ open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
 
     ret = ioctl(fd, 73, &info);
     if (ret) {
-        perror("ioctl(/dev/rlite-io)");
+        fprintf(stderr, "ioctl(%s) failed: %s\n", RLITE_IODEV_NAME,
+                strerror(errno));
         return -1;
     }
 
@@ -332,21 +334,17 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
 }
 
 int
-rl_ctrl_init(struct rl_ctrl *ctrl, const char *dev, unsigned flags)
+rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags)
 {
     int ret;
-
-    if (!dev) {
-        dev = "/dev/rlite";
-    }
 
     list_init(&ctrl->pqueue);
     ctrl->event_id_counter = 1;
 
     /* Open the RLITE control device. */
-    ctrl->rfd = open(dev, O_RDWR);
+    ctrl->rfd = open(RLITE_CTRLDEV_NAME, O_RDWR);
     if (ctrl->rfd < 0) {
-        PE("Cannot open '%s'\n", dev);
+        PE("Cannot open '%s'\n", RLITE_CTRLDEV_NAME);
         perror("open(ctrldev)");
         return ctrl->rfd;
     }
@@ -556,7 +554,7 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
 int
 rina_open()
 {
-    return open("/dev/rlite", O_RDWR);
+    return open(RLITE_CTRLDEV_NAME, O_RDWR);
 }
 
 static int

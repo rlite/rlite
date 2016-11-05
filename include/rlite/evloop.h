@@ -95,8 +95,7 @@ int
 rl_evloop_join(struct rl_evloop *loop);
 
 int
-rl_evloop_init(struct rl_evloop *loop, const char *dev,
-               rl_resp_handler_t *handlers,
+rl_evloop_init(struct rl_evloop *loop, rl_resp_handler_t *handlers,
                unsigned int flags);
 
 int

@@ -48,7 +48,7 @@ struct rl_ctrl;
 typedef int (*rl_msg_handler_t)(struct rl_ctrl *rc,
                                    struct rl_msg_base *bmsg);
 
-/* Data structure associated to the /dev/rlite file descriptor. */
+/* Data structure associated to the an rlite control device. */
 struct rl_ctrl {
     char msgbuf[1024];
 

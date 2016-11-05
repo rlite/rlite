@@ -518,8 +518,7 @@ rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
 }
 
 int
-rl_evloop_init(struct rl_evloop *loop, const char *dev,
-               rl_resp_handler_t *handlers,
+rl_evloop_init(struct rl_evloop *loop, rl_resp_handler_t *handlers,
                unsigned int flags)
 {
     int ret;
@@ -539,7 +538,7 @@ rl_evloop_init(struct rl_evloop *loop, const char *dev,
     loop->evloop_th = 0;
     loop->running = 0;
 
-    ret = rl_ctrl_init(&loop->ctrl, dev, flags);
+    ret = rl_ctrl_init(&loop->ctrl, flags);
     if (ret) {
         return ret;
     }

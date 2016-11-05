@@ -693,7 +693,7 @@ process_args(int argc, char **argv)
 
             /* We init an rlite control device, with IPCP updates
              * enabled. */
-            ret = rl_ctrl_init(&ctrl, NULL, RL_F_IPCPS);
+            ret = rl_ctrl_init(&ctrl, RL_F_IPCPS);
             if (ret) {
                 return ret;
             }

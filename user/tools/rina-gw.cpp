@@ -433,7 +433,7 @@ Gateway::Gateway()
 {
     rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
 
-    if (rl_evloop_init(&loop, NULL, NULL, 0)) {
+    if (rl_evloop_init(&loop, NULL, 0)) {
         exit(EXIT_FAILURE);
     }
 

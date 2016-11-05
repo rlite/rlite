@@ -454,7 +454,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     /* We are not setting the RL_F_IPCPS flags, so we will need to
      * use uipcp->uipcps->loop to get information about IPCPs in the
      * system. */
-    ret = rl_evloop_init(&uipcp->loop, NULL, NULL, 0);
+    ret = rl_evloop_init(&uipcp->loop, NULL, 0);
     if (ret) {
         goto err0;
     }
