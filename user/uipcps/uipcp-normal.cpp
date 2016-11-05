@@ -69,7 +69,7 @@ namespace obj_name {
     string lowerflow = "/daf/mgmt/" + obj_class::lowerflow;
 };
 
-#define MGMTBUF_SIZE_MAX 4096
+#define MGMTBUF_SIZE_MAX 8092
 
 static int
 mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
@@ -81,13 +81,13 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
     int ret = 0;
 
     if (buflen > MGMTBUF_SIZE_MAX) {
-        UPE(uipcp, "Dropping oversized mgmt message %d/%d\n",
-            (int)buflen, MGMTBUF_SIZE_MAX);
+        errno = EFBIG;
+        return -1;
     }
 
     mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
     if (!mgmtbuf) {
-        UPE(uipcp, "Out of memory\n");
+        errno = ENOMEM;
         return -1;
     }
 
@@ -97,11 +97,9 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
 
     n = write(rib->mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
-        UPE(uipcp, "write(): %s\n", strerror(errno));
         ret = n;
-    } else if (n != (int)buflen) {
-        UPE(uipcp, "partial write %d/%d\n", n, (int)buflen);
-        ret = -1;
+    } else {
+        assert(n == (int)buflen);
     }
 
     free(mgmtbuf);
@@ -579,6 +577,9 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
     }
 
     ret = mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
+    if (ret < 0) {
+        UPE(uipcp, "mgmt_write(): %s\n", strerror(errno));
+    }
 
     delete [] serbuf;
 
