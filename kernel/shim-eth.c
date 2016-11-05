@@ -815,6 +815,8 @@ shim_eth_rx_handler(struct sk_buff **skbp)
     return RX_HANDLER_CONSUMED;
 }
 
+#define flow_can_write(_p)  ((_p)->ntu != (_p)->ntp)
+
 static void
 shim_eth_skb_destructor(struct sk_buff *skb)
 {
@@ -825,7 +827,7 @@ shim_eth_skb_destructor(struct sk_buff *skb)
     bool notify;
 
     spin_lock_bh(&priv->tx_lock);
-    notify = (priv->ntu == priv->ntp);
+    notify = !flow_can_write(priv);
     priv->ntp++;
     spin_unlock_bh(&priv->tx_lock);
 
@@ -833,8 +835,6 @@ shim_eth_skb_destructor(struct sk_buff *skb)
         rl_write_restart_flows(ipcp);
     }
 }
-
-#define flow_can_write(_p)  ((_p)->ntu != (_p)->ntp)
 
 static bool
 rl_shim_eth_flow_writeable(struct flow_entry *flow)
