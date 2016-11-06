@@ -562,7 +562,7 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
     return ret;
 }
 
-/* This routine is for debugging purposes. */
+/* Print the current list of uipcps, used for debugging purposes. */
 int
 uipcps_print(struct uipcps *uipcps)
 {
@@ -703,7 +703,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
              ipn->depth);
         PV_S("    uppers = [");
         list_for_each_entry(e, &ipn->uppers, node) {
-            PD_S("%u, ", e->ipcp->id);
+            PV_S("%u, ", e->ipcp->id);
         }
         PV_S("]\n");
         PV_S("    lowers = [");
