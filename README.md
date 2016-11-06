@@ -2,6 +2,7 @@
 ## Table of contents                                                        #
 #############################################################################
 
+* 0. Introduction
 * 1. Software requirements
 * 2. Build instructions
 * 3. Overview of the software components
@@ -20,6 +21,26 @@
     * 5.3. shim-tcp4 IPC Process
     * 5.4. shim-loopback IPC Process
     * 5.5. Normal IPC Process
+
+
+#############################################################################
+## 0. Introduction                                                          #
+#############################################################################
+
+The *rlite* project provides a lightweight open source implementation of
+the Recursive InterNetwork Architecture (RINA) for Linux-based operating
+systems.
+
+The main goal of *rlite* is to become a baseline implementation for RINA
+systems to be used in production. In order to achieve this goal, *rlite*
+focuses on robustness and performance by leveraging on a clean keep-it-simple
+design. The current implementation includes about 26 Klocs of C/C++ code,
+splitted between kernel-space and user-space.
+
+Considerable attention is devoted to provide a POSIX-like API for applications
+that can be easily assimilated by programmers used to the socket API, while
+additionally offering the QoS awareness built into RINA.
+The application API can be found in the include/rlite/api.h header file.
 
 
 #############################################################################
