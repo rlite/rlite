@@ -207,6 +207,8 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         m = flow->conn->msg_deser(serbuf, serlen);
         if (!m) {
             UPE(rib->uipcp, "msg_deser() failed\n");
+            /* Remove flow. */
+            rib->neigh_flow_prune(flow);
             return -1;
         }
 
@@ -677,6 +679,32 @@ uipcp_rib::remote_sync_obj_all(bool create, const string& obj_class,
                            const UipcpObject *obj_value) const
 {
     return remote_sync_obj_excluding(NULL, create, obj_class, obj_name, obj_value);
+}
+
+void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
+{
+    Neighbor *neigh = nf->neigh;
+
+    /* Remove the NeighFlow from the Neighbor and, if the
+     * NeighFlow is the current mgmt flow, elect
+     * another NeighFlow as mgmt flow, if possible. */
+    neigh->flows.erase(nf->port_id);
+
+    if (nf->port_id == neigh->mgmt_port_id && neigh->flows.size())
+    {
+        neigh->mgmt_port_id = neigh->flows.begin()->second->port_id;
+        UPI(uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
+                static_cast<string>(neigh->ipcp_name).c_str(),
+                neigh->mgmt_port_id);
+    }
+
+    /* First delete the N-1 flow. */
+    delete nf;
+
+    /* If there are no other N-1 flows, delete the neighbor. */
+    if (neigh->flows.size() == 0) {
+        del_neighbor(neigh->ipcp_name);
+    }
 }
 
 static int

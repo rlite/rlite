@@ -196,6 +196,7 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     uipcp_rib *rib = nf->neigh->rib;
+    Neighbor *neigh = nf->neigh;
     ScopeLock(rib->lock);
     CDAPMessage m;
     int ret;
@@ -203,7 +204,7 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
     nf->keepalive_tmrid = 0;
 
     UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
-        static_cast<string>(nf->neigh->ipcp_name).c_str());
+        static_cast<string>(neigh->ipcp_name).c_str());
 
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive,
              0, 0, string());
@@ -215,36 +216,15 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
     nf->pending_keepalive_reqs++;
 
     if (nf->pending_keepalive_reqs > NEIGH_KEEPALIVE_THRESH) {
-        bool delete_neighbor;
-        RinaName neigh_name = nf->neigh->ipcp_name;
+        RinaName neigh_name = neigh->ipcp_name;
 
-        /* We assume the neighbor is not alive on this flow.
-         * Remove the NeighFlow from the Neighbor and, if the
-         * NeighFlow is the current mgmt flow, elect
-         * another NeighFlow as mgmt flow, if possible. */
+        /* We assume the neighbor is not alive on this flow, so
+         * we prune the flow. */
         UPI(rib->uipcp, "Neighbor %s is not alive on N-1 flow %u "
             "and therefore will be pruned\n",
             static_cast<string>(neigh_name).c_str(), nf->port_id);
 
-        nf->neigh->flows.erase(nf->port_id);
-
-        if (nf->port_id == nf->neigh->mgmt_port_id && nf->neigh->flows.size())
-        {
-            nf->neigh->mgmt_port_id = nf->neigh->flows.begin()->second->port_id;
-            UPI(rib->uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
-                static_cast<string>(neigh_name).c_str(),
-                nf->neigh->mgmt_port_id);
-        }
-
-        delete_neighbor = (nf->neigh->flows.size() == 0);
-
-        /* First delete the N-1 flow. */
-        delete nf;
-
-        /* If this was the last N-1 flow, delete the neighbor. */
-        if (delete_neighbor) {
-            rib->del_neighbor(neigh_name);
-        }
+        rib->neigh_flow_prune(nf);
 
     } else {
         /* Schedule the next keepalive request. */

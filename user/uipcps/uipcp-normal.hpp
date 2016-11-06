@@ -315,6 +315,7 @@ struct uipcp_rib {
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
     rl_addr_t address_allocate() const;
+    void neigh_flow_prune(NeighFlow *nf);
 
     const LowerFlow *lfdb_find(rl_addr_t local_addr,
                                rl_addr_t remote_addr) const {
