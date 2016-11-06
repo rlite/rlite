@@ -80,16 +80,16 @@ namespace obj_name {
 
 enum enroll_state_t {
     NEIGH_NONE = 0,
-    NEIGH_I_WAIT_CONNECT_R,
-    NEIGH_S_WAIT_START,
-    NEIGH_I_WAIT_START_R,
-    NEIGH_S_WAIT_STOP_R,
-    NEIGH_I_WAIT_STOP,
-    NEIGH_I_WAIT_START,
+    NEIGH_I_WAIT_CONNECT_R, /* 1 */
+    NEIGH_S_WAIT_START, /* 2 */
+    NEIGH_I_WAIT_START_R, /* 3 */
+    NEIGH_S_WAIT_STOP_R, /* 4 */
+    NEIGH_I_WAIT_STOP, /* 5 */
+    NEIGH_I_WAIT_START, /* 6 */
 
-    NEIGH_I_LF_WAIT_START_R,
+    NEIGH_I_LF_WAIT_START_R, /* 7 */
 
-    NEIGH_ENROLLED,
+    NEIGH_ENROLLED, /* 8 */
 
     NEIGH_STATE_LAST,
 };

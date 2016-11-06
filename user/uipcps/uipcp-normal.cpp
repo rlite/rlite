@@ -424,11 +424,15 @@ uipcp_rib::dump() const
             ss << "} ";
         }
 
-        if (neigh != neighbors.end()) {
-            ss << "[Connected, last heard " <<
-                static_cast<int>(time(NULL) - neigh->second->unheard_since)
-                    << " seconds ago]";
-
+        if (neigh != neighbors.end() && neigh->second->has_mgmt_flow()) {
+            if (neigh->second->enrollment_complete()) {
+                ss << "[Enrolled, last heard " <<
+                    static_cast<int>(time(NULL) - neigh->second->unheard_since)
+                        << " seconds ago]";
+            } else {
+                ss << "[Enrollment ongoing <" <<
+                        neigh->second->mgmt_conn()->enrollment_state << ">]";
+            }
         } else {
             ss << "[Disconnected]";
         }
