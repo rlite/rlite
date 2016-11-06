@@ -688,18 +688,18 @@ uipcps_compute_depths(struct uipcps *uipcps)
     max_depth = visit(uipcps);
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        PD_S("NODE %u, depth = %u\n", ipn->id,
+        PV_S("NODE %u, depth = %u\n", ipn->id,
              ipn->depth);
-        PD_S("    uppers = [");
+        PV_S("    uppers = [");
         list_for_each_entry(e, &ipn->uppers, node) {
             PD_S("%u, ", e->ipcp->id);
         }
-        PD_S("]\n");
-        PD_S("    lowers = [");
+        PV_S("]\n");
+        PV_S("    lowers = [");
         list_for_each_entry(e, &ipn->lowers, node) {
-            PD_S("%u, ", e->ipcp->id);
+            PV_S("%u, ", e->ipcp->id);
         }
-        PD_S("]\n");
+        PV_S("]\n");
     }
 
     uipcps_update_depths(uipcps, max_depth);
