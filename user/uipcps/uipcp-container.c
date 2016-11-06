@@ -591,6 +591,17 @@ uipcps_print(struct uipcps *uipcps)
     return 0;
 }
 
+
+/*
+ * Routines for DIF topological ordering, used for two reasons:
+ *   (1) To check that there are no loops in the DIF stacking.
+ *   (2) To compute the number of EFCP headers that each IPCP in the local
+ *       system needs to allocate for each packet to be transmitted.
+ *       Depending on the lower DIFs actually trasversed, it can happen
+ *       that some of the header space is left unused, but the worst case
+ *       is covered in any case.
+ */
+
 static unsigned int
 visit(struct uipcps *uipcps)
 {
