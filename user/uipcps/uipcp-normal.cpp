@@ -372,12 +372,21 @@ uipcp_rib::dump() const
 
     ss << "Address: " << uipcp->addr << endl << endl;
 
-    ss << "LowerDIFs: {";
-    for (list<string>::const_iterator lit = lower_difs.begin();
-                            lit != lower_difs.end(); lit++) {
-            ss << *lit << ", ";
+    {
+        bool first = true;
+
+        ss << "LowerDIFs: {";
+        for (list<string>::const_iterator lit = lower_difs.begin();
+                                lit != lower_difs.end(); lit++) {
+                if (first) {
+                    first = false;
+                } else {
+                    ss << ", ";
+                }
+                ss << *lit;
+        }
+        ss << "}" << endl << endl;
     }
-    ss << "}" << endl << endl;
 
     ss << "Candidate Neighbors:" << endl;
     for (map<string, NeighborCandidate>::const_iterator
@@ -400,11 +409,21 @@ uipcp_rib::dump() const
         ss << "    Name: " << cand.apn << "/" << cand.api
             << ", Address: " << cand.address << ", Lower DIFs: {";
 
-        for (list<string>::const_iterator lit = cand.lower_difs.begin();
-                    lit != cand.lower_difs.end(); lit++) {
-            ss << *lit << ", ";
+        {
+            bool first = true;
+
+            for (list<string>::const_iterator lit = cand.lower_difs.begin();
+                        lit != cand.lower_difs.end(); lit++) {
+                if (first) {
+                    first = false;
+                } else {
+                    ss << ", ";
+                }
+                ss << *lit;
+            }
+            ss << "} ";
         }
-        ss << "} ";
+
         if (neigh != neighbors.end()) {
             ss << "[Connected, last heard " <<
                 static_cast<int>(time(NULL) - neigh->second->unheard_since)
