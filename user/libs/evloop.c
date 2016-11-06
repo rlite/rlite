@@ -929,12 +929,12 @@ rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
 
     rl_ipcp_config_fill(req, ipcp_id, param_name, param_value);
 
-    PD("Requesting IPCP config...\n");
+    PV("Requesting IPCP config...\n");
 
     resp = rl_evloop_issue_request(loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp); (void)resp;
-    PD("result: %d\n", result);
+    PV("result: %d\n", result);
 
     return result;
 }
