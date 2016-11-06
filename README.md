@@ -26,9 +26,10 @@
 ## 1. Software requirements                                                 #
 #############################################################################
 
-This sections lists the software packages required to build and run *rlite* on
-Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are indicated
-here, but using other distributions should be straightforward.
+This section lists the software packages required to build and run *rlite* on
+Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are explicitly
+indicated here, but using other distributions should be equally
+straightforward.
 
 ### Ubuntu 14.04 and Debian 8
 #############################################################################
