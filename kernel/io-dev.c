@@ -37,6 +37,22 @@
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
 
+#if 0
+static const char *
+hms_time(void)
+{
+    static char tbuf[20];
+    struct timeval time;
+    struct tm tm;
+
+    do_gettimeofday(&time);
+    /*sys_tz.tz_minuteswest * 60)) */
+    time_to_tm(time.tv_sec, 0,  &tm);
+    snprintf(tbuf, sizeof(tbuf), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    return tbuf;
+}
+#endif
 
 void
 tx_completion_func(unsigned long arg)
