@@ -30,6 +30,7 @@
 #include "rlite/kernel-msg.h"
 #include "rlite/list.h"
 #include "rlite/evloop.h"
+#include "rlite/utils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -198,7 +199,7 @@ int uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
                                 const struct rl_flow_config *flowcfg);
 
 #define UPRINT(_u, LEV, FMT, ...)    \
-    DOPRINT("[" LEV "][%u]%s: " FMT, (_u)->id, __func__, ##__VA_ARGS__)
+    DOPRINT("[%s:" LEV "][%u]%s: " FMT, hms_string(), (_u)->id, __func__, ##__VA_ARGS__)
 
 #define UPD(_u, FMT, ...)   \
     if (rl_verbosity >= RL_VERB_DBG)    \

@@ -86,6 +86,22 @@ int __rina_name_from_string(const char *str, struct rina_name *name,
 
 /* Logging macros. */
 
+#include <time.h>
+
+static inline const char*
+hms_string(void)
+{
+    static char tbuf[9];
+    time_t ctime = time(NULL);
+    struct tm *time_info;
+
+    time_info = localtime(&ctime);
+
+    strftime(tbuf, sizeof(tbuf), "%H:%M:%S", time_info);
+
+    return tbuf;
+}
+
 extern int rl_verbosity;
 
 #define DOPRINT(FMT, ...)               \
@@ -97,7 +113,8 @@ extern int rl_verbosity;
 #define PRINTFUN1(FMT, ...)                 \
                 DOPRINT(FMT, ##__VA_ARGS__)
 #define PRINTFUN2(LEV, FMT, ...)            \
-                DOPRINT("[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
+                DOPRINT("[%s:" LEV "]%s: " FMT, hms_string(), \
+                        __func__, ##__VA_ARGS__)
 
 #define PD(FMT, ...) \
         if (rl_verbosity >= RL_VERB_DBG) \
