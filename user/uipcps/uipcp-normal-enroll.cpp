@@ -46,6 +46,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
 {
+    last_activity = time(NULL);
     pthread_cond_init(&enrollment_stopped, NULL);
     assert(neigh);
 }
@@ -85,7 +86,7 @@ NeighFlow::~NeighFlow()
 
 int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
-                          const UipcpObject *obj) const
+                          const UipcpObject *obj)
 {
     char objbuf[4096];
     int objlen;
@@ -122,6 +123,10 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
     if (serbuf) {
         delete [] serbuf;
+    }
+
+    if (ret == 0) {
+        last_activity = time(NULL);
     }
 
     return ret;
@@ -891,6 +896,8 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
     enroll_state_t old_state = nf->enrollment_state;
     int ret;
 
+    nf->last_activity = time(NULL);
+
     if (enrollment_complete() && nf != mgmt_conn() && nf->enrollment_starting(rm)) {
         /* We thought we were already enrolled to this neighbor, but
          * he is trying to start again the enrollment procedure on a
@@ -940,7 +947,7 @@ int Neighbor::remote_sync_obj(const NeighFlow *nf, bool create,
                    0, 0, "");
     }
 
-    ret = nf->send_to_port_id(&m, 0, obj_value);
+    ret = const_cast<NeighFlow *>(nf)->send_to_port_id(&m, 0, obj_value);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed\n");
     }
@@ -1315,7 +1322,7 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
     ScopeLock(rib->lock);
 
-    /* Scan all the candidates. */
+    /* Scan all the neighbor candidates. */
     for (set<string>::const_iterator
             cand = rib->neighbors_cand.begin();
                 cand != rib->neighbors_cand.end(); cand++) {
@@ -1328,6 +1335,22 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
         neigh = rib->neighbors.find(*cand);
 
         if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+            time_t inact;
+
+            /* There is a management flow towards this neighbor, but we need
+             * to check that this is not a dead flow hanging forever in
+             * the NEIGH_NONE state. */
+
+            inact = time(NULL) - neigh->second->mgmt_conn()->last_activity;
+
+            if (neigh->second->mgmt_conn()->enrollment_state == NEIGH_NONE &&
+                        inact > 10) {
+                /* Prune the flow now, we'll try to enroll later. */
+                PD("Pruning flow towards %s since inactive for %d seconds\n",
+                    cand->c_str(), (int)inact);
+                rib->neigh_flow_prune(neigh->second->mgmt_conn());
+            }
+
             /* Enrollment not needed. */
             continue;
         }

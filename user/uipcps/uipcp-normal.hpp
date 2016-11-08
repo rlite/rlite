@@ -109,6 +109,8 @@ struct NeighFlow {
     rl_ipcp_id_t lower_ipcp_id;
     CDAPConn *conn;
 
+    time_t last_activity;
+
     int enroll_tmrid;
     pthread_cond_t enrollment_stopped;
     enum enroll_state_t enrollment_state;
@@ -130,7 +132,7 @@ struct NeighFlow {
     void enrollment_state_set(enroll_state_t st);
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
-                        const UipcpObject *obj) const;
+                        const UipcpObject *obj);
 };
 
 /* Holds the information about a neighbor IPCP. */
