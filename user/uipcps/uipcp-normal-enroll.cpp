@@ -1050,7 +1050,6 @@ sync_timeout_cb(struct rl_evloop *loop, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
     ScopeLock(rib->lock);
-    CDAPMessage m;
 
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
@@ -1308,6 +1307,46 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
     }
 
     return -1;
+}
+
+void
+re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
+{
+    uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
+    ScopeLock(rib->lock);
+
+    /* Scan all the candidates. */
+    for (set<string>::const_iterator
+            cand = rib->neighbors_cand.begin();
+                cand != rib->neighbors_cand.end(); cand++) {
+        map<string, NeighborCandidate>::const_iterator mit =
+                rib->neighbors_seen.find(*cand);
+        map<string, Neighbor *>::iterator neigh;
+        string common_dif;
+
+        assert(mit != rib->neighbors_seen.end());
+        neigh = rib->neighbors.find(*cand);
+
+        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+            /* Enrollment not needed. */
+            continue;
+        }
+
+        common_dif = common_lower_dif(mit->second.lower_difs,
+                                      rib->lower_difs);
+        if (common_dif == string()) {
+            /* Weird, but it could happen. */
+            continue;
+        }
+
+        /* Start the enrollment. */
+        UPD(rib->uipcp, "I should re-enroll with neighbor %s through "
+                        "lower DIF %s\n", cand->c_str(), common_dif.c_str());
+    }
+
+    rib->re_enroll_tmrid = rl_evloop_schedule(&rib->uipcp->loop,
+                                              RL_RE_ENROLL_INTVAL * 1000,
+                                              re_enroll_timeout_cb, rib);
 }
 
 int

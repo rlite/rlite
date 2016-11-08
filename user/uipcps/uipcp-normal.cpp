@@ -299,12 +299,16 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0)
                                         age_incr_cb, this);
     sync_tmrid = rl_evloop_schedule(&uipcp->loop, RL_NEIGH_SYNC_INTVAL * 1000,
                                     sync_timeout_cb, this);
+    re_enroll_tmrid = rl_evloop_schedule(&uipcp->loop,
+                                         RL_RE_ENROLL_INTVAL * 1000,
+                                         re_enroll_timeout_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
 {
     rl_evloop_schedule_canc(&uipcp->loop, sync_tmrid);
     rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
+    rl_evloop_schedule_canc(&uipcp->loop, re_enroll_tmrid);
 
     for (map<string, Neighbor*>::iterator mit = neighbors.begin();
                                     mit != neighbors.end(); mit++) {
@@ -390,6 +394,7 @@ uipcp_rib::dump() const
         ss << "}" << endl << endl;
     }
 
+    // TODO simplify this? only scan neighbors_cand
     ss << "Candidate Neighbors:" << endl;
     for (map<string, NeighborCandidate>::const_iterator
             mit = neighbors_seen.begin();

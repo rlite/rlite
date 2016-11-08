@@ -78,6 +78,10 @@ namespace obj_name {
  * RIB synchronizations. */
 #define RL_NEIGH_SYNC_INTVAL           30
 
+/* Time interval (in seconds) between two consecutive periodic
+ * RIB synchronizations. */
+#define RL_RE_ENROLL_INTVAL           10
+
 enum enroll_state_t {
     NEIGH_NONE = 0,
     NEIGH_I_WAIT_CONNECT_R, /* 1 */
@@ -268,6 +272,9 @@ struct uipcp_rib {
     std::map< std::string, NeighborCandidate > neighbors_seen;
     std::set< std::string > neighbors_cand;
 
+    /* Timer ID for re-enrollment. */
+    int re_enroll_tmrid;
+
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
 
@@ -276,6 +283,7 @@ struct uipcp_rib {
 
     SPEngine spe;
 
+    /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
 
     /* For A-DATA messages. */
@@ -385,6 +393,7 @@ int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
 
 void age_incr_cb(struct rl_evloop *loop, void *arg);
 void sync_timeout_cb(struct rl_evloop *loop, void *arg);
+void re_enroll_timeout_cb(struct rl_evloop *loop, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 
