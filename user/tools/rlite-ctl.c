@@ -370,6 +370,7 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
     const char *dif_name;
     const char *supp_dif_name;
     struct ipcp_attrs *attrs;
+    int ret;
 
     assert(argc >= 4);
     dif_name = argv[0];
@@ -390,7 +391,14 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
     rina_name_from_string(neigh_ipcp_name_s, &req.neigh_name);
     req.supp_dif_name = strdup(supp_dif_name);
 
-    return request_response(RLITE_MB(&req), NULL);
+    ret = request_response(RLITE_MB(&req), NULL);
+    if (ret) {
+        PE("Enrollment failed\n");
+    } else {
+        PI("Enrollment completed successfully\n");
+    }
+
+    return ret;
 }
 
 static int
