@@ -152,7 +152,7 @@ flowspec2flowcfg(struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 int
 uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
-    RinaName dest_appl(&req->remote_appl);
+    string dest_appl(req->remote_appl);
     rl_addr_t remote_addr;
     CDAPMessage *m;
     FlowRequest freq;
@@ -166,7 +166,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     if (ret) {
         /* Return a negative flow allocation response immediately. */
         UPI(uipcp, "No DFT matching entry for destination %s\n",
-                static_cast<string>(dest_appl).c_str());
+                dest_appl.c_str());
 
         return uipcp_issue_fa_resp_arrived(uipcp, req->local_port,
                                      0 /* don't care */,
@@ -179,8 +179,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     conn_id.src_cep = req->local_cep;
     conn_id.dst_cep = 0;
 
-    freq.src_app = RinaName(&req->local_appl);
-    freq.dst_app = dest_appl;
+    freq.src_app = RinaName(req->local_appl);
+    freq.dst_app = RinaName(dest_appl);
     freq.src_port = req->local_port;
     freq.dst_port = 0;
     freq.src_addr = uipcp->addr;
@@ -291,7 +291,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
     }
 
     FlowRequest freq(objbuf, objlen);
-    struct rina_name local_appl, remote_appl;
+    std::string local_appl, remote_appl;
     struct rl_flow_config flowcfg;
     rl_addr_t dft_next_hop;
     int ret;
@@ -338,17 +338,14 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
 
     /* freq.dst_app is registered with us, let's go ahead. */
 
-    freq.dst_app.rina_name_fill(&local_appl);
-    freq.src_app.rina_name_fill(&remote_appl);
+    local_appl = freq.dst_app;
+    remote_appl = freq.src_app;
     policies2flowcfg(&flowcfg, freq.qos, freq.policies);
 
     uipcp_issue_fa_req_arrived(uipcp, kevent_id_cnt, freq.src_port,
                                freq.connections.front().src_cep,
-                               freq.src_addr, &local_appl, &remote_appl,
-                               &flowcfg);
-
-    rina_name_free(&local_appl);
-    rina_name_free(&remote_appl);
+                               freq.src_addr, local_appl.c_str(),
+                               remote_appl.c_str(), &flowcfg);
 
     freq.invoke_id = rm->invoke_id;
     freq.initiator = false;

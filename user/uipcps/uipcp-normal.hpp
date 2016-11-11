@@ -35,6 +35,7 @@
 #include "rlite/uipcps-msg.h"
 #include "rlite/evloop.h"
 #include "rlite/cdap.hpp"
+#include "rlite/cpputils.hpp"
 
 #include "uipcp-normal-codecs.hpp"
 #include "uipcp-container.h"
@@ -141,7 +142,7 @@ struct Neighbor {
     struct uipcp_rib *rib;
 
     /* Name of the neighbor. */
-    RinaName ipcp_name;
+    std::string ipcp_name;
 
     /* Did we initiate the enrollment procedure towards this neighbor
      * or were we the target? */
@@ -160,7 +161,7 @@ struct Neighbor {
                                                   const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
-    Neighbor(struct uipcp_rib *rib, const struct rina_name *name,
+    Neighbor(struct uipcp_rib *rib, const char *name,
              bool initiator);
     bool operator==(const Neighbor& other) const
         { return ipcp_name == other.ipcp_name; }
@@ -309,15 +310,15 @@ struct uipcp_rib {
     char *dump() const;
 
     int set_address(rl_addr_t address);
-    Neighbor *get_neighbor(const struct rina_name *neigh_name, bool initiator);
-    int del_neighbor(const RinaName& neigh_name);
-    int dft_lookup(const RinaName& appl_name, rl_addr_t& dstaddr) const;
-    int dft_set(const RinaName& appl_name, rl_addr_t remote_addr);
+    Neighbor *get_neighbor(const char *neigh_name, bool initiator);
+    int del_neighbor(const std::string& neigh_name);
+    int dft_lookup(const std::string& appl_name, rl_addr_t& dstaddr) const;
+    int dft_set(const std::string& appl_name, rl_addr_t remote_addr);
     int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rl_kmsg_appl_register *req);
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
-    rl_addr_t lookup_neighbor_address(const RinaName& neigh_name) const;
-    RinaName lookup_neighbor_by_address(rl_addr_t address);
+    rl_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
+    std::string lookup_neighbor_by_address(rl_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
     int commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh);
@@ -384,13 +385,13 @@ int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
 int rib_neigh_set_port_id(struct uipcp_rib *rib,
-                          const struct rina_name *neigh_name,
+                          const char *neigh_name,
                           const char *supp_dif,
                           rl_port_t neigh_port_id,
                           rl_ipcp_id_t lower_ipcp_id);
 
 int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
-                          const struct rina_name *neigh_name,
+                          const char *neigh_name,
                           rl_port_t neigh_port_id, int neigh_fd);
 
 void age_incr_cb(struct rl_evloop *loop, void *arg);

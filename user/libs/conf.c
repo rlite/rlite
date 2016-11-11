@@ -34,7 +34,7 @@
 /* Create an IPC process. */
 long int
 rl_conf_ipcp_create(struct rl_ctrl *ctrl,
-                    const struct rina_name *name, const char *dif_type,
+                    const char *name, const char *dif_type,
                     const char *dif_name)
 {
     struct rl_kmsg_ipcp_create msg;
@@ -44,7 +44,7 @@ rl_conf_ipcp_create(struct rl_ctrl *ctrl,
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_CREATE;
     msg.event_id = rl_ctrl_get_id(ctrl);
-    rina_name_copy(&msg.name, name);
+    msg.name = name ? strdup(name) : NULL;
     msg.dif_type = strdup(dif_type);
     msg.dif_name = strdup(dif_name);
 

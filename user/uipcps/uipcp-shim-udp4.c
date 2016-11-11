@@ -63,7 +63,7 @@ struct udp4_endpoint {
  * name. */
 struct udp4_bindpoint {
     int fd;
-    struct rina_name appl_name; /* Used to at unregister time. */
+    char *appl_name; /* Used to at unregister time. */
     rl_port_t port_id; /* Used at flow dealloc time. */
     struct rl_evloop *loop;
     struct list_head node;
@@ -95,33 +95,33 @@ strrepchar(char *s, char old, char new)
 
 /* Use socket API to translate a RINA name into an IP address. */
 static int
-rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
+rina_name_to_ipaddr(struct shim_udp4 *shim, const char *name,
                     struct sockaddr_in *addr)
 {
     struct addrinfo hints, *resaddrlist;
-    char *name_s;
+    char *cname = strdup(name);
     int ret;
 
-    name_s = rina_name_to_string(name);
-    if (!name_s) {
+    if (!cname) {
         UPE(shim->uipcp, "Out of memory\n");
         return -1;
     }
 
-    strrepchar(name_s, '/', '-');
+    strrepchar(cname, '/', '-');
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    ret = getaddrinfo(name_s, NULL, &hints, &resaddrlist);
+    ret = getaddrinfo(cname, NULL, &hints, &resaddrlist);
     if (ret) {
-        UPE(shim->uipcp, "getaddrinfo() failed: %s\n", gai_strerror(ret));
+        UPE(shim->uipcp, "getaddrinfo(%s) failed: %s\n", cname,
+                         gai_strerror(ret));
         goto err;
     }
 
     if (resaddrlist == NULL) {
-        UPE(shim->uipcp, "Could not find IP address for %s\n", name_s);
+        UPE(shim->uipcp, "Could not find IP address for %s\n", cname);
         goto err;
     }
 
@@ -130,21 +130,21 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const struct rina_name *name,
     freeaddrinfo(resaddrlist);
     {
         char strbuf[INET_ADDRSTRLEN];
-        UPD(shim->uipcp, "'%s' --> '%s'\n", name_s,
+        UPD(shim->uipcp, "'%s' --> '%s'\n", cname,
             inet_ntop(AF_INET, &addr->sin_addr, strbuf, sizeof(strbuf)));
     }
 
-    free(name_s);
+    free(cname);
 
     return 0;
 err:
-    free(name_s);
+    free(cname);
     return -1;
 }
 
 /* Use socket API to translate an IP address into a RINA name. */
 static int
-ipaddr_to_rina_name(struct shim_udp4 *shim, struct rina_name *name,
+ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
                     const struct sockaddr_in *addr)
 {
     socklen_t hostlen = 256;
@@ -173,13 +173,9 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, struct rina_name *name,
 
     strrepchar(host, '-', '/');
 
-    ret = rina_name_from_string(host, name);
-    free(host);
-    if (ret) {
-        UPE(shim->uipcp, "rina_name_from_string() failed\n");
-    }
+    *name = host;
 
-    return ret;
+    return 0;
 }
 
 static void
@@ -313,7 +309,7 @@ udp4_recv_dgram(struct rl_evloop *loop, int bfd)
 
     ep = udp4_endpoint_lookup(shim, &remote_addr);
     if (!ep) {
-        struct rina_name remote_appl, local_appl;
+        char *remote_appl, *local_appl;
         struct sockaddr_in bpaddr;
         struct rl_flow_config cfg;
         int ret = 0;
@@ -349,10 +345,10 @@ udp4_recv_dgram(struct rl_evloop *loop, int bfd)
         /* Push the file descriptor and source address down to kernelspace. */
         udp4_flow_config_fill(ep, &cfg);
         ret = uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
-                                         &local_appl, &remote_appl, &cfg);
+                                         local_appl, remote_appl, &cfg);
 skip:
-        rina_name_free(&local_appl);
-        rina_name_free(&remote_appl);
+        free(local_appl);
+        free(remote_appl);
         if (ret) {
             UPE(uipcp, "uipcp_fa_req_arrived() failed\n");
             return;
@@ -391,7 +387,7 @@ skip:
 }
 
 static struct udp4_bindpoint *
-udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
+udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
 {
     struct uipcp *uipcp = shim->uipcp;
     struct sockaddr_in bpaddr;
@@ -422,7 +418,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
         goto err;
     }
 
-    if (rina_name_copy(&bp->appl_name, local_name)) {
+    bp->appl_name = strdup(local_name);
+    if (!bp->appl_name) {
         goto err;
     }
 
@@ -446,7 +443,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, struct rina_name *local_name)
     return bp;
 
 err:
-    rina_name_free(&bp->appl_name);
+    free(bp->appl_name);
     if (bp->fd >= 0) close(bp->fd);
     free(bp);
     return NULL;
@@ -458,7 +455,7 @@ udp4_bindpoint_close(struct udp4_bindpoint *bp)
     rl_evloop_fdcb_del(bp->loop, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
-    rina_name_free(&bp->appl_name);
+    if (bp->appl_name) free(bp->appl_name);
     free(bp);
 }
 
@@ -488,13 +485,13 @@ shim_udp4_appl_register(struct rl_evloop *loop,
     struct udp4_bindpoint *bp;
 
     if (req->reg) {
-        bp = udp4_bindpoint_open(shim, &req->appl_name);
+        bp = udp4_bindpoint_open(shim, req->appl_name);
         return uipcp_appl_register_resp(uipcp, uipcp->id,
                         bp ? RLITE_SUCC : RLITE_ERR, req);
     }
 
     list_for_each_entry(bp, &shim->bindpoints, node) {
-        if (rina_name_cmp(&bp->appl_name, &req->appl_name) == 0) {
+        if (strcmp(bp->appl_name, req->appl_name) == 0) {
             udp4_bindpoint_close(bp);
             return 0;
         }
@@ -527,7 +524,7 @@ shim_udp4_fa_req(struct rl_evloop *loop,
     ep->port_id = req->local_port;
 
     /* Resolve the destination name into an IP address. */
-    if (rina_name_to_ipaddr(shim, &req->remote_appl, &ep->remote_addr)) {
+    if (rina_name_to_ipaddr(shim, req->remote_appl, &ep->remote_addr)) {
         udp4_endpoint_close(ep);
         return -1;
     }

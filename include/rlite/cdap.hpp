@@ -88,8 +88,8 @@ public:
 
     void reset();
 
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
+    std::string local_appl;
+    std::string remote_appl;
     int fd;
     long version;
 };
@@ -103,8 +103,8 @@ struct CDAPMessage {
     int                 abs_syntax;
     gpb::authTypes_t    auth_mech;
     CDAPAuthValue       auth_value;
-    struct rina_name    src_appl;
-    struct rina_name    dst_appl;
+    std::string         src_appl;
+    std::string         dst_appl;
     std::string         filter;
     gpb::flagValues_t   flags;
     int                 invoke_id;
@@ -162,8 +162,8 @@ struct CDAPMessage {
 
     int m_connect(gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value,
-                  const struct rina_name *local_appl,
-                  const struct rina_name *remote_appl);
+                  const std::string& local_appl,
+                  const std::string& remote_appl);
 
     int m_connect_r(const struct CDAPMessage *req, int result,
                     const std::string& result_reason);

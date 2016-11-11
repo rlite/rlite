@@ -81,7 +81,7 @@ struct rl_kmsg_ipcp_create {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    struct rina_name name;
+    char *name;
     char *dif_type;
     char *dif_name;
 } __attribute__((packed));
@@ -124,7 +124,7 @@ struct rl_kmsg_ipcp_update {
     rl_ipcp_id_t ipcp_id;
     rl_addr_t ipcp_addr;
     uint16_t  depth;
-    struct rina_name ipcp_name;
+    char *ipcp_name;
     char *dif_name;
     char *dif_type;
 } __attribute__((packed));
@@ -135,7 +135,7 @@ struct rl_kmsg_appl_register {
     uint32_t event_id;
 
     uint8_t reg;
-    struct rina_name appl_name;
+    char *appl_name;
     char *dif_name;
 } __attribute__((packed));
 
@@ -147,7 +147,7 @@ struct rl_kmsg_appl_register_resp {
     rl_ipcp_id_t ipcp_id;
     uint8_t reg;
     uint8_t response;
-    struct rina_name appl_name;
+    char *appl_name;
 } __attribute__((packed));
 
 /* application --> kernel to initiate a flow allocation. */
@@ -159,8 +159,8 @@ struct rl_kmsg_fa_req {
     struct rina_flow_spec flowspec;
     rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
+    char *local_appl;
+    char *remote_appl;
     char *dif_name;
 } __attribute__((packed));
 
@@ -181,8 +181,8 @@ struct rl_kmsg_fa_req_arrived {
     uint32_t kevent_id;
     rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
+    char *local_appl;
+    char *remote_appl;
     char *dif_name;
 } __attribute__((packed));
 
@@ -255,9 +255,9 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     rl_addr_t remote_addr;
     struct rl_flow_config flowcfg;
     /* Requested application. */
-    struct rina_name local_appl;
+    char *local_appl;
     /* Requesting application. */
-    struct rina_name remote_appl;
+    char *remote_appl;
 } __attribute__((packed));
 
 /* uipcp (application) --> kernel to tell the kernel that a flow

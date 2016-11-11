@@ -198,8 +198,8 @@ for i in sorted(vms):
             'sudo rlite-uipcps &> uipcp.log &\n'\
             '\n'\
             'for i in $(seq 1 %(levels)s); do\n'\
-            '   rlite-ctl ipcp-create n.${i}.IPCP/%(id)s// normal n.${i}.DIF\n'\
-            '   rlite-ctl ipcp-config n.${i}.IPCP/%(id)s// address %(id)d\n'\
+            '   rlite-ctl ipcp-create n.${i}.IPCP/%(id)s normal n.${i}.DIF\n'\
+            '   rlite-ctl ipcp-config n.${i}.IPCP/%(id)s address %(id)d\n'\
             'done\n'\
             '\n' % d
 
@@ -209,19 +209,19 @@ for i in sorted(vms):
                      'shimtype': args.type}
         outs += 'PORT=$(mac2ifname %(mac)s)\n'\
                 'sudo ip link set $PORT up\n'\
-                'rlite-ctl ipcp-create e.%(brid)s.IPCP/%(idx)s// shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
+                'rlite-ctl ipcp-create e.%(brid)s.IPCP/%(idx)s shim-%(shimtype)s e.%(brid)s.DIF\n' % vars_dict
         if args.type == 'eth':
-                outs += 'rlite-ctl ipcp-config e.%(brid)s.IPCP/%(idx)s// netdev $PORT\n' % vars_dict
+                outs += 'rlite-ctl ipcp-config e.%(brid)s.IPCP/%(idx)s netdev $PORT\n' % vars_dict
         elif args.type == 'tcp4':
                 outs += 'sudo ip addr add 10.71.%(brid)s.%(id)s/24 dev $PORT\n' % vars_dict
-                entry = 'n.1.IPCP/%(id)s// 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.DIF' % vars_dict
+                entry = 'n.1.IPCP/%(id)s 10.71.%(brid)s.%(id)s 9876 e.%(brid)s.DIF' % vars_dict
                 outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-tcp4-dir\'\n' % (entry, )
                 tcp4_dir.append(entry)
-        outs += 'rlite-ctl ipcp-register e.%(brid)s.DIF n.1.IPCP/%(id)s//\n'\
+        outs += 'rlite-ctl ipcp-register e.%(brid)s.DIF n.1.IPCP/%(id)s\n'\
                 '\n' % vars_dict
 
     outs += 'for i in $(seq 2 %(levels)s); do\n'\
-            '   rlite-ctl ipcp-register n.$(($i-1)).DIF n.$i.IPCP/%(id)s//\n'\
+            '   rlite-ctl ipcp-register n.$(($i-1)).DIF n.$i.IPCP/%(id)s\n'\
             'done\n'\
             'true\n'\
             'ENDSSH\n'\
@@ -282,8 +282,8 @@ for br_name in sorted(bridges):
                 '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
         if not args.quiet:
             outs += 'set -x\n'
-        outs += 'rlite-ctl ipcp-enroll n.1.DIF n.1.IPCP/%(id)s// '\
-                                    'n.1.IPCP/%(pvid)s// e.%(brid)s.DIF\n'\
+        outs += 'rlite-ctl ipcp-enroll n.1.DIF n.1.IPCP/%(id)s '\
+                                    'n.1.IPCP/%(pvid)s e.%(brid)s.DIF\n'\
                 'true\n'\
                 'ENDSSH\n'\
                 '   DONE=$?\n'\
@@ -316,8 +316,8 @@ for level in range(2, args.levels + 1):
                 '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
         if not args.quiet:
             outs += 'set -x\n'
-        outs += 'rlite-ctl ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP/%(id)s// '\
-                            'n.%(level)s.IPCP/%(pvid)s// n.%(lm1)s.DIF\n'\
+        outs += 'rlite-ctl ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP/%(id)s '\
+                            'n.%(level)s.IPCP/%(pvid)s n.%(lm1)s.DIF\n'\
                 'true\n'\
                 'ENDSSH\n'\
                 '   DONE=$?\n'\

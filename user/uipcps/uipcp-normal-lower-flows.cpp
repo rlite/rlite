@@ -150,7 +150,6 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     LowerFlowList lfl(objbuf, objlen);
     LowerFlowList prop_lfl;
-    RinaName my_name = RinaName(&uipcp->name);
     bool modified = false;
 
     for (list<LowerFlow>::iterator f = lfl.flows.begin();

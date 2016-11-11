@@ -70,28 +70,15 @@ flow_allocate_resp_arrived(struct rl_evloop *loop,
             (struct rl_kmsg_fa_req *)b_req;
     struct rl_kmsg_fa_resp_arrived *resp =
             (struct rl_kmsg_fa_resp_arrived *)b_resp;
-    char *local_s = NULL;
-    char *remote_s = NULL;
-
-    local_s = rina_name_to_string(&req->local_appl);
-    remote_s = rina_name_to_string(&req->remote_appl);
 
     if (resp->response) {
         PE("Failed to allocate a flow between local appl "
                "'%s' and remote appl '%s'\n",
-                local_s, remote_s);
+                req->local_appl, req->remote_appl);
     } else {
         PI("Allocated flow between local appl "
                "'%s' and remote appl '%s' [port-id = %u]\n",
-                local_s, remote_s, resp->port_id);
-    }
-
-    if (local_s) {
-        free(local_s);
-    }
-
-    if (remote_s) {
-        free(remote_s);
+                req->local_appl, req->remote_appl, resp->port_id);
     }
 
     return 0;
@@ -104,22 +91,15 @@ appl_register_resp(struct rl_evloop *loop,
 {
     struct rl_kmsg_appl_register_resp *resp =
             (struct rl_kmsg_appl_register_resp *)b_resp;
-    char *appl_name_s = NULL;
 
     (void)b_req;
 
-    appl_name_s = rina_name_to_string(&resp->appl_name);
-
     if (resp->response) {
-        PE("Application '%s' %sregistration failed\n", appl_name_s,
+        PE("Application '%s' %sregistration failed\n", resp->appl_name,
             (resp->reg ? "" : "un"));
     } else {
         PD("Application '%s' %sregistration successfully completed\n",
-           appl_name_s, (resp->reg ? "" : "un"));
-    }
-
-    if (appl_name_s) {
-        free(appl_name_s);
+           resp->appl_name, (resp->reg ? "" : "un"));
     }
 
     return 0;
@@ -811,7 +791,7 @@ struct rl_kmsg_appl_register_resp *
 rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
                   unsigned int wait_ms, int reg,
                   const char *dif_name,
-                  const struct rina_name *appl_name)
+                  const char *appl_name)
 {
     struct rl_kmsg_appl_register *req;
     int result;
@@ -835,7 +815,7 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
 int
 rl_evloop_register(struct rl_evloop *loop, int reg,
                    const char *dif_name,
-                   const struct rina_name *appl_name,
+                   const char *appl_name,
                    unsigned int wait_ms)
 {
     struct rl_kmsg_appl_register_resp *resp;
@@ -863,8 +843,8 @@ rl_evloop_register(struct rl_evloop *loop, int reg,
 int
 rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
                      const char *dif_name,
-                     const struct rina_name *local_appl,
-                     const struct rina_name *remote_appl,
+                     const char *local_appl,
+                     const char *remote_appl,
                      const struct rina_flow_spec *flowspec,
                      rl_ipcp_id_t upper_ipcp_id,
                      rl_port_t *port_id, unsigned int wait_ms)

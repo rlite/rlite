@@ -84,9 +84,8 @@ InetName::operator std::string() const
 }
 
 struct RinaName {
-    string name_s;
-    struct rina_name name_r;
-    string dif_name_s;
+    string name;
+    string dif_name;
     int max_sdu_size;
 
     RinaName();
@@ -96,45 +95,33 @@ struct RinaName {
     ~RinaName();
 
     bool operator<(const RinaName& other) const {
-        return name_s < other.name_s;
+        return name < other.name;
     }
 
-    operator std::string() const { return dif_name_s + ":" + name_s; }
+    operator std::string() const { return dif_name + ":" + name; }
 };
 
 #define MAX_SDU_SIZE    1460
 
 RinaName::RinaName()
 {
-    memset(&name_r, 0, sizeof(name_r));
     max_sdu_size = MAX_SDU_SIZE;
 }
 
 RinaName::~RinaName()
 {
-    rina_name_free(&name_r);
 }
 
 RinaName::RinaName(const string& n, const string& d, int mss = MAX_SDU_SIZE) :
-                        name_s(n), dif_name_s(d), max_sdu_size(mss)
+                        name(n), dif_name(d), max_sdu_size(mss)
 {
-    memset(&name_r, 0, sizeof(name_r));
-
-    if (rina_name_from_string(n.c_str(), &name_r)) {
-        throw std::bad_alloc();
-    }
 }
 
 RinaName::RinaName(const RinaName& other)
 {
-    memset(&name_r, 0, sizeof(name_r));
-
-    name_s = other.name_s;
-    dif_name_s = other.dif_name_s;
+    name = other.name;
+    dif_name = other.dif_name;
     max_sdu_size = other.max_sdu_size;
-    if (rina_name_copy(&name_r, &other.name_r)) {
-        throw std::bad_alloc();
-    }
 }
 
 RinaName&
@@ -144,12 +131,9 @@ RinaName::operator=(const RinaName& other)
         return *this;
     }
 
-    name_s = other.name_s;
-    dif_name_s = other.dif_name_s;
+    name = other.name;
+    dif_name = other.dif_name;
     max_sdu_size = other.max_sdu_size;
-    if (rina_name_copy(&name_r, &other.name_r)) {
-        throw std::bad_alloc();
-    }
 
     return *this;
 }
@@ -188,7 +172,7 @@ private:
 
 struct Gateway {
     struct rl_evloop loop;
-    struct rina_name appl_name;
+    string appl_name;
 
     /* Used to map IP:PORT --> RINA NAME, when
      * receiving TCP connection requests from the INET world
@@ -431,7 +415,7 @@ Worker::run()
 
 Gateway::Gateway()
 {
-    rina_name_fill(&appl_name, "rina-gw", "1", NULL, NULL);
+    appl_name = "rina-gw/1";
 
     if (rl_evloop_init(&loop, NULL, 0)) {
         exit(EXIT_FAILURE);
@@ -579,28 +563,12 @@ gw_fa_req_arrived(struct rl_evloop *loop,
     map<RinaName, InetName>::iterator mit;
     Worker *w = gw->workers[0];
     RinaName dst_name;
-    char *dst_name_s;
     int max_sdu_size;
     int cfd;
     int rfd;
     int ret;
 
-    dst_name_s = rina_name_to_string(&req->local_appl);
-    if (!dst_name_s) {
-        PE("rina_name_to_string(local_appl) failed\n");
-        return 0;
-    }
-
-    try {
-        dst_name = RinaName(string(dst_name_s), string(req->dif_name));
-    } catch (...) {
-        PE("Failed to build RinaName out of '%s' and '%s'\n",
-           dst_name_s, req->dif_name);
-        free(dst_name_s);
-        return 0;
-    }
-
-    free(dst_name_s);
+    dst_name = RinaName(string(req->local_appl), string(req->dif_name));
 
     mit = gw->dst_map.find(dst_name);
     if (mit == gw->dst_map.end()) {
@@ -735,8 +703,8 @@ accept_inet_conn(struct rl_evloop *loop, int lfd)
     event_id = rl_ctrl_get_id(&loop->ctrl);
 
     /* Issue a non-blocking flow allocation request. */
-    ret = rl_evloop_flow_alloc(loop, event_id, mit->second.dif_name_s.c_str(),
-                               &gw->appl_name, &mit->second.name_r,
+    ret = rl_evloop_flow_alloc(loop, event_id, mit->second.dif_name.c_str(),
+                               gw->appl_name.c_str(), mit->second.name.c_str(),
                                &flowspec, 0xffff, &unused, 0);
     if (ret) {
         PE("Flow allocation failed\n");
@@ -818,8 +786,8 @@ setup()
 
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rl_evloop_register(&gw.loop, 1, mit->first.dif_name_s.c_str(),
-                           &mit->first.name_r, 3000);
+        rl_evloop_register(&gw.loop, 1, mit->first.dif_name.c_str(),
+                           mit->first.name.c_str(), 3000);
         if (ret) {
             PE("Registration of application '%s'\n",
                static_cast<string>(mit->first).c_str());

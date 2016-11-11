@@ -29,6 +29,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
+#include "rlite/cpputils.hpp"
 
 #include "uipcp-normal-codecs.hpp"
 
@@ -83,9 +84,19 @@ RinaName::RinaName(const struct rina_name *name)
     aei = name->aei ? string(name->aei) : string();
 }
 
+RinaName::RinaName(const string& str)
+{
+    rina_components_from_string(str, apn, api, aen, aei);
+}
+
+RinaName::RinaName(const char *str)
+{
+    rina_components_from_string(string(str), apn, api, aen, aei);
+}
+
 RinaName::operator std::string() const
 {
-    return apn + '/' + api + '/' + aen + '/' + aei;
+    return rina_string_from_components(apn, api, aen, aei);
 }
 
 bool RinaName::operator==(const RinaName& other) const

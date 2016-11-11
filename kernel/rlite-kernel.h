@@ -227,8 +227,7 @@ struct ipcp_ops {
     bool (*flow_writeable)(struct flow_entry *flow);
     void (*destroy)(struct ipcp_entry *ipcp);
 
-    int (*appl_register)(struct ipcp_entry *ipcp,
-                                struct rina_name *appl, int reg);
+    int (*appl_register)(struct ipcp_entry *ipcp, char *appl_name, int reg);
 
     /* Invoked by the core to notify the IPCP about a new
      * flow allocation request from the upper layer. */
@@ -291,7 +290,7 @@ struct dif {
 
 struct ipcp_entry {
     rl_ipcp_id_t        id;    /* Key */
-    struct rina_name    name;
+    char                *name;
     struct dif          *dif;
     rl_addr_t           addr;
 
@@ -404,8 +403,8 @@ struct flow_entry {
     uint16_t            local_cep;
     uint16_t            remote_cep;
     rl_addr_t           remote_addr;
-    struct rina_name    local_appl;
-    struct rina_name    remote_appl;
+    char                *local_appl;
+    char                *remote_appl;
     struct upper_ref    upper;
     uint32_t            event_id; /* requestor event id */
     struct txrx         txrx;
@@ -456,8 +455,8 @@ int rl_ipcp_factory_unregister(const char *dif_type);
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                         rl_port_t remote_port, uint32_t remote_cep,
                         rl_addr_t remote_addr,
-                        const struct rina_name *local_appl,
-                        const struct rina_name *remote_appl,
+                        const char *local_appl,
+                        const char *remote_appl,
                         const struct rl_flow_config *flowcfg);
 
 int rl_fa_resp_arrived(struct ipcp_entry *ipcp,

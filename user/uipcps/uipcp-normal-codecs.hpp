@@ -59,6 +59,8 @@ struct RinaName {
              const std::string& aen_,
              const std::string& aei_);
     RinaName(const struct rina_name *name);
+    RinaName(const char *name);
+    RinaName(const std::string& name);
     operator std::string() const;
     bool operator==(const RinaName& other) const;
     bool operator!=(const RinaName& other) const;
@@ -90,6 +92,8 @@ struct DFTSlice : public UipcpObject {
 struct NeighborCandidate : public UipcpObject {
     std::string apn;
     std::string api;
+    std::string aen; /* not serialized */
+    std::string aei; /* not serialized */
     rl_addr_t address;
     std::list<std::string> lower_difs;
 

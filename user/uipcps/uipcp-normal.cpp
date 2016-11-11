@@ -400,9 +400,8 @@ uipcp_rib::dump() const
             mit = neighbors_seen.begin();
                 mit != neighbors_seen.end(); mit++) {
         const NeighborCandidate& cand = mit->second;
-        string neigh_name = static_cast<string>(
-                                RinaName(cand.apn, cand.api,
-                                         string(), string()));
+        string neigh_name = rina_string_from_components(cand.apn, cand.api,
+                                                        string(), string());
         map<string, Neighbor*>::const_iterator neigh;
 
         if (!neighbors_cand.count(neigh_name)) {
@@ -769,7 +768,7 @@ neigh_fa_req_arrived(struct rl_evloop *loop,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to call rib_neigh_set_port_id()). */
-    ret = rib_neigh_set_port_id(rib, &req->remote_appl, req->dif_name,
+    ret = rib_neigh_set_port_id(rib, req->remote_appl, req->dif_name,
                                 req->port_id, req->ipcp_id);
     if (ret) {
         UPE(uipcp, "rib_neigh_set_port_id() failed\n");
@@ -789,7 +788,7 @@ neigh_fa_req_arrived(struct rl_evloop *loop,
         goto err;
     }
 
-    ret = rib_neigh_set_flow_fd(rib, &req->remote_appl, req->port_id, flow_fd);
+    ret = rib_neigh_set_flow_fd(rib, req->remote_appl, req->port_id, flow_fd);
     if (ret) {
         goto err;
     }
@@ -799,7 +798,7 @@ neigh_fa_req_arrived(struct rl_evloop *loop,
     return 0;
 
 err:
-    rib->del_neighbor(RinaName(&req->remote_appl));
+    rib->del_neighbor(string(req->remote_appl));
 
     return 0;
 }
@@ -876,7 +875,7 @@ normal_register_to_lower(struct uipcp *uipcp,
 
     /* Perform the registration. */
     ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
-                             &req->ipcp_name, 2000);
+                             req->ipcp_name, 2000);
 
     if (ret) {
         return ret;
@@ -901,7 +900,7 @@ normal_ipcp_dft_set(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    return rib->dft_set(RinaName(&req->appl_name), req->remote_addr);
+    return rib->dft_set(string(req->appl_name), req->remote_addr);
 }
 
 static char *

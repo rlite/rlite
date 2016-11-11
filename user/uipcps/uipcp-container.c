@@ -58,7 +58,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     resp->ipcp_id = ipcp_id;
     resp->reg = 1;
     resp->response = response;
-    rina_name_copy(&resp->appl_name, &req->appl_name);
+    resp->appl_name = strdup(req->appl_name);
 
     UPD(uipcp, "Issuing application register response ...\n");
 
@@ -135,8 +135,8 @@ int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_port_t remote_port, uint32_t remote_cep,
                            rl_addr_t remote_addr,
-                           const struct rina_name *local_appl,
-                           const struct rina_name *remote_appl,
+                           const char *local_appl,
+                           const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_req_arrived *req;
@@ -163,8 +163,8 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     } else {
         memset(&req->flowcfg, 0, sizeof(*flowcfg));
     }
-    rina_name_copy(&req->local_appl, local_appl);
-    rina_name_copy(&req->remote_appl, remote_appl);
+    req->local_appl = strdup(local_appl);
+    req->remote_appl = strdup(remote_appl);
 
     UPD(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
@@ -334,15 +334,14 @@ select_uipcp_ops(const char *dif_type)
 /* This function takes the uipcps lock and does not take into
  * account kernel-space IPCPs. */
 struct uipcp *
-uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
+uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
 {
     struct uipcp *uipcp;
-    char *s;
 
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        if (!uipcp_is_kernelspace(uipcp) && rina_name_valid(&uipcp->name) &&
-                        rina_name_cmp(&uipcp->name, ipcp_name) == 0) {
+        if (!uipcp_is_kernelspace(uipcp) && rina_sername_valid(uipcp->name) &&
+                        strcmp(uipcp->name, ipcp_name) == 0) {
             uipcp->refcnt++;
             pthread_mutex_unlock(&uipcps->lock);
 
@@ -351,9 +350,7 @@ uipcp_get_by_name(struct uipcps *uipcps, const struct rina_name *ipcp_name)
     }
     pthread_mutex_unlock(&uipcps->lock);
 
-    s = rina_name_to_string(ipcp_name);
-    PE("No such IPCP '%s'\n", s);
-    if (s) free(s);
+    PE("No such IPCP '%s'\n", ipcp_name);
 
     return NULL;
 }
@@ -388,14 +385,14 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     }
 
     if (uipcp->dif_type) free(uipcp->dif_type);
-    rina_name_free(&uipcp->name);
+    if (uipcp->name) free(uipcp->name);
     if (uipcp->dif_name) free(uipcp->dif_name);
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
     uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
-    rina_name_move(&uipcp->name, &upd->ipcp_name);
+    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
     pthread_mutex_unlock(&uipcps->lock);
@@ -426,7 +423,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
     uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
-    rina_name_move(&uipcp->name, &upd->ipcp_name);
+    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
     pthread_mutex_lock(&uipcps->lock);
@@ -546,7 +543,7 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
     }
 
     if (uipcp->dif_type) free(uipcp->dif_type);
-    rina_name_free(&uipcp->name);
+    if (uipcp->name) free(uipcp->name);
     if (uipcp->dif_name) free(uipcp->dif_name);
 
     free(uipcp);
@@ -572,19 +569,12 @@ uipcps_print(struct uipcps *uipcps)
     PD_S("IPC Processes table:\n");
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        char *ipcp_name_s = NULL;
-
-        ipcp_name_s = rina_name_to_string(&uipcp->name);
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
                 " address = %llu, depth = %u\n",
-                uipcp->id, ipcp_name_s, uipcp->dif_type,
+                uipcp->id, uipcp->name, uipcp->dif_type,
                 uipcp->dif_name,
                 (long long unsigned int)uipcp->addr,
                 uipcp->depth);
-
-        if (ipcp_name_s) {
-            free(ipcp_name_s);
-        }
     }
     pthread_mutex_unlock(&uipcps->lock);
 

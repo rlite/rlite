@@ -45,7 +45,7 @@ struct rl_flow {
 
 long int
 rl_conf_ipcp_create(struct rl_ctrl *ctrl,
-                    const struct rina_name *name, const char *dif_type,
+                    const char *name, const char *dif_type,
                     const char *dif_name);
 
 int

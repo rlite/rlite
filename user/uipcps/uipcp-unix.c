@@ -54,7 +54,7 @@
 
 struct registered_ipcp {
     rl_ipcp_id_t id;
-    struct rina_name name;
+    char *name;
     char *dif_name;
 
     struct list_head node;
@@ -86,7 +86,7 @@ ipcp_register(struct uipcps *uipcps,
     int result = RLITE_ERR;
 
     /* Grab the corresponding userspace IPCP. */
-    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (!uipcp) {
         return -1;
     }
@@ -119,7 +119,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
     struct uipcp *uipcp;
 
     /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (uipcp && uipcp->ops.enroll) {
         ret = uipcp->ops.enroll(uipcp, req, 1);
     }
@@ -152,7 +152,7 @@ rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
     resp.result = RLITE_ERR;
 
     /* Find the userspace part of the requestor IPCP. */
-    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (uipcp && uipcp->ops.lower_flow_alloc) {
         resp.result = uipcp->ops.lower_flow_alloc(uipcp, req, 1);
     }
@@ -172,7 +172,7 @@ rl_u_ipcp_dft_set(struct uipcps *uipcps, int sfd,
 
     resp.result = RLITE_ERR; /* Report failure by default. */
 
-    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (!uipcp) {
         goto out;
     }
@@ -202,7 +202,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     resp.dump.buf = NULL;
     resp.dump.len = 0;
 
-    uipcp = uipcp_get_by_name(uipcps, &req->ipcp_name);
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (!uipcp) {
         goto out;
     }
@@ -385,7 +385,7 @@ uipcps_ipcp_update(struct rl_evloop *loop,
         case RLITE_UPDATE_ADD:
         case RLITE_UPDATE_UPD:
             if (!upd->dif_type || !upd->dif_name ||
-                    !rina_name_valid(&upd->ipcp_name)) {
+                    !rina_sername_valid(upd->ipcp_name)) {
                 PE("Invalid ipcp update\n");
                 return -1;
             }

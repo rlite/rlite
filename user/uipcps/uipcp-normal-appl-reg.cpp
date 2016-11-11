@@ -43,11 +43,11 @@ static uint64_t time64()
 }
 
 int
-uipcp_rib::dft_lookup(const RinaName& appl_name,
+uipcp_rib::dft_lookup(const std::string& appl_name,
                       rl_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
-         = dft.find(static_cast<string>(appl_name));
+         = dft.find(appl_name);
 
     if (mit == dft.end()) {
         return -1;
@@ -59,19 +59,18 @@ uipcp_rib::dft_lookup(const RinaName& appl_name,
 }
 
 int
-uipcp_rib::dft_set(const RinaName& appl_name, rl_addr_t remote_addr)
+uipcp_rib::dft_set(const std::string& appl_name, rl_addr_t remote_addr)
 {
-    string key = static_cast<string>(appl_name);
     DFTEntry entry;
 
     entry.address = remote_addr;
-    entry.appl_name = appl_name;
+    entry.appl_name = RinaName(appl_name);
     entry.timestamp = time64();
 
-    dft[key] = entry;
+    dft[appl_name] = entry;
 
     UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->id,
-       key.c_str(), (long long unsigned)entry.address);
+        appl_name.c_str(), (long long unsigned)entry.address);
 
     return 0;
 }
@@ -79,25 +78,23 @@ uipcp_rib::dft_set(const RinaName& appl_name, rl_addr_t remote_addr)
 int
 uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 {
-    RinaName appl_name(&req->appl_name);
     map< string, DFTEntry >::iterator mit;
-    string name_str;
+    string appl_name(req->appl_name);
     bool create = true;
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
     dft_entry.address = uipcp->addr;
-    dft_entry.appl_name = appl_name;
+    dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
     dft_entry.local = true;
-    name_str = static_cast<string>(dft_entry.appl_name);
 
-    mit = dft.find(name_str);
+    mit = dft.find(appl_name);
 
     if (req->reg) {
         if (mit != dft.end()) {
             UPE(uipcp, "Application %s already registered on uipcp with address "
-                    "[%llu], my address being [%llu]\n", name_str.c_str(),
+                    "[%llu], my address being [%llu]\n", appl_name.c_str(),
                     (long long unsigned)mit->second.address,
                     (long long unsigned)uipcp->addr);
             return uipcp_appl_register_resp(uipcp, uipcp->id,
@@ -105,12 +102,12 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
         }
 
         /* Insert the object into the RIB. */
-        dft.insert(make_pair(name_str, dft_entry));
+        dft.insert(make_pair(appl_name, dft_entry));
 
     } else {
         if (mit == dft.end()) {
             UPE(uipcp, "Application %s was not registered here\n",
-                name_str.c_str());
+                appl_name.c_str());
             return 0;
         }
 
@@ -122,7 +119,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     dft_slice.entries.push_back(dft_entry);
 
     UPD(uipcp, "Application %s %sregistered %s uipcp %d\n",
-            name_str.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
+            appl_name.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->id);
 
     remote_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);

@@ -30,6 +30,7 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/cdap.hpp"
+#include "rlite/cpputils.hpp"
 
 using namespace std;
 
@@ -235,8 +236,6 @@ CDAPConn::CDAPConn(int arg_fd, long arg_version)
 {
     fd = arg_fd;
     version = arg_version;
-    memset(&local_appl, 0, sizeof(local_appl));
-    memset(&remote_appl, 0, sizeof(remote_appl));
     state = NONE;
 }
 
@@ -247,18 +246,14 @@ CDAPConn::CDAPConn(const CDAPConn& o)
 
 CDAPConn::~CDAPConn()
 {
-    rina_name_free(&local_appl);
-    rina_name_free(&remote_appl);
 }
 
 void
 CDAPConn::reset()
 {
     state = NONE;
-    rina_name_free(&local_appl);
-    rina_name_free(&remote_appl);
-    memset(&local_appl, 0, sizeof(local_appl));
-    memset(&remote_appl, 0, sizeof(remote_appl));
+    local_appl = string();
+    remote_appl = string();
     invoke_id_mgr = InvokeIdMgr();
     PD("Connection reset to %s\n", conn_state_repr(state));
 }
@@ -351,8 +346,6 @@ CDAPMessage::CDAPMessage()
 {
     abs_syntax = 0;
     auth_mech = gpb::AUTH_NONE;
-    memset(&src_appl, 0, sizeof(src_appl));
-    memset(&dst_appl, 0, sizeof(dst_appl));
     flags = gpb::F_NO_FLAGS;
     invoke_id = 0;
     obj_inst = 0;
@@ -369,12 +362,8 @@ CDAPMessage::copy(const CDAPMessage& o)
     abs_syntax = o.abs_syntax;
     auth_mech = o.auth_mech;
     auth_value = o.auth_value;
-    if (rina_name_copy(&src_appl, &o.src_appl)) {
-        throw std::bad_alloc();
-    }
-    if (rina_name_copy(&dst_appl, &o.dst_appl)) {
-        throw std::bad_alloc();
-    }
+    src_appl = o.src_appl;
+    dst_appl = o.dst_appl;
     filter = o.filter;
     flags = o.flags;
     invoke_id = o.invoke_id;
@@ -412,8 +401,8 @@ CDAPMessage::copy(const CDAPMessage& o)
 void
 CDAPMessage::destroy()
 {
-    rina_name_free(&src_appl);
-    rina_name_free(&dst_appl);
+    src_appl.clear();
+    dst_appl.clear();
     if (obj_value.ty == BYTES && obj_value.u.buf.owned
                 && obj_value.u.buf.ptr) {
         delete [] obj_value.u.buf.ptr;
@@ -574,7 +563,7 @@ CDAPMessage::set_obj_value(const char *buf, size_t len)
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
 {
-    const char *apn, *api, *aen, *aei;
+    string apn, api, aen, aei;
     gpb::objVal_t objvalue = gm.objvalue();
 
     abs_syntax = gm.abssyntax();
@@ -645,17 +634,17 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
     auth_value.password = gm.authvalue().authpassword();
     auth_value.other = gm.authvalue().authother();
 
-    apn = gm.has_destapname() ? gm.destapname().c_str() : NULL;
-    api = gm.has_destapinst() ? gm.destapinst().c_str() : NULL;
-    aen = gm.has_destaename() ? gm.destaename().c_str() : NULL;
-    aei = gm.has_destaeinst() ? gm.destaeinst().c_str() : NULL;
-    rina_name_fill(&dst_appl, apn, api, aen, aei);
+    apn = gm.has_destapname() ? gm.destapname() : string();
+    api = gm.has_destapinst() ? gm.destapinst() : string();
+    aen = gm.has_destaename() ? gm.destaename() : string();
+    aei = gm.has_destaeinst() ? gm.destaeinst() : string();
+    dst_appl = rina_string_from_components(apn, api, aen, aei);
 
-    apn = gm.has_srcapname() ? gm.srcapname().c_str() : NULL;
-    api = gm.has_srcapinst() ? gm.srcapinst().c_str() : NULL;
-    aen = gm.has_srcaename() ? gm.srcaename().c_str() : NULL;
-    aei = gm.has_srcaeinst() ? gm.srcaeinst().c_str() : NULL;
-    rina_name_fill(&src_appl, apn, api, aen, aei);
+    apn = gm.has_srcapname() ? gm.srcapname() : string();
+    api = gm.has_srcapinst() ? gm.srcapinst() : string();
+    aen = gm.has_srcaename() ? gm.srcaename() : string();
+    aei = gm.has_srcaeinst() ? gm.srcaeinst() : string();
+    src_appl = rina_string_from_components(apn, api, aen, aei);
 
     result_reason = gm.resultreason();
     version = gm.version();
@@ -668,6 +657,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gpb::CDAPMessage gm;
     gpb::objVal_t *objvalue = new gpb::objVal_t();
     gpb::authValue_t *authvalue = new gpb::authValue_t();
+    string apn, api, aen, aei;
 
     gm.set_abssyntax(abs_syntax);
     gm.set_opcode(op_code);
@@ -727,15 +717,17 @@ CDAPMessage::operator gpb::CDAPMessage() const
     authvalue->set_authother(auth_value.other);
     gm.set_allocated_authvalue(authvalue);
 
-    gm.set_destapname(std::string(safe_c_string(dst_appl.apn)));
-    gm.set_destapinst(std::string(safe_c_string(dst_appl.api)));
-    gm.set_destaename(std::string(safe_c_string(dst_appl.aen)));
-    gm.set_destaeinst(std::string(safe_c_string(dst_appl.aei)));
+    rina_components_from_string(dst_appl, apn, api, aen, aei);
+    gm.set_destapname(apn);
+    gm.set_destapinst(api);
+    gm.set_destaename(aen);
+    gm.set_destaeinst(aei);
 
-    gm.set_srcapname(std::string(safe_c_string(src_appl.apn)));
-    gm.set_srcapinst(std::string(safe_c_string(src_appl.api)));
-    gm.set_srcaename(std::string(safe_c_string(src_appl.aen)));
-    gm.set_srcaeinst(std::string(safe_c_string(src_appl.aei)));
+    rina_components_from_string(src_appl, apn, api, aen, aei);
+    gm.set_srcapname(apn);
+    gm.set_srcapinst(api);
+    gm.set_srcaename(aen);
+    gm.set_srcaeinst(aei);
 
     gm.set_resultreason(result_reason);
     gm.set_version(version);
@@ -758,10 +750,10 @@ CDAPMessage::valid(bool check_invoke_id) const
                           !auth_value.empty());
 
     ret = ret && vt.check(FLNUM(SrcApName), "src_appl", op_code,
-                          rina_name_valid(&src_appl));
+                          rina_sername_valid(src_appl.c_str()));
 
     ret = ret && vt.check(FLNUM(DestApName), "dst_appl", op_code,
-                          rina_name_valid(&dst_appl));
+                          rina_sername_valid(dst_appl.c_str()));
 
     ret = ret && vt.check(FLNUM(Filter), "filter", op_code,
                           filter != string());
@@ -807,8 +799,6 @@ CDAPMessage::valid(bool check_invoke_id) const
 void
 CDAPMessage::dump() const
 {
-    char *name;
-
     PD("CDAP Message { ");
     PD_S("abs_syntax: %d, ", abs_syntax);
     if (op_code <= MAX_CDAP_OPCODE) {
@@ -887,21 +877,9 @@ CDAPMessage::dump() const
                 auth_value.other.c_str());
     }
 
-    if (rina_name_valid(&dst_appl)) {
-        name = rina_name_to_string(&dst_appl);
-        PD_S("dst_appl: %s, ", name);
-        if (name) {
-            free(name);
-        }
-    }
+    PD_S("dst_appl: %s, ", dst_appl.c_str());
 
-    if (rina_name_valid(&src_appl)) {
-        name = rina_name_to_string(&src_appl);
-        PD_S("src_appl: %s, ", name);
-        if (name) {
-            free(name);
-        }
-    }
+    PD_S("src_appl: %s, ", src_appl.c_str());
 
     if (result_reason != string()) {
         PD_S("result_reason: %s, ", result_reason.c_str());
@@ -926,8 +904,7 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
     switch (m->op_code) {
         case gpb::M_CONNECT:
             {
-                struct rina_name *local, *remote;
-                int ret;
+                std::string local, remote;
 
                 if (state != NONE) {
                     PE("Cannot %s M_CONNECT message: Invalid state %s\n",
@@ -936,22 +913,15 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                 }
 
                 if (sender) {
-                    local = &m->src_appl;
-                    remote = &m->dst_appl;
+                    local = m->src_appl;
+                    remote = m->dst_appl;
                 } else {
-                    local = &m->dst_appl;
-                    remote = &m->src_appl;
+                    local = m->dst_appl;
+                    remote = m->src_appl;
                 }
 
-                rina_name_free(&local_appl);
-                rina_name_free(&remote_appl);
-                ret = rina_name_copy(&local_appl, local);
-                ret |= rina_name_copy(&remote_appl, remote);
-                if (ret) {
-                    rina_name_free(&local_appl);
-                    rina_name_free(&remote_appl);
-                    return ret;
-                }
+                local_appl = local;
+                remote_appl = remote;
 
                 state = AWAITCON;
             }
@@ -972,8 +942,8 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                                     action, conn_state_repr(state));
                 return -1;
             }
-            rina_name_free(&local_appl);
-            rina_name_free(&remote_appl);
+            local_appl = string();
+            remote_appl = string();
             state = AWAITCLOSE;
             break;
 
@@ -1157,22 +1127,15 @@ CDAPConn::msg_recv()
 int
 CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
                        const struct CDAPAuthValue *auth_value_,
-                       const struct rina_name *local_appl,
-                       const struct rina_name *remote_appl)
+                       const std::string& local_appl,
+                       const std::string& remote_appl)
 {
-    int ret;
-
     op_code = gpb::M_CONNECT;
     abs_syntax = CDAP_ABS_SYNTAX;
     auth_mech = auth_mech_;
     auth_value = *auth_value_;
-    ret = rina_name_copy(&src_appl, local_appl);
-    ret |= rina_name_copy(&dst_appl, remote_appl);
-
-    if (ret) {
-        PE("Out of memory\n");
-        return ret;
-    }
+    src_appl = local_appl;
+    dst_appl = remote_appl;
 
     return 0;
 }
@@ -1181,22 +1144,15 @@ int
 CDAPMessage::m_connect_r(const struct CDAPMessage *req, int result_,
                       const std::string& result_reason_)
 {
-    int ret;
-
     op_code = gpb::M_CONNECT_R;
     abs_syntax = CDAP_ABS_SYNTAX;
     auth_mech = req->auth_mech;
     auth_value = req->auth_value;
-    ret = rina_name_copy(&src_appl, &req->dst_appl);
-    ret |= rina_name_copy(&dst_appl, &req->src_appl);
+    src_appl = req->dst_appl;
+    dst_appl = req->src_appl;
 
     result = result_;
     result_reason = result_reason_;
-
-    if (ret) {
-        PE("Out of memory\n");
-        return ret;
-    }
 
     return 0;
 }

@@ -197,19 +197,19 @@ static int
 client_connect(CDAPConn *conn)
 {
     struct CDAPAuthValue av;
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
+    const char *local_appl;
+    const char *remote_appl;
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
     av.name = "George";
     av.password = "Washington";
 
-    rina_name_fill(&local_appl, "Dulles", "1", NULL, NULL);
-    rina_name_fill(&remote_appl, "London", "1", NULL, NULL);
+    local_appl = "Dulles/1";
+    remote_appl = "London/1";
 
     if (req.m_connect(gpb::AUTH_NONE,
-                      &av, &local_appl, &remote_appl) ||
+                      &av, local_appl, remote_appl) ||
             conn->msg_send(&req, 0)) {
         PE("Failed to send CDAP message\n");
     }

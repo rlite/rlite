@@ -46,8 +46,8 @@ struct rl_hmsg_fa_req {
     uint32_t event_id;
 
     rl_port_t src_port;
-    struct rina_name src_appl;
-    struct rina_name dst_appl;
+    char *src_appl;
+    char *dst_appl;
 } __attribute__((packed));
 
 /* Message to respond to a flow allocation request. */

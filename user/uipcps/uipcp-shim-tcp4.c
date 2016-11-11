@@ -63,9 +63,8 @@ struct shim_tcp4 {
 
 static int
 parse_directory(struct shim_tcp4 *shim, int appl2sock,
-                struct sockaddr_in *addr, struct rina_name *appl_name)
+                struct sockaddr_in *addr, char **appl_name)
 {
-    char *appl_name_s = NULL;
     const char *dirfile = "/etc/rlite/shim-tcp4-dir";
     FILE *fin;
     char *linebuf = NULL;
@@ -73,20 +72,9 @@ parse_directory(struct shim_tcp4 *shim, int appl2sock,
     ssize_t n;
     int found = 0;
 
-    if (appl2sock) {
-        appl_name_s = rina_name_to_string(appl_name);
-        if (!appl_name_s) {
-            UPE(shim->uipcp, "Out of memory\n");
-            return -1;
-        }
-    }
-
     fin = fopen(dirfile, "r");
     if (!fin) {
         UPE(shim->uipcp, "Could not open directory file '%s'\n", dirfile);
-        if (appl_name_s) {
-            free(appl_name_s);
-        }
         return -1;
     }
 
@@ -141,7 +129,7 @@ parse_directory(struct shim_tcp4 *shim, int appl2sock,
         }
 
         if (appl2sock) {
-            if (strcmp(nm, appl_name_s) == 0 &&
+            if (strcmp(nm, *appl_name) == 0 &&
                         strcmp(shnm, shim->dif_name) == 0) {
                 memcpy(addr, &cur_addr, sizeof(cur_addr));
                 found = 1;
@@ -152,19 +140,17 @@ parse_directory(struct shim_tcp4 *shim, int appl2sock,
                     /* addr->sin_port == cur_addr.sin_port && */
                     memcmp(&addr->sin_addr, &cur_addr.sin_addr,
                     sizeof(cur_addr.sin_addr)) == 0) {
-                ret = rina_name_from_string(nm, appl_name);
-                if (ret) {
-                    UPE(shim->uipcp, "Invalid name '%s'\n", nm);
+                *appl_name = strdup(nm);
+                if (!(*appl_name)) {
+                    UPE(shim->uipcp, "Out of memory\n");
+                    found = 0;
+                } else {
+                    found = 1;
                 }
-                found = (ret == 0);
             }
         }
 
         NPD("dir '%s' '%s'[%d] '%d'\n", nm, ip, ret, atoi(port));
-    }
-
-    if (appl_name_s) {
-        free(appl_name_s);
     }
 
     if (linebuf) {
@@ -178,19 +164,17 @@ parse_directory(struct shim_tcp4 *shim, int appl2sock,
 
 static int
 appl_name_to_sock_addr(struct shim_tcp4 *shim,
-                       const struct rina_name *appl_name,
+                       const char *appl_name,
                        struct sockaddr_in *addr)
 {
-    return parse_directory(shim, 1, addr,
-                           (struct rina_name *)appl_name);
+    return parse_directory(shim, 1, addr, (char **)&appl_name);
 }
 
 static int
 sock_addr_to_appl_name(struct shim_tcp4 *shim, const struct sockaddr_in *addr,
-                       struct rina_name *appl_name)
+                       char **appl_name)
 {
-    return parse_directory(shim, 0, (struct sockaddr_in *)addr,
-                           appl_name);
+    return parse_directory(shim, 0, (struct sockaddr_in *)addr, appl_name);
 }
 
 static int
@@ -227,18 +211,12 @@ static int
 shim_tcp4_appl_unregister(struct uipcp *uipcp,
                            struct rl_kmsg_appl_register *req)
 {
-    char *appl_name_s = rina_name_to_string(&req->appl_name);
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct tcp4_bindpoint *bp;
     int ret = -1;
 
-    if (!appl_name_s) {
-        UPE(uipcp, "Out of memory\n");
-        return -1;
-    }
-
     list_for_each_entry(bp, &shim->bindpoints, node) {
-        if (strcmp(appl_name_s, bp->appl_name_s) == 0) {
+        if (strcmp(req->appl_name, bp->appl_name_s) == 0) {
             rl_evloop_fdcb_del(&uipcp->loop, bp->fd);
             list_del(&bp->node);
             close(bp->fd);
@@ -251,11 +229,8 @@ shim_tcp4_appl_unregister(struct uipcp *uipcp,
     }
 
     if (ret) {
-        UPE(uipcp, "Could not find endpoint for appl_name %s\n", appl_name_s);
-    }
-
-    if (appl_name_s) {
-        free(appl_name_s);
+        UPE(uipcp, "Could not find endpoint for appl_name %s\n",
+            req->appl_name);
     }
 
     return ret;
@@ -286,13 +261,13 @@ shim_tcp4_appl_register(struct rl_evloop *loop,
         goto err0;
     }
 
-    bp->appl_name_s = rina_name_to_string(&req->appl_name);
+    bp->appl_name_s = strdup(req->appl_name);
     if (!bp->appl_name_s) {
         UPE(uipcp, "Out of memory\n");
         goto err1;
     }
 
-    ret = appl_name_to_sock_addr(shim, &req->appl_name, &bp->addr);
+    ret = appl_name_to_sock_addr(shim, req->appl_name, &bp->addr);
     if (ret) {
         UPE(uipcp, "Failed to get tcp4 address from appl_name '%s'\n",
            bp->appl_name_s);
@@ -357,9 +332,10 @@ shim_tcp4_fa_req(struct rl_evloop *loop,
     ep->port_id = req->local_port;
 
     /* This lookup is needed for the connect(). */
-    ret = appl_name_to_sock_addr(shim, &req->remote_appl, &remote_addr);
+    ret = appl_name_to_sock_addr(shim, req->remote_appl, &remote_addr);
     if (ret) {
-        UPE(uipcp, "Failed to get tcp4 address for remote appl\n");
+        UPE(uipcp, "Failed to get tcp4 address for remote appl '%s'\n",
+                    req->remote_appl);
         goto err1;
     }
 
@@ -396,13 +372,14 @@ err1:
 }
 
 static int
-lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, struct rina_name *name)
+lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, char **name)
 {
     struct tcp4_bindpoint *ep;
 
     list_for_each_entry(ep, &shim->bindpoints, node) {
         if (lfd == ep->fd) {
-            return rina_name_from_string(ep->appl_name_s, name);
+            *name = strdup(ep->appl_name_s);
+            return *name ? 0 : -1;
         }
     }
 
@@ -416,7 +393,7 @@ accept_conn(struct rl_evloop *loop, int lfd)
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
-    struct rina_name remote_appl, local_appl;
+    char *remote_appl, *local_appl;
     struct tcp4_endpoint *ep;
     struct rl_flow_config cfg;
     int sfd;
@@ -452,7 +429,7 @@ accept_conn(struct rl_evloop *loop, int lfd)
      * TCP client. */
     if (sock_addr_to_appl_name(shim, &ep->addr, &remote_appl)) {
         UPE(uipcp, "Failed to get appl_name from remote address\n");
-        rina_name_free(&local_appl);
+        if (local_appl) free(local_appl);
         free(ep);
         return;
     }
@@ -464,9 +441,9 @@ accept_conn(struct rl_evloop *loop, int lfd)
     memset(&cfg, 0, sizeof(cfg));
     cfg.fd = ep->fd;
     uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
-                               &local_appl, &remote_appl, &cfg);
-    rina_name_free(&local_appl);
-    rina_name_free(&remote_appl);
+                               local_appl, remote_appl, &cfg);
+    if (local_appl) free(local_appl);
+    if (remote_appl) free(remote_appl);
 }
 
 static struct tcp4_endpoint *

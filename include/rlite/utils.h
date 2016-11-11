@@ -42,6 +42,7 @@ struct rl_buf_field {
     uint32_t    len;
 };
 
+int rina_sername_valid(const char *str);
 unsigned rina_name_serlen(const struct rina_name *name);
 void serialize_string(void **pptr, const char *s);
 void serialize_rina_name(void **pptr, const struct rina_name *name);

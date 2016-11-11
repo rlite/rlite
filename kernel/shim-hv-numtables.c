@@ -28,8 +28,8 @@
 struct rl_msg_layout rl_shim_hv_numtables[] = {
     [RLITE_SHIM_HV_FA_REQ] = {
         .copylen = sizeof(struct rl_hmsg_fa_req) -
-                   2 * sizeof(struct rina_name),
-        .names = 2,
+                   2 * sizeof(char *),
+        .strings = 2,
     },
     [RLITE_SHIM_HV_FA_RESP] = {
         .copylen = sizeof(struct rl_hmsg_fa_resp),
@@ -38,5 +38,6 @@ struct rl_msg_layout rl_shim_hv_numtables[] = {
     [RLITE_SHIM_HV_MSG_MAX] = {
         .copylen = 0,
         .names = 0,
+        .strings = 0,
     },
 };

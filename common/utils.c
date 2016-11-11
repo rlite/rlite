@@ -550,6 +550,29 @@ rina_name_to_string(const struct rina_name *name)
 }
 COMMON_EXPORT(rina_name_to_string);
 
+int
+rina_sername_valid(const char *str)
+{
+    const char *orig_str = str;
+    int cnt = 0;
+
+    if (!str || strlen(str) == 0) {
+        return 0;
+    }
+
+    while (*str != '\0') {
+        if (*str == '/' || *str == '|') {
+            if (++ cnt > 3) {
+                return 0;
+            }
+        }
+        str ++;
+    }
+
+    return (*orig_str == '/' || *orig_str == '|') ? 0 : 1;
+}
+COMMON_EXPORT(rina_sername_valid);
+
 COMMON_STATIC int
 __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
 {

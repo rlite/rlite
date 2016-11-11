@@ -72,6 +72,8 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
 
     ret = priv->vmpi_ops.write(&priv->vmpi_ops, 0, rb);
 
+    rl_msg_free(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX, msg);
+
     return !(ret == serlen);
 }
 
@@ -96,7 +98,7 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
         }
 
         ret = rl_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0,
-                    &req.dst_appl, &req.src_appl, NULL);
+                    req.dst_appl, req.src_appl, NULL);
         if (ret) {
             PE("failed to report flow allocation request\n");
         }
@@ -195,8 +197,8 @@ rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     req.msg_type = RLITE_SHIM_HV_FA_REQ;
     req.event_id = 0;
-    rina_name_copy(&req.src_appl, &flow->local_appl);
-    rina_name_copy(&req.dst_appl, &flow->remote_appl);
+    req.src_appl = kstrdup(flow->local_appl, GFP_KERNEL);
+    req.dst_appl = kstrdup(flow->remote_appl, GFP_KERNEL);
     req.src_port = flow->local_port;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&req));

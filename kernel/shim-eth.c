@@ -75,8 +75,7 @@ struct rl_shim_eth {
     unsigned int ntp;
     unsigned int ntu;
 
-    struct rina_name upper_name;
-    char *upper_name_s;
+    char *upper_name;
     struct list_head arp_table;
     spinlock_t arpt_lock;
     spinlock_t tx_lock;
@@ -99,7 +98,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
     priv->netdev = NULL;
     priv->ntu = priv->ntp = 0;
-    priv->upper_name_s = NULL;
+    priv->upper_name = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
     spin_lock_init(&priv->tx_lock);
@@ -140,9 +139,8 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
         dev_put(priv->netdev);
     }
 
-    if (priv->upper_name_s) {
-        kfree(priv->upper_name_s);
-        rina_name_free(&priv->upper_name);
+    if (priv->upper_name) {
+        kfree(priv->upper_name);
     }
 
     kfree(priv);
@@ -151,47 +149,36 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
 }
 
 static int
-rl_shim_eth_register(struct ipcp_entry *ipcp, struct rina_name *appl,
-                       int reg)
+rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 {
     struct rl_shim_eth *priv = ipcp->priv;
 
     if (reg) {
-        int ret;
-
-        if (priv->upper_name_s) {
+        if (priv->upper_name) {
             /* Only one application can be currently registered. */
             return -EBUSY;
         }
 
-        priv->upper_name_s = rina_name_to_string(appl);
-        if (!priv->upper_name_s) {
+        priv->upper_name = kstrdup(appl, GFP_KERNEL);
+        if (!priv->upper_name) {
             PE("Out of memory\n");
             return -ENOMEM;
         }
 
-        ret = rina_name_copy(&priv->upper_name, appl);
-        if (ret) {
-            kfree(priv->upper_name_s);
-            priv->upper_name_s = NULL;
-            return ret;
-        }
-
-        PD("Application %s registered\n", priv->upper_name_s);
+        PD("Application %s registered\n", priv->upper_name);
 
         return 0;
     }
 
-    if (!priv->upper_name_s) {
+    if (!priv->upper_name) {
         /* Nothing to do. */
         return 0;
     }
 
-    if (rina_name_cmp(appl, &priv->upper_name) == 0) {
-        PD("Application %s unregistered\n", priv->upper_name_s);
-        rina_name_free(&priv->upper_name);
-        kfree(priv->upper_name_s);
-        priv->upper_name_s = NULL;
+    if (strcmp(appl, priv->upper_name) == 0) {
+        PD("Application %s unregistered\n", priv->upper_name);
+        kfree(priv->upper_name);
+        priv->upper_name = NULL;
     } else {
         /* Nothing to do. Main module may be trying to clean up a
          * failed registration, so don't report an error. */
@@ -368,8 +355,6 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry = NULL;
     struct sk_buff *skb;
-    char *spa = NULL; /* Sender Protocol Address. */
-    char *tpa = NULL; /* Target Protocol Address. */
 
     if (!priv->netdev) {
         return -ENXIO;
@@ -380,15 +365,10 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return -EINVAL;
     }
 
-    tpa = rina_name_to_string(&flow->remote_appl);
-    spa = rina_name_to_string(&flow->local_appl);
-    if (!tpa || !spa) {
-        goto nomem;
-    }
-
     spin_lock_bh(&priv->arpt_lock);
 
-    entry = arp_lookup_direct_b(priv, tpa, strlen(tpa));
+    entry = arp_lookup_direct_b(priv, flow->remote_appl,
+                                strlen(flow->remote_appl));
     if (entry) {
         /* ARP entry already exist for remote application. */
         int ret;
@@ -401,8 +381,6 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         }
 
         spin_unlock_bh(&priv->arpt_lock);
-        kfree(spa);
-        kfree(tpa);
 
         if (ret == 0) {
             rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL);
@@ -417,34 +395,29 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         goto nomem;
     }
 
-    entry->tpa = tpa; tpa = NULL;  /* Pass ownership. */
-    entry->spa = spa; spa = NULL;  /* Pass ownership. */
+    entry->tpa = kstrdup(flow->remote_appl, GFP_ATOMIC);
+    entry->spa = kstrdup(flow->local_appl, GFP_ATOMIC);
+    if (!entry->tpa || !entry->spa) {
+        spin_unlock_bh(&priv->arpt_lock);
+        goto nomem;
+    }
+
     entry->complete = false;  /* Not meaningful. */
     entry->fa_req_arrived = false;
     INIT_LIST_HEAD(&entry->rx_tmpq);
     entry->rx_tmpq_len = 0;
     arpt_flow_bind(entry, flow);
-
     rl_flow_stats_init(&entry->stats);
-
     list_add_tail(&entry->node, &priv->arp_table);
 
     spin_unlock_bh(&priv->arpt_lock);
 
-    spa = rina_name_to_string(&flow->local_appl);
-    tpa = rina_name_to_string(&flow->remote_appl);
-    if (!spa || !tpa) {
-        goto nomem;
-    }
-
-    skb = arp_create(priv, ARPOP_REQUEST, spa, strlen(spa),
-                     tpa, strlen(tpa), NULL, GFP_KERNEL);
+    skb = arp_create(priv, ARPOP_REQUEST, flow->local_appl,
+                     strlen(flow->local_appl), flow->remote_appl,
+                     strlen(flow->remote_appl), NULL, GFP_KERNEL);
     if (!skb) {
         goto nomem;
     }
-
-    kfree(spa);
-    kfree(tpa);
 
     dev_queue_xmit(skb);
 
@@ -460,12 +433,13 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 nomem:
     PE("Out of memory\n");
 
-    if (spa) kfree(spa);
-    if (tpa) kfree(tpa);
     if (entry) {
         list_del(&entry->node);
         if (entry->tpa) {
             kfree(entry->tpa);
+        }
+        if (entry->spa) {
+            kfree(entry->spa);
         }
         kfree(entry);
     }
@@ -479,19 +453,13 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry;
-    char *remote_app_s;
     struct rl_buf *rb, *tmp;
     int ret = -ENXIO;
 
-    remote_app_s = rina_name_to_string(&flow->remote_appl);
-    if (!remote_app_s) {
-        PE("Out of memory\n");
-        return -ENOMEM;
-    }
-
     spin_lock_bh(&priv->arpt_lock);
 
-    entry = arp_lookup_direct_b(priv, remote_app_s, strlen(remote_app_s));
+    entry = arp_lookup_direct_b(priv, flow->remote_appl,
+                                strlen(flow->remote_appl));
     if (entry) {
         /* Drain the temporary rx queue. Calling rl_sdu_rx_flow() while
          * holding the ARP table spinlock it's not the best option, but
@@ -516,8 +484,6 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     spin_unlock_bh(&priv->arpt_lock);
-
-    kfree(remote_app_s);
 
     return ret;
 }
@@ -555,25 +521,25 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
         struct arpt_entry *entry;
         int upper_name_len;
 
-        if (!priv->upper_name_s) {
+        if (!priv->upper_name) {
             /* No application registered here, there's nothing to do. */
             goto out;
         }
-        upper_name_len = strlen(priv->upper_name_s);
+        upper_name_len = strlen(priv->upper_name);
 
         if (arp->ar_pln < upper_name_len) {
             /* This ARP request cannot match us. */
             goto out;
         }
 
-        if (memcmp(tpa, priv->upper_name_s, upper_name_len)) {
+        if (memcmp(tpa, priv->upper_name, upper_name_len)) {
             /* No match. */
             goto out;
         }
 
         /* Send an ARP reply. */
-        skb = arp_create(priv, ARPOP_REPLY, priv->upper_name_s,
-                         strlen(priv->upper_name_s),
+        skb = arp_create(priv, ARPOP_REPLY, priv->upper_name,
+                         strlen(priv->upper_name),
                          spa, arp->ar_pln, sha, GFP_ATOMIC);
 
         entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
@@ -724,7 +690,6 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     /* Here 'entry' is a valid pointer. */
 
     {
-        struct rina_name remote_app;
         int ret;
 
         if (entry->fa_req_arrived) {
@@ -733,21 +698,14 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 
         /* The first PDU is interpreted as a flow allocation request. */
 
-        if (!priv->upper_name_s) {
+        if (!priv->upper_name) {
             RPD(2, "Flow allocation request arrived but no application "
                "registered\n");
             goto drop;
         }
 
-        ret = __rina_name_from_string(entry->tpa, &remote_app, GFP_ATOMIC);
-        if (ret) {
-            PD("Out of memory\n");
-            goto drop;
-        }
-
-        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, &priv->upper_name,
-                &remote_app, NULL);
-        rina_name_free(&remote_app);
+        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_name,
+                                entry->tpa, NULL);
 
         if (ret) {
             PD("Out of memory\n");

@@ -258,14 +258,14 @@ pending_queue_fini(struct list_head *list)
 int
 rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
-                     const struct rina_name *appl_name)
+                     const char *appl_name)
 {
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_APPL_REGISTER;
     req->event_id = event_id;
     req->dif_name = dif_name ? strdup(dif_name) : NULL;
     req->reg = reg;
-    rina_name_copy(&req->appl_name, appl_name);
+    req->appl_name = appl_name ? strdup(appl_name) : NULL;
 
     if (dif_name && !req->dif_name) {
         return -1; /* Out of memory. */
@@ -277,8 +277,8 @@ rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, const char *dif_name,
-               const struct rina_name *local_appl,
-               const struct rina_name *remote_appl,
+               const char *local_appl,
+               const char *remote_appl,
                const struct rina_flow_spec *flowspec,
                rl_ipcp_id_t upper_ipcp_id)
 {
@@ -295,8 +295,8 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     } else {
         rina_flow_spec_default(&req->flowspec);
     }
-    rina_name_copy(&req->local_appl, local_appl);
-    rina_name_copy(&req->remote_appl, remote_appl);
+    req->local_appl = local_appl ? strdup(local_appl) : NULL;
+    req->remote_appl = remote_appl ? strdup(remote_appl) : NULL;
 
     return 0;
 }
@@ -387,8 +387,8 @@ rl_ctrl_fini(struct rl_ctrl *ctrl)
 
 uint32_t
 rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
-               const struct rina_name *local_appl,
-               const struct rina_name *remote_appl,
+               const char *local_appl,
+               const char *remote_appl,
                const struct rina_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
@@ -422,7 +422,7 @@ rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
 
 uint32_t
 rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
-                const struct rina_name *appl_name)
+                const char *appl_name)
 {
     struct rl_kmsg_appl_register req;
     uint32_t event_id;
@@ -580,24 +580,16 @@ wait_for_next_msg(int fd)
 
 static int
 rina_register_common(int fd, const char *dif_name, const char *local_appl,
-                   int reg)
+                     int reg)
 {
     struct rl_kmsg_appl_register req;
     struct rl_kmsg_appl_register_resp *resp;
-    struct rina_name appl_name;
     unsigned int response;
     uint32_t event_id = 1;
     int ret;
 
-    ret = rina_name_from_string(local_appl, &appl_name);
-    if (ret) {
-        errno = ENOMEM;
-        return -1;
-    }
-
     ret = rina_register_req_fill(&req, event_id, dif_name,
-                               reg, &appl_name);
-    rina_name_free(&appl_name);
+                               reg, local_appl);
     if (ret) {
         errno = ENOMEM;
         return -1;
@@ -648,33 +640,16 @@ rina_unregister(int fd, const char *dif_name, const char *local_appl)
 }
 
 int
-rina_flow_alloc(const char *dif_name, const char *local_appl_s,
-              const char *remote_appl_s, const struct rina_flow_spec *flowspec)
+rina_flow_alloc(const char *dif_name, const char *local_appl,
+              const char *remote_appl, const struct rina_flow_spec *flowspec)
 {
     struct rl_kmsg_fa_req req;
     struct rl_kmsg_fa_resp_arrived *resp;
-    struct rina_name local_appl;
-    struct rina_name remote_appl;
     uint32_t event_id = 1;
     int rfd, ret;
 
-    ret = rina_name_from_string(local_appl_s, &local_appl);
-    if (ret) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    ret = rina_name_from_string(remote_appl_s, &remote_appl);
-    if (ret) {
-        rina_name_free(&local_appl);
-        errno = ENOMEM;
-        return -1;
-    }
-
-    ret = rl_fa_req_fill(&req, event_id, dif_name, &local_appl,
-                         &remote_appl, flowspec, 0xffff);
-    rina_name_free(&local_appl);
-    rina_name_free(&remote_appl);
+    ret = rl_fa_req_fill(&req, event_id, dif_name, local_appl,
+                         remote_appl, flowspec, 0xffff);
     if (ret) {
         errno = ENOMEM;
         return -1;

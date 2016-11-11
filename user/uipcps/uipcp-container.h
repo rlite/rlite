@@ -52,10 +52,9 @@ struct uipcps {
 };
 
 struct enrolled_neigh {
-    // TODO these can be serialized names
     char *dif_name;
-    struct rina_name ipcp_name;
-    struct rina_name neigh_name;
+    char *ipcp_name;
+    char *neigh_name;
     char *supp_dif;
 
     struct list_head node;
@@ -130,7 +129,7 @@ struct uipcp {
 
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
-    struct rina_name name;
+    char *name;
     rl_addr_t addr;
     unsigned int depth;
     char *dif_type;
@@ -162,7 +161,7 @@ int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
 struct uipcp *uipcp_get_by_name(struct uipcps *uipcps,
-                                const struct rina_name *ipcp_name);
+                                const char *ipcp_name);
 
 int uipcps_print(struct uipcps *uipcps);
 
@@ -184,8 +183,8 @@ int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_port_t remote_port, uint32_t remote_cep,
                                rl_addr_t remote_addr,
-                               const struct rina_name *local_appl,
-                               const struct rina_name *remote_appl,
+                               const char *local_appl,
+                               const char *remote_appl,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
