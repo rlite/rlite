@@ -704,13 +704,11 @@ rina_flow_accept(int fd, char **remote_appl)
     int ffd = -1;
     int ret;
 
-    if (remote_appl) {
-        /* TODO to be filled with appropriate value */
-        *remote_appl = NULL;
-    }
-
     req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
     if (!req) {
+        if (remote_appl) {
+            *remote_appl = NULL;
+        }
         return -1;
     }
     assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
