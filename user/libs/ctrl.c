@@ -702,7 +702,7 @@ int rina_flow_wait(int fd, char **remote_appl)
     return -1;
 }
 
-int rina_flow_respond(int fd, int handle)
+int rina_flow_respond(int fd, int handle, int response)
 {
     /* Currently not implemented */
     return -1;

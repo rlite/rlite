@@ -82,16 +82,43 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl);
  * memory for the requestor name is allocated by the calle and must be
  * freed by the caller.
  *
+ * A call to rina_flow_accept(fd, &x) is functionally equivalent to:
+ *     h = rina_flow_wait(sfd, &x);
+ *     cfd = rina_flow_respond(sfd, h, 0);
+ *
  * On success, it returns a file descriptor that can be subsequently used
  * with standard I/O system calls (write(), read(), select(), ...) to
- * exchange SDUs on the flow and synchronize. On error -1 is returned.
+ * exchange SDUs on the flow and synchronize. On error -1 is returned,
  * with the errno code properly set.
+ *
  */
 int rina_flow_accept(int fd, char **remote_appl);
 
+/*
+ * Receive a flow allocation request arrived on @fd, without accepting it
+ * or issuing a negative verdict. On success, the char* pointed by remote_appl,
+ * if not NULL, is assigned the name of the requesting application. The
+ * memory for the requestor name is allocated by the calle and must be
+ * freed by the caller.
+ *
+ * On error, -1 is returned. On success, a positive number is returned as
+ * an handle to be passed to subsequent call to rina_flow_respond().
+ */
 int rina_flow_wait(int fd, char **remote_appl);
 
-int rina_flow_respond(int fd, int handle);
+/*
+ * Emit a verdict on the flow allocation request identified by @handle,
+ * that was previously received on @fd. A zero @response indicates a positive
+ * response, which completes the flow allocation procedure. A non-zero
+ * @response indicates that the flow allocation request is denied. In both
+ * cases @response is sent to the requesting application to inform it
+ * about the verdict. When the response is positive, this function returns
+ * a file descriptor that can be subsequently used with standard I/O system
+ * calls (write(), read(), select(), ...) to exchange SDUs on the flow and
+ * synchronize. When the response is negative, 0 is returned. On error -1
+ * is returned, with the errno code properly set.
+ */
+int rina_flow_respond(int fd, int handle, int response);
 
 /*
  * Allocate a flow towards the destination application called @remote_appl,
@@ -106,7 +133,7 @@ int rina_flow_respond(int fd, int handle);
  *
  * On success, it returns a file descriptor that can be subsequently used
  * with standard I/O system calls (write(), read(), select(), ...) to
- * exchange SDUs on the flow and synchronize. On error -1 is returned.
+ * exchange SDUs on the flow and synchronize. On error -1 is returned,
  * with the errno code properly set.
  */
 int rina_flow_alloc(const char *dif_name, const char *local_appl,
