@@ -697,7 +697,7 @@ out:
 }
 
 int
-rina_flow_accept(int fd, const char **remote_appl)
+rina_flow_accept(int fd, char **remote_appl)
 {
     struct rl_kmsg_fa_req_arrived *req;
     struct rl_kmsg_fa_resp resp;
@@ -713,26 +713,37 @@ rina_flow_accept(int fd, const char **remote_appl)
     if (!req) {
         return -1;
     }
-
     assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
+
+    if (remote_appl) {
+        *remote_appl = NULL;
+        if (req->remote_appl) {
+            *remote_appl = strdup(req->remote_appl);
+            if (*remote_appl == NULL) {
+                errno = ENOMEM;
+                goto out1;
+            }
+        }
+    }
 
     ret = rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
                           req->port_id, RLITE_SUCC);
     if (ret) {
         errno = ENOMEM;
-        goto out;
+        goto out2;
     }
 
     ret = rl_write_msg(fd, RLITE_MB(&resp));
     if (ret < 0) {
-        goto out;
+        goto out2;
     }
 
     ffd = rl_open_appl_port(req->port_id);
 
-out:
+out2:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
+out1:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(req));
     free(req);
