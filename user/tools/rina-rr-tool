@@ -28,7 +28,7 @@ def buf2str(b):
 class RinaRRTool:
 
     def __init__(self):
-        self.cfd = rlite.open(None)
+        self.cfd = rlite.open()
         if self.cfd < 0:
             raise Exception("Could not open rlite ctrl device")
 

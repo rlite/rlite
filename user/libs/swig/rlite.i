@@ -4,6 +4,6 @@
 #include "rlite/api.h"
 %}
 
-%rename("%(strip:[rl_])s") "";
+%rename("%(strip:[rina_])s") "";
 
 %include "rlite/api.h"
