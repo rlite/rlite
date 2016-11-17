@@ -89,6 +89,10 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl);
  */
 int rina_flow_accept(int fd, char **remote_appl);
 
+int rina_flow_wait(int fd, char **remote_appl);
+
+int rina_flow_respond(int fd, int handle);
+
 /*
  * Allocate a flow towards the destination application called @remote_appl,
  * using @local_appl as a source application name. If @flowspec is not NULL,

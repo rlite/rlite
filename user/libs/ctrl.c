@@ -696,6 +696,18 @@ out:
     return ret;
 }
 
+int rina_flow_wait(int fd, char **remote_appl)
+{
+    /* Currently not implemented */
+    return -1;
+}
+
+int rina_flow_respond(int fd, int handle)
+{
+    /* Currently not implemented */
+    return -1;
+}
+
 int
 rina_flow_accept(int fd, char **remote_appl)
 {
