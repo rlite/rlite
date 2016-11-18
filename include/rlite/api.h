@@ -40,8 +40,7 @@ struct rina_flow_spec {
     uint32_t max_jitter;        /* in microseconds */
     uint8_t in_order_delivery;  /* boolean */
 
-    uint8_t flow_control;       /* temporary, for debugging */
-    uint8_t reserved[38];       /* for future use */
+    uint8_t reserved[39];       /* for future use */
 };
 
 /*

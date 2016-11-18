@@ -190,11 +190,30 @@ struct rl_flow_config {
 #define RL_A_MSECS_DFLT         0
 #define RL_DATA_RXMS_MAX_DFLT   10
 
+/* We don't currently have a good way to understand what flow specs
+ * should result into DTCP flow control to be enabled or disabled,
+ * although it could be argued that flow control is always needed.
+ * As a temporary solution, we let the user directly specify for flow
+ * control to be enabled, using the last reserved byte. This is going
+ * to change, for instance adding a 'nofc' field in the flowspec.
+ * These two accessors are intended to hide this hack. */
+static inline int
+rina_flow_spec_fc_get(struct rina_flow_spec *spec)
+{
+    return spec->reserved[38] != 0;
+}
+
+static inline void
+rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
+{
+    spec->reserved[38] = value;
+}
+
 /* Does a flow specification correspond to best effort QoS? */
 static inline int rina_flow_spec_best_effort(struct rina_flow_spec *spec) {
     return spec->max_sdu_gap == ((rl_seq_t)-1) && !spec->avg_bandwidth
             && !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery
-            && !spec->flow_control;
+            && !rina_flow_spec_fc_get(spec);
 }
 
 struct rl_flow_stats {

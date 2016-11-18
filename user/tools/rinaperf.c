@@ -675,7 +675,7 @@ main(int argc, char **argv)
                 break;
 
             case 'f': /* Enable flow control. */
-                flowspec.flow_control = 1;
+                flowspec.reserved[38] = 1;
                 break;
 
             case 'b':

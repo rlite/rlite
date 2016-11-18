@@ -132,7 +132,7 @@ flowspec2flowcfg(struct rina_flow_spec *spec, struct rl_flow_config *cfg)
     (void)spec->max_delay;
     (void)spec->max_jitter;
 
-    if (spec->flow_control) {
+    if (rina_flow_spec_fc_get(spec)) {
         /* This is temporary used to test flow control */
         cfg->dtcp_present = 1;
         cfg->dtcp.flow_control = 1;

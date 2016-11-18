@@ -142,7 +142,7 @@ rina_flow_spec_default(struct rina_flow_spec *spec)
     spec->max_delay = 0;            /* don't care about delay */
     spec->max_jitter = 0;           /* don't care about jitter */
     spec->in_order_delivery = 0;    /* don't require that */
-    spec->flow_control = 0;         /* no flow control */
+    rina_flow_spec_fc_set(spec, 0); /* no flow control */
 }
 
 /* This is used by uipcp, not by applications. */

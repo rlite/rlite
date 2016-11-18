@@ -698,7 +698,7 @@ accept_inet_conn(struct rl_evloop *loop, int lfd)
     /* Ask for a reliable flow. */
     rina_flow_spec_default(&flowspec);
     flowspec.max_sdu_gap = 0;
-    flowspec.flow_control = 1;
+    rina_flow_spec_fc_set(&flowspec, 1);
 
     event_id = rl_ctrl_get_id(&loop->ctrl);
 
