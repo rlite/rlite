@@ -38,7 +38,7 @@
 #include <signal.h>
 #include <poll.h>
 
-#include "rlite/api.h"
+#include <rina/api.h>
 
 
 #define SDU_SIZE_MAX    65535

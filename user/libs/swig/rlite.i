@@ -1,9 +1,9 @@
 %module rlite
 %{
 /* AGGIUNTE */
-#include "rlite/api.h"
+#include "rina/api.h"
 %}
 
 %rename("%(strip:[rina_])s") "";
 
-%include "rlite/api.h"
+%include "rina/api.h"

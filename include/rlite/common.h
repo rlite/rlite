@@ -35,7 +35,7 @@
 #include <stdint.h>
 #endif
 
-#include "rlite/api.h"
+#include "rina/api.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -40,7 +40,7 @@ splitted between kernel-space and user-space.
 Considerable attention is devoted to provide a POSIX-like API for applications
 that can be easily assimilated by programmers used to the socket API, while
 additionally offering the QoS awareness built into RINA.
-The application API can be found in the include/rlite/api.h header file.
+The application API can be found in the include/rina/api.h header file.
 
 
 #############################################################################

@@ -549,7 +549,7 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
  * POSIX-like API
  */
 
-#include "rlite/api.h"
+#include "rina/api.h"
 
 int
 rina_open()

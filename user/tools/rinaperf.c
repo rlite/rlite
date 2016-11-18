@@ -39,7 +39,7 @@
 #include <poll.h>
 #include <time.h>
 
-#include "rlite/api.h"
+#include <rina/api.h>
 
 
 #define SDU_SIZE_MAX    65535
