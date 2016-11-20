@@ -29,6 +29,9 @@ struct list_head {
         struct list_head *succ;
 };
 
+#define LIST_STATIC_DECL(xyz) \
+        struct list_head xyz = { &(xyz), &(xyz) }
+
 static inline void
 list_init(struct list_head *list)
 {

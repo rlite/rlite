@@ -696,16 +696,130 @@ out:
     return ret;
 }
 
+/* Split accept lock and pending list. */
+static volatile char sa_lock_var = 0;
+static int sa_handle = 0;
+static unsigned int sa_pending_len = 0;
+LIST_STATIC_DECL(sa_pending);
+
+struct sa_pending_item {
+    int handle;
+    struct rl_kmsg_fa_req_arrived *req;
+    struct list_head node;
+};
+
+static void
+sa_lock(void)
+{
+    while (__sync_lock_test_and_set(&sa_lock_var, 1)) {
+        /* Memory barrier is implicit into the compiler built-in.
+         * We could also use the newer __atomic_test_and_set() built-in. */
+    }
+}
+
+static void
+sa_unlock(void)
+{
+    /* Stores 0 in the lock variable. We could also use the newer
+     * __atomic_clear() built-in. */
+    __sync_lock_release(&sa_lock_var);
+}
+
 int rina_flow_wait(int fd, char **remote_appl)
 {
-    /* Currently not implemented */
-    return -1;
+    struct sa_pending_item *spi;
+
+    if (sa_pending_len >= 128) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    spi = malloc(sizeof(*spi));
+    if (!spi) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    spi->req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
+    if (!spi->req) {
+        if (remote_appl) {
+            *remote_appl = NULL;
+        }
+        free(spi);
+        return -1;
+    }
+    assert(spi->req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
+
+    if (remote_appl) {
+        *remote_appl = NULL;
+        if (spi->req->remote_appl) {
+            *remote_appl = strdup(spi->req->remote_appl);
+            if (*remote_appl == NULL) {
+                errno = ENOMEM;
+                rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                            RLITE_MB(spi->req));
+                free(spi->req);
+                free(spi);
+                return -1;
+            }
+        }
+    }
+
+    sa_lock();
+    spi->handle = sa_handle ++;
+    if (sa_handle < 0) { /* Overflow */
+        sa_handle = 0;
+    }
+    list_add_tail(&spi->node, &sa_pending);
+    sa_pending_len ++;
+    sa_unlock();
+
+    return spi->handle;
 }
 
 int rina_flow_respond(int fd, int handle, int response)
 {
-    /* Currently not implemented */
-    return -1;
+    struct sa_pending_item *cur, *spi = NULL;
+    struct rl_kmsg_fa_req_arrived *req;
+    struct rl_kmsg_fa_resp resp;
+    int ffd = -1;
+    int ret;
+
+    sa_lock();
+    list_for_each_entry(cur, &sa_pending, node) {
+        if (handle == cur->handle) {
+            spi = cur;
+            list_del(&spi->node);
+            sa_pending_len --;
+            break;
+        }
+    }
+    sa_unlock();
+
+    if (spi == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    req = spi->req;
+    free(spi);
+
+    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
+                    req->port_id, (uint8_t)response);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(req));
+    free(req);
+
+    ret = rl_write_msg(fd, RLITE_MB(&resp));
+    if (ret < 0) {
+        goto out;
+    }
+
+    ffd = rl_open_appl_port(resp.port_id);
+out:
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                   RLITE_MB(&resp));
+
+    return ffd;
 }
 
 int
