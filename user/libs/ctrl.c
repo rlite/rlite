@@ -301,7 +301,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     return 0;
 }
 
-int
+void
 rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
                 rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
                 rl_port_t port_id, uint8_t response)
@@ -315,8 +315,6 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
     resp->upper_ipcp_id = upper_ipcp_id;
     resp->port_id = port_id;
     resp->response = response;
-
-    return 0;
 }
 
 int
@@ -861,12 +859,8 @@ rina_flow_accept(int fd, char **remote_appl)
         goto out1;
     }
 
-    ret = rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
-                          req->port_id, RLITE_SUCC);
-    if (ret) {
-        errno = ENOMEM;
-        goto out2;
-    }
+    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
+                    req->port_id, RLITE_SUCC);
 
     ret = rl_write_msg(fd, RLITE_MB(&resp));
     if (ret < 0) {
