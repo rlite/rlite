@@ -1040,7 +1040,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
     }
 
     n = write(fd, serbuf, serlen);
-    if (n != serlen) {
+    if (n != (ssize_t)serlen) {
         if (n < 0) {
             perror("write(cdap_msg)");
         } else {
