@@ -814,7 +814,13 @@ int rina_flow_respond(int fd, int handle, int response)
         goto out;
     }
 
-    ffd = rl_open_appl_port(resp.port_id);
+    if (response == 0) {
+        /* Positive response, open an I/O device. */
+        ffd = rl_open_appl_port(resp.port_id);
+    } else {
+        /* Negative response, just return 0. */
+        ffd = 0;
+    }
 out:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
