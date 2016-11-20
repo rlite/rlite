@@ -1032,7 +1032,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 {
     size_t serlen;
     char *serbuf;
-    size_t n;
+    ssize_t n;
 
     n = msg_ser(m, invoke_id, &serbuf, &serlen);
     if (n) {

@@ -488,11 +488,13 @@ parse_conf(const char *confname)
 
             try {
                 int max_sdu_size = MAX_SDU_SIZE;
+                int port;
 
                 memset(&inet_addr, 0, sizeof(inet_addr));
                 inet_addr.sin_family = AF_INET;
-                inet_addr.sin_port = htons(atoi(tokens[4].c_str()));
-                if (inet_addr.sin_port >= 65536) {
+                port = atoi(tokens[4].c_str());
+                inet_addr.sin_port = htons(port);
+                if (port < 0 || port >= 65536) {
                     PI("Invalid configuration entry at line %d: "
                        "invalid port number '%s'\n", lines_cnt,
                        tokens[4].c_str());

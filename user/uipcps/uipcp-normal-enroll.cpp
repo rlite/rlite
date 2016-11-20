@@ -1362,7 +1362,7 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
 int
 Neighbor::alloc_flow(const char *supp_dif)
 {
-    rl_ipcp_id_t lower_ipcp_id_ = -1;
+    rl_ipcp_id_t lower_ipcp_id_;
     rl_port_t port_id_;
     unsigned int event_id;
     int flow_fd_;
@@ -1376,17 +1376,19 @@ Neighbor::alloc_flow(const char *supp_dif)
         /* Lookup the id of the lower IPCP towards the neighbor. */
         struct uipcps *uipcps = rib->uipcp->uipcps;
         struct uipcp *cur;
+        bool found = false;
 
         pthread_mutex_lock(&uipcps->lock);
         list_for_each_entry(cur, &uipcps->uipcps, node) {
             if (strcmp(cur->dif_name, supp_dif) == 0) {
                 lower_ipcp_id_ = cur->id;
+                found = true;
                 break;
             }
         }
         pthread_mutex_unlock(&uipcps->lock);
 
-        if (lower_ipcp_id_ == -1) {
+        if (!found) {
             UPI(rib->uipcp, "Failed to get lower ipcp id in DIF %s\n",
 			    supp_dif);
             return -1;

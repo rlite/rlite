@@ -320,10 +320,12 @@ uipcp_rib::~uipcp_rib()
     pthread_mutex_destroy(&lock);
 }
 
+#ifdef RL_USE_QOS_CUBES
 static inline string
 u82boolstr(uint8_t v) {
     return v != 0 ? string("true") : string("false");
 }
+#endif
 
 char *
 uipcp_rib::dump() const
