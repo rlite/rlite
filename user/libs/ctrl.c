@@ -725,6 +725,27 @@ sa_unlock(void)
     __sync_lock_release(&sa_lock_var);
 }
 
+static int
+remote_appl_fill(char *src, char **remote_appl)
+{
+    if (remote_appl == NULL) {
+        return 0;
+    }
+
+    *remote_appl = NULL;
+    if (src == NULL) {
+        return 0;
+    }
+
+    *remote_appl = strdup(src);
+    if (*remote_appl == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    return 0;
+}
+
 int rina_flow_wait(int fd, char **remote_appl)
 {
     struct sa_pending_item *spi;
@@ -750,19 +771,10 @@ int rina_flow_wait(int fd, char **remote_appl)
     }
     assert(spi->req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
 
-    if (remote_appl) {
-        *remote_appl = NULL;
-        if (spi->req->remote_appl) {
-            *remote_appl = strdup(spi->req->remote_appl);
-            if (*remote_appl == NULL) {
-                errno = ENOMEM;
-                rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                            RLITE_MB(spi->req));
-                free(spi->req);
-                free(spi);
-                return -1;
-            }
-        }
+    if (remote_appl_fill(spi->req->remote_appl, remote_appl)) {
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(spi->req));
+        free(spi->req);
+        free(spi);
     }
 
     sa_lock();
@@ -845,15 +857,8 @@ rina_flow_accept(int fd, char **remote_appl)
     }
     assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
 
-    if (remote_appl) {
-        *remote_appl = NULL;
-        if (req->remote_appl) {
-            *remote_appl = strdup(req->remote_appl);
-            if (*remote_appl == NULL) {
-                errno = ENOMEM;
-                goto out1;
-            }
-        }
+    if (remote_appl_fill(req->remote_appl, remote_appl)) {
+        goto out1;
     }
 
     ret = rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
