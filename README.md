@@ -323,61 +323,61 @@ On node A, set-up the interface towards B and create a shim IPCP
 over Ethernet:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethAB.IPCP/1// shim-eth ethAB.DIF
+    $ sudo rlite-ctl ipcp-create ethAB.IPCP/1 shim-eth ethAB.DIF
 
 Bind the shim IPCP to eth0, so that the network interface will be used
 to send and receive packets:
 
-    $ sudo rlite-ctl ipcp-config ethAB.IPCP/1// netdev eth0
+    $ sudo rlite-ctl ipcp-config ethAB.IPCP/1 netdev eth0
 
 Create a normal IPCP and give it an address in the normal DIF:
 
-    $ sudo rlite-ctl ipcp-create a.IPCP/1// normal n.DIF
-    $ sudo rlite-ctl ipcp-config a.IPCP/1// address 71
+    $ sudo rlite-ctl ipcp-create a.IPCP/1 normal n.DIF
+    $ sudo rlite-ctl ipcp-config a.IPCP/1 address 71
 
 Let the normal IPCP register to the shim DIF:
 
-    $ sudo rlite-ctl ipcp-register ethAB.DIF a.IPCP/1//
+    $ sudo rlite-ctl ipcp-register ethAB.DIF a.IPCP/1
 
 
 On node B, similar operations are carried out for both the interfaces:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethAB.IPCP/1// shim-eth ethAB.DIF
-    $ sudo rlite-ctl ipcp-config ethAB.IPCP/1// netdev eth0
+    $ sudo rlite-ctl ipcp-create ethAB.IPCP/1 shim-eth ethAB.DIF
+    $ sudo rlite-ctl ipcp-config ethAB.IPCP/1 netdev eth0
     $
     $ sudo ip link set eth1 up
-    $ sudo rlite-ctl ipcp-create ethBC.IPCP/1// shim-eth ethBC.DIF
-    $ sudo rlite-ctl ipcp-config ethBC.IPCP/1// netdev eth1
+    $ sudo rlite-ctl ipcp-create ethBC.IPCP/1 shim-eth ethBC.DIF
+    $ sudo rlite-ctl ipcp-config ethBC.IPCP/1 netdev eth1
     $
-    $ sudo rlite-ctl ipcp-create b.IPCP/1// normal n.DIF
-    $ sudo rlite-ctl ipcp-config b.IPCP/1// address 72
-    $ sudo rlite-ctl ipcp-register ethAB.DIF b.IPCP/1//
-    $ sudo rlite-ctl ipcp-register ethBC.DIF b.IPCP/1//
+    $ sudo rlite-ctl ipcp-create b.IPCP/1 normal n.DIF
+    $ sudo rlite-ctl ipcp-config b.IPCP/1 address 72
+    $ sudo rlite-ctl ipcp-register ethAB.DIF b.IPCP/1
+    $ sudo rlite-ctl ipcp-register ethBC.DIF b.IPCP/1
 
 On node C:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethBC.IPCP/1// shim-eth ethBC.DIF
-    $ sudo rlite-ctl ipcp-config ethBC.IPCP/1// netdev eth0
+    $ sudo rlite-ctl ipcp-create ethBC.IPCP/1 shim-eth ethBC.DIF
+    $ sudo rlite-ctl ipcp-config ethBC.IPCP/1 netdev eth0
     $
-    $ sudo rlite-ctl ipcp-create c.IPCP/1// normal n.DIF
-    $ sudo rlite-ctl ipcp-config c.IPCP/1// address 73
-    $ sudo rlite-ctl ipcp-register ethBC.DIF c.IPCP/1//
+    $ sudo rlite-ctl ipcp-create c.IPCP/1 normal n.DIF
+    $ sudo rlite-ctl ipcp-config c.IPCP/1 address 73
+    $ sudo rlite-ctl ipcp-register ethBC.DIF c.IPCP/1
 
 Once the IPCPs are set up, we have to carry out the enrollments in
 the normal DIF. Among the possible strategies, we can enroll A and
 C against B, so that B will be the initial node in the DIF.
 
-On node A, enroll a.IPCP/1// to the neighbor b.IPCP/1// using
+On node A, enroll a.IPCP/1 to the neighbor b.IPCP/1 using
 ethAB.DIF as a supporting DIF:
 
-    $ sudo rlite-ctl ipcp-enroll n.DIF a.IPCP/1// b.IPCP/1// ethAB.DIF
+    $ sudo rlite-ctl ipcp-enroll n.DIF a.IPCP/1 b.IPCP/1 ethAB.DIF
 
-On node C, enroll c.IPCP/1// to the neighbor b.IPCP/1// using
+On node C, enroll c.IPCP/1 to the neighbor b.IPCP/1 using
 ethBC.DIF as a supporting DIF:
 
-    $ sudo rlite-ctl ipcp-enroll n.DIF c.IPCP/1// b.IPCP/1// ethBC.DIF
+    $ sudo rlite-ctl ipcp-enroll n.DIF c.IPCP/1 b.IPCP/1 ethBC.DIF
 
 On any node, you can check the standard output of the userspace daemon,
 to check that the previous operations are completed with success.
@@ -427,9 +427,9 @@ must be configured with the O.S. name of the Ethernet Network Interface Card
 
 In the following example
 
-    $ sudo rlite-ctl ipcp-config ether3/181// netdev eth2
+    $ sudo rlite-ctl ipcp-config ether3/181 netdev eth2
 
-a shim IPCP called ether3/181// is assigned a network interface called eth2.
+a shim IPCP called ether3/181 is assigned a network interface called eth2.
 
 
 ### 5.2. shim-udp4 IPC Process
@@ -455,13 +455,13 @@ An example of /etc/hosts configuration is the following:
     8.12.97.230     asd-63--
 
 In this example, the IP 8.12.97.231 is mapped to an application called
-xyz/abc//, while the IP 8.12.97.230 is mapped to another application
-called asd/63//. This means that this shim UDP implements a tunnel
+xyz/abc, while the IP 8.12.97.230 is mapped to another application
+called asd/63. This means that this shim UDP implements a tunnel
 between two nodes. The first endpoint node has a network interface configured
 with the address 8.12.97.231 (with some netmask), and a RINA application
-called xyz/abc// can register to the local shim UDP IPCP. The other endpoint
+called xyz/abc can register to the local shim UDP IPCP. The other endpoint
 node has a network interface configured with the address 8.12.97.232, and a
-RINA application called asd/63// can register to the local shim UDP IPCP.
+RINA application called asd/63 can register to the local shim UDP IPCP.
 
 Note that while an IP address corresponds to one and only one application
 name, an application name may correspond to multiple IP addresses. This
@@ -500,11 +500,11 @@ file is stored at /etc/rlite/shim-tcp4-dir.
 
 An example configuration is the following:
 
-    rinaperf-data/client// 10.0.0.1 6789 i.DIF
-    rinaperf-data/server// 10.0.0.2 6788 i.DIF
+    rinaperf-data/client 10.0.0.1 6789 i.DIF
+    rinaperf-data/server 10.0.0.2 6788 i.DIF
 
-where the application named rinaperf-data/client// is mapped (bound) to the
-TCP socket with address 10.0.0.1:6789 and rinaperf-data/server// is mapped
+where the application named rinaperf-data/client is mapped (bound) to the
+TCP socket with address 10.0.0.1:6789 and rinaperf-data/server is mapped
 to the TCP socket 10.0.0.1:6788. These mappings are valid for a shim DIF
 called i.DIF.
 
@@ -554,8 +554,8 @@ centralized address allocation).
 
 In the following example
 
-    $ sudo rlite-ctl ipcp-config normal1/xyz// address 7382
+    $ sudo rlite-ctl ipcp-config normal1/xyz address 7382
 
-a normal IPCP called normal1/xyz// is given the address 7382 to be used
+a normal IPCP called normal1/xyz is given the address 7382 to be used
 in its DIF.
 
