@@ -497,7 +497,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rina_flow_accept(rp->cfd, NULL);
+        rp->dfd = rina_flow_accept(rp->cfd, NULL, 0);
         if (rp->dfd < 0) {
             perror("rina_flow_accept()");
             break;
@@ -675,7 +675,7 @@ main(int argc, char **argv)
                 break;
 
             case 'f': /* Enable flow control. */
-                flowspec.reserved[38] = 1;
+                flowspec.reserved[36] = 1;
                 break;
 
             case 'b':
@@ -791,7 +791,7 @@ main(int argc, char **argv)
     } else {
         /* We're the client: allocate a flow and run the perf function. */
         rp.dfd = rina_flow_alloc(dif_name, rp.cli_appl_name,
-                               rp.srv_appl_name, &flowspec);
+                               rp.srv_appl_name, &flowspec, 0);
         cli_flow_allocated = 1;
         if (rp.dfd < 0) {
             perror("rina_flow_alloc()");

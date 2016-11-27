@@ -637,39 +637,20 @@ rina_unregister(int fd, const char *dif_name, const char *local_appl)
     return rina_register_common(fd, dif_name, local_appl, 0);
 }
 
+#define RINA_FA_EVENT_ID    0x6271 /* casual value, used just for assert() */
+
 int
-rina_flow_alloc(const char *dif_name, const char *local_appl,
-              const char *remote_appl, const struct rina_flow_spec *flowspec)
+rina_flow_alloc_wait(int wfd)
 {
-    struct rl_kmsg_fa_req req;
     struct rl_kmsg_fa_resp_arrived *resp;
-    uint32_t event_id = 1;
-    int rfd, ret;
+    int ret;
 
-    ret = rl_fa_req_fill(&req, event_id, dif_name, local_appl,
-                         remote_appl, flowspec, 0xffff);
-    if (ret) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    rfd = rina_open();
-    if (rfd < 0) {
-        return rfd;
-    }
-
-    ret = rl_write_msg(rfd, RLITE_MB(&req));
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
-    if (ret < 0) {
-        goto out;
-    }
-
-    ret = wait_for_next_msg(rfd);
+    ret = wait_for_next_msg(wfd);
     if (ret) {
         goto out;
     }
 
-    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(rfd);
+    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(wfd);
     if (!resp) {
         errno = ENOMEM;
         ret = -1;
@@ -677,7 +658,7 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
     }
 
     assert(resp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
-    assert(resp->event_id == event_id);
+    assert(resp->event_id == RINA_FA_EVENT_ID);
 
     if (resp->response) {
         errno = EPERM;
@@ -689,12 +670,53 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     free(resp);
 out:
-    close(rfd);
+    close(wfd);
 
     return ret;
 }
 
-/* Split accept lock and pending list. */
+int
+rina_flow_alloc(const char *dif_name, const char *local_appl,
+                const char *remote_appl, const struct rina_flow_spec *flowspec,
+                unsigned int flags)
+{
+    struct rl_kmsg_fa_req req;
+    int wfd, ret;
+
+    if (flags & ~(RINA_F_NOWAIT)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ret = rl_fa_req_fill(&req, RINA_FA_EVENT_ID, dif_name, local_appl,
+                         remote_appl, flowspec, 0xffff);
+    if (ret) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    wfd = rina_open();
+    if (wfd < 0) {
+        return wfd;
+    }
+
+    ret = rl_write_msg(wfd, RLITE_MB(&req));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
+    if (ret < 0) {
+        close(wfd);
+        return ret;
+    }
+
+    if (flags & RINA_F_NOWAIT) {
+        /* Return the control file descriptor. */
+        return wfd;
+    }
+
+    /* Return the I/O file descriptor (or an error). */
+    return rina_flow_alloc_wait(wfd);
+}
+
+/* Split accept lock and pending lists. */
 static volatile char sa_lock_var = 0;
 static int sa_handle = 0;
 static unsigned int sa_pending_len = 0;
@@ -742,49 +764,6 @@ remote_appl_fill(char *src, char **remote_appl)
     }
 
     return 0;
-}
-
-int rina_flow_wait(int fd, char **remote_appl)
-{
-    struct sa_pending_item *spi;
-
-    if (sa_pending_len >= 128) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    spi = malloc(sizeof(*spi));
-    if (!spi) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    spi->req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
-    if (!spi->req) {
-        if (remote_appl) {
-            *remote_appl = NULL;
-        }
-        free(spi);
-        return -1;
-    }
-    assert(spi->req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
-
-    if (remote_appl_fill(spi->req->remote_appl, remote_appl)) {
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(spi->req));
-        free(spi->req);
-        free(spi);
-    }
-
-    sa_lock();
-    spi->handle = sa_handle ++;
-    if (sa_handle < 0) { /* Overflow */
-        sa_handle = 0;
-    }
-    list_add_tail(&spi->node, &sa_pending);
-    sa_pending_len ++;
-    sa_unlock();
-
-    return spi->handle;
 }
 
 int rina_flow_respond(int fd, int handle, int response)
@@ -839,24 +818,56 @@ out:
 }
 
 int
-rina_flow_accept(int fd, char **remote_appl)
+rina_flow_accept(int fd, char **remote_appl, unsigned int flags)
 {
-    struct rl_kmsg_fa_req_arrived *req;
+    struct rl_kmsg_fa_req_arrived *req = NULL;
+    struct sa_pending_item *spi = NULL;
     struct rl_kmsg_fa_resp resp;
     int ffd = -1;
     int ret;
+
+    if (flags & ~(RINA_F_NORESP)) { /* wrong flags */
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (flags & RINA_F_NORESP) {
+        if (sa_pending_len >= 128) {
+            errno = ENOMEM;
+            return -1;
+        }
+
+        spi = malloc(sizeof(*spi));
+        if (!spi) {
+            errno = ENOMEM;
+            return -1;
+        }
+    }
 
     req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
     if (!req) {
         if (remote_appl) {
             *remote_appl = NULL;
         }
-        return -1;
+        goto out0;
     }
     assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
 
     if (remote_appl_fill(req->remote_appl, remote_appl)) {
         goto out1;
+    }
+
+    if (flags & RINA_F_NORESP) {
+        sa_lock();
+        spi->handle = sa_handle ++;
+        if (sa_handle < 0) { /* Overflow */
+            sa_handle = 0;
+        }
+        list_add_tail(&spi->node, &sa_pending);
+        sa_pending_len ++;
+        sa_unlock();
+
+        return spi->handle;
     }
 
     rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
@@ -876,6 +887,10 @@ out1:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(req));
     free(req);
+out0:
+    if (spi) {
+        free(spi);
+    }
 
     return ffd;
 }

@@ -45,7 +45,7 @@ class RinaRRTool:
 
     def client(self, args):
         fd = rlite.flow_alloc(self.dif, self.client_name,
-                              self.server_name, self.flow_spec)
+                              self.server_name, self.flow_spec, 0)
 
         if fd < 0:
             return fd
@@ -74,7 +74,7 @@ class RinaRRTool:
             return ret
 
         while 1:
-            fd = rlite.flow_accept(self.cfd, None)
+            fd = rlite.flow_accept(self.cfd, None, 0)
             if fd < 0:
                 continue
 

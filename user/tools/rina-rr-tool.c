@@ -63,7 +63,7 @@ client(struct rl_rr *rr)
 
     /* We're the client: allocate a flow and run the perf function. */
     dfd = rina_flow_alloc(rr->dif_name, rr->cli_appl_name,
-                        rr->srv_appl_name, &rr->flowspec);
+                        rr->srv_appl_name, &rr->flowspec, 0);
     if (dfd < 0) {
         perror("rina_flow_alloc()");
         return dfd;
@@ -124,7 +124,7 @@ server(struct rl_rr *rr)
     }
 
     for (;;) {
-        dfd = rina_flow_accept(rr->cfd, NULL);
+        dfd = rina_flow_accept(rr->cfd, NULL, 0);
         if (dfd < 0) {
             perror("rina_flow_accept()");
             continue;
