@@ -51,8 +51,8 @@ struct rina_flow_spec {
  * Open a file descriptor that can be used to register/unregister names,
  * and to manage incoming flow allocation requests. On success, it
  * returns a file descriptor that can be later provided to rina_register(),
- * rina_unregister(), rina_flow_accept(), rina_flow_wait() and
- * rina_flow_respond(). On error -1 is returned.
+ * rina_unregister(), rina_flow_accept(), and rina_flow_respond().
+ * On error -1 is returned.
  * This function is typically used on the "server side" of applications.
  */
 int rina_open(void);
@@ -150,8 +150,8 @@ int rina_flow_respond(int fd, int handle, int response);
  * On error -1 is returned, with the errno code properly set.
  */
 int rina_flow_alloc(const char *dif_name, const char *local_appl,
-              const char *remote_appl, const struct rina_flow_spec *flowspec,
-              unsigned int flags);
+                    const char *remote_appl,
+                    const struct rina_flow_spec *flowspec, unsigned int flags);
 
 /*
  * Wait for the completion of a flow allocation procedure previosuly initiated
