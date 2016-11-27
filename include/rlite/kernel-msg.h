@@ -181,6 +181,7 @@ struct rl_kmsg_fa_req_arrived {
     uint32_t kevent_id;
     rl_port_t port_id;
     rl_ipcp_id_t ipcp_id;
+    struct rina_flow_spec flowspec;
     char *local_appl;
     char *remote_appl;
     char *dif_name;
@@ -254,6 +255,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     uint32_t remote_cep;
     rl_addr_t remote_addr;
     struct rl_flow_config flowcfg;
+    struct rina_flow_spec flowspec;
     /* Requested application. */
     char *local_appl;
     /* Requesting application. */

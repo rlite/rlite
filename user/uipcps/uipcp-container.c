@@ -131,6 +131,22 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     return result;
 }
 
+/* This function is the inverse of flowspec2flowcfg(), and this property
+ * must be manually preserved. */
+static void
+flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
+{
+    memset(spec, 0, sizeof(*spec));
+
+    spec->max_sdu_gap = cfg->max_sdu_gap;
+    spec->in_order_delivery = cfg->in_order_delivery;
+    spec->avg_bandwidth = cfg->dtcp.bandwidth;
+
+    if (cfg->dtcp.flow_control) {
+        rina_flow_spec_fc_set(spec, 1);
+    }
+}
+
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_port_t remote_port, uint32_t remote_cep,
@@ -163,6 +179,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     } else {
         memset(&req->flowcfg, 0, sizeof(*flowcfg));
     }
+    flowcfg2flowspec(&req->flowspec, &req->flowcfg);
     req->local_appl = strdup(local_appl);
     req->remote_appl = strdup(remote_appl);
 

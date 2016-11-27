@@ -1678,9 +1678,10 @@ rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp = ipcp_get(req->ipcp_id);
     if (ipcp) {
         ret = rl_fa_req_arrived(ipcp, req->kevent_id, req->remote_port,
-                                  req->remote_cep,
-                                  req->remote_addr, req->local_appl,
-                                  req->remote_appl, &req->flowcfg);
+                                req->remote_cep,
+                                req->remote_addr, req->local_appl,
+                                req->remote_appl, &req->flowcfg,
+                                &req->flowspec);
     }
 
     ipcp_put(ipcp);
@@ -2118,11 +2119,12 @@ out:
 /* This may be called from softirq context. */
 int
 rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                    rl_port_t remote_port, uint32_t remote_cep,
-                    rl_addr_t remote_addr,
-                    const char *local_appl,
-                    const char *remote_appl,
-                    const struct rl_flow_config *flowcfg)
+                  rl_port_t remote_port, uint32_t remote_cep,
+                  rl_addr_t remote_addr,
+                  const char *local_appl,
+                  const char *remote_appl,
+                  const struct rl_flow_config *flowcfg,
+                  const struct rina_flow_spec *flowspec)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_appl *app;
@@ -2163,6 +2165,11 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     req.remote_appl = remote_appl ? kstrdup(remote_appl, GFP_ATOMIC) : NULL;
     if (ipcp->dif->name) {
         req.dif_name = kstrdup(ipcp->dif->name, GFP_ATOMIC);
+    }
+    if (flowspec) {
+        memcpy(&req.flowspec, flowspec, sizeof(*flowspec));
+    } else {
+        rl_flow_spec_default(&req.flowspec);
     }
 
     /* Enqueue the request into the upqueue. */

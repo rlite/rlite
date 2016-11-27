@@ -705,7 +705,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         }
 
         ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_name,
-                                entry->tpa, NULL);
+                                entry->tpa, NULL, NULL);
 
         if (ret) {
             PD("Out of memory\n");

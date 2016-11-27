@@ -710,3 +710,16 @@ flow_config_dump(const struct rl_flow_config *c)
                 c->dtcp.rtx.initial_tr);
 }
 COMMON_EXPORT(flow_config_dump);
+
+void
+rl_flow_spec_default(struct rina_flow_spec *spec)
+{
+    memset(spec, 0, sizeof(*spec));
+    spec->max_sdu_gap = (rl_seq_t)-1;  /* unbounded allowed gap */
+    spec->avg_bandwidth = 0;        /* don't care about bandwidth */
+    spec->max_delay = 0;            /* don't care about delay */
+    spec->max_jitter = 0;           /* don't care about jitter */
+    spec->in_order_delivery = 0;    /* don't require that */
+    rina_flow_spec_fc_set(spec, 0); /* no flow control */
+}
+COMMON_EXPORT(rl_flow_spec_default);

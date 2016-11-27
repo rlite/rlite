@@ -453,11 +453,12 @@ int rl_ipcp_factory_register(struct ipcp_factory *factory);
 int rl_ipcp_factory_unregister(const char *dif_type);
 
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
-                        rl_port_t remote_port, uint32_t remote_cep,
-                        rl_addr_t remote_addr,
-                        const char *local_appl,
-                        const char *remote_appl,
-                        const struct rl_flow_config *flowcfg);
+                      rl_port_t remote_port, uint32_t remote_cep,
+                      rl_addr_t remote_addr,
+                      const char *local_appl,
+                      const char *remote_appl,
+                      const struct rl_flow_config *flowcfg,
+                      const struct rina_flow_spec *flowspec);
 
 int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                          rl_port_t local_port,

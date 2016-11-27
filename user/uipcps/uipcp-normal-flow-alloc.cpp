@@ -108,8 +108,10 @@ policies2flowcfg(struct rl_flow_config *cfg,
 }
 
 #ifndef RL_USE_QOS_CUBES
+/* Any modification to this function must be also reported in the inverse
+ * function flowcfg2flowspec(). */
 static void
-flowspec2flowcfg(struct rina_flow_spec *spec, struct rl_flow_config *cfg)
+flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
 
@@ -128,8 +130,9 @@ flowspec2flowcfg(struct rina_flow_spec *spec, struct rl_flow_config *cfg)
         cfg->dtcp.initial_a = RL_A_MSECS_DFLT;
     }
 
-    /* Delay and jitter ignored for now. */
+    /* Delay, loss and jitter ignored for now. */
     (void)spec->max_delay;
+    (void)spec->max_loss;
     (void)spec->max_jitter;
 
     if (rina_flow_spec_fc_get(spec)) {

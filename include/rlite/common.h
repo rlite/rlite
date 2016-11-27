@@ -198,7 +198,7 @@ struct rl_flow_config {
  * to change, for instance adding a 'nofc' field in the flowspec.
  * These two accessors are intended to hide this hack. */
 static inline int
-rina_flow_spec_fc_get(struct rina_flow_spec *spec)
+rina_flow_spec_fc_get(const struct rina_flow_spec *spec)
 {
     return spec->reserved[36] != 0;
 }

@@ -74,6 +74,8 @@ int rina_name_valid(const struct rina_name *name);
 
 void flow_config_dump(const struct rl_flow_config *c);
 
+void rl_flow_spec_default(struct rina_flow_spec *spec);
+
 #ifdef __KERNEL__
 /* GFP variations of some of the functions above. */
 int __rina_name_fill(struct rina_name *name, const char *apn,
