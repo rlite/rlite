@@ -812,13 +812,22 @@ out:
 }
 
 int
-rina_flow_accept(int fd, char **remote_appl, unsigned int flags)
+rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
+                 unsigned int flags)
 {
     struct rl_kmsg_fa_req_arrived *req = NULL;
     struct sa_pending_item *spi = NULL;
     struct rl_kmsg_fa_resp resp;
     int ffd = -1;
     int ret;
+
+    if (remote_appl) {
+        *remote_appl = NULL;
+    }
+
+    if (spec) {
+        memset(spec, 0, sizeof(*spec));
+    }
 
     if (flags & ~(RINA_F_NORESP)) { /* wrong flags */
         errno = EINVAL;
@@ -840,15 +849,16 @@ rina_flow_accept(int fd, char **remote_appl, unsigned int flags)
 
     req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
     if (!req) {
-        if (remote_appl) {
-            *remote_appl = NULL;
-        }
         goto out0;
     }
     assert(req->msg_type == RLITE_KER_FA_REQ_ARRIVED);
 
     if (remote_appl_fill(req->remote_appl, remote_appl)) {
         goto out1;
+    }
+
+    if (spec) {
+        memcpy(spec, &req->flowspec, sizeof(*spec));
     }
 
     if (flags & RINA_F_NORESP) {

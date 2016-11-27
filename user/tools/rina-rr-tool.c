@@ -124,7 +124,7 @@ server(struct rl_rr *rr)
     }
 
     for (;;) {
-        dfd = rina_flow_accept(rr->cfd, NULL, 0);
+        dfd = rina_flow_accept(rr->cfd, NULL, NULL, 0);
         if (dfd < 0) {
             perror("rina_flow_accept()");
             continue;

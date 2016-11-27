@@ -497,7 +497,7 @@ server(struct rinaperf *rp)
         perf_function_t perf_function = NULL;
         int ret;
 
-        rp->dfd = rina_flow_accept(rp->cfd, NULL, 0);
+        rp->dfd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
         if (rp->dfd < 0) {
             perror("rina_flow_accept()");
             break;

@@ -83,9 +83,11 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl);
  * RINA_F_NORESP, it also sends a positive response to the requesting
  * application; otherwise, the response (positive or negative) can be sent by
  * a subsequent call to the rina_flow_respond().
- * On success, the char* pointed by remote_appl, if not NULL, is assigned the name of the
- * requesting application. The memory for the requestor name is allocated by
- * the callee and must be freed by the caller.
+ * On success, the char* pointed by remote_appl, if not NULL, is assigned the
+ * name of the requesting application. The memory for the requestor name is
+ * allocated by the callee and must be freed by the caller. Moreover, if
+ * @spec is not NULL, the referenced data structure is filled with the QoS
+ * specification specified by the requesting application.
  *
  * If @flags does not contain RINA_F_NORESP, on success it returns a file
  * descriptor that can be subsequently used with standard I/O system calls
@@ -103,7 +105,8 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl);
  *
  * On error -1 is returned, with the errno code properly set.
  */
-int rina_flow_accept(int fd, char **remote_appl, unsigned int flags);
+int rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
+                     unsigned int flags);
 
 /*
  * Emit a verdict on the flow allocation request identified by @handle,
