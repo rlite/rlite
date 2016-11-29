@@ -1303,11 +1303,17 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
     return -1;
 }
 
+static int
+normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
+                 const char *supp_dif_name, int wait_for_completion);
+
 void
 re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
-    ScopeLock(rib->lock);
+    list< pair<string, string> > re_enrollments;
+
+    pthread_mutex_lock(&rib->lock);
 
     /* Scan all the neighbor candidates. */
     for (set<string>::const_iterator
@@ -1350,13 +1356,21 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
         }
 
         /* Start the enrollment. */
-        UPD(rib->uipcp, "I should re-enroll with neighbor %s through "
+        UPD(rib->uipcp, "I will re-enroll with neighbor %s through "
                         "lower DIF %s\n", cand->c_str(), common_dif.c_str());
+        re_enrollments.push_back(make_pair(*cand, common_dif));
     }
 
     rib->re_enroll_tmrid = rl_evloop_schedule(&rib->uipcp->loop,
                                               RL_RE_ENROLL_INTVAL * 1000,
                                               re_enroll_timeout_cb, rib);
+    pthread_mutex_unlock(&rib->lock);
+
+    /* Start asynchronous re-enrollments outside of the lock. */
+    for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
+                                        lit != re_enrollments.end(); lit ++) {
+        normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
+    }
 }
 
 int
@@ -1429,9 +1443,9 @@ Neighbor::alloc_flow(const char *supp_dif)
     return 0;
 }
 
-int
-normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
-                   int wait_for_completion)
+static int
+normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
+                 const char *supp_dif_name, int wait_for_completion)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
@@ -1440,7 +1454,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 
     pthread_mutex_lock(&rib->lock);
 
-    neigh = rib->get_neighbor(req->neigh_name, true);
+    neigh = rib->get_neighbor(neigh_name, true);
     if (!neigh) {
         UPE(uipcp, "Failed to add neighbor\n");
         pthread_mutex_unlock(&rib->lock);
@@ -1448,7 +1462,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
     }
 
     if (!neigh->has_mgmt_flow()) {
-        ret = neigh->alloc_flow(req->supp_dif_name);
+        ret = neigh->alloc_flow(supp_dif_name);
         if (ret) {
             pthread_mutex_unlock(&rib->lock);
             return ret;
@@ -1488,6 +1502,14 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
     pthread_mutex_unlock(&rib->lock);
 
     return ret;
+}
+
+int
+normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
+                   int wait_for_completion)
+{
+    return normal_do_enroll(uipcp, req->neigh_name, req->supp_dif_name,
+                            wait_for_completion);
 }
 
 int
