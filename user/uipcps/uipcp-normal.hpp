@@ -378,9 +378,6 @@ int normal_ipcp_enroll(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroll *req,
                        int wait_for_completion);
 
-int normal_get_enrollment_targets(struct uipcp *uipcp,
-                                  struct list_head *neighs);
-
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 

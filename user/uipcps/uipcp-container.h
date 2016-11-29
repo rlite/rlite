@@ -97,8 +97,6 @@ struct uipcp_ops {
     int (*flow_deallocated)(struct rl_evloop *loop,
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
-
-    int (*get_enrollment_targets)(struct uipcp *, struct list_head *neighs);
 };
 
 struct ipcp_node {
