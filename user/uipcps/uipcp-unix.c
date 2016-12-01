@@ -447,8 +447,12 @@ sigint_handler(int signum)
     struct uipcps *uipcps = &guipcps;
     struct uipcp *uipcp, *tmp;
 
-    /* Destroy all the IPCPs. */
-    pthread_mutex_lock(&uipcps->lock);
+    PI("Signal %d received, terminating...\n", signum);
+
+    /* We need to destroy all the IPCPs. This requires to take the uipcps
+     * lock, but this lock may be already taken; we therefore trylock
+     * without checking the return value. */
+    pthread_mutex_trylock(&uipcps->lock);
     list_for_each_entry_safe(uipcp, tmp, &uipcps->uipcps, node) {
         if (!uipcp_is_kernelspace(uipcp)) {
             rl_ipcp_id_t uid = uipcp->id;
