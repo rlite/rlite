@@ -442,8 +442,8 @@ rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
 
         if (has_response) {
             /* Remove the entry from the pending queue and free it. */
-            pending_queue_remove_by_event_id(&loop->ctrl.pqueue,
-                                             msg->event_id);
+            list_del(&entry->node);
+            pthread_cond_destroy(&entry->op_complete_cond);
             free(entry);
         }
         *result = ret;
@@ -478,6 +478,12 @@ rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
             }
         }
         pthread_cond_destroy(&entry->op_complete_cond);
+
+        /* If pthread_cond_timedwait() above timed out, it means that the
+         * event-loop didn't remove the entry from the pending queue.
+         * We do that here, unconditionally, since if the entry was already
+         * removed list_del() has no effect. */
+        list_del(&entry->node);
 
         /* Free the pending queue entry and the associated request message. */
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, entry->msg);
