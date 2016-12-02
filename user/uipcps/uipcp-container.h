@@ -46,6 +46,9 @@ struct uipcps {
     struct list_head uipcps;
     pthread_mutex_t lock;
 
+    /* Timer ID for re-enrollments. */
+    int re_enroll_tmrid;
+
     struct list_head ipcp_nodes;
 
     struct rl_evloop loop;
@@ -97,6 +100,8 @@ struct uipcp_ops {
     int (*flow_deallocated)(struct rl_evloop *loop,
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
+
+    void  (*trigger_re_enrollments)(struct uipcp *);
 };
 
 struct ipcp_node {

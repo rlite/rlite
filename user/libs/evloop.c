@@ -61,6 +61,7 @@ struct rl_tmr_event {
     struct list_head node;
 };
 
+/* Only informative, we may suppress it. */
 static int
 flow_allocate_resp_arrived(struct rl_evloop *loop,
                            const struct rl_msg_base *b_resp,
@@ -84,6 +85,7 @@ flow_allocate_resp_arrived(struct rl_evloop *loop,
     return 0;
 }
 
+/* Only informative, we may suppress it. */
 static int
 appl_register_resp(struct rl_evloop *loop,
                    const struct rl_msg_base *b_resp,

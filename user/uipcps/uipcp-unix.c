@@ -416,6 +416,28 @@ uipcps_ipcp_update(struct rl_evloop *loop,
     return 0;
 }
 
+/* Time interval (in seconds) between two consecutive periodic
+ * RIB synchronizations. */
+#define RL_RE_ENROLL_INTVAL             10
+
+static void
+re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
+{
+    struct uipcps *uipcps = arg;
+    struct uipcp *uipcp;
+
+    pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        if (uipcp->ops.trigger_re_enrollments) {
+            uipcp->ops.trigger_re_enrollments(uipcp);
+        }
+    }
+    uipcps->re_enroll_tmrid = rl_evloop_schedule(loop,
+                                                 RL_RE_ENROLL_INTVAL * 1000,
+                                                 re_enroll_timeout_cb, uipcps);
+    pthread_mutex_unlock(&uipcps->lock);
+}
+
 static int
 uipcps_init(struct uipcps *uipcps)
 {
@@ -438,6 +460,9 @@ uipcps_init(struct uipcps *uipcps)
     uipcps_print(uipcps);
 #endif
 
+    uipcps->re_enroll_tmrid = rl_evloop_schedule(&uipcps->loop,
+                                                 RL_RE_ENROLL_INTVAL * 1000,
+                                                 re_enroll_timeout_cb, uipcps);
     return 0;
 }
 
@@ -448,6 +473,8 @@ sigint_handler(int signum)
     struct uipcp *uipcp, *tmp;
 
     PI("Signal %d received, terminating...\n", signum);
+
+    rl_evloop_schedule_canc(&uipcps->loop, uipcps->re_enroll_tmrid);
 
     /* We need to destroy all the IPCPs. This requires to take the uipcps
      * lock, but this lock may be already taken; we therefore trylock

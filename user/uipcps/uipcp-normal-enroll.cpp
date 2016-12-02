@@ -1303,76 +1303,6 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
     return -1;
 }
 
-static int
-normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
-                 const char *supp_dif_name, int wait_for_completion);
-
-void
-re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
-{
-    uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
-    list< pair<string, string> > re_enrollments;
-
-    pthread_mutex_lock(&rib->lock);
-
-    /* Scan all the neighbor candidates. */
-    for (set<string>::const_iterator
-            cand = rib->neighbors_cand.begin();
-                cand != rib->neighbors_cand.end(); cand++) {
-        map<string, NeighborCandidate>::const_iterator mit =
-                rib->neighbors_seen.find(*cand);
-        map<string, Neighbor *>::iterator neigh;
-        string common_dif;
-
-        assert(mit != rib->neighbors_seen.end());
-        neigh = rib->neighbors.find(*cand);
-
-        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
-            time_t inact;
-
-            /* There is a management flow towards this neighbor, but we need
-             * to check that this is not a dead flow hanging forever in
-             * the NEIGH_NONE state. */
-
-            inact = time(NULL) - neigh->second->mgmt_conn()->last_activity;
-
-            if (neigh->second->mgmt_conn()->enrollment_state == NEIGH_NONE &&
-                        inact > 10) {
-                /* Prune the flow now, we'll try to enroll later. */
-                PD("Pruning flow towards %s since inactive for %d seconds\n",
-                    cand->c_str(), (int)inact);
-                rib->neigh_flow_prune(neigh->second->mgmt_conn());
-            }
-
-            /* Enrollment not needed. */
-            continue;
-        }
-
-        common_dif = common_lower_dif(mit->second.lower_difs,
-                                      rib->lower_difs);
-        if (common_dif == string()) {
-            /* Weird, but it could happen. */
-            continue;
-        }
-
-        /* Start the enrollment. */
-        UPD(rib->uipcp, "I will re-enroll with neighbor %s through "
-                        "lower DIF %s\n", cand->c_str(), common_dif.c_str());
-        re_enrollments.push_back(make_pair(*cand, common_dif));
-    }
-
-    rib->re_enroll_tmrid = rl_evloop_schedule(&rib->uipcp->loop,
-                                              RL_RE_ENROLL_INTVAL * 1000,
-                                              re_enroll_timeout_cb, rib);
-    pthread_mutex_unlock(&rib->lock);
-
-    /* Start asynchronous re-enrollments outside of the lock. */
-    for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
-                                        lit != re_enrollments.end(); lit ++) {
-        normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
-    }
-}
-
 int
 Neighbor::alloc_flow(const char *supp_dif)
 {
@@ -1510,6 +1440,69 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 {
     return normal_do_enroll(uipcp, req->neigh_name, req->supp_dif_name,
                             wait_for_completion);
+}
+
+void
+normal_trigger_re_enrollments(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    list< pair<string, string> > re_enrollments;
+
+    pthread_mutex_lock(&rib->lock);
+
+    /* Scan all the neighbor candidates. */
+    for (set<string>::const_iterator
+            cand = rib->neighbors_cand.begin();
+                cand != rib->neighbors_cand.end(); cand++) {
+        map<string, NeighborCandidate>::const_iterator mit =
+                rib->neighbors_seen.find(*cand);
+        map<string, Neighbor *>::iterator neigh;
+        string common_dif;
+
+        assert(mit != rib->neighbors_seen.end());
+        neigh = rib->neighbors.find(*cand);
+
+        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+            time_t inact;
+
+            /* There is a management flow towards this neighbor, but we need
+             * to check that this is not a dead flow hanging forever in
+             * the NEIGH_NONE state. */
+
+            inact = time(NULL) - neigh->second->mgmt_conn()->last_activity;
+
+            if (neigh->second->mgmt_conn()->enrollment_state == NEIGH_NONE &&
+                        inact > 10) {
+                /* Prune the flow now, we'll try to enroll later. */
+                PD("Pruning flow towards %s since inactive for %d seconds\n",
+                    cand->c_str(), (int)inact);
+                rib->neigh_flow_prune(neigh->second->mgmt_conn());
+            }
+
+            /* Enrollment not needed. */
+            continue;
+        }
+
+        common_dif = common_lower_dif(mit->second.lower_difs,
+                                      rib->lower_difs);
+        if (common_dif == string()) {
+            /* Weird, but it could happen. */
+            continue;
+        }
+
+        /* Start the enrollment. */
+        UPD(rib->uipcp, "I will re-enroll with neighbor %s through "
+                        "lower DIF %s\n", cand->c_str(), common_dif.c_str());
+        re_enrollments.push_back(make_pair(*cand, common_dif));
+    }
+
+    pthread_mutex_unlock(&rib->lock);
+
+    /* Start asynchronous re-enrollments outside of the lock. */
+    for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
+                                        lit != re_enrollments.end(); lit ++) {
+        normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
+    }
 }
 
 int

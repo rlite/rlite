@@ -79,10 +79,6 @@ namespace obj_name {
  * RIB synchronizations. */
 #define RL_NEIGH_SYNC_INTVAL           30
 
-/* Time interval (in seconds) between two consecutive periodic
- * RIB synchronizations. */
-#define RL_RE_ENROLL_INTVAL           10
-
 enum enroll_state_t {
     NEIGH_NONE = 0,
     NEIGH_I_WAIT_CONNECT_R, /* 1 */
@@ -275,9 +271,6 @@ struct uipcp_rib {
     std::map< std::string, NeighborCandidate > neighbors_seen;
     std::set< std::string > neighbors_cand;
 
-    /* Timer ID for re-enrollment. */
-    int re_enroll_tmrid;
-
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
 
@@ -377,6 +370,8 @@ private:
 int normal_ipcp_enroll(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroll *req,
                        int wait_for_completion);
+
+void normal_trigger_re_enrollments(struct uipcp *uipcp);
 
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);

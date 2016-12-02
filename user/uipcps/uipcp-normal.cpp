@@ -299,16 +299,12 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0)
                                         age_incr_cb, this);
     sync_tmrid = rl_evloop_schedule(&uipcp->loop, RL_NEIGH_SYNC_INTVAL * 1000,
                                     sync_timeout_cb, this);
-    re_enroll_tmrid = rl_evloop_schedule(&uipcp->loop,
-                                         RL_RE_ENROLL_INTVAL * 1000,
-                                         re_enroll_timeout_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
 {
     rl_evloop_schedule_canc(&uipcp->loop, sync_tmrid);
     rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
-    rl_evloop_schedule_canc(&uipcp->loop, re_enroll_tmrid);
 
     for (map<string, Neighbor*>::iterator mit = neighbors.begin();
                                     mit != neighbors.end(); mit++) {
@@ -926,5 +922,6 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
+    .trigger_re_enrollments = normal_trigger_re_enrollments,
 };
 
