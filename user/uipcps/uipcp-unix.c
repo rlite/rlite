@@ -426,11 +426,24 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
     struct uipcps *uipcps = arg;
     struct uipcp *uipcp;
 
+    /* Get a reference to each uipcp. */
     pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        uipcp->refcnt++;
+    }
+    pthread_mutex_unlock(&uipcps->lock);
+
+    /* Carry out re-enrollments outside the uipcps lock. */
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         if (uipcp->ops.trigger_re_enrollments) {
             uipcp->ops.trigger_re_enrollments(uipcp);
         }
+    }
+
+    /* Drop the references and reschedule. */
+    pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        uipcp_put(uipcps, uipcp->id, 0);
     }
     uipcps->re_enroll_tmrid = rl_evloop_schedule(loop,
                                                  RL_RE_ENROLL_INTVAL * 1000,
