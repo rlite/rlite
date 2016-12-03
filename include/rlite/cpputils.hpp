@@ -12,15 +12,15 @@ rina_string_from_components(const std::string& apn, const std::string& api,
     std::string acc;
 
     if (aei.size()) {
-        acc = std::string("/") + aei + acc;
+        acc = std::string(":") + aei + acc;
     }
 
     if (aen.size()) {
-        acc = std::string("/") + aen + acc;
+        acc = std::string(":") + aen + acc;
     }
 
     if (api.size()) {
-        acc = std::string("/") + api + acc;
+        acc = std::string(":") + api + acc;
     }
 
     return apn + acc;
@@ -40,7 +40,7 @@ rina_components_from_string(const std::string& str , std::string& apn, std::stri
     std::string *vps[] = { &apn, &api, &aen, &aei };
     std::stringstream ss(str);
 
-    for (int i = 0; i < 4 && std::getline(ss, *(vps[i]), '/'); i++) {
+    for (int i = 0; i < 4 && std::getline(ss, *(vps[i]), ':'); i++) {
     }
 }
 

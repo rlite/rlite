@@ -519,19 +519,19 @@ __rina_name_to_string(const struct rina_name *name, int maysleep)
     memcpy(cur, name->apn, apn_len);
     cur += apn_len;
 
-    *cur = '/';
+    *cur = ':';
     cur++;
 
     memcpy(cur, name->api, api_len);
     cur += api_len;
 
-    *cur = '/';
+    *cur = ':';
     cur++;
 
     memcpy(cur, name->aen, aen_len);
     cur += aen_len;
 
-    *cur = '/';
+    *cur = ':';
     cur++;
 
     memcpy(cur, name->aei, aei_len);
@@ -561,7 +561,7 @@ rina_sername_valid(const char *str)
     }
 
     while (*str != '\0') {
-        if (*str == '/' || *str == '|') {
+        if (*str == ':') {
             if (++ cnt > 3) {
                 return 0;
             }
@@ -569,7 +569,7 @@ rina_sername_valid(const char *str)
         str ++;
     }
 
-    return (*orig_str == '/' || *orig_str == '|') ? 0 : 1;
+    return (*orig_str == ':') ? 0 : 1;
 }
 COMMON_EXPORT(rina_sername_valid);
 
@@ -587,13 +587,13 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
         return -1;
     }
 
-    apn = strsep(strp, "/|");
-    api = strsep(strp, "/|");
-    aen = strsep(strp, "/|");
-    aei = strsep(strp, "/|");
+    apn = strsep(strp, ":");
+    api = strsep(strp, ":");
+    aen = strsep(strp, ":");
+    aei = strsep(strp, ":");
 
     if (!apn) {
-        /* The '/' are not necessary if some of the api, aen, aei
+        /* The ':' are not necessary if some of the api, aen, aei
          * are not present. */
         COMMON_FREE(strc_orig);
         return -1;
