@@ -83,7 +83,8 @@ struct shim_udp4 {
 
 #define SHIM(_u)    ((struct shim_udp4 *)((_u)->priv))
 
-static void
+/* Currently unused */
+void
 strrepchar(char *s, char old, char new)
 {
     for (; *s != '\0'; s++) {
@@ -99,29 +100,21 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const char *name,
                     struct sockaddr_in *addr)
 {
     struct addrinfo hints, *resaddrlist;
-    char *cname = strdup(name);
     int ret;
-
-    if (!cname) {
-        UPE(shim->uipcp, "Out of memory\n");
-        return -1;
-    }
-
-    strrepchar(cname, ':', '-');
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    ret = getaddrinfo(cname, NULL, &hints, &resaddrlist);
+    ret = getaddrinfo(name, NULL, &hints, &resaddrlist);
     if (ret) {
-        UPE(shim->uipcp, "getaddrinfo(%s) failed: %s\n", cname,
+        UPE(shim->uipcp, "getaddrinfo(%s) failed: %s\n", name,
                          gai_strerror(ret));
         goto err;
     }
 
     if (resaddrlist == NULL) {
-        UPE(shim->uipcp, "Could not find IP address for %s\n", cname);
+        UPE(shim->uipcp, "Could not find IP address for %s\n", name);
         goto err;
     }
 
@@ -130,15 +123,12 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const char *name,
     freeaddrinfo(resaddrlist);
     {
         char strbuf[INET_ADDRSTRLEN];
-        UPD(shim->uipcp, "'%s' --> '%s'\n", cname,
+        UPD(shim->uipcp, "'%s' --> '%s'\n", name,
             inet_ntop(AF_INET, &addr->sin_addr, strbuf, sizeof(strbuf)));
     }
 
-    free(cname);
-
     return 0;
 err:
-    free(cname);
     return -1;
 }
 
@@ -170,8 +160,6 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
         UPD(shim->uipcp, "'%s' --> '%s'\n", inet_ntop(AF_INET, &addr->sin_addr,
             strbuf, sizeof(strbuf)), host);
     }
-
-    strrepchar(host, '-', ':');
 
     *name = host;
 

@@ -589,7 +589,7 @@ for vmname in sorted(vms):
         for lower_dif in sorted(difs[dif][vmname]):
             if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
                 vars_dict = {'dif': dif, 'id': vm['id']}
-                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP-%(id)s' % vars_dict
+                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP:%(id)s' % vars_dict
                 del vars_dict
 
 
