@@ -48,6 +48,7 @@ class RinaRRTool:
                               self.server_name, self.flow_spec, 0)
 
         if fd < 0:
+            print("Flow allocation failed")
             return fd
 
         msg = 'Hello guys, this is a test message!'
