@@ -8,6 +8,6 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-sudo rlite-ctl ipcp-destroy ${1}.IPCP/1//
+sudo rlite-ctl ipcp-destroy ${1}.IPCP:1
 
 source tests/epilogue.sh

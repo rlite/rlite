@@ -14,7 +14,7 @@ if [ -z ${vmpi_id} ]; then
     echo "No registered provider"
 fi
 
-sudo rlite-ctl ipcp-create ${1}.IPCP/1// shim-hv d.DIF
-sudo rlite-ctl ipcp-config ${1}.IPCP/1// vmpi-id ${vmpi_id}
+sudo rlite-ctl ipcp-create ${1}.IPCP:1 shim-hv d.DIF
+sudo rlite-ctl ipcp-config ${1}.IPCP:1 vmpi-id ${vmpi_id}
 
 source tests/epilogue.sh

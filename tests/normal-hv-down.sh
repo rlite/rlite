@@ -18,7 +18,7 @@ fi
 
 # it's not necessary to unregister, we can rely on
 # auto-unregistration
-sudo rlite-ctl ipcp-destroy $NORMIPCP/1//
-sudo rlite-ctl ipcp-destroy $SHIPCP/1//
+sudo rlite-ctl ipcp-destroy $NORMIPCP:1
+sudo rlite-ctl ipcp-destroy $SHIPCP:1
 
 source tests/epilogue.sh
