@@ -36,6 +36,7 @@
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
+#include <asm/compat.h>
 
 
 int verbosity = RL_VERB_DBG;
@@ -2552,7 +2553,9 @@ rl_ctrl_ioctl(struct file *f, unsigned int cmd, unsigned long flags)
     unsigned int changed = flags ^ rc->flags;
 
     /* We have only one command, to change the flags. */
-    (void) cmd;
+    if (cmd != RLITE_IOCTL_CHFLAGS) {
+        return -EINVAL;
+    }
 
     if (flags & ~RL_F_ALL) {
         return -EINVAL;
@@ -2568,6 +2571,14 @@ rl_ctrl_ioctl(struct file *f, unsigned int cmd, unsigned long flags)
     return 0;
 }
 
+#ifdef CONFIG_COMPAT
+static long
+rl_ctrl_compat_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+	return rl_ctrl_ioctl(f, cmd, (unsigned long)compat_ptr(arg));
+}
+#endif
+
 static const struct file_operations rl_ctrl_fops = {
     .owner          = THIS_MODULE,
     .release        = rl_ctrl_release,
@@ -2576,6 +2587,9 @@ static const struct file_operations rl_ctrl_fops = {
     .read           = rl_ctrl_read,
     .poll           = rl_ctrl_poll,
     .unlocked_ioctl = rl_ctrl_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl   = rl_ctrl_compat_ioctl,
+#endif
     .llseek         = noop_llseek,
 };
 

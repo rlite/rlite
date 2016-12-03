@@ -170,7 +170,7 @@ open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
     info.ipcp_id = ipcp_id;
     info.mode = mode;
 
-    ret = ioctl(fd, 73, &info);
+    ret = ioctl(fd, RLITE_IOCTL_FLOW_BIND, &info);
     if (ret) {
         fprintf(stderr, "ioctl(%s) failed: %s\n", RLITE_IODEV_NAME,
                 strerror(errno));
@@ -344,7 +344,7 @@ rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags)
     flags &= RL_F_ALL;
     ctrl->flags = flags;
     if (flags) {
-        ret = ioctl(ctrl->rfd, 0, flags);
+        ret = ioctl(ctrl->rfd, RLITE_IOCTL_CHFLAGS, flags);
         if (ret) {
             perror("ioctl(flags)");
             goto clos;

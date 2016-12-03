@@ -33,6 +33,7 @@
 #else
 #include <stdio.h>
 #include <stdint.h>
+#include <asm/ioctl.h>
 #endif
 
 #include "rina/api.h"
@@ -107,6 +108,9 @@ struct rl_ioctl_info {
     rl_port_t       port_id;
     rl_ipcp_id_t    ipcp_id;
 } __attribute__((packed));
+
+#define RLITE_IOCTL_FLOW_BIND   _IOW(0xAF, 0x00, struct rl_ioctl_info)
+#define RLITE_IOCTL_CHFLAGS     _IOW(0xAF, 0x01, uint64_t)
 
 #define RLITE_MGMT_HDR_T_OUT_LOCAL_PORT      1
 #define RLITE_MGMT_HDR_T_OUT_DST_ADDR        2

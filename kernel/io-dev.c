@@ -36,6 +36,7 @@
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
+#include <asm/compat.h>
 
 #if 0
 static const char *
@@ -705,6 +706,14 @@ rl_io_release(struct inode *inode, struct file *f)
     return 0;
 }
 
+#ifdef CONFIG_COMPAT
+static long
+rl_io_compat_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+{
+	return rl_io_ioctl(f, cmd, (unsigned long)compat_ptr(arg));
+}
+#endif
+
 static const struct file_operations rl_io_fops = {
     .owner          = THIS_MODULE,
     .release        = rl_io_release,
@@ -713,6 +722,9 @@ static const struct file_operations rl_io_fops = {
     .read           = rl_io_read,
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl    = rl_io_compat_ioctl,
+#endif
     .llseek         = noop_llseek,
 };
 
