@@ -582,17 +582,13 @@ usage(void)
         "   -c NUM : number of SDUs to send during the test\n"
         "   -s NUM : size of the SDUs that are sent during the test\n"
         "   -i NUM : number of microseconds to wait after each SDUs is sent\n"
-        "   -p APNAME : application process name of the IPC process that "
-                "overrides what is specified by the -d option (debug only)\n"
-        "   -P APNAME : application process instance of the IPC process that "
-                "overrides what is specified by the -d option (debug only)\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
         "   -B NUM : average bandwitdh for the data flow, in bits per second\n"
         "   -f : enable flow control\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
-        "   -a APNAME : application process name/instance of the rinaperf client\n"
-        "   -z APNAME : application process name/instance of the rinaperf server\n"
+        "   -a APNAME : application process name and instance of the rinaperf client\n"
+        "   -z APNAME : application process name and instance of the rinaperf server\n"
         "   -x : use a separate control connection\n"
           );
 }
@@ -623,7 +619,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:p:P:i:B:g:fb:a:A:z:Z:x")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:x")) != -1) {
         switch (opt) {
             case 'h':
                 usage();

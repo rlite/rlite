@@ -183,10 +183,6 @@ usage(void)
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
-        "   -p APNAME : application process name of the IPC process that "
-                "overrides what is specified by the -d option (debug only)\n"
-        "   -P APNAME : application process instance of the IPC process that "
-                "overrides what is specified by the -d option (debug only)\n"
         "   -a APNAME : application process name/instance of the rl_rr client\n"
         "   -z APNAME : application process name/instance of the rl_rr server\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
@@ -209,7 +205,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rr.flowspec);
 
-    while ((opt = getopt(argc, argv, "hld:p:P:a:z:g:")) != -1) {
+    while ((opt = getopt(argc, argv, "hld:a:z:g:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
