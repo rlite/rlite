@@ -1491,7 +1491,7 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
         }
 
         /* Start the enrollment. */
-        UPD(rib->uipcp, "I will re-enroll with neighbor %s through "
+        UPD(rib->uipcp, "Triggering re-enrollement with neighbor %s through "
                         "lower DIF %s\n", cand->c_str(), common_dif.c_str());
         re_enrollments.push_back(make_pair(*cand, common_dif));
     }
