@@ -658,8 +658,11 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
     struct rl_ioctl_info info;
     long ret = -EINVAL;
 
-    /* We have only one command. This should be used and checked. */
-    (void) cmd;
+    /* We have only one command for now. */
+    if (cmd != RLITE_IOCTL_FLOW_BIND
+            && cmd != 1 /* splitted-sdu hack, temporary*/) {
+        return -EINVAL;
+    }
 
     if (copy_from_user(&info, argp, sizeof(info))) {
         return -EFAULT;

@@ -548,7 +548,7 @@ gw_open_appl_port(rl_port_t port_id, unsigned int max_sdu_size)
 
     if (fd >= 0) { /* Enable splitted sdu_write hack. */
         uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
-        ioctl(fd, 0, data);
+        ioctl(fd, 1, data);
     }
 
     return fd;
