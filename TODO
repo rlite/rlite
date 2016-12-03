@@ -1,7 +1,3 @@
-- flow entries in ALLOCATED state but never associated to a file descriptor
-  with a bind operation should disappear after a while, otherwise we
-  have leakage
-
 - rlite-utils: deserialization routines should check lengths
 
 - support generic RIB M_READ (and M_WRITE)

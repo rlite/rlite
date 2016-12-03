@@ -37,7 +37,6 @@
 #include <linux/list.h>
 #include <asm/atomic.h>
 
-
 /*
  * Logging support.
  */
@@ -421,6 +420,8 @@ struct flow_entry {
     struct rl_flow_stats stats;
     struct delayed_work remove;
     unsigned int        refcnt;
+#define RL_FLOW_NEVER_BOUND     (1 << 0)
+    uint8_t             flags;
     bool                never_bound;
     struct hlist_node   node;
     struct hlist_node   node_cep;
@@ -520,5 +521,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
+
+#define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(30000))
 
 #endif  /* __RLITE_KERNEL_H__ */

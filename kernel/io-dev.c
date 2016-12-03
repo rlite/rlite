@@ -700,7 +700,6 @@ rl_io_release(struct inode *inode, struct file *f)
     struct rl_io *rio = (struct rl_io *)f->private_data;
 
     rl_io_release_internal(rio);
-
     kfree(rio);
 
     return 0;

@@ -1032,6 +1032,12 @@ flow_del_func(struct work_struct *work)
 {
     struct flow_entry *flow = container_of(work, struct flow_entry,
                                            remove.work);
+
+    if (flow->flags & RL_FLOW_NEVER_BOUND) {
+        printk("Removing flow %u since it was never bound\n",
+                flow->local_port);
+        __flow_put(flow, true);
+    }
     __flow_put(flow, true);
 }
 
@@ -1083,7 +1089,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        entry->never_bound = true;
+        entry->flags = RL_FLOW_NEVER_BOUND;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
@@ -1156,20 +1162,23 @@ flow_rc_unbind(struct rl_ctrl *rc)
 void
 flow_make_mortal(struct flow_entry *flow)
 {
-    if (flow) {
-        FLOCK();
-
-        if (flow->never_bound) {
-            /* Here reference counter is (likely) 2. Reset it to 1, so that
-             * proper flow destruction happens in rl_io_release(). If we
-             * didn't do it, the flow would live forever with its refcount
-             * set to 1. */
-            flow->never_bound = false;
-            flow->refcnt--;
-        }
-
-        FUNLOCK();
+    if (!flow) {
+        return;
     }
+
+    FLOCK();
+
+    if (flow->flags & RL_FLOW_NEVER_BOUND) {
+        /* Here reference counter is (likely) 2. Reset it to 1, so that
+         * proper flow destruction happens in rl_io_release(). If we
+         * didn't do it, the flow would live forever with its refcount
+         * set to 1. */
+        flow->flags &= ~RL_FLOW_NEVER_BOUND;
+        cancel_delayed_work(&flow->remove);
+        flow->refcnt--;
+    }
+
+    FUNLOCK();
 }
 
 int
@@ -2108,10 +2117,12 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     if (ret || resp->response) {
         flow_put(flow_entry);
+    } else {
+        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
     }
 out:
 
-    flow_entry = flow_put(flow_entry);
+    flow_put(flow_entry);
 
     return ret;
 }
@@ -2235,10 +2246,12 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
     if (response) {
         /* Negative response --> delete the flow. */
         flow_put(flow_entry);
+    } else {
+        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
     }
 
 out:
-    flow_entry = flow_put(flow_entry);
+    flow_put(flow_entry);
 
     return ret;
 }
