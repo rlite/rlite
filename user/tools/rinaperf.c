@@ -613,8 +613,8 @@ main(int argc, char **argv)
     int opt;
     int i;
 
-    rp.cli_appl_name = "rinaperf-data/client";
-    rp.srv_appl_name = "rinaperf-data/server";
+    rp.cli_appl_name = "rinaperf-data:client";
+    rp.srv_appl_name = "rinaperf-data:server";
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&flowspec);
@@ -769,7 +769,7 @@ main(int argc, char **argv)
 
         /* In listen mode also register the application names. */
         if (have_ctrl) {
-            ret = rina_register(rp.cfd, dif_name, "rinaperf-ctrl/server");
+            ret = rina_register(rp.cfd, dif_name, "rinaperf-ctrl:server");
             if (ret) {
                 perror("rina_register()");
                 return ret;

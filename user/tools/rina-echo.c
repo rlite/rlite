@@ -199,8 +199,8 @@ main(int argc, char **argv)
     int ret;
     int opt;
 
-    rr.cli_appl_name = "rl_rr-data/client";
-    rr.srv_appl_name = "rl_rr-data/server";
+    rr.cli_appl_name = "rl_rr-data:client";
+    rr.srv_appl_name = "rl_rr-data:server";
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rr.flowspec);

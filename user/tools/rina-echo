@@ -108,9 +108,9 @@ argparser.add_argument('-d', '--dif',
                        help = "DIF to register to or ask for flow allocation",
                        type = str)
 argparser.add_argument('-a', '--client-name', help = "client name",
-                       type = str, default='rl_rr-data/client')
+                       type = str, default='rl_rr-data:client')
 argparser.add_argument('-z', '--server-name', help = "server name",
-                       type = str, default='rl_rr-data/server')
+                       type = str, default='rl_rr-data:server')
 
 args = argparser.parse_args()
 
