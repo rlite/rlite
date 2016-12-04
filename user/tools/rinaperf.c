@@ -157,6 +157,7 @@ ping_client(struct rinaperf *rp)
     int size = rp->test_config.size;
     char buf[SDU_SIZE_MAX];
     volatile uint16_t *seqnum = (uint16_t *)buf;
+    unsigned int timeouts = 0;
     int verb = rp->ping;
     unsigned int i = 0;
     unsigned long us;
@@ -209,8 +210,13 @@ repoll:
 
         if (ret == 0) {
             printf("Timeout: %d bytes lost\n", size);
+            if (++ timeouts > 8) {
+                printf("Stopping after %u consecutive timeouts\n", timeouts);
+                stop = 1;
+            }
         } else {
             /* Ready to read. */
+            timeouts = 0;
             ret = read(rp->dfd, buf, sizeof(buf));
             if (ret <= 0) {
                 if (ret) {
@@ -273,7 +279,7 @@ ping_server(struct rinaperf *rp)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            printf("timeout occurred\n");
+            printf("Timeout occurred\n");
             break;
         }
 
