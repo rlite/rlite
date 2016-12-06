@@ -1035,8 +1035,8 @@ flow_del_func(struct work_struct *work)
                                            remove.work);
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
-        printk("Removing flow %u since it was never bound\n",
-                flow->local_port);
+        PI("Removing flow %u since it was never bound\n",
+           flow->local_port);
         __flow_put(flow, true);
     }
     __flow_put(flow, true);
@@ -1090,7 +1090,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        entry->flags = RL_FLOW_NEVER_BOUND;
+        entry->flags = 0;
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp, false);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
@@ -1170,12 +1170,15 @@ flow_make_mortal(struct flow_entry *flow)
     FLOCK();
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
+        int canceled;
         /* Here reference counter is (likely) 2. Reset it to 1, so that
          * proper flow destruction happens in rl_io_release(). If we
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
-        cancel_delayed_work(&flow->remove);
+        canceled = cancel_delayed_work(&flow->remove);
+        PD("cancel_delayed_work(%u) --> %d\n", flow->local_port, canceled);
+        BUG_ON(!canceled);
         flow->refcnt--;
     }
 
@@ -2084,6 +2087,9 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
     flow_entry->txrx.state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
                                                    : FLOW_STATE_NULL;
+    if (resp->response == 0) {
+        flow_entry->flags |= RL_FLOW_NEVER_BOUND;
+    }
     spin_unlock_bh(&flow_entry->txrx.rx_lock);
 
     PI("Flow allocation response [%u] issued to IPC process %u, "
@@ -2092,6 +2098,12 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     if (!resp->response && resp->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(rc, resp->upper_ipcp_id, flow_entry);
+    }
+
+    if (!resp->response) {
+        /* Positive response. Start the unbound timer before informing the
+         * userspace, see explanatin in rl_fa_resp_arrived(). */
+        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
     }
 
     /* Notify the involved IPC process about the response. */
@@ -2117,9 +2129,10 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     if (ret || resp->response) {
+        if (!resp->response) {
+            cancel_delayed_work(&flow_entry->remove);
+        }
         flow_put(flow_entry);
-    } else {
-        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
     }
 out:
 
@@ -2222,6 +2235,9 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
     }
     flow_entry->txrx.state = (response == 0) ? FLOW_STATE_ALLOCATED
                                              : FLOW_STATE_NULL;
+    if (response == 0) {
+        flow_entry->flags |= RL_FLOW_NEVER_BOUND;
+    }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;
     flow_entry->remote_addr = remote_addr;
@@ -2240,15 +2256,25 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
             "port-id %u, remote addr %llu\n", ipcp->id,
             local_port, (long long unsigned)remote_addr);
 
-    ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
-                                                 flow_entry->event_id,
-                                                 local_port, response);
+    if (!response) {
+        /* Positive response. Start the unbound timer before informing
+         * the application. This prevents a possible race condition
+         * with flow_make_mortal() calling cancel_delayed_work() before
+         * schedule_delayed_work() is called here (that in turn would cause
+         * flow_put() to be called by flow_del_func() when it shouldn't). */
+        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
+    }
 
-    if (response) {
+    ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
+                                               flow_entry->event_id,
+                                               local_port, response);
+
+    if (response || ret) {
+        if (!response) {
+            cancel_delayed_work(&flow_entry->remove);
+        }
         /* Negative response --> delete the flow. */
         flow_put(flow_entry);
-    } else {
-        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
     }
 
 out:

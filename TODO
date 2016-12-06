@@ -8,3 +8,7 @@
 - install: don't overwrite config files
 
 - DTCP: RTT estimate should happen using ktime_t variables
+
+- implement a first address assignment policy
+
+- extend rinaperf to be multithreaded
