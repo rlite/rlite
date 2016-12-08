@@ -268,7 +268,6 @@ struct txrx {
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
     struct rina_pci     *rx_cur_pci;
-    bool                mgmt;
     uint8_t             state;
 
     /* Write operation support. */
@@ -510,7 +509,6 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->__tx_wqh);
     txrx->tx_wqh = &txrx->__tx_wqh; /* Use per-flow tx_wqh by default. */
-    txrx->mgmt = mgmt;
     if (mgmt) {
         txrx->state = FLOW_STATE_ALLOCATED;
     } else {

@@ -430,6 +430,7 @@ static ssize_t
 rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 {
     struct rl_io *rio = (struct rl_io *)f->private_data;
+    struct flow_entry *flow = rio->flow; /* NULL if mgmt */
     bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
@@ -505,8 +506,8 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
                 ret = -EFAULT;
             }
 
-            if (!txrx->mgmt && rio->flow->sdu_rx_consumed) {
-                rio->flow->sdu_rx_consumed(rio->flow, pci);
+            if (flow && flow->sdu_rx_consumed) {
+                flow->sdu_rx_consumed(flow, pci);
             }
 
             rl_buf_free(rb);
