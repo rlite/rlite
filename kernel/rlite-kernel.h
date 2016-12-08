@@ -269,6 +269,8 @@ struct txrx {
     spinlock_t          rx_lock;
     struct rina_pci     *rx_cur_pci;
     uint8_t             state;
+#define RL_TXRX_EOF         (1 << 0)
+    uint8_t             flags;
 
     /* Write operation support. */
     struct ipcp_entry   *ipcp;
@@ -514,6 +516,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     } else {
         txrx->state = FLOW_STATE_PENDING;
     }
+    txrx->flags = 0;
 }
 
 void dtp_init(struct dtp *dtp);

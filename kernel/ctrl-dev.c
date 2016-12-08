@@ -1731,6 +1731,7 @@ rl_flow_shutdown(struct flow_entry *flow)
     spin_lock_bh(&flow->txrx.rx_lock);
     if (flow->txrx.state == FLOW_STATE_ALLOCATED) {
         /* Set the EOF condition on the flow. */
+        flow->txrx.flags |= RL_TXRX_EOF;
         flow->txrx.state = FLOW_STATE_DEALLOCATED;
         deallocated = 1;
     }
@@ -1739,7 +1740,7 @@ rl_flow_shutdown(struct flow_entry *flow)
     if (deallocated) {
         /* Wake up readers and pollers, so that they can read the EOF. */
         wake_up_interruptible_poll(&flow->txrx.rx_wqh, POLLIN |
-                POLLRDNORM | POLLRDBAND);
+                                   POLLRDNORM | POLLRDBAND);
     }
 }
 EXPORT_SYMBOL(rl_flow_shutdown);

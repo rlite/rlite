@@ -451,7 +451,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
         spin_lock_bh(&txrx->rx_lock);
         if (list_empty(&txrx->rx_q)) {
-            if (unlikely(txrx->state == FLOW_STATE_DEALLOCATED)) {
+            if (unlikely(txrx->flags & RL_TXRX_EOF)) {
                 /* Report the EOF condition to userspace reader. */
                 ret = 0;
                 spin_unlock_bh(&txrx->rx_lock);
@@ -540,8 +540,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     poll_wait(f, &txrx->rx_wqh, wait);
 
     spin_lock_bh(&txrx->rx_lock);
-    if (!list_empty(&txrx->rx_q) ||
-            txrx->state == FLOW_STATE_DEALLOCATED) {
+    if (!list_empty(&txrx->rx_q) || txrx->flags & RL_TXRX_EOF) {
         /* Userspace can read when the flow rxq is not empty
          * or when the flow has been deallocated, so that
          * we can report EOF. */
