@@ -1090,9 +1090,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        entry->flags = 0;
+        entry->flags = RL_FLOW_PENDING;
         INIT_LIST_HEAD(&entry->pduft_entries);
-        txrx_init(&entry->txrx, ipcp, false);
+        txrx_init(&entry->txrx, ipcp);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
         if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
             hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
@@ -1139,7 +1139,7 @@ flow_rc_unbind(struct rl_ctrl *rc)
             /* Since this 'rc' is going to disappear, we have to remove
              * the reference stored into this flow. */
             flow->upper.rc = NULL;
-            if (flow->txrx.state == FLOW_STATE_PENDING) {
+            if (flow->flags & RL_FLOW_PENDING) {
                 /* This flow is still pending. Since this rl_ctrl
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
@@ -1729,10 +1729,10 @@ rl_flow_shutdown(struct flow_entry *flow)
     int deallocated = 0;
 
     spin_lock_bh(&flow->txrx.rx_lock);
-    if (flow->txrx.state == FLOW_STATE_ALLOCATED) {
+    if (flow->flags & RL_FLOW_ALLOCATED) {
         /* Set the EOF condition on the flow. */
         flow->txrx.flags |= RL_TXRX_EOF;
-        flow->txrx.state = FLOW_STATE_DEALLOCATED;
+        flow->flags |= RL_FLOW_DEALLOCATED;
         deallocated = 1;
     }
     spin_unlock_bh(&flow->txrx.rx_lock);
@@ -2080,16 +2080,15 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
     spin_lock_bh(&flow_entry->txrx.rx_lock);
-    if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
-        PE("flow %u is in invalid state %u\n",
-                flow_entry->local_port, flow_entry->txrx.state);
+    if (!(flow_entry->flags & RL_FLOW_PENDING)) {
+        PE("flow %u is in invalid state %x\n",
+                flow_entry->local_port, flow_entry->flags);
         spin_unlock_bh(&flow_entry->txrx.rx_lock);
         goto out;
     }
-    flow_entry->txrx.state = (resp->response == 0) ? FLOW_STATE_ALLOCATED
-                                                   : FLOW_STATE_NULL;
+    flow_entry->flags &= ~RL_FLOW_PENDING;
     if (resp->response == 0) {
-        flow_entry->flags |= RL_FLOW_NEVER_BOUND;
+        flow_entry->flags |= RL_FLOW_NEVER_BOUND | RL_FLOW_ALLOCATED;
     }
     spin_unlock_bh(&flow_entry->txrx.rx_lock);
 
@@ -2230,14 +2229,13 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
     }
 
     spin_lock_bh(&flow_entry->txrx.rx_lock);
-    if (flow_entry->txrx.state != FLOW_STATE_PENDING) {
+    if (!(flow_entry->flags & RL_FLOW_PENDING)) {
         spin_unlock_bh(&flow_entry->txrx.rx_lock);
         goto out;
     }
-    flow_entry->txrx.state = (response == 0) ? FLOW_STATE_ALLOCATED
-                                             : FLOW_STATE_NULL;
+    flow_entry->flags &= ~RL_FLOW_PENDING;
     if (response == 0) {
-        flow_entry->flags |= RL_FLOW_NEVER_BOUND;
+        flow_entry->flags |= RL_FLOW_NEVER_BOUND | RL_FLOW_ALLOCATED;
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;

@@ -540,7 +540,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     poll_wait(f, &txrx->rx_wqh, wait);
 
     spin_lock_bh(&txrx->rx_lock);
-    if (!list_empty(&txrx->rx_q) || txrx->flags & RL_TXRX_EOF) {
+    if (!list_empty(&txrx->rx_q) || (txrx->flags & RL_TXRX_EOF)) {
         /* Userspace can read when the flow rxq is not empty
          * or when the flow has been deallocated, so that
          * we can report EOF. */
@@ -596,7 +596,7 @@ rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
         return -ENOMEM;
     }
 
-    txrx_init(rio->txrx, ipcp, true);
+    txrx_init(rio->txrx, ipcp);
     ipcp->mgmt_txrx = rio->txrx;
 
     return 0;

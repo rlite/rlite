@@ -268,7 +268,6 @@ struct txrx {
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
     struct rina_pci     *rx_cur_pci;
-    uint8_t             state;
 #define RL_TXRX_EOF         (1 << 0)
     uint8_t             flags;
 
@@ -334,13 +333,6 @@ struct ipcp_factory {
     struct ipcp_ops ops;
 
     struct list_head node;
-};
-
-enum {
-    FLOW_STATE_NULL = 0,    /* Not really used. */
-    FLOW_STATE_PENDING,
-    FLOW_STATE_ALLOCATED,
-    FLOW_STATE_DEALLOCATED,
 };
 
 struct upper_ref {
@@ -421,7 +413,10 @@ struct flow_entry {
     struct rl_flow_stats stats;
     struct delayed_work remove;
     unsigned int        refcnt;
-#define RL_FLOW_NEVER_BOUND     (1 << 0)
+#define RL_FLOW_NEVER_BOUND     (1 << 0) /* flow was never bound with ioctl */
+#define RL_FLOW_PENDING         (1 << 1) /* flow allocation is pending */
+#define RL_FLOW_ALLOCATED       (1 << 2) /* flow has been allocated */
+#define RL_FLOW_DEALLOCATED     (1 << 3) /* flow has been deallocated */
     uint8_t             flags;
     bool                never_bound;
     struct hlist_node   node;
@@ -501,7 +496,7 @@ void flow_make_mortal(struct flow_entry *flow);
 void rl_flow_shutdown(struct flow_entry *flow);
 
 static inline void
-txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
+txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 {
     spin_lock_init(&txrx->rx_lock);
     INIT_LIST_HEAD(&txrx->rx_q);
@@ -511,11 +506,6 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp, bool mgmt)
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->__tx_wqh);
     txrx->tx_wqh = &txrx->__tx_wqh; /* Use per-flow tx_wqh by default. */
-    if (mgmt) {
-        txrx->state = FLOW_STATE_ALLOCATED;
-    } else {
-        txrx->state = FLOW_STATE_PENDING;
-    }
     txrx->flags = 0;
 }
 
