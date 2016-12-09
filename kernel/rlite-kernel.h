@@ -262,7 +262,7 @@ struct ipcp_ops {
 };
 
 struct txrx {
-    /* Read operation (and flow state) support. */
+    /* Read operation support. */
     struct list_head    rx_q;
     unsigned int        rx_qlen;
     wait_queue_head_t   rx_wqh;
@@ -418,7 +418,6 @@ struct flow_entry {
 #define RL_FLOW_ALLOCATED       (1 << 2) /* flow has been allocated */
 #define RL_FLOW_DEALLOCATED     (1 << 3) /* flow has been deallocated */
     uint8_t             flags;
-    bool                never_bound;
     struct hlist_node   node;
     struct hlist_node   node_cep;
 };
