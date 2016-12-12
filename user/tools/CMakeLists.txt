@@ -4,7 +4,7 @@ add_executable(rina-echo-bin rina-echo.c)
 add_executable(rlite-ctl rlite-ctl.c)
 add_executable(rina-gw rina-gw.cpp)
 
-target_link_libraries(rinaperf rlite)
+target_link_libraries(rinaperf rlite ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(rina-echo-bin rlite)
 target_link_libraries(rlite-ctl rlite rlite-conf)
 target_link_libraries(rina-gw rlite rlite-evloop ${CMAKE_THREAD_LIBS_INIT})
