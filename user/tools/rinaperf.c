@@ -44,7 +44,8 @@
 #include <rina/api.h>
 
 
-#define SDU_SIZE_MAX    65535
+#define SDU_SIZE_MAX            65535
+#define RINAPERF_MAX_WORKERS    1023
 
 static int stop = 0; /* Used to stop client on SIGINT. */
 static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
@@ -85,6 +86,7 @@ struct rinaperf {
     /* Only used by the server. */
     struct worker *workers_head;
     struct worker *workers_tail;
+    unsigned int workers_num;
 };
 
 static int
@@ -521,8 +523,6 @@ worker_function(void *opaque)
     struct worker *w = opaque;
     int ret;
 
-    printf("Worker %p started\n", w);
-
     ret = server_test_config(w);
     if (ret) {
         goto out;
@@ -540,8 +540,6 @@ out:
     close(w->fd);
     w->fd = -1;
 
-    printf("Worker %p finished\n", w);
-
     return NULL;
 }
 
@@ -554,25 +552,32 @@ server(struct rinaperf *rp)
         struct worker *p;
         int ret;
 
-        /* Try to join terminated threads. */
-        for (p = NULL, w = rp->workers_head; w; p = w, w = w->next) {
-            ret = pthread_tryjoin_np(w->th, NULL);
-            if (ret == 0) {
-                if (w == rp->workers_head) {
-                    rp->workers_head = w->next;
-                }
-                if (p) {
-                    p->next = w->next;
-                }
-                if (w == rp->workers_tail) {
-                    rp->workers_tail = p;
-                }
-                printf("Freed worker %p\n", w);
-                free(w);
+        for (;;) {
+            /* Try to join terminated threads. */
+            for (p = NULL, w = rp->workers_head; w; p = w, w = w->next) {
+                ret = pthread_tryjoin_np(w->th, NULL);
+                if (ret == 0) {
+                    if (w == rp->workers_head) {
+                        rp->workers_head = w->next;
+                    }
+                    if (p) {
+                        p->next = w->next;
+                    }
+                    if (w == rp->workers_tail) {
+                        rp->workers_tail = p;
+                    }
+                    free(w);
+                    rp->workers_num --;
 
-            } else if (ret != EBUSY) {
-                printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                } else if (ret != EBUSY) {
+                    printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                }
             }
+
+            if (rp->workers_num < RINAPERF_MAX_WORKERS) {
+                break;
+            }
+            usleep(10000);
         }
 
         /* Allocate new worker and accept a new flow. */
@@ -590,7 +595,11 @@ server(struct rinaperf *rp)
             break;
         }
 
-        pthread_create(&w->th, NULL, worker_function, w);
+        ret = pthread_create(&w->th, NULL, worker_function, w);
+        if (ret) {
+            printf("pthread_create() failed: %s\n", strerror(ret));
+            break;
+        }
 
         /* List tail insertion */
         if (rp->workers_tail == NULL) {
@@ -599,6 +608,8 @@ server(struct rinaperf *rp)
             rp->workers_tail->next = w;
             rp->workers_tail = w;
         }
+        rp->workers_num ++;
+        printf("Active workers %u\n", rp->workers_num);
     }
 
     if (w) {
