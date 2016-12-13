@@ -79,6 +79,7 @@ struct rinaperf {
     const char *srv_appl_name;
     const char *dif_name;
     int cfd; /* Control file descriptor */
+    int parallel;
 
     /* List of workers. */
     struct worker *workers_head;
@@ -716,6 +717,7 @@ usage(void)
                 "specified by -i option (default b=1)\n"
         "   -a APNAME : application process name and instance of the rinaperf client\n"
         "   -z APNAME : application process name and instance of the rinaperf server\n"
+        "   -p NUM : clients run NUM parallel instances, using NUM threads\n"
         "   -x : use a separate control connection\n"
           );
 }
@@ -741,14 +743,16 @@ main(int argc, char **argv)
     memset(&rp, 0, sizeof(rp));
     memset(&wt, 0, sizeof(wt));
     wt.rp = &rp;
+    wt.fd = -1;
 
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
+    rp.parallel = 1;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:x")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:xp:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -824,6 +828,14 @@ main(int argc, char **argv)
                 printf("Warning: Control connection support is incomplete\n");
                 break;
 
+            case 'p':
+                rp.parallel = atoi(optarg);
+                if (rp.parallel <= 0) {
+                    printf("    Invalid 'parallel' %d\n", rp.parallel);
+                    return -1;
+                }
+                break;
+
             default:
                 printf("    Unrecognized option %c\n", opt);
                 usage();
@@ -897,8 +909,32 @@ main(int argc, char **argv)
 
     if (listen) {
         server(&rp);
-    } else {
+    } else if (rp.parallel == 1) {
         client_worker_function(&wt);
+    } else {
+        struct worker *workers = calloc(rp.parallel, sizeof(*workers));
+
+        if (workers == NULL) {
+            printf("Failed to allocate client workers\n");
+            return -1;
+        }
+
+        for (i = 0; i < rp.parallel; i++) {
+            memcpy(workers + i, &wt, sizeof(wt));
+            ret = pthread_create(&workers[i].th, NULL, client_worker_function,
+                                 workers + i);
+            if (ret) {
+                printf("pthread_create(#%d) failed: %s\n", i, strerror(ret));
+                break;
+            }
+        }
+
+        for (i = 0; i < rp.parallel; i++) {
+            ret = pthread_join(workers[i].th, NULL);
+            if (ret) {
+                printf("pthread_join(#%d) failed: %s\n", i, strerror(ret));
+            }
+        }
     }
 
     return close(rp.cfd);
