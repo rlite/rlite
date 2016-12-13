@@ -569,6 +569,14 @@ static int
 server(struct rinaperf *rp)
 {
     struct worker *w = NULL;
+    int ret;
+
+    /* Server-side initializations. */
+    ret = rina_register(rp->cfd, rp->dif_name, rp->srv_appl_name);
+    if (ret) {
+        perror("rina_register()");
+        return ret;
+    }
 
     for (;;) {
         struct worker *p;
@@ -823,6 +831,8 @@ main(int argc, char **argv)
         }
     }
 
+    (void)have_ctrl;
+
     /*
      * Fixups:
      *   - Use 1 second interval for ping tests, if the user did not
@@ -886,25 +896,7 @@ main(int argc, char **argv)
     }
 
     if (listen) {
-        /* Server-side initializations. */
-
-        /* In listen mode also register the application names. */
-        if (have_ctrl) {
-            ret = rina_register(rp.cfd, rp.dif_name, "rinaperf-ctrl:server");
-            if (ret) {
-                perror("rina_register()");
-                return ret;
-            }
-        }
-
-        ret = rina_register(rp.cfd, rp.dif_name, rp.srv_appl_name);
-        if (ret) {
-            perror("rina_register()");
-            return ret;
-        }
-
         server(&rp);
-
     } else {
         client_worker_function(&wt);
     }
