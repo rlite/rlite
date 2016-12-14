@@ -37,11 +37,13 @@
 #include <endian.h>
 #include <signal.h>
 #include <poll.h>
+#include <sys/select.h>
 
 #include <rina/api.h>
 
 
 #define SDU_SIZE_MAX    65535
+#define MAX_CLIENTS     3
 
 struct rl_rr {
     int cfd;
@@ -51,58 +53,132 @@ struct rl_rr {
     struct rina_flow_spec flowspec;
 };
 
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
+
+struct selfd {
+#define SELFD_S_ALLOC   1
+#define SELFD_S_WRITE   2
+#define SELFD_S_READ    3
+#define SELFD_S_NONE    4
+#define SELFD_S_ACCEPT  5
+    int state;
+    int fd;
+};
+
 static int
 client(struct rl_rr *rr)
 {
     const char *msg = "Hello guys, this is a test message!";
     char buf[SDU_SIZE_MAX];
-    struct pollfd pfd;
-    int ret = 0;
+    struct selfd sfds[1];
+    fd_set rdfs, wrfs;
+    int maxfd;
+    int p = 1;
+    int ret;
     int size;
-    int dfd;
+    int i;
 
-    /* We're the client: allocate a flow and run the perf function. */
-    dfd = rina_flow_alloc(rr->dif_name, rr->cli_appl_name,
-                        rr->srv_appl_name, &rr->flowspec, 0);
-    if (dfd < 0) {
-        perror("rina_flow_alloc()");
-        return dfd;
-    }
+    /* Start flow allocations in parallel, without waiting for completion. */
 
-    pfd.fd = dfd;
-    pfd.events = POLLIN;
-
-    strncpy(buf, msg, SDU_SIZE_MAX);
-    size = strlen(buf) + 1;
-
-    ret = write(dfd, buf, size);
-    if (ret != size) {
-        if (ret < 0) {
-            perror("write(buf)");
-        } else {
-            printf("Partial write %d/%d\n", ret, size);
+    for (i = 0; i < p; i ++) {
+        sfds[i].state = SELFD_S_ALLOC;
+        sfds[i].fd = rina_flow_alloc(rr->dif_name, rr->cli_appl_name,
+                                     rr->srv_appl_name, &rr->flowspec,
+                                     RINA_F_NOWAIT);
+        if (sfds[i].fd < 0) {
+            perror("rina_flow_alloc()");
+            return sfds[i].fd;
         }
     }
 
-    ret = poll(&pfd, 1, 3000);
-    if (ret < 0) {
-        perror("poll(flow)");
-    } else if (ret == 0) {
-        /* Timeout */
-        printf("timeout occurred\n");
-        return -1;
+    for (;;) {
+        FD_ZERO(&rdfs);
+        FD_ZERO(&wrfs);
+        maxfd = 0;
+
+        for (i = 0; i < p; i++) {
+            switch (sfds[i].state) {
+            case SELFD_S_WRITE:
+                FD_SET(sfds[i].fd, &wrfs);
+                break;
+            case SELFD_S_READ:
+            case SELFD_S_ALLOC:
+                FD_SET(sfds[i].fd, &rdfs);
+                break;
+            case SELFD_S_NONE:
+                /* Do nothing */
+                break;
+            }
+
+            maxfd = MAX(maxfd, sfds[i].fd);
+        }
+
+        if (maxfd <= 0) {
+            /* Nothing more to process. */
+            break;
+        }
+
+        ret = select(maxfd + 1, &rdfs, &wrfs, NULL, NULL);
+        if (ret < 0) {
+            perror("select()\n");
+            return ret;
+        } else if (ret == 0) {
+            /* Timeout */
+            printf("Timeout occurred\n");
+            break;
+        }
+
+        for (i = 0; i < p; i++) {
+            switch (sfds[i].state) {
+            case SELFD_S_ALLOC:
+                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                    /* Complete flow allocation, replacing the fd. */
+                    sfds[i].fd = rina_flow_alloc_wait(sfds[i].fd);
+                    if (sfds[i].fd < 0) {
+                        perror("rina_flow_alloc_wait()");
+                        return sfds[i].fd;
+                    }
+                    sfds[i].state = SELFD_S_WRITE;
+                    printf("Flow %d allocated\n", i);
+                }
+                break;
+
+            case SELFD_S_WRITE:
+                if (FD_ISSET(sfds[i].fd, &wrfs)) {
+                    strncpy(buf, msg, SDU_SIZE_MAX);
+                    size = strlen(buf) + 1;
+
+                    ret = write(sfds[i].fd, buf, size);
+                    if (ret != size) {
+                        if (ret < 0) {
+                            perror("write(buf)");
+                        } else {
+                            printf("Partial write %d/%d\n", ret, size);
+                        }
+                    }
+                    sfds[i].state = SELFD_S_READ;
+                }
+                break;
+
+            case SELFD_S_READ:
+                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                    /* Ready to read. */
+                    ret = read(sfds[i].fd, buf, sizeof(buf));
+                    if (ret < 0) {
+                        perror("read(buf");
+                    }
+                    buf[ret] = '\0';
+                    printf("Response: '%s'\n", buf);
+                    close(sfds[i].fd);
+                    sfds[i].fd = -1;
+
+                    sfds[i].state = SELFD_S_NONE;
+                    printf("Flow %d deallocated\n", i);
+                }
+                break;
+            }
+        }
     }
-
-    /* Ready to read. */
-    ret = read(dfd, buf, sizeof(buf));
-    if (ret < 0) {
-        perror("read(buf");
-    }
-    buf[ret] = '\0';
-
-    close(dfd);
-
-    printf("Response: '%s'\n", buf);
 
     return 0;
 }
@@ -110,11 +186,12 @@ client(struct rl_rr *rr)
 static int
 server(struct rl_rr *rr)
 {
-    int n, ret, dfd;
+    struct selfd sfds[MAX_CLIENTS + 1];
     char buf[SDU_SIZE_MAX];
-    struct pollfd pfd;
-
-    /* Server-side initializations. */
+    fd_set rdfs, wrfs;
+    int n, ret;
+    int maxfd;
+    int i;
 
     /* In listen mode also register the application names. */
     ret = rina_register(rr->cfd, rr->dif_name, rr->srv_appl_name);
@@ -123,48 +200,125 @@ server(struct rl_rr *rr)
         return ret;
     }
 
+    sfds[0].state = SELFD_S_ACCEPT;
+    sfds[0].fd = rr->cfd;
+
+    for (i = 1; i <= MAX_CLIENTS; i++) {
+        sfds[i].state = SELFD_S_NONE;
+        sfds[i].fd = -1;
+    }
+
     for (;;) {
-        dfd = rina_flow_accept(rr->cfd, NULL, NULL, 0);
-        if (dfd < 0) {
-            perror("rina_flow_accept()");
-            continue;
-        }
+        FD_ZERO(&rdfs);
+        FD_ZERO(&wrfs);
+        maxfd = 0;
 
-        pfd.fd = dfd;
-        pfd.events = POLLIN;
-
-        n = poll(&pfd, 1, 3000);
-        if (n < 0) {
-            perror("poll(flow)");
-        } else if (n == 0) {
-            /* Timeout */
-            printf("timeout occurred\n");
-            return -1;
-        }
-
-        /* File descriptor is ready for reading. */
-        n = read(dfd, buf, sizeof(buf));
-        if (n < 0) {
-            perror("read(flow)");
-            return -1;
-        }
-
-        buf[n] = '\0';
-        printf("Request: '%s'\n", buf);
-
-        ret = write(dfd, buf, n);
-        if (ret != n) {
-            if (ret < 0) {
-                perror("write(flow)");
-            } else {
-                printf("partial write");
+        for (i = 0; i <= MAX_CLIENTS; i++) {
+            switch (sfds[i].state) {
+            case SELFD_S_WRITE:
+                FD_SET(sfds[i].fd, &wrfs);
+                break;
+            case SELFD_S_READ:
+            case SELFD_S_ACCEPT:
+                FD_SET(sfds[i].fd, &rdfs);
+                break;
+            case SELFD_S_NONE:
+                /* Do nothing */
+                break;
             }
-            return -1;
+
+            maxfd = MAX(maxfd, sfds[i].fd);
         }
 
-        close(dfd);
+        assert(maxfd >= 0);
 
-        printf("Response sent back\n");
+        ret = select(maxfd + 1, &rdfs, &wrfs, NULL, NULL);
+        if (ret < 0) {
+            perror("select()\n");
+            return ret;
+        } else if (ret == 0) {
+            /* Timeout */
+            printf("Timeout occurred\n");
+            break;
+        }
+
+        for (i = 0; i <= MAX_CLIENTS; i++) {
+            switch (sfds[i].state) {
+            case SELFD_S_ACCEPT:
+                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                    int handle;
+                    int j;
+
+                    /* Look for a free slot. */
+                    for (j = 1; j <= MAX_CLIENTS; j++) {
+                        if (sfds[j].state == SELFD_S_NONE) {
+                            break;
+                        }
+                    }
+
+                    /* Receive flow allocation request without
+                     * responding. */
+                    handle = rina_flow_accept(sfds[i].fd, NULL, NULL,
+                                              RINA_F_NORESP);
+                    if (handle < 0) {
+                        perror("rina_flow_accept()");
+                        return handle;
+                    }
+
+                    /* Respond positively if we have found a slot. */
+                    sfds[j].fd = rina_flow_respond(sfds[i].fd, handle,
+                                                   j > MAX_CLIENTS ? -1 : 0);
+                    if (sfds[j].fd < 0) {
+                        perror("rina_flow_respond()");
+                        return sfds[j].fd;
+                    }
+
+                    if (j > MAX_CLIENTS) {
+                        sfds[j].state = SELFD_S_NONE;
+                        sfds[j].fd = -1;
+                    } else {
+                        sfds[j].state = SELFD_S_READ;
+                        printf("Accept client %d\n", j);
+                    }
+                }
+                break;
+
+            case SELFD_S_READ:
+                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                    /* File descriptor is ready for reading. */
+                    n = read(sfds[i].fd, buf, sizeof(buf));
+                    if (n < 0) {
+                        perror("read(flow)");
+                        return -1;
+                    }
+
+                    buf[n] = '\0';
+                    printf("Request: '%s'\n", buf);
+
+                    sfds[i].state = SELFD_S_WRITE;
+                }
+                break;
+
+            case SELFD_S_WRITE:
+                if (FD_ISSET(sfds[i].fd, &wrfs)) {
+                    ret = write(sfds[i].fd, buf, n);
+                    if (ret != n) {
+                        if (ret < 0) {
+                            perror("write(flow)");
+                        } else {
+                            printf("partial write");
+                        }
+                        return -1;
+                    }
+
+                    printf("Response sent back\n");
+                    close(sfds[i].fd);
+                    sfds[i].state = SELFD_S_NONE;
+                    sfds[i].fd = -1;
+                    printf("Close client %d\n", i);
+                }
+            }
+        }
     }
 
     return 0;
