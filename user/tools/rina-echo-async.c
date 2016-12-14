@@ -43,7 +43,7 @@
 
 
 #define SDU_SIZE_MAX    65535
-#define MAX_CLIENTS     3
+#define MAX_CLIENTS     128
 
 struct echo_async {
     int cfd;
@@ -65,6 +65,14 @@ struct selfd {
     int state;
     int fd;
 };
+
+static void
+shutdown_flow(struct selfd *sfd)
+{
+    close(sfd->fd);
+    sfd->state = SELFD_S_NONE;
+    sfd->fd = -1;
+}
 
 static int
 client(struct echo_async *rea)
@@ -141,11 +149,12 @@ client(struct echo_async *rea)
                     /* Complete flow allocation, replacing the fd. */
                     sfds[i].fd = rina_flow_alloc_wait(sfds[i].fd);
                     if (sfds[i].fd < 0) {
-                        perror("rina_flow_alloc_wait()");
-                        return sfds[i].fd;
+                        printf("rina_flow_alloc_wait(): flow %d denied\n", i);
+                        shutdown_flow(sfds + i);
+                    } else {
+                        sfds[i].state = SELFD_S_WRITE;
+                        printf("Flow %d allocated\n", i);
                     }
-                    sfds[i].state = SELFD_S_WRITE;
-                    printf("Flow %d allocated\n", i);
                 }
                 break;
 
@@ -155,14 +164,11 @@ client(struct echo_async *rea)
                     size = strlen(buf) + 1;
 
                     ret = write(sfds[i].fd, buf, size);
-                    if (ret != size) {
-                        if (ret < 0) {
-                            perror("write(buf)");
-                        } else {
-                            printf("Partial write %d/%d\n", ret, size);
-                        }
+                    if (ret == size) {
+                        sfds[i].state = SELFD_S_READ;
+                    } else {
+                        shutdown_flow(sfds + i);
                     }
-                    sfds[i].state = SELFD_S_READ;
                 }
                 break;
 
@@ -170,16 +176,12 @@ client(struct echo_async *rea)
                 if (FD_ISSET(sfds[i].fd, &rdfs)) {
                     /* Ready to read. */
                     ret = read(sfds[i].fd, buf, sizeof(buf));
-                    if (ret < 0) {
-                        perror("read(buf");
+                    if (ret > 0) {
+                        buf[ret] = '\0';
+                        printf("Response: '%s'\n", buf);
+                        printf("Flow %d deallocated\n", i);
                     }
-                    buf[ret] = '\0';
-                    printf("Response: '%s'\n", buf);
-                    close(sfds[i].fd);
-                    sfds[i].fd = -1;
-
-                    sfds[i].state = SELFD_S_NONE;
-                    printf("Flow %d deallocated\n", i);
+                    shutdown_flow(sfds + i);
                 }
                 break;
             }
@@ -187,14 +189,6 @@ client(struct echo_async *rea)
     }
 
     return 0;
-}
-
-static void
-shutdown_flow(struct selfd *sfd)
-{
-    close(sfd->fd);
-    sfd->state = SELFD_S_NONE;
-    sfd->fd = -1;
 }
 
 static int
