@@ -56,7 +56,7 @@ struct echo_async {
 
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
-struct selfd {
+struct fdfsm {
 #define SELFD_S_ALLOC   1
 #define SELFD_S_WRITE   2
 #define SELFD_S_READ    3
@@ -67,11 +67,11 @@ struct selfd {
 };
 
 static void
-shutdown_flow(struct selfd *sfd)
+shutdown_flow(struct fdfsm *fsm)
 {
-    close(sfd->fd);
-    sfd->state = SELFD_S_NONE;
-    sfd->fd = -1;
+    close(fsm->fd);
+    fsm->state = SELFD_S_NONE;
+    fsm->fd = -1;
 }
 
 static int
@@ -79,15 +79,15 @@ client(struct echo_async *rea)
 {
     const char *msg = "Hello guys, this is a test message!";
     char buf[SDU_SIZE_MAX];
-    struct selfd *sfds;
+    struct fdfsm *fsms;
     fd_set rdfs, wrfs;
     int maxfd;
     int ret;
     int size;
     int i;
 
-    sfds = calloc(rea->p, sizeof(*sfds));
-    if (sfds == NULL) {
+    fsms = calloc(rea->p, sizeof(*fsms));
+    if (fsms == NULL) {
         printf("Failed to allocate memory for %d parallel flows\n", rea->p);
         return -1;
     }
@@ -95,13 +95,13 @@ client(struct echo_async *rea)
     /* Start flow allocations in parallel, without waiting for completion. */
 
     for (i = 0; i < rea->p; i ++) {
-        sfds[i].state = SELFD_S_ALLOC;
-        sfds[i].fd = rina_flow_alloc(rea->dif_name, rea->cli_appl_name,
+        fsms[i].state = SELFD_S_ALLOC;
+        fsms[i].fd = rina_flow_alloc(rea->dif_name, rea->cli_appl_name,
                                      rea->srv_appl_name, &rea->flowspec,
                                      RINA_F_NOWAIT);
-        if (sfds[i].fd < 0) {
+        if (fsms[i].fd < 0) {
             perror("rina_flow_alloc()");
-            return sfds[i].fd;
+            return fsms[i].fd;
         }
     }
 
@@ -111,20 +111,20 @@ client(struct echo_async *rea)
         maxfd = 0;
 
         for (i = 0; i < rea->p; i++) {
-            switch (sfds[i].state) {
+            switch (fsms[i].state) {
             case SELFD_S_WRITE:
-                FD_SET(sfds[i].fd, &wrfs);
+                FD_SET(fsms[i].fd, &wrfs);
                 break;
             case SELFD_S_READ:
             case SELFD_S_ALLOC:
-                FD_SET(sfds[i].fd, &rdfs);
+                FD_SET(fsms[i].fd, &rdfs);
                 break;
             case SELFD_S_NONE:
                 /* Do nothing */
                 break;
             }
 
-            maxfd = MAX(maxfd, sfds[i].fd);
+            maxfd = MAX(maxfd, fsms[i].fd);
         }
 
         if (maxfd <= 0) {
@@ -143,45 +143,45 @@ client(struct echo_async *rea)
         }
 
         for (i = 0; i < rea->p; i++) {
-            switch (sfds[i].state) {
+            switch (fsms[i].state) {
             case SELFD_S_ALLOC:
-                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     /* Complete flow allocation, replacing the fd. */
-                    sfds[i].fd = rina_flow_alloc_wait(sfds[i].fd);
-                    if (sfds[i].fd < 0) {
+                    fsms[i].fd = rina_flow_alloc_wait(fsms[i].fd);
+                    if (fsms[i].fd < 0) {
                         printf("rina_flow_alloc_wait(): flow %d denied\n", i);
-                        shutdown_flow(sfds + i);
+                        shutdown_flow(fsms + i);
                     } else {
-                        sfds[i].state = SELFD_S_WRITE;
+                        fsms[i].state = SELFD_S_WRITE;
                         printf("Flow %d allocated\n", i);
                     }
                 }
                 break;
 
             case SELFD_S_WRITE:
-                if (FD_ISSET(sfds[i].fd, &wrfs)) {
+                if (FD_ISSET(fsms[i].fd, &wrfs)) {
                     strncpy(buf, msg, SDU_SIZE_MAX);
                     size = strlen(buf) + 1;
 
-                    ret = write(sfds[i].fd, buf, size);
+                    ret = write(fsms[i].fd, buf, size);
                     if (ret == size) {
-                        sfds[i].state = SELFD_S_READ;
+                        fsms[i].state = SELFD_S_READ;
                     } else {
-                        shutdown_flow(sfds + i);
+                        shutdown_flow(fsms + i);
                     }
                 }
                 break;
 
             case SELFD_S_READ:
-                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     /* Ready to read. */
-                    ret = read(sfds[i].fd, buf, sizeof(buf));
+                    ret = read(fsms[i].fd, buf, sizeof(buf));
                     if (ret > 0) {
                         buf[ret] = '\0';
                         printf("Response: '%s'\n", buf);
                         printf("Flow %d deallocated\n", i);
                     }
-                    shutdown_flow(sfds + i);
+                    shutdown_flow(fsms + i);
                 }
                 break;
             }
@@ -194,7 +194,7 @@ client(struct echo_async *rea)
 static int
 server(struct echo_async *rea)
 {
-    struct selfd sfds[MAX_CLIENTS + 1];
+    struct fdfsm fsms[MAX_CLIENTS + 1];
     char buf[SDU_SIZE_MAX];
     fd_set rdfs, wrfs;
     int n, ret;
@@ -208,12 +208,12 @@ server(struct echo_async *rea)
         return ret;
     }
 
-    sfds[0].state = SELFD_S_ACCEPT;
-    sfds[0].fd = rea->cfd;
+    fsms[0].state = SELFD_S_ACCEPT;
+    fsms[0].fd = rea->cfd;
 
     for (i = 1; i <= MAX_CLIENTS; i++) {
-        sfds[i].state = SELFD_S_NONE;
-        sfds[i].fd = -1;
+        fsms[i].state = SELFD_S_NONE;
+        fsms[i].fd = -1;
     }
 
     for (;;) {
@@ -222,20 +222,20 @@ server(struct echo_async *rea)
         maxfd = 0;
 
         for (i = 0; i <= MAX_CLIENTS; i++) {
-            switch (sfds[i].state) {
+            switch (fsms[i].state) {
             case SELFD_S_WRITE:
-                FD_SET(sfds[i].fd, &wrfs);
+                FD_SET(fsms[i].fd, &wrfs);
                 break;
             case SELFD_S_READ:
             case SELFD_S_ACCEPT:
-                FD_SET(sfds[i].fd, &rdfs);
+                FD_SET(fsms[i].fd, &rdfs);
                 break;
             case SELFD_S_NONE:
                 /* Do nothing */
                 break;
             }
 
-            maxfd = MAX(maxfd, sfds[i].fd);
+            maxfd = MAX(maxfd, fsms[i].fd);
         }
 
         assert(maxfd >= 0);
@@ -251,22 +251,22 @@ server(struct echo_async *rea)
         }
 
         for (i = 0; i <= MAX_CLIENTS; i++) {
-            switch (sfds[i].state) {
+            switch (fsms[i].state) {
             case SELFD_S_ACCEPT:
-                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     int handle;
                     int j;
 
                     /* Look for a free slot. */
                     for (j = 1; j <= MAX_CLIENTS; j++) {
-                        if (sfds[j].state == SELFD_S_NONE) {
+                        if (fsms[j].state == SELFD_S_NONE) {
                             break;
                         }
                     }
 
                     /* Receive flow allocation request without
                      * responding. */
-                    handle = rina_flow_accept(sfds[i].fd, NULL, NULL,
+                    handle = rina_flow_accept(fsms[i].fd, NULL, NULL,
                                               RINA_F_NORESP);
                     if (handle < 0) {
                         perror("rina_flow_accept()");
@@ -274,48 +274,48 @@ server(struct echo_async *rea)
                     }
 
                     /* Respond positively if we have found a slot. */
-                    sfds[j].fd = rina_flow_respond(sfds[i].fd, handle,
+                    fsms[j].fd = rina_flow_respond(fsms[i].fd, handle,
                                                    j > MAX_CLIENTS ? -1 : 0);
-                    if (sfds[j].fd < 0) {
+                    if (fsms[j].fd < 0) {
                         perror("rina_flow_respond()");
-                        return sfds[j].fd;
+                        return fsms[j].fd;
                     }
 
                     if (j > MAX_CLIENTS) {
-                        sfds[j].state = SELFD_S_NONE;
-                        sfds[j].fd = -1;
+                        fsms[j].state = SELFD_S_NONE;
+                        fsms[j].fd = -1;
                     } else {
-                        sfds[j].state = SELFD_S_READ;
+                        fsms[j].state = SELFD_S_READ;
                         printf("Accept client %d\n", j);
                     }
                 }
                 break;
 
             case SELFD_S_READ:
-                if (FD_ISSET(sfds[i].fd, &rdfs)) {
+                if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     /* File descriptor is ready for reading. */
-                    n = read(sfds[i].fd, buf, sizeof(buf));
+                    n = read(fsms[i].fd, buf, sizeof(buf));
                     if (n < 0) {
-                        shutdown_flow(sfds + i);
+                        shutdown_flow(fsms + i);
                         printf("Shutdown client %d\n", i);
                     } else {
                         buf[n] = '\0';
                         printf("Request: '%s'\n", buf);
-                        sfds[i].state = SELFD_S_WRITE;
+                        fsms[i].state = SELFD_S_WRITE;
                     }
                 }
                 break;
 
             case SELFD_S_WRITE:
-                if (FD_ISSET(sfds[i].fd, &wrfs)) {
-                    ret = write(sfds[i].fd, buf, n);
+                if (FD_ISSET(fsms[i].fd, &wrfs)) {
+                    ret = write(fsms[i].fd, buf, n);
                     if (ret == n) {
                         printf("Response sent back\n");
                         printf("Close client %d\n", i);
                     } else {
                         printf("Shutdown client %d\n", i);
                     }
-                    shutdown_flow(sfds + i);
+                    shutdown_flow(fsms + i);
                 }
             }
         }
