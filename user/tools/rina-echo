@@ -75,7 +75,7 @@ class RinaRRTool:
             return ret
 
         while 1:
-            fd = rlite.flow_accept(self.cfd, None, 0)
+            fd = rlite.flow_accept(self.cfd, None, None, 0)
             if fd < 0:
                 continue
 
