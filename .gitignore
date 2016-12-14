@@ -6,3 +6,6 @@
 *.symvers
 *tags
 *cscope.out
+*.log
+*.pid
+*.d
