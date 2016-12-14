@@ -189,6 +189,14 @@ client(struct echo_async *rea)
     return 0;
 }
 
+static void
+shutdown_flow(struct selfd *sfd)
+{
+    close(sfd->fd);
+    sfd->state = SELFD_S_NONE;
+    sfd->fd = -1;
+}
+
 static int
 server(struct echo_async *rea)
 {
@@ -294,34 +302,26 @@ server(struct echo_async *rea)
                     /* File descriptor is ready for reading. */
                     n = read(sfds[i].fd, buf, sizeof(buf));
                     if (n < 0) {
-                        perror("read(flow)");
-                        return -1;
+                        shutdown_flow(sfds + i);
+                        printf("Shutdown client %d\n", i);
+                    } else {
+                        buf[n] = '\0';
+                        printf("Request: '%s'\n", buf);
+                        sfds[i].state = SELFD_S_WRITE;
                     }
-
-                    buf[n] = '\0';
-                    printf("Request: '%s'\n", buf);
-
-                    sfds[i].state = SELFD_S_WRITE;
                 }
                 break;
 
             case SELFD_S_WRITE:
                 if (FD_ISSET(sfds[i].fd, &wrfs)) {
                     ret = write(sfds[i].fd, buf, n);
-                    if (ret != n) {
-                        if (ret < 0) {
-                            perror("write(flow)");
-                        } else {
-                            printf("partial write");
-                        }
-                        return -1;
+                    if (ret == n) {
+                        printf("Response sent back\n");
+                        printf("Close client %d\n", i);
+                    } else {
+                        printf("Shutdown client %d\n", i);
                     }
-
-                    printf("Response sent back\n");
-                    close(sfds[i].fd);
-                    sfds[i].state = SELFD_S_NONE;
-                    sfds[i].fd = -1;
-                    printf("Close client %d\n", i);
+                    shutdown_flow(sfds + i);
                 }
             }
         }
