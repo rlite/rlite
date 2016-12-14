@@ -45,12 +45,13 @@
 #define SDU_SIZE_MAX    65535
 #define MAX_CLIENTS     3
 
-struct rl_rr {
+struct echo_async {
     int cfd;
     const char *cli_appl_name;
     const char *srv_appl_name;
     char *dif_name;
     struct rina_flow_spec flowspec;
+    int p; /* parallel clients */
 };
 
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
@@ -66,24 +67,29 @@ struct selfd {
 };
 
 static int
-client(struct rl_rr *rr)
+client(struct echo_async *rea)
 {
     const char *msg = "Hello guys, this is a test message!";
     char buf[SDU_SIZE_MAX];
-    struct selfd sfds[1];
+    struct selfd *sfds;
     fd_set rdfs, wrfs;
     int maxfd;
-    int p = 1;
     int ret;
     int size;
     int i;
 
+    sfds = calloc(rea->p, sizeof(*sfds));
+    if (sfds == NULL) {
+        printf("Failed to allocate memory for %d parallel flows\n", rea->p);
+        return -1;
+    }
+
     /* Start flow allocations in parallel, without waiting for completion. */
 
-    for (i = 0; i < p; i ++) {
+    for (i = 0; i < rea->p; i ++) {
         sfds[i].state = SELFD_S_ALLOC;
-        sfds[i].fd = rina_flow_alloc(rr->dif_name, rr->cli_appl_name,
-                                     rr->srv_appl_name, &rr->flowspec,
+        sfds[i].fd = rina_flow_alloc(rea->dif_name, rea->cli_appl_name,
+                                     rea->srv_appl_name, &rea->flowspec,
                                      RINA_F_NOWAIT);
         if (sfds[i].fd < 0) {
             perror("rina_flow_alloc()");
@@ -96,7 +102,7 @@ client(struct rl_rr *rr)
         FD_ZERO(&wrfs);
         maxfd = 0;
 
-        for (i = 0; i < p; i++) {
+        for (i = 0; i < rea->p; i++) {
             switch (sfds[i].state) {
             case SELFD_S_WRITE:
                 FD_SET(sfds[i].fd, &wrfs);
@@ -128,7 +134,7 @@ client(struct rl_rr *rr)
             break;
         }
 
-        for (i = 0; i < p; i++) {
+        for (i = 0; i < rea->p; i++) {
             switch (sfds[i].state) {
             case SELFD_S_ALLOC:
                 if (FD_ISSET(sfds[i].fd, &rdfs)) {
@@ -184,7 +190,7 @@ client(struct rl_rr *rr)
 }
 
 static int
-server(struct rl_rr *rr)
+server(struct echo_async *rea)
 {
     struct selfd sfds[MAX_CLIENTS + 1];
     char buf[SDU_SIZE_MAX];
@@ -194,14 +200,14 @@ server(struct rl_rr *rr)
     int i;
 
     /* In listen mode also register the application names. */
-    ret = rina_register(rr->cfd, rr->dif_name, rr->srv_appl_name);
+    ret = rina_register(rea->cfd, rea->dif_name, rea->srv_appl_name);
     if (ret) {
         perror("rina_register()");
         return ret;
     }
 
     sfds[0].state = SELFD_S_ACCEPT;
-    sfds[0].fd = rr->cfd;
+    sfds[0].fd = rea->cfd;
 
     for (i = 1; i <= MAX_CLIENTS; i++) {
         sfds[i].state = SELFD_S_NONE;
@@ -333,13 +339,14 @@ sigint_handler(int signum)
 static void
 usage(void)
 {
-    printf("rl_rr [OPTIONS]\n"
+    printf("rina-echo-async [OPTIONS]\n"
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
         "   -d DIF : name of DIF to which register or ask to allocate a flow\n"
-        "   -a APNAME : application process name/instance of the rl_rr client\n"
-        "   -z APNAME : application process name/instance of the rl_rr server\n"
+        "   -a APNAME : application process name/instance of the echo_async client\n"
+        "   -z APNAME : application process name/instance of the echo_async server\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
+        "   -p NUM : open NUM parallel flows\n"
           );
 }
 
@@ -347,19 +354,22 @@ int
 main(int argc, char **argv)
 {
     struct sigaction sa;
-    struct rl_rr rr;
+    struct echo_async rea;
     const char *dif_name = NULL;
     int listen = 0;
     int ret;
     int opt;
 
-    rr.cli_appl_name = "rl_rr-data:client";
-    rr.srv_appl_name = "rl_rr-data:server";
+    memset(&rea, 0, sizeof(rea));
+
+    rea.cli_appl_name = "rina-echo-async:client";
+    rea.srv_appl_name = "rina-echo-async:server";
+    rea.p = 1;
 
     /* Start with a default flow configuration (unreliable flow). */
-    rina_flow_spec_default(&rr.flowspec);
+    rina_flow_spec_default(&rea.flowspec);
 
-    while ((opt = getopt(argc, argv, "hld:a:z:g:")) != -1) {
+    while ((opt = getopt(argc, argv, "hld:a:z:g:p:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -374,15 +384,23 @@ main(int argc, char **argv)
                 break;
 
             case 'a':
-                rr.cli_appl_name = optarg;
+                rea.cli_appl_name = optarg;
                 break;
 
             case 'z':
-                rr.srv_appl_name = optarg;
+                rea.srv_appl_name = optarg;
                 break;
 
             case 'g': /* Set max_sdu_gap flow specification parameter. */
-                rr.flowspec.max_sdu_gap = atoll(optarg);
+                rea.flowspec.max_sdu_gap = atoll(optarg);
+                break;
+
+            case 'p':
+                rea.p = atoll(optarg);
+                if (rea.p <= 0) {
+                    printf("Invalid -p argument '%d'\n", rea.p);
+                    return -1;
+                }
                 break;
 
             default:
@@ -408,20 +426,20 @@ main(int argc, char **argv)
     }
 
     /* Initialization of RLITE application. */
-    rr.cfd = rina_open();
-    if (rr.cfd < 0) {
+    rea.cfd = rina_open();
+    if (rea.cfd < 0) {
         perror("rina_open()");
-        return rr.cfd;
+        return rea.cfd;
     }
 
-    rr.dif_name = dif_name ? strdup(dif_name) : NULL;
+    rea.dif_name = dif_name ? strdup(dif_name) : NULL;
 
     if (listen) {
-        server(&rr);
+        server(&rea);
 
     } else {
-        client(&rr);
+        client(&rea);
     }
 
-    return close(rr.cfd);
+    return close(rea.cfd);
 }
