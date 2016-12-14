@@ -805,8 +805,7 @@ int rina_flow_respond(int fd, int handle, int response)
         ffd = 0;
     }
 out:
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ffd;
 }
@@ -845,6 +844,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
             errno = ENOMEM;
             return -1;
         }
+        memset(spi, 0, sizeof(*spi));
     }
 
     req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
@@ -863,6 +863,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
 
     if (flags & RINA_F_NORESP) {
         sa_lock();
+        spi->req = req;
         spi->handle = sa_handle ++;
         if (sa_handle < 0) { /* Overflow */
             sa_handle = 0;
