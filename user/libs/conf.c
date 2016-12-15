@@ -286,20 +286,23 @@ rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
         struct rl_flow_stats stats;
         int ret;
 
-        PI_S("    ipcp_id = %u, local_port = %u, remote_port = %u, "
-             "local_addr = %llu, remote_addr = %llu\n",
-                rl_flow->ipcp_id, rl_flow->local_port,
-                rl_flow->remote_port,
-                (long long unsigned int)rl_flow->local_addr,
-                (long long unsigned int)rl_flow->remote_addr);
-
         ret = rl_conf_flow_get_stats(ctrl, rl_flow->local_port, &stats);
-        if (!ret) {
-            PI_S("      tx_pkt: %lu, tx_byte: %lu, tx_err: %lu\n"
-                 "      rx_pkt: %lu, rx_byte: %lu, rx_err: %lu\n\n",
-                 stats.tx_pkt, stats.tx_byte, stats.tx_err, stats.rx_pkt,
-                 stats.rx_byte, stats.rx_err);
+        if (ret) {
+            continue;
         }
+
+        PI_S("  ipcp_id %u, local addr/port %llu:%u, "
+                "remote addr/port %llu:%u, "
+                "tx %lu pkt %lu byte %lu err, "
+                "rx %lu pkt %lu byte %lu err\n",
+                rl_flow->ipcp_id,
+                (long long unsigned int)rl_flow->local_addr,
+                rl_flow->local_port,
+                (long long unsigned int)rl_flow->remote_addr,
+                rl_flow->remote_port,
+                stats.tx_pkt, stats.tx_byte, stats.tx_err,
+                stats.rx_pkt, stats.rx_byte, stats.rx_err
+                );
     }
 
     return 0;
