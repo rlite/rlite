@@ -585,7 +585,7 @@ server(struct rinaperf *rp)
 
         for (;;) {
             /* Try to join terminated threads. */
-            for (p = NULL, w = rp->workers_head; w; p = w, w = w->next) {
+            for (p = NULL, w = rp->workers_head; w; ) {
                 ret = pthread_tryjoin_np(w->th, NULL);
                 if (ret == 0) {
                     if (w == rp->workers_head) {
@@ -597,11 +597,20 @@ server(struct rinaperf *rp)
                     if (w == rp->workers_tail) {
                         rp->workers_tail = p;
                     }
-                    free(w);
+                    {
+                        struct worker *tmp;
+                        tmp = w;
+                        w = w->next;
+                        free(tmp);
+                    }
                     rp->workers_num --;
 
-                } else if (ret != EBUSY) {
-                    printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                } else {
+                    if (ret != EBUSY) {
+                        printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                    }
+                    p = w;
+                    w = w->next;
                 }
             }
 
