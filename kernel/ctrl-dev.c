@@ -1989,6 +1989,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                     (struct rl_kmsg_fa_req *)bmsg;
     struct ipcp_entry *ipcp_entry = NULL;
     struct flow_entry *flow_entry = NULL;
+    uint32_t event_id = req->event_id;
     struct upper_ref upper = {
             .rc = rc,
         };
@@ -2003,7 +2004,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ipcp_id = ipcp_entry->id;
 
     /* Allocate a port id and the associated flow entry. */
-    ret = flow_add(ipcp_entry, upper, req->event_id, req->local_appl,
+    ret = flow_add(ipcp_entry, upper, event_id, req->local_appl,
                    req->remote_appl, NULL, &flow_entry,
                    GFP_KERNEL);
     if (ret) {
@@ -2031,7 +2032,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             /* This IPCP handles the flow allocation in user-space. This is
              * currently true for normal IPCPs.
              * Reflect the flow allocation request message to userspace. */
-            req->event_id = 0;
+            req->event_id = 0; /* clear it, not needed */
             req->local_port = flow_entry->local_port;
             req->local_cep = flow_entry->local_cep;
             ret = rl_upqueue_append(ipcp_entry->uipcp,
@@ -2056,7 +2057,7 @@ out:
     }
 
     /* Create a negative response message. */
-    return rl_append_allocate_flow_resp_arrived(rc, req->event_id, 0, 1);
+    return rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1);
 }
 
 static int
