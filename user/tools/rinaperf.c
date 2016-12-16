@@ -515,15 +515,31 @@ static struct perf_function_desc descs[] = {
     },
 };
 
+#define CLI_FA_TIMEOUT_SEC     5
+
 static void *
 client_worker_function(void *opaque)
 {
     struct worker *w = opaque;
+    struct pollfd pfd;
     int ret;
 
     /* We're the client: allocate a flow and run the perf function. */
-    w->fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
-                            w->rp->srv_appl_name, &w->rp->flowspec, 0);
+    pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
+                             w->rp->srv_appl_name, &w->rp->flowspec,
+                             RINA_F_NOWAIT);
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_SEC * 1000);
+    if (ret <= 0) {
+        if (ret < 0) {
+            perror("poll()");
+        } else {
+            printf("Flow allocation timed out\n");
+        }
+        close(pfd.fd);
+        return NULL;
+    }
+    w->fd = rina_flow_alloc_wait(pfd.fd);
     cli_flow_allocated = 1;
     if (w->fd < 0) {
         perror("rina_flow_alloc()");
