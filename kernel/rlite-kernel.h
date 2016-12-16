@@ -454,15 +454,17 @@ int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                       const char *local_appl,
                       const char *remote_appl,
                       const struct rl_flow_config *flowcfg,
-                      const struct rina_flow_spec *flowspec);
+                      const struct rina_flow_spec *flowspec,
+                      bool maysleep);
 
 int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
-                         rl_port_t local_port,
-                         rl_port_t remote_port,
-                         uint32_t remote_cep,
-                         rl_addr_t remote_addr,
-                         uint8_t response,
-                         struct rl_flow_config *flowcfg);
+                       rl_port_t local_port,
+                       rl_port_t remote_port,
+                       uint32_t remote_cep,
+                       rl_addr_t remote_addr,
+                       uint8_t response,
+                       struct rl_flow_config *flowcfg,
+                       bool maysleep);
 
 int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
               rl_port_t local_port);

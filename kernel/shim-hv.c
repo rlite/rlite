@@ -98,7 +98,7 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
         }
 
         ret = rl_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0,
-                    req.dst_appl, req.src_appl, NULL, NULL);
+                    req.dst_appl, req.src_appl, NULL, NULL, false);
         if (ret) {
             PE("failed to report flow allocation request\n");
         }
@@ -117,7 +117,7 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
 
         ret = rl_fa_resp_arrived(priv->ipcp, resp.src_port,
                                     resp.dst_port, 0, 0, resp.response,
-                                    NULL);
+                                    NULL, false);
         if (ret) {
             PE("failed to report flow allocation response\n");
         }

@@ -244,13 +244,15 @@ rl_ipcp_factory_unregister(const char *dif_type)
 EXPORT_SYMBOL(rl_ipcp_factory_unregister);
 
 static int
-rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg)
+rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
+                  bool maysleep)
 {
+    gfp_t gfp = maysleep ? GFP_KERNEL : GFP_ATOMIC;
     struct upqueue_entry *entry;
     unsigned int serlen;
     void *serbuf;
 
-    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+    entry = kzalloc(sizeof(*entry), gfp);
     if (!entry) {
         PE("Out of memory\n");
         return -ENOMEM;
@@ -258,7 +260,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg)
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
     serlen = rl_msg_serlen(rl_ker_numtables, RLITE_KER_MSG_MAX, rmsg);
-    serbuf = kzalloc(serlen, GFP_KERNEL);
+    serbuf = kzalloc(serlen, gfp);
     if (!serbuf) {
         kfree(entry);
         PE("Out of memory\n");
@@ -800,7 +802,7 @@ application_del_by_rc(struct rl_ctrl *rc)
             ntfy.reg = false;
             ntfy.appl_name = app->name; app->name = NULL; /* move */
             rl_upqueue_append(app->ipcp->uipcp,
-                                (const struct rl_msg_base *)&ntfy);
+                                (const struct rl_msg_base *)&ntfy, true);
             app->name = ntfy.appl_name; ntfy.appl_name = NULL; /* back */
             ntfy.dif_name = NULL;  /* return the borrowed string. */
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -984,7 +986,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
 
-        rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy);
+        rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
+                          true);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&ntfy));
     }
@@ -1336,7 +1339,7 @@ ipcp_update_all(rl_ipcp_id_t ipcp_id, int update_type)
     mutex_lock(&rl_dm.general_lock);
     list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
         if (rcur->flags & RL_F_IPCPS) {
-            rl_upqueue_append(rcur, RLITE_MB(&upd));
+            rl_upqueue_append(rcur, RLITE_MB(&upd), false);
         }
     }
     mutex_unlock(&rl_dm.general_lock);
@@ -1368,7 +1371,7 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     resp.ipcp_id = ipcp_id;
 
     /* Enqueue the response into the upqueue. */
-    ret = rl_upqueue_append(rc, RLITE_MB(&resp));
+    ret = rl_upqueue_append(rc, RLITE_MB(&resp), true);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&resp));
     if (ret) {
@@ -1418,7 +1421,7 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             mutex_lock(&rl_dm.general_lock);
             list_for_each_entry(rcur, &rl_dm.ctrl_devs, node) {
                 if (rcur->flags & RL_F_IPCPS) {
-                    rl_upqueue_append(rcur, RLITE_MB(&upd));
+                    rl_upqueue_append(rcur, RLITE_MB(&upd), false);
                 }
             }
             mutex_unlock(&rl_dm.general_lock);
@@ -1482,7 +1485,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
                                node);
         list_del(&fqe->node);
         fqe->resp.event_id = req->event_id;
-        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp));
+        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
         kfree(fqe);
     }
@@ -1694,7 +1697,7 @@ rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                                 req->remote_cep,
                                 req->remote_addr, req->local_appl,
                                 req->remote_appl, &req->flowcfg,
-                                &req->flowspec);
+                                &req->flowspec, true);
     }
 
     ipcp_put(ipcp);
@@ -1704,7 +1707,7 @@ rl_uipcp_fa_req_arrived(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
 static int
 rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc,
-                           struct rl_msg_base *bmsg)
+                         struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived *req =
                     (struct rl_kmsg_uipcp_fa_resp_arrived *)bmsg;
@@ -1715,7 +1718,7 @@ rl_uipcp_fa_resp_arrived(struct rl_ctrl *rc,
     if (ipcp) {
         ret = rl_fa_resp_arrived(ipcp, req->local_port, req->remote_port,
                                    req->remote_cep, req->remote_addr,
-                                   req->response, &req->flowcfg);
+                                   req->response, &req->flowcfg, true);
     }
     ipcp_put(ipcp);
 
@@ -1787,7 +1790,7 @@ rl_flow_get_stats(struct rl_ctrl *rc,
     }
     flow_put(flow);
 
-    ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp);
+    ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ret;
@@ -1882,7 +1885,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
              * userspace IPCP can take appropriate actions. */
             req->event_id = 0;
             rl_upqueue_append(ipcp->uipcp,
-                    (const struct rl_msg_base *)req);
+                    (const struct rl_msg_base *)req, true);
         }
 
         if (ret || !ipcp->uipcp || !req->reg) {
@@ -1903,7 +1906,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
             resp.appl_name = kstrdup(req->appl_name, GFP_ATOMIC);
 
-            rl_upqueue_append(rc, (const struct rl_msg_base *)&resp);
+            rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(&resp));
 
@@ -1954,9 +1957,9 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             } else {
                 app->state = APPL_REG_COMPLETE;
                 PI("Application process %s %sregistered to IPC process %u\n",
-                        resp->appl_name, (resp->reg ? "" : "un"), resp->ipcp_id);
+                   resp->appl_name, (resp->reg ? "" : "un"), resp->ipcp_id);
             }
-            rl_upqueue_append(app->rc, (const struct rl_msg_base *)resp);
+            rl_upqueue_append(app->rc, (const struct rl_msg_base *)resp, true);
         }
         ipcp_application_put(app);
     }
@@ -1968,7 +1971,8 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
 static int
 rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
-                                       rl_port_t port_id, uint8_t response)
+                                     rl_port_t port_id, uint8_t response,
+                                     bool maysleep)
 {
     struct rl_kmsg_fa_resp_arrived resp;
 
@@ -1979,7 +1983,7 @@ rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
     resp.response = response;
 
     /* Enqueue the response into the upqueue. */
-    return rl_upqueue_append(rc, RLITE_MB(&resp));
+    return rl_upqueue_append(rc, RLITE_MB(&resp), maysleep);
 }
 
 static int
@@ -2036,7 +2040,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             req->local_port = flow_entry->local_port;
             req->local_cep = flow_entry->local_cep;
             ret = rl_upqueue_append(ipcp_entry->uipcp,
-                    (const struct rl_msg_base *)req);
+                                    (const struct rl_msg_base *)req, true);
         }
     }
 
@@ -2057,7 +2061,7 @@ out:
     }
 
     /* Create a negative response message. */
-    return rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1);
+    return rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1, true);
 }
 
 static int
@@ -2125,7 +2129,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             resp->event_id = 0;
             resp->cep_id = flow_entry->local_cep;
             ret = rl_upqueue_append(ipcp->uipcp,
-                    (const struct rl_msg_base *)resp);
+                    (const struct rl_msg_base *)resp, true);
         }
     }
 
@@ -2150,7 +2154,8 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                   const char *local_appl,
                   const char *remote_appl,
                   const struct rl_flow_config *flowcfg,
-                  const struct rina_flow_spec *flowspec)
+                  const struct rina_flow_spec *flowspec,
+                  bool maysleep)
 {
     struct flow_entry *flow_entry = NULL;
     struct registered_appl *app;
@@ -2199,7 +2204,7 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     }
 
     /* Enqueue the request into the upqueue. */
-    ret = rl_upqueue_append(app->rc, RLITE_MB(&req));
+    ret = rl_upqueue_append(app->rc, RLITE_MB(&req), maysleep);
     if (ret) {
         flow_put(flow_entry);
     }
@@ -2219,7 +2224,8 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      uint32_t remote_cep,
                      rl_addr_t remote_addr,
                      uint8_t response,
-                     struct rl_flow_config *flowcfg)
+                     struct rl_flow_config *flowcfg,
+                     bool maysleep)
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
@@ -2267,7 +2273,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
                                                flow_entry->event_id,
-                                               local_port, response);
+                                               local_port, response, maysleep);
 
     if (response || ret) {
         if (!response) {
@@ -2488,7 +2494,7 @@ initial_ipcp_update(struct rl_ctrl *rc)
 
         ret = ipcp_update_fill(entry, &upd, RLITE_UPDATE_ADD);
 
-        rl_upqueue_append(rc, (const struct rl_msg_base *)&upd);
+        rl_upqueue_append(rc, (const struct rl_msg_base *)&upd, false);
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&upd));

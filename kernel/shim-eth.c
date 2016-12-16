@@ -383,7 +383,8 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         spin_unlock_bh(&priv->arpt_lock);
 
         if (ret == 0) {
-            rl_fa_resp_arrived(ipcp, flow->local_port, 0, 0, 0, 0, NULL);
+            rl_fa_resp_arrived(ipcp, flow->local_port,
+                               0, 0, 0, 0, NULL, false);
         }
 
         return ret;
@@ -610,7 +611,7 @@ out:
         /* This ARP reply is interpreted as a positive flow allocation
          * response message. */
         rl_fa_resp_arrived(flow->txrx.ipcp, flow->local_port, 0, 0, 0,
-                              0, NULL);
+                              0, NULL, false);
     }
 
     if (skb) {
@@ -705,7 +706,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         }
 
         ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_name,
-                                entry->tpa, NULL, NULL);
+                                entry->tpa, NULL, NULL, false);
 
         if (ret) {
             PD("Out of memory\n");
