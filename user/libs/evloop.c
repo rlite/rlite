@@ -437,7 +437,7 @@ rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
     }
 
     /* Issue the request to the kernel. */
-    ret = rl_write_msg(loop->ctrl.rfd, msg);
+    ret = rl_write_msg(loop->ctrl.rfd, msg, 0);
     if (ret < 0) {
         /* System call reports an error (incomplete write is not acceptable)
          * for a rlite control device. */

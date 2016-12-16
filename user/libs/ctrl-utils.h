@@ -83,6 +83,6 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value);
 
 int
-rl_write_msg(int rfd, struct rl_msg_base *msg);
+rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
 
 #endif  /* __CTRL_UTILS_H__ */

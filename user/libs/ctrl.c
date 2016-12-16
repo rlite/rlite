@@ -95,7 +95,7 @@ read_next_msg(int rfd)
 }
 
 int
-rl_write_msg(int rfd, struct rl_msg_base *msg)
+rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet)
 {
     char serbuf[4096];
     unsigned int serlen;
@@ -116,7 +116,8 @@ rl_write_msg(int rfd, struct rl_msg_base *msg)
     if (ret < 0) {
         /* An uIPCP may try to deallocate an already deallocated
          * flow. Be quiet just in case. */
-        if (!(errno == ENXIO && msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
+        if (!quiet && !(errno == ENXIO &&
+                        msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
             perror("write(ctrlmsg)");
         }
 
@@ -396,7 +397,7 @@ rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
         return 0;
     }
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req), 0);
     if (ret < 0) {
         if (errno == ENXIO) {
             PE("Cannot find IPCP for DIF %s\n", dif_name);
@@ -429,7 +430,7 @@ rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg, const char *dif_name,
         return 0;
     }
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&req), 0);
     if (ret < 0) {
         if (errno == ENXIO) {
             PE("Cannot find IPCP for DIF %s\n", dif_name);
@@ -587,7 +588,7 @@ rina_register_common(int fd, const char *dif_name, const char *local_appl,
         return -1;
     }
 
-    ret = rl_write_msg(fd, RLITE_MB(&req));
+    ret = rl_write_msg(fd, RLITE_MB(&req), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&req));
     if (ret < 0) {
@@ -694,7 +695,7 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
         return wfd;
     }
 
-    ret = rl_write_msg(wfd, RLITE_MB(&req));
+    ret = rl_write_msg(wfd, RLITE_MB(&req), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
     if (ret < 0) {
         close(wfd);
@@ -792,7 +793,7 @@ int rina_flow_respond(int fd, int handle, int response)
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(req));
     free(req);
 
-    ret = rl_write_msg(fd, RLITE_MB(&resp));
+    ret = rl_write_msg(fd, RLITE_MB(&resp), 1);
     if (ret < 0) {
         goto out;
     }
@@ -878,7 +879,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
                     req->port_id, RLITE_SUCC);
 
-    ret = rl_write_msg(fd, RLITE_MB(&resp));
+    ret = rl_write_msg(fd, RLITE_MB(&resp), 1);
     if (ret < 0) {
         goto out2;
     }

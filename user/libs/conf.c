@@ -48,7 +48,7 @@ rl_conf_ipcp_create(struct rl_ctrl *ctrl,
     msg.dif_type = strdup(dif_type);
     msg.dif_name = strdup(dif_name);
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -87,7 +87,7 @@ rl_conf_ipcp_uipcp_wait(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
     msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
     }
@@ -110,7 +110,7 @@ rl_conf_ipcp_destroy(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
     msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
     }
@@ -131,7 +131,7 @@ rl_conf_ipcp_config(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
 
     rl_ipcp_config_fill(&msg, ipcp_id, param_name, param_value);
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
     }
@@ -199,7 +199,7 @@ rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
 
         msg.event_id = rl_ctrl_get_id(ctrl);
 
-        ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+        ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
         if (ret < 0) {
             PE("Failed to issue request to the kernel\n");
         }
@@ -251,7 +251,7 @@ rl_conf_flow_get_stats(struct rl_ctrl *ctrl, rl_port_t port_id,
     msg.event_id = rl_ctrl_get_id(ctrl);
     msg.port_id = port_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg));
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
     if (ret < 0) {
         PE("Failed to issue request to the kernel\n");
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
