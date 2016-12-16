@@ -2366,13 +2366,14 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
         case RLITE_KER_UIPCP_FA_REQ_ARRIVED:
         case RLITE_KER_UIPCP_FA_RESP_ARRIVED:
         case RLITE_KER_FLOW_DEALLOC:
-        case RLITE_KER_FLOW_FETCH:
-#if 0  // Skip the check for now, just to ease testing
+#if 1
             if (!capable(CAP_SYS_ADMIN)) {
                 kfree(kbuf);
                 return -EPERM;
             }
 #endif
+            break;
+        case RLITE_KER_FLOW_FETCH:
             break;
     }
 

@@ -15,6 +15,4 @@
 
 - upqueue: size should be in bytes, not in messages
 
-- root permissions to create/delete/config ipcps
-
 - rinaperf: failure --> and automatic unregistration does not work
