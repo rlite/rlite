@@ -273,10 +273,10 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg)
     spin_lock(&rc->upqueue_lock);
     if (rc->upqueue_len >= 64) {
         spin_unlock(&rc->upqueue_lock);
-        RPD(1, "upqueue overrun, dropping\n");
+        RPD(2, "upqueue overrun, dropping\n");
         kfree(serbuf);
         kfree(entry);
-        return -ENOMEM;
+        return -ENOSPC;
     }
     list_add_tail(&entry->node, &rc->upqueue);
     rc->upqueue_len ++;

@@ -835,7 +835,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
 
     if (flags & RINA_F_NORESP) {
         if (sa_pending_len >= 128) {
-            errno = ENOMEM;
+            errno = ENOSPC;
             return -1;
         }
 
