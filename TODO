@@ -12,3 +12,9 @@
 - implement a first address assignment policy
 
 - demo: extend --ring to use more levels of DIFs
+
+- upqueue: size should be in bytes, not in messages
+
+- root permissions to create/delete/config ipcps
+
+- rinaperf: failure --> and automatic unregistration does not work
