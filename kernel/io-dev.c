@@ -65,14 +65,14 @@ tx_completion_func(unsigned long arg)
         int ret;
 
         spin_lock_bh(&ipcp->rmtq_lock);
-        if (ipcp->rmtq_len == 0) {
+        if (ipcp->rmtq_size == 0) {
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
         }
 
         rb = list_first_entry(&ipcp->rmtq, struct rl_buf, node);
         list_del(&rb->node);
-        ipcp->rmtq_len--;
+        ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
         PD("Sending [%lu] from rmtq\n",
@@ -85,7 +85,7 @@ tx_completion_func(unsigned long arg)
                     (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
             spin_lock_bh(&ipcp->rmtq_lock);
             list_add_tail(&rb->node, &ipcp->rmtq);
-            ipcp->rmtq_len++;
+            ipcp->rmtq_size += rl_buf_truesize(rb);
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
         }
@@ -216,7 +216,7 @@ rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
     spin_lock_bh(&ipcp->rmtq_lock);
 
-    if (ipcp->rmtq_len > 0) {
+    if (ipcp->rmtq_size > 0) {
         /* Schedule a tasklet to complete the tx work.
          * If appropriate, the tasklet will wake up
          * waiting process contexts. */

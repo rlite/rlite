@@ -519,7 +519,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         mutex_init(&entry->lock);
         hash_add(rl_dm.ipcp_table, &entry->node, entry->id);
         INIT_LIST_HEAD(&entry->rmtq);
-        entry->rmtq_len = 0;
+        entry->rmtq_size = 0;
         spin_lock_init(&entry->rmtq_lock);
         tasklet_init(&entry->tx_completion, tx_completion_func,
                      (unsigned long)entry);

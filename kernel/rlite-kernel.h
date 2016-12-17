@@ -318,7 +318,7 @@ struct ipcp_entry {
 
     /* TX completion structures. */
     struct list_head    rmtq;
-    unsigned int        rmtq_len;
+    unsigned int        rmtq_size;
     spinlock_t          rmtq_lock;
     struct tasklet_struct   tx_completion;
     wait_queue_head_t   tx_wqh;

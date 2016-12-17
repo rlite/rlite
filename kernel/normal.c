@@ -415,7 +415,7 @@ pduft_lookup(struct rl_normal *priv, rl_addr_t dst_addr)
     return entry ? entry->flow : NULL;
 }
 
-#define RMTQ_MAX_LEN    64
+#define RMTQ_MAX_SIZE    (1 << 17)
 
 static int
 rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
@@ -475,10 +475,10 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 /* Enqueue in the RMT queue, if possible. */
 
                 spin_lock_bh(&lower_ipcp->rmtq_lock);
-                if (lower_ipcp->rmtq_len < RMTQ_MAX_LEN) {
+                if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
                     rb->tx_compl_flow = lower_flow;
                     list_add_tail(&rb->node, &lower_ipcp->rmtq);
-                    lower_ipcp->rmtq_len++;
+                    lower_ipcp->rmtq_size += rl_buf_truesize(rb);
                 } else {
                     RPD(2, "rmtq overrun: dropping PDU\n");
                     rl_buf_free(rb);
