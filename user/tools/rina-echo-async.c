@@ -281,10 +281,7 @@ server(struct echo_async *rea)
                         return fsms[j].fd;
                     }
 
-                    if (j > MAX_CLIENTS) {
-                        fsms[j].state = SELFD_S_NONE;
-                        fsms[j].fd = -1;
-                    } else {
+                    if (j <= MAX_CLIENTS) {
                         fsms[j].state = SELFD_S_READ;
                         printf("Accept client %d\n", j);
                     }
