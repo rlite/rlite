@@ -57,7 +57,8 @@ struct rl_ctrl {
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
-    unsigned int upqueue_len;
+#define RL_UPQUEUE_SIZE_MAX     (1 << 14)
+    unsigned int upqueue_size;
     spinlock_t upqueue_lock;
     wait_queue_head_t upqueue_wqh;
 
@@ -243,6 +244,12 @@ rl_ipcp_factory_unregister(const char *dif_type)
 }
 EXPORT_SYMBOL(rl_ipcp_factory_unregister);
 
+static inline unsigned int
+upqentry_size(struct upqueue_entry *entry)
+{
+    return entry->serlen + sizeof(*entry);
+}
+
 static int
 rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
                   bool maysleep)
@@ -284,7 +291,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
 
     for (;;) {
         spin_lock(&rc->upqueue_lock);
-        if (rc->upqueue_len >= 64) {
+        if (rc->upqueue_size + upqentry_size(entry) > RL_UPQUEUE_SIZE_MAX) {
             /* No free space in the queue. */
             spin_unlock(&rc->upqueue_lock);
             if (!maysleep || !time_before(jiffies, exp)) {
@@ -300,7 +307,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
             continue;
         }
         list_add_tail(&entry->node, &rc->upqueue);
-        rc->upqueue_len ++;
+        rc->upqueue_size += upqentry_size(entry);
         spin_unlock(&rc->upqueue_lock);
         break;
     }
@@ -2473,7 +2480,7 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
 
             /* Unlink and free the upqueue entry and the associated message. */
             list_del(&entry->node);
-            rc->upqueue_len --;
+            rc->upqueue_size -= upqentry_size(entry);
             kfree(entry->sermsg);
             kfree(entry);
         }
@@ -2554,7 +2561,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
 
     f->private_data = rc;
     INIT_LIST_HEAD(&rc->upqueue);
-    rc->upqueue_len = 0;
+    rc->upqueue_size = 0;
     spin_lock_init(&rc->upqueue_lock);
     init_waitqueue_head(&rc->upqueue_wqh);
 
