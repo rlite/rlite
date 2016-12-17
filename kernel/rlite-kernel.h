@@ -208,6 +208,13 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
 void rina_pci_dump(struct rina_pci *pci);
 
+/* Amount of memory consumed by this packet. */
+static inline unsigned int
+rl_buf_truesize(struct rl_buf *rb)
+{
+    return sizeof(*rb) + rb->raw->size;
+}
+
 #define RLITE_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RLITE_BUF_PCI(rb) rb->pci
 #define RLITE_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
@@ -264,7 +271,7 @@ struct ipcp_ops {
 struct txrx {
     /* Read operation support. */
     struct list_head    rx_q;
-    unsigned int        rx_qlen;
+    unsigned int        rx_qsize; /* in bytes */
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
     struct rina_pci     *rx_cur_pci;
@@ -501,7 +508,7 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 {
     spin_lock_init(&txrx->rx_lock);
     INIT_LIST_HEAD(&txrx->rx_q);
-    txrx->rx_qlen = 0;
+    txrx->rx_qsize = 0;
     txrx->rx_cur_pci = NULL;
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;

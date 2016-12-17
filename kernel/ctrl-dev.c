@@ -994,7 +994,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         list_del(&rb->node);
         rl_buf_free(rb);
     }
-    entry->txrx.rx_qlen = 0;
+    entry->txrx.rx_qsize = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
         int r;

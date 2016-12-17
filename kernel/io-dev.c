@@ -98,8 +98,8 @@ tx_completion_func(unsigned long arg)
 #endif
 }
 
-/* Userspace queue threshold. */
-#define USR_Q_TH        128
+/* Userspace queue threshold in bytes. */
+#define RL_RXQ_SIZE_MAX         (1 << 20)
 
 int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rl_buf *rb, bool qlimit)
@@ -156,14 +156,14 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     }
 
     spin_lock_bh(&txrx->rx_lock);
-    if (unlikely(qlimit && txrx->rx_qlen >= USR_Q_TH)) {
+    if (unlikely(qlimit && txrx->rx_qsize > RL_RXQ_SIZE_MAX)) {
         /* This is useful when flow control is not used on a flow. */
         RPD(2, "dropping PDU [length %lu] to avoid userspace rx queue "
                 "overrun\n", (long unsigned)rb->len);
         rl_buf_free(rb);
     } else {
         list_add_tail(&rb->node, &txrx->rx_q);
-        txrx->rx_qlen++;
+        txrx->rx_qsize += rl_buf_truesize(rb);
     }
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
@@ -496,7 +496,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
             /* Complete SDU read, consume the rb. */
             list_del(&rb->node);
-            txrx->rx_qlen--;
+            txrx->rx_qsize -= rl_buf_truesize(rb);
             pci = txrx->rx_cur_pci;
             txrx->rx_cur_pci = NULL;
             spin_unlock_bh(&txrx->rx_lock);
@@ -615,7 +615,7 @@ rl_io_release_internal(struct rl_io *rio)
             list_del(&rb->node);
             rl_buf_free(rb);
         }
-        rio->txrx->rx_qlen = 0;
+        rio->txrx->rx_qsize = 0;
     }
 
     switch (rio->mode) {
