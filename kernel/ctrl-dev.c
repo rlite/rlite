@@ -248,9 +248,13 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
                   bool maysleep)
 {
     gfp_t gfp = maysleep ? GFP_KERNEL : GFP_ATOMIC;
+    unsigned long to = msecs_to_jiffies(2000);
+    DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
+    unsigned long exp;
     unsigned int serlen;
     void *serbuf;
+    int ret = 0;
 
     entry = kzalloc(sizeof(*entry), gfp);
     if (!entry) {
@@ -272,21 +276,45 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
     entry->sermsg = serbuf;
     entry->serlen = serlen;
 
-    spin_lock(&rc->upqueue_lock);
-    if (rc->upqueue_len >= 64) {
-        spin_unlock(&rc->upqueue_lock);
-        RPD(2, "upqueue overrun, dropping\n");
-        kfree(serbuf);
-        kfree(entry);
-        return -ENOSPC;
+    if (maysleep) {
+        add_wait_queue(&rc->upqueue_wqh, &wait);
     }
-    list_add_tail(&entry->node, &rc->upqueue);
-    rc->upqueue_len ++;
-    wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
-                               POLLRDBAND);
-    spin_unlock(&rc->upqueue_lock);
 
-    return 0;
+    exp = jiffies + to;
+
+    for (;;) {
+        spin_lock(&rc->upqueue_lock);
+        if (rc->upqueue_len >= 64) {
+            /* No free space in the queue. */
+            spin_unlock(&rc->upqueue_lock);
+            if (!maysleep || !time_before(jiffies, exp)) {
+                RPD(2, "upqueue overrun, dropping\n");
+                kfree(serbuf);
+                kfree(entry);
+                ret = -ENOSPC;
+                break;
+            }
+
+            /* Wait for more space, but not more than 2 seconds. */
+            schedule_timeout_interruptible(to);
+            continue;
+        }
+        list_add_tail(&entry->node, &rc->upqueue);
+        rc->upqueue_len ++;
+        spin_unlock(&rc->upqueue_lock);
+        break;
+    }
+
+    if (maysleep) {
+        remove_wait_queue(&rc->upqueue_wqh, &wait);
+    }
+
+    if (ret == 0) {
+        wake_up_interruptible_poll(&rc->upqueue_wqh, POLLIN | POLLRDNORM |
+                                                     POLLRDBAND);
+    }
+
+    return ret;
 }
 
 static struct dif *
@@ -987,7 +1015,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         ntfy.remote_addr = entry->remote_addr;
 
         rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
-                          true);
+                          false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&ntfy));
     }
@@ -2458,6 +2486,10 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         remove_wait_queue(&rc->upqueue_wqh, &wait);
     }
 
+    if (ret == 0) {
+        wake_up_interruptible_poll(&rc->upqueue_wqh, POLLOUT | POLLWRNORM |
+                                                     POLLWRBAND);
+    }
     return ret;
 }
 
