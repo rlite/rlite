@@ -515,14 +515,19 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
+/* default value for keepalive paramter */
+#define NEIGH_KEEPALIVE_TO      5
+
 static void
 usage(void)
 {
     printf("rlite-uipcps [OPTIONS]\n"
         "   -h : show this help\n"
-        "   -v VERB_LEVEL: set verbosity LEVEL: QUIET, WARN, INFO, "
+        "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
                            "DBG (default), VERY\n"
-          );
+        "   -k NUM : keepalive interval in seconds (default "
+                                "%d seconds, 0 to disable)\n",
+          NEIGH_KEEPALIVE_TO);
 }
 
 int main(int argc, char **argv)
@@ -532,6 +537,7 @@ int main(int argc, char **argv)
     struct sigaction sa;
     const char *verbosity = "DBG";
     int ret, opt;
+    int iarg;
 
     /* We require root permissions. */
     if (geteuid() != 0) {
@@ -549,7 +555,9 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    while ((opt = getopt(argc, argv, "hv:")) != -1) {
+    uipcps->keepalive = NEIGH_KEEPALIVE_TO;
+
+    while ((opt = getopt(argc, argv, "hv:k:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -557,6 +565,16 @@ int main(int argc, char **argv)
 
             case 'v':
                 verbosity = optarg;
+                break;
+
+            case 'k':
+                iarg = atoi(optarg);
+                if (iarg < 0) {
+                    PE("Invalid -k argument '%u'\n", iarg);
+                    usage();
+                    return -1;
+                }
+                uipcps->keepalive = iarg;
                 break;
 
             default:

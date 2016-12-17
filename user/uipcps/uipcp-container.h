@@ -49,6 +49,9 @@ struct uipcps {
     /* Timer ID for re-enrollments. */
     int re_enroll_tmrid;
 
+    /* Keepalive timeout in seconds. */
+    unsigned int keepalive;
+
     struct list_head ipcp_nodes;
 
     struct rl_evloop loop;

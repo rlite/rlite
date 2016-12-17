@@ -188,6 +188,8 @@ argparser.add_argument('-f', '--frontend',
                        default = 'virtio-net-pci')
 argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
+argparser.add_argument('--keepalive', default = 5,
+                       help = "Neighbor keepalive timeout in seconds", type = int)
 args = argparser.parse_args()
 
 
@@ -620,9 +622,10 @@ for vmname in sorted(vms):
                     '$SUDO mkdir -p /var/rlite\n'\
                     '$SUDO chmod -R a+rw /var/rlite\n'\
                     '\n'\
-                    '$SUDO rlite-uipcps -v %(verb)s &> uipcp.log &\n'\
+                    '$SUDO rlite-uipcps -v %(verb)s -k %(keepalive)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
-                           'verbidx': verbmap[args.verbosity]}
+                           'verbidx': verbmap[args.verbosity],
+                           'keepalive': args.keepalive}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:

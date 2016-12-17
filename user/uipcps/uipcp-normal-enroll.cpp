@@ -31,7 +31,6 @@ using namespace std;
 
 
 /* Timeout intervals are expressed in milliseconds. */
-#define NEIGH_KEEPALIVE_INTVAL      5000
 #define NEIGH_KEEPALIVE_THRESH      3
 #define NEIGH_ENROLL_TO             1500
 #define NEIGH_ENROLL_MAX_ATTEMPTS   3
@@ -267,8 +266,16 @@ NeighFlow::enroll_tmr_stop()
 void
 NeighFlow::keepalive_tmr_start()
 {
+    /* keepalive is in seconds, we need to convert it to milliseconds. */
+    unsigned int keepalive = neigh->rib->uipcp->uipcps->keepalive;
+
+    if (keepalive == 0) {
+        /* no keepalive */
+        return;
+    }
+
     keepalive_tmrid = rl_evloop_schedule(&neigh->rib->uipcp->loop,
-                                         NEIGH_KEEPALIVE_INTVAL,
+                                         keepalive * 1000,
                                          keepalive_timeout_cb, this);
 }
 
