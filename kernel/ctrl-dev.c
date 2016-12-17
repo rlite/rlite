@@ -919,7 +919,6 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     struct rl_buf *tmp;
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
-    struct flow_entry *ret = entry;
     struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
     unsigned long postpone = 0;
@@ -935,7 +934,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     entry->refcnt--;
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
-        goto out;
+        FUNLOCK();
+        return entry;
     }
 
     ipcp = entry->txrx.ipcp;
@@ -970,10 +970,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
          * after having performed its work.
          */
         entry->refcnt++;
-        goto out;
+        FUNLOCK();
+        return entry;
     }
-
-    ret = NULL;
 
     if (ipcp->ops.flow_deallocated) {
         ipcp->ops.flow_deallocated(ipcp, entry);
@@ -991,19 +990,31 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     entry->txrx.rx_qlen = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        int ret;
+        int r;
         rl_addr_t dst_addr = pfte->address;
 
         BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
         /* Here we are sure that 'upper_ipcp' will not be destroyed
          * before 'entry' is destroyed.. */
-        ret = upper_ipcp->ops.pduft_del(upper_ipcp, pfte);
-        if (ret == 0) {
+        r = upper_ipcp->ops.pduft_del(upper_ipcp, pfte);
+        if (r == 0) {
             PD("Removed IPC process %u PDUFT entry: %llu --> %u\n",
                upper_ipcp->id, (unsigned long long)dst_addr,
                entry->local_port);
         }
     }
+
+    hash_del(&entry->node);
+    if (entry->local_appl) kfree(entry->local_appl);
+    if (entry->remote_appl) kfree(entry->remote_appl);
+    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
+    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
+        hash_del(&entry->node_cep);
+        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
+    }
+    FUNLOCK();
+    PD("flow entry %u removed\n", entry->local_port);
+    kfree(entry);
 
     if (ipcp->uipcp) {
         struct rl_kmsg_flow_deallocated ntfy;
@@ -1039,19 +1050,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     }
     ipcp_put(ipcp);
 
-    hash_del(&entry->node);
-    if (entry->local_appl) kfree(entry->local_appl);
-    if (entry->remote_appl) kfree(entry->remote_appl);
-    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
-    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-        hash_del(&entry->node_cep);
-        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
-    }
-    PD("flow entry %u removed\n", entry->local_port);
-    kfree(entry);
-out:
-    FUNLOCK();
-    return ret;
+    return NULL;
 }
 
 struct flow_entry *
