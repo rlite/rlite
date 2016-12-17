@@ -42,7 +42,7 @@
 #include <rina/api.h>
 
 
-#define SDU_SIZE_MAX    65535
+#define SDU_SIZE_MAX    64
 #define MAX_CLIENTS     128
 
 struct echo_async {
@@ -57,6 +57,8 @@ struct echo_async {
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
 struct fdfsm {
+    char buf[SDU_SIZE_MAX];
+    int buflen;
 #define SELFD_S_ALLOC   1
 #define SELFD_S_WRITE   2
 #define SELFD_S_READ    3
@@ -78,7 +80,6 @@ static int
 client(struct echo_async *rea)
 {
     const char *msg = "Hello guys, this is a test message!";
-    char buf[SDU_SIZE_MAX];
     struct fdfsm *fsms;
     fd_set rdfs, wrfs;
     int maxfd;
@@ -160,10 +161,10 @@ client(struct echo_async *rea)
 
             case SELFD_S_WRITE:
                 if (FD_ISSET(fsms[i].fd, &wrfs)) {
-                    strncpy(buf, msg, SDU_SIZE_MAX);
-                    size = strlen(buf) + 1;
+                    strncpy(fsms[i].buf, msg, sizeof(fsms[i].buf));
+                    size = strlen(fsms[i].buf) + 1;
 
-                    ret = write(fsms[i].fd, buf, size);
+                    ret = write(fsms[i].fd, fsms[i].buf, size);
                     if (ret == size) {
                         fsms[i].state = SELFD_S_READ;
                     } else {
@@ -175,10 +176,10 @@ client(struct echo_async *rea)
             case SELFD_S_READ:
                 if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     /* Ready to read. */
-                    ret = read(fsms[i].fd, buf, sizeof(buf));
+                    ret = read(fsms[i].fd, fsms[i].buf, sizeof(fsms[i].buf));
                     if (ret > 0) {
-                        buf[ret] = '\0';
-                        printf("Response: '%s'\n", buf);
+                        fsms[i].buf[ret] = '\0';
+                        printf("Response: '%s'\n", fsms[i].buf);
                         printf("Flow %d deallocated\n", i);
                     }
                     shutdown_flow(fsms + i);
@@ -195,10 +196,9 @@ static int
 server(struct echo_async *rea)
 {
     struct fdfsm fsms[MAX_CLIENTS + 1];
-    char buf[SDU_SIZE_MAX];
     fd_set rdfs, wrfs;
-    int n, ret;
     int maxfd;
+    int ret;
     int i;
 
     /* In listen mode also register the application names. */
@@ -294,13 +294,14 @@ server(struct echo_async *rea)
             case SELFD_S_READ:
                 if (FD_ISSET(fsms[i].fd, &rdfs)) {
                     /* File descriptor is ready for reading. */
-                    n = read(fsms[i].fd, buf, sizeof(buf));
-                    if (n < 0) {
+                    fsms[i].buflen = read(fsms[i].fd, fsms[i].buf,
+                                          sizeof(fsms[i].buf));
+                    if (fsms[i].buflen < 0) {
                         shutdown_flow(fsms + i);
                         printf("Shutdown client %d\n", i);
                     } else {
-                        buf[n] = '\0';
-                        printf("Request: '%s'\n", buf);
+                        fsms[i].buf[fsms[i].buflen] = '\0';
+                        printf("Request: '%s'\n", fsms[i].buf);
                         fsms[i].state = SELFD_S_WRITE;
                     }
                 }
@@ -308,8 +309,8 @@ server(struct echo_async *rea)
 
             case SELFD_S_WRITE:
                 if (FD_ISSET(fsms[i].fd, &wrfs)) {
-                    ret = write(fsms[i].fd, buf, n);
-                    if (ret == n) {
+                    ret = write(fsms[i].fd, fsms[i].buf, fsms[i].buflen);
+                    if (ret == fsms[i].buflen) {
                         printf("Response sent back\n");
                         printf("Close client %d\n", i);
                     } else {
