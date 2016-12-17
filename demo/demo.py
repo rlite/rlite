@@ -253,7 +253,7 @@ while 1:
     if line.startswith('#'):
         continue
 
-    m = re.match(r'\s*eth\s+(\w+)\s+(\d+)([GMK])bps\s+(\w.*)$', line)
+    m = re.match(r'\s*eth\s+([\w-]+)\s+(\d+)([GMK])bps\s+(\w.*)$', line)
     if m:
         shim = m.group(1)
         speed = int(m.group(2))
@@ -278,7 +278,7 @@ while 1:
         #        print(vm_list[i], vm_list[j])
         continue
 
-    m = re.match(r'\s*udp4\s+(\w+)\s+(\w.*)$', line)
+    m = re.match(r'\s*udp4\s+([\w-]+)\s+(\w.*)$', line)
     if m:
         shim = m.group(1)
         members = m.group(2).split()
@@ -306,7 +306,7 @@ while 1:
             dns_mappings[shim][vm] = {'ip': ip}
         continue
 
-    m = re.match(r'\s*dif\s+(\w+)\s+(\w+)\s+(\w.*)$', line)
+    m = re.match(r'\s*dif\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
     if m:
         dif = m.group(1)
         vm = m.group(2)
@@ -327,7 +327,7 @@ while 1:
 
         continue
 
-    m = re.match(r'\s*netem\s+(\w+)\s+(\w+)\s+(\w.*)$', line)
+    m = re.match(r'\s*netem\s+([\w-]+)\s+([\w-]+)\s+(\w.*)$', line)
     if m:
         dif = m.group(1)
         vmname = m.group(2)
