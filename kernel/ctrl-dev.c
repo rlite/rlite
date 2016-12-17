@@ -920,6 +920,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct flow_entry *ret = entry;
+    struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
     unsigned long postpone = 0;
 
@@ -936,6 +937,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         /* Flow is still being used by someone. */
         goto out;
     }
+
+    ipcp = entry->txrx.ipcp;
+    upper_ipcp = entry->upper.ipcp;
 
     if (entry->cfg.dtcp_present && !maysleep) {
         /* If DTCP is present, check if we should postopone flow
@@ -971,8 +975,6 @@ __flow_put(struct flow_entry *entry, bool maysleep)
 
     ret = NULL;
 
-    ipcp = entry->txrx.ipcp;
-
     if (ipcp->ops.flow_deallocated) {
         ipcp->ops.flow_deallocated(ipcp, entry);
     }
@@ -992,14 +994,14 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         int ret;
         rl_addr_t dst_addr = pfte->address;
 
-        BUG_ON(!entry->upper.ipcp || !entry->upper.ipcp->ops.pduft_del);
-        /* Here we are sure that 'entry->upper.ipcp' will not be destroyed
+        BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
+        /* Here we are sure that 'upper_ipcp' will not be destroyed
          * before 'entry' is destroyed.. */
-        ret = entry->upper.ipcp->ops.pduft_del(entry->upper.ipcp, pfte);
+        ret = upper_ipcp->ops.pduft_del(upper_ipcp, pfte);
         if (ret == 0) {
             PD("Removed IPC process %u PDUFT entry: %llu --> %u\n",
-                    entry->upper.ipcp->id,
-                    (unsigned long long)dst_addr, entry->local_port);
+               upper_ipcp->id, (unsigned long long)dst_addr,
+               entry->local_port);
         }
     }
 
@@ -1023,9 +1025,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     /* We are in process context here, so we can safely do the
      * removal. This is done for either the IPCP which supports
      * the flow (entry->txrx.ipcp) and the IPCP which uses the
-     * flow (entry->upper.ipcp). */
+     * flow (upper_ipcp). */
 
-    if (entry->upper.ipcp) {
+    if (upper_ipcp) {
         mutex_lock(&ipcp->lock);
         ipcp->shortcut_flows--;
         if (ipcp->shortcut_flows == 0) {
@@ -1033,7 +1035,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
         mutex_unlock(&ipcp->lock);
 
-        ipcp_put(entry->upper.ipcp);
+        ipcp_put(upper_ipcp);
     }
     ipcp_put(ipcp);
 
