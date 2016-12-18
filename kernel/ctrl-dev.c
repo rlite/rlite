@@ -922,9 +922,10 @@ EXPORT_SYMBOL(flow_get_ref);
 static struct flow_entry *
 __flow_put(struct flow_entry *entry, bool maysleep)
 {
+    struct rl_kmsg_flow_deallocated ntfy;
+    struct pduft_entry *pfte, *tmp_pfte;
     struct rl_buf *rb;
     struct rl_buf *tmp;
-    struct pduft_entry *pfte, *tmp_pfte;
     struct dtp *dtp;
     struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
@@ -1020,20 +1021,21 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
     FUNLOCK();
-    PD("flow entry %u removed\n", entry->local_port);
-    kfree(entry);
-
     if (ipcp->uipcp) {
-        struct rl_kmsg_flow_deallocated ntfy;
-
-        /* Notify the uipcp about flow deallocation. */
+        /* Prepare a flow deallocation message. */
+        memset(&ntfy, 0, sizeof(ntfy));
         ntfy.msg_type = RLITE_KER_FLOW_DEALLOCATED;
         ntfy.event_id = 0;
         ntfy.ipcp_id = ipcp->id;
         ntfy.local_port_id = entry->local_port;
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
+    }
+    PD("flow entry %u removed\n", entry->local_port);
+    kfree(entry);
 
+    if (ipcp->uipcp) {
+        /* Notify the uipcp about flow deallocation. */
         rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
                           false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -1042,8 +1044,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
 
     /* We are in process context here, so we can safely do the
      * removal. This is done for either the IPCP which supports
-     * the flow (entry->txrx.ipcp) and the IPCP which uses the
-     * flow (upper_ipcp). */
+     * the flow (ipcp) and the IPCP which uses the flow (upper_ipcp). */
 
     if (upper_ipcp) {
         mutex_lock(&ipcp->lock);
