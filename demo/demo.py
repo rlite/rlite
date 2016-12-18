@@ -676,9 +676,10 @@ for vmname in sorted(vms):
                         % vars_dict
             del vars_dict
 
-    if args.register:
-        outs += 'rina-echo-async -z %(regname)s -l &> rina-echo-async.log &\n' \
-                    % {'regname': 'rina-echo-async:%s' % (vm['name'],)}
+        if args.register:
+            outs += 'rina-echo-async -z %(regname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' \
+                        % {'regname': 'rina-echo-async:%s' % (vm['name'],),
+                           'dif': dif}
 
     outs +=         '\n'\
                     'sleep 1\n'\
