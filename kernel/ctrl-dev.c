@@ -1037,7 +1037,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     if (ipcp->uipcp) {
         /* Notify the uipcp about flow deallocation. */
         rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
-                          false);
+                          true);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&ntfy));
     }

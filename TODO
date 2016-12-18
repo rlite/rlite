@@ -13,4 +13,4 @@
 
 - demo: extend --ring to use more levels of DIFs
 
-- rinaperf: failure --> and automatic unregistration does not work
+- allocate and use N-flows rather than N-1-flows over shim DIFs
