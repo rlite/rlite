@@ -190,6 +190,8 @@ argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
 argparser.add_argument('--keepalive', default = 5,
                        help = "Neighbor keepalive timeout in seconds", type = int)
+argparser.add_argument('--register', action='store_true',
+                       help = "Register rina-echo-async apps instances on each node")
 args = argparser.parse_args()
 
 
@@ -674,6 +676,10 @@ for vmname in sorted(vms):
                         % vars_dict
             del vars_dict
 
+    if args.register:
+        outs += 'rina-echo-async -z %(regname)s -l &> rina-echo-async.log &\n' \
+                    % {'regname': 'rina-echo-async:%s' % (vm['name'],)}
+
     outs +=         '\n'\
                     'sleep 1\n'\
                     'true\n'\
@@ -704,6 +710,14 @@ for dif in dif_ordering:
                                   enrollment['enroller'],
                                   enrollment['lower_dif']))
 
+        vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
+                     'pvid': vms[enrollment['enroller']]['id'],
+                     'username': username,
+                     'vmname': vm['name'],
+                     'dif': dif, 'ldif': enrollment['lower_dif'],
+                     'sshopts': sshopts, 'sudo': sudo,
+                     'oper': oper}
+
         outs += 'sleep 1\n' # important!!
         outs += ''\
             'DONE=255\n'\
@@ -712,7 +726,7 @@ for dif in dif_ordering:
             'set -x\n'\
             'SUDO=%(sudo)s\n'\
             '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.DIF %(dif)s.%(id)s.IPCP:%(id)s '\
-                            '%(dif)s.%(pvid)s.IPCP:%(pvid)s %(ldif)s.DIF\n'\
+                    '%(dif)s.%(pvid)s.IPCP:%(pvid)s %(ldif)s.DIF\n'\
             'sleep 1\n'\
             'true\n'\
             'ENDSSH\n'\
@@ -720,13 +734,7 @@ for dif in dif_ordering:
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
-            'done\n\n' % {'ssh': vm['ssh'], 'id': vm['id'],
-                          'pvid': vms[enrollment['enroller']]['id'],
-                          'username': username,
-                          'vmname': vm['name'],
-                          'dif': dif, 'ldif': enrollment['lower_dif'],
-                          'sshopts': sshopts, 'sudo': sudo,
-                          'oper': oper}
+            'done\n\n' % vars_dict
 
 
 # Apply netem rules. For now this step is done after enrollment in order to
