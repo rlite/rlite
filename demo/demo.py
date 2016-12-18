@@ -855,3 +855,44 @@ if args.graphviz:
         print("Warning: pydot module not installed, cannot produce DIF "\
               "graphs images")
 
+
+###### Generate echo script for automatic testing ######
+if args.register:
+    fout = open('echo.sh', 'w')
+
+    outs =  '#!/bin/bash\n'             \
+            '\n'                        \
+            '#set -x\n'
+
+    # For each DIF
+    for dif in dif_ordering:
+        if dif in shims or len(difs[dif]) == 0:
+            continue
+
+        # Select a pivot node
+        pivot = sorted(difs[dif])[0]
+        outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
+            'DONE=255\n'\
+            'while [ $DONE != "0" ]; do\n'\
+            '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                    '#set -x\n' % {'sshopts': sshopts, 'username': username,
+                                  'ssh': vms[pivot]['ssh'], 'pivot': pivot,
+                                  'dif': dif}
+
+        for vmname in sorted(difs[dif]):
+            outs += 'rina-echo-async -z rina-echo-async:%(vmname)s -d %(dif)s.DIF\n' \
+                    '[ "$?" == "0" ] || echo "Failed to reach %(vmname)s ' \
+                        'in DIF %(dif)s"\n'\
+                        % {'vmname': vmname, 'dif': dif}
+
+        outs +=      'true\n'\
+                'ENDSSH\n'\
+            '   DONE=$?\n'\
+            '   if [ $DONE != "0" ]; then\n'\
+            '       sleep 1\n'\
+            '   fi\n'\
+            'done\n\n'
+
+    fout.write(outs)
+    fout.close()
+    subprocess.call(['chmod', '+x', 'echo.sh'])
