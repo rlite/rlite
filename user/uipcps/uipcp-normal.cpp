@@ -479,11 +479,11 @@ uipcp_rib::dump() const
         const FlowRequest& freq = mit->second;
 
         ss << "    [" << (freq.initiator ? "L" : "R") << "]" <<
-                ", SrcAppl: " << static_cast<string>(freq.src_app) <<
-                ", DstAppl: " << static_cast<string>(freq.dst_app) <<
-                ", SrcAddr: " << freq.src_addr << ", SrcPort: " <<
-                freq.src_port << ", DstAddr: " << freq.dst_addr <<
-                ", DstPort: " << freq.dst_port << ", Connections: [";
+                ", Src=" << static_cast<string>(freq.src_app) <<
+                ", Dst=" << static_cast<string>(freq.dst_app) <<
+                ", SrcAddr:Port=" << freq.src_addr << ":" << freq.src_port <<
+                ", DstAddr:Port=" << freq.dst_addr << ":" << freq.dst_port <<
+                ", Connections: [";
         for (list<ConnId>::const_iterator conn = freq.connections.begin();
                                 conn != freq.connections.end(); conn++) {
             ss << "<SrcCep=" << conn->src_cep << ", DstCep=" << conn->dst_cep
