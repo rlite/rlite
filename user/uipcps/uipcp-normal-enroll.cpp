@@ -1269,7 +1269,6 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
         /* Reset the keepalive request counter, we know the neighbor
          * is alive on this flow. */
         nf->pending_keepalive_reqs = 0;
-        nf->neigh->unheard_since = time(NULL);
 
         UPV(uipcp, "M_READ_R(keepalive) received from neighbor %s\n",
             static_cast<string>(nf->neigh->ipcp_name).c_str());

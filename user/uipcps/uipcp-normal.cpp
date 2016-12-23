@@ -638,6 +638,10 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
         return -1;
     }
 
+    if (nf && nf->neigh) {
+        nf->neigh->unheard_since = time(NULL); /* update */
+    }
+
     return (this->*(hi->second))(rm, nf);
 }
 
