@@ -1474,7 +1474,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 }
 
 void
-normal_trigger_re_enrollments(struct uipcp *uipcp)
+normal_trigger_tasks(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list< pair<string, string> > re_enrollments;

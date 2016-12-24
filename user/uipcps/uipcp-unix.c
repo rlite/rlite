@@ -433,10 +433,10 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
     }
     pthread_mutex_unlock(&uipcps->lock);
 
-    /* Carry out re-enrollments outside the uipcps lock. */
+    /* Carry out tasks outside the uipcps lock. */
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        if (uipcp->ops.trigger_re_enrollments) {
-            uipcp->ops.trigger_re_enrollments(uipcp);
+        if (uipcp->ops.trigger_tasks) {
+            uipcp->ops.trigger_tasks(uipcp);
         }
     }
 

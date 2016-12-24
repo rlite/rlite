@@ -373,7 +373,7 @@ int normal_ipcp_enroll(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroll *req,
                        int wait_for_completion);
 
-void normal_trigger_re_enrollments(struct uipcp *uipcp);
+void normal_trigger_tasks(struct uipcp *uipcp);
 
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);

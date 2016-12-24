@@ -926,6 +926,6 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
-    .trigger_re_enrollments = normal_trigger_re_enrollments,
+    .trigger_tasks = normal_trigger_tasks,
 };
 

@@ -104,7 +104,7 @@ struct uipcp_ops {
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
 
-    void  (*trigger_re_enrollments)(struct uipcp *);
+    void  (*trigger_tasks)(struct uipcp *);
 };
 
 struct ipcp_node {
