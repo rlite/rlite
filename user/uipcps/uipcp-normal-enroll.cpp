@@ -26,6 +26,7 @@
 #include <pthread.h>
 
 #include "uipcp-normal.hpp"
+#include <rlite/conf.h>
 
 using namespace std;
 
@@ -1312,6 +1313,8 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
 int
 Neighbor::alloc_flow(const char *supp_dif)
 {
+    struct rina_flow_spec relspec;
+    bool have_reliable_flow;
     rl_ipcp_id_t lower_ipcp_id_;
     rl_port_t port_id_;
     unsigned int event_id;
@@ -1347,9 +1350,19 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
 
+    rl_flow_spec_default(&relspec);
+    relspec.max_sdu_gap = 0;
+    relspec.in_order_delivery = 1;
+    rina_flow_spec_fc_set(&relspec, 1);
+    have_reliable_flow = (rl_conf_ipcp_qos_supported(&rib->uipcp->loop.ctrl,
+                                            lower_ipcp_id_, &relspec) == 0);
+    UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
+                                             (have_reliable_flow ? "" : " not"));
+
     /* Allocate a flow for the enrollment. */
     ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif,
-                               rib->uipcp->name, ipcp_name.c_str(), NULL,
+                               rib->uipcp->name, ipcp_name.c_str(),
+                               have_reliable_flow ? &relspec : NULL,
                                rib->uipcp->id, &port_id_, 2000);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
