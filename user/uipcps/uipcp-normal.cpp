@@ -871,6 +871,7 @@ normal_finalize(struct uipcp *uipcp)
 {
     int ret;
 
+    /* Self-registration: needed to use N-flows rather than N-1-flows. */
     ret = rl_evloop_register(&uipcp->loop, 1, uipcp->dif_name,
                              uipcp->name, 2000);
     if (ret) {
