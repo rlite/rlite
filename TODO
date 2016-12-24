@@ -16,7 +16,3 @@
 - allocate and use N-flows rather than N-1-flows over shim DIFs
 
 - periodic DFT synchronization
-
-- update last_activity
-
-- flow alloc and resp: remove ipcp_id param
