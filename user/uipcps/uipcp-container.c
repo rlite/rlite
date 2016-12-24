@@ -505,6 +505,10 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err2;
     }
 
+    if (uipcp->ops.finalize) {
+        uipcp->ops.finalize(uipcp);
+    }
+
     PI("userspace IPCP %u created\n", upd->ipcp_id);
 
     return 0;

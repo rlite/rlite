@@ -762,8 +762,16 @@ neigh_fa_req_arrived(struct rl_evloop *loop,
 
     assert(b_req == NULL);
 
-    UPD(uipcp, "flow request arrived: [ipcp_id = %u, data_port_id = %u]\n",
-            req->ipcp_id, req->port_id);
+    if (strcmp(req->dif_name, uipcp->dif_name) == 0) {
+        UPD(uipcp, "N-flow request arrived: [neigh = %s, port_id = %u]\n",
+                req->remote_appl, req->port_id);
+        ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
+                                0xffff, req->port_id, RLITE_ERR);
+        return 0;
+    }
+
+    UPD(uipcp, "N-1-flow request arrived: [neigh = %s, port_id = %u]\n",
+            req->remote_appl, req->port_id);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking rl_appl_fa_resp,
@@ -855,7 +863,23 @@ normal_init(struct uipcp *uipcp)
     }
 
     return rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ_ARRIVED,
-                                    neigh_fa_req_arrived);
+                                 neigh_fa_req_arrived);
+}
+
+static int
+normal_finalize(struct uipcp *uipcp)
+{
+    int ret;
+
+    ret = rl_evloop_register(&uipcp->loop, 1, uipcp->dif_name,
+                             uipcp->name, 2000);
+    if (ret) {
+        UPI(uipcp, "Failed to self-register IPCP %s to DIF %s\n",
+                    uipcp->name, uipcp->dif_name);
+    } else {
+        UPI(uipcp, "IPCP %s self-registered to DIF %s\n",
+                    uipcp->name, uipcp->dif_name);
+    }
 
     return 0;
 }
@@ -875,17 +899,17 @@ normal_register_to_lower(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int ret;
 
+    if (!req->dif_name) {
+        UPE(uipcp, "lower DIF name is not specified\n");
+        return -1;
+    }
+
     /* Perform the registration. */
     ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
                              req->ipcp_name, 2000);
 
     if (ret) {
         return ret;
-    }
-
-    if (!req->dif_name) {
-        UPE(uipcp, "lower DIF name is not specified\n");
-        return -1;
     }
 
     ScopeLock(rib->lock);
@@ -916,6 +940,7 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 
 struct uipcp_ops normal_ops = {
     .init = normal_init,
+    .finalize = normal_finalize,
     .fini = normal_fini,
     .register_to_lower = normal_register_to_lower,
     .enroll = normal_ipcp_enroll,

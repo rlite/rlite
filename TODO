@@ -18,3 +18,5 @@
 - periodic DFT synchronization
 
 - update last_activity
+
+- flow alloc and resp: remove ipcp_id param

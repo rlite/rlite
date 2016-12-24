@@ -71,6 +71,7 @@ struct uipcp;
 /* All these callbacks must be non-null. */
 struct uipcp_ops {
     int (*init)(struct uipcp *);
+    int (*finalize)(struct uipcp *);
 
     int (*fini)(struct uipcp *);
 
