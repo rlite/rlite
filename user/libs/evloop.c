@@ -884,7 +884,9 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
 
         /* (wait_ms == 0 && result == 0) means non-blocking invocation, so
          * it is ok to get NULL. */
-        *port_id = ~0U;
+        if (port_id) {
+            *port_id = ~0U;
+        }
 
         return 0;
     }
@@ -892,7 +894,9 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
     PI("Flow allocation response: ret = %u, port-id = %u\n",
                 kresp->response, kresp->port_id);
     result = kresp->response;
-    *port_id = kresp->port_id;
+    if (port_id) {
+        *port_id = kresp->port_id;
+    }
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(kresp));
     free(kresp);

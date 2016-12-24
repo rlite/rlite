@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <cassert>
 #include <pthread.h>
+#include <poll.h>
 
 #include "uipcp-normal.hpp"
 #include <rlite/conf.h>
@@ -39,8 +40,9 @@ using namespace std;
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
                                   neigh(n), supp_dif(supdif),
-                                  port_id(pid), flow_fd(ffd),
-                                  lower_ipcp_id(lid), conn(NULL),
+                                  port_id(pid), lower_ipcp_id(lid),
+                                  flow_fd(ffd), reliable(false),
+                                  upper_flow_fd(-1), conn(NULL),
                                   enroll_tmrid(0),
                                   enrollment_state(NEIGH_NONE),
                                   keepalive_tmrid(0),
@@ -68,13 +70,23 @@ NeighFlow::~NeighFlow()
     }
 
     ret = close(flow_fd);
-
     if (ret) {
-        UPE(neigh->rib->uipcp, "Error deallocating N-1 flow fd %d\n",
-                flow_fd);
+        UPE(neigh->rib->uipcp, "Error deallocating N-1-flow fd %d\n",
+                               flow_fd);
     } else {
-        UPD(neigh->rib->uipcp, "N-1 flow deallocated [fd=%d]\n",
-                flow_fd);
+        UPD(neigh->rib->uipcp, "N-1-flow deallocated [fd=%d]\n",
+                               flow_fd);
+    }
+
+    if (upper_flow_fd >= 0) {
+        ret = close(upper_flow_fd);
+        if (ret) {
+            UPE(neigh->rib->uipcp, "Error deallocating N-flow fd %d\n",
+                                   upper_flow_fd);
+        } else {
+            UPD(neigh->rib->uipcp, "N-flow deallocated [fd=%d]\n",
+                                   upper_flow_fd);
+        }
     }
 
     uipcps_lower_flow_removed(neigh->rib->uipcp->uipcps,
@@ -1365,13 +1377,13 @@ Neighbor::alloc_flow(const char *supp_dif)
                                have_reliable_flow ? &relspec : NULL,
                                rib->uipcp->id, &port_id_, 2000);
     if (ret) {
-        UPE(rib->uipcp, "Failed to allocate a flow towards neighbor\n");
+        UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
         return -1;
     }
 
     flow_fd_ = rl_open_appl_port(port_id_);
     if (flow_fd_ < 0) {
-        UPE(rib->uipcp, "Failed to access the flow towards the neighbor\n");
+        UPE(rib->uipcp, "Failed to access N-1 flow towards the neighbor\n");
         return -1;
     }
 
@@ -1466,6 +1478,7 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list< pair<string, string> > re_enrollments;
+    list<string> n_flow_allocations;
 
     pthread_mutex_lock(&rib->lock);
 
@@ -1477,9 +1490,25 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
                 rib->neighbors_seen.find(*cand);
         map<string, Neighbor *>::iterator neigh;
         string common_dif;
+        NeighFlow *nf = NULL;
 
         assert(mit != rib->neighbors_seen.end());
         neigh = rib->neighbors.find(*cand);
+
+        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+            nf = neigh->second->mgmt_conn();
+        }
+
+        if (neigh->second->enrollment_complete() && neigh->second->initiator &&
+                                !nf->reliable && nf->upper_flow_fd < 0) {
+            /* This N-1-flow towards the enrolled neighbor is not reliable.
+             * We then try to allocate an N-flow, to be used in place of
+             * the N-1-flow. */
+            nf->reliable = true; /* TODO temporary */
+            n_flow_allocations.push_back(*cand);
+            UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
+                " because N-1-flow is unreliable\n", cand->c_str());
+        }
 
         if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
             time_t inact;
@@ -1488,14 +1517,13 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
              * to check that this is not a dead flow hanging forever in
              * the NEIGH_NONE state. */
 
-            inact = time(NULL) - neigh->second->mgmt_conn()->last_activity;
+            inact = time(NULL) - nf->last_activity;
 
-            if (neigh->second->mgmt_conn()->enrollment_state == NEIGH_NONE &&
-                        inact > 10) {
+            if (nf->enrollment_state == NEIGH_NONE && inact > 10) {
                 /* Prune the flow now, we'll try to enroll later. */
-                PD("Pruning flow towards %s since inactive for %d seconds\n",
-                    cand->c_str(), (int)inact);
-                rib->neigh_flow_prune(neigh->second->mgmt_conn());
+                UPD(rib->uipcp, "Pruning flow towards %s since inactive "
+                                "for %d seconds\n", cand->c_str(), (int)inact);
+                rib->neigh_flow_prune(nf);
             }
 
             /* Enrollment not needed. */
@@ -1510,7 +1538,7 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
         }
 
         /* Start the enrollment. */
-        UPD(rib->uipcp, "Triggering re-enrollement with neighbor %s through "
+        UPD(rib->uipcp, "Triggering re-enrollment with neighbor %s through "
                         "lower DIF %s\n", cand->c_str(), common_dif.c_str());
         re_enrollments.push_back(make_pair(*cand, common_dif));
     }
@@ -1521,6 +1549,62 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
     for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
                                         lit != re_enrollments.end(); lit ++) {
         normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
+    }
+
+    /* Carry out allocations of N-flows. */
+    struct rina_flow_spec relspec;
+
+    rl_flow_spec_default(&relspec);
+    relspec.max_sdu_gap = 0;
+    relspec.in_order_delivery = 1;
+    rina_flow_spec_fc_set(&relspec, 1);
+
+    for (list< string >::iterator lit = n_flow_allocations.begin();
+                            lit != n_flow_allocations.end(); lit ++) {
+        struct pollfd pfd;
+        int ret;
+
+        pfd.fd = rina_flow_alloc(rib->uipcp->dif_name, rib->uipcp->name,
+                                 lit->c_str(), &relspec, RINA_F_NOWAIT);
+        if (pfd.fd < 0) {
+            UPI(rib->uipcp, "Failed to issue N-flow allocation towards"
+                            " %s [%s]\n", lit->c_str(), strerror(errno));
+            continue;
+        }
+        pfd.events = POLLIN;
+        ret = poll(&pfd, 1, 2000);
+        if (ret <= 0) {
+            if (ret < 0) {
+                perror("poll()");
+            } else {
+                UPI(rib->uipcp, "Timeout while allocating N-flow towards %s\n",
+                                lit->c_str());
+            }
+            close(pfd.fd);
+            continue;
+        }
+
+        pfd.fd = rina_flow_alloc_wait(pfd.fd);
+        if (pfd.fd < 0) {
+            UPI(rib->uipcp, "Failed to allocate N-flow towards %s [%s]\n",
+                            lit->c_str(), strerror(errno));
+            continue;
+        }
+
+        UPI(rib->uipcp, "N-flow allocated [fd=%d]\n", pfd.fd);
+
+        map<string, Neighbor *>::iterator neigh;
+
+        pthread_mutex_lock(&rib->lock);
+        neigh = rib->neighbors.find(*lit);
+        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+            neigh->second->mgmt_conn()->upper_flow_fd = pfd.fd;
+        } else {
+            UPE(rib->uipcp, "Neighbor disappeared, closing "
+                            "N-flow %d\n", pfd.fd);
+            close(pfd.fd);
+        }
+        pthread_mutex_unlock(&rib->lock);
     }
 }
 

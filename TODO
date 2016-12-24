@@ -14,3 +14,9 @@
 - demo: extend --ring to use more levels of DIFs
 
 - allocate and use N-flows rather than N-1-flows over shim DIFs
+
+- periodic DFT synchronization
+
+- remove asynchronous API
+
+- update last_activity

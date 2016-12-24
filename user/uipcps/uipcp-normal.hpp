@@ -102,8 +102,10 @@ struct NeighFlow {
     Neighbor *neigh;
     std::string supp_dif;
     rl_port_t port_id;
-    int flow_fd;
     rl_ipcp_id_t lower_ipcp_id;
+    int flow_fd;
+    bool reliable;
+    int upper_flow_fd;
     CDAPConn *conn;
 
     time_t last_activity;
