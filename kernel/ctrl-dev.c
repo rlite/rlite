@@ -1640,6 +1640,28 @@ rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     return ret;
 }
+static int
+rl_ipcp_qos_supported(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_ipcp_qos_supported *req =
+                    (struct rl_kmsg_ipcp_qos_supported *)bmsg;
+    struct ipcp_entry *ipcp;
+    int ret = -EINVAL;
+
+    ipcp = ipcp_get(req->ipcp_id);
+    if (ipcp) {
+        if (ipcp->ops.qos_supported) {
+            /* IPCP is able to validate QoS. */
+            ret = ipcp->ops.qos_supported(ipcp, &req->flowspec);
+        } else {
+            /* IPCP only supports best effort. */
+            ret = rina_flow_spec_best_effort(&req->flowspec) ? 0 : -ENOSYS;
+        }
+    }
+    ipcp_put(ipcp);
+
+    return ret;
+}
 
 static int
 rl_ipcp_uipcp_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
@@ -2354,6 +2376,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_FLOW_DEALLOC] = rl_flow_dealloc,
     [RLITE_KER_FLOW_STATS_REQ] = rl_flow_get_stats,
     [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
+    [RLITE_KER_IPCP_QOS_SUPPORTED] = rl_ipcp_qos_supported,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 

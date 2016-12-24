@@ -266,6 +266,8 @@ struct ipcp_ops {
                           const struct rl_mgmt_hdr *hdr,
                           struct rl_buf *rb, struct ipcp_entry **lower_ipcp,
                           struct flow_entry **lower_flow);
+
+    int (*qos_supported)(struct ipcp_entry *ipcp, struct rina_flow_spec *spec);
 };
 
 struct txrx {

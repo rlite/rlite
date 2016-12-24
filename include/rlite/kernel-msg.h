@@ -55,6 +55,7 @@ enum {
     RLITE_KER_FLOW_STATS_REQ, /* 22 */
     RLITE_KER_FLOW_STATS_RESP, /* 23 */
     RLITE_KER_FLOW_CFG_UPDATE, /* 24 */
+    RLITE_KER_IPCP_QOS_SUPPORTED, /* 25 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -310,6 +311,8 @@ struct rl_kmsg_flow_dealloc {
     rl_port_t port_id;
 } __attribute__((packed));
 
+/* application --> kernel message to ask for
+ * statistics of a given flow. */
 struct rl_kmsg_flow_stats_req {
     rl_msg_t msg_type;
     uint32_t event_id;
@@ -317,11 +320,24 @@ struct rl_kmsg_flow_stats_req {
     rl_port_t port_id;
 } __attribute__((packed));
 
+/* application <-- kernel message to report statistics
+ * about a give flow. */
 struct rl_kmsg_flow_stats_resp {
     rl_msg_t msg_type;
     uint32_t event_id;
 
     struct rl_flow_stats stats;
+} __attribute__((packed));
+
+
+/* application --> kernel message to ask an IPCP if a given
+ * QoS can be supported. */
+struct rl_kmsg_ipcp_qos_supported {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    rl_ipcp_id_t ipcp_id;
+    struct rina_flow_spec flowspec;
 } __attribute__((packed));
 
 #endif  /* __RLITE_KER_H__ */

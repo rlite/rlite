@@ -839,6 +839,15 @@ rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
     return 0;
 }
 
+static int
+rl_normal_qos_supported(struct ipcp_entry *ipcp, struct rina_flow_spec *spec)
+{
+    /* For the moment being we say we support any QoS. In future we
+     * should take into account resource allocation, e.g. to check whether
+     * there is enough bandwidth. */
+    return 0;
+}
+
 static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
@@ -1468,6 +1477,7 @@ static struct ipcp_factory normal_factory = {
     .ops.sdu_rx = rl_normal_sdu_rx,
     .ops.flow_get_stats = rl_normal_flow_get_stats,
     .ops.flow_writeable = rl_normal_flow_writeable,
+    .ops.qos_supported = rl_normal_qos_supported,
 };
 
 static int __init
