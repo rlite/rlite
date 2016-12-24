@@ -68,6 +68,10 @@ rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows);
 void
 rl_conf_flows_purge(struct list_head *flows);
 
+int
+rl_conf_ipcp_qos_supported(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
+                           struct rina_flow_spec *spec);
+
 #ifdef __cplusplus
 }
 #endif

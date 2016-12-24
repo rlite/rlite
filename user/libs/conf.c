@@ -308,3 +308,25 @@ rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
     return 0;
 }
 
+int
+rl_conf_ipcp_qos_supported(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
+                           struct rina_flow_spec *spec)
+{
+    struct rl_kmsg_ipcp_qos_supported msg;
+    int ret;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_type = RLITE_KER_IPCP_QOS_SUPPORTED;
+    msg.event_id = rl_ctrl_get_id(ctrl);
+    msg.ipcp_id = ipcp_id;
+    memcpy(&msg.flowspec, spec, sizeof(*spec));
+
+    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 1);
+    if (ret < 0 && errno != ENOSYS) {
+        PE("Failed to issue request to the kernel\n");
+    }
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+
+    return ret;
+}
