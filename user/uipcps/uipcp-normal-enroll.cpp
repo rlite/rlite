@@ -1473,12 +1473,11 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
                             wait_for_completion);
 }
 
-void
-normal_trigger_tasks(struct uipcp *uipcp)
+static void
+normal_trigger_re_enrollments(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list< pair<string, string> > re_enrollments;
-    list<string> n_flow_allocations;
 
     pthread_mutex_lock(&rib->lock);
 
@@ -1496,18 +1495,7 @@ normal_trigger_tasks(struct uipcp *uipcp)
         neigh = rib->neighbors.find(*cand);
 
         if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
-            nf = neigh->second->mgmt_conn();
-        }
-
-        if (neigh->second->enrollment_complete() && neigh->second->initiator &&
-                                !nf->reliable && nf->upper_flow_fd < 0) {
-            /* This N-1-flow towards the enrolled neighbor is not reliable.
-             * We then try to allocate an N-flow, to be used in place of
-             * the N-1-flow. */
-            nf->reliable = true; /* TODO temporary */
-            n_flow_allocations.push_back(*cand);
-            UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
-                " because N-1-flow is unreliable\n", cand->c_str());
+            nf = neigh->second->mgmt_conn(); /* cache variable */
         }
 
         if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
@@ -1550,6 +1538,43 @@ normal_trigger_tasks(struct uipcp *uipcp)
                                         lit != re_enrollments.end(); lit ++) {
         normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
     }
+}
+
+static void
+normal_allocate_n_flows(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    list<string> n_flow_allocations;
+
+    pthread_mutex_lock(&rib->lock);
+    /* Scan all the enrolled neighbors. */
+    for (set<string>::const_iterator
+            cand = rib->neighbors_cand.begin();
+                cand != rib->neighbors_cand.end(); cand++) {
+        map<string, Neighbor *>::iterator neigh;
+        NeighFlow *nf = NULL;
+
+        neigh = rib->neighbors.find(*cand);
+        if (neigh == rib->neighbors.end() ||
+                !neigh->second->enrollment_complete() ||
+                        !neigh->second->initiator) {
+            continue;
+        }
+
+        nf = neigh->second->mgmt_conn();
+        if (nf->reliable || nf->upper_flow_fd >= 0) {
+            continue;
+        }
+
+        /* This N-1-flow towards the enrolled neighbor is not reliable.
+         * We then try to allocate an N-flow, to be used in place of
+         * the N-1-flow. */
+        nf->reliable = true; /* TODO temporary */
+        n_flow_allocations.push_back(*cand);
+        UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
+            " because N-1-flow is unreliable\n", cand->c_str());
+    }
+    pthread_mutex_unlock(&rib->lock);
 
     /* Carry out allocations of N-flows. */
     struct rina_flow_spec relspec;
@@ -1606,6 +1631,13 @@ normal_trigger_tasks(struct uipcp *uipcp)
         }
         pthread_mutex_unlock(&rib->lock);
     }
+}
+
+void
+normal_trigger_tasks(struct uipcp *uipcp)
+{
+    normal_trigger_re_enrollments(uipcp);
+    normal_allocate_n_flows(uipcp);
 }
 
 int
