@@ -78,21 +78,6 @@ int
 rl_open_appl_port(rl_port_t port_id);
 
 
-/*
- * Asynchronous API.
- */
-
-uint32_t
-rl_ctrl_fa_req(struct rl_ctrl *ctrl, const char *dif_name,
-               const char *local_appl,
-               const char *remote_appl,
-               const struct rina_flow_spec *flowspec);
-
-uint32_t
-rl_ctrl_reg_req(struct rl_ctrl *ctrl, int reg,
-                const char *dif_name,
-                const char *appl_name);
-
 struct rl_msg_base *
 rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id, unsigned int wait_ms);
 
