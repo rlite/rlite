@@ -763,15 +763,17 @@ neigh_fa_req_arrived(struct rl_evloop *loop,
     assert(b_req == NULL);
 
     if (strcmp(req->dif_name, uipcp->dif_name) == 0) {
-        UPD(uipcp, "N-flow request arrived: [neigh = %s, port_id = %u]\n",
-                req->remote_appl, req->port_id);
+        UPD(uipcp, "N-flow request arrived: [neigh = %s, supp_dif = %s, "
+                   "port_id = %u]\n",
+                req->remote_appl, req->dif_name, req->port_id);
         ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
                                 0xffff, req->port_id, RLITE_ERR);
         return 0;
     }
 
-    UPD(uipcp, "N-1-flow request arrived: [neigh = %s, port_id = %u]\n",
-            req->remote_appl, req->port_id);
+    UPD(uipcp, "N-1-flow request arrived: [neigh = %s, supp_dif = %s, "
+               "port_id = %u]\n",
+               req->remote_appl, req->dif_name, req->port_id);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking rl_appl_fa_resp,

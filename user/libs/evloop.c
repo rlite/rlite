@@ -77,8 +77,8 @@ flow_allocate_resp_arrived(struct rl_evloop *loop,
                "'%s' and remote appl '%s'\n",
                 req->local_appl, req->remote_appl);
     } else {
-        PI("Allocated flow between local appl "
-               "'%s' and remote appl '%s' [port-id = %u]\n",
+        PV("Allocated flow between local appl "
+            "'%s' and remote appl '%s' [port-id = %u]\n",
                 req->local_appl, req->remote_appl, resp->port_id);
     }
 
@@ -100,7 +100,7 @@ appl_register_resp(struct rl_evloop *loop,
         PE("Application '%s' %sregistration failed\n", resp->appl_name,
             (resp->reg ? "" : "un"));
     } else {
-        PD("Application '%s' %sregistration successfully completed\n",
+        PV("Application '%s' %sregistration successfully completed\n",
            resp->appl_name, (resp->reg ? "" : "un"));
     }
 
