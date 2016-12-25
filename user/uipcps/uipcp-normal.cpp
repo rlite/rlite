@@ -850,6 +850,16 @@ normal_flow_deallocated(struct rl_evloop *loop,
     return 0;
 }
 
+static void
+normal_update_address(struct uipcp *uipcp, rl_addr_t old_addr,
+                      rl_addr_t new_addr)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
+
+    rib->dft_update_address(old_addr, new_addr);
+}
+
 static int
 normal_init(struct uipcp *uipcp)
 {
@@ -954,6 +964,7 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
+    .update_address = normal_update_address,
     .trigger_tasks = normal_trigger_tasks,
 };
 

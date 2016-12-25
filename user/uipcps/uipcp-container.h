@@ -89,6 +89,7 @@ struct uipcp_ops {
 
     char * (*rib_show)(struct uipcp *);
 
+    /* TODO why evloop and not uipcp ? */
     int (*appl_register)(struct rl_evloop *loop,
                          const struct rl_msg_base *b_resp,
                          const struct rl_msg_base *b_req);
@@ -105,6 +106,11 @@ struct uipcp_ops {
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
 
+    /* Called when the uipcp address gets updated. */
+    void (*update_address)(struct uipcp *uipcp, rl_addr_t old_addr,
+                           rl_addr_t new_addr);
+
+    /* For tasks to be executed in the context of the uipcps event loop. */
     void  (*trigger_tasks)(struct uipcp *);
 };
 

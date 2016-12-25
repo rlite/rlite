@@ -16,3 +16,7 @@
 - allocate and use N-flows rather than N-1-flows over shim DIFs
 
 - periodic DFT synchronization
+
+- refactor rina-gw using the POSIX API
+
+- uipcps lock: is that used?

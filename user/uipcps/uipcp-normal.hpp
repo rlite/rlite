@@ -309,6 +309,7 @@ struct uipcp_rib {
     int del_neighbor(const std::string& neigh_name);
     int dft_lookup(const std::string& appl_name, rl_addr_t& dstaddr) const;
     int dft_set(const std::string& appl_name, rl_addr_t remote_addr);
+    void dft_update_address(rl_addr_t old_addr, rl_addr_t new_addr);
     int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rl_kmsg_appl_register *req);
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);

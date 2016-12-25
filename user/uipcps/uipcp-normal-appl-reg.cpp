@@ -195,3 +195,24 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
+void
+uipcp_rib::dft_update_address(rl_addr_t old_addr, rl_addr_t new_addr)
+{
+    map< string, DFTEntry >::iterator mit;
+    DFTSlice prop_dft;
+
+    /* Update all the DFT entries corresponding to application that are
+     * registered within us. */
+    for (mit = dft.begin(); mit != dft.end(); mit ++) {
+        if (mit->second.address == old_addr) {
+            mit->second.address = new_addr;
+            prop_dft.entries.push_back(mit->second);
+            UPD(uipcp, "Updated address for DFT entry %s\n", mit->first.c_str());
+        }
+    }
+
+    /* Disseminate the update. */
+    if (prop_dft.entries.size()) {
+        remote_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
+    }
+}

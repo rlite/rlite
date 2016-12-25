@@ -392,6 +392,7 @@ int
 uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {
     struct uipcp *uipcp;
+    rl_addr_t old_addr;
 
     pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
@@ -401,17 +402,31 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         return 0;
     }
 
+    uipcp->refcnt ++;
+
     if (uipcp->dif_type) free(uipcp->dif_type);
     if (uipcp->name) free(uipcp->name);
     if (uipcp->dif_name) free(uipcp->dif_name);
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
+    old_addr = uipcp->addr;
     uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
+    pthread_mutex_unlock(&uipcps->lock);
+
+    if (old_addr != upd->ipcp_addr) {
+        /* Address changed, notify the IPCP. */
+        if (uipcp->ops.update_address) {
+            uipcp->ops.update_address(uipcp, old_addr, upd->ipcp_addr);
+        }
+    }
+
+    pthread_mutex_lock(&uipcps->lock);
+    uipcp->refcnt --;
     pthread_mutex_unlock(&uipcps->lock);
 
     return 0;
