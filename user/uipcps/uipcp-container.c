@@ -543,19 +543,14 @@ errx:
 }
 
 int
-uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
+uipcp_put(struct uipcp *uipcp, int locked)
 {
-    struct uipcp *uipcp;
     int kernelspace = 0;
     int destroy;
     int ret = 0;
 
-    if (locked) pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup(uipcps, ipcp_id);
-    if (!uipcp) {
-        if (locked) pthread_mutex_unlock(&uipcps->lock);
-        /* The specified IPCP is a Shim IPCP. */
-        return 0;
+    if (locked) {
+        pthread_mutex_lock(&uipcp->uipcps->lock);
     }
 
     uipcp->refcnt--;
@@ -565,7 +560,9 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
         list_del(&uipcp->node);
     }
 
-    if (locked) pthread_mutex_unlock(&uipcps->lock);
+    if (locked) {
+        pthread_mutex_unlock(&uipcp->uipcps->lock);
+    }
 
     if (!destroy) {
         return 0;
@@ -582,15 +579,35 @@ uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked)
     if (uipcp->name) free(uipcp->name);
     if (uipcp->dif_name) free(uipcp->dif_name);
 
-    free(uipcp);
-
     if (ret == 0) {
         if (!kernelspace) {
-            PI("userspace IPCP %u destroyed\n", ipcp_id);
+            PI("userspace IPCP %u destroyed\n", uipcp->id);
         } else {
-            PD("Removed entry of kernel-space IPCP %u\n", ipcp_id);
+            PD("Removed entry of kernel-space IPCP %u\n", uipcp->id);
         }
     }
+
+    free(uipcp);
+
+    return ret;
+}
+
+int
+uipcp_put_by_id(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
+{
+    struct uipcp *uipcp;
+    int ret = 0;
+
+    pthread_mutex_lock(&uipcps->lock);
+    uipcp = uipcp_lookup(uipcps, ipcp_id);
+    if (!uipcp) {
+        /* The specified IPCP is a Shim IPCP. */
+        goto out;
+    }
+
+    ret = uipcp_put(uipcp, 0);
+out:
+    pthread_mutex_unlock(&uipcps->lock);
 
     return ret;
 }

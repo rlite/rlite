@@ -167,7 +167,9 @@ void *uipcp_server(void *arg);
 
 int uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
-int uipcp_put(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int locked);
+int uipcp_put_by_id(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
+
+int uipcp_put(struct uipcp *uipcp, int locked);
 
 int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
