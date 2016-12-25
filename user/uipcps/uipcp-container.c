@@ -425,9 +425,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         }
     }
 
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp->refcnt --;
-    pthread_mutex_unlock(&uipcps->lock);
+    uipcp_put(uipcp, 1);
 
     return 0;
 }
