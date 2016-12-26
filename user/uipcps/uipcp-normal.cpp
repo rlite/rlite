@@ -882,6 +882,7 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     neigh->flows[neigh_port_id] = new NeighFlow(neigh, string(supp_dif),
                                                 neigh_port_id, 0,
                                                 lower_ipcp_id);
+    neigh->flows[neigh_port_id]->reliable = is_reliable_spec(&req->flowspec);
 
     ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
                             uipcp->id, req->port_id, result);
@@ -898,9 +899,10 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     }
 
     neigh->flows[neigh_port_id]->flow_fd = flow_fd;
-    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u,reliable=%s]\n",
                     neigh->flows[neigh_port_id]->flow_fd,
-                    neigh->flows[neigh_port_id]->port_id);
+                    neigh->flows[neigh_port_id]->port_id,
+                    neigh->flows[neigh_port_id]->reliable ? "yes" : "no");
 
     uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 
