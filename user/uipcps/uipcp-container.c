@@ -409,7 +409,6 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
@@ -447,7 +446,6 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
@@ -614,23 +612,15 @@ int
 uipcps_print(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
-    char addrbuf[20];
 
     pthread_mutex_lock(&uipcps->lock);
     PD_S("IPC Processes table:\n");
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        if (uipcp->addr == 0) {
-            strncpy(addrbuf, "*", sizeof(addrbuf));
-        } else {
-            snprintf(addrbuf, sizeof(addrbuf), "%llu",
-                     (long long unsigned int)uipcp->addr);
-        }
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %s, depth = %u\n",
+                " depth = %u\n",
                 uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name, addrbuf,
-                uipcp->depth);
+                uipcp->dif_name, uipcp->depth);
     }
     pthread_mutex_unlock(&uipcps->lock);
 

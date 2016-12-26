@@ -161,7 +161,6 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    rl_addr_t addr; /* for convenience, the important one is in the RIB */
     unsigned int depth;
     char *dif_type;
     char *dif_name;
