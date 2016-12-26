@@ -460,15 +460,21 @@ ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl,
            struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
+    char addrbuf[20];
 
     PI_S("IPC Processes table:\n");
 
     list_for_each_entry(attrs, &ipcps, node) {
+        if (attrs->addr == 0) {
+            strncpy(addrbuf, "*", sizeof(addrbuf));
+        } else {
+            snprintf(addrbuf, sizeof(addrbuf), "%llu",
+                     (long long unsigned int)attrs->addr);
+        }
         PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %llu, depth = %u\n",
+                " address = %s, depth = %u\n",
                 attrs->id, attrs->name, attrs->dif_type,
-                attrs->dif_name,
-                (long long unsigned int)attrs->addr,
+                attrs->dif_name, addrbuf,
                 attrs->depth);
     }
 
