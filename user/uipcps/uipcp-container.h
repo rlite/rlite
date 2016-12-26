@@ -195,6 +195,9 @@ struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 struct uipcp *uipcp_get_by_name(struct uipcps *uipcps,
                                 const char *ipcp_name);
 
+int uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
+                           rl_ipcp_id_t *ipcp_id);
+
 int uipcps_print(struct uipcps *uipcps);
 
 int uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,

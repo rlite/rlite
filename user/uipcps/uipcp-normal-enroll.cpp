@@ -1339,27 +1339,13 @@ Neighbor::alloc_flow(const char *supp_dif)
         UPI(rib->uipcp, "Trying to allocate additional N-1 flow\n");
     }
 
-    {
-        /* Lookup the id of the lower IPCP towards the neighbor. */
-        struct uipcps *uipcps = rib->uipcp->uipcps;
-        struct uipcp *cur;
-        bool found = false;
-
-        pthread_mutex_lock(&uipcps->lock);
-        list_for_each_entry(cur, &uipcps->uipcps, node) {
-            if (strcmp(cur->dif_name, supp_dif) == 0) {
-                lower_ipcp_id_ = cur->id;
-                found = true;
-                break;
-            }
-        }
-        pthread_mutex_unlock(&uipcps->lock);
-
-        if (!found) {
-            UPI(rib->uipcp, "Failed to get lower ipcp id in DIF %s\n",
-			    supp_dif);
-            return -1;
-        }
+    /* Lookup the id of the lower IPCP towards the neighbor. */
+    ret = uipcp_lookup_id_by_dif(rib->uipcp->uipcps, supp_dif,
+                                 &lower_ipcp_id_);
+    if (ret) {
+        UPE(rib->uipcp, "Failed to get lower ipcp id in DIF %s\n",
+                        supp_dif);
+        return -1;
     }
 
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
@@ -1568,7 +1554,6 @@ normal_allocate_n_flows(struct uipcp *uipcp)
         /* This N-1-flow towards the enrolled neighbor is not reliable.
          * We then try to allocate an N-flow, to be used in place of
          * the N-1-flow for layer management. */
-        nf->reliable = true; /* TODO temporary */
         n_flow_allocations.push_back(*cand);
         UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
             " because N-1-flow is unreliable\n", cand->c_str());

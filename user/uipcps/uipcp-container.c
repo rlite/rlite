@@ -388,6 +388,27 @@ uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
     return NULL;
 }
 
+/* Lookup the id of an uipcp belonging to dif_name. */
+int
+uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
+                       rl_ipcp_id_t *ipcp_id)
+{
+    struct uipcp *cur;
+    int ret = -1;
+
+    pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry(cur, &uipcps->uipcps, node) {
+        if (strcmp(cur->dif_name, dif_name) == 0) {
+            *ipcp_id = cur->id;
+            ret = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&uipcps->lock);
+
+    return ret;
+}
+
 int
 uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {

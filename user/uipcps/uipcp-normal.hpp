@@ -103,9 +103,9 @@ struct NeighFlow {
     std::string supp_dif;
     rl_port_t port_id;
     rl_ipcp_id_t lower_ipcp_id;
-    int flow_fd;
+    int flow_fd; /* only used for close() */
     bool reliable;
-    int upper_flow_fd;
+    int upper_flow_fd; /* TODO currently unused */
     CDAPConn *conn;
 
     time_t last_activity;
