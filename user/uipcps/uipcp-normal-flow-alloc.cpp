@@ -255,17 +255,18 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
 
     FlowRequest& freq = f->second;
 
+    /* Update the freq object with the port-id and cep-id allocated by
+     * the kernel. */
+    freq.dst_port = resp->port_id;
+    freq.connections.front().dst_cep = resp->cep_id;
+
+    obj_name << obj_name::flows << "/" << freq.src_addr
+             << "-" << freq.src_port;
+
     if (resp->response) {
         reason = "Application refused the accept the flow request";
     } else {
-        /* Update the freq object with the port-id and cep-id allocated by
-         * the kernel. */
-        freq.dst_port = resp->port_id;
-        freq.connections.front().dst_cep = resp->cep_id;
-
         /* Move the freq object from the temporary map to the right one. */
-        obj_name << obj_name::flows << "/" << freq.src_addr
-                 << "-" << freq.src_port;
         flow_reqs[obj_name.str() + string("R")] = freq;
     }
 

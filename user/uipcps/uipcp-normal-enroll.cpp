@@ -1546,9 +1546,6 @@ normal_allocate_n_flows(struct uipcp *uipcp)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list<string> n_flow_allocations;
 
-#if 1
-    return; /* TODO temporarily disabled */
-#endif
     pthread_mutex_lock(&rib->lock);
     /* Scan all the enrolled neighbors. */
     for (set<string>::const_iterator

@@ -18,3 +18,5 @@
 - periodic DFT synchronization
 
 - refactor rina-gw using the POSIX API
+
+- normal: self-registration only when needed (hook into ipcp_register)
