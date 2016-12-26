@@ -105,6 +105,10 @@ struct uipcp_ops {
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
 
+    int (*neigh_fa_req_arrived)(struct rl_evloop *loop,
+                                const struct rl_msg_base *b_resp,
+                                const struct rl_msg_base *b_req);
+
     /* Called when the uipcp address gets updated. */
     void (*update_address)(struct uipcp *uipcp, rl_addr_t old_addr,
                            rl_addr_t new_addr);

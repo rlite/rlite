@@ -749,9 +749,9 @@ normal_fa_req(struct rl_evloop *loop,
 }
 
 static int
-neigh_fa_req_arrived(struct rl_evloop *loop,
-                     const struct rl_msg_base *b_resp,
-                     const struct rl_msg_base *b_req)
+normal_neigh_fa_req_arrived(struct rl_evloop *loop,
+                            const struct rl_msg_base *b_resp,
+                            const struct rl_msg_base *b_req)
 {
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req_arrived *req =
@@ -875,8 +875,7 @@ normal_init(struct uipcp *uipcp)
         return -1;
     }
 
-    return rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ_ARRIVED,
-                                 neigh_fa_req_arrived);
+    return 0;
 }
 
 static int
@@ -965,6 +964,7 @@ struct uipcp_ops normal_ops = {
     .fa_req = normal_fa_req,
     .fa_resp = normal_fa_resp,
     .flow_deallocated = normal_flow_deallocated,
+    .neigh_fa_req_arrived = normal_neigh_fa_req_arrived,
     .update_address = normal_update_address,
     .trigger_tasks = normal_trigger_tasks,
 };

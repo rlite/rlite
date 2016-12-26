@@ -506,6 +506,9 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     ret |= rl_evloop_set_handler(&uipcp->loop,
                                  RLITE_KER_FLOW_DEALLOCATED,
                                  uipcp->ops.flow_deallocated);
+
+    ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ_ARRIVED,
+                                 uipcp->ops.neigh_fa_req_arrived);
     if (ret) {
         goto err2;
     }
