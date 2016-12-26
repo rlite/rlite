@@ -60,12 +60,12 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     resp->response = response;
     resp->appl_name = strdup(req->appl_name);
 
-    UPD(uipcp, "Issuing application register response ...\n");
+    UPV(uipcp, "Issuing application register response ...\n");
 
     fkresp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(resp),
                                sizeof(*resp), 0, 0, &result);
     assert(!fkresp); (void)fkresp;
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -183,12 +183,12 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     req->local_appl = strdup(local_appl);
     req->remote_appl = strdup(remote_appl);
 
-    UPD(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
+    UPV(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp); (void)resp;
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -225,12 +225,12 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
         rl_flow_cfg_default(&req->flowcfg);
     }
 
-    UPD(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
+    UPV(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                          0, 0, &result);
     assert(!resp); (void)resp;
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }
@@ -255,12 +255,12 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
     req->ipcp_id = uipcp->id;
     req->port_id = local_port;
 
-    UPD(uipcp, "Issuing FLOW_DEALLOC message...\n");
+    UPV(uipcp, "Issuing FLOW_DEALLOC message...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp); (void)resp;
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result); /* this often returns -1 */
 
     return result;
 }
@@ -316,12 +316,12 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
 
-    UPD(uipcp, "Requesting IPCP uipcp set...\n");
+    UPV(uipcp, "Requesting IPCP uipcp set...\n");
 
     resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
                                0, 0, &result);
     assert(!resp); (void)resp;
-    UPD(uipcp, "result: %d\n", result);
+    UPV(uipcp, "result: %d\n", result);
 
     return result;
 }

@@ -813,7 +813,7 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
 
     rina_register_req_fill(req, event_id, dif_name, reg, appl_name);
 
-    PD("Requesting appl %sregistration...\n", (reg ? "": "un"));
+    PV("Requesting appl %sregistration...\n", (reg ? "": "un"));
 
     return (struct rl_kmsg_appl_register_resp *)
            rl_evloop_issue_request(loop, RLITE_MB(req),
@@ -870,7 +870,7 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
     rl_fa_req_fill(req, event_id, dif_name, local_appl, remote_appl,
                    flowspec, upper_ipcp_id);
 
-    PD("Requesting flow allocation...\n");
+    PV("Requesting flow allocation...\n");
 
     kresp = (struct rl_kmsg_fa_resp_arrived *)
             rl_evloop_issue_request(loop, RLITE_MB(req),
@@ -891,7 +891,7 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
         return 0;
     }
 
-    PI("Flow allocation response: ret = %u, port-id = %u\n",
+    PV("Flow allocation response: ret = %u, port-id = %u\n",
                 kresp->response, kresp->port_id);
     result = kresp->response;
     if (port_id) {
