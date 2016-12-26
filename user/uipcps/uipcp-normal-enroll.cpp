@@ -1350,10 +1350,7 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
 
-    rl_flow_spec_default(&relspec);
-    relspec.max_sdu_gap = 0;
-    relspec.in_order_delivery = 1;
-    rina_flow_spec_fc_set(&relspec, 1);
+    reliable_spec(&relspec);
     have_reliable_flow = (rl_conf_ipcp_qos_supported(&rib->uipcp->loop.ctrl,
                                             lower_ipcp_id_, &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
@@ -1564,10 +1561,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
     /* Carry out allocations of N-flows. */
     struct rina_flow_spec relspec;
 
-    rl_flow_spec_default(&relspec);
-    relspec.max_sdu_gap = 0;
-    relspec.in_order_delivery = 1;
-    rina_flow_spec_fc_set(&relspec, 1);
+    reliable_spec(&relspec);
 
     for (list< string >::iterator lit = n_flow_allocations.begin();
                             lit != n_flow_allocations.end(); lit ++) {

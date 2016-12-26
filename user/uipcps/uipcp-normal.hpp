@@ -377,6 +377,23 @@ private:
     uint32_t kevent_id_cnt;
 };
 
+static inline void
+reliable_spec(struct rina_flow_spec *spec)
+{
+    rl_flow_spec_default(spec);
+    spec->max_sdu_gap = 0;
+    spec->in_order_delivery = 1;
+    rina_flow_spec_fc_set(spec, 1);
+}
+
+static inline bool
+is_reliable_spec(const struct rina_flow_spec *spec)
+{
+    return spec->max_sdu_gap == 0 &&
+                spec->in_order_delivery == 1 &&
+                    rina_flow_spec_fc_get(spec);
+}
+
 int normal_ipcp_enroll(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroll *req,
                        int wait_for_completion);
