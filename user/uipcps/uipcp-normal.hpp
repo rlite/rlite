@@ -159,8 +159,7 @@ struct Neighbor {
                                                   const CDAPMessage *rm);
     enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
-    Neighbor(struct uipcp_rib *rib, const char *name,
-             bool initiator);
+    Neighbor(struct uipcp_rib *rib, const char *name);
     bool operator==(const Neighbor& other) const
         { return ipcp_name == other.ipcp_name; }
     bool operator!=(const Neighbor& other) const
@@ -305,7 +304,7 @@ struct uipcp_rib {
     char *dump() const;
 
     int set_address(rl_addr_t address);
-    Neighbor *get_neighbor(const char *neigh_name, bool initiator);
+    Neighbor *get_neighbor(const char *neigh_name);
     int del_neighbor(const std::string& neigh_name);
     int dft_lookup(const std::string& appl_name, rl_addr_t& dstaddr) const;
     int dft_set(const std::string& appl_name, rl_addr_t remote_addr);

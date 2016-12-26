@@ -301,11 +301,10 @@ NeighFlow::keepalive_tmr_stop()
     }
 }
 
-Neighbor::Neighbor(struct uipcp_rib *rib_, const char *name,
-                   bool initiator_)
+Neighbor::Neighbor(struct uipcp_rib *rib_, const char *name)
 {
     rib = rib_;
-    initiator = initiator_;
+    initiator = false;
     enroll_attempts = 0;
     ipcp_name = string(name);
     memset(enroll_fsm_handlers, 0, sizeof(enroll_fsm_handlers));
@@ -1109,12 +1108,12 @@ uipcp_rib::remote_refresh_lower_flows()
 }
 
 Neighbor *
-uipcp_rib::get_neighbor(const char *neigh_name, bool initiator)
+uipcp_rib::get_neighbor(const char *neigh_name)
 {
     string neigh_name_s(neigh_name);
 
     if (!neighbors.count(neigh_name_s)) {
-        neighbors[neigh_name_s] = new Neighbor(this, neigh_name, initiator);
+        neighbors[neigh_name_s] = new Neighbor(this, neigh_name);
     }
 
     return neighbors[neigh_name_s];
@@ -1415,12 +1414,13 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     pthread_mutex_lock(&rib->lock);
 
-    neigh = rib->get_neighbor(neigh_name, true);
+    neigh = rib->get_neighbor(neigh_name);
     if (!neigh) {
         UPE(uipcp, "Failed to add neighbor\n");
         pthread_mutex_unlock(&rib->lock);
         return -1;
     }
+    neigh->initiator = true;
 
     if (!neigh->has_mgmt_flow()) {
         ret = neigh->alloc_flow(supp_dif_name);
@@ -1647,12 +1647,13 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
                       rl_port_t neigh_port_id,
                       rl_ipcp_id_t lower_ipcp_id)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name, false);
+    Neighbor *neigh = rib->get_neighbor(neigh_name);
 
     if (!neigh) {
         UPE(rib->uipcp, "Failed to get neighbor\n");
         return -1;
     }
+    neigh->initiator = false;
 
     if (neigh->flows.count(neigh_port_id)) {
         UPE(rib->uipcp, "Port id '%u' already exists\n",
@@ -1677,11 +1678,12 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const char *neigh_name,
                       rl_port_t neigh_port_id, int neigh_fd)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name, false);
+    Neighbor *neigh = rib->get_neighbor(neigh_name);
 
     if (!neigh) {
         UPE(rib->uipcp, "Failed to get neighbor\n");
     }
+    neigh->initiator = false;
 
     if (!neigh->flows.count(neigh_port_id)) {
         UPE(rib->uipcp, "Port id '%u' does not exist\n",
