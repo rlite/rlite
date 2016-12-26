@@ -1382,6 +1382,7 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     flows[port_id_] = new NeighFlow(this, string(supp_dif), port_id_, flow_fd_,
                                     lower_ipcp_id_);
+    flows[port_id_]->reliable = have_reliable_flow;
 
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
