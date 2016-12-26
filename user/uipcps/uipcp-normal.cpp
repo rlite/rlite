@@ -757,7 +757,7 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
     int ret;
 
     /* Check that the N-flow allocation request makes sense. */
-    neigh = rib->get_neighbor(req->remote_appl);
+    neigh = rib->get_neighbor(req->remote_appl, false);
     if (!neigh || !neigh->enrollment_complete()) {
         UPE(rib->uipcp, "Rejected N-flow request from non-neighbor %s\n",
                         req->remote_appl);

@@ -304,7 +304,7 @@ struct uipcp_rib {
     char *dump() const;
 
     int set_address(rl_addr_t address);
-    Neighbor *get_neighbor(const char *neigh_name);
+    Neighbor *get_neighbor(const char *neigh_name, bool create);
     int del_neighbor(const std::string& neigh_name);
     int dft_lookup(const std::string& appl_name, rl_addr_t& dstaddr) const;
     int dft_set(const std::string& appl_name, rl_addr_t remote_addr);

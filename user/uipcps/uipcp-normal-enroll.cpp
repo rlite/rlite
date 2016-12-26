@@ -1108,11 +1108,14 @@ uipcp_rib::remote_refresh_lower_flows()
 }
 
 Neighbor *
-uipcp_rib::get_neighbor(const char *neigh_name)
+uipcp_rib::get_neighbor(const char *neigh_name, bool create)
 {
     string neigh_name_s(neigh_name);
 
     if (!neighbors.count(neigh_name_s)) {
+        if (!create) {
+            return NULL;
+        }
         neighbors[neigh_name_s] = new Neighbor(this, neigh_name);
     }
 
@@ -1414,12 +1417,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     pthread_mutex_lock(&rib->lock);
 
-    neigh = rib->get_neighbor(neigh_name);
-    if (!neigh) {
-        UPE(uipcp, "Failed to add neighbor\n");
-        pthread_mutex_unlock(&rib->lock);
-        return -1;
-    }
+    neigh = rib->get_neighbor(neigh_name, true);
     neigh->initiator = true;
 
     if (!neigh->has_mgmt_flow()) {
@@ -1563,12 +1561,13 @@ normal_allocate_n_flows(struct uipcp *uipcp)
 
         nf = neigh->second->mgmt_conn();
         if (nf->reliable || nf->upper_flow_fd >= 0) {
+            /* N-flow unnecessary or already allocated. */
             continue;
         }
 
         /* This N-1-flow towards the enrolled neighbor is not reliable.
          * We then try to allocate an N-flow, to be used in place of
-         * the N-1-flow. */
+         * the N-1-flow for layer management. */
         nf->reliable = true; /* TODO temporary */
         n_flow_allocations.push_back(*cand);
         UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
@@ -1647,12 +1646,8 @@ rib_neigh_set_port_id(struct uipcp_rib *rib,
                       rl_port_t neigh_port_id,
                       rl_ipcp_id_t lower_ipcp_id)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name);
+    Neighbor *neigh = rib->get_neighbor(neigh_name, true);
 
-    if (!neigh) {
-        UPE(rib->uipcp, "Failed to get neighbor\n");
-        return -1;
-    }
     neigh->initiator = false;
 
     if (neigh->flows.count(neigh_port_id)) {
@@ -1678,11 +1673,8 @@ rib_neigh_set_flow_fd(struct uipcp_rib *rib,
                       const char *neigh_name,
                       rl_port_t neigh_port_id, int neigh_fd)
 {
-    Neighbor *neigh = rib->get_neighbor(neigh_name);
+    Neighbor *neigh = rib->get_neighbor(neigh_name, true);
 
-    if (!neigh) {
-        UPE(rib->uipcp, "Failed to get neighbor\n");
-    }
     neigh->initiator = false;
 
     if (!neigh->flows.count(neigh_port_id)) {
