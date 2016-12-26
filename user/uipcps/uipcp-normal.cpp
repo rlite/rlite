@@ -749,6 +749,54 @@ normal_fa_req(struct rl_evloop *loop,
 }
 
 static int
+neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
+{
+    uint8_t response = RLITE_ERR;
+    ScopeLock(rib->lock);
+    Neighbor *neigh;
+    int ret;
+
+    /* Check that the N-flow allocation request makes sense. */
+    neigh = rib->get_neighbor(req->remote_appl);
+    if (!neigh || !neigh->enrollment_complete()) {
+        UPE(rib->uipcp, "Rejected N-flow request from non-neighbor %s\n",
+                        req->remote_appl);
+
+    } else if (neigh->mgmt_conn()->upper_flow_fd >= 0) {
+        UPE(rib->uipcp, "Rejected N-flow request from %s, an N-flow "
+                        "already exists\n", req->remote_appl);
+
+    } else if (neigh->mgmt_conn()->reliable) {
+        UPE(rib->uipcp, "Rejected N-flow request from %s, N-1 flow "
+                        "is already reliable\n", req->remote_appl);
+
+    } else {
+        response = RLITE_SUCC;
+    }
+
+    ret = rl_evloop_fa_resp(&rib->uipcp->loop, req->kevent_id, req->ipcp_id,
+                            0xffff, req->port_id, response);
+    if (ret || response == RLITE_ERR) {
+        if (ret) {
+            UPE(rib->uipcp, "rl_appl_fa_resp() failed\n");
+        }
+        return 0;
+    }
+
+    neigh->mgmt_conn()->upper_flow_fd = rl_open_appl_port(req->port_id);
+    if (neigh->mgmt_conn()->upper_flow_fd < 0) {
+        UPE(rib->uipcp, "Failed to open I/O port for N-flow towards %s\n",
+                        req->remote_appl);
+        return 0;
+    }
+
+    UPD(rib->uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
+                    req->remote_appl, req->dif_name, req->port_id);
+
+    return 0;
+}
+
+static int
 normal_neigh_fa_req_arrived(struct rl_evloop *loop,
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req)
@@ -764,13 +812,13 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     assert(b_req == NULL);
 
     if (strcmp(req->dif_name, uipcp->dif_name) == 0) {
-        UPD(uipcp, "N-flow request arrived: [neigh = %s, supp_dif = %s, "
-                   "port_id = %u]\n",
-                req->remote_appl, req->dif_name, req->port_id);
-        ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
-                                0xffff, req->port_id, RLITE_ERR);
-        return 0;
+        /* This an N-flow coming from a remote uipcp which should already be
+         * a neighbor of ours. */
+        return neigh_n_fa_req_arrived(rib, req);
     }
+
+    /* Regular N-1-flow request coming from a remote uipcp who may want to
+     * enroll in the DIF or who only wants to establish a new neighborhood. */
 
     UPD(uipcp, "N-1-flow request arrived: [neigh = %s, supp_dif = %s, "
                "port_id = %u]\n",
