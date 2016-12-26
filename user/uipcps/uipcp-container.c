@@ -494,18 +494,18 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     /* Set the evloop handlers for flow allocation request/response and
      * registration reflected messages. */
     ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ,
-                                    uipcp->ops.fa_req);
+                                 uipcp->ops.fa_req);
 
     ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_RESP,
-                                    uipcp->ops.fa_resp);
+                                 uipcp->ops.fa_resp);
 
     ret |= rl_evloop_set_handler(&uipcp->loop,
-                                   RLITE_KER_APPL_REGISTER,
-                                   uipcp->ops.appl_register);
+                                 RLITE_KER_APPL_REGISTER,
+                                 uipcp->ops.appl_register);
 
     ret |= rl_evloop_set_handler(&uipcp->loop,
-                                    RLITE_KER_FLOW_DEALLOCATED,
-                                    uipcp->ops.flow_deallocated);
+                                 RLITE_KER_FLOW_DEALLOCATED,
+                                 uipcp->ops.flow_deallocated);
     if (ret) {
         goto err2;
     }

@@ -89,7 +89,6 @@ struct uipcp_ops {
 
     char * (*rib_show)(struct uipcp *);
 
-    /* TODO why evloop and not uipcp ? */
     int (*appl_register)(struct rl_evloop *loop,
                          const struct rl_msg_base *b_resp,
                          const struct rl_msg_base *b_req);
