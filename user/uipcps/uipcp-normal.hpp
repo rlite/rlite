@@ -403,16 +403,6 @@ void normal_trigger_tasks(struct uipcp *uipcp);
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
-int rib_neigh_set_port_id(struct uipcp_rib *rib,
-                          const char *neigh_name,
-                          const char *supp_dif,
-                          rl_port_t neigh_port_id,
-                          rl_ipcp_id_t lower_ipcp_id);
-
-int rib_neigh_set_flow_fd(struct uipcp_rib *rib,
-                          const char *neigh_name,
-                          rl_port_t neigh_port_id, int neigh_fd);
-
 void age_incr_cb(struct rl_evloop *loop, void *arg);
 void sync_timeout_cb(struct rl_evloop *loop, void *arg);
 void re_enroll_timeout_cb(struct rl_evloop *loop, void *arg);

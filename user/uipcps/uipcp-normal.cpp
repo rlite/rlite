@@ -838,6 +838,9 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req_arrived *req =
                     (struct rl_kmsg_fa_req_arrived *)b_resp;
+    rl_port_t neigh_port_id = req->port_id;
+    const char *supp_dif = req->dif_name;
+    rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     int flow_fd;
     int result = RLITE_SUCC;
@@ -856,19 +859,29 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
 
     UPD(uipcp, "N-1-flow request arrived: [neigh = %s, supp_dif = %s, "
                "port_id = %u]\n",
-               req->remote_appl, req->dif_name, req->port_id);
+               req->remote_appl, supp_dif, neigh_port_id);
+
+    ScopeLock(rib->lock);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking rl_appl_fa_resp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
-     * chance to call rib_neigh_set_port_id()). */
-    ret = rib_neigh_set_port_id(rib, req->remote_appl, req->dif_name,
-                                req->port_id, req->ipcp_id);
-    if (ret) {
-        UPE(uipcp, "rib_neigh_set_port_id() failed\n");
-        result = RLITE_ERR;
+     * chance to add the neighbor with the associated port_id. */
+    Neighbor *neigh = rib->get_neighbor(req->remote_appl, true);
+
+    neigh->initiator = false;
+    assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
+
+    /* Set mgmt_port_id if required. */
+    if (!neigh->has_mgmt_flow()) {
+        neigh->mgmt_port_id = neigh_port_id;
     }
+
+    /* Add the flow. */
+    neigh->flows[neigh_port_id] = new NeighFlow(neigh, string(supp_dif),
+                                                neigh_port_id, 0,
+                                                lower_ipcp_id);
 
     ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
                             uipcp->id, req->port_id, result);
@@ -878,15 +891,16 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
         goto err;
     }
 
+    /* Complete the operation: open the port and set the file descriptor. */
     flow_fd = rl_open_appl_port(req->port_id);
     if (flow_fd < 0) {
         goto err;
     }
 
-    ret = rib_neigh_set_flow_fd(rib, req->remote_appl, req->port_id, flow_fd);
-    if (ret) {
-        goto err;
-    }
+    neigh->flows[neigh_port_id]->flow_fd = flow_fd;
+    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
+                    neigh->flows[neigh_port_id]->flow_fd,
+                    neigh->flows[neigh_port_id]->port_id);
 
     uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 
