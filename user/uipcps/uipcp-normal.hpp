@@ -260,6 +260,11 @@ struct uipcp_rib {
      * enrolled. */
     int enrolled;
 
+    /* True if the name of this IPCP is registered to the IPCP itself.
+     * Self-registration is used to receive N-flow allocation requests. */
+    bool self_registered;
+    bool self_registration_needed;
+
     /* IPCP address .*/
     rl_addr_t myaddr;
 

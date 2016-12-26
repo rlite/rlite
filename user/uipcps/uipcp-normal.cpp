@@ -36,6 +36,8 @@
 #include <cerrno>
 #include <pthread.h>
 
+#include <rlite/conf.h>
+
 #include "uipcp-normal.hpp"
 
 using namespace std;
@@ -258,7 +260,9 @@ mgmt_fd_ready(struct rl_evloop *loop, int fd)
                  n - sizeof(*mhdr));
 }
 
-uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0)
+uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
+                                         self_registered(false),
+                                         self_registration_needed(false)
 {
     int ret;
 
@@ -533,6 +537,36 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
             return -1;
         }
         lower_difs.erase(lit);
+    }
+
+    /* Check whether we need to do or undo self-registration. */
+    struct rina_flow_spec relspec;
+
+    rl_flow_spec_default(&relspec);
+    relspec.max_sdu_gap = 0;
+    relspec.in_order_delivery = 1;
+    rina_flow_spec_fc_set(&relspec, 1);
+
+    self_registration_needed = false;
+    /* Scan all the (updated) lower DIFs. */
+    for (lit = lower_difs.begin(); lit != lower_difs.end(); lit++) {
+        rl_ipcp_id_t lower_ipcp_id;
+        int ret;
+
+        ret = uipcp_lookup_id_by_dif(uipcp->uipcps, lit->c_str(),
+                                     &lower_ipcp_id);
+        if (ret) {
+            UPE(uipcp, "Failed to find lower IPCP for dif %s\n", lit->c_str());
+            continue;
+        }
+
+        if (rl_conf_ipcp_qos_supported(&uipcp->loop.ctrl,
+                                       lower_ipcp_id, &relspec) != 0) {
+            /* We have a lower DIF that does not support reliable (N-1) flows,
+             * therefore we need self-registration. */
+            self_registration_needed = true;
+            break;
+        }
     }
 
     return 0;
@@ -930,25 +964,6 @@ normal_init(struct uipcp *uipcp)
 }
 
 static int
-normal_finalize(struct uipcp *uipcp)
-{
-    int ret;
-
-    /* Self-registration: needed to use N-flows rather than N-1-flows. */
-    ret = rl_evloop_register(&uipcp->loop, 1, uipcp->dif_name,
-                             uipcp->name, 2000);
-    if (ret) {
-        UPI(uipcp, "Failed to self-register IPCP %s to DIF %s\n",
-                    uipcp->name, uipcp->dif_name);
-    } else {
-        UPI(uipcp, "IPCP %s self-registered to DIF %s\n",
-                    uipcp->name, uipcp->dif_name);
-    }
-
-    return 0;
-}
-
-static int
 normal_fini(struct uipcp *uipcp)
 {
     delete UIPCP_RIB(uipcp);
@@ -961,6 +976,8 @@ normal_register_to_lower(struct uipcp *uipcp,
                          const struct rl_cmsg_ipcp_register *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
+    bool self_reg_pending;
+    int self_reg;
     int ret;
 
     if (!req->dif_name) {
@@ -976,9 +993,32 @@ normal_register_to_lower(struct uipcp *uipcp,
         return ret;
     }
 
-    ScopeLock(rib->lock);
-
+    pthread_mutex_lock(&rib->lock);
     ret = rib->register_to_lower(req->reg, string(req->dif_name));
+    if (ret) {
+        pthread_mutex_unlock(&rib->lock);
+        return ret;
+    }
+    self_reg_pending =
+            (rib->self_registered != rib->self_registration_needed);
+    self_reg = rib->self_registration_needed;
+    pthread_mutex_unlock(&rib->lock);
+
+    if (self_reg_pending) {
+        /* Perform (un)registration out of the lock. */
+        ret = rl_evloop_register(&uipcp->loop, self_reg, uipcp->dif_name,
+                                 uipcp->name, 2000);
+
+        if (ret) {
+            UPE(uipcp, "self-(un)registration failed\n");
+        } else {
+            pthread_mutex_lock(&rib->lock);
+            rib->self_registered = self_reg;
+            pthread_mutex_unlock(&rib->lock);
+            UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
+                self_reg ? "" : "un", uipcp->dif_name);
+        }
+    }
 
     return ret;
 }
@@ -1004,7 +1044,6 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
 
 struct uipcp_ops normal_ops = {
     .init = normal_init,
-    .finalize = normal_finalize,
     .fini = normal_fini,
     .register_to_lower = normal_register_to_lower,
     .enroll = normal_ipcp_enroll,

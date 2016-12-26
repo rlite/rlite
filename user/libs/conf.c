@@ -308,6 +308,7 @@ rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
     return 0;
 }
 
+/* Return 0 if the @spec is supported by the IPCP with id @ipcp_id. */
 int
 rl_conf_ipcp_qos_supported(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
                            struct rina_flow_spec *spec)
