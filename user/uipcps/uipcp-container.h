@@ -75,41 +75,57 @@ struct uipcp_ops {
 
     int (*fini)(struct uipcp *);
 
+    /* User wants to register this uipcp to a lower DIF. */
     int (*register_to_lower)(struct uipcp *uipcp,
                              const struct rl_cmsg_ipcp_register *req);
 
+    /* User wants to enroll this uipcp to a DIF. */
     int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *,
                   int wait_for_completion);
 
+    /* User wants this uipcp to allocate an N-1-flow towards a member
+     * of the DIF (no enrollment, just flow allocation). */
     int (*lower_flow_alloc)(struct uipcp *,
                             const struct rl_cmsg_ipcp_enroll *,
                             int wait_for_completion);
 
+    /* Deprecated. User wants to manually set an entry of the DFT. */
     int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
 
+    /* User asks for a dump of the RIB. */
     char * (*rib_show)(struct uipcp *);
 
+    /* An application asked to be registered within the DIF this
+     * uipcp is part of. */
     int (*appl_register)(struct rl_evloop *loop,
                          const struct rl_msg_base *b_resp,
                          const struct rl_msg_base *b_req);
 
+    /* An application issued a flow allocation request using the DIF
+     * this uipcp is part of. */
     int (*fa_req)(struct rl_evloop *loop,
                   const struct rl_msg_base *b_resp,
                   const struct rl_msg_base *b_req);
 
+    /* An application issued a flow allocation response managed by
+     * this uipcp. */
     int (*fa_resp)(struct rl_evloop *loop,
                    const struct rl_msg_base *b_resp,
                    const struct rl_msg_base *b_req);
 
+    /* An application deallocated a flow managed by this uipcp. */
     int (*flow_deallocated)(struct rl_evloop *loop,
                             const struct rl_msg_base *b_resp,
                             const struct rl_msg_base *b_req);
 
+    /* Flow allocation request received from a remote uipcp, who
+     * wants to establish a neighborhood relationship. This could
+     * be an N-1-flow or an N-flow. */
     int (*neigh_fa_req_arrived)(struct rl_evloop *loop,
                                 const struct rl_msg_base *b_resp,
                                 const struct rl_msg_base *b_req);
 
-    /* Called when the uipcp address gets updated. */
+    /* The uipcp address gets updated. */
     void (*update_address)(struct uipcp *uipcp, rl_addr_t old_addr,
                            rl_addr_t new_addr);
 
