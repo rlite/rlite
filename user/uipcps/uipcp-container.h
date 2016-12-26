@@ -126,8 +126,7 @@ struct uipcp_ops {
                                 const struct rl_msg_base *b_req);
 
     /* The uipcp address gets updated. */
-    void (*update_address)(struct uipcp *uipcp, rl_addr_t old_addr,
-                           rl_addr_t new_addr);
+    void (*update_address)(struct uipcp *uipcp, rl_addr_t new_addr);
 
     /* For tasks to be executed in the context of the uipcps event loop. */
     void  (*trigger_tasks)(struct uipcp *);
@@ -162,7 +161,7 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    rl_addr_t addr;
+    rl_addr_t addr; /* for convenience, the important one is in the RIB */
     unsigned int depth;
     char *dif_type;
     char *dif_name;

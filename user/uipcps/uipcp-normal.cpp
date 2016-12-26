@@ -375,7 +375,7 @@ uipcp_rib::dump() const
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    ss << "Address: " << uipcp->addr << endl << endl;
+    ss << "Address: " << myaddr << endl << endl;
 
     {
         bool first = true;
@@ -567,7 +567,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
 
     m->invoke_id = invoke_id_mgr.get_invoke_id();
 
-    if (dst_addr == uipcp->addr) {
+    if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
         ret = cdap_dispatch(m, NULL);
         delete m;
@@ -575,7 +575,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
         return ret;
     }
 
-    adata.src_addr = uipcp->addr;
+    adata.src_addr = myaddr;
     adata.dst_addr = dst_addr;
     adata.cdap = m; /* Ownership passing */
 
@@ -900,13 +900,16 @@ normal_flow_deallocated(struct rl_evloop *loop,
 }
 
 static void
-normal_update_address(struct uipcp *uipcp, rl_addr_t old_addr,
-                      rl_addr_t new_addr)
+normal_update_address(struct uipcp *uipcp, rl_addr_t new_addr)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    rib->dft_update_address(old_addr, new_addr);
+    if (rib->myaddr == new_addr) {
+        return;
+    }
+    rib->dft_update_address(new_addr);
+    rib->myaddr = new_addr; /* do the update */
 }
 
 static int

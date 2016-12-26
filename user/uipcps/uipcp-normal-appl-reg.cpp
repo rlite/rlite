@@ -84,7 +84,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    dft_entry.address = uipcp->addr;
+    dft_entry.address = myaddr;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
     dft_entry.local = true;
@@ -96,7 +96,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
             UPE(uipcp, "Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", appl_name.c_str(),
                     (long long unsigned)mit->second.address,
-                    (long long unsigned)uipcp->addr);
+                    (long long unsigned)myaddr);
             return uipcp_appl_register_resp(uipcp, uipcp->id,
                                             RLITE_ERR, req);
         }
@@ -196,7 +196,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-uipcp_rib::dft_update_address(rl_addr_t old_addr, rl_addr_t new_addr)
+uipcp_rib::dft_update_address(rl_addr_t new_addr)
 {
     map< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;
@@ -204,7 +204,7 @@ uipcp_rib::dft_update_address(rl_addr_t old_addr, rl_addr_t new_addr)
     /* Update all the DFT entries corresponding to application that are
      * registered within us. */
     for (mit = dft.begin(); mit != dft.end(); mit ++) {
-        if (mit->second.address == old_addr) {
+        if (mit->second.address == myaddr) {
             mit->second.address = new_addr;
             prop_dft.entries.push_back(mit->second);
             UPD(uipcp, "Updated address for DFT entry %s\n", mit->first.c_str());

@@ -392,7 +392,6 @@ int
 uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {
     struct uipcp *uipcp;
-    rl_addr_t old_addr;
 
     pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
@@ -410,7 +409,6 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    old_addr = uipcp->addr;
     uipcp->addr = upd->ipcp_addr;
     uipcp->depth = upd->depth;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
@@ -418,11 +416,9 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     pthread_mutex_unlock(&uipcps->lock);
 
-    if (old_addr != upd->ipcp_addr) {
-        /* Address changed, notify the IPCP. */
-        if (uipcp->ops.update_address) {
-            uipcp->ops.update_address(uipcp, old_addr, upd->ipcp_addr);
-        }
+    /* Address may have changed, notify the IPCP. */
+    if (uipcp->ops.update_address) {
+        uipcp->ops.update_address(uipcp, upd->ipcp_addr);
     }
 
     uipcp_put(uipcp, 1);
@@ -618,16 +614,22 @@ int
 uipcps_print(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
+    char addrbuf[20];
 
     pthread_mutex_lock(&uipcps->lock);
     PD_S("IPC Processes table:\n");
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+        if (uipcp->addr == 0) {
+            strncpy(addrbuf, "*", sizeof(addrbuf));
+        } else {
+            snprintf(addrbuf, sizeof(addrbuf), "%llu",
+                     (long long unsigned int)uipcp->addr);
+        }
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %llu, depth = %u\n",
+                " address = %s, depth = %u\n",
                 uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name,
-                (long long unsigned int)uipcp->addr,
+                uipcp->dif_name, addrbuf,
                 uipcp->depth);
     }
     pthread_mutex_unlock(&uipcps->lock);

@@ -471,7 +471,7 @@ Neighbor::i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm)
     if (rib->enrolled == 0) {
         /* The IPCP is not enrolled yet, so we have to start a complete
          * enrollment. */
-        enr_info.address = rib->uipcp->addr;
+        enr_info.address = rib->myaddr;
         enr_info.lower_difs = rib->lower_difs;
         obj = &enr_info;
         next_state = NEIGH_I_WAIT_START_R;
@@ -589,7 +589,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     cand = NeighborCandidate();
     rina_components_from_string(string(rib->uipcp->name), cand.apn, cand.api,
                                 cand.aen, cand.aei);
-    cand.address = rib->uipcp->addr;
+    cand.address = rib->myaddr;
     cand.lower_difs = rib->lower_difs;
     ncl.candidates.clear();
     ncl.candidates.push_back(cand);
@@ -789,7 +789,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
-    rib->commit_lower_flow(rib->uipcp->addr, *this);
+    rib->commit_lower_flow(rib->myaddr, *this);
 
     remote_sync_rib(nf);
     pthread_cond_signal(&nf->enrollment_stopped);
@@ -848,7 +848,7 @@ Neighbor::s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
-    rib->commit_lower_flow(rib->uipcp->addr, *this);
+    rib->commit_lower_flow(rib->myaddr, *this);
     pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
@@ -886,7 +886,7 @@ Neighbor::i_lf_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
 
     /* Add a new LowerFlow entry to the RIB, corresponding to
      * the new neighbor. */
-    rib->commit_lower_flow(rib->uipcp->addr, *this);
+    rib->commit_lower_flow(rib->myaddr, *this);
     pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
@@ -1035,7 +1035,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 /* A neighbor representing myself. */
                 rina_components_from_string(string(rib->uipcp->name), cand.apn,
                                             cand.api, cand.aen, cand.aei);
-                cand.address = rib->uipcp->addr;
+                cand.address = rib->myaddr;
                 cand.lower_difs = rib->lower_difs;
                 ncl.candidates.push_back(cand);
 
@@ -1088,7 +1088,7 @@ uipcp_rib::remote_refresh_lower_flows()
 
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
-    it = lfdb.find(uipcp->addr);
+    it = lfdb.find(myaddr);
     assert(it != lfdb.end());
 
     for (map< rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
