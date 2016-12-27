@@ -341,7 +341,7 @@ Worker::run()
             /* We've been requested to repoll the queue. */
             nrdy--;
             if (pollfds[0].revents & POLLIN) {
-                if (verbose >= 1) {
+                if (verbose >= 2) {
                     printf("w%d: Mappings changed, rebuilding poll array\n", idx);
                 }
                 pthread_mutex_lock(&lock);
