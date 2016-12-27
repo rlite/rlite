@@ -44,12 +44,23 @@
 #include <sys/eventfd.h>
 #include <poll.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #include <rina/api.h>
 
 using namespace std;
 
 static int verbose = 1;
+
+static int
+set_nonblocking(int fd)
+{
+    int ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        perror("fcntl(F_SETFL, O_NONBLOCK");
+    }
+    return ret;
+}
 
 struct InetName {
     struct sockaddr_in addr;
@@ -186,8 +197,12 @@ struct Gateway {
     map<int, InetName> dst_fd_map;
 
     /* Pending flow allocation requests issued by accept_inet_conn().
-     * flow_alloc wfd --> tcp_client_fd */
+     * flow_alloc_wfd --> tcp_client_fd */
     map<int, Fd> pending_fa_reqs;
+
+    /* Pending TCP connection requests issued by accept_rina_flow().
+     * client_fd --> flow_fd */
+    map<int, Fd> pending_conns;
 
     vector<Worker*> workers;
 
@@ -543,11 +558,30 @@ splitted_sdu_hack(int fd, int max_sdu_size)
     ioctl(fd, 1, data);
 }
 
+static void
+complete_tcp_conn(int cfd, Fd fds)
+{
+    Worker *w = gw.workers[0];
+    int max_sdu_size;
+    int rfd;
+
+    rfd = fds.fd;
+    max_sdu_size = fds.max_sdu_size;
+
+    /* Submit the new session to a worker. */
+    pthread_mutex_lock(&w->lock);
+    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
+    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
+    w->repoll();
+    pthread_mutex_unlock(&w->lock);
+
+    printf("New mapping created %d <--> %d\n", cfd, rfd);
+}
+
 static int
 accept_rina_flow(int fd, const InetName &inet)
 {
     struct rina_flow_spec spec;
-    Worker *w = gw.workers[0];
     int max_sdu_size;
     int cfd;
     int rfd;
@@ -560,6 +594,8 @@ accept_rina_flow(int fd, const InetName &inet)
         return 0;
     }
 
+    set_nonblocking(rfd);
+
     max_sdu_size = MAX_SDU_SIZE;
     splitted_sdu_hack(rfd, max_sdu_size);
 
@@ -570,53 +606,25 @@ accept_rina_flow(int fd, const InetName &inet)
         return 0;
     }
 
+    set_nonblocking(cfd);
+
     ret = connect(cfd, (struct sockaddr *)&inet.addr, sizeof(inet.addr));
-    if (ret) {
+    if (ret && errno != EINPROGRESS) {
         close(rfd);
         perror("connect()");
         return 0;
     }
 
-    /* Submit the new session to a worker. */
-    pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
-    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
-    w->repoll();
-    pthread_mutex_unlock(&w->lock);
-
-    printf("New mapping created %d <--> %d\n", cfd, rfd);
-
-    return 0;
-}
-
-static void
-complete_flow_alloc(int wfd, Fd fds)
-{
-    Worker *w = gw.workers[0];
-    int max_sdu_size;
-    int cfd;
-    int rfd;
-
-    /* Complete the flow allocation procedure. */
-    rfd = rina_flow_alloc_wait(wfd);
-    if (rfd < 0) {
-        /* Failure or negative response. */
-        perror("rina_flow_alloc_wait()");
-        return;
+    if (ret == 0) {
+        complete_tcp_conn(cfd, Fd(rfd, max_sdu_size));
+        return 0;
     }
 
-    cfd = fds.fd;
-    max_sdu_size = fds.max_sdu_size;
+    /* Store the pending request. */
+    gw.pending_conns[cfd] = Fd(rfd, max_sdu_size);
+    printf("TCP handshake started [cfd=%d]\n", cfd);
 
-    splitted_sdu_hack(rfd, max_sdu_size);
-
-    pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
-    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
-    w->repoll();
-    pthread_mutex_unlock(&w->lock);
-
-    printf("New mapping created %d <--> %d\n", cfd, rfd);
+    return 0;
 }
 
 static void
@@ -636,6 +644,8 @@ accept_inet_conn(int lfd, const RinaName &rname)
         return;
     }
 
+    set_nonblocking(cfd);
+
     /* Issue a non-blocking flow allocation request, asking for a reliable
      * flow. */
     rina_flow_spec_default(&flowspec);
@@ -649,10 +659,43 @@ accept_inet_conn(int lfd, const RinaName &rname)
         return;
     }
 
+    set_nonblocking(wfd);
+
     /* Store the pending request. */
     gw.pending_fa_reqs[wfd] = Fd(cfd, rname.max_sdu_size);
-
     printf("Flow allocation request issued [wfd=%d]\n", wfd);
+}
+
+static void
+complete_flow_alloc(int wfd, Fd fds)
+{
+    Worker *w = gw.workers[0];
+    int max_sdu_size;
+    int cfd;
+    int rfd;
+
+    /* Complete the flow allocation procedure. */
+    rfd = rina_flow_alloc_wait(wfd);
+    if (rfd < 0) {
+        /* Failure or negative response. */
+        perror("rina_flow_alloc_wait()");
+        return;
+    }
+
+    set_nonblocking(rfd);
+
+    cfd = fds.fd;
+    max_sdu_size = fds.max_sdu_size;
+
+    splitted_sdu_hack(rfd, max_sdu_size);
+
+    pthread_mutex_lock(&w->lock);
+    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
+    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
+    w->repoll();
+    pthread_mutex_unlock(&w->lock);
+
+    printf("New mapping created %d <--> %d\n", cfd, rfd);
 }
 
 static int
@@ -687,6 +730,8 @@ inet_server_socket(const InetName& inet_name)
         return -1;
     }
 
+    set_nonblocking(fd);
+
     return fd;
 }
 
@@ -701,9 +746,10 @@ setup()
         if (fd < 0) {
             printf("Failed to open listening socket for '%s'\n",
                    static_cast<string>(mit->first).c_str());
-        } else {
-            gw.srv_fd_map[fd] = mit->second;
+            continue;
         }
+
+        gw.srv_fd_map[fd] = mit->second;
     }
 
     /* Open RINA listening "sockets". */
@@ -716,6 +762,8 @@ setup()
             perror("rina_open()");
             continue;
         }
+
+        set_nonblocking(fd);
 
         ret = rina_register(fd, mit->first.dif_name.c_str(),
                             mit->first.name.c_str());
@@ -769,6 +817,7 @@ int main()
 
     for (;;) {
         vector<int> completed_flow_allocs;
+        vector<int> completed_conns;
         int n = 0;
 
         /* Load listening RINA "sockets". */
@@ -790,6 +839,13 @@ int main()
                             mit != gw.pending_fa_reqs.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
+        }
+
+        /* Load pending TCP connections. */
+        for (map<int, Fd>::iterator mit = gw.pending_conns.begin();
+                            mit != gw.pending_conns.end(); mit ++, n ++) {
+            pfd[n].fd = mit->first;
+            pfd[n].events = POLLOUT;
         }
 
         ret = poll(pfd, n, -1 /* no timeout */);
@@ -826,9 +882,23 @@ int main()
             }
         }
 
+        for (map<int, Fd>::iterator mit = gw.pending_conns.begin();
+                            mit != gw.pending_conns.end(); mit ++, n ++) {
+            if (pfd[n].revents & POLLIN) {
+                /* TCP connection handshake completed. */
+                complete_tcp_conn(mit->first, mit->second);
+                completed_conns.push_back(mit->first);
+            }
+        }
+
         /* Clean up consumed pending_fa_reqs entries. */
         for (unsigned i = 0; i < completed_flow_allocs.size(); i ++) {
             gw.pending_fa_reqs.erase(completed_flow_allocs[i]);
+        }
+
+        /* Clean up consumed pending_conns entries. */
+        for (unsigned i = 0; i < completed_conns.size(); i ++) {
+            gw.pending_conns.erase(completed_conns[i]);
         }
     }
 
