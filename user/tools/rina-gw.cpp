@@ -445,7 +445,7 @@ Gateway::~Gateway()
     }
 }
 
-Gateway gw;
+Gateway gw; /* global data structure */
 
 static int
 parse_conf(const char *confname)
@@ -553,11 +553,10 @@ splitted_sdu_hack(int fd, int max_sdu_size)
 }
 
 static void
-complete_tcp_conn(int cfd, int rfd)
+submit_to_worker(int cfd, int rfd)
 {
     Worker *w = gw.workers[0];
 
-    /* Submit the new session to a worker. */
     pthread_mutex_lock(&w->lock);
     w->fdmap[cfd] = rfd;
     w->fdmap[rfd] = cfd;
@@ -603,7 +602,7 @@ accept_rina_flow(int fd, const InetName &inet)
     }
 
     if (ret == 0) {
-        complete_tcp_conn(cfd, rfd);
+        submit_to_worker(cfd, rfd);
         return 0;
     }
 
@@ -656,7 +655,6 @@ accept_inet_conn(int lfd, const RinaName &rname)
 static void
 complete_flow_alloc(int wfd, int cfd)
 {
-    Worker *w = gw.workers[0];
     int rfd;
 
     /* Complete the flow allocation procedure. */
@@ -668,16 +666,8 @@ complete_flow_alloc(int wfd, int cfd)
     }
 
     set_nonblocking(rfd);
-
     splitted_sdu_hack(rfd, MAX_SDU_SIZE);
-
-    pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = rfd;
-    w->fdmap[rfd] = cfd;
-    w->repoll();
-    pthread_mutex_unlock(&w->lock);
-
-    printf("New mapping created %d <--> %d\n", cfd, rfd);
+    submit_to_worker(cfd, rfd);
 }
 
 static int
@@ -718,7 +708,7 @@ inet_server_socket(const InetName& inet_name)
 }
 
 static int
-setup()
+setup_for_listening(void)
 {
     /* Open Internet listening sockets. */
     for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
@@ -795,7 +785,7 @@ int main()
     }
 
     print_conf();
-    setup();
+    setup_for_listening();
 
     for (;;) {
         vector<int> completed_flow_allocs;
@@ -868,7 +858,7 @@ int main()
                             mit != gw.pending_conns.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* TCP connection handshake completed. */
-                complete_tcp_conn(mit->first, mit->second);
+                submit_to_worker(mit->first, mit->second);
                 completed_conns.push_back(mit->first);
             }
         }
