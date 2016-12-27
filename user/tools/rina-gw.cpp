@@ -50,7 +50,7 @@
 
 using namespace std;
 
-static int verbose = 1;
+static int verbose = 0;
 
 static int
 set_nonblocking(int fd)
@@ -324,7 +324,7 @@ Worker::run()
         }
         pthread_mutex_unlock(&lock);
 
-        if (verbose) {
+        if (verbose >= 2) {
             printf("w%d polls %d file descriptors\n", idx, nfds);
         }
         nrdy = poll(pollfds, nfds, -1);
@@ -341,7 +341,9 @@ Worker::run()
             /* We've been requested to repoll the queue. */
             nrdy--;
             if (pollfds[0].revents & POLLIN) {
-                printf("w%d: Mappings changed, rebuilding poll array\n", idx);
+                if (verbose >= 1) {
+                    printf("w%d: Mappings changed, rebuilding poll array\n", idx);
+                }
                 pthread_mutex_lock(&lock);
                 drain_syncfd();
                 pthread_mutex_unlock(&lock);
@@ -369,7 +371,7 @@ Worker::run()
             /* Consume the events on this fd. */
             j++;
 
-            if (verbose) {
+            if (verbose >= 2) {
                 printf("w%d: fd %d ready, events %d\n", idx, pollfds[i].fd,
                                                         pollfds[i].revents);
             }
@@ -384,7 +386,10 @@ Worker::run()
              * disappeared in a previous iteration of this loop. */
             mit = fdmap.find(ifd);
             if (mit == fdmap.end()) {
-                printf("w%d: fd %d just disappeared from the map\n", idx, ifd);
+                if (verbose >= 2) {
+                    printf("w%d: fd %d just disappeared from the map\n",
+                           idx, ifd);
+                }
                 continue;
             }
 
@@ -395,12 +400,16 @@ Worker::run()
                 /* Forwarding failed for some season, we have to close
                  * the session. */
                 if (ret == 0 || errno == EPIPE) {
-                    printf("w%d: Session %d <--> %d closed normally\n",
-                            idx, ifd, ofd);
+                    if (verbose >= 1) {
+                        printf("w%d: Session %d <--> %d closed normally\n",
+                                idx, ifd, ofd);
+                    }
 
                 } else {
-                    printf("w%d: Session %d <--> %d closed with errors\n",
-                            idx, ifd, ofd);
+                    if (verbose >= 1) {
+                        printf("w%d: Session %d <--> %d closed with errors\n",
+                                idx, ifd, ofd);
+                    }
                 }
 
                 close(ifd);
@@ -411,14 +420,18 @@ Worker::run()
                 fdmap.erase(mit);
 
             } else if (verbose) {
-                printf("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
+                if (verbose >= 2) {
+                    printf("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
+                }
             }
         }
 
         pthread_mutex_unlock(&lock);
     }
 
-    printf("w%d stops\n", idx);
+    if (verbose >= 1) {
+        printf("w%d stops\n", idx);
+    }
 }
 
 Gateway::Gateway()
@@ -565,7 +578,9 @@ submit_to_worker(int cfd, int rfd)
     w->repoll();
     pthread_mutex_unlock(&w->lock);
 
-    printf("New mapping created %d <--> %d\n", cfd, rfd);
+    if (verbose >= 1) {
+        printf("New mapping created %d <--> %d\n", cfd, rfd);
+    }
 }
 
 static int
@@ -610,7 +625,9 @@ accept_rina_flow(int fd, const InetName &inet)
 
     /* Store the pending request. */
     gw->pending_conns[cfd] = rfd;
-    printf("TCP handshake started [cfd=%d]\n", cfd);
+    if (verbose >= 1) {
+        printf("TCP handshake started [cfd=%d]\n", cfd);
+    }
 
     return 0;
 }
@@ -651,7 +668,9 @@ accept_inet_conn(int lfd, const RinaName &rname)
 
     /* Store the pending request. */
     gw->pending_fa_reqs[wfd] = cfd;
-    printf("Flow allocation request issued [wfd=%d]\n", wfd);
+    if (verbose >= 1) {
+        printf("Flow allocation request issued [wfd=%d]\n", wfd);
+    }
 }
 
 static void
@@ -908,8 +927,6 @@ int main(int argc, char **argv)
             gw->pending_conns.erase(completed_conns[i]);
         }
     }
-
-    printf("Main thread exits\n");
 
     return 0;
 }
