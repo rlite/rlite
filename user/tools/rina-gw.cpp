@@ -290,7 +290,7 @@ Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
         return n;
 
     } else {
-        if (verbose) {
+        if (verbose >= 2) {
             printf("Read 0 bytes from %d\n", ifd);
         }
     }
@@ -304,7 +304,9 @@ Worker::run()
     struct pollfd pollfds[1 + MAX_FDS];
     char buf[MAX_BUF_SIZE];
 
-    printf("w%d starts\n", idx);
+    if (verbose >= 1) {
+        printf("w%d starts\n", idx);
+    }
 
     for (;;) {
         int nrdy;
@@ -766,17 +768,48 @@ print_conf()
     }
 }
 
-int main()
+static void
+usage(void)
+{
+    cout << "rina-gw\n"
+            << "-h <show this help>\n"
+            << "-v <increase verbosity>\n"
+            << "-c PATH_TO_CONFIG_FILE (default = '/etc/rlite/rina-gw.conf')\n";
+}
+
+int main(int argc, char **argv)
 {
     const char *confname = "/etc/rlite/rina-gw.conf";
     struct pollfd pfd[128];
     int ret;
+    int opt;
 
     errno = 0;
     signal(SIGPIPE, SIG_IGN);
     if (errno) {
         perror("signal()");
         return -1;
+    }
+
+    while ((opt = getopt(argc, argv, "hvc:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
+            case 'v':
+                verbose ++;
+                break;
+
+            case 'c':
+                confname = optarg;
+                break;
+
+            default:
+                printf("    Unrecognized option %c\n", opt);
+                usage();
+                return -1;
+        }
     }
 
     ret = parse_conf(confname);
