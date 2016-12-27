@@ -438,6 +438,7 @@ Gateway::Gateway()
 {
     appl_name = "rina-gw/1";
 
+    /* Start workers. */
     for (int i=0; i<NUM_WORKERS; i++) {
         workers.push_back(new Worker(i));
     }
@@ -831,6 +832,7 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Build the Gateway object here, as building it starts the workers. */
     gw = new Gateway();
 
     ret = parse_conf(confname);

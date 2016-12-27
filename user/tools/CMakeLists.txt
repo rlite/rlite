@@ -7,7 +7,7 @@ add_executable(rina-gw rina-gw.cpp)
 target_link_libraries(rinaperf rlite ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(rina-echo-async rlite)
 target_link_libraries(rlite-ctl rlite rlite-conf)
-target_link_libraries(rina-gw rlite rlite-evloop ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(rina-gw rlite ${CMAKE_THREAD_LIBS_INIT})
 
  # Installation directives
 install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async DESTINATION usr/bin)
