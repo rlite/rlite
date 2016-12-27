@@ -45,8 +45,6 @@
 #include <poll.h>
 #include <signal.h>
 
-#include "rlite/utils.h"
-#include "rlite/evloop.h"
 #include <rina/api.h>
 
 using namespace std;
@@ -537,6 +535,14 @@ parse_conf(const char *confname)
 
 #include <sys/ioctl.h>
 
+static void
+splitted_sdu_hack(int fd, int max_sdu_size)
+{
+    /* Enable splitted sdu_write hack. */
+    uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
+    ioctl(fd, 1, data);
+}
+
 static int
 accept_rina_flow(int fd, const InetName &inet)
 {
@@ -555,6 +561,7 @@ accept_rina_flow(int fd, const InetName &inet)
     }
 
     max_sdu_size = MAX_SDU_SIZE;
+    splitted_sdu_hack(rfd, max_sdu_size);
 
     /* Open a TCP connection towards the mapped endpoint (@inet). */
     cfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -568,11 +575,6 @@ accept_rina_flow(int fd, const InetName &inet)
         close(rfd);
         perror("connect()");
         return 0;
-    }
-
-    { /* Enable splitted sdu_write hack. */
-        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
-        ioctl(rfd, 1, data);
     }
 
     /* Submit the new session to a worker. */
@@ -606,10 +608,7 @@ complete_flow_alloc(int wfd, Fd fds)
     cfd = fds.fd;
     max_sdu_size = fds.max_sdu_size;
 
-    { /* Enable splitted sdu_write hack. */
-        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
-        ioctl(rfd, 1, data);
-    }
+    splitted_sdu_hack(rfd, max_sdu_size);
 
     pthread_mutex_lock(&w->lock);
     w->fdmap[cfd] = Fd(rfd, max_sdu_size);
@@ -641,7 +640,7 @@ accept_inet_conn(int lfd, const RinaName &rname)
      * flow. */
     rina_flow_spec_default(&flowspec);
     flowspec.max_sdu_gap = 0;
-    rina_flow_spec_fc_set(&flowspec, 1);
+    flowspec.reserved[36] = 1;
     wfd = rina_flow_alloc(rname.dif_name.c_str(), gw.appl_name.c_str(),
                           rname.name.c_str(), &flowspec, RINA_F_NOWAIT);
     if (wfd < 0) {
