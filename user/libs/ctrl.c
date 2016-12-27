@@ -477,7 +477,7 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
 #include "rina/api.h"
 
 int
-rina_open()
+rina_open(void)
 {
     return open(RLITE_CTRLDEV_NAME, O_RDWR);
 }
