@@ -174,14 +174,14 @@ struct Gateway {
     /* Used to map IP:PORT --> RINA NAME, when
      * receiving TCP connection requests from the INET world
      * towards the RINA world. */
-    map<InetName, RinaName> srv_map;
-    map<int, RinaName> srv_fd_map;
+    map<InetName, RinaName> i2r_map;
+    map<int, RinaName> i2r_fd_map;
 
     /* Used to map RINA NAME --> IP:PORT, when
      * receiving flow allocation requests from the RINA world
      * towards the INET world. */
-    map<RinaName, InetName> dst_map;
-    map<int, InetName> dst_fd_map;
+    map<RinaName, InetName> r2i_map;
+    map<int, InetName> r2i_fd_map;
 
     /* Pending flow allocation requests issued by accept_inet_conn().
      * flow_alloc_wfd --> tcp_client_fd */
@@ -430,13 +430,13 @@ Gateway::Gateway()
 
 Gateway::~Gateway()
 {
-    for (map<int, RinaName>::iterator mit = srv_fd_map.begin();
-                                    mit != srv_fd_map.end(); mit++) {
+    for (map<int, RinaName>::iterator mit = i2r_fd_map.begin();
+                                    mit != i2r_fd_map.end(); mit++) {
         close(mit->first);
     }
 
-    for (map<int, InetName>::iterator mit = dst_fd_map.begin();
-                                    mit != dst_fd_map.end(); mit++) {
+    for (map<int, InetName>::iterator mit = r2i_fd_map.begin();
+                                    mit != r2i_fd_map.end(); mit++) {
         close(mit->first);
     }
 
@@ -522,11 +522,11 @@ parse_conf(const char *confname)
                 InetName inet_name(inet_addr);
                 RinaName rina_name(tokens[2], tokens[1]);
 
-                if (tokens[0] == "SRV") {
-                    gw.srv_map.insert(make_pair(inet_name, rina_name));
+                if (tokens[0] == "I2R") {
+                    gw.i2r_map.insert(make_pair(inet_name, rina_name));
 
-                } else if (tokens[0] == "DST") {
-                    gw.dst_map.insert(make_pair(rina_name, inet_name));
+                } else if (tokens[0] == "R2I") {
+                    gw.r2i_map.insert(make_pair(rina_name, inet_name));
 
                 } else {
                     printf("Invalid configuration entry at line %d: %s is "
@@ -711,8 +711,8 @@ static int
 setup_for_listening(void)
 {
     /* Open Internet listening sockets. */
-    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
-                                    mit != gw.srv_map.end(); mit++) {
+    for (map<InetName, RinaName>::iterator mit = gw.i2r_map.begin();
+                                    mit != gw.i2r_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
 
         if (fd < 0) {
@@ -721,12 +721,12 @@ setup_for_listening(void)
             continue;
         }
 
-        gw.srv_fd_map[fd] = mit->second;
+        gw.i2r_fd_map[fd] = mit->second;
     }
 
     /* Open RINA listening "sockets". */
-    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
-                                    mit != gw.dst_map.end(); mit++) {
+    for (map<RinaName, InetName>::iterator mit = gw.r2i_map.begin();
+                                    mit != gw.r2i_map.end(); mit++) {
         int fd = rina_open();
         int ret;
 
@@ -743,7 +743,7 @@ setup_for_listening(void)
             printf("Registration of application '%s' failed\n",
                    static_cast<string>(mit->first).c_str());
         } else {
-            gw.dst_fd_map[fd] = mit->second;
+            gw.r2i_fd_map[fd] = mit->second;
         }
     }
 
@@ -753,15 +753,15 @@ setup_for_listening(void)
 static void
 print_conf()
 {
-    for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
-                                    mit != gw.srv_map.end(); mit++) {
-        cout << "SRV: " << static_cast<string>(mit->first) << " --> "
+    for (map<InetName, RinaName>::iterator mit = gw.i2r_map.begin();
+                                    mit != gw.i2r_map.end(); mit++) {
+        cout << "I2R: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
     }
 
-    for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
-                                    mit != gw.dst_map.end(); mit++) {
-        cout << "DST: " << static_cast<string>(mit->first) << " --> "
+    for (map<RinaName, InetName>::iterator mit = gw.r2i_map.begin();
+                                    mit != gw.r2i_map.end(); mit++) {
+        cout << "R2I: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
     }
 }
@@ -793,15 +793,15 @@ int main()
         int n = 0;
 
         /* Load listening RINA "sockets". */
-        for (map<int, InetName>::iterator mit = gw.dst_fd_map.begin();
-                                    mit != gw.dst_fd_map.end(); mit ++, n ++) {
+        for (map<int, InetName>::iterator mit = gw.r2i_fd_map.begin();
+                                    mit != gw.r2i_fd_map.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load listening Internet sockets. */
-        for (map<int, RinaName>::iterator mit = gw.srv_fd_map.begin();
-                                    mit != gw.srv_fd_map.end(); mit ++, n ++) {
+        for (map<int, RinaName>::iterator mit = gw.i2r_fd_map.begin();
+                                    mit != gw.i2r_fd_map.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
         }
@@ -829,16 +829,16 @@ int main()
         /* Now check which events were ready. */
         n = 0;
 
-        for (map<int, InetName>::iterator mit = gw.dst_fd_map.begin();
-                                    mit != gw.dst_fd_map.end(); mit ++, n ++) {
+        for (map<int, InetName>::iterator mit = gw.r2i_fd_map.begin();
+                                    mit != gw.r2i_fd_map.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming flow allocation request from the RINA world. */
                 accept_rina_flow(mit->first, mit->second);
             }
         }
 
-        for (map<int, RinaName>::iterator mit = gw.srv_fd_map.begin();
-                                    mit != gw.srv_fd_map.end(); mit ++, n ++) {
+        for (map<int, RinaName>::iterator mit = gw.i2r_fd_map.begin();
+                                    mit != gw.i2r_fd_map.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming TCP connection from the Internet world. */
                 accept_inet_conn(mit->first, mit->second);
