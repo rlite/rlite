@@ -910,7 +910,7 @@ int main(int argc, char **argv)
 
         for (map<int, int>::iterator mit = gw->pending_conns.begin();
                             mit != gw->pending_conns.end(); mit ++, n ++) {
-            if (pfd[n].revents & POLLIN) {
+            if (pfd[n].revents & POLLOUT) {
                 /* TCP connection handshake completed. */
                 submit_to_worker(mit->first, mit->second);
                 completed_conns.push_back(mit->first);
