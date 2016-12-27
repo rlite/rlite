@@ -447,7 +447,7 @@ Gateway::~Gateway()
     }
 }
 
-Gateway gw; /* global data structure */
+Gateway *gw = NULL; /* global data structure */
 
 static int
 parse_conf(const char *confname)
@@ -525,10 +525,10 @@ parse_conf(const char *confname)
                 RinaName rina_name(tokens[2], tokens[1]);
 
                 if (tokens[0] == "I2R") {
-                    gw.i2r_map.insert(make_pair(inet_name, rina_name));
+                    gw->i2r_map.insert(make_pair(inet_name, rina_name));
 
                 } else if (tokens[0] == "R2I") {
-                    gw.r2i_map.insert(make_pair(rina_name, inet_name));
+                    gw->r2i_map.insert(make_pair(rina_name, inet_name));
 
                 } else {
                     printf("Invalid configuration entry at line %d: %s is "
@@ -557,7 +557,7 @@ splitted_sdu_hack(int fd, int max_sdu_size)
 static void
 submit_to_worker(int cfd, int rfd)
 {
-    Worker *w = gw.workers[0];
+    Worker *w = gw->workers[0];
 
     pthread_mutex_lock(&w->lock);
     w->fdmap[cfd] = rfd;
@@ -609,7 +609,7 @@ accept_rina_flow(int fd, const InetName &inet)
     }
 
     /* Store the pending request. */
-    gw.pending_conns[cfd] = rfd;
+    gw->pending_conns[cfd] = rfd;
     printf("TCP handshake started [cfd=%d]\n", cfd);
 
     return 0;
@@ -639,7 +639,7 @@ accept_inet_conn(int lfd, const RinaName &rname)
     rina_flow_spec_default(&flowspec);
     flowspec.max_sdu_gap = 0;
     flowspec.reserved[36] = 1;
-    wfd = rina_flow_alloc(rname.dif_name.c_str(), gw.appl_name.c_str(),
+    wfd = rina_flow_alloc(rname.dif_name.c_str(), gw->appl_name.c_str(),
                           rname.name.c_str(), &flowspec, RINA_F_NOWAIT);
     if (wfd < 0) {
         close(cfd);
@@ -650,7 +650,7 @@ accept_inet_conn(int lfd, const RinaName &rname)
     set_nonblocking(wfd);
 
     /* Store the pending request. */
-    gw.pending_fa_reqs[wfd] = cfd;
+    gw->pending_fa_reqs[wfd] = cfd;
     printf("Flow allocation request issued [wfd=%d]\n", wfd);
 }
 
@@ -713,8 +713,8 @@ static int
 setup_for_listening(void)
 {
     /* Open Internet listening sockets. */
-    for (map<InetName, RinaName>::iterator mit = gw.i2r_map.begin();
-                                    mit != gw.i2r_map.end(); mit++) {
+    for (map<InetName, RinaName>::iterator mit = gw->i2r_map.begin();
+                                    mit != gw->i2r_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
 
         if (fd < 0) {
@@ -723,12 +723,12 @@ setup_for_listening(void)
             continue;
         }
 
-        gw.i2r_fd_map[fd] = mit->second;
+        gw->i2r_fd_map[fd] = mit->second;
     }
 
     /* Open RINA listening "sockets". */
-    for (map<RinaName, InetName>::iterator mit = gw.r2i_map.begin();
-                                    mit != gw.r2i_map.end(); mit++) {
+    for (map<RinaName, InetName>::iterator mit = gw->r2i_map.begin();
+                                    mit != gw->r2i_map.end(); mit++) {
         int fd = rina_open();
         int ret;
 
@@ -745,7 +745,7 @@ setup_for_listening(void)
             printf("Registration of application '%s' failed\n",
                    static_cast<string>(mit->first).c_str());
         } else {
-            gw.r2i_fd_map[fd] = mit->second;
+            gw->r2i_fd_map[fd] = mit->second;
         }
     }
 
@@ -755,14 +755,14 @@ setup_for_listening(void)
 static void
 print_conf()
 {
-    for (map<InetName, RinaName>::iterator mit = gw.i2r_map.begin();
-                                    mit != gw.i2r_map.end(); mit++) {
+    for (map<InetName, RinaName>::iterator mit = gw->i2r_map.begin();
+                                    mit != gw->i2r_map.end(); mit++) {
         cout << "I2R: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
     }
 
-    for (map<RinaName, InetName>::iterator mit = gw.r2i_map.begin();
-                                    mit != gw.r2i_map.end(); mit++) {
+    for (map<RinaName, InetName>::iterator mit = gw->r2i_map.begin();
+                                    mit != gw->r2i_map.end(); mit++) {
         cout << "R2I: " << static_cast<string>(mit->first) << " --> "
                 << static_cast<string>(mit->second) << endl;
     }
@@ -772,9 +772,9 @@ static void
 usage(void)
 {
     cout << "rina-gw\n"
-            << "-h <show this help>\n"
-            << "-v <increase verbosity>\n"
-            << "-c PATH_TO_CONFIG_FILE (default = '/etc/rlite/rina-gw.conf')\n";
+            << "    -h <show this help>\n"
+            << "    -v <increase verbosity>\n"
+            << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rlite/rina-gw.conf')\n";
 }
 
 int main(int argc, char **argv)
@@ -812,6 +812,8 @@ int main(int argc, char **argv)
         }
     }
 
+    gw = new Gateway();
+
     ret = parse_conf(confname);
     if (ret) {
         return ret;
@@ -826,29 +828,29 @@ int main(int argc, char **argv)
         int n = 0;
 
         /* Load listening RINA "sockets". */
-        for (map<int, InetName>::iterator mit = gw.r2i_fd_map.begin();
-                                    mit != gw.r2i_fd_map.end(); mit ++, n ++) {
+        for (map<int, InetName>::iterator mit = gw->r2i_fd_map.begin();
+                                    mit != gw->r2i_fd_map.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load listening Internet sockets. */
-        for (map<int, RinaName>::iterator mit = gw.i2r_fd_map.begin();
-                                    mit != gw.i2r_fd_map.end(); mit ++, n ++) {
+        for (map<int, RinaName>::iterator mit = gw->i2r_fd_map.begin();
+                                    mit != gw->i2r_fd_map.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load pending flow allocation requests. */
-        for (map<int, int>::iterator mit = gw.pending_fa_reqs.begin();
-                            mit != gw.pending_fa_reqs.end(); mit ++, n ++) {
+        for (map<int, int>::iterator mit = gw->pending_fa_reqs.begin();
+                            mit != gw->pending_fa_reqs.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load pending TCP connections. */
-        for (map<int, int>::iterator mit = gw.pending_conns.begin();
-                            mit != gw.pending_conns.end(); mit ++, n ++) {
+        for (map<int, int>::iterator mit = gw->pending_conns.begin();
+                            mit != gw->pending_conns.end(); mit ++, n ++) {
             pfd[n].fd = mit->first;
             pfd[n].events = POLLOUT;
         }
@@ -862,24 +864,24 @@ int main(int argc, char **argv)
         /* Now check which events were ready. */
         n = 0;
 
-        for (map<int, InetName>::iterator mit = gw.r2i_fd_map.begin();
-                                    mit != gw.r2i_fd_map.end(); mit ++, n ++) {
+        for (map<int, InetName>::iterator mit = gw->r2i_fd_map.begin();
+                                    mit != gw->r2i_fd_map.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming flow allocation request from the RINA world. */
                 accept_rina_flow(mit->first, mit->second);
             }
         }
 
-        for (map<int, RinaName>::iterator mit = gw.i2r_fd_map.begin();
-                                    mit != gw.i2r_fd_map.end(); mit ++, n ++) {
+        for (map<int, RinaName>::iterator mit = gw->i2r_fd_map.begin();
+                                    mit != gw->i2r_fd_map.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming TCP connection from the Internet world. */
                 accept_inet_conn(mit->first, mit->second);
             }
         }
 
-        for (map<int, int>::iterator mit = gw.pending_fa_reqs.begin();
-                            mit != gw.pending_fa_reqs.end(); mit ++, n ++) {
+        for (map<int, int>::iterator mit = gw->pending_fa_reqs.begin();
+                            mit != gw->pending_fa_reqs.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* Flow allocation response arrived. */
                 complete_flow_alloc(mit->first, mit->second);
@@ -887,8 +889,8 @@ int main(int argc, char **argv)
             }
         }
 
-        for (map<int, int>::iterator mit = gw.pending_conns.begin();
-                            mit != gw.pending_conns.end(); mit ++, n ++) {
+        for (map<int, int>::iterator mit = gw->pending_conns.begin();
+                            mit != gw->pending_conns.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
                 /* TCP connection handshake completed. */
                 submit_to_worker(mit->first, mit->second);
@@ -898,12 +900,12 @@ int main(int argc, char **argv)
 
         /* Clean up consumed pending_fa_reqs entries. */
         for (unsigned i = 0; i < completed_flow_allocs.size(); i ++) {
-            gw.pending_fa_reqs.erase(completed_flow_allocs[i]);
+            gw->pending_fa_reqs.erase(completed_flow_allocs[i]);
         }
 
         /* Clean up consumed pending_conns entries. */
         for (unsigned i = 0; i < completed_conns.size(); i ++) {
-            gw.pending_conns.erase(completed_conns[i]);
+            gw->pending_conns.erase(completed_conns[i]);
         }
     }
 
