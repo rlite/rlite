@@ -47,9 +47,11 @@
 
 #include "rlite/utils.h"
 #include "rlite/evloop.h"
+#include <rina/api.h>
 
 using namespace std;
 
+static int verbose = 1;
 
 struct InetName {
     struct sockaddr_in addr;
@@ -171,7 +173,6 @@ private:
 #define NUM_WORKERS     1
 
 struct Gateway {
-    struct rl_evloop loop;
     string appl_name;
 
     /* Used to map IP:PORT --> RINA NAME, when
@@ -184,17 +185,16 @@ struct Gateway {
      * receiving flow allocation requests from the RINA world
      * towards the INET world. */
     map<RinaName, InetName> dst_map;
+    map<int, InetName> dst_fd_map;
 
     /* Pending flow allocation requests issued by accept_inet_conn().
-     * fa_req_event_id --> tcp_client_fd */
-    map<unsigned int, Fd> pending_fa_reqs;
+     * flow_alloc wfd --> tcp_client_fd */
+    map<int, Fd> pending_fa_reqs;
 
     vector<Worker*> workers;
 
     Gateway();
     ~Gateway();
-
-    int join();
 };
 
 static void *
@@ -280,7 +280,7 @@ Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
                 return m;
 
             } else {
-                PE("Partial write %d/%d\n", m, n);
+                printf("Partial write %d/%d\n", m, n);
                 return -1;
             }
         }
@@ -290,7 +290,9 @@ Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
         return n;
 
     } else {
-        NPD("Read 0 bytes from %d\n", ifd);
+        if (verbose) {
+            printf("Read 0 bytes from %d\n", ifd);
+        }
     }
 
     return n;
@@ -302,7 +304,7 @@ Worker::run()
     struct pollfd pollfds[1 + MAX_FDS];
     char buf[MAX_BUF_SIZE];
 
-    PD("w%d starts\n", idx);
+    printf("w%d starts\n", idx);
 
     for (;;) {
         int nrdy;
@@ -320,14 +322,16 @@ Worker::run()
         }
         pthread_mutex_unlock(&lock);
 
-        NPD("w%d polls %d file descriptors\n", idx, nfds);
+        if (verbose) {
+            printf("w%d polls %d file descriptors\n", idx, nfds);
+        }
         nrdy = poll(pollfds, nfds, -1);
         if (nrdy < 0) {
             perror("poll()");
             break;
 
         } else if (nrdy == 0) {
-            PI("w%d: poll() timeout\n", idx);
+            printf("w%d: poll() timeout\n", idx);
             continue;
         }
 
@@ -335,13 +339,13 @@ Worker::run()
             /* We've been requested to repoll the queue. */
             nrdy--;
             if (pollfds[0].revents & POLLIN) {
-                PD("w%d: Mappings changed, rebuilding poll array\n", idx);
+                printf("w%d: Mappings changed, rebuilding poll array\n", idx);
                 pthread_mutex_lock(&lock);
                 drain_syncfd();
                 pthread_mutex_unlock(&lock);
 
             } else {
-                PD("w%d: Error event %d on syncfd\n", idx,
+                printf("w%d: Error event %d on syncfd\n", idx,
                    pollfds[0].revents);
             }
 
@@ -363,8 +367,10 @@ Worker::run()
             /* Consume the events on this fd. */
             j++;
 
-            NPD("w%d: fd %d ready, events %d\n", idx,
-               pollfds[i].fd, pollfds[i].revents);
+            if (verbose) {
+                printf("w%d: fd %d ready, events %d\n", idx, pollfds[i].fd,
+                                                        pollfds[i].revents);
+            }
 
             if (!(pollfds[i].revents & POLLIN)) {
                 /* No read event, so forwarding cannot happen, let's
@@ -376,7 +382,7 @@ Worker::run()
              * disappeared in a previous iteration of this loop. */
             mit = fdmap.find(ifd);
             if (mit == fdmap.end()) {
-                PD("w%d: fd %d just disappeared from the map\n", idx, ifd);
+                printf("w%d: fd %d just disappeared from the map\n", idx, ifd);
                 continue;
             }
 
@@ -387,11 +393,11 @@ Worker::run()
                 /* Forwarding failed for some season, we have to close
                  * the session. */
                 if (ret == 0 || errno == EPIPE) {
-                    PI("w%d: Session %d <--> %d closed normally\n",
+                    printf("w%d: Session %d <--> %d closed normally\n",
                             idx, ifd, ofd);
 
                 } else {
-                    PI("w%d: Session %d <--> %d closed with errors\n",
+                    printf("w%d: Session %d <--> %d closed with errors\n",
                             idx, ifd, ofd);
                 }
 
@@ -402,24 +408,20 @@ Worker::run()
                 assert(mit != fdmap.end());
                 fdmap.erase(mit);
 
-            } else {
-                NPD("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
+            } else if (verbose) {
+                printf("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
             }
         }
 
         pthread_mutex_unlock(&lock);
     }
 
-    PD("w%d stops\n", idx);
+    printf("w%d stops\n", idx);
 }
 
 Gateway::Gateway()
 {
     appl_name = "rina-gw/1";
-
-    if (rl_evloop_init(&loop, NULL, 0)) {
-        exit(EXIT_FAILURE);
-    }
 
     for (int i=0; i<NUM_WORKERS; i++) {
         workers.push_back(new Worker(i));
@@ -433,17 +435,9 @@ Gateway::~Gateway()
         close(mit->first);
     }
 
-    rl_evloop_fini(&loop);
-
     for (unsigned int i=0; i<workers.size(); i++) {
         delete workers[i];
     }
-}
-
-int
-Gateway::join()
-{
-    return rl_evloop_join(&loop);
 }
 
 Gateway gw;
@@ -454,7 +448,7 @@ parse_conf(const char *confname)
     ifstream fin(confname);
 
     if (fin.fail()) {
-        PE("Failed to open configuration file '%s'\n", confname);
+        printf("Failed to open configuration file '%s'\n", confname);
         return -1;
     }
 
@@ -481,7 +475,8 @@ parse_conf(const char *confname)
 
             if (tokens.size() < 5) {
                 if (tokens.size()) {
-                    PI("Invalid configuration entry at line %d\n", lines_cnt);
+                    printf("Invalid configuration entry at line %d\n",
+                           lines_cnt);
                 }
                 continue;
             }
@@ -495,14 +490,14 @@ parse_conf(const char *confname)
                 port = atoi(tokens[4].c_str());
                 inet_addr.sin_port = htons(port);
                 if (port < 0 || port >= 65536) {
-                    PI("Invalid configuration entry at line %d: "
+                    printf("Invalid configuration entry at line %d: "
                        "invalid port number '%s'\n", lines_cnt,
                        tokens[4].c_str());
                 }
                 ret = inet_pton(AF_INET, tokens[3].c_str(),
                                 &inet_addr.sin_addr);
                 if (ret != 1) {
-                    PI("Invalid configuration entry at line %d: "
+                    printf("Invalid configuration entry at line %d: "
                        "invalid IP address '%s'\n", lines_cnt,
                        tokens[3].c_str());
                     continue;
@@ -511,7 +506,8 @@ parse_conf(const char *confname)
                 if (tokens.size() >= 6) {
                     max_sdu_size = atoi(tokens[5].c_str());
                     if (max_sdu_size <= 0) {
-                        PI("Invalid SDU size --> using %d\n", MAX_SDU_SIZE);
+                        printf("Invalid SDU size --> using %d\n",
+                               MAX_SDU_SIZE);
                         max_sdu_size = MAX_SDU_SIZE;
                     }
                 }
@@ -526,12 +522,12 @@ parse_conf(const char *confname)
                     gw.dst_map.insert(make_pair(rina_name, inet_name));
 
                 } else {
-                    PI("Invalid configuration entry at line %d: %s is "
+                    printf("Invalid configuration entry at line %d: %s is "
                        "unknown\n", lines_cnt, tokens[0].c_str());
                     continue;
                 }
             } catch (std::bad_alloc) {
-                PE("Out of memory while processing configuration file\n");
+                printf("Out of memory while processing configuration file\n");
             }
         }
     }
@@ -542,180 +538,122 @@ parse_conf(const char *confname)
 #include <sys/ioctl.h>
 
 static int
-gw_open_appl_port(rl_port_t port_id, unsigned int max_sdu_size)
+accept_rina_flow(int fd, const InetName &inet)
 {
-    int fd = rl_open_appl_port(port_id);
-
-    if (fd >= 0) { /* Enable splitted sdu_write hack. */
-        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
-        ioctl(fd, 1, data);
-    }
-
-    return fd;
-}
-
-static int
-gw_fa_req_arrived(struct rl_evloop *loop,
-                  const struct rl_msg_base *b_resp,
-                  const struct rl_msg_base *b_req)
-{
-    Gateway * gw = container_of(loop, struct Gateway, loop);
-    struct rl_kmsg_fa_req_arrived *req =
-            (struct rl_kmsg_fa_req_arrived *)b_resp;
-    map<RinaName, InetName>::iterator mit;
-    Worker *w = gw->workers[0];
-    RinaName dst_name;
+    struct rina_flow_spec spec;
+    Worker *w = gw.workers[0];
     int max_sdu_size;
     int cfd;
     int rfd;
     int ret;
 
-    dst_name = RinaName(string(req->local_appl), string(req->dif_name));
-
-    mit = gw->dst_map.find(dst_name);
-    if (mit == gw->dst_map.end()) {
-        PE("Internal error: Failed to lookup '%s' into dst_map\n",
-            static_cast<string>(dst_name).c_str());
+    /* Accept the incoming flow request. */
+    rfd = rina_flow_accept(fd, /* source name */ NULL, &spec, 0);
+    if (rfd < 0) {
+        perror("rina_flow_accept()");
         return 0;
     }
 
-    max_sdu_size = mit->first.max_sdu_size;
+    max_sdu_size = MAX_SDU_SIZE;
 
+    /* Open a TCP connection towards the mapped endpoint (@inet). */
     cfd = socket(AF_INET, SOCK_STREAM, 0);
     if (cfd < 0) {
         perror("socket()");
         return 0;
     }
 
-    ret = connect(cfd, (struct sockaddr *)&mit->second.addr,
-                  sizeof(mit->second.addr));
+    ret = connect(cfd, (struct sockaddr *)&inet.addr, sizeof(inet.addr));
     if (ret) {
+        close(rfd);
         perror("connect()");
         return 0;
     }
 
-    ret = rl_evloop_fa_resp(&gw->loop, req->kevent_id,
-                            req->ipcp_id, 0xffff,
-                            req->port_id, RLITE_SUCC);
-    if (ret != RLITE_SUCC) {
-        PE("rl_appl_fa_resp() failed\n");
-        close(cfd);
-        return 0;
+    { /* Enable splitted sdu_write hack. */
+        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
+        ioctl(rfd, 1, data);
     }
 
-    rfd = gw_open_appl_port(req->port_id, max_sdu_size);
-    if (rfd < 0) {
-        PE("rina_open_appl_port() failed\n");
-        close(cfd);
-        return 0;
-    }
-
+    /* Submit the new session to a worker. */
     pthread_mutex_lock(&w->lock);
     w->fdmap[cfd] = Fd(rfd, max_sdu_size);
     w->fdmap[rfd] = Fd(cfd, max_sdu_size);
     w->repoll();
     pthread_mutex_unlock(&w->lock);
 
-    PI("New mapping created %d <--> %d\n", cfd, rfd);
-
-    return 0;
-}
-
-static int
-gw_fa_resp_arrived(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req)
-{
-    Gateway * gw = container_of(loop, struct Gateway, loop);
-    struct rl_kmsg_fa_resp_arrived *resp =
-            (struct rl_kmsg_fa_resp_arrived *)b_resp;
-    map<unsigned int, Fd>::iterator mit;
-    Worker *w = gw->workers[0];
-    int max_sdu_size;
-    int cfd;
-    int rfd;
-
-    mit = gw->pending_fa_reqs.find(b_req->event_id);
-    if (mit == gw->pending_fa_reqs.end()) {
-        PE("Spurious flow allocation response [id=%u]\n", b_req->event_id);
-        return 0;
-    }
-
-    cfd = mit->second.fd;
-    max_sdu_size = mit->second.max_sdu_size;
-    gw->pending_fa_reqs.erase(mit);
-
-    if (resp->response) {
-        /* Negative response. */
-        PD("Negative flow allocation response received\n");
-        close(cfd);
-        return 0;
-    }
-
-    rfd = gw_open_appl_port(resp->port_id, max_sdu_size);
-    if (rfd < 0) {
-        PE("Failed to open application port\n");
-        close(cfd);
-        return 0;
-    }
-
-    pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
-    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
-    w->repoll();
-    pthread_mutex_unlock(&w->lock);
-
-    PI("New mapping created %d <--> %d\n", cfd, rfd);
+    printf("New mapping created %d <--> %d\n", cfd, rfd);
 
     return 0;
 }
 
 static void
-accept_inet_conn(struct rl_evloop *loop, int lfd)
+complete_flow_alloc(int wfd, Fd fds)
 {
-    Gateway * gw = container_of(loop, struct Gateway, loop);
+    Worker *w = gw.workers[0];
+    int max_sdu_size;
+    int cfd;
+    int rfd;
+
+    /* Complete the flow allocation procedure. */
+    rfd = rina_flow_alloc_wait(wfd);
+    if (rfd < 0) {
+        /* Failure or negative response. */
+        perror("rina_flow_alloc_wait()");
+        return;
+    }
+
+    cfd = fds.fd;
+    max_sdu_size = fds.max_sdu_size;
+
+    { /* Enable splitted sdu_write hack. */
+        uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
+        ioctl(rfd, 1, data);
+    }
+
+    pthread_mutex_lock(&w->lock);
+    w->fdmap[cfd] = Fd(rfd, max_sdu_size);
+    w->fdmap[rfd] = Fd(cfd, max_sdu_size);
+    w->repoll();
+    pthread_mutex_unlock(&w->lock);
+
+    printf("New mapping created %d <--> %d\n", cfd, rfd);
+}
+
+static void
+accept_inet_conn(int lfd, const RinaName &rname)
+{
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
-    map<int, RinaName>::iterator mit;
     struct rina_flow_spec flowspec;
-    unsigned int event_id;
-    unsigned int unused;
+    int wfd;
     int cfd;
-    int ret;
 
     /* First of all let's call accept, so that we consume the event
      * on lfd, independently of what happen next. */
     cfd = accept(lfd, (struct sockaddr *)&remote_addr, &addrlen);
     if (cfd < 0) {
-        PE("accept() failed\n");
+        perror("accept() failed");
         return;
     }
 
-    mit = gw->srv_fd_map.find(lfd);
-    if (mit == gw->srv_fd_map.end()) {
-        PE("Internal error: Failed to lookup lfd %d into srv_fd_map\n", lfd);
-        return;
-    }
-
-    /* Ask for a reliable flow. */
+    /* Issue a non-blocking flow allocation request, asking for a reliable
+     * flow. */
     rina_flow_spec_default(&flowspec);
     flowspec.max_sdu_gap = 0;
     rina_flow_spec_fc_set(&flowspec, 1);
-
-    event_id = rl_ctrl_get_id(&loop->ctrl);
-
-    /* Issue a non-blocking flow allocation request. */
-    ret = rl_evloop_flow_alloc(loop, event_id, mit->second.dif_name.c_str(),
-                               gw->appl_name.c_str(), mit->second.name.c_str(),
-                               &flowspec, 0xffff, &unused, 0);
-    if (ret) {
-        PE("Flow allocation failed\n");
+    wfd = rina_flow_alloc(rname.dif_name.c_str(), gw.appl_name.c_str(),
+                          rname.name.c_str(), &flowspec, RINA_F_NOWAIT);
+    if (wfd < 0) {
+        close(cfd);
+        perror("rina_flow_alloc failed");
         return;
     }
 
-    gw->pending_fa_reqs[event_id] = Fd(cfd, mit->second.max_sdu_size);
+    /* Store the pending request. */
+    gw.pending_fa_reqs[wfd] = Fd(cfd, rname.max_sdu_size);
 
-    PD("Flow allocation request issued, event id %d\n", event_id);
+    printf("Flow allocation request issued [wfd=%d]\n", wfd);
 }
 
 static int
@@ -727,31 +665,25 @@ inet_server_socket(const InetName& inet_name)
     fd = socket(PF_INET, SOCK_STREAM, 0);
 
     if (fd < 0) {
-        PE("socket() failed [%d]\n", errno);
+        perror("socket()");
         return -1;
     }
 
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable,
                    sizeof(enable))) {
-        PE("setsockopt(SO_REUSEADDR) failed [%d]\n", errno);
+        perror("setsockopt(SO_REUSEADDR)");
         close(fd);
         return -1;
     }
 
     if (bind(fd, (struct sockaddr *)&inet_name.addr, sizeof(inet_name.addr))) {
-        PE("bind() failed [%d]\n", errno);
+        perror("bind()");
         close(fd);
         return -1;
     }
 
     if (listen(fd, 10)) {
-        PE("listen() failed [%d]\n", errno);
-        close(fd);
-        return -1;
-    }
-
-    if (rl_evloop_fdcb_add(&gw.loop, fd, accept_inet_conn)) {
-        PE("rl_evloop_fcdb_add() failed [%d]\n", errno);
+        perror("listen()");
         close(fd);
         return -1;
     }
@@ -762,37 +694,37 @@ inet_server_socket(const InetName& inet_name)
 static int
 setup()
 {
-    int ret;
-
-    /* Register the handler for incoming flow allocation requests and
-     * response. */
-    ret = rl_evloop_set_handler(&gw.loop, RLITE_KER_FA_REQ_ARRIVED,
-                                gw_fa_req_arrived);
-    ret |= rl_evloop_set_handler(&gw.loop, RLITE_KER_FA_RESP_ARRIVED,
-                                 gw_fa_resp_arrived);
-    if (ret) {
-        return -1;
-    }
-
+    /* Open Internet listening sockets. */
     for (map<InetName, RinaName>::iterator mit = gw.srv_map.begin();
                                     mit != gw.srv_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
 
         if (fd < 0) {
-            PE("Failed to open listening socket for '%s'\n",
-               static_cast<string>(mit->first).c_str());
+            printf("Failed to open listening socket for '%s'\n",
+                   static_cast<string>(mit->first).c_str());
         } else {
             gw.srv_fd_map[fd] = mit->second;
         }
     }
 
+    /* Open RINA listening "sockets". */
     for (map<RinaName, InetName>::iterator mit = gw.dst_map.begin();
                                     mit != gw.dst_map.end(); mit++) {
-        rl_evloop_register(&gw.loop, 1, mit->first.dif_name.c_str(),
-                           mit->first.name.c_str(), 3000);
+        int fd = rina_open();
+        int ret;
+
+        if (fd < 0) {
+            perror("rina_open()");
+            continue;
+        }
+
+        ret = rina_register(fd, mit->first.dif_name.c_str(),
+                            mit->first.name.c_str());
         if (ret) {
-            PE("Registration of application '%s'\n",
-               static_cast<string>(mit->first).c_str());
+            printf("Registration of application '%s' failed\n",
+                   static_cast<string>(mit->first).c_str());
+        } else {
+            gw.dst_fd_map[fd] = mit->second;
         }
     }
 
@@ -818,6 +750,7 @@ print_conf()
 int main()
 {
     const char *confname = "/etc/rlite/rina-gw.conf";
+    struct pollfd pfd[128];
     int ret;
 
     errno = 0;
@@ -835,9 +768,72 @@ int main()
     print_conf();
     setup();
 
-    gw.join();
+    for (;;) {
+        vector<int> completed_flow_allocs;
+        int n = 0;
 
-    PI("Main thread exits\n");
+        /* Load listening RINA "sockets". */
+        for (map<int, InetName>::iterator mit = gw.dst_fd_map.begin();
+                                    mit != gw.dst_fd_map.end(); mit ++, n ++) {
+            pfd[n].fd = mit->first;
+            pfd[n].events = POLLIN;
+        }
+
+        /* Load listening Internet sockets. */
+        for (map<int, RinaName>::iterator mit = gw.srv_fd_map.begin();
+                                    mit != gw.srv_fd_map.end(); mit ++, n ++) {
+            pfd[n].fd = mit->first;
+            pfd[n].events = POLLIN;
+        }
+
+        /* Load pending flow allocation requests. */
+        for (map<int, Fd>::iterator mit = gw.pending_fa_reqs.begin();
+                            mit != gw.pending_fa_reqs.end(); mit ++, n ++) {
+            pfd[n].fd = mit->first;
+            pfd[n].events = POLLIN;
+        }
+
+        ret = poll(pfd, n, -1 /* no timeout */);
+        if (ret <= 0) {
+            perror("poll()");
+            break;
+        }
+
+        /* Now check which events were ready. */
+        n = 0;
+
+        for (map<int, InetName>::iterator mit = gw.dst_fd_map.begin();
+                                    mit != gw.dst_fd_map.end(); mit ++, n ++) {
+            if (pfd[n].revents & POLLIN) {
+                /* Incoming flow allocation request from the RINA world. */
+                accept_rina_flow(mit->first, mit->second);
+            }
+        }
+
+        for (map<int, RinaName>::iterator mit = gw.srv_fd_map.begin();
+                                    mit != gw.srv_fd_map.end(); mit ++, n ++) {
+            if (pfd[n].revents & POLLIN) {
+                /* Incoming TCP connection from the Internet world. */
+                accept_inet_conn(mit->first, mit->second);
+            }
+        }
+
+        for (map<int, Fd>::iterator mit = gw.pending_fa_reqs.begin();
+                            mit != gw.pending_fa_reqs.end(); mit ++, n ++) {
+            if (pfd[n].revents & POLLIN) {
+                /* Flow allocation response arrived. */
+                complete_flow_alloc(mit->first, mit->second);
+                completed_flow_allocs.push_back(mit->first);
+            }
+        }
+
+        /* Clean up consumed pending_fa_reqs entries. */
+        for (unsigned i = 0; i < completed_flow_allocs.size(); i ++) {
+            gw.pending_fa_reqs.erase(completed_flow_allocs[i]);
+        }
+    }
+
+    printf("Main thread exits\n");
 
     return 0;
 }
