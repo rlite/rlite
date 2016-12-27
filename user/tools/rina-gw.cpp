@@ -435,6 +435,11 @@ Gateway::~Gateway()
         close(mit->first);
     }
 
+    for (map<int, InetName>::iterator mit = dst_fd_map.begin();
+                                    mit != dst_fd_map.end(); mit++) {
+        close(mit->first);
+    }
+
     for (unsigned int i=0; i<workers.size(); i++) {
         delete workers[i];
     }
