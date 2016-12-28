@@ -111,8 +111,6 @@ struct RinaName {
     operator std::string() const { return dif_name + ":" + name; }
 };
 
-#define MAX_SDU_SIZE    1460
-
 RinaName::RinaName()
 {
 }
@@ -167,6 +165,9 @@ private:
 };
 
 #define NUM_WORKERS     1
+#define MAX_FDS         16
+#define MAX_BUF_SIZE    65536
+#define MAX_SDU_SIZE    65536
 
 struct Gateway {
     string appl_name;
@@ -262,9 +263,6 @@ Worker::drain_syncfd()
 
     return 0;
 }
-
-#define MAX_FDS         16
-#define MAX_BUF_SIZE    4096
 
 int
 Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
@@ -558,16 +556,6 @@ parse_conf(const char *confname)
     return 0;
 }
 
-#include <sys/ioctl.h>
-
-static void
-splitted_sdu_hack(int fd, int max_sdu_size)
-{
-    /* Enable splitted sdu_write hack. */
-    uint8_t data[5]; data[0] = 90; *((uint32_t *)(data+1)) = max_sdu_size;
-    ioctl(fd, 1, data);
-}
-
 static void
 submit_to_worker(int cfd, int rfd)
 {
@@ -600,8 +588,6 @@ accept_rina_flow(int fd, const InetName &inet)
     }
 
     set_nonblocking(rfd);
-
-    splitted_sdu_hack(rfd, MAX_SDU_SIZE);
 
     /* Open a TCP connection towards the mapped endpoint (@inet). */
     cfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -688,7 +674,6 @@ complete_flow_alloc(int wfd, int cfd)
     }
 
     set_nonblocking(rfd);
-    splitted_sdu_hack(rfd, MAX_SDU_SIZE);
     submit_to_worker(cfd, rfd);
 }
 
