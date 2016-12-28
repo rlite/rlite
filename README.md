@@ -194,7 +194,7 @@ Other programs are available for testing and deployment:
                 measurement. Use `rinaperf -h` to see the availble commmands.
 * **rina-gw**, a deamon program implementing a gateway between a TCP/IP
                network and a RINA network.
-* **rina-rr-tool**, a simple echo program written using the Python bindings.
+* **rina-echo**, a simple echo program written using the Python bindings.
 
 #### Examples of rinaperf usage
 
@@ -224,7 +224,7 @@ Python bindings, which are a wrapper for the **librlite** library. Run
     >>> help(rlite)
 
 in the Python interpreter, in order to see the available classes.
-The **rina-rr-tool** script is an example written using these bindings.
+The **rina-echo** script is an example written using these bindings.
 
 
 

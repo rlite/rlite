@@ -11,8 +11,10 @@
 
 - implement a first address assignment policy
 
-- demo: extend --ring to use more levels of DIFs
-
 - allocate and use N-flows rather than N-1-flows over shim DIFs
+    - logic for self-registration and N-flow allocation already in place
+    - the only missing thing is to actually use the N-flow and not the N-1
 
 - periodic DFT synchronization
+
+- compute MSS for each IPCP, add "preserve message boundary" to the QoS
