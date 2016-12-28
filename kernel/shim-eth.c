@@ -895,8 +895,8 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
 static int
 rl_shim_eth_config(struct ipcp_entry *ipcp,
-                       const char *param_name,
-                       const char *param_value)
+                   const char *param_name,
+                   const char *param_value)
 {
     struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
     int ret = -EINVAL;
@@ -946,7 +946,13 @@ rl_shim_eth_config(struct ipcp_entry *ipcp,
 
             spin_unlock_bh(&priv->tx_lock);
 
-            PD("netdev set to %p\n", priv->netdev);
+            /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
+             * changed; we should intercept those changes, reflect the change
+             * in the ipcp_entry and notify userspace. */
+            ipcp->max_sdu_size = netdev->mtu;
+
+            PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
+               netdev->mtu);
 
         } else {
             dev_put(netdev);

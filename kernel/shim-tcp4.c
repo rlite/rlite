@@ -92,6 +92,12 @@ rl_shim_tcp4_create(struct ipcp_entry *ipcp)
     INIT_WORK(&priv->txw, tcp4_tx_worker);
     spin_lock_init(&priv->txq_lock);
 
+    /* The max_sdu_size for this IPCP is limited by the the TCP
+     * send socket buffer (which is configurable). The default
+     * size is contained in the kernel variable sysctl_wmem_default,
+     * but that one is not exported. We use a reasonable value here. */
+    ipcp->max_sdu_size = (1 << 16);
+
     PD("New IPCP created [%p]\n", priv);
 
     return priv;

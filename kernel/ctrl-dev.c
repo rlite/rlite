@@ -442,7 +442,7 @@ ipcp_select_by_dif(const char *dif_name)
     hash_for_each(rl_dm.ipcp_table, bucket, entry, node) {
         if (!dif_name) {
             /* The request does not specify a DIF: select any DIF,
-             * giving priority to normal DIFs. */
+             * giving priority to higher ranked normal DIFs. */
             if (!selected || (strcmp(entry->dif->ty, "normal") == 0 &&
                     (strcmp(selected->dif->ty, "normal") != 0 ||
                      entry->depth > selected->depth))) {
@@ -512,7 +512,8 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->dif = dif;
         entry->addr = 0;
         entry->refcnt = 1;
-        entry->depth = RLITE_DEFAULT_LAYERS;
+        entry->depth = RLITE_DEFAULT_LAYERS; /* recomputed in userspace */
+        entry->max_sdu_size = (1 << 16); /* default, ok for normal IPCPs */
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
         init_waitqueue_head(&entry->uipcp_wqh);

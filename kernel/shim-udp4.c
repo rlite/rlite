@@ -87,6 +87,14 @@ rl_shim_udp4_create(struct ipcp_entry *ipcp)
     INIT_WORK(&priv->txw, udp4_tx_worker);
     spin_lock_init(&priv->txq_lock);
 
+    /* Set max_sdu_size for the IPCP, considering that the SDU is going
+     * to be encapsulated in the UDP packet, and the UDP packet is going
+     * to be encapsulated in the IP packet. Assuming the IP packet does
+     * not have options, and is not encapsulated in other tunnels, the
+     * maximum SDU size is limited by the maximum size of an IP packet,
+     * that is (2^16 - 1). */
+    ipcp->max_sdu_size = ((1<<16) - 1) - 8 /* UDP hdr */ - 20 /* IP hdr */;
+
     return priv;
 }
 

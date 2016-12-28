@@ -306,13 +306,14 @@ struct ipcp_entry {
 #define RL_K_IPCP_ZOMBIE        (1<<1)
     uint32_t            flags;
 
-    /* Receive side optimization. The 'uppers' field is protected by 'lock'. */
+    /* Receive side optimization. Fields protected by 'lock'. */
     struct ipcp_entry   *shortcut;
     int                 shortcut_flows;
 
     struct ipcp_ops     ops;
     void                *priv;
-    uint8_t             depth;
+    uint8_t             depth; /* DIF stacking depth, computed by uipcps */
+    uint32_t            max_sdu_size;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
     struct rl_ctrl      *uipcp;

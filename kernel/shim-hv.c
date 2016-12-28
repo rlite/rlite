@@ -167,6 +167,8 @@ rl_shim_hv_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
     priv->vmpi_id = ~0U;
 
+    ipcp->max_sdu_size = PAGE_SIZE - 64; /* 64 to stay safe */
+
     PD("New IPC created [%p]\n", priv);
 
     return priv;
