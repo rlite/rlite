@@ -449,6 +449,18 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
+rl_shim_udp4_config(struct ipcp_entry *ipcp,
+                    const char *param_name,
+                    const char *param_value)
+{
+    if (strcmp(param_name, "mss") == 0) {
+        return -EPERM; /* deny */
+    }
+
+    return -ENOSYS;
+}
+
+static int
 rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
                                 struct rl_flow_stats *stats)
 {
@@ -469,6 +481,7 @@ static struct ipcp_factory shim_udp4_factory = {
     .ops.flow_init = rl_shim_udp4_flow_init,
     .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
     .ops.sdu_write = rl_shim_udp4_sdu_write,
+    .ops.config = rl_shim_udp4_config,
     .ops.flow_get_stats = rl_shim_udp4_flow_get_stats,
     .ops.flow_writeable = rl_shim_udp4_flow_writeable,
 };

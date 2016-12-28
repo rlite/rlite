@@ -253,7 +253,7 @@ rl_shim_hv_config(struct ipcp_entry *ipcp,
                     const char *param_value)
 {
     struct rl_shim_hv *priv = (struct rl_shim_hv *)ipcp->priv;
-    int ret = -EINVAL;
+    int ret = -ENOSYS;
 
     if (strcmp(param_name, "vmpi-id") == 0) {
         unsigned int provider = VMPI_PROVIDER_AUTO;
@@ -278,6 +278,9 @@ rl_shim_hv_config(struct ipcp_entry *ipcp,
             PE("register_read_callback() failed\n");
             return ret;
         }
+    } else if (strcmp(param_name, "mss") == 0) {
+        /* Deny. */
+        return -EPERM;
     }
 
     return ret;

@@ -751,8 +751,7 @@ static int
 rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
                    const char *param_value)
 {
-    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-    int ret = -EINVAL;
+    int ret = -ENOSYS; /* don't know how to manage this parameter */
 
     if (strcmp(param_name, "address") == 0) {
         rl_addr_t address;
@@ -764,8 +763,6 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
             ipcp->addr = address;
         }
     }
-
-    (void)priv;
 
     return ret;
 }

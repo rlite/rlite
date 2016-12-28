@@ -1540,7 +1540,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rl_kmsg_ipcp_config *req =
                     (struct rl_kmsg_ipcp_config *)bmsg;
     struct ipcp_entry *entry;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret;
 
     if (!req->name || !req->value) {
         return -EINVAL;
@@ -1549,8 +1549,21 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* Find the IPC process entry corresponding to req->ipcp_id and
      * fill the DIF name field. */
     entry = ipcp_get(req->ipcp_id);
+    if (!entry) {
+        return -EINVAL;
+    }
 
-    if (entry) {
+    ret = -ENOSYS; /* parameter not implemented */
+    /* Check if the IPCP knows how to change this paramter. */
+    mutex_lock(&entry->lock);
+    if (entry->ops.config) {
+        ret = entry->ops.config(entry, req->name, req->value);
+    }
+    mutex_unlock(&entry->lock);
+
+    if (ret == -ENOSYS) {
+        /* This operation was not managed by ops.config, let's see if
+         *  we can manage it here. */
         if (strcmp(req->name, "depth") == 0) {
             uint8_t depth;
 
@@ -1559,12 +1572,15 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                 entry->depth = depth;
             }
 
-        } else {
-            mutex_lock(&entry->lock);
-            if (entry->ops.config) {
-                ret = entry->ops.config(entry, req->name, req->value);
+        } else if (strcmp(req->name, "mss") == 0) {
+            uint32_t max_sdu_size;
+
+            ret = kstrtou32(req->value, 10, &max_sdu_size);
+            if (ret == 0) {
+                entry->max_sdu_size = max_sdu_size;
             }
-            mutex_unlock(&entry->lock);
+        } else {
+            ret = -EINVAL; /* unknown request */
         }
     }
 
@@ -1575,7 +1591,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
                 req->ipcp_id, req->name, req->value);
 
         if (strcmp(req->name, "address") == 0 ||
-                strcmp(req->name, "max_sdu_size") == 0) {
+                strcmp(req->name, "mss") == 0) {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
             ipcp_update_all(req->ipcp_id, RLITE_UPDATE_UPD);

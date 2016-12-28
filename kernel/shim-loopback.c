@@ -354,11 +354,11 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
 
 static int
 rl_shim_loopback_config(struct ipcp_entry *ipcp,
-                           const char *param_name,
-                           const char *param_value)
+                        const char *param_name,
+                        const char *param_value)
 {
     struct rl_shim_loopback *priv = (struct rl_shim_loopback *)ipcp->priv;
-    int ret = -EINVAL;
+    int ret = -ENOSYS;
 
     if (strcmp(param_name, "queued") == 0) {
         unsigned int queued;

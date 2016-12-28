@@ -899,7 +899,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp,
                    const char *param_value)
 {
     struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
-    int ret = -EINVAL;
+    int ret = -ENOSYS;
 
     if (strcmp(param_name, "netdev") == 0) {
         struct net_device *netdev = NULL;
@@ -933,30 +933,35 @@ rl_shim_eth_config(struct ipcp_entry *ipcp,
         ret = netdev_rx_handler_register(netdev, shim_eth_rx_handler, priv);
         rtnl_unlock();
 
-        if (ret == 0) {
-            spin_lock_bh(&priv->tx_lock);
-
-            priv->netdev = netdev;
-            priv->ntu = 0;
-            if (netdev->tx_queue_len) {
-                priv->ntp = priv->ntu + netdev->tx_queue_len;
-            } else {
-                priv->ntp = -2;
-            }
-
-            spin_unlock_bh(&priv->tx_lock);
-
-            /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
-             * changed; we should intercept those changes, reflect the change
-             * in the ipcp_entry and notify userspace. */
-            ipcp->max_sdu_size = netdev->mtu;
-
-            PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
-               netdev->mtu);
-
-        } else {
+        if (ret) {
             dev_put(netdev);
+            return ret;
         }
+
+        spin_lock_bh(&priv->tx_lock);
+
+        priv->netdev = netdev;
+        priv->ntu = 0;
+        if (netdev->tx_queue_len) {
+            priv->ntp = priv->ntu + netdev->tx_queue_len;
+        } else {
+            priv->ntp = -2;
+        }
+
+        spin_unlock_bh(&priv->tx_lock);
+
+        /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
+         * changed; we should intercept those changes, reflect the change
+         * in the ipcp_entry and notify userspace. */
+        ipcp->max_sdu_size = priv->netdev->mtu;
+
+        PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
+           netdev->mtu);
+
+    } else if (strcmp(param_name, "mss") == 0) {
+        /* Deny changes to max_sdu_size (and update). */
+        ipcp->max_sdu_size = priv->netdev->mtu;
+        return -EPERM;
     }
 
     return ret;
