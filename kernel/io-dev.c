@@ -260,7 +260,6 @@ struct rl_io {
     uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
-    size_t max_sdu_size; /* temporary */
 };
 
 static int
@@ -273,7 +272,6 @@ rl_io_open(struct inode *inode, struct file *f)
         return -ENOMEM;
     }
 
-    rio->max_sdu_size = ~0U; /* Hack disabled by default */
     f->private_data = rio;
 
     return 0;
@@ -335,10 +333,11 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         ubuf += sizeof(mhdr);
         ulen -= sizeof(mhdr);
 
-    } else if (unlikely(ulen > rio->max_sdu_size)) {
-        /* Temporary, partial hack, it will go away once
-         * EFCP implements fragmentation and reassembly. */
-        return splitted_sdu_write(f, ubuf, ulen, ppos, rio->max_sdu_size);
+    } else if (unlikely(ulen > ipcp->max_sdu_size)) {
+        /* This path should only be taken if QoS does not specify
+         * message boundaries. Message boundaries should be managed
+         * by EFCP fragmentation and reassembly. */
+        return splitted_sdu_write(f, ubuf, ulen, ppos, ipcp->max_sdu_size);
     }
 
     rb = rl_buf_alloc(ulen, ipcp->depth, GFP_KERNEL);
@@ -666,12 +665,6 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 
     if (copy_from_user(&info, argp, sizeof(info))) {
         return -EFAULT;
-    }
-
-    if (info.mode == RLITE_IO_MODE_MAX_SDU_SIZE) {
-        /* temporary, info->port_id contains the max SDU size. */
-        rio->max_sdu_size = (size_t)info.port_id;
-        return 0;
     }
 
     rl_io_release_internal(rio);

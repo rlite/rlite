@@ -98,11 +98,6 @@ struct rl_msg_base_resp {
  * PDUs for the IPCP specified by ipcp_id. */
 #define RLITE_IO_MODE_IPCP_MGMT     88
 
-/* Temporary, partial hack to limit the PDU size.
- * It will go away once EFCP supports
- * fragmentation and reassembly. */
-#define RLITE_IO_MODE_MAX_SDU_SIZE  90
-
 struct rl_ioctl_info {
     uint8_t         mode;
     rl_port_t       port_id;

@@ -17,4 +17,4 @@
 
 - periodic DFT synchronization
 
-- compute MSS for each IPCP, add "preserve message boundary" to the QoS
+- add "preserve message boundary" to the QoS
