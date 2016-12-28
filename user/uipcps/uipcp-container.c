@@ -668,8 +668,10 @@ visit(struct uipcps *uipcps)
         struct ipcp_node *next = NULL;
         struct list_head *prevs, *nexts;
 
+        /* Scan all the nodes that have not been marked (visited) yet,
+         * looking for a node that has no unmarked "uppers".  */
         list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-            int no_prev = 1;
+            int no_prevs = 1;
 
             if (ipn->marked) {
                 continue;
@@ -680,26 +682,28 @@ visit(struct uipcps *uipcps)
 
             list_for_each_entry(e, prevs, node) {
                 if (!e->ipcp->marked) {
-                    no_prev = 0;
+                    no_prevs = 0;
                     break;
                 }
             }
 
-            if (no_prev) {
+            if (no_prevs) { /* found one */
                 next = ipn;
                 break;
             }
         }
 
-        if (!next) {
+        if (!next) { /* none were found */
             break;
         }
 
+        /* Mark (visit) the node, appling the relaxation rule to
+         * maximize depth. */
         next->marked = 1;
 
         list_for_each_entry(e, nexts, node) {
-            if (e->ipcp->depth < ipn->depth + 1) {
-                e->ipcp->depth = ipn->depth + 1;
+            if (e->ipcp->depth < next->depth + 1) {
+                e->ipcp->depth = next->depth + 1;
                 if (e->ipcp->depth > max_depth) {
                     max_depth = e->ipcp->depth;
                 }
@@ -719,9 +723,8 @@ uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
     int ret;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        /* Shims have down_depth set to 0, so we use the up_depth
-         * for them. For all the other (normal) IPCPs we use the
-         * down_depth. */
+        /* Shims have the higher depths, and normals the lower
+         * depths. We invert these value using the max depth. */
         depth = max_depth - ipn->depth;
         ret = snprintf(strbuf, sizeof(strbuf), "%u", depth);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
@@ -749,6 +752,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         ipn->marked = 0;
         ipn->depth = 0;
+        ipn->max_sdu_size = 0;
     }
 
     max_depth = visit(uipcps);
@@ -789,6 +793,7 @@ uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         PE("Out of memory\n");
         return NULL;
     }
+    memset(ipn, 0, sizeof(*ipn));
 
     ipn->id = ipcp_id;
     ipn->refcnt = 0;
@@ -815,7 +820,7 @@ uipcps_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
 
 static int
 flow_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
-                    struct list_head *edges)
+              struct list_head *edges)
 {
     struct flow_edge *e;
 
@@ -830,6 +835,7 @@ flow_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
         PE("Out of memory\n");
         return -1;
     }
+    memset(e, 0, sizeof(*e));
 
     e->ipcp = neigh;
     e->refcnt = 0;
@@ -843,7 +849,7 @@ ok:
 
 static int
 flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
-                    struct list_head *edges)
+              struct list_head *edges)
 {
     struct flow_edge *e;
 
@@ -872,7 +878,7 @@ uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
                         unsigned int lower_id)
 {
     struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
-    struct ipcp_node *lower= uipcps_node_get(uipcps, lower_id);
+    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id);
 
     if (!upper || !lower) {
         return -1;
@@ -897,7 +903,7 @@ uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
                          unsigned int lower_id)
 {
     struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
-    struct ipcp_node *lower= uipcps_node_get(uipcps, lower_id);
+    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id);
 
     if (lower == NULL) {
         PE("Could not find uipcp %u\n", lower_id);

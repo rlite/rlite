@@ -52,6 +52,8 @@ struct uipcps {
     /* Keepalive timeout in seconds. */
     unsigned int keepalive;
 
+    /* List of IPCP "nodes", used for topological sorting and computation
+     * of IPCP depth and maximum SDU size. */
     struct list_head ipcp_nodes;
 
     struct rl_evloop loop;
@@ -135,6 +137,7 @@ struct ipcp_node {
     unsigned int marked;
     unsigned int depth;
     unsigned int refcnt;
+    unsigned int max_sdu_size;
 
     struct list_head lowers;
     struct list_head uppers;
