@@ -48,6 +48,7 @@ struct ipcp_attrs {
     char *name;
     rl_addr_t addr;
     unsigned int depth;
+    unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
 
@@ -472,10 +473,10 @@ ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl,
                      (long long unsigned int)attrs->addr);
         }
         PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %s, depth = %u\n",
+                " address = %s, depth = %u, mss = %u\n",
                 attrs->id, attrs->name, attrs->dif_type,
                 attrs->dif_name, addrbuf,
-                attrs->depth);
+                attrs->depth, attrs->max_sdu_size);
     }
 
     return 0;
@@ -573,6 +574,7 @@ ipcps_load(struct rl_ctrl *ctrl)
         attrs->dif_name = upd->dif_name; upd->dif_name = NULL;
         attrs->addr = upd->ipcp_addr;
         attrs->depth = upd->depth;
+        attrs->max_sdu_size = upd->max_sdu_size;
 
         list_for_each_entry(scan, &ipcps, node) {
             if (attrs->id < scan->id) {

@@ -1331,6 +1331,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->ipcp_id = ipcp->id;
     upd->ipcp_addr = ipcp->addr;
     upd->depth = ipcp->depth;
+    upd->max_sdu_size = ipcp->max_sdu_size;
     if (ipcp->name) {
         upd->ipcp_name = kstrdup(ipcp->name, GFP_ATOMIC);
         if (!upd->ipcp_name) {
@@ -1573,7 +1574,8 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         PI("Configured IPC process %u: %s <= %s\n",
                 req->ipcp_id, req->name, req->value);
 
-        if (strcmp(req->name, "address") == 0) {
+        if (strcmp(req->name, "address") == 0 ||
+                strcmp(req->name, "max_sdu_size") == 0) {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
             ipcp_update_all(req->ipcp_id, RLITE_UPDATE_UPD);

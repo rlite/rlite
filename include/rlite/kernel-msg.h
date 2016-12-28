@@ -125,6 +125,7 @@ struct rl_kmsg_ipcp_update {
     rl_ipcp_id_t ipcp_id;
     rl_addr_t ipcp_addr;
     uint16_t  depth;
+    uint32_t max_sdu_size;
     char *ipcp_name;
     char *dif_name;
     char *dif_type;
