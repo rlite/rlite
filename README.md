@@ -284,8 +284,15 @@ client request/response (rr) mode:
 This will produce 1000 request/response transactions between client and server,
 and the client will report the average round trip time.
 
-In the same terminal, you can run **rinaperf** in ping mode with the following
-command:
+To look at the RIB of the normal DIF (n1.DIF), use the following command:
+
+    # rlite-ctl dif-rib-show n1.DIF
+
+In the DFT (Directory Forwarding Table) part of the RIB you can see an
+entry for the **rinaperf** application registered on node **a**.
+
+Always in the same terminal, you can run **rinaperf** in ping mode with the
+following command:
 
     # rinaperf -d n1.DIF
 
