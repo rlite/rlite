@@ -657,19 +657,18 @@ uipcps_print(struct uipcps *uipcps)
  *       is covered in any case.
  */
 
-static unsigned int
+static void
 visit(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
-    unsigned int max_depth = 0;
 
     for (;;) {
         struct ipcp_node *next = NULL;
         struct list_head *prevs, *nexts;
 
         /* Scan all the nodes that have not been marked (visited) yet,
-         * looking for a node that has no unmarked "uppers".  */
+         * looking for a node that has no unmarked "lowers".  */
         list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
             int no_prevs = 1;
 
@@ -677,8 +676,8 @@ visit(struct uipcps *uipcps)
                 continue;
             }
 
-            prevs = &ipn->uppers;
-            nexts = &ipn->lowers;
+            prevs = &ipn->lowers;
+            nexts = &ipn->uppers;
 
             list_for_each_entry(e, prevs, node) {
                 if (!e->ipcp->marked) {
@@ -704,38 +703,29 @@ visit(struct uipcps *uipcps)
         list_for_each_entry(e, nexts, node) {
             if (e->ipcp->depth < next->depth + 1) {
                 e->ipcp->depth = next->depth + 1;
-                if (e->ipcp->depth > max_depth) {
-                    max_depth = e->ipcp->depth;
-                }
             }
         }
     }
-
-    return max_depth;
 }
 
 static int
-uipcps_update_depths(struct uipcps *uipcps, unsigned int max_depth)
+uipcps_update_depths(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
-    unsigned int depth;
     char strbuf[10];
     int ret;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        /* Shims have the higher depths, and normals the lower
-         * depths. We invert these value using the max depth. */
-        depth = max_depth - ipn->depth;
-        ret = snprintf(strbuf, sizeof(strbuf), "%u", depth);
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->depth);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
-            PE("Impossible depth %u\n", depth);
+            PE("Impossible depth %u\n", ipn->depth);
             continue;
         }
 
         ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "depth",
                                     strbuf);
         if (ret) {
-            PE("'ipcp-config depth %u' failed\n", depth);
+            PE("'ipcp-config depth %u' failed\n", ipn->depth);
         }
     }
 
@@ -747,7 +737,6 @@ uipcps_compute_depths(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
-    unsigned int max_depth;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         ipn->marked = 0;
@@ -755,7 +744,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
         ipn->max_sdu_size = 0;
     }
 
-    max_depth = visit(uipcps);
+    visit(uipcps);
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         PV_S("NODE %u, depth = %u\n", ipn->id,
@@ -772,7 +761,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
         PV_S("]\n");
     }
 
-    uipcps_update_depths(uipcps, max_depth);
+    uipcps_update_depths(uipcps);
 
     return 0;
 }
