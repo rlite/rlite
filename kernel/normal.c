@@ -749,7 +749,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
 
 static int
 rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
-                   const char *param_value)
+                   const char *param_value, int *notify)
 {
     int ret = -ENOSYS; /* don't know how to manage this parameter */
 
@@ -760,6 +760,7 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
         if (ret == 0) {
             PI("IPCP %u address set to %lu\n", ipcp->id,
                (long unsigned)address);
+            *notify = (ipcp->addr != address);
             ipcp->addr = address;
         }
     }

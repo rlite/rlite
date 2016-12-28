@@ -410,44 +410,6 @@ uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
 }
 
 int
-uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
-{
-    struct uipcp *uipcp;
-
-    pthread_mutex_lock(&uipcps->lock);
-    uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
-    if (!uipcp) {
-        pthread_mutex_unlock(&uipcps->lock);
-        /* A shim IPCP. */
-        return 0;
-    }
-
-    uipcp->refcnt ++;
-
-    if (uipcp->dif_type) free(uipcp->dif_type);
-    if (uipcp->name) free(uipcp->name);
-    if (uipcp->dif_name) free(uipcp->dif_name);
-
-    uipcp->id = upd->ipcp_id;
-    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->depth = upd->depth;
-    uipcp->max_sdu_size = upd->max_sdu_size;
-    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
-    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
-
-    pthread_mutex_unlock(&uipcps->lock);
-
-    /* Address may have changed, notify the IPCP. */
-    if (uipcp->ops.update_address) {
-        uipcp->ops.update_address(uipcp, upd->ipcp_addr);
-    }
-
-    uipcp_put(uipcp, 1);
-
-    return 0;
-}
-
-int
 uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 {
     const struct uipcp_ops *ops = select_uipcp_ops(upd->dif_type);
@@ -650,11 +612,12 @@ uipcps_print(struct uipcps *uipcps)
 /*
  * Routines for DIF topological ordering, used for two reasons:
  *   (1) To check that there are no loops in the DIF stacking.
- *   (2) To compute the number of EFCP headers that each IPCP in the local
- *       system needs to allocate for each packet to be transmitted.
- *       Depending on the lower DIFs actually trasversed, it can happen
- *       that some of the header space is left unused, but the worst case
- *       is covered in any case.
+ *   (2) To compute the maximum SDU size allowed at each IPCP in the local
+ *       system, taking into account the EFCP headers that needs to be
+ *       pushed by the normal IPCPs. Depending on the lower DIFs actually
+ *       trasversed by each packet, it can happen that some of the reserved
+ *       header space is left unused, but the worst case is covered in any
+ *       case.
  */
 
 static void
@@ -662,6 +625,20 @@ visit(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
+    int hdrlen = 32; /* temporarily hardcoded, see struct rina_pci */
+
+    pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
+
+        ipn->marked = 0;
+        ipn->depth = 0;
+        ipn->mss_computed = 0;
+        if (uipcp) {
+            ipn->max_sdu_size = uipcp->max_sdu_size;
+        }
+    }
+    pthread_mutex_unlock(&uipcps->lock);
 
     for (;;) {
         struct ipcp_node *next = NULL;
@@ -697,13 +674,20 @@ visit(struct uipcps *uipcps)
         }
 
         /* Mark (visit) the node, appling the relaxation rule to
-         * maximize depth. */
-        next->marked = 1;
+         * maximize depth and minimize max_sdu_size. */
+        ipn->marked = 1;
 
         list_for_each_entry(e, nexts, node) {
-            if (e->ipcp->depth < next->depth + 1) {
-                e->ipcp->depth = next->depth + 1;
+            if (e->ipcp->depth < ipn->depth + 1) {
+                e->ipcp->depth = ipn->depth + 1;
             }
+            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - hdrlen) {
+                e->ipcp->max_sdu_size = ipn->max_sdu_size - hdrlen;
+                if (e->ipcp->max_sdu_size < 0) {
+                    e->ipcp->max_sdu_size = 0;
+                }
+            }
+            e->ipcp->mss_computed = 1;
         }
     }
 }
@@ -722,10 +706,24 @@ uipcps_update_depths(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "depth",
-                                    strbuf);
+        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "depth", strbuf);
         if (ret) {
             PE("'ipcp-config depth %u' failed\n", ipn->depth);
+        }
+
+        if (!ipn->mss_computed) {
+            continue;
+        }
+
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->max_sdu_size);
+        if (ret <= 0 || ret >= sizeof(strbuf)) {
+            PE("Impossible mss %u\n", ipn->max_sdu_size);
+            continue;
+        }
+
+        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "mss", strbuf);
+        if (ret) {
+            PE("'ipcp-config mss %u' failed\n", ipn->max_sdu_size);
         }
     }
 
@@ -738,17 +736,11 @@ uipcps_compute_depths(struct uipcps *uipcps)
     struct ipcp_node *ipn;
     struct flow_edge *e;
 
-    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        ipn->marked = 0;
-        ipn->depth = 0;
-        ipn->max_sdu_size = 0;
-    }
-
     visit(uipcps);
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        PV_S("NODE %u, depth = %u\n", ipn->id,
-             ipn->depth);
+        PV_S("NODE %u, mss = %u\n", ipn->id,
+             ipn->max_sdu_size);
         PV_S("    uppers = [");
         list_for_each_entry(e, &ipn->uppers, node) {
             PV_S("%u, ", e->ipcp->id);
@@ -767,7 +759,7 @@ uipcps_compute_depths(struct uipcps *uipcps)
 }
 
 static struct ipcp_node *
-uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
+uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 {
     struct ipcp_node *ipn;
 
@@ -775,6 +767,10 @@ uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         if (ipn->id == ipcp_id) {
             return ipn;
         }
+    }
+
+    if (!create) {
+        return NULL;
     }
 
     ipn = malloc(sizeof(*ipn));
@@ -857,7 +853,7 @@ flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
         }
     }
 
-    PE("Cannot find neigh %u for ipcp %u\n", neigh->id, ipcp->id);
+    PE("Cannot find neigh %u for node %u\n", neigh->id, ipcp->id);
 
     return -1;
 }
@@ -866,8 +862,8 @@ int
 uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
                         unsigned int lower_id)
 {
-    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
-    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id);
+    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id, 1);
+    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id, 1);
 
     if (!upper || !lower) {
         return -1;
@@ -881,7 +877,7 @@ uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
     }
 
     PD("Added flow (%d -> %d)\n", upper_id, lower_id);
-
+    /* Graph changed, recompute. */
     uipcps_compute_depths(uipcps);
 
     return 0;
@@ -891,11 +887,16 @@ int
 uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
                          unsigned int lower_id)
 {
-    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id);
-    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id);
+    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id, 0);
+    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id, 0);
 
     if (lower == NULL) {
-        PE("Could not find uipcp %u\n", lower_id);
+        PE("Could not find node %u\n", lower_id);
+        return -1;
+    }
+
+    if (upper == NULL) {
+        PE("Could not find node %u\n", upper_id);
         return -1;
     }
 
@@ -906,7 +907,66 @@ uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
     uipcps_node_put(uipcps, lower);
 
     PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
+    /* Graph changed, recompute. */
+    uipcps_compute_depths(uipcps);
 
+    return 0;
+}
+
+/* Called on IPCP attributes update. */
+int
+uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
+{
+    struct ipcp_node *node;
+    struct uipcp *uipcp;
+    int mss_changed;
+
+    pthread_mutex_lock(&uipcps->lock);
+    uipcp = uipcp_lookup(uipcps, upd->ipcp_id);
+    if (!uipcp) {
+        pthread_mutex_unlock(&uipcps->lock);
+        /* A shim IPCP. */
+        return 0;
+    }
+
+    uipcp->refcnt ++;
+
+    if (uipcp->dif_type) free(uipcp->dif_type);
+    if (uipcp->name) free(uipcp->name);
+    if (uipcp->dif_name) free(uipcp->dif_name);
+
+    uipcp->id = upd->ipcp_id;
+    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
+    uipcp->depth = upd->depth;
+    mss_changed = (uipcp->max_sdu_size != upd->max_sdu_size);
+    uipcp->max_sdu_size = upd->max_sdu_size;
+    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
+    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
+
+    pthread_mutex_unlock(&uipcps->lock);
+
+    /* Address may have changed, notify the IPCP. */
+    if (uipcp->ops.update_address) {
+        uipcp->ops.update_address(uipcp, upd->ipcp_addr);
+    }
+
+    uipcp_put(uipcp, 1);
+
+    if (!mss_changed) {
+        return 0;
+    }
+
+    node = uipcps_node_get(uipcps, upd->ipcp_id, 1);
+    if (!node) {
+        return 0;
+    }
+    if (node->mss_computed) {
+        /* mss changed, but this is just a consequence of the
+         * previous topological ordering computation. */
+        return 0;
+    }
+
+    /* A mss was updated, restart topological ordering. */
     uipcps_compute_depths(uipcps);
 
     return 0;

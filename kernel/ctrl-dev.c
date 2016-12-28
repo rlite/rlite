@@ -1540,6 +1540,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rl_kmsg_ipcp_config *req =
                     (struct rl_kmsg_ipcp_config *)bmsg;
     struct ipcp_entry *entry;
+    int notify = 0;
     int ret;
 
     if (!req->name || !req->value) {
@@ -1557,7 +1558,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* Check if the IPCP knows how to change this paramter. */
     mutex_lock(&entry->lock);
     if (entry->ops.config) {
-        ret = entry->ops.config(entry, req->name, req->value);
+        ret = entry->ops.config(entry, req->name, req->value, &notify);
     }
     mutex_unlock(&entry->lock);
 
@@ -1578,6 +1579,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             ret = kstrtou32(req->value, 10, &max_sdu_size);
             if (ret == 0) {
                 entry->max_sdu_size = max_sdu_size;
+                notify = 1;
             }
         } else {
             ret = -EINVAL; /* unknown request */
@@ -1590,8 +1592,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         PI("Configured IPC process %u: %s <= %s\n",
                 req->ipcp_id, req->name, req->value);
 
-        if (strcmp(req->name, "address") == 0 ||
-                strcmp(req->name, "mss") == 0) {
+        if (notify) {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
             ipcp_update_all(req->ipcp_id, RLITE_UPDATE_UPD);

@@ -894,9 +894,8 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rl_shim_eth_config(struct ipcp_entry *ipcp,
-                   const char *param_name,
-                   const char *param_value)
+rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
+                   const char *param_value, int *notify)
 {
     struct rl_shim_eth *priv = (struct rl_shim_eth *)ipcp->priv;
     int ret = -ENOSYS;
@@ -953,6 +952,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp,
         /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
          * changed; we should intercept those changes, reflect the change
          * in the ipcp_entry and notify userspace. */
+        *notify = (ipcp->max_sdu_size != priv->netdev->mtu);
         ipcp->max_sdu_size = priv->netdev->mtu;
 
         PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
@@ -960,6 +960,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp,
 
     } else if (strcmp(param_name, "mss") == 0) {
         /* Deny changes to max_sdu_size (and update). */
+        *notify = (ipcp->max_sdu_size != priv->netdev->mtu);
         ipcp->max_sdu_size = priv->netdev->mtu;
         return -EPERM;
     }

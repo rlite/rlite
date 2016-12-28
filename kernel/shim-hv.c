@@ -248,9 +248,8 @@ rl_shim_hv_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rl_shim_hv_config(struct ipcp_entry *ipcp,
-                    const char *param_name,
-                    const char *param_value)
+rl_shim_hv_config(struct ipcp_entry *ipcp, const char *param_name,
+                  const char *param_value, int *notify)
 {
     struct rl_shim_hv *priv = (struct rl_shim_hv *)ipcp->priv;
     int ret = -ENOSYS;

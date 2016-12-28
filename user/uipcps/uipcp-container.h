@@ -137,7 +137,8 @@ struct ipcp_node {
     unsigned int marked;
     unsigned int depth;
     unsigned int refcnt;
-    unsigned int max_sdu_size;
+    unsigned int mss_computed;
+    int max_sdu_size;
 
     struct list_head lowers;
     struct list_head uppers;

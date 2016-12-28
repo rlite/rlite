@@ -257,7 +257,7 @@ struct ipcp_ops {
                      struct rl_buf *rb, bool maysleep);
     int (*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
-                  const char *param_value);
+                  const char *param_value, int *notify);
     int (*pduft_set)(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);

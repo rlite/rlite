@@ -449,9 +449,8 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
 }
 
 static int
-rl_shim_udp4_config(struct ipcp_entry *ipcp,
-                    const char *param_name,
-                    const char *param_value)
+rl_shim_udp4_config(struct ipcp_entry *ipcp, const char *param_name,
+                    const char *param_value, int *notify)
 {
     if (strcmp(param_name, "mss") == 0) {
         return -EPERM; /* deny */
