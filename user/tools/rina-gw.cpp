@@ -161,13 +161,12 @@ struct Worker {
     void run();
 
 private:
-    int forward_data(int ifd, int ofd, char *buf, int max_sdu_size);
+    int forward_data(int ifd, int ofd, char *buf);
 };
 
 #define NUM_WORKERS     1
 #define MAX_FDS         16
-#define MAX_BUF_SIZE    65536
-#define MAX_SDU_SIZE    65536
+#define MAX_BUF_SIZE    1460
 
 struct Gateway {
     string appl_name;
@@ -265,9 +264,9 @@ Worker::drain_syncfd()
 }
 
 int
-Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
+Worker::forward_data(int ifd, int ofd, char *buf)
 {
-    int n = read(ifd, buf, max_sdu_size);
+    int n = read(ifd, buf, MAX_BUF_SIZE);
     int left = n;
     int ofs = 0;
     int m;
@@ -388,7 +387,7 @@ Worker::run()
 
             ofd = mit->second;
 
-            ret = forward_data(ifd, ofd, buf, MAX_SDU_SIZE);
+            ret = forward_data(ifd, ofd, buf);
             if (ret <= 0) {
                 /* Forwarding failed for some season, we have to close
                  * the session. */
@@ -496,7 +495,6 @@ parse_conf(const char *confname)
             }
 
             try {
-                int max_sdu_size = MAX_SDU_SIZE;
                 int port;
 
                 memset(&inet_addr, 0, sizeof(inet_addr));
@@ -516,17 +514,6 @@ parse_conf(const char *confname)
                        tokens[3].c_str());
                     continue;
                 }
-
-                if (tokens.size() >= 6) {
-                    max_sdu_size = atoi(tokens[5].c_str());
-                    if (max_sdu_size <= 0) {
-                        printf("Invalid SDU size --> using %d\n",
-                               MAX_SDU_SIZE);
-                        max_sdu_size = MAX_SDU_SIZE;
-                    }
-                }
-
-                (void)max_sdu_size;
 
                 InetName inet_name(inet_addr);
                 RinaName rina_name(tokens[2], tokens[1]);
