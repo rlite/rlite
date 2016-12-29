@@ -298,7 +298,7 @@ Worker::submit(int cfd, int rfd)
     pthread_mutex_unlock(&lock);
 
     if (verbose >= 1) {
-        printf("New mapping created %d <--> %d [entries %d %d]\n",
+        printf("New mapping created %d <--> %d [entries=%d,%d]\n",
                 cfd, rfd, nfds - 2, nfds - 1);
     }
 }
@@ -328,8 +328,8 @@ Worker::terminate(unsigned int i, int ret, int errcode)
         }
 
         cout << "w" << idx << ": Session " << fds[i].fd << " <--> "
-                << fds[j].fd << " closed " << how << " [entries" << i
-                << ", " << j << "]" <<endl;
+                << fds[j].fd << " closed " << how << " [entries=" << i
+                << "," << j << "]" <<endl;
     }
 
     /* fds entries are recovered at the beginning of the run() main loop */
@@ -355,19 +355,42 @@ Worker::run()
          * the entries of closed sessions. */
         pthread_mutex_lock(&lock);
         for (int i = 0; i < nfds; ) {
+            int j = i + 1; /* index of the mapped entry */
+
             if (fds[i].close) {
-                nfds --;
+                nfds -= 2;
                 if (i < nfds) {
-                    fds[i] = fds[nfds];
+                    fds[i] = fds[nfds-1];
+                    fds[j] = fds[nfds];
                     if (verbose >= 1) {
-                        printf("Recycled entry %d\n", i);
+                        printf("Recycled entries %d,%d\n", i, j);
                     }
                 }
                 continue;
             }
+
             pfds[i].fd = fds[i].fd;
-            pfds[i].events = POLLIN | POLLOUT;
-            i ++;
+            pfds[j].fd = fds[j].fd;
+            pfds[i].events = pfds[j].events = 0;
+
+            /* If there is pending data in the output buffer for entry i,
+             * request POLLOUT to flush that data. Otherwise request POLLIN
+             * on the mapped entry, but only if the mapped entry does not
+             * need to flush its own output buffer. */
+            if (fds[i].len) {
+                pfds[i].events = POLLOUT;
+            } else if (!fds[j].len) {
+                pfds[j].events = POLLIN;
+            }
+
+            /* Same logic for the mapped entry. */
+            if (fds[j].len) {
+                pfds[j].events = POLLOUT;
+            } else if (!fds[i].len) {
+                pfds[i].events = POLLIN;
+            }
+
+            i += 2;
         }
         pthread_mutex_unlock(&lock);
 
@@ -408,43 +431,42 @@ Worker::run()
         for (int i = 0, n = 0; n < nrdy; i ++) {
             int j;
 
-            if (pfds[i].revents) {
-                if (verbose >= 2) {
-                    printf("w%d: fd %d ready, events %d\n", idx,
-                            pfds[i].fd, pfds[i].revents);
-                }
-
-                /* Consume the events on this fd. */
-                n++;
-            }
-
-            if (!(pfds[i].revents & POLLOUT) || fds[i].close) {
-                /* No space to write on this fd, or the session has
+            if (!pfds[i].revents || fds[i].close) {
+                /* No events on this fd, or the session has
                  * been terminated by the mapped fd (in a previous
                  * iteration of this loop). Let's skip it. */
                 continue;
             }
 
+            if (verbose >= 2) {
+                printf("w%d: fd %d ready, events %d\n", idx,
+                        pfds[i].fd, pfds[i].revents);
+            }
+
+            /* Consume the events on this fd. */
+            n++;
+
             j = i ^ 0x1; /* index to the mapped fds entry */
 
-            if (!fds[i].len && (pfds[j].revents & POLLIN)) {
+            if (pfds[i].revents & POLLIN) {
                 int m;
 
-                /* The output buffer for entry i is empty and, there
-                 * is data to read from the mapped entry j. Load the
+                assert(fds[j].len == 0);
+                /* The output buffer for entry j is empty and, there
+                 * is data to read from the mapped entry i. Load the
                  * output buffer with this data. */
-                m = read(fds[j].fd, fds[i].data, MAX_BUF_SIZE);
+                m = read(fds[i].fd, fds[j].data, MAX_BUF_SIZE);
                 if (m <= 0) {
                     terminate(i, m, errno);
                 } else {
-                    fds[i].len = m;
-                    fds[i].ofs = 0;
+                    fds[j].len = m;
+                    fds[j].ofs = 0;
                 }
-            }
 
-            if (fds[i].len) {
+            } else if (pfds[i].revents & POLLOUT) {
                 int m;
 
+                assert(fds[i].len > 0);
                 /* There is data in the output buffer of entry i. Try to
                  * flush it. */
                 m = write(fds[i].fd, fds[i].data + fds[i].ofs, fds[i].len);
