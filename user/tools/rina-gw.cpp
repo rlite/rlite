@@ -143,30 +143,43 @@ RinaName::operator=(const RinaName& other)
     return *this;
 }
 
+#define NUM_WORKERS     1
+#define MAX_SESSIONS    16
+#define MAX_BUF_SIZE    1460
+
+struct Fd {
+    int fd;
+    int len;
+    int ofs;
+    char close;
+    char data[MAX_BUF_SIZE];
+
+    Fd(int _fd): fd(_fd), len(0), ofs(0), close(0) { }
+    Fd(): Fd(0) { }
+};
+
 struct Worker {
     pthread_t th;
     pthread_mutex_t lock;
     int syncfd;
     int idx;
 
-    /* Holds the active mappings between rlite file descriptors and
+    /* Holds the active mappings between rina file descriptors and
      * socket file descriptors. */
     map<int, int> fdmap;
+
+    struct Fd fds[MAX_SESSIONS * 2];
+    int nfds;
 
     Worker(int idx_);
     ~Worker();
 
     int repoll();
     int drain_syncfd();
+    void submit(int cfd, int rfd);
+    void terminate(unsigned int i, int ret, int errcode);
     void run();
-
-private:
-    int forward_data(int ifd, int ofd, char *buf);
 };
-
-#define NUM_WORKERS     1
-#define MAX_FDS         16
-#define MAX_BUF_SIZE    1460
 
 struct Gateway {
     string appl_name;
@@ -208,7 +221,7 @@ worker_function(void *opaque)
 }
 
 
-Worker::Worker(int idx_) : idx(idx_)
+Worker::Worker(int idx_) : idx(idx_), nfds(0)
 {
     syncfd = eventfd(0, 0);
     if (syncfd < 0) {
@@ -263,38 +276,70 @@ Worker::drain_syncfd()
     return 0;
 }
 
-int
-Worker::forward_data(int ifd, int ofd, char *buf)
+void
+Worker::submit(int cfd, int rfd)
 {
-    int n = read(ifd, buf, MAX_BUF_SIZE);
-    int left = n;
-    int ofs = 0;
-    int m;
+    pthread_mutex_lock(&lock);
 
-    if (n < 0) {
-        perror("read()");
-        return n;
+    if (nfds >= 2 * MAX_SESSIONS) {
+        pthread_mutex_unlock(&lock);
+        printf("too many sessions, shutting down %d <--> %d\n", cfd, rfd);
+        close(cfd);
+        close(rfd);
+        return;
     }
 
-    while (left) {
-        m = write(ofd, buf + ofs, left);
-        if (m < 0) {
-            perror("write()");
-            return m;
+    /* Add the new mapping. The converse would be the same. */
+    fdmap[rfd] = cfd;
+    /* Append two entries in the fds array. */
+    fds[nfds ++] = Fd(rfd);
+    fds[nfds ++] = Fd(cfd);
+    repoll();
+    pthread_mutex_unlock(&lock);
+
+    if (verbose >= 1) {
+        printf("New mapping created %d <--> %d [entries %d %d]\n",
+                cfd, rfd, nfds - 2, nfds - 1);
+    }
+}
+
+/* Called under worker lock. */
+void
+Worker::terminate(unsigned int i, int ret, int errcode)
+{
+    unsigned j;
+    string how;
+
+    i &= ~(0x1);
+    j = i + 1;
+
+    close(fds[i].fd);
+    close(fds[j].fd);
+    fds[i].close = fds[j].close = 1;
+
+    assert(fdmap.find(fds[i].fd) != fdmap.end());
+    fdmap.erase(fds[i].fd);
+
+    if (verbose >= 1) {
+        if (ret == 0 || errcode == EPIPE) {
+            how = "normally";
+        } else {
+            how = "with errors";
         }
 
-        ofs += m;
-        left -= m;
+        cout << "w" << idx << ": Session " << fds[i].fd << " <--> "
+                << fds[j].fd << " closed " << how << " [entries" << i
+                << ", " << j << "]" <<endl;
     }
 
-    return n;
+    /* fds entries are recovered at the beginning of the run() main loop */
 }
 
 void
 Worker::run()
 {
-    struct pollfd pollfds[1 + MAX_FDS];
-    char buf[MAX_BUF_SIZE];
+    struct pollfd pollfds[1 + MAX_SESSIONS * 2];
+    struct pollfd *pfds = pollfds + 1;
 
     if (verbose >= 1) {
         printf("w%d starts\n", idx);
@@ -302,24 +347,34 @@ Worker::run()
 
     for (;;) {
         int nrdy;
-        int nfds = 1;
 
-        pollfds[0].fd = syncfd;
-        pollfds[0].events = POLLIN;
+        pfds[-1].fd = syncfd;
+        pfds[-1].events = POLLIN;
 
-        /* Load the poll array with the active fd mappings. */
+        /* Load the poll array with the active fd mappings, also recycling
+         * the entries of closed sessions. */
         pthread_mutex_lock(&lock);
-        for (map<int, int>::iterator mit = fdmap.begin();
-                                mit != fdmap.end(); mit++, nfds++) {
-            pollfds[nfds].fd = mit->first;
-            pollfds[nfds].events = POLLIN; /* | POLLOUT; */
+        for (int i = 0; i < nfds; ) {
+            if (fds[i].close) {
+                nfds --;
+                if (i < nfds) {
+                    fds[i] = fds[nfds];
+                    if (verbose >= 1) {
+                        printf("Recycled entry %d\n", i);
+                    }
+                }
+                continue;
+            }
+            pfds[i].fd = fds[i].fd;
+            pfds[i].events = POLLIN | POLLOUT;
+            i ++;
         }
         pthread_mutex_unlock(&lock);
 
         if (verbose >= 2) {
-            printf("w%d polls %d file descriptors\n", idx, nfds);
+            printf("w%d polls %d file descriptors\n", idx, nfds + 1);
         }
-        nrdy = poll(pollfds, nfds, -1);
+        nrdy = poll(pollfds, nfds + 1, -1);
         if (nrdy < 0) {
             perror("poll()");
             break;
@@ -329,10 +384,10 @@ Worker::run()
             continue;
         }
 
-        if (pollfds[0].revents) {
+        if (pfds[-1].revents) {
             /* We've been requested to repoll the queue. */
             nrdy--;
-            if (pollfds[0].revents & POLLIN) {
+            if (pfds[-1].revents & POLLIN) {
                 if (verbose >= 2) {
                     printf("w%d: Mappings changed, rebuilding poll array\n", idx);
                 }
@@ -342,7 +397,7 @@ Worker::run()
 
             } else {
                 printf("w%d: Error event %d on syncfd\n", idx,
-                   pollfds[0].revents);
+                   pfds[-1].revents);
             }
 
             continue;
@@ -350,70 +405,58 @@ Worker::run()
 
         pthread_mutex_lock(&lock);
 
-        for (int i=1, j=0; j<nrdy; i++) {
-            int ifd = pollfds[i].fd;
-            map<int, int>::iterator mit;
-            int ofd, ret;
+        for (int i = 0, n = 0; n < nrdy; i ++) {
+            int j;
 
-            if (!pollfds[i].revents) {
-                /* No events on this fd, let's skip it. */
-                continue;
-            }
-
-            /* Consume the events on this fd. */
-            j++;
-
-            if (verbose >= 2) {
-                printf("w%d: fd %d ready, events %d\n", idx, pollfds[i].fd,
-                                                        pollfds[i].revents);
-            }
-
-            if (!(pollfds[i].revents & POLLIN)) {
-                /* No read event, so forwarding cannot happen, let's
-                 * skip it. */
-                continue;
-            }
-
-            /* A safe lookup is necessary, since the mapping could have
-             * disappeared in a previous iteration of this loop. */
-            mit = fdmap.find(ifd);
-            if (mit == fdmap.end()) {
+            if (pfds[i].revents) {
                 if (verbose >= 2) {
-                    printf("w%d: fd %d just disappeared from the map\n",
-                           idx, ifd);
+                    printf("w%d: fd %d ready, events %d\n", idx,
+                            pfds[i].fd, pfds[i].revents);
                 }
+
+                /* Consume the events on this fd. */
+                n++;
+            }
+
+            if (!(pfds[i].revents & POLLOUT) || fds[i].close) {
+                /* No space to write on this fd, or the session has
+                 * been terminated by the mapped fd (in a previous
+                 * iteration of this loop). Let's skip it. */
                 continue;
             }
 
-            ofd = mit->second;
+            j = i ^ 0x1; /* index to the mapped fds entry */
 
-            ret = forward_data(ifd, ofd, buf);
-            if (ret <= 0) {
-                /* Forwarding failed for some season, we have to close
-                 * the session. */
-                if (ret == 0 || errno == EPIPE) {
-                    if (verbose >= 1) {
-                        printf("w%d: Session %d <--> %d closed normally\n",
-                                idx, ifd, ofd);
-                    }
+            if (!fds[i].len && (pfds[j].revents & POLLIN)) {
+                int m;
 
+                /* The output buffer for entry i is empty and, there
+                 * is data to read from the mapped entry j. Load the
+                 * output buffer with this data. */
+                m = read(fds[j].fd, fds[i].data, MAX_BUF_SIZE);
+                if (m <= 0) {
+                    terminate(i, m, errno);
                 } else {
-                    if (verbose >= 1) {
-                        printf("w%d: Session %d <--> %d closed with errors\n",
-                                idx, ifd, ofd);
-                    }
+                    fds[i].len = m;
+                    fds[i].ofs = 0;
                 }
+            }
 
-                close(ifd);
-                close(ofd);
-                fdmap.erase(mit);
-                mit = fdmap.find(ofd);
-                assert(mit != fdmap.end());
-                fdmap.erase(mit);
+            if (fds[i].len) {
+                int m;
 
-            } else if (verbose) {
-                if (verbose >= 2) {
-                    printf("Forwarded %d bytes %d --> %d\n", ret, ifd, ofd);
+                /* There is data in the output buffer of entry i. Try to
+                 * flush it. */
+                m = write(fds[i].fd, fds[i].data + fds[i].ofs, fds[i].len);
+                if (m <= 0) {
+                    terminate(i, m, errno);
+                } else {
+                    fds[i].ofs += m;
+                    fds[i].len -= m;
+                    if (verbose >= 2) {
+                        printf("Forwarded %d bytes %d --> %d\n", m,
+                               fds[j].fd, fds[i].fd);
+                    }
                 }
             }
         }
@@ -538,22 +581,6 @@ parse_conf(const char *confname)
     return 0;
 }
 
-static void
-submit_to_worker(int cfd, int rfd)
-{
-    Worker *w = gw->workers[0];
-
-    pthread_mutex_lock(&w->lock);
-    w->fdmap[cfd] = rfd;
-    w->fdmap[rfd] = cfd;
-    w->repoll();
-    pthread_mutex_unlock(&w->lock);
-
-    if (verbose >= 1) {
-        printf("New mapping created %d <--> %d\n", cfd, rfd);
-    }
-}
-
 static int
 accept_rina_flow(int fd, const InetName &inet)
 {
@@ -588,7 +615,7 @@ accept_rina_flow(int fd, const InetName &inet)
     }
 
     if (ret == 0) {
-        submit_to_worker(cfd, rfd);
+        gw->workers[0]->submit(cfd, rfd);
         return 0;
     }
 
@@ -658,7 +685,7 @@ complete_flow_alloc(int wfd, int cfd)
     }
 
     set_nonblocking(rfd);
-    submit_to_worker(cfd, rfd);
+    gw->workers[0]->submit(cfd, rfd);
 }
 
 static int
@@ -883,7 +910,7 @@ int main(int argc, char **argv)
                             mit != gw->pending_conns.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLOUT) {
                 /* TCP connection handshake completed. */
-                submit_to_worker(mit->first, mit->second);
+                gw->workers[0]->submit(mit->first, mit->second);
                 completed_conns.push_back(mit->first);
             }
         }
