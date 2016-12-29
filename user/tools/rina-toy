@@ -88,11 +88,14 @@ class RinaRRTool:
             return ret
 
         while 1:
-            fd = rlite.flow_accept(self.cfd, None, None, 0)
+            spec = rlite.flow_spec()
+            fd = rlite.flow_accept(self.cfd, None, spec, 0)
             if fd < 0:
                 continue
 
-            if args.stream:
+            print('Accepted flow, msg_boundaries %s' % (spec.msg_boundaries,))
+
+            if not spec.msg_boundaries:
                 # server sends a large file to the client
                 left = 500000000 # about 500 MB
                 chunk = 31000
@@ -151,7 +154,7 @@ try:
     if args.stream:
         rr.flow_spec.max_sdu_gap = 0
         rr.flow_spec.in_order_delivery = 1
-        rr.flow_spec.msg_boundaries = 1
+        rr.flow_spec.msg_boundaries = 0
         rr.flow_spec.spare3 = 1
 
     if args.server_mode:
