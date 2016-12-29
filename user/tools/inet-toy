@@ -87,9 +87,9 @@ def client(args):
             tot = 0
             while 1:
                 data = sock.recv(4096)
-                tot += len(data)
                 if not data:
                     break
+                tot += len(data)
             print('received %d bytes' % (tot,))
 
         else:
