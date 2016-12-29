@@ -268,29 +268,24 @@ int
 Worker::forward_data(int ifd, int ofd, char *buf, int max_sdu_size)
 {
     int n = read(ifd, buf, max_sdu_size);
+    int left = n;
+    int ofs = 0;
     int m;
 
-    if (n > 0) {
-        m = write(ofd, buf, n);
-        if (m != n) {
-            if (m < 0) {
-                perror("write()");
-                return m;
-
-            } else {
-                printf("Partial write %d/%d\n", m, n);
-                return -1;
-            }
-        }
-
-    } else if (n < 0) {
+    if (n < 0) {
         perror("read()");
         return n;
+    }
 
-    } else {
-        if (verbose >= 2) {
-            printf("Read 0 bytes from %d\n", ifd);
+    while (left) {
+        m = write(ofd, buf + ofs, left);
+        if (m < 0) {
+            perror("write()");
+            return m;
         }
+
+        ofs += m;
+        left -= m;
     }
 
     return n;
