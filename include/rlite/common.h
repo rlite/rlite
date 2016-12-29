@@ -198,13 +198,13 @@ struct rl_flow_config {
 static inline int
 rina_flow_spec_fc_get(const struct rina_flow_spec *spec)
 {
-    return spec->reserved[35] != 0;
+    return spec->spare3 != 0;
 }
 
 static inline void
 rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
 {
-    spec->reserved[35] = value;
+    spec->spare3 = value;
 }
 
 /* Does a flow specification correspond to best effort QoS? */

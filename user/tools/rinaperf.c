@@ -829,7 +829,7 @@ main(int argc, char **argv)
                 break;
 
             case 'f': /* Enable flow control. */
-                rp.flowspec.reserved[35] = 1;
+                rp.flowspec.spare3 = 1;
                 break;
 
             case 'b':
