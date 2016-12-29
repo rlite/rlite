@@ -42,7 +42,7 @@ struct rina_flow_spec {
     uint8_t in_order_delivery;  /* boolean */
     uint8_t msg_boundaries;     /* boolean */
 
-    uint8_t reserved[36];       /* for future use */
+    char reserved[36];       /* for future use */
 };
 
 #define RINA_F_NOWAIT       (1 << 0)
