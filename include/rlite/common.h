@@ -171,8 +171,7 @@ struct dtcp_config {
 
 struct rl_flow_config {
     /* Used by normal IPCP. */
-    uint8_t partial_delivery;
-    uint8_t incomplete_delivery;
+    uint8_t msg_boundaries;
     uint8_t in_order_delivery;
     rl_seq_t max_sdu_gap;
     uint8_t dtcp_present;
@@ -199,13 +198,13 @@ struct rl_flow_config {
 static inline int
 rina_flow_spec_fc_get(const struct rina_flow_spec *spec)
 {
-    return spec->reserved[36] != 0;
+    return spec->reserved[35] != 0;
 }
 
 static inline void
 rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
 {
-    spec->reserved[36] = value;
+    spec->reserved[35] = value;
 }
 
 /* Does a flow specification correspond to best effort QoS? */

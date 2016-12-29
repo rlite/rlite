@@ -334,9 +334,13 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         ulen -= sizeof(mhdr);
 
     } else if (unlikely(ulen > ipcp->max_sdu_size)) {
-        /* This path should only be taken if QoS does not specify
-         * message boundaries. Message boundaries should be managed
-         * by EFCP fragmentation and reassembly. */
+        if (flow->cfg.msg_boundaries) {
+            /* We cannot split the write(): message boundaries needs to be
+             * managed by EFCP fragmentation and reassembly. */
+            return -EMSGSIZE;
+        }
+
+        /* QoS does not require message boundaries, we can split. */
         return splitted_sdu_write(f, ubuf, ulen, ppos, ipcp->max_sdu_size);
     }
 

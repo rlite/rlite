@@ -340,9 +340,8 @@ uipcp_rib::dump() const
             const struct rl_flow_config& c = i->second;
 
             ss << i->first.c_str() << ": {" << endl;
-            ss << "   partial_delivery=" << u82boolstr(c.partial_delivery)
-                << endl << "   incomplete_delivery=" <<
-                u82boolstr(c.incomplete_delivery) << endl <<
+            ss << "   msg_boundaries=" << u82boolstr(c.msg_boundaries)
+                << endl <<
                 "   in_order_delivery=" << u82boolstr(c.in_order_delivery)
                 << endl << "   max_sdu_gap=" <<
                 static_cast<unsigned long long>(c.max_sdu_gap) << endl

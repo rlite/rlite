@@ -150,7 +150,7 @@ struct QosSpec : public UipcpObject {
     uint64_t peak_bw_duration;
     uint64_t peak_sdu_bw_duration;
     double undetected_bit_error_rate;
-    bool partial_delivery;
+    bool partial_delivery; /* carries msg_boundaries */
     bool in_order_delivery;
     int32_t max_sdu_gap;
     uint32_t delay;

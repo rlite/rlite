@@ -140,6 +140,7 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 
     spec->max_sdu_gap = cfg->max_sdu_gap;
     spec->in_order_delivery = cfg->in_order_delivery;
+    spec->msg_boundaries = cfg->msg_boundaries;
     spec->avg_bandwidth = cfg->dtcp.bandwidth;
 
     if (cfg->dtcp.flow_control) {

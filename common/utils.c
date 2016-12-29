@@ -671,8 +671,7 @@ flow_config_dump(const struct rl_flow_config *c)
     }
 
     COMMON_PRINT("Flow configuration:\n"
-                "   partial_delivery=%u\n"
-                "   incomplete_delivery=%u\n"
+                "   msg_boundaries=%u\n"
                 "   in_order_delivery=%u\n"
                 "   max_sdu_gap=%llu\n"
                 "   dtcp_present=%u\n"
@@ -680,8 +679,7 @@ flow_config_dump(const struct rl_flow_config *c)
                 "   dtcp.bandwidth=%u\n"
                 "   dtcp.flow_control=%u\n"
                 "   dtcp.rtx_control=%u\n",
-                c->partial_delivery,
-                c->incomplete_delivery,
+                c->msg_boundaries,
                 c->in_order_delivery,
                 (long long unsigned)c->max_sdu_gap,
                 c->dtcp_present,
@@ -720,6 +718,7 @@ rl_flow_spec_default(struct rina_flow_spec *spec)
     spec->max_delay = 0;            /* don't care about delay */
     spec->max_jitter = 0;           /* don't care about jitter */
     spec->in_order_delivery = 0;    /* don't require that */
+    spec->msg_boundaries = 1;       /* UDP-like */
     rina_flow_spec_fc_set(spec, 0); /* no flow control */
 }
 COMMON_EXPORT(rl_flow_spec_default);

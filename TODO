@@ -16,5 +16,3 @@
     - the only missing thing is to actually use the N-flow and not the N-1
 
 - periodic DFT synchronization
-
-- add "preserve message boundary" to the QoS

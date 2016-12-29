@@ -35,8 +35,7 @@ static void
 flowcfg2policies(const struct rl_flow_config *cfg,
                  QosSpec &q, ConnPolicies& p)
 {
-    q.partial_delivery = cfg->partial_delivery;
-    /* req->flowcfg.incomplete_delivery ? */
+    q.partial_delivery = !cfg->msg_boundaries;
     q.in_order_delivery = cfg->in_order_delivery;
     q.max_sdu_gap = cfg->max_sdu_gap;
     q.avg_bw = cfg->dtcp.bandwidth;
@@ -75,7 +74,7 @@ static void
 policies2flowcfg(struct rl_flow_config *cfg,
                  const QosSpec &q, const ConnPolicies& p)
 {
-    cfg->partial_delivery = q.partial_delivery;
+    cfg->msg_boundaries = !q.partial_delivery;
     cfg->in_order_delivery = q.in_order_delivery;
     cfg->max_sdu_gap = q.max_sdu_gap;
     cfg->dtcp.bandwidth = q.avg_bw;
@@ -117,6 +116,7 @@ flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 
     cfg->max_sdu_gap = spec->max_sdu_gap;
     cfg->in_order_delivery = spec->in_order_delivery;
+    cfg->msg_boundaries = spec->msg_boundaries;
     cfg->dtcp.bandwidth = spec->avg_bandwidth;
 
     if (spec->max_sdu_gap == 0) {

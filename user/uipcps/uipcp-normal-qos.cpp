@@ -84,13 +84,8 @@ update_qos_cube(struct rl_flow_config& flowcfg, const string& param,
 {
     int field_int;
 
-    if (!parse_flowcfg_bool(param, value, &flowcfg.partial_delivery,
-                                            "partial_delivery")) {
-        return 0;
-    }
-
-    if (!parse_flowcfg_bool(param, value, &flowcfg.incomplete_delivery,
-                                            "incomplete_delivery")) {
+    if (!parse_flowcfg_bool(param, value, &flowcfg.msg_boundaries,
+                                            "msg_boundaries")) {
         return 0;
     }
 
