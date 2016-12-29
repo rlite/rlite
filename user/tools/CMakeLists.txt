@@ -12,4 +12,4 @@ target_link_libraries(rina-gw rlite ${CMAKE_THREAD_LIBS_INIT})
  # Installation directives
 install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async DESTINATION usr/bin)
 install(FILES rina-gw.conf DESTINATION etc/rlite)
-install(PROGRAMS inet-echo rina-echo DESTINATION usr/bin)
+install(PROGRAMS inet-toy rina-toy DESTINATION usr/bin)

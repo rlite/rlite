@@ -40,22 +40,31 @@ def server(args):
 
     while True:
         # Wait for a connection
-        print(sys.stderr, 'waiting for a connection')
+        print('waiting for a connection')
         connection, client_address = sock.accept()
 
+        print('connection from', client_address)
         try:
-            print('connection from', client_address)
+            if args.stream:
+                # server sends a large file to the client
+                left = 500000000 # about 500 MB
+                chunk = 31000
+                buf = bytearray(chunk)
+                while left:
+                    if left < chunk:
+                        buf = bytearray(left)
+                    n = connection.send(buf)
+                    left -= n
+            else:
+                # echo: Receive the data in chunks and retransmit it
+                while True:
+                    data = socket_recv_string(connection)
+                    if not data:
+                        break
 
-            # Receive the data in small chunks and retransmit it
-            while True:
-                data = socket_recv_string(connection)
-                if not data:
-                    print('no more data from', client_address)
-                    break
-
-                print('received "%s"' % data)
-                print('sending data back to the client')
-                socket_send_string(connection, data)
+                    print('received "%s"' % data)
+                    print('sending data back to the client')
+                    socket_send_string(connection, data)
 
         finally:
             # Clean up the connection
@@ -73,19 +82,30 @@ def client(args):
 
     try:
 
-        # Send data
-        message = 'Hello guys, this is a test message!'
-        print('sending "%s"' % message)
-        socket_send_string(sock, message)
+        if args.stream:
+            # Download a large file from server
+            tot = 0
+            while 1:
+                data = sock.recv(4096)
+                tot += len(data)
+                if not data:
+                    break
+            print('received %d bytes' % (tot,))
 
-        # Look for the response
-        amount_received = 0
-        amount_expected = len(message)
+        else:
+            # echo: send data
+            message = 'Hello guys, this is a test message!'
+            print('sending "%s"' % message)
+            socket_send_string(sock, message)
 
-        while amount_received < amount_expected:
-            data = socket_recv_string(sock)
-            amount_received += len(data)
-            print('received "%s"' % data)
+            # Look for the response
+            amount_received = 0
+            amount_expected = len(message)
+
+            while amount_received < amount_expected:
+                data = socket_recv_string(sock)
+                amount_received += len(data)
+                print('received "%s"' % data)
 
     finally:
         print('closing socket')
@@ -109,6 +129,8 @@ argparser.add_argument('-p', '--port',
 argparser.add_argument('-l', '--listen', dest = 'server_mode',
                        action='store_true',
                        help = "Run in server mode")
+argparser.add_argument('-S', '--stream', action='store_true',
+                       help = "Run in stream download mode")
 
 args = argparser.parse_args()
 
@@ -118,7 +140,4 @@ try:
     else:
         client(args)
 except KeyboardInterrupt:
-    pass
-except:
-    print("Uncaught exception. Bye.")
     pass
