@@ -930,7 +930,6 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     struct dtp *dtp;
     struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
-    unsigned long postpone = 0;
 
     if (unlikely(!entry)) {
         return NULL;
@@ -950,18 +949,19 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     ipcp = entry->txrx.ipcp;
     upper_ipcp = entry->upper.ipcp;
 
-    if (entry->cfg.dtcp_present && !maysleep) {
-        /* If DTCP is present, check if we should postopone flow
-         * removal. We check mauusleep to make sure
-         * that this flow_entry() invocation is not due to a postponed
-         * removal, so that we avoid postponing forever. */
+    entry->flags |= RL_FLOW_DEALLOCATED;
 
+    /* We postpone flow removal, at least for MPL, and also allow
+     * cwq and rtxq to be drained. We check the flag
+     * to make sure that this flow_entry() invocation is not due to a
+     * postponed removal, so that we avoid postponing forever. */
+    if (!(entry->flags & RL_FLOW_DEL_POSTPONED)) {
+        entry->flags |= RL_FLOW_DEL_POSTPONED;
         spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
-            PD("Flow removal postponed since cwq contains "
+            PD("Flow removal postponed, cwq contains "
                     "%u PDUs and rtxq contains %u PDUs\n",
                     dtp->cwq_len, dtp->rtxq_len);
-            postpone = 2 * HZ;
 
             /* No one can write or read from this flow anymore, so there
              * is no reason to have the inactivity timer running. */
@@ -969,10 +969,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
             del_timer(&dtp->rcv_inact_tmr);
         }
         spin_unlock_bh(&dtp->lock);
-    }
 
-    if (!maysleep) {
-        schedule_delayed_work(&entry->remove, postpone);
+        schedule_delayed_work(&entry->remove, 10 * HZ);
         /* Reference counter is zero here, but since the delayed
          * worker is going to use the flow, we reset the reference
          * counter to 1. The delayed worker will invoke flow_put()
@@ -982,6 +980,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         FUNLOCK();
         return entry;
     }
+
+    BUG_ON(!maysleep);
 
     if (ipcp->ops.flow_deallocated) {
         ipcp->ops.flow_deallocated(ipcp, entry);

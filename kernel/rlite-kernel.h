@@ -427,6 +427,7 @@ struct flow_entry {
 #define RL_FLOW_PENDING         (1 << 1) /* flow allocation is pending */
 #define RL_FLOW_ALLOCATED       (1 << 2) /* flow has been allocated */
 #define RL_FLOW_DEALLOCATED     (1 << 3) /* flow has been deallocated */
+#define RL_FLOW_DEL_POSTPONED   (1 << 4) /* flow removal has been postponed */
     uint8_t             flags;
     struct hlist_node   node;
     struct hlist_node   node_cep;
