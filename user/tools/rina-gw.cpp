@@ -155,7 +155,7 @@ struct Fd {
     char data[MAX_BUF_SIZE];
 
     Fd(int _fd): fd(_fd), len(0), ofs(0), close(0) { }
-    Fd(): Fd(0) { }
+    Fd(): fd(0), len(0), ofs(0), close(0) { }
 };
 
 struct Worker {
