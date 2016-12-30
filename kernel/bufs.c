@@ -74,6 +74,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
         return NULL;
     }
 
+    BUG_ON(rb == NULL);
     /* Increment the raw buffer reference counter. */
     atomic_inc(&rb->raw->refcnt);
 
@@ -89,6 +90,11 @@ EXPORT_SYMBOL(rl_buf_clone);
 void
 rl_buf_free(struct rl_buf *rb)
 {
+    if (unlikely(!rb)) {
+        PI("warning: NULL rb\n");
+        return;
+    }
+
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
         kfree(rb->raw);
     }
