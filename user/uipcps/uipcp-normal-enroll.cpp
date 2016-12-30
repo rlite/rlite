@@ -25,6 +25,7 @@
 #include <cassert>
 #include <pthread.h>
 #include <poll.h>
+#include <errno.h>
 
 #include "uipcp-normal.hpp"
 #include <rlite/conf.h>
