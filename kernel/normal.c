@@ -329,7 +329,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     /* MPL + R + A */
     dtp->mpl_r_a = mpl + r + msecs_to_jiffies(flow->cfg.dtcp.initial_a);
-    PD("MPL+R+A = %u ms\n", jiffies_to_msecs(dtp->mpl_r_a));
+    PV("MPL+R+A = %u ms\n", jiffies_to_msecs(dtp->mpl_r_a));
 
     dtp->snd_inact_tmr.function = snd_inact_tmr_cb;
     dtp->snd_inact_tmr.data = (unsigned long)flow;

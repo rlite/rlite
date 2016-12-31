@@ -1220,7 +1220,7 @@ flow_make_mortal(struct flow_entry *flow)
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
         canceled = cancel_delayed_work(&flow->remove);
-        PD("cancel_delayed_work(%u) --> %d\n", flow->local_port, canceled);
+        PV("cancel_delayed_work(%u) --> %d\n", flow->local_port, canceled);
         BUG_ON(!canceled);
         flow->refcnt--;
     }
