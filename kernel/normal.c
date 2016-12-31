@@ -273,12 +273,12 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_unlock_bh(&dtp->lock);
 
-    /* Send PDUs popped out from RTX queue. Note that the rrbq list
-     * is not emptied and must not be used after the scan. */
+    /* Send PDUs popped out from RTX queue. */
     list_for_each_entry_safe(crb, tmp, &rrbq, node) {
         struct rina_pci *pci = RLITE_BUF_PCI(crb);
 
         RPD(2, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
+        list_del_init(&crb->node);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
 
@@ -1158,6 +1158,7 @@ out:
 
         NPD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
+        list_del_init(&qrb->node);
         rmt_tx(ipcp, pci->dst_addr, qrb, false);
     }
 
