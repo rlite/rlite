@@ -133,7 +133,7 @@ snd_inact_tmr_cb(long unsigned arg)
     dtp_snd_reset(flow);
 
     /* Flush the retransmission queue. */
-    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
+    PD("dropping %u PDUs from rtxq\n", dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);
@@ -141,7 +141,7 @@ snd_inact_tmr_cb(long unsigned arg)
     }
 
     /* Flush the closed window queue */
-    PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
+    PD("dropping %u PDUs from cwq\n", dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);
@@ -174,7 +174,7 @@ rcv_inact_tmr_cb(long unsigned arg)
     dtp_rcv_reset(flow);
 
     /* Flush sequencing queue. */
-    PD("%s: dropping %u PDUs from seqq\n", __func__, dtp->seqq_len);
+    PD("dropping %u PDUs from seqq\n", dtp->seqq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);

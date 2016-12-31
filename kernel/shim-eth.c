@@ -822,7 +822,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     int ret;
 
     if (unlikely(!entry)) {
-        RPD(2, "%s() called on deallocated entry\n", __func__);
+        RPD(2, "called on deallocated entry\n");
         return -ENXIO;
     }
 
