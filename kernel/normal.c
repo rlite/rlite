@@ -453,12 +453,15 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     for (;;) {
         current->state = TASK_INTERRUPTIBLE;
 
-        /* Push down to the underlying IPCP. */
+        /* Try to push the rb down to the lower IPCP. */
         ret = lower_ipcp->ops.sdu_write(lower_ipcp, lower_flow,
                                         rb, maysleep);
 
         if (ret == -EAGAIN) {
-
+            /* The lower IPCP cannot transmit it for the time being. If we
+             * can, we sleep waiting for the IPCP to become available
+             * again. Otherwise we try to enqueue the rb in an RMT queue.
+             */
             if (maysleep) {
                 if (signal_pending(current)) {
                     rl_buf_free(rb);
@@ -467,24 +470,28 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                     break;
                 }
 
-                /* No room to write, let's sleep. */
                 schedule();
                 continue;
 
-            } else {
-                /* Enqueue in the RMT queue, if possible. */
-
-                spin_lock_bh(&lower_ipcp->rmtq_lock);
-                if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
-                    rb->tx_compl_flow = lower_flow;
-                    list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
-                    lower_ipcp->rmtq_size += rl_buf_truesize(rb);
-                } else {
-                    RPD(2, "rmtq overrun: dropping PDU\n");
-                    rl_buf_free(rb);
-                }
-                spin_unlock_bh(&lower_ipcp->rmtq_lock);
             }
+
+            spin_lock_bh(&lower_ipcp->rmtq_lock);
+            if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
+                rb->tx_compl_flow = lower_flow;
+                list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
+                lower_ipcp->rmtq_size += rl_buf_truesize(rb);
+            } else {
+                /* No room in the RMT queue, we are forced to drop. */
+                RPD(2, "rmtq overrun: dropping PDU\n");
+                rl_buf_free(rb);
+            }
+            spin_unlock_bh(&lower_ipcp->rmtq_lock);
+            /* The rb was managed someway (queued or dropped),so  we must
+             * reset the error code. If we propagated the -EAGAIN, and we
+             * were recursively called by an upper rmt_tx(), also the upper
+             * rmt_tx() would try to put the same rb in its queue, which
+             * is a bug that would crash the system. */
+            ret = 0;
         }
 
         break;
