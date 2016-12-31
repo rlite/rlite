@@ -39,6 +39,7 @@ struct rl_flow {
     rl_port_t remote_port;
     rl_addr_t local_addr;
     rl_addr_t remote_addr;
+    struct rina_flow_spec spec;
 
     struct list_head node;
 };

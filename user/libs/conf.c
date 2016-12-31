@@ -166,6 +166,7 @@ flow_fetch_resp(struct list_head *flows,
     rl_flow->remote_port = resp->remote_port;
     rl_flow->local_addr = resp->local_addr;
     rl_flow->remote_addr = resp->remote_addr;
+    rl_flow->spec = resp->spec;
 
     /* Insert the flow into the list sorting by IPCP id first
      * and then by local port id. */
@@ -280,26 +281,39 @@ int
 rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
 {
     struct rl_flow *rl_flow;
+    char specinfo[16];
 
     PI_S("Flows table:\n");
     list_for_each_entry(rl_flow, flows, node) {
         struct rl_flow_stats stats;
         int ret;
+        int ofs = 0;
 
         ret = rl_conf_flow_get_stats(ctrl, rl_flow->local_port, &stats);
         if (ret) {
             continue;
         }
 
-        PI_S("  ipcp_id %u, local addr/port %llu:%u, "
-                "remote addr/port %llu:%u, "
+        memset(specinfo, '\0', sizeof(specinfo));
+        if (rl_flow->spec.spare3) {
+            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, "fc");
+        }
+        if (rl_flow->spec.max_sdu_gap == 0) {
+            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, " rtx");
+        }
+        if (ofs) {
+            ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, ", ");
+        }
+
+        PI_S("  ipcp %u, local addr/port %llu:%u, "
+                "remote addr/port %llu:%u, %s"
                 "tx %lu pkt %lu byte %lu err, "
                 "rx %lu pkt %lu byte %lu err\n",
                 rl_flow->ipcp_id,
                 (long long unsigned int)rl_flow->local_addr,
                 rl_flow->local_port,
                 (long long unsigned int)rl_flow->remote_addr,
-                rl_flow->remote_port,
+                rl_flow->remote_port, specinfo,
                 stats.tx_pkt, stats.tx_byte, stats.tx_err,
                 stats.rx_pkt, stats.rx_byte, stats.rx_err
                 );
