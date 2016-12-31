@@ -527,4 +527,10 @@ void dtp_dump(struct dtp *dtp);
 
 #define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(30000))
 
+#define list_add_tail_safe(e, h) \
+        do { \
+            BUG_ON(!list_empty(e)); \
+            list_add_tail(e, h); \
+        } while (0)
+
 #endif  /* __RLITE_KERNEL_H__ */

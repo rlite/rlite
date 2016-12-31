@@ -71,7 +71,7 @@ tx_completion_func(unsigned long arg)
         }
 
         rb = list_first_entry(&ipcp->rmtq, struct rl_buf, node);
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
@@ -84,7 +84,7 @@ tx_completion_func(unsigned long arg)
             PD("Pushing [%lu] back to rmtq\n",
                     (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
             spin_lock_bh(&ipcp->rmtq_lock);
-            list_add_tail(&rb->node, &ipcp->rmtq);
+            list_add_tail_safe(&rb->node, &ipcp->rmtq);
             ipcp->rmtq_size += rl_buf_truesize(rb);
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
@@ -162,7 +162,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 "overrun\n", (long unsigned)rb->len);
         rl_buf_free(rb);
     } else {
-        list_add_tail(&rb->node, &txrx->rx_q);
+        list_add_tail_safe(&rb->node, &txrx->rx_q);
         txrx->rx_qsize += rl_buf_truesize(rb);
     }
     spin_unlock_bh(&txrx->rx_lock);
@@ -498,7 +498,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             struct rina_pci *pci;
 
             /* Complete SDU read, consume the rb. */
-            list_del(&rb->node);
+            list_del_init(&rb->node);
             txrx->rx_qsize -= rl_buf_truesize(rb);
             pci = txrx->rx_cur_pci;
             txrx->rx_cur_pci = NULL;
@@ -615,7 +615,7 @@ rl_io_release_internal(struct rl_io *rio)
         struct rl_buf *rb, *tmp;
 
         list_for_each_entry_safe(rb, tmp, &rio->txrx->rx_q, node) {
-            list_del(&rb->node);
+            list_del_init(&rb->node);
             rl_buf_free(rb);
         }
         rio->txrx->rx_qsize = 0;

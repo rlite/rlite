@@ -135,7 +135,7 @@ snd_inact_tmr_cb(long unsigned arg)
     /* Flush the retransmission queue. */
     PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         rl_buf_free(rb);
         dtp->rtxq_len--;
     }
@@ -143,7 +143,7 @@ snd_inact_tmr_cb(long unsigned arg)
     /* Flush the closed window queue */
     PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         rl_buf_free(rb);
         dtp->cwq_len--;
     }
@@ -176,7 +176,7 @@ rcv_inact_tmr_cb(long unsigned arg)
     /* Flush sequencing queue. */
     PD("%s: dropping %u PDUs from seqq\n", __func__, dtp->seqq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         rl_buf_free(rb);
         dtp->seqq_len--;
     }
@@ -258,7 +258,7 @@ rtx_tmr_cb(long unsigned arg)
             if (unlikely(!crb)) {
                 RPD(1, "OOM\n");
             } else {
-                list_add_tail(&crb->node, &rrbq);
+                list_add_tail_safe(&crb->node, &rrbq);
             }
 
         } else if (rb->rtx_jiffies < next_exp) {
@@ -477,7 +477,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
                 spin_lock_bh(&lower_ipcp->rmtq_lock);
                 if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
                     rb->tx_compl_flow = lower_flow;
-                    list_add_tail(&rb->node, &lower_ipcp->rmtq);
+                    list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
                     lower_ipcp->rmtq_size += rl_buf_truesize(rb);
                 } else {
                     RPD(2, "rmtq overrun: dropping PDU\n");
@@ -515,7 +515,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
-    list_add_tail(&crb->node, &dtp->rtxq);
+    list_add_tail_safe(&crb->node, &dtp->rtxq);
     dtp->rtxq_len++;
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
@@ -641,7 +641,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
                  * insert it into the Closed Window Queue.
                  * Because of the check above, we are sure
                  * that dtp->cwq_len < dtp->max_cwq_len. */
-                list_add_tail(&rb->node, &dtp->cwq);
+                list_add_tail_safe(&rb->node, &dtp->cwq);
                 dtp->cwq_len++;
                 NPD("push [%lu] into cwq\n",
                         (long unsigned)pci->seqnum);
@@ -789,8 +789,8 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
         list_add_tail(&entry->fnode, &flow->pduft_entries);
     } else {
         /* Move from the old list to the new one. */
-        list_del(&entry->fnode);
-        list_add_tail(&entry->fnode, &flow->pduft_entries);
+        list_del_init(&entry->fnode);
+        list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
     }
 
     entry->flow = flow;
@@ -812,7 +812,7 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
     write_lock_bh(&priv->pduft_lock);
 
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
-        list_del(&entry->fnode);
+        list_del_init(&entry->fnode);
         hash_del(&entry->node);
         kfree(entry);
     }
@@ -828,7 +828,7 @@ rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
     write_lock_bh(&priv->pduft_lock);
-    list_del(&entry->fnode);
+    list_del_init(&entry->fnode);
     hash_del(&entry->node);
     write_unlock_bh(&priv->pduft_lock);
 
@@ -977,7 +977,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     }
 
     /* Insert the rb right before 'pos'. */
-    list_add_tail(&rb->node, pos);
+    list_add_tail_safe(&rb->node, pos);
     dtp->seqq_len++;
     RPD(2, "[%lu] inserted\n", (long unsigned)seqnum);
 }
@@ -992,9 +992,9 @@ seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct list_head *qrbs)
         struct rina_pci *pci = RLITE_BUF_PCI(qrb);
 
         if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
-            list_del(&qrb->node);
+            list_del_init(&qrb->node);
             dtp->seqq_len--;
-            list_add_tail(&qrb->node, qrbs);
+            list_add_tail_safe(&qrb->node, qrbs);
             dtp->rcv_lwe_priv = pci->seqnum + 1;
             RPD(2, "[%lu] popped out from seqq\n",
                     (long unsigned)pci->seqnum);
@@ -1067,9 +1067,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 if (dtp->snd_lwe >= dtp->snd_rwe) {
                     break;
                 }
-                list_del(&qrb->node);
+                list_del_init(&qrb->node);
                 dtp->cwq_len--;
-                list_add_tail(&qrb->node, &qrbs);
+                list_add_tail_safe(&qrb->node, &qrbs);
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
 
                 if (flow->cfg.dtcp.rtx_control) {
@@ -1094,7 +1094,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
                         NPD("Remove [%lu] from rtxq\n",
                                 (long unsigned)pci->seqnum);
-                        list_del(&cur->node);
+                        list_del_init(&cur->node);
                         dtp->rtxq_len--;
 
                         if (cur->tx_jiffies) {
@@ -1381,7 +1381,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
          * that we must use the safe version of list scanning, since
          * rl_sdu_rx_flow() will modify qrb->node. */
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
-            list_del(&qrb->node);
+            list_del_init(&qrb->node);
             if (unlikely(rl_buf_pci_pop(qrb))) {
                 rl_buf_free(qrb);
                 continue;

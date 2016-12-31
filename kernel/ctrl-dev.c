@@ -233,7 +233,7 @@ rl_ipcp_factory_unregister(const char *dif_type)
 
     /* Just remove from the list, we don't have ownership of
      * the factory object. */
-    list_del(&factory->node);
+    list_del_init(&factory->node);
 
     mutex_unlock(&rl_dm.general_lock);
 
@@ -399,7 +399,7 @@ dif_put(struct dif *dif)
 
     PD("DIF %s [type '%s'] destroyed\n", dif->name, dif->ty);
 
-    list_del(&dif->node);
+    list_del_init(&dif->node);
     kfree(dif->name);
     kfree(dif);
 
@@ -649,8 +649,8 @@ appl_removew_func(struct work_struct *w)
 
     spin_lock_bh(&rl_dm.appl_removeq_lock);
     list_for_each_entry_safe(app, tmp, &rl_dm.appl_removeq, node) {
-        list_del(&app->node);
-        list_add_tail(&app->node, &removeq);
+        list_del_init(&app->node);
+        list_add_tail_safe(&app->node, &removeq);
     }
     spin_unlock_bh(&rl_dm.appl_removeq_lock);
 
@@ -678,7 +678,7 @@ ipcp_application_put(struct registered_appl *app)
         return;
     }
 
-    list_del(&app->node);
+    list_del_init(&app->node);
 
     RAUNLOCK(ipcp);
 
@@ -686,7 +686,7 @@ ipcp_application_put(struct registered_appl *app)
         /* Perform cleanup operation in process context, because we need
          * to take the per-ipcp mutex. */
         spin_lock_bh(&rl_dm.appl_removeq_lock);
-        list_add_tail(&app->node, &rl_dm.appl_removeq);
+        list_add_tail_safe(&app->node, &rl_dm.appl_removeq);
         spin_unlock_bh(&rl_dm.appl_removeq_lock);
         schedule_work(&rl_dm.appl_removew);
     } else {
@@ -799,8 +799,8 @@ application_del_by_rc(struct rl_ctrl *rc)
             if (app->rc == rc) {
                 if (app->refcnt == 1) {
                     /* Just move the reference. */
-                    list_del(&app->node);
-                    list_add_tail(&app->node, &remove_apps);
+                    list_del_init(&app->node);
+                    list_add_tail_safe(&app->node, &remove_apps);
                 } else {
                     /* Do what ipcp_application_put() would do, but
                      * without taking the regapp_lock. */
@@ -993,7 +993,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     dtp_fini(dtp);
 
     list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         rl_buf_free(rb);
     }
     entry->txrx.rx_qsize = 0;
@@ -1262,7 +1262,7 @@ __ipcp_put(struct ipcp_entry *entry)
     tasklet_kill(&entry->tx_completion);
 
     list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
-        list_del(&rb->node);
+        list_del_init(&rb->node);
         rl_buf_free(rb);
     }
 
@@ -1522,7 +1522,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
     if (!list_empty(&rc->flows_fetch_q)) {
         fqe = list_first_entry(&rc->flows_fetch_q, struct flows_fetch_q_entry,
                                node);
-        list_del(&fqe->node);
+        list_del_init(&fqe->node);
         fqe->resp.event_id = req->event_id;
         ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
@@ -2523,7 +2523,7 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
             }
 
             /* Unlink and free the upqueue entry and the associated message. */
-            list_del(&entry->node);
+            list_del_init(&entry->node);
             rc->upqueue_size -= upqentry_size(entry);
             kfree(entry->sermsg);
             kfree(entry);
@@ -2626,7 +2626,7 @@ rl_ctrl_release(struct inode *inode, struct file *f)
     struct rl_ctrl *rc = (struct rl_ctrl *)f->private_data;
 
     mutex_lock(&rl_dm.general_lock);
-    list_del(&rc->node);
+    list_del_init(&rc->node);
     mutex_unlock(&rl_dm.general_lock);
 
     /* We must invalidate (e.g. unregister) all the
@@ -2639,7 +2639,7 @@ rl_ctrl_release(struct inode *inode, struct file *f)
         struct upqueue_entry *ue, *uet;
 
         list_for_each_entry_safe(ue, uet, &rc->upqueue, node) {
-            list_del(&ue->node);
+            list_del_init(&ue->node);
             kfree(ue->sermsg);
             kfree(ue);
         }
@@ -2650,7 +2650,7 @@ rl_ctrl_release(struct inode *inode, struct file *f)
         struct flows_fetch_q_entry *fqe, *fqet;
 
         list_for_each_entry_safe(fqe, fqet, &rc->flows_fetch_q, node) {
-            list_del(&fqe->node);
+            list_del_init(&fqe->node);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                         RLITE_MB(&fqe->resp));
             kfree(fqe);

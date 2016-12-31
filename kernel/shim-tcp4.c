@@ -380,7 +380,7 @@ tcp4_tx_worker(struct work_struct *w)
         spin_lock_bh(&priv->txq_lock);
         if (priv->txq_len) {
             qe = list_first_entry(&priv->txq, struct txq_entry, node);
-            list_del(&qe->node);
+            list_del_init(&qe->node);
             priv->txq_len--;
         }
         spin_unlock_bh(&priv->txq_lock);

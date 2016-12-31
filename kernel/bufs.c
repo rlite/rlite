@@ -52,6 +52,7 @@ rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
     rb->pci = (struct rina_pci *)(rb->raw->buf + num_pci * sizeof(struct rina_pci));
     rb->len = size;
     rb->tx_compl_flow = NULL;
+    INIT_LIST_HEAD(&rb->node);
 
     return rb;
 }
@@ -81,6 +82,8 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
     /* Normal copy - includes pointer copy. */
     memcpy(crb, rb, sizeof(*rb));
 
+    /* Reset some fields. */
+    crb->tx_compl_flow = NULL;
     INIT_LIST_HEAD(&crb->node);
 
     return crb;
@@ -98,6 +101,8 @@ rl_buf_free(struct rl_buf *rb)
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
         kfree(rb->raw);
     }
+
+    BUG_ON(!list_empty(&rb->node));
     kfree(rb);
 }
 EXPORT_SYMBOL(rl_buf_free);

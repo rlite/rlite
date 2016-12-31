@@ -120,7 +120,7 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
 
     spin_lock_bh(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
-        list_del(&entry->node);
+        list_del_init(&entry->node);
         if (entry->spa) {
             kfree(entry->spa);
         }
@@ -435,7 +435,7 @@ nomem:
     PE("Out of memory\n");
 
     if (entry) {
-        list_del(&entry->node);
+        list_del_init(&entry->node);
         if (entry->tpa) {
             kfree(entry->tpa);
         }
@@ -476,7 +476,7 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
         PD("Popping %u PDUs from rx_tmpq\n",
                 entry->rx_tmpq_len);
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
-            list_del(&rb->node);
+            list_del_init(&rb->node);
             rl_sdu_rx_flow(ipcp, flow, rb, true);
         }
         entry->rx_tmpq_len = 0;
@@ -719,7 +719,7 @@ enq:
             goto drop;
         }
         RPD(2, "Push PDU into rx_tmpq\n");
-        list_add_tail(&rb->node, &entry->rx_tmpq);
+        list_add_tail_safe(&rb->node, &entry->rx_tmpq);
         entry->rx_tmpq_len++;
     }
 
@@ -986,7 +986,7 @@ rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
             entry->flow = NULL;
             entry->fa_req_arrived = false;
             list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
-                list_del(&rb->node);
+                list_del_init(&rb->node);
                 rl_buf_free(rb);
             }
             entry->rx_tmpq_len = 0;
