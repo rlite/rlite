@@ -1508,6 +1508,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
             fqe->resp.remote_port = entry->remote_port;
             fqe->resp.local_addr = entry->txrx.ipcp->addr;
             fqe->resp.remote_addr = entry->remote_addr;
+            fqe->resp.spec = entry->spec;
         }
 
         fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);

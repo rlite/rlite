@@ -110,6 +110,7 @@ struct rl_kmsg_flow_fetch_resp {
     rl_port_t remote_port;
     rl_addr_t local_addr;
     rl_addr_t remote_addr;
+    struct rina_flow_spec spec;
 } __attribute__((packed));
 
 #define RLITE_UPDATE_ADD    0x01
