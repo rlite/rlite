@@ -57,21 +57,20 @@ dtp_fini(struct dtp *dtp)
     del_timer_sync(&dtp->rtx_tmr);
     del_timer_sync(&dtp->a_tmr);
 
-    PD("%s: dropping %u PDUs from cwq\n", __func__, dtp->cwq_len);
+    PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n",
+       dtp->cwq_len, dtp->seqq_len, dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);
     }
     dtp->cwq_len = 0;
 
-    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->seqq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);
     }
     dtp->seqq_len = 0;
 
-    PD("%s: dropping %u PDUs from rtxq\n", __func__, dtp->rtxq_len);
     list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
         list_del_init(&rb->node);
         rl_buf_free(rb);
