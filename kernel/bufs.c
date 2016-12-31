@@ -91,21 +91,15 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 EXPORT_SYMBOL(rl_buf_clone);
 
 void
-rl_buf_free(struct rl_buf *rb)
+__rl_buf_free(struct rl_buf *rb)
 {
-    if (unlikely(!rb)) {
-        PI("warning: NULL rb\n");
-        return;
-    }
-
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
         kfree(rb->raw);
     }
 
-    BUG_ON(!list_empty(&rb->node));
     kfree(rb);
 }
-EXPORT_SYMBOL(rl_buf_free);
+EXPORT_SYMBOL(__rl_buf_free);
 
 void
 rina_pci_dump(struct rina_pci *pci)

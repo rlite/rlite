@@ -148,7 +148,14 @@ struct rl_buf * rl_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
 
 struct rl_buf * rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
-void rl_buf_free(struct rl_buf *rb);
+void __rl_buf_free(struct rl_buf *rb);
+
+#define rl_buf_free(_rb) \
+    do { \
+        BUG_ON((_rb) == NULL); \
+        BUG_ON(!list_empty(&(_rb)->node)); \
+        __rl_buf_free(_rb); \
+    } while (0)
 
 static inline int
 rl_buf_pci_pop(struct rl_buf *rb)
