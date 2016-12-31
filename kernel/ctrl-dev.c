@@ -1089,6 +1089,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
          const char *local_appl,
          const char *remote_appl,
          const struct rl_flow_config *flowcfg,
+         const struct rina_flow_spec *flowspec,
          struct flow_entry **pentry, gfp_t gfp)
 {
     struct flow_entry *entry;
@@ -1132,6 +1133,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
         entry->flags = RL_FLOW_PENDING;
+        memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
         hash_add(rl_dm.flow_table, &entry->node, entry->local_port);
@@ -2088,7 +2090,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Allocate a port id and the associated flow entry. */
     ret = flow_add(ipcp_entry, upper, event_id, req->local_appl,
-                   req->remote_appl, NULL, &flow_entry,
+                   req->remote_appl, NULL, &req->flowspec, &flow_entry,
                    GFP_KERNEL);
     if (ret) {
         goto out;
@@ -2249,12 +2251,18 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
         goto out;
     }
 
+    memset(&req, 0, sizeof(req));
+    if (flowspec) {
+        memcpy(&req.flowspec, flowspec, sizeof(*flowspec));
+    } else {
+        rl_flow_spec_default(&req.flowspec);
+    }
+
     /* Allocate a port id and the associated flow entry. */
     upper.rc = app->rc;
     upper.ipcp = NULL;
-    ret = flow_add(ipcp, upper, 0, local_appl,
-                   remote_appl, flowcfg, &flow_entry,
-                   GFP_ATOMIC);
+    ret = flow_add(ipcp, upper, 0, local_appl, remote_appl,
+                   flowcfg, &req.flowspec, &flow_entry, GFP_ATOMIC);
     if (ret) {
         goto out;
     }
@@ -2265,7 +2273,6 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     PI("Flow allocation request arrived to IPC process %u, "
         "port-id %u\n", ipcp->id, flow_entry->local_port);
 
-    memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_FA_REQ_ARRIVED;
     req.event_id = 0;
     req.kevent_id = kevent_id;
@@ -2275,11 +2282,6 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     req.remote_appl = remote_appl ? kstrdup(remote_appl, GFP_ATOMIC) : NULL;
     if (ipcp->dif->name) {
         req.dif_name = kstrdup(ipcp->dif->name, GFP_ATOMIC);
-    }
-    if (flowspec) {
-        memcpy(&req.flowspec, flowspec, sizeof(*flowspec));
-    } else {
-        rl_flow_spec_default(&req.flowspec);
     }
 
     /* Enqueue the request into the upqueue. */

@@ -412,6 +412,7 @@ struct flow_entry {
     struct txrx         txrx;
     struct dtp          dtp;
     struct rl_flow_config cfg;
+    struct rina_flow_spec spec;
 
     int (*sdu_rx_consumed)(struct flow_entry *flow,
                            struct rina_pci *pci);
