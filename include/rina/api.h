@@ -84,6 +84,8 @@ int rina_register(int fd, const char *dif_name, const char *local_appl,
 int rina_unregister(int fd, const char *dif_name, const char *local_appl,
                     int flags);
 
+int rina_register_wait(int fd, int wfd);
+
 /*
  * Accept an incoming flow request arrived on @fd. If @flags does not contain
  * RINA_F_NORESP, it also sends a positive response to the requesting

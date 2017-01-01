@@ -70,7 +70,9 @@ read_next_msg(int rfd)
 
     ret = read(rfd, serbuf, sizeof(serbuf));
     if (ret < 0) {
-        perror("read(rfd)");
+        if (errno != EAGAIN) {
+            perror("read(rfd)");
+        }
         return NULL;
     }
 
@@ -78,6 +80,7 @@ read_next_msg(int rfd)
     resp = RLITE_MB(malloc(max_resp_size));
     if (!resp) {
         PE("Out of memory\n");
+        errno = ENOMEM;
         return NULL;
     }
 
@@ -87,6 +90,7 @@ read_next_msg(int rfd)
     if (ret) {
         PE("Problems during deserialization [%d]\n", ret);
         free(resp);
+        errno = ENOMEM;
         return NULL;
     }
 
@@ -501,57 +505,24 @@ wait_for_next_msg(int fd)
     return 0;
 }
 
-static int
-rina_register_common(int fd, const char *dif_name, const char *local_appl,
-                     int flags, int reg)
+#define RINA_REG_EVENT_ID   0x7a6b /* casual value, used just for assert() */
+
+int
+rina_register_wait(int fd, int wfd)
 {
-    struct rl_kmsg_appl_register req;
     struct rl_kmsg_appl_register_resp *resp;
     struct rl_kmsg_appl_move move;
     unsigned int response;
-    uint32_t event_id = 1;
     rl_ipcp_id_t ipcp_id;
-    int ret = -1;
-    int wfd;
-
-    if (flags & ~(RINA_F_NOWAIT)) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    /* Open a dedicated file descriptor to perform the operation. */
-    wfd = rina_open();
-    if (wfd < 0) {
-        return wfd;
-    }
-
-    ret = rina_register_req_fill(&req, event_id, dif_name,
-                               reg, local_appl);
-    if (ret) {
-        errno = ENOMEM;
-        goto out;
-    }
-
-    /* Issue the request ad wait for the response. */
-    ret = rl_write_msg(wfd, RLITE_MB(&req), 1);
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
-    if (ret < 0) {
-        goto out;
-    }
-
-    ret = wait_for_next_msg(wfd);
-    if (ret) {
-        return ret;
-    }
+    int ret = 0;
 
     resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(wfd);
     if (!resp) {
-        errno = ENOMEM;
         goto out;
     }
 
     assert(resp->msg_type == RLITE_KER_APPL_REGISTER_RESP);
-    assert(resp->event_id == event_id);
+    assert(resp->event_id == RINA_REG_EVENT_ID);
     ipcp_id = resp->ipcp_id;
     response = resp->response;
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
@@ -566,12 +537,58 @@ rina_register_common(int fd, const char *dif_name, const char *local_appl,
      * with the file descriptor specified by the caller. */
     memset(&move, 0, sizeof(move));
     move.msg_type = RLITE_KER_APPL_MOVE;
-    move.event_id = event_id + 1;
+    move.event_id = 1;
     move.ipcp_id = ipcp_id;
     move.fd = fd;
 
     ret = rl_write_msg(wfd, RLITE_MB(&move), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&move));
+out:
+    close (wfd);
+
+    return ret;
+}
+
+static int
+rina_register_common(int fd, const char *dif_name, const char *local_appl,
+                     int flags, int reg)
+{
+    struct rl_kmsg_appl_register req;
+    int ret = 0;
+    int wfd;
+
+    if (flags & ~(RINA_F_NOWAIT)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* Open a dedicated file descriptor to perform the operation and wait
+     * for the response. */
+    wfd = rina_open();
+    if (wfd < 0) {
+        return wfd;
+    }
+
+    ret = rina_register_req_fill(&req, RINA_REG_EVENT_ID, dif_name,
+                                 reg, local_appl);
+    if (ret) {
+        errno = ENOMEM;
+        goto out;
+    }
+
+    /* Issue the request ad wait for the response. */
+    ret = rl_write_msg(wfd, RLITE_MB(&req), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
+    if (ret < 0) {
+        goto out;
+    }
+
+    if (flags & RINA_F_NOWAIT) {
+        return wfd; /* Return the file descriptor to wait on. */
+    }
+
+    /* Wait for the operation to complete right now. */
+    return rina_register_wait(fd, wfd);
 out:
     close (wfd);
 
@@ -606,7 +623,6 @@ rina_flow_alloc_wait(int wfd)
 
     resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(wfd);
     if (!resp) {
-        errno = ENOMEM;
         ret = -1;
         goto out;
     }
