@@ -58,7 +58,7 @@ pending_queue_remove_by_msg_type(struct list_head *list,
                                                        unsigned int msg_type);
 
 struct rl_msg_base *
-read_next_msg(int rfd);
+read_next_msg(int rfd, int quiet);
 
 int
 rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,

@@ -59,7 +59,7 @@ rl_ctrl_get_id(struct rl_ctrl *ctrl)
 }
 
 struct rl_msg_base *
-read_next_msg(int rfd)
+read_next_msg(int rfd, int quiet)
 {
     unsigned int max_resp_size = rl_numtables_max_size(
                 rl_ker_numtables,
@@ -70,7 +70,7 @@ read_next_msg(int rfd)
 
     ret = read(rfd, serbuf, sizeof(serbuf));
     if (ret < 0) {
-        if (errno != EAGAIN) {
+        if (!quiet) {
             perror("read(rfd)");
         }
         return NULL;
@@ -79,7 +79,9 @@ read_next_msg(int rfd)
     /* Here we can malloc the maximum kernel message size. */
     resp = RLITE_MB(malloc(max_resp_size));
     if (!resp) {
-        PE("Out of memory\n");
+        if (!quiet) {
+            PE("Out of memory\n");
+        }
         errno = ENOMEM;
         return NULL;
     }
@@ -428,7 +430,7 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
         }
 
         /* Read the next message posted by the kernel. */
-        resp = read_next_msg(ctrl->rfd);
+        resp = read_next_msg(ctrl->rfd, 1);
         if (!resp) {
             continue;
         }
@@ -484,27 +486,6 @@ rina_open(void)
     return open(RLITE_CTRLDEV_NAME, O_RDWR);
 }
 
-static int
-wait_for_next_msg(int fd)
-{
-    struct pollfd pfd;
-    int ret;
-
-    /* Wait for the event with select. This is necessary when the fd
-     * is nonblocking. */
-    pfd.fd = fd;
-    pfd.events = POLLIN;
-    ret = poll(&pfd, 1, -1);
-    if (ret <= 0) {
-        if (ret == 0) {
-            errno = EAGAIN;
-        }
-        return -1;
-    }
-
-    return 0;
-}
-
 #define RINA_REG_EVENT_ID   0x7a6b /* casual value, used just for assert() */
 
 int
@@ -516,7 +497,7 @@ rina_register_wait(int fd, int wfd)
     rl_ipcp_id_t ipcp_id;
     int ret = 0;
 
-    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(wfd);
+    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(wfd, 1);
     if (!resp) {
         goto out;
     }
@@ -614,16 +595,10 @@ int
 rina_flow_alloc_wait(int wfd)
 {
     struct rl_kmsg_fa_resp_arrived *resp;
-    int ret;
+    int ret = -1;
 
-    ret = wait_for_next_msg(wfd);
-    if (ret) {
-        goto out;
-    }
-
-    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(wfd);
+    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(wfd, 1);
     if (!resp) {
-        ret = -1;
         goto out;
     }
 
@@ -632,7 +607,6 @@ rina_flow_alloc_wait(int wfd)
 
     if (resp->response) {
         errno = EPERM;
-        ret = -1;
     } else {
         ret = rl_open_appl_port(resp->port_id);
     }
@@ -823,7 +797,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
         memset(spi, 0, sizeof(*spi));
     }
 
-    req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd);
+    req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd, 1);
     if (!req) {
         goto out0;
     }
