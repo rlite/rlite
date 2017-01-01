@@ -25,6 +25,7 @@
 #define __CTRL_UTILS_H__
 
 #include <stdint.h>
+#include <pthread.h>
 #include "rlite/common.h"
 #include "rlite/list.h"
 

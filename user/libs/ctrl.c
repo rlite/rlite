@@ -27,7 +27,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <pthread.h>
 #include <errno.h>
 #include <sys/select.h>
 #include <sys/poll.h>
