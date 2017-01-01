@@ -117,6 +117,9 @@ struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_IPCP_QOS_SUPPORTED] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_qos_supported),
     },
+    [RLITE_KER_APPL_MOVE] = {
+        .copylen = sizeof(struct rl_kmsg_appl_move),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

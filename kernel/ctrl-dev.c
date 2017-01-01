@@ -24,6 +24,7 @@
 #include "rlite-kernel.h"
 
 #include <linux/module.h>
+#include <linux/file.h>
 #include <linux/aio.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
@@ -2051,6 +2052,46 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     return ret;
 }
 
+static const struct file_operations rl_ctrl_fops;
+
+static int
+rl_appl_move(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    struct rl_kmsg_appl_move *req = (struct rl_kmsg_appl_move *)bmsg;
+    struct registered_appl *app;
+    struct ipcp_entry *ipcp;
+    struct file *dst_file;
+    struct rl_ctrl *dst_rc;
+    int ret = 0;
+
+    dst_file = fget(req->fd);
+    if (dst_file == NULL || dst_file->f_op != &rl_ctrl_fops) {
+        return -EBADF;
+    }
+    dst_rc = dst_file->private_data;
+
+    ipcp = ipcp_get(req->ipcp_id);
+    if (!ipcp) {
+        ret = -ENXIO;
+        goto out;
+    }
+
+    RALOCK(ipcp);
+    /* Search all the applications registered to this control device. */
+    list_for_each_entry(app, &ipcp->registered_appls, node) {
+        if (app->rc == rc) {
+            app->rc = dst_rc; /* move */
+        }
+    }
+    RAUNLOCK(ipcp);
+
+    ipcp_put(ipcp);
+out:
+    fput(dst_file);
+
+    return ret;
+}
+
 static int
 rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
                                      rl_port_t port_id, uint8_t response,
@@ -2400,6 +2441,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_FLOW_STATS_REQ] = rl_flow_get_stats,
     [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
     [RLITE_KER_IPCP_QOS_SUPPORTED] = rl_ipcp_qos_supported,
+    [RLITE_KER_APPL_MOVE] = rl_appl_move,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 

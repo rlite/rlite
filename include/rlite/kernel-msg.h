@@ -56,6 +56,7 @@ enum {
     RLITE_KER_FLOW_STATS_RESP, /* 23 */
     RLITE_KER_FLOW_CFG_UPDATE, /* 24 */
     RLITE_KER_IPCP_QOS_SUPPORTED, /* 25 */
+    RLITE_KER_APPL_MOVE, /* 26 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -152,6 +153,14 @@ struct rl_kmsg_appl_register_resp {
     uint8_t response;
     char *appl_name;
 } __attribute__((packed));
+
+struct rl_kmsg_appl_move {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    rl_ipcp_id_t ipcp_id;
+    int fd; /* where to move */
+};
 
 /* application --> kernel to initiate a flow allocation. */
 struct rl_kmsg_fa_req {
