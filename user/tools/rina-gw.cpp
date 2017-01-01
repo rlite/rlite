@@ -778,7 +778,7 @@ setup_for_listening(void)
         set_nonblocking(fd);
 
         ret = rina_register(fd, mit->first.dif_name.c_str(),
-                            mit->first.name.c_str());
+                            mit->first.name.c_str(), 0);
         if (ret) {
             printf("Registration of application '%s' failed\n",
                    static_cast<string>(mit->first).c_str());

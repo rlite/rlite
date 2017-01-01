@@ -202,7 +202,7 @@ server(struct echo_async *rea)
     int i;
 
     /* In listen mode also register the application names. */
-    ret = rina_register(rea->cfd, rea->dif_name, rea->srv_appl_name);
+    ret = rina_register(rea->cfd, rea->dif_name, rea->srv_appl_name, 0);
     if (ret) {
         perror("rina_register()");
         return ret;

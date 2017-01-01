@@ -350,7 +350,7 @@ rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
         return;
     }
 
-    /* Skip the copiable part and scan all the RLITE names contained in
+    /* Skip the copiable part and scan all the names contained in
      * the message. */
     name = (struct rina_name *)(((void *)msg) + copylen);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {

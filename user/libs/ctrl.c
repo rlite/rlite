@@ -503,63 +503,92 @@ wait_for_next_msg(int fd)
 
 static int
 rina_register_common(int fd, const char *dif_name, const char *local_appl,
-                     int reg)
+                     int flags, int reg)
 {
     struct rl_kmsg_appl_register req;
     struct rl_kmsg_appl_register_resp *resp;
+    struct rl_kmsg_appl_move move;
     unsigned int response;
     uint32_t event_id = 1;
-    int ret;
+    rl_ipcp_id_t ipcp_id;
+    int ret = -1;
+    int wfd;
+
+    if (flags & ~(RINA_F_NOWAIT)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* Open a dedicated file descriptor to perform the operation. */
+    wfd = rina_open();
+    if (wfd < 0) {
+        return wfd;
+    }
 
     ret = rina_register_req_fill(&req, event_id, dif_name,
                                reg, local_appl);
     if (ret) {
         errno = ENOMEM;
-        return -1;
+        goto out;
     }
 
-    ret = rl_write_msg(fd, RLITE_MB(&req), 1);
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&req));
+    /* Issue the request ad wait for the response. */
+    ret = rl_write_msg(wfd, RLITE_MB(&req), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
     if (ret < 0) {
-        return -1;
+        goto out;
     }
 
-    ret = wait_for_next_msg(fd);
+    ret = wait_for_next_msg(wfd);
     if (ret) {
         return ret;
     }
 
-    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(fd);
+    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(wfd);
     if (!resp) {
         errno = ENOMEM;
-        return -1;
+        goto out;
     }
 
     assert(resp->msg_type == RLITE_KER_APPL_REGISTER_RESP);
     assert(resp->event_id == event_id);
+    ipcp_id = resp->ipcp_id;
     response = resp->response;
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     free(resp);
 
     if (response) {
         errno = EINVAL;
-        return -1;
+        goto out;
     }
 
-    return 0;
+    /* Registration was successful: associate the registered application
+     * with the file descriptor specified by the caller. */
+    memset(&move, 0, sizeof(move));
+    move.msg_type = RLITE_KER_APPL_MOVE;
+    move.event_id = event_id + 1;
+    move.ipcp_id = ipcp_id;
+    move.fd = fd;
+
+    ret = rl_write_msg(wfd, RLITE_MB(&move), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&move));
+out:
+    close (wfd);
+
+    return ret;
 }
 
 int
-rina_register(int fd, const char *dif_name, const char *local_appl)
+rina_register(int fd, const char *dif_name, const char *local_appl, int flags)
 {
-    return rina_register_common(fd, dif_name, local_appl, 1);
+    return rina_register_common(fd, dif_name, local_appl, flags, 1);
 }
 
 int
-rina_unregister(int fd, const char *dif_name, const char *local_appl)
+rina_unregister(int fd, const char *dif_name, const char *local_appl,
+                int flags)
 {
-    return rina_register_common(fd, dif_name, local_appl, 0);
+    return rina_register_common(fd, dif_name, local_appl, flags, 0);
 }
 
 #define RINA_FA_EVENT_ID    0x6271 /* casual value, used just for assert() */

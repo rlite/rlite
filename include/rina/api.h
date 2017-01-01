@@ -71,7 +71,8 @@ int rina_open(void);
  * be registered to.
  * Returns 0 on success, -1 on error, with the errno code properly set.
  */
-int rina_register(int fd, const char *dif_name, const char *local_appl);
+int rina_register(int fd, const char *dif_name, const char *local_appl,
+                  int flags);
 
 /*
  * Unregister the application name @local_appl from the DIF where it
@@ -80,7 +81,8 @@ int rina_register(int fd, const char *dif_name, const char *local_appl);
  * requests can no longer be received on @fd.
  * Returns 0 on success, -1 on error, with the errno code properly set.
  */
-int rina_unregister(int fd, const char *dif_name, const char *local_appl);
+int rina_unregister(int fd, const char *dif_name, const char *local_appl,
+                    int flags);
 
 /*
  * Accept an incoming flow request arrived on @fd. If @flags does not contain
