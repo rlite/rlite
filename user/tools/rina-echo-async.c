@@ -199,12 +199,21 @@ server(struct echo_async *rea)
     fd_set rdfs, wrfs;
     int maxfd;
     int ret;
+    int wfd;
     int i;
 
-    /* In listen mode also register the application names. */
-    ret = rina_register(rea->cfd, rea->dif_name, rea->srv_appl_name, 0);
-    if (ret) {
+    /* In listen mode also register the application names. Here we use
+     * two-steps registration (RINA_F_NOWAIT) just for fun. */
+    wfd = rina_register(rea->cfd, rea->dif_name, rea->srv_appl_name,
+                        RINA_F_NOWAIT);
+    if (wfd < 0) {
         perror("rina_register()");
+        return wfd;
+    }
+
+    ret = rina_register_wait(rea->cfd, wfd);
+    if (ret < 0) {
+        perror("rina_register_wait()");
         return ret;
     }
 
