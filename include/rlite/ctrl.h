@@ -88,6 +88,7 @@ rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
 uint32_t
 rl_ctrl_get_id(struct rl_ctrl *ctrl);
 
+struct rl_msg_base * read_next_msg(int rfd, int quiet);
 
 /*
  * API calls for userspace IPCPs, not to be used by applications.

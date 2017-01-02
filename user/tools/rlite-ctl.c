@@ -34,13 +34,13 @@
 #include <sys/un.h>
 #include <signal.h>
 #include <assert.h>
+#include <sys/ioctl.h>
+
+#include <rlite/list.h>
+#include <rlite/uipcps-msg.h>
+#include <rlite/conf.h>
 
 #include "../helpers.h"
-#include "rlite/list.h"
-#include "rlite/uipcps-msg.h"
-#include "rlite/ctrl.h"
-#include "rlite/conf.h"
-
 
 /* IPCP attributes. */
 struct ipcp_attrs {
@@ -62,8 +62,7 @@ struct cmd_descriptor {
     const char *name;
     const char *usage;
     unsigned int num_args;
-    int (*func)(int argc, char **argv, struct rl_ctrl *ctrl,
-                struct cmd_descriptor *cd);
+    int (*func)(int argc, char **argv, struct cmd_descriptor *cd);
 };
 
 static struct ipcp_attrs *
@@ -215,8 +214,7 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
 }
 
 static int
-ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl,
-            struct cmd_descriptor *cd)
+ipcp_create(int argc, char **argv, struct cmd_descriptor *cd)
 {
     const char *ipcp_name;
     const char *dif_type;
@@ -251,8 +249,7 @@ ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl,
-             struct cmd_descriptor *cd)
+ipcp_destroy(int argc, char **argv, struct cmd_descriptor *cd)
 {
     const char *ipcp_name;
     struct ipcp_attrs *attrs;
@@ -279,8 +276,7 @@ ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl,
-            struct cmd_descriptor *cd)
+ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
 {
     const char *ipcp_name;
     const char *param_name;
@@ -311,7 +307,7 @@ ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl,
 
 static int
 ipcp_register_common(int argc, char **argv, unsigned int reg,
-                     struct rl_ctrl *ctrl, struct cmd_descriptor *cd)
+                     struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_register req;
     const char *ipcp_name;
@@ -343,22 +339,19 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 }
 
 static int
-ipcp_register(int argc, char **argv, struct rl_ctrl *ctrl,
-              struct cmd_descriptor *cd)
+ipcp_register(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    return ipcp_register_common(argc, argv, 1, ctrl, cd);
+    return ipcp_register_common(argc, argv, 1, cd);
 }
 
 static int
-ipcp_unregister(int argc, char **argv, struct rl_ctrl *ctrl,
-                struct cmd_descriptor *cd)
+ipcp_unregister(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    return ipcp_register_common(argc, argv, 0, ctrl, cd);
+    return ipcp_register_common(argc, argv, 0, cd);
 }
 
 static int
-ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
-                   rl_msg_t msg_type)
+ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
 {
     struct rl_cmsg_ipcp_enroll req;
     const char *ipcp_name;
@@ -403,22 +396,19 @@ ipcp_enroll_common(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-ipcp_enroll(int argc, char **argv, struct rl_ctrl *ctrl,
-            struct cmd_descriptor *cd)
+ipcp_enroll(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_ENROLL);
+    return ipcp_enroll_common(argc, argv, RLITE_U_IPCP_ENROLL);
 }
 
 static int
-ipcp_lower_flow_alloc(int argc, char **argv, struct rl_ctrl *ctrl,
-                      struct cmd_descriptor *cd)
+ipcp_lower_flow_alloc(int argc, char **argv, struct cmd_descriptor *cd)
 {
-    return ipcp_enroll_common(argc, argv, ctrl, RLITE_U_IPCP_LOWER_FLOW_ALLOC);
+    return ipcp_enroll_common(argc, argv, RLITE_U_IPCP_LOWER_FLOW_ALLOC);
 }
 
 static int
-ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl,
-             struct cmd_descriptor *cd)
+ipcp_dft_set(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_dft_set req;
     const char *ipcp_name;
@@ -457,8 +447,7 @@ ipcp_dft_set(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl,
-           struct cmd_descriptor *cd)
+ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
     char addrbuf[20];
@@ -483,8 +472,7 @@ ipcps_show(int argc, char **argv, struct rl_ctrl *ctrl,
 }
 
 static int
-flows_show(int argc, char **argv, struct rl_ctrl *ctrl,
-           struct cmd_descriptor *cd)
+flows_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct list_head flows;
 
@@ -510,8 +498,7 @@ ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
 }
 
 static int
-ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl,
-              struct cmd_descriptor *cd)
+ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_rib_show_req req;
     const char *name;
@@ -545,9 +532,28 @@ ipcp_rib_show(int argc, char **argv, struct rl_ctrl *ctrl,
 
 /* Build the list of IPCPs running in the system, ordered by id. */
 static int
-ipcps_load(struct rl_ctrl *ctrl)
+ipcps_load()
 {
     int ret = 0;
+    int fd;
+
+    /* We init an rlite control device, with IPCP updates
+     * enabled. */
+    fd = rina_open();
+    if (fd < 0) {
+        perror("rina_open");
+        return fd;
+    }
+    ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
+    if (ret < 0) {
+        perror("ioctl()");
+        return ret;
+    }
+    ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret < 0) {
+        perror("fcntl(F_SETFL, O_NONBLOCK)");
+        return ret;
+    }
 
     list_init(&ipcps);
 
@@ -555,11 +561,14 @@ ipcps_load(struct rl_ctrl *ctrl)
         struct rl_kmsg_ipcp_update *upd;
         struct ipcp_attrs *attrs, *scan;
 
-        upd = (struct rl_kmsg_ipcp_update *)
-              rl_ctrl_wait_any(ctrl, RLITE_KER_IPCP_UPDATE, 0);
+        upd = (struct rl_kmsg_ipcp_update *)read_next_msg(fd, 1);
         if (!upd) {
+            if (errno && errno != EAGAIN) {
+                perror("read_next_msg()");
+            }
             break;
         }
+        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
         attrs = malloc(sizeof(*attrs));
         if (!attrs) {
@@ -583,6 +592,7 @@ ipcps_load(struct rl_ctrl *ctrl)
         }
         list_add_tail(&attrs->node, &scan->node);
     }
+    close(fd);
 
     return ret;
 }
@@ -695,7 +705,6 @@ process_args(int argc, char **argv)
 
     for (i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
-            struct rl_ctrl ctrl;
             int ret;
 
             assert(cmd_descriptors[i].func);
@@ -707,22 +716,13 @@ process_args(int argc, char **argv)
                 return -1;
             }
 
-            /* We init an rlite control device, with IPCP updates
-             * enabled. */
-            ret = rl_ctrl_init(&ctrl, RL_F_IPCPS);
+            ret = ipcps_load();
             if (ret) {
                 return ret;
             }
 
-            ret = ipcps_load(&ctrl);
-            if (ret) {
-                return ret;
-            }
-
-            ret = cmd_descriptors[i].func(argc - 2, argv + 2, &ctrl,
+            ret = cmd_descriptors[i].func(argc - 2, argv + 2,
                                           cmd_descriptors + i);
-
-            rl_ctrl_fini(&ctrl);
 
             return ret;
         }
