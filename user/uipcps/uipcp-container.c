@@ -273,6 +273,7 @@ uipcp_loop(void *opaque)
 
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
+        rl_resp_handler_t handler = NULL;
         struct rl_msg_base *msg;
         fd_set rdfs;
         int ret;
@@ -317,6 +318,35 @@ uipcp_loop(void *opaque)
         }
 
         assert(msg->msg_type < RLITE_KER_MSG_MAX);
+
+        switch (msg->msg_type) {
+        case RLITE_KER_FA_REQ:
+            handler = uipcp->ops.fa_req;
+            break;
+
+        case RLITE_KER_FA_RESP:
+            handler = uipcp->ops.fa_resp;
+            break;
+
+        case RLITE_KER_APPL_REGISTER:
+            handler = uipcp->ops.appl_register;
+            break;
+
+        case RLITE_KER_FLOW_DEALLOCATED:
+            handler = uipcp->ops.flow_deallocated;
+            break;
+
+        case RLITE_KER_FA_REQ_ARRIVED:
+            handler = uipcp->ops.neigh_fa_req_arrived;
+            break;
+
+        default:
+            UPE(uipcp, "Message type %u not handled\n", msg->msg_type);
+            break;
+        }
+
+        // TODO call the handler
+        (void)handler;
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(msg));
         free(msg);
