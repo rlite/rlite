@@ -31,7 +31,6 @@
 
 #include <rlite/conf.h>
 #include <rlite/utils.h>
-#include <rlite/evloop.h>
 #include <rlite/uipcps-msg.h>
 
 #include "../helpers.h"

@@ -33,7 +33,6 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/uipcps-msg.h"
-#include "rlite/evloop.h"
 #include "rlite/cdap.hpp"
 #include "rlite/cpputils.hpp"
 

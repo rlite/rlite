@@ -29,7 +29,6 @@
 #include "rlite/uipcps-msg.h"
 #include "rlite/kernel-msg.h"
 #include "rlite/list.h"
-#include "rlite/evloop.h"
 #include "rlite/utils.h"
 
 #ifdef __cplusplus

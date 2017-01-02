@@ -16,3 +16,5 @@
     - the only missing thing is to actually use the N-flow and not the N-1
 
 - periodic DFT synchronization
+
+- uipcp_add(): don't create thread for kernelspace IPCP

@@ -46,8 +46,6 @@
 #include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
 #include "rlite/list.h"
-#include "rlite/evloop.h"
-#include "rlite/evloop.h"
 #include "rlite/conf.h"
 
 #include "../helpers.h"
@@ -430,6 +428,8 @@ uipcps_loop(void *opaque)
             continue;
         }
 
+        /* There is something to read on the control file descriptor. It
+         * can only be an IPCP update message. */
         upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(uipcps->cfd, 1);
         if (!upd) {
             break;

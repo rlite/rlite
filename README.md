@@ -152,9 +152,6 @@ Four libraries are available:
 * **librlite**, the main library, wrapping the control device and I/O device.
                 This is the library used by applications to register names
                 and allocate flows.
-* **librlite-evloop**, implementing an extensible event-loop over a control
-                       device. Used by **rlite-uipcps** and the RINA
-                       gateway application.
 * **librlite-conf**, implementing the management and monitoring functionalities
                      of *rlite*, such as IPCP creation, removal and
                      configuration, flow monitoring, etc.
