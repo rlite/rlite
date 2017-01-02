@@ -206,7 +206,11 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
 
     ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
     if (ret) {
-        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+        if (errno == ENXIO) {
+            UPD(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+        } else {
+            UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+        }
     }
 
     return ret;
