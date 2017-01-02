@@ -81,13 +81,6 @@ struct rl_evloop {
     int timer_next_id;
 };
 
-/* Issue a request message to the kernel. Takes the ownership of
- * @msg. */
-struct rl_msg_base *
-rl_evloop_issue_request(struct rl_evloop *loop, struct rl_msg_base *msg,
-                        size_t msg_len, int has_response,
-                        unsigned int wait_for_completion, int *result);
-
 int
 rl_evloop_stop(struct rl_evloop *loop);
 
