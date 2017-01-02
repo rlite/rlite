@@ -904,30 +904,3 @@ rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
     return result;
 }
 
-int
-rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
-                      const char *param_name, const char *param_value)
-{
-    struct rl_kmsg_ipcp_config *req;
-    struct rl_msg_base *resp;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("Out of memory\n");
-        return ENOMEM;
-    }
-
-    rl_ipcp_config_fill(req, ipcp_id, param_name, param_value);
-
-    PV("Requesting IPCP config...\n");
-
-    resp = rl_evloop_issue_request(loop, RLITE_MB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp); (void)resp;
-    PV("result: %d\n", result);
-
-    return result;
-}
-

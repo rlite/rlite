@@ -27,13 +27,13 @@
 #include <errno.h>
 #include <string.h>
 
+#include <rlite/conf.h>
+#include <rlite/utils.h>
+#include <rlite/evloop.h>
+#include <rlite/uipcps-msg.h>
+
 #include "../helpers.h"
-
-#include "rlite/utils.h"
-#include "rlite/uipcps-msg.h"
-
 #include "uipcp-container.h"
-#include "rlite/evloop.h"
 
 
 int
@@ -327,6 +327,16 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     return result;
 }
 
+static void *
+uipcp_loop(void *opaque)
+{
+    struct uipcp *uipcp = opaque;
+
+    (void)uipcp;
+
+    return NULL;
+}
+
 extern struct uipcp_ops normal_ops;
 extern struct uipcp_ops shim_tcp4_ops;
 extern struct uipcp_ops shim_udp4_ops;
@@ -501,6 +511,11 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err2;
     }
 
+    ret = pthread_create(&uipcp->th, NULL, uipcp_loop, uipcp);
+    if (ret) {
+        goto err2;
+    }
+
     PI("userspace IPCP %u created\n", upd->ipcp_id);
 
     return 0;
@@ -548,6 +563,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
     kernelspace = uipcp_is_kernelspace(uipcp);
 
     if (!kernelspace) {
+        pthread_join(uipcp->th, NULL);
         uipcp->ops.fini(uipcp);
         ret = rl_evloop_fini(&uipcp->loop);
     }
@@ -707,7 +723,7 @@ uipcps_update_depths(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "depth", strbuf);
+        ret = rl_conf_ipcp_config(ipn->id, "depth", strbuf);
         if (ret) {
             PE("'ipcp-config depth %u' failed\n", ipn->depth);
         }
@@ -722,7 +738,7 @@ uipcps_update_depths(struct uipcps *uipcps)
             continue;
         }
 
-        ret = rl_evloop_ipcp_config(&uipcps->loop, ipn->id, "mss", strbuf);
+        ret = rl_conf_ipcp_config(ipn->id, "mss", strbuf);
         if (ret) {
             PE("'ipcp-config mss %u' failed\n", ipn->max_sdu_size);
         }

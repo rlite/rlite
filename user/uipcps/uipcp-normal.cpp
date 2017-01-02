@@ -505,8 +505,7 @@ uipcp_rib::set_address(rl_addr_t address)
     stringstream addr_ss;
 
     addr_ss << address;
-    return rl_evloop_ipcp_config(&uipcp->loop, uipcp->id,
-                                 "address", addr_ss.str().c_str());
+    return rl_conf_ipcp_config(uipcp->id, "address", addr_ss.str().c_str());
 }
 
 int

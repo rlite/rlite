@@ -144,9 +144,6 @@ int rl_evloop_fa_resp(struct rl_evloop *loop,
                       rl_ipcp_id_t upper_ipcp_id, rl_port_t port_id,
                       uint8_t response);
 
-int rl_evloop_ipcp_config(struct rl_evloop *loop, rl_ipcp_id_t ipcp_id,
-                          const char *param_name, const char *param_value);
-
 #ifdef __cplusplus
 }
 #endif
