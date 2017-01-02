@@ -26,6 +26,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/eventfd.h>
+#include <fcntl.h>
 
 #include <rlite/conf.h>
 #include <rlite/utils.h>
@@ -259,14 +261,87 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     return ret;
 }
 
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
+
+#define RL_SIGNAL_STOP      1
+#define RL_SIGNAL_REPOLL    2
+
 static void *
 uipcp_loop(void *opaque)
 {
     struct uipcp *uipcp = opaque;
 
-    (void)uipcp;
+    for (;;) {
+        int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
+        struct rl_msg_base *msg;
+        fd_set rdfs;
+        int ret;
+
+        FD_ZERO(&rdfs);
+        FD_SET(uipcp->cfd, &rdfs);
+        FD_SET(uipcp->eventfd, &rdfs);
+
+        ret = select(maxfd + 1, &rdfs, NULL, NULL, NULL);
+        if (ret == -1) {
+            /* Error. */
+            perror("select()");
+            break;
+
+        }
+
+        if (FD_ISSET(uipcp->eventfd, &rdfs)) {
+            /* A signal arrived. */
+            uint64_t x;
+            int n;
+
+            n = read(uipcp->eventfd, &x, sizeof(x));
+            if (n != sizeof(x)) {
+                perror("read(eventfd)");
+            }
+
+            if (x == RL_SIGNAL_STOP) {
+                /* Stop the event loop. */
+                UPD(uipcp, "quit main loop\n");
+                break;
+            }
+        }
+
+        if (!FD_ISSET(uipcp->cfd, &rdfs)) {
+            continue;
+        }
+
+        /* Read the next message posted by the kernel. */
+        msg = rl_read_next_msg(uipcp->cfd, 0);
+        if (!msg) {
+            continue;
+        }
+
+        assert(msg->msg_type < RLITE_KER_MSG_MAX);
+
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(msg));
+        free(msg);
+        /* Do we have an handler for this response message? */
+    }
 
     return NULL;
+}
+
+static int
+uipcp_loop_signal(struct uipcp *uipcp, unsigned int code)
+{
+    uint64_t x = code;
+    int n;
+
+    n = write(uipcp->eventfd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("write(eventfd)");
+        if (n < 0) {
+            return n;
+        }
+        return -1;
+    }
+
+    return 0;
 }
 
 extern struct uipcp_ops normal_ops;
@@ -385,6 +460,19 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto erry;
     }
 
+    ret = fcntl(uipcp->cfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        PE("fcntl(F_SETFL, O_NONBLOCK) failed [%s]\n", strerror(errno));
+        goto errz;
+    }
+
+    uipcp->eventfd = eventfd(0, 0);
+    if (uipcp->eventfd < 0) {
+        PE("eventfd() failed [%s]\n", strerror(errno));
+        ret = uipcp->eventfd;
+        goto errz;
+    }
+
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
         PE("uipcp %u already created\n", upd->ipcp_id);
@@ -468,6 +556,9 @@ err0:
     list_del(&uipcp->node);
 errx:
     pthread_mutex_unlock(&uipcps->lock);
+    close(uipcp->eventfd);
+errz:
+    close(uipcp->cfd);
 erry:
     free(uipcp);
 
@@ -503,11 +594,14 @@ uipcp_put(struct uipcp *uipcp, int locked)
     kernelspace = uipcp_is_kernelspace(uipcp);
 
     if (!kernelspace) {
-        close(uipcp->cfd);
+        uipcp_loop_signal(uipcp, RL_SIGNAL_STOP);
         ret = pthread_join(uipcp->th, NULL);
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));
         }
+        close(uipcp->eventfd);
+        close(uipcp->cfd);
+
         uipcp->ops.fini(uipcp);
         ret = rl_evloop_fini(&uipcp->loop);
     }

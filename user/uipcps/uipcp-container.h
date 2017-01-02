@@ -159,6 +159,7 @@ struct uipcp {
 
     pthread_t th;
     int cfd;
+    int eventfd;
 
     /* Container object. */
     struct uipcps *uipcps;
