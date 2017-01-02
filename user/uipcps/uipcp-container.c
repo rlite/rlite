@@ -241,7 +241,7 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
 }
 
 static int
-uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
+uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_set req;
     int ret;
@@ -290,7 +290,7 @@ time_cmp(const struct timespec *t1, const struct timespec *t2)
     return 0;
 }
 
-struct uipcp_tmr_event {
+struct uipcp_loop_tmr {
     int id;
     struct timespec exp;
     uipcp_tmr_cb_t cb;
@@ -299,9 +299,9 @@ struct uipcp_tmr_event {
     struct list_head node;
 };
 
-struct uipcp_fdcb {
+struct uipcp_loop_fdh {
     int fd;
-    uipcp_fdcb_t cb;
+    uipcp_loop_fdh_t cb;
 
     struct list_head node;
 };
@@ -314,7 +314,7 @@ uipcp_loop(void *opaque)
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
         uipcp_msg_handler_t handler = NULL;
-        struct uipcp_fdcb *fdcb;
+        struct uipcp_loop_fdh *fdcb;
         struct timeval *top = NULL;
         struct rl_msg_base *msg;
         struct timeval to;
@@ -341,11 +341,11 @@ uipcp_loop(void *opaque)
              *        expire
              */
             struct timespec now;
-            struct uipcp_tmr_event *te;
+            struct uipcp_loop_tmr *te;
 
             if (uipcp->timer_events_cnt) {
                 te = list_first_entry(&uipcp->timer_events,
-                                       struct uipcp_tmr_event, node);
+                                       struct uipcp_loop_tmr, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
                 if (time_cmp(&now, &te->exp) > 0) {
@@ -400,7 +400,7 @@ uipcp_loop(void *opaque)
             struct timespec now;
             struct list_head expired;
             struct list_head *elem;
-            struct uipcp_tmr_event *te;
+            struct uipcp_loop_tmr *te;
 
             list_init(&expired);
 
@@ -408,7 +408,7 @@ uipcp_loop(void *opaque)
 
             while (uipcp->timer_events_cnt) {
                 te = list_first_entry(&uipcp->timer_events,
-                                      struct uipcp_tmr_event, node);
+                                      struct uipcp_loop_tmr, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
                 if (time_cmp(&te->exp, &now) > 0) {
@@ -423,7 +423,7 @@ uipcp_loop(void *opaque)
             pthread_mutex_unlock(&uipcp->lock);
 
             while ((elem = list_pop_front(&expired))) {
-                te = container_of(elem, struct uipcp_tmr_event, node);
+                te = container_of(elem, struct uipcp_loop_tmr, node);
                 NPD("Exec timer callback [%d]\n", te->id);
                 te->cb(uipcp, te->arg);
                 free(te);
@@ -513,7 +513,7 @@ int
 uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
                     uipcp_tmr_cb_t cb, void *arg)
 {
-    struct uipcp_tmr_event *e, *cur;
+    struct uipcp_loop_tmr *e, *cur;
 
     if (!cb) {
         PE("NULL timer calback\n");
@@ -571,7 +571,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
 int
 uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
 {
-    struct uipcp_tmr_event *cur, *e = NULL;
+    struct uipcp_loop_tmr *cur, *e = NULL;
     int ret = -1;
 
     pthread_mutex_lock(&uipcp->lock);
@@ -598,9 +598,9 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
 }
 
 int
-uipcp_fdcb_add(struct uipcp *uipcp, int fd, uipcp_fdcb_t cb)
+uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
 {
-    struct uipcp_fdcb *fdcb;
+    struct uipcp_loop_fdh *fdcb;
 
     if (!cb || fd < 0) {
         PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
@@ -627,9 +627,9 @@ uipcp_fdcb_add(struct uipcp *uipcp, int fd, uipcp_fdcb_t cb)
 }
 
 int
-uipcp_fdcb_del(struct uipcp *uipcp, int fd)
+uipcp_loop_fdh_del(struct uipcp *uipcp, int fd)
 {
-    struct uipcp_fdcb *fdcb;
+    struct uipcp_loop_fdh *fdcb;
 
     pthread_mutex_lock(&uipcp->lock);
     list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
@@ -812,7 +812,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     /* Tell the kernel what is the control device to be associated to
      * the ipcp_id specified, so that reflected messages for that
      * IPCP are redirected to this uipcp. */
-    ret = uipcp_evloop_set(uipcp, upd->ipcp_id);
+    ret = uipcp_loop_set(uipcp, upd->ipcp_id);
     if (ret) {
         goto err2;
     }
@@ -880,7 +880,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
 
         {
             /* Clean up the timer_events list. */
-            struct uipcp_tmr_event *e, *tmp;
+            struct uipcp_loop_tmr *e, *tmp;
 
             list_for_each_entry_safe(e, tmp, &uipcp->timer_events, node) {
                 list_del(&e->node);
@@ -890,7 +890,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
 
         {
             /* Clean up the fdcbs list. */
-            struct uipcp_fdcb *fdcb, *tmp;
+            struct uipcp_loop_fdh *fdcb, *tmp;
 
             list_for_each_entry_safe(fdcb, tmp, &uipcp->fdcbs, node) {
                 list_del(&fdcb->node);

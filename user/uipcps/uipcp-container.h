@@ -249,11 +249,11 @@ typedef int (*uipcp_msg_handler_t)(struct uipcp *uipcp,
 typedef void (*uipcp_tmr_cb_t)(struct uipcp *uipcp, void *arg);
 
 /* The signature of file descriptor callback. */
-typedef void (*uipcp_fdcb_t)(struct uipcp *uipcp, int fd);
+typedef void (*uipcp_loop_fdh_t)(struct uipcp *uipcp, int fd);
 
-int uipcp_fdcb_add(struct uipcp *uipcp, int fd, uipcp_fdcb_t cb);
+int uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb);
 
-int uipcp_fdcb_del(struct uipcp *uipcp, int fd);
+int uipcp_loop_fdh_del(struct uipcp *uipcp, int fd);
 
 int uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
                         uipcp_tmr_cb_t cb, void *arg);

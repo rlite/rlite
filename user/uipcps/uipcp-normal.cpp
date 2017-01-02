@@ -276,7 +276,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
         throw std::exception();
     }
 
-    ret = uipcp_fdcb_add(uipcp, mgmtfd, mgmt_fd_ready);
+    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_fd_ready);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
@@ -316,7 +316,7 @@ uipcp_rib::~uipcp_rib()
         delete mit->second;
     }
 
-    uipcp_fdcb_del(uipcp, mgmtfd);
+    uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }

@@ -420,8 +420,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
 
     /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
      * for port 0x0D1F. */
-    if (uipcp_fdcb_add(uipcp, bp->fd, udp4_recv_dgram)) {
-        UPE(uipcp, "uipcp_fdcb_add() failed\n");
+    if (uipcp_loop_fdh_add(uipcp, bp->fd, udp4_recv_dgram)) {
+        UPE(uipcp, "uipcp_loop_fdh_add() failed\n");
         goto err;
     }
 
@@ -439,7 +439,7 @@ err:
 static void
 udp4_bindpoint_close(struct udp4_bindpoint *bp)
 {
-    uipcp_fdcb_del(bp->uipcp, bp->fd);
+    uipcp_loop_fdh_del(bp->uipcp, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
     if (bp->appl_name) free(bp->appl_name);

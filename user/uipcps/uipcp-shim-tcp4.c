@@ -217,7 +217,7 @@ shim_tcp4_appl_unregister(struct uipcp *uipcp,
 
     list_for_each_entry(bp, &shim->bindpoints, node) {
         if (strcmp(req->appl_name, bp->appl_name_s) == 0) {
-            uipcp_fdcb_del(uipcp, bp->fd);
+            uipcp_loop_fdh_del(uipcp, bp->fd);
             list_del(&bp->node);
             close(bp->fd);
             free(bp->appl_name_s);
@@ -285,7 +285,7 @@ shim_tcp4_appl_register(struct uipcp *uipcp,
 
     /* The accept_conn() callback will be invoked on new incoming
      * connections. */
-    uipcp_fdcb_add(uipcp, bp->fd, accept_conn);
+    uipcp_loop_fdh_add(uipcp, bp->fd, accept_conn);
 
     list_add_tail(&bp->node, &shim->bindpoints);
 
