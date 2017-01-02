@@ -158,6 +158,7 @@ struct uipcp {
     struct rl_evloop loop;
 
     pthread_t th;
+    int cfd;
 
     /* Container object. */
     struct uipcps *uipcps;

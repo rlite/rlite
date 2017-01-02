@@ -378,6 +378,13 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
+    uipcp->cfd = rina_open();
+    if (uipcp->cfd < 0) {
+        PE("rina_open() failed [%s]\n", strerror(errno));
+        ret = uipcp->cfd;
+        goto erry;
+    }
+
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
         PE("uipcp %u already created\n", upd->ipcp_id);
@@ -461,6 +468,7 @@ err0:
     list_del(&uipcp->node);
 errx:
     pthread_mutex_unlock(&uipcps->lock);
+erry:
     free(uipcp);
 
     return ret;
@@ -495,6 +503,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
     kernelspace = uipcp_is_kernelspace(uipcp);
 
     if (!kernelspace) {
+        close(uipcp->cfd);
         ret = pthread_join(uipcp->th, NULL);
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));
