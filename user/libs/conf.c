@@ -84,6 +84,7 @@ rl_conf_ipcp_create(const char *name, const char *dif_type,
 
     resp = (struct rl_kmsg_ipcp_create_resp *)wait_for_next_msg(fd, 3000);
     if (!resp) {
+        ret = -1L;
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
         goto out;
     }
@@ -276,46 +277,50 @@ rl_conf_flows_purge(struct list_head *flows)
     }
 }
 
-int
-rl_conf_flow_get_stats(struct rl_ctrl *ctrl, rl_port_t port_id,
-                       struct rl_flow_stats *stats)
+static int
+rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
 {
     struct rl_kmsg_flow_stats_req msg;
     struct rl_kmsg_flow_stats_resp *resp;
     int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_FLOW_STATS_REQ;
-    msg.event_id = rl_ctrl_get_id(ctrl);
+    msg.event_id = 1;
     msg.port_id = port_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                       RLITE_MB(&msg));
-        return -1;
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+        goto out;
     }
 
-    resp = (struct rl_kmsg_flow_stats_resp *)rl_ctrl_wait(ctrl, msg.event_id,
-                                                          3000);
+    resp = (struct rl_kmsg_flow_stats_resp *)wait_for_next_msg(fd, 3000);
     if (!resp) {
-        return -1;
+        ret = -1;
+        goto out;
     }
+    assert(resp->event_id == msg.event_id);
 
     *stats = resp->stats;
 
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     free(resp);
+out:
+    close(fd);
 
-    return 0;
+    return ret;
 }
 
 int
-rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
+rl_conf_flows_print(struct list_head *flows)
 {
     struct rl_flow *rl_flow;
     char specinfo[16];
@@ -326,7 +331,7 @@ rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
         int ret;
         int ofs = 0;
 
-        ret = rl_conf_flow_get_stats(ctrl, rl_flow->local_port, &stats);
+        ret = rl_conf_flow_get_stats(rl_flow->local_port, &stats);
         if (ret) {
             continue;
         }
