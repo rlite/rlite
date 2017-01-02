@@ -314,7 +314,7 @@ shim_tcp4_fa_req(struct uipcp *uipcp,
     struct tcp4_endpoint *ep;
     int ret;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     ep = malloc(sizeof(*ep));
     if (!ep) {
@@ -480,7 +480,7 @@ shim_tcp4_fa_resp(struct uipcp *uipcp,
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     struct tcp4_endpoint *ep;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
     if (!ep) {

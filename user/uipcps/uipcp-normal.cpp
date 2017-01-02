@@ -766,7 +766,7 @@ normal_fa_req(struct uipcp *uipcp,
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     ScopeLock(rib->lock);
 
@@ -923,7 +923,7 @@ normal_fa_resp(struct uipcp *uipcp,
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     ScopeLock(rib->lock);
 

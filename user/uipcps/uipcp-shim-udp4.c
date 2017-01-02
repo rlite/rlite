@@ -494,7 +494,7 @@ shim_udp4_fa_req(struct uipcp *uipcp,
     struct rl_flow_config cfg;
     struct udp4_endpoint *ep;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     /* Open an UDP socket. */
     ep = udp4_endpoint_open(shim);
@@ -534,7 +534,7 @@ shim_udp4_fa_resp(struct uipcp *uipcp,
     struct udp4_sdu *sdu, *tmp;
     struct udp4_endpoint *ep;
 
-    UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
     ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
     if (!ep) {
