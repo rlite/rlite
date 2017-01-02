@@ -119,11 +119,6 @@ rl_evloop_schedule(struct rl_evloop *loop, unsigned long delta_ms,
 int
 rl_evloop_schedule_canc(struct rl_evloop *loop, int id);
 
-int rl_evloop_fa_resp(struct rl_evloop *loop,
-                      uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
-                      rl_ipcp_id_t upper_ipcp_id, rl_port_t port_id,
-                      uint8_t response);
-
 #ifdef __cplusplus
 }
 #endif

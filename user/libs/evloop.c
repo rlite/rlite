@@ -769,29 +769,3 @@ rl_evloop_schedule_canc(struct rl_evloop *loop, int id)
     return ret;
 }
 
-int
-rl_evloop_fa_resp(struct rl_evloop *loop, uint32_t kevent_id,
-                  rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-                  rl_port_t port_id, uint8_t response)
-{
-    struct rl_kmsg_fa_resp *req;
-    struct rl_msg_base *resp;
-    int result;
-
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("Out of memory\n");
-        return ENOMEM;
-    }
-    rl_fa_resp_fill(req, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
-
-    PD("Responding to flow allocation request...\n");
-
-    resp = rl_evloop_issue_request(loop, RLITE_MB(req),
-                         sizeof(*req), 0, 0, &result);
-    assert(!resp); (void)resp;
-    PD("result: %d\n", result);
-
-    return result;
-}
-
