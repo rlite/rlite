@@ -300,6 +300,13 @@ struct uipcp_tmr_event {
     struct list_head node;
 };
 
+struct uipcp_fdcb {
+    int fd;
+    uipcp_fdcb_t cb;
+
+    struct list_head node;
+};
+
 static void *
 uipcp_loop(void *opaque)
 {
@@ -308,6 +315,7 @@ uipcp_loop(void *opaque)
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
         rl_resp_handler_t handler = NULL;
+        struct uipcp_fdcb *fdcb;
         struct timeval *top = NULL;
         struct rl_msg_base *msg;
         struct timeval to;
@@ -317,6 +325,13 @@ uipcp_loop(void *opaque)
         FD_ZERO(&rdfs);
         FD_SET(uipcp->cfd, &rdfs);
         FD_SET(uipcp->eventfd, &rdfs);
+
+        pthread_mutex_lock(&uipcp->lock);
+
+        list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
+            FD_SET(fdcb->fd, &rdfs);
+            maxfd = MAX(maxfd, fdcb->fd);
+        }
 
         {
             /* Compute the next timeout. Possible outcomes are:
@@ -328,8 +343,6 @@ uipcp_loop(void *opaque)
              */
             struct timespec now;
             struct uipcp_tmr_event *te;
-
-            pthread_mutex_lock(&uipcp->lock);
 
             if (uipcp->timer_events_cnt) {
                 te = list_first_entry(&uipcp->timer_events,
@@ -353,9 +366,8 @@ uipcp_loop(void *opaque)
                 NPD("Next timeout due in %lu secs and %lu usecs\n",
                     top->tv_sec, top->tv_usec);
             }
-
-            pthread_mutex_unlock(&uipcp->lock);
         }
+        pthread_mutex_unlock(&uipcp->lock);
 
         ret = select(maxfd + 1, &rdfs, NULL, NULL, top);
         if (ret == -1) {
@@ -416,6 +428,15 @@ uipcp_loop(void *opaque)
                 NPD("Exec timer callback [%d]\n", te->id);
                 te->cb(uipcp, te->arg);
                 free(te);
+            }
+        }
+
+        {
+            /* Process fdcb events. TODO take uipcp lock */
+            list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
+                if (FD_ISSET(fdcb->fd, &rdfs)) {
+                    fdcb->cb(uipcp, fdcb->fd);
+                }
             }
         }
 
@@ -576,6 +597,56 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
     return ret;
 }
 
+int
+uipcp_fdcb_add(struct uipcp *uipcp, int fd, uipcp_fdcb_t cb)
+{
+    struct uipcp_fdcb *fdcb;
+
+    if (!cb || fd < 0) {
+        PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
+        return -1;
+    }
+
+    fdcb = malloc(sizeof(*fdcb));
+    if (!fdcb) {
+        return -1;
+    }
+
+
+    memset(fdcb, 0, sizeof(*fdcb));
+    fdcb->fd = fd;
+    fdcb->cb = cb;
+
+    pthread_mutex_lock(&uipcp->lock);
+    list_add_tail(&fdcb->node, &uipcp->fdcbs);
+    pthread_mutex_unlock(&uipcp->lock);
+
+    uipcp_loop_signal(uipcp, RL_SIGNAL_REPOLL);
+
+    return 0;
+}
+
+int
+uipcp_fdcb_del(struct uipcp *uipcp, int fd)
+{
+    struct uipcp_fdcb *fdcb;
+
+    pthread_mutex_lock(&uipcp->lock);
+    list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
+        if (fdcb->fd == fd) {
+            list_del(&fdcb->node);
+            pthread_mutex_unlock(&uipcp->lock);
+            free(fdcb);
+
+            return 0;
+        }
+    }
+
+    pthread_mutex_unlock(&uipcp->lock);
+
+    return -1;
+}
+
 extern struct uipcp_ops normal_ops;
 extern struct uipcp_ops shim_tcp4_ops;
 extern struct uipcp_ops shim_udp4_ops;
@@ -706,6 +777,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     }
 
     pthread_mutex_init(&uipcp->lock, NULL);
+    list_init(&uipcp->fdcbs);
     list_init(&uipcp->timer_events);
     uipcp->timer_events_cnt = 0;
     uipcp->timer_next_id = 1;
@@ -836,6 +908,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));
         }
+
         {
             /* Clean up the timer_events list. */
             struct uipcp_tmr_event *e, *tmp;
@@ -845,7 +918,19 @@ uipcp_put(struct uipcp *uipcp, int locked)
                 free(e);
             }
         }
+
+        {
+            /* Clean up the fdcbs list. */
+            struct uipcp_fdcb *fdcb, *tmp;
+
+            list_for_each_entry_safe(fdcb, tmp, &uipcp->fdcbs, node) {
+                list_del(&fdcb->node);
+                free(fdcb);
+            }
+        }
+
         pthread_mutex_destroy(&uipcp->lock);
+
         close(uipcp->eventfd);
         close(uipcp->cfd);
 

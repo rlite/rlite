@@ -165,6 +165,10 @@ struct uipcp {
     int timer_events_cnt;
     int timer_next_id;
 
+    /* Used to store the list of file descriptor callbacks registered within
+     * the uipcp main loop. */
+    struct list_head fdcbs;
+
     /* Container object. */
     struct uipcps *uipcps;
 
@@ -243,8 +247,15 @@ int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
 int uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
                                 const struct rl_flow_config *flowcfg);
 
+/* The signature of a message handler. */
+typedef int (*uipcp_msg_handler_t)(struct uipcp *uipcp,
+                                   const struct rl_msg_base *msg);
+
 /* The signature of timer callback. */
 typedef void (*uipcp_tmr_cb_t)(struct uipcp *uipcp, void *arg);
+
+/* The signature of file descriptor callback. */
+typedef void (*uipcp_fdcb_t)(struct uipcp *uipcp, int fd);
 
 #define UPRINT(_u, LEV, FMT, ...)    \
     DOPRINT("[%s:" LEV "][%u]%s: " FMT, hms_string(), (_u)->id, __func__, ##__VA_ARGS__)
