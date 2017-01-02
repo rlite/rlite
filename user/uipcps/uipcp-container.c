@@ -584,7 +584,7 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
     }
 
     if (!e) {
-        PE("Cannot found scheduled timer with id %d\n", id);
+        PE("Cannot find scheduled timer with id %d\n", id);
     } else {
         ret = 0;
         list_del(&e->node);
