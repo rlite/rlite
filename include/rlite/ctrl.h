@@ -93,6 +93,10 @@ int rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                    const struct rina_flow_spec *flowspec,
                    rl_ipcp_id_t upper_ipcp_id);
 
+void rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
+                    rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
+                    rl_port_t port_id, uint8_t response);
+
 /*
  * API calls for userspace IPCPs, not to be used by applications.
  */

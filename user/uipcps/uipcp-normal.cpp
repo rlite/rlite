@@ -781,6 +781,19 @@ normal_fa_req(struct rl_evloop *loop,
 }
 
 static int
+uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id,
+              rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
+              rl_port_t port_id, uint8_t response)
+{
+    struct rl_kmsg_fa_resp resp;
+
+    rl_fa_resp_fill(&resp, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
+
+    PV("Responding to flow allocation request...\n");
+    return rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&resp), 1);
+}
+
+static int
 neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
@@ -806,11 +819,11 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
         response = RLITE_SUCC;
     }
 
-    ret = rl_evloop_fa_resp(&rib->uipcp->loop, req->kevent_id, req->ipcp_id,
-                            0xffff, req->port_id, response);
+    ret = uipcp_fa_resp(rib->uipcp, req->kevent_id, req->ipcp_id,
+                        0xffff, req->port_id, response);
     if (ret || response == RLITE_ERR) {
         if (ret) {
-            UPE(rib->uipcp, "rl_appl_fa_resp() failed\n");
+            UPE(rib->uipcp, "uipcp_fa_resp() failed[%s]\n", strerror(errno));
         }
         return 0;
     }
@@ -862,7 +875,7 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     ScopeLock(rib->lock);
 
     /* First of all we update the neighbors in the RIB. This
-     * must be done before invoking rl_appl_fa_resp,
+     * must be done before invoking uipcp_fa_resp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to add the neighbor with the associated port_id. */
@@ -882,11 +895,13 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
                                                 lower_ipcp_id);
     neigh->flows[neigh_port_id]->reliable = is_reliable_spec(&req->flowspec);
 
-    ret = rl_evloop_fa_resp(&uipcp->loop, req->kevent_id, req->ipcp_id,
-                            uipcp->id, req->port_id, result);
+    ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
+                        uipcp->id, req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
-        UPE(uipcp, "rl_appl_fa_resp() failed\n");
+        if (ret) {
+            UPE(uipcp, "uipcp_fa_resp() failed [%s]\n", strerror(errno));
+        }
         goto err;
     }
 
