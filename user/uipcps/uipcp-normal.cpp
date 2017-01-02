@@ -35,6 +35,7 @@
 #include <cassert>
 #include <cerrno>
 #include <pthread.h>
+#include <poll.h>
 
 #include <rlite/conf.h>
 
@@ -985,6 +986,41 @@ normal_fini(struct uipcp *uipcp)
 }
 
 static int
+do_registration(struct uipcp *uipcp, const char *dif_name,
+                const char *local_name, int reg)
+{
+    struct pollfd pfd;
+    int ret;
+
+    if (reg) {
+        pfd.fd = rina_register(uipcp->loop.ctrl.rfd, dif_name,
+                               local_name, RINA_F_NOWAIT);
+    } else {
+        pfd.fd = rina_unregister(uipcp->loop.ctrl.rfd, dif_name,
+                                 local_name, RINA_F_NOWAIT);
+    }
+
+    if (pfd.fd < 0) {
+        UPE(uipcp, "rina_register() failed [%s]\n", strerror(errno));
+        return -1;
+    }
+
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 2000);
+    if (ret <= 0) {
+        if (ret == 0) {
+            UPE(uipcp, "poll() timed out\n");
+            ret = -1;
+        } else {
+            UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
+        }
+        return ret;
+    }
+
+    return rina_register_wait(uipcp->loop.ctrl.rfd, pfd.fd);
+}
+
+static int
 normal_register_to_lower(struct uipcp *uipcp,
                          const struct rl_cmsg_ipcp_register *req)
 {
@@ -999,9 +1035,7 @@ normal_register_to_lower(struct uipcp *uipcp,
     }
 
     /* Perform the registration. */
-    ret = rl_evloop_register(&uipcp->loop, req->reg, req->dif_name,
-                             req->ipcp_name, 2000);
-
+    ret = do_registration(uipcp, req->dif_name, req->ipcp_name, req->reg);
     if (ret) {
         return ret;
     }
@@ -1019,8 +1053,7 @@ normal_register_to_lower(struct uipcp *uipcp,
 
     if (self_reg_pending) {
         /* Perform (un)registration out of the lock. */
-        ret = rl_evloop_register(&uipcp->loop, self_reg, uipcp->dif_name,
-                                 uipcp->name, 2000);
+        ret = do_registration(uipcp, uipcp->dif_name, uipcp->name, self_reg);
 
         if (ret) {
             UPE(uipcp, "self-(un)registration failed\n");

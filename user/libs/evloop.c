@@ -821,34 +821,6 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
 }
 
 int
-rl_evloop_register(struct rl_evloop *loop, int reg,
-                   const char *dif_name,
-                   const char *appl_name,
-                   unsigned int wait_ms)
-{
-    struct rl_kmsg_appl_register_resp *resp;
-    uint32_t event_id = rl_ctrl_get_id(&loop->ctrl);
-    int ret = 0;
-
-    resp = rl_evloop_reg_req(loop, event_id, wait_ms, reg, dif_name,
-                             appl_name);
-
-    if (!resp) {
-        return -1;
-    }
-
-    if (resp->response != RLITE_SUCC) {
-        ret = -1;
-    }
-
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                  RLITE_MB(resp));
-    free(resp);
-
-    return ret;
-}
-
-int
 rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
                      const char *dif_name,
                      const char *local_appl,

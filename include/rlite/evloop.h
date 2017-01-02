@@ -125,11 +125,6 @@ rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
                   int reg, const char *dif_name,
                   const char *appl_name);
 
-int rl_evloop_register(struct rl_evloop *loop,
-                       int reg, const char *dif_name,
-                       const char *appl_name,
-                       unsigned int wait_ms);
-
 int rl_evloop_flow_alloc(struct rl_evloop *loop,
                         uint32_t event_id,
                         const char *dif_name,
