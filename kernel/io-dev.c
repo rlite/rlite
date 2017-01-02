@@ -75,12 +75,13 @@ tx_completion_func(unsigned long arg)
         ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
-        PD("Sending [%lu] from rmtq\n",
+        RPD(2, "Sending [%lu] from rmtq\n",
                 (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
 
         BUG_ON(!rb->tx_compl_flow);
         ret = ipcp->ops.sdu_write(ipcp, rb->tx_compl_flow, rb, false);
         if (unlikely(ret == -EAGAIN)) {
+#if 0
             PD("Pushing [%lu] back to rmtq\n",
                     (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
             spin_lock_bh(&ipcp->rmtq_lock);
@@ -88,14 +89,11 @@ tx_completion_func(unsigned long arg)
             ipcp->rmtq_size += rl_buf_truesize(rb);
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
+#else
+            rl_buf_free(rb);
+#endif
         }
     }
-#if 0
-    if (drained) {
-        wake_up_interruptible_poll(flow->txrx.tx_wqh, POLLOUT |
-                                   POLLWRBAND | POLLWRNORM);
-    }
-#endif
 }
 
 /* Userspace queue threshold in bytes. */
@@ -217,14 +215,11 @@ rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
     spin_lock_bh(&ipcp->rmtq_lock);
 
     if (ipcp->rmtq_size > 0) {
-        /* Schedule a tasklet to complete the tx work.
-         * If appropriate, the tasklet will wake up
-         * waiting process contexts. */
+        /* Schedule a tasklet to complete the tx work. */
         tasklet_schedule(&ipcp->tx_completion);
-    } else {
-        /* Wake up waiting process contexts directly. */
-        wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
     }
+    /* Wake up waiting process contexts. */
+    wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
 
     spin_unlock_bh(&ipcp->rmtq_lock);
 }
