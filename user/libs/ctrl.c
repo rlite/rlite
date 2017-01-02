@@ -254,8 +254,9 @@ pending_queue_fini(struct list_head *list)
         free(e);
     }
 }
-int
-rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
+
+static int
+rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
                      const char *appl_name)
 {
@@ -536,8 +537,8 @@ rina_register_common(int fd, const char *dif_name, const char *local_appl,
         return wfd;
     }
 
-    ret = rina_register_req_fill(&req, RINA_REG_EVENT_ID, dif_name,
-                                 reg, local_appl);
+    ret = rl_register_req_fill(&req, RINA_REG_EVENT_ID, dif_name,
+                               reg, local_appl);
     if (ret) {
         errno = ENOMEM;
         goto out;
