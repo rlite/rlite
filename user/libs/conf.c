@@ -50,7 +50,7 @@ wait_for_next_msg(int fd, int timeout)
         return NULL;
     }
 
-    return read_next_msg(fd, 1);
+    return rl_read_next_msg(fd, 1);
 }
 
 /* Create an IPC process. */

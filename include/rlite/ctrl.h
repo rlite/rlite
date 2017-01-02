@@ -84,7 +84,7 @@ uint32_t rl_ctrl_get_id(struct rl_ctrl *ctrl);
 
 int rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
 
-struct rl_msg_base * read_next_msg(int rfd, int quiet);
+struct rl_msg_base *rl_read_next_msg(int rfd, int quiet);
 
 int rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                    uint32_t event_id, const char *dif_name,

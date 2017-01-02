@@ -561,10 +561,10 @@ ipcps_load()
         struct rl_kmsg_ipcp_update *upd;
         struct ipcp_attrs *attrs, *scan;
 
-        upd = (struct rl_kmsg_ipcp_update *)read_next_msg(fd, 1);
+        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
         if (!upd) {
             if (errno && errno != EAGAIN) {
-                perror("read_next_msg()");
+                perror("rl_read_next_msg()");
             }
             break;
         }

@@ -59,7 +59,7 @@ rl_ctrl_get_id(struct rl_ctrl *ctrl)
 }
 
 struct rl_msg_base *
-read_next_msg(int rfd, int quiet)
+rl_read_next_msg(int rfd, int quiet)
 {
     unsigned int max_resp_size = rl_numtables_max_size(
                 rl_ker_numtables,
@@ -430,7 +430,7 @@ rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
         }
 
         /* Read the next message posted by the kernel. */
-        resp = read_next_msg(ctrl->rfd, 1);
+        resp = rl_read_next_msg(ctrl->rfd, 1);
         if (!resp) {
             continue;
         }
@@ -497,7 +497,7 @@ rina_register_wait(int fd, int wfd)
     rl_ipcp_id_t ipcp_id;
     int ret = 0;
 
-    resp = (struct rl_kmsg_appl_register_resp *)read_next_msg(wfd, 1);
+    resp = (struct rl_kmsg_appl_register_resp *)rl_read_next_msg(wfd, 1);
     if (!resp) {
         goto out;
     }
@@ -597,7 +597,7 @@ rina_flow_alloc_wait(int wfd)
     struct rl_kmsg_fa_resp_arrived *resp;
     int ret = -1;
 
-    resp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(wfd, 1);
+    resp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(wfd, 1);
     if (!resp) {
         goto out;
     }
@@ -797,7 +797,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
         memset(spi, 0, sizeof(*spi));
     }
 
-    req = (struct rl_kmsg_fa_req_arrived *)read_next_msg(fd, 1);
+    req = (struct rl_kmsg_fa_req_arrived *)rl_read_next_msg(fd, 1);
     if (!req) {
         goto out0;
     }

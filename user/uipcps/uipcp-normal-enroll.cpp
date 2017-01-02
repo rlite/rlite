@@ -1378,9 +1378,9 @@ uipcp_flow_alloc(struct uipcp *uipcp, const char *dif_name,
         goto out;
     }
 
-    kresp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(fd, 1);
+    kresp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(fd, 1);
     if (!kresp) {
-        UPE(uipcp, "read_next_msg failed() [%s]\n", strerror(errno));
+        UPE(uipcp, "rl_read_next_msg failed() [%s]\n", strerror(errno));
         goto out;
     }
     assert(kresp->msg_type == RLITE_KER_FA_RESP_ARRIVED);

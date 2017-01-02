@@ -275,7 +275,7 @@ evloop_function(void *arg)
         }
 
         /* Read the next message posted by the kernel. */
-        resp = read_next_msg(loop->ctrl.rfd, 0);
+        resp = rl_read_next_msg(loop->ctrl.rfd, 0);
         if (!resp) {
             continue;
         }
