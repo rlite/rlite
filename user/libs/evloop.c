@@ -191,10 +191,10 @@ evloop_function(void *arg)
                     to.tv_sec = delta_ns / ONEBILLION;
                     to.tv_usec = (delta_ns % ONEBILLION) / 1000;
 
-                    top = &to;
-                    NPD("Next timeout due in %lu secs and %lu usecs\n",
-                            top->tv_sec, top->tv_usec);
                 }
+                top = &to;
+                NPD("Next timeout due in %lu secs and %lu usecs\n",
+                        top->tv_sec, top->tv_usec);
             }
 
             pthread_mutex_unlock(&loop->timer_lock);

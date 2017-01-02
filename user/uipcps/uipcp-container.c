@@ -266,6 +266,40 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 #define RL_SIGNAL_STOP      1
 #define RL_SIGNAL_REPOLL    2
 
+#define ONEBILLION 1000000000ULL
+#define ONEMILLION 1000000ULL
+
+static int
+time_cmp(const struct timespec *t1, const struct timespec *t2)
+{
+    if (t1->tv_sec > t2->tv_sec) {
+        return 1;
+    }
+
+    if (t1->tv_sec < t2->tv_sec) {
+        return -1;
+    }
+
+    if (t1->tv_nsec > t2->tv_nsec) {
+        return 1;
+    }
+
+    if (t1->tv_nsec < t2->tv_nsec) {
+        return -1;
+    }
+
+    return 0;
+}
+
+struct uipcp_tmr_event {
+    int id;
+    struct timespec exp;
+    uipcp_tmr_cb_t cb;
+    void *arg;
+
+    struct list_head node;
+};
+
 static void *
 uipcp_loop(void *opaque)
 {
@@ -274,7 +308,9 @@ uipcp_loop(void *opaque)
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
         rl_resp_handler_t handler = NULL;
+        struct timeval *top = NULL;
         struct rl_msg_base *msg;
+        struct timeval to;
         fd_set rdfs;
         int ret;
 
@@ -282,7 +318,46 @@ uipcp_loop(void *opaque)
         FD_SET(uipcp->cfd, &rdfs);
         FD_SET(uipcp->eventfd, &rdfs);
 
-        ret = select(maxfd + 1, &rdfs, NULL, NULL, NULL);
+        {
+            /* Compute the next timeout. Possible outcomes are:
+             *     1) no timeout
+             *     2) 0, i.e. wake up immediately, because some
+             *        timer has already expired
+             *     3) > 0, i.e. the existing timer still has to
+             *        expire
+             */
+            struct timespec now;
+            struct uipcp_tmr_event *te;
+
+            pthread_mutex_lock(&uipcp->lock);
+
+            if (uipcp->timer_events_cnt) {
+                te = list_first_entry(&uipcp->timer_events,
+                                       struct uipcp_tmr_event, node);
+
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if (time_cmp(&now, &te->exp) > 0) {
+                    to.tv_sec = 0;
+                    to.tv_usec = 0;
+                } else {
+                    unsigned long delta_ns;
+
+                    delta_ns = (te->exp.tv_sec - now.tv_sec) * ONEBILLION +
+                        (te->exp.tv_nsec - now.tv_nsec);
+
+                    to.tv_sec = delta_ns / ONEBILLION;
+                    to.tv_usec = (delta_ns % ONEBILLION) / 1000;
+                }
+
+                top = &to;
+                NPD("Next timeout due in %lu secs and %lu usecs\n",
+                    top->tv_sec, top->tv_usec);
+            }
+
+            pthread_mutex_unlock(&uipcp->lock);
+        }
+
+        ret = select(maxfd + 1, &rdfs, NULL, NULL, top);
         if (ret == -1) {
             /* Error. */
             perror("select()");
@@ -304,6 +379,43 @@ uipcp_loop(void *opaque)
                 /* Stop the event loop. */
                 UPD(uipcp, "quit main loop\n");
                 break;
+            }
+        }
+
+        {
+            /* Process expired timers. Timer callbacks
+             * are allowed to call uipcp_loop_schedule(), so
+             * rescheduling is possible. */
+            struct timespec now;
+            struct list_head expired;
+            struct list_head *elem;
+            struct uipcp_tmr_event *te;
+
+            list_init(&expired);
+
+            pthread_mutex_lock(&uipcp->lock);
+
+            while (uipcp->timer_events_cnt) {
+                te = list_first_entry(&uipcp->timer_events,
+                                      struct uipcp_tmr_event, node);
+
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if (time_cmp(&te->exp, &now) > 0) {
+                    break;
+                }
+
+                list_del(&te->node);
+                uipcp->timer_events_cnt--;
+                list_add_tail(&te->node, &expired);
+            }
+
+            pthread_mutex_unlock(&uipcp->lock);
+
+            while ((elem = list_pop_front(&expired))) {
+                te = container_of(elem, struct uipcp_tmr_event, node);
+                NPD("Exec timer callback [%d]\n", te->id);
+                te->cb(uipcp, te->arg);
+                free(te);
             }
         }
 
@@ -372,6 +484,96 @@ uipcp_loop_signal(struct uipcp *uipcp, unsigned int code)
     }
 
     return 0;
+}
+
+#define TIMER_EVENTS_MAX    64
+
+int
+uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
+                    uipcp_tmr_cb_t cb, void *arg)
+{
+    struct uipcp_tmr_event *e, *cur;
+
+    if (!cb) {
+        PE("NULL timer calback\n");
+        return -1;
+    }
+
+    e = malloc(sizeof(*e));
+    if (!e) {
+        PE("Out of memory\n");
+        return -1;
+    }
+    memset(e, 0, sizeof(*e));
+
+    pthread_mutex_lock(&uipcp->lock);
+
+    if (uipcp->timer_events_cnt >= TIMER_EVENTS_MAX) {
+        PE("Max number of timers reached [%u]\n",
+           uipcp->timer_events_cnt);
+    }
+
+    e->id = uipcp->timer_next_id;
+    e->cb = cb;
+    e->arg = arg;
+    clock_gettime(CLOCK_MONOTONIC, &e->exp);
+    e->exp.tv_nsec += delta_ms * ONEMILLION;
+    e->exp.tv_sec += e->exp.tv_nsec / ONEBILLION;
+    e->exp.tv_nsec = e->exp.tv_nsec % ONEBILLION;
+
+    list_for_each_entry(cur, &uipcp->timer_events, node) {
+        if (time_cmp(&e->exp, &cur->exp) < 0) {
+            break;
+        }
+    }
+
+    /* Insert 'e' right before 'cur'. */
+    list_add_tail(&e->node, &cur->node);
+    uipcp->timer_events_cnt++;
+    if (++uipcp->timer_next_id > TIMER_EVENTS_MAX) {
+        uipcp->timer_next_id = 1;
+    }
+#if 0
+    printf("TIMERLIST: [");
+    list_for_each_entry(cur, &uipcp->timer_events, node) {
+        printf("[%d] %lu+%lu, ", cur->id, cur->exp.tv_sec, cur->exp.tv_nsec);
+    }
+    printf("]\n");
+#endif
+    pthread_mutex_unlock(&uipcp->lock);
+
+    uipcp_loop_signal(uipcp, RL_SIGNAL_REPOLL);
+
+    return e->id;
+}
+
+int
+uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
+{
+    struct uipcp_tmr_event *cur, *e = NULL;
+    int ret = -1;
+
+    pthread_mutex_lock(&uipcp->lock);
+
+    list_for_each_entry(cur, &uipcp->timer_events, node) {
+        if (cur->id == id) {
+            e = cur;
+            break;
+        }
+    }
+
+    if (!e) {
+        PE("Cannot found scheduled timer with id %d\n", id);
+    } else {
+        ret = 0;
+        list_del(&e->node);
+        uipcp->timer_events_cnt--;
+        free(e);
+    }
+
+    pthread_mutex_unlock(&uipcp->lock);
+
+    return ret;
 }
 
 extern struct uipcp_ops normal_ops;
@@ -503,6 +705,11 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto errz;
     }
 
+    pthread_mutex_init(&uipcp->lock, NULL);
+    list_init(&uipcp->timer_events);
+    uipcp->timer_events_cnt = 0;
+    uipcp->timer_next_id = 1;
+
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
         PE("uipcp %u already created\n", upd->ipcp_id);
@@ -629,6 +836,16 @@ uipcp_put(struct uipcp *uipcp, int locked)
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));
         }
+        {
+            /* Clean up the timer_events list. */
+            struct uipcp_tmr_event *e, *tmp;
+
+            list_for_each_entry_safe(e, tmp, &uipcp->timer_events, node) {
+                list_del(&e->node);
+                free(e);
+            }
+        }
+        pthread_mutex_destroy(&uipcp->lock);
         close(uipcp->eventfd);
         close(uipcp->cfd);
 
