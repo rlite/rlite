@@ -119,12 +119,6 @@ rl_evloop_schedule(struct rl_evloop *loop, unsigned long delta_ms,
 int
 rl_evloop_schedule_canc(struct rl_evloop *loop, int id);
 
-struct rl_kmsg_appl_register_resp *
-rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
-                  unsigned int wait_ms,
-                  int reg, const char *dif_name,
-                  const char *appl_name);
-
 int rl_evloop_flow_alloc(struct rl_evloop *loop,
                         uint32_t event_id,
                         const char *dif_name,

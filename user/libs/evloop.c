@@ -795,31 +795,6 @@ rl_evloop_fa_resp(struct rl_evloop *loop, uint32_t kevent_id,
     return result;
 }
 
-struct rl_kmsg_appl_register_resp *
-rl_evloop_reg_req(struct rl_evloop *loop, uint32_t event_id,
-                  unsigned int wait_ms, int reg,
-                  const char *dif_name,
-                  const char *appl_name)
-{
-    struct rl_kmsg_appl_register *req;
-    int result;
-
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        PE("Out of memory\n");
-        return NULL;
-    }
-
-    rina_register_req_fill(req, event_id, dif_name, reg, appl_name);
-
-    PV("Requesting appl %sregistration...\n", (reg ? "": "un"));
-
-    return (struct rl_kmsg_appl_register_resp *)
-           rl_evloop_issue_request(loop, RLITE_MB(req),
-                               sizeof(*req), 1, wait_ms, &result);
-}
-
 int
 rl_evloop_flow_alloc(struct rl_evloop *loop, uint32_t event_id,
                      const char *dif_name,
