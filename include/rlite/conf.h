@@ -63,7 +63,7 @@ int
 rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows);
 
 int
-rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows);
+rl_conf_flows_fetch(struct list_head *flows);
 
 void
 rl_conf_flows_purge(struct list_head *flows);

@@ -213,11 +213,18 @@ flow_fetch_resp(struct list_head *flows,
 }
 
 int
-rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
+rl_conf_flows_fetch(struct list_head *flows)
 {
     struct rl_kmsg_flow_fetch_resp *resp;
     struct rl_msg_base msg;
+    uint32_t event_id = 1;
     int end = 0;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_FLOW_FETCH;
@@ -228,19 +235,19 @@ rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
         /* Fetch information about a single IPC process. */
         int ret;
 
-        msg.event_id = rl_ctrl_get_id(ctrl);
+        msg.event_id = event_id ++;
 
-        ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
+        ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
             PE("Failed to issue request to the kernel\n");
         }
 
-        resp = (struct rl_kmsg_flow_fetch_resp *)
-               rl_ctrl_wait(ctrl, msg.event_id, 3000);
+        resp = (struct rl_kmsg_flow_fetch_resp *)wait_for_next_msg(fd, 3000);
         if (!resp) {
             end = 1;
 
         } else {
+            assert(resp->event_id == msg.event_id);
             /* Consume and free the response. */
             flow_fetch_resp(flows, resp);
 
@@ -251,8 +258,8 @@ rl_conf_flows_fetch(struct rl_ctrl *ctrl, struct list_head *flows)
         }
     }
 
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
 
     return 0;
 }

@@ -489,7 +489,7 @@ flows_show(int argc, char **argv, struct rl_ctrl *ctrl,
     struct list_head flows;
 
     list_init(&flows);
-    rl_conf_flows_fetch(ctrl, &flows);
+    rl_conf_flows_fetch(&flows);
     rl_conf_flows_print(ctrl, &flows);
     rl_conf_flows_purge(&flows);
 
