@@ -157,9 +157,6 @@ struct uipcp {
     /* Parent object. */
     struct rl_evloop loop;
 
-    /* Event loop thread */
-    pthread_t th;
-
     /* Container object. */
     struct uipcps *uipcps;
 

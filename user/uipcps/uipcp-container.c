@@ -327,16 +327,6 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     return result;
 }
 
-static void *
-uipcp_loop(void *opaque)
-{
-    struct uipcp *uipcp = opaque;
-
-    (void)uipcp;
-
-    return NULL;
-}
-
 extern struct uipcp_ops normal_ops;
 extern struct uipcp_ops shim_tcp4_ops;
 extern struct uipcp_ops shim_udp4_ops;
@@ -511,11 +501,6 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err2;
     }
 
-    ret = pthread_create(&uipcp->th, NULL, uipcp_loop, uipcp);
-    if (ret) {
-        goto err2;
-    }
-
     PI("userspace IPCP %u created\n", upd->ipcp_id);
 
     return 0;
@@ -563,7 +548,6 @@ uipcp_put(struct uipcp *uipcp, int locked)
     kernelspace = uipcp_is_kernelspace(uipcp);
 
     if (!kernelspace) {
-        pthread_join(uipcp->th, NULL);
         uipcp->ops.fini(uipcp);
         ret = rl_evloop_fini(&uipcp->loop);
     }
