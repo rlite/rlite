@@ -45,19 +45,18 @@ struct rl_flow {
 };
 
 long int
-rl_conf_ipcp_create(struct rl_ctrl *ctrl,
-                    const char *name, const char *dif_type,
+rl_conf_ipcp_create(const char *name, const char *dif_type,
                     const char *dif_name);
 
 int
-rl_conf_ipcp_uipcp_wait(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id);
+rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id);
 
 int
-rl_conf_ipcp_destroy(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id);
+rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id);
 
 int
-rl_conf_ipcp_config(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
-                    const char *param_name, const char *param_value);
+rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
+                    const char *param_value);
 
 /* Fetch information about all flows in the system. */
 int
@@ -70,8 +69,7 @@ void
 rl_conf_flows_purge(struct list_head *flows);
 
 int
-rl_conf_ipcp_qos_supported(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
-                           struct rina_flow_spec *spec);
+rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec);
 
 #ifdef __cplusplus
 }

@@ -1352,8 +1352,8 @@ Neighbor::alloc_flow(const char *supp_dif)
     event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
 
     reliable_spec(&relspec);
-    have_reliable_flow = (rl_conf_ipcp_qos_supported(&rib->uipcp->loop.ctrl,
-                                            lower_ipcp_id_, &relspec) == 0);
+    have_reliable_flow = (rl_conf_ipcp_qos_supported(lower_ipcp_id_,
+                                                     &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
                                              (have_reliable_flow ? "" : " not"));
 

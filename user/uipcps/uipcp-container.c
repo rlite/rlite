@@ -493,7 +493,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err2;
     }
 
-    /* Tell the kernel what is the event loop to be associated to
+    /* Tell the kernel what is the control device to be associated to
      * the ipcp_id specified, so that reflected messages for that
      * IPCP are redirected to this uipcp. */
     ret = uipcp_evloop_set(uipcp, upd->ipcp_id);

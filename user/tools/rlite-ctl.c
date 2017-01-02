@@ -229,17 +229,17 @@ ipcp_create(int argc, char **argv, struct rl_ctrl *ctrl,
     dif_type = argv[1];
     dif_name = argv[2];
 
-    ipcp_id = rl_conf_ipcp_create(ctrl, ipcp_name, dif_type, dif_name);
+    ipcp_id = rl_conf_ipcp_create(ipcp_name, dif_type, dif_name);
 
     if (ipcp_id >= 0L) {
         PI("IPCP of type '%s' created, assigned id %u\n", dif_type,
            (unsigned int)ipcp_id);
 
         if (type_has_uipcp(dif_type)) {
-            ret = rl_conf_ipcp_uipcp_wait(ctrl, (unsigned int)ipcp_id);
+            ret = rl_conf_ipcp_uipcp_wait((unsigned int)ipcp_id);
             if (ret) {
                 PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
-                rl_conf_ipcp_destroy(ctrl, (unsigned int)ipcp_id);
+                rl_conf_ipcp_destroy((unsigned int)ipcp_id);
 
             } else {
                 PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
@@ -270,7 +270,7 @@ ipcp_destroy(int argc, char **argv, struct rl_ctrl *ctrl,
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rl_conf_ipcp_destroy(ctrl, attrs->id);
+    ret = rl_conf_ipcp_destroy(attrs->id);
     if (!ret) {
         PI("IPCP %u destroyed\n", attrs->id);
     }
@@ -299,7 +299,7 @@ ipcp_config(int argc, char **argv, struct rl_ctrl *ctrl,
         PE("Could not find a suitable IPC process\n");
     } else {
         /* Forward the request to the kernel. */
-        ret = rl_conf_ipcp_config(ctrl, attrs->id, param_name, param_value);
+        ret = rl_conf_ipcp_config(attrs->id, param_name, param_value);
         if (!ret) {
             PI("IPCP %u configured correctly: %s <== %s\n", attrs->id,
                param_name, param_value);

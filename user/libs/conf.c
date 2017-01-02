@@ -26,118 +26,148 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
+#include <poll.h>
+#include <unistd.h>
 
 #include "rlite/conf.h"
 #include "ctrl-utils.h"
 
 
+static struct rl_msg_base *
+wait_for_next_msg(int fd, int timeout)
+{
+    struct pollfd pfd;
+    int ret;
+
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+
+    ret = poll(&pfd, 1, timeout);
+    if (ret <= 0) {
+        if (ret == 0) {
+            errno = ETIMEDOUT;
+        }
+        return NULL;
+    }
+
+    return read_next_msg(fd, 1);
+}
+
 /* Create an IPC process. */
 long int
-rl_conf_ipcp_create(struct rl_ctrl *ctrl,
-                    const char *name, const char *dif_type,
+rl_conf_ipcp_create(const char *name, const char *dif_type,
                     const char *dif_name)
 {
     struct rl_kmsg_ipcp_create msg;
     struct rl_kmsg_ipcp_create_resp *resp;
-    long int ret;
+    long int ret = -1;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_CREATE;
-    msg.event_id = rl_ctrl_get_id(ctrl);
+    msg.event_id = 1;
     msg.name = name ? strdup(name) : NULL;
     msg.dif_type = strdup(dif_type);
     msg.dif_name = strdup(dif_name);
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&msg));
-        return ret;
+        goto out;
     }
 
-    resp = (struct rl_kmsg_ipcp_create_resp *)rl_ctrl_wait(ctrl, msg.event_id,
-                                                           3000);
+    resp = (struct rl_kmsg_ipcp_create_resp *)wait_for_next_msg(fd, 3000);
     if (!resp) {
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                       RLITE_MB(&msg));
-        return -1L;
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+        goto out;
     }
 
     ret = resp->ipcp_id;
 
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     free(resp);
+out:
+    close(fd);
 
     return ret;
 }
 
 /* Wait for an uIPCP to show up. */
 int
-rl_conf_ipcp_uipcp_wait(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
+rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_uipcp_wait msg;
     int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_UIPCP_WAIT;
     msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
-    if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
-    }
-
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
 
     return ret;
 }
 
 /* Destroy an IPC process. */
 int
-rl_conf_ipcp_destroy(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id)
+rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_DESTROY;
     msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
-    if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
-    }
-
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
 
     return ret;
 }
 
 /* Configure an IPC process. */
 int
-rl_conf_ipcp_config(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
-                    const char *param_name, const char *param_value)
+rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
+                    const char *param_value)
 {
     struct rl_kmsg_ipcp_config msg;
     int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     rl_ipcp_config_fill(&msg, ipcp_id, param_name, param_value);
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 0);
-    if (ret < 0) {
-        PE("Failed to issue request to the kernel\n");
-    }
-
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&msg));
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
 
     return ret;
 }
@@ -324,24 +354,28 @@ rl_conf_flows_print(struct rl_ctrl *ctrl, struct list_head *flows)
 
 /* Return 0 if the @spec is supported by the IPCP with id @ipcp_id. */
 int
-rl_conf_ipcp_qos_supported(struct rl_ctrl *ctrl, rl_ipcp_id_t ipcp_id,
-                           struct rina_flow_spec *spec)
+rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec)
 {
     struct rl_kmsg_ipcp_qos_supported msg;
     int ret;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_QOS_SUPPORTED;
-    msg.event_id = rl_ctrl_get_id(ctrl);
+    msg.event_id = 1;
     msg.ipcp_id = ipcp_id;
     memcpy(&msg.flowspec, spec, sizeof(*spec));
 
-    ret = rl_write_msg(ctrl->rfd, RLITE_MB(&msg), 1);
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
     if (ret < 0 && errno != ENOSYS) {
-        PE("Failed to issue request to the kernel\n");
     }
-
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
 
     return ret;
 }

@@ -498,7 +498,7 @@ sigint_handler(int signum)
             rl_ipcp_id_t uid = uipcp->id;
 
             uipcp_put(uipcp, 0);
-            rl_conf_ipcp_destroy(&uipcps->loop.ctrl, uid);
+            rl_conf_ipcp_destroy(uid);
         }
     }
     pthread_mutex_unlock(&uipcps->lock);

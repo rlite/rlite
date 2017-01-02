@@ -559,8 +559,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
             continue;
         }
 
-        if (rl_conf_ipcp_qos_supported(&uipcp->loop.ctrl,
-                                       lower_ipcp_id, &relspec) != 0) {
+        if (rl_conf_ipcp_qos_supported(lower_ipcp_id, &relspec) != 0) {
             /* We have a lower DIF that does not support reliable (N-1) flows,
              * therefore we need self-registration. */
             self_registration_needed = true;
