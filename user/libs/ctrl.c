@@ -38,25 +38,12 @@
 #include <sys/ioctl.h>
 #include <sys/eventfd.h>
 #include "rlite/kernel-msg.h"
-#include "rlite/uipcps-msg.h"
 #include "rlite/utils.h"
 #include "rlite/ctrl.h"
-
-#include "ctrl-utils.h"
 
 
 /* Global variable for the user to set verbosity. */
 int rl_verbosity = RL_VERB_DBG;
-
-uint32_t
-rl_ctrl_get_id(struct rl_ctrl *ctrl)
-{
-    if (++ctrl->event_id_counter == (1 << 30)) {
-        ctrl->event_id_counter = 1;
-    }
-
-    return ctrl->event_id_counter;
-}
 
 struct rl_msg_base *
 rl_read_next_msg(int rfd, int quiet)
@@ -198,63 +185,6 @@ int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
     return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
-struct pending_entry *
-pending_queue_remove_by_event_id(struct list_head *list, uint32_t event_id)
-{
-    struct pending_entry *cur;
-    struct pending_entry *found = NULL;
-
-    list_for_each_entry(cur, list, node) {
-        if (cur->msg->event_id == event_id) {
-            found = cur;
-            break;
-        }
-    }
-
-    if (found) {
-        list_del(&found->node);
-    }
-
-    return found;
-}
-
-struct pending_entry *
-pending_queue_remove_by_msg_type(struct list_head *list, unsigned int msg_type)
-{
-    struct pending_entry *cur;
-    struct pending_entry *found = NULL;
-
-    list_for_each_entry(cur, list, node) {
-        if (cur->msg->msg_type == msg_type) {
-            found = cur;
-            break;
-        }
-    }
-
-    if (found) {
-        list_del(&found->node);
-    }
-
-    return found;
-}
-
-void
-pending_queue_fini(struct list_head *list)
-{
-    struct pending_entry *e, *tmp;
-
-    list_for_each_entry_safe(e, tmp, list, node) {
-        list_del(&e->node);
-        if (e->msg) {
-            free(e->msg);
-        }
-        if (e->resp) {
-            free(e->resp);
-        }
-        free(e);
-    }
-}
-
 static int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
@@ -315,150 +245,6 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
     resp->upper_ipcp_id = upper_ipcp_id;
     resp->port_id = port_id;
     resp->response = response;
-}
-
-int
-rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags)
-{
-    int ret;
-
-    list_init(&ctrl->pqueue);
-    ctrl->event_id_counter = 1;
-
-    /* Open the RLITE control device. */
-    ctrl->rfd = open(RLITE_CTRLDEV_NAME, O_RDWR);
-    if (ctrl->rfd < 0) {
-        PE("Cannot open '%s'\n", RLITE_CTRLDEV_NAME);
-        perror("open(ctrldev)");
-        return ctrl->rfd;
-    }
-
-    flags &= RL_F_ALL;
-    ctrl->flags = flags;
-    if (flags) {
-        ret = ioctl(ctrl->rfd, RLITE_IOCTL_CHFLAGS, flags);
-        if (ret) {
-            perror("ioctl(flags)");
-            goto clos;
-        }
-    }
-
-    /* Set non-blocking operation for the RLITE control device, so that
-     * we can synchronize with the kernel through select(). */
-    ret = fcntl(ctrl->rfd, F_SETFL, O_NONBLOCK);
-    if (ret) {
-        perror("fcntl(O_NONBLOCK)");
-        goto clos;
-    }
-
-    return 0;
-clos:
-    close(ctrl->rfd);
-    return ret;
-}
-
-int
-rl_ctrl_fini(struct rl_ctrl *ctrl)
-{
-    pending_queue_fini(&ctrl->pqueue);
-
-    if (ctrl->rfd >= 0) {
-        close(ctrl->rfd);
-    }
-
-    return 0;
-}
-
-static struct rl_msg_base *
-rl_ctrl_wait_common(struct rl_ctrl *ctrl, unsigned int msg_type,
-                    uint32_t event_id, unsigned int wait_ms)
-{
-    struct rl_msg_base *resp;
-    struct pending_entry *entry;
-    struct timeval to, *to_p = NULL;
-    fd_set rdfs;
-    int ret;
-
-    if (wait_ms != ~0U) {
-        to.tv_sec = wait_ms / 1000;
-        to.tv_usec = wait_ms * 1000 - to.tv_sec * 1000000;
-        to_p = &to;
-    }
-
-    /* Try to match the msg_type or the event_id against a response that has
-     * already been read. */
-    if (msg_type) {
-        entry = pending_queue_remove_by_msg_type(&ctrl->pqueue, msg_type);
-    } else {
-        entry = pending_queue_remove_by_event_id(&ctrl->pqueue, event_id);
-    }
-
-    if (entry) {
-        resp = RLITE_MB(entry->msg);
-        free(entry);
-
-        return resp;
-    }
-
-    for (;;) {
-        FD_ZERO(&rdfs);
-        FD_SET(ctrl->rfd, &rdfs);
-
-        ret = select(ctrl->rfd + 1, &rdfs, NULL, NULL, to_p);
-
-        if (ret == -1) {
-            /* Error. */
-            perror("select()");
-            break;
-
-        } else if (ret == 0) {
-            /* Timeout */
-            break;
-        }
-
-        /* Read the next message posted by the kernel. */
-        resp = rl_read_next_msg(ctrl->rfd, 1);
-        if (!resp) {
-            continue;
-        }
-
-        if (msg_type && resp->msg_type == msg_type) {
-            /* We found the requested match against msg_type. */
-            return resp;
-        }
-
-        if (resp->event_id == event_id) {
-            /* We found the requested match against event_id. */
-            return resp;
-        }
-
-        /* Store the message for subsequent use. */
-        entry = malloc(sizeof(*entry));
-        if (!entry) {
-            PE("Out of memory\n");
-            free(resp);
-
-            return NULL;
-        }
-        memset(entry, 0, sizeof(*entry));
-        entry->msg = RLITE_MB(resp);
-        list_add_tail(&entry->node, &ctrl->pqueue);
-    }
-
-    return NULL;
-}
-
-struct rl_msg_base *
-rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id, unsigned int wait_ms)
-{
-    return rl_ctrl_wait_common(ctrl, 0, event_id, wait_ms);
-}
-
-struct rl_msg_base *
-rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
-                 unsigned int wait_ms)
-{
-    return rl_ctrl_wait_common(ctrl, msg_type, 0, wait_ms);
 }
 
 /*
