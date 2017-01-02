@@ -65,7 +65,7 @@ struct udp4_bindpoint {
     int fd;
     char *appl_name; /* Used to at unregister time. */
     rl_port_t port_id; /* Used at flow dealloc time. */
-    struct rl_evloop *loop;
+    struct uipcp *uipcp;
     struct list_head node;
 };
 
@@ -277,9 +277,8 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
 }
 
 static void
-udp4_recv_dgram(struct rl_evloop *loop, int bfd)
+udp4_recv_dgram(struct uipcp *uipcp, int bfd)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_udp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
@@ -396,7 +395,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
     }
     memset(bp, 0, sizeof(*bp));
 
-    bp->loop = &uipcp->loop;
+    bp->uipcp = uipcp;
 
     /* Init the bound UDP socket, where implicit flow allocation
      * requests will be received for local_name. */
@@ -421,8 +420,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
 
     /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
      * for port 0x0D1F. */
-    if (rl_evloop_fdcb_add(&uipcp->loop, bp->fd, udp4_recv_dgram)) {
-        UPE(uipcp, "evloop_fdcb_add() failed\n");
+    if (uipcp_fdcb_add(uipcp, bp->fd, udp4_recv_dgram)) {
+        UPE(uipcp, "uipcp_fdcb_add() failed\n");
         goto err;
     }
 
@@ -440,7 +439,7 @@ err:
 static void
 udp4_bindpoint_close(struct udp4_bindpoint *bp)
 {
-    rl_evloop_fdcb_del(bp->loop, bp->fd);
+    uipcp_fdcb_del(bp->uipcp, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
     if (bp->appl_name) free(bp->appl_name);
@@ -462,13 +461,11 @@ get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
 }
 
 static int
-shim_udp4_appl_register(struct rl_evloop *loop,
-                        const struct rl_msg_base *b_resp,
-                        const struct rl_msg_base *b_req)
+shim_udp4_appl_register(struct uipcp *uipcp,
+                        const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
-                (struct rl_kmsg_appl_register *)b_resp;
+                (struct rl_kmsg_appl_register *)msg;
     struct shim_udp4 *shim = SHIM(uipcp);
     struct udp4_bindpoint *bp;
 
@@ -489,17 +486,13 @@ shim_udp4_appl_register(struct rl_evloop *loop,
 }
 
 static int
-shim_udp4_fa_req(struct rl_evloop *loop,
-                 const struct rl_msg_base *b_resp,
-                 const struct rl_msg_base *b_req)
+shim_udp4_fa_req(struct uipcp *uipcp,
+                 const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
     struct shim_udp4 *shim = SHIM(uipcp);
     struct rl_flow_config cfg;
     struct udp4_endpoint *ep;
-
-    assert(b_req == NULL);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
@@ -533,19 +526,15 @@ shim_udp4_fa_req(struct rl_evloop *loop,
 }
 
 static int
-shim_udp4_fa_resp(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req)
+shim_udp4_fa_resp(struct uipcp *uipcp,
+                   const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_udp4 *shim = SHIM(uipcp);
-    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
+    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     struct udp4_sdu *sdu, *tmp;
     struct udp4_endpoint *ep;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    assert(b_req == NULL);
 
     ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
     if (!ep) {
@@ -581,13 +570,11 @@ shim_udp4_fa_resp(struct rl_evloop *loop,
 }
 
 static int
-shim_udp4_flow_deallocated(struct rl_evloop *loop,
-                       const struct rl_msg_base *b_resp,
-                       const struct rl_msg_base *b_req)
+shim_udp4_flow_deallocated(struct uipcp *uipcp,
+                       const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
-                (struct rl_kmsg_flow_deallocated *)b_resp;
+                (struct rl_kmsg_flow_deallocated *)msg;
     struct shim_udp4 *shim = SHIM(uipcp);
     struct udp4_endpoint *ep;
 

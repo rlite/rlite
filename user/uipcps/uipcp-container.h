@@ -97,33 +97,28 @@ struct uipcp_ops {
 
     /* An application asked to be registered within the DIF this
      * uipcp is part of. */
-    int (*appl_register)(struct rl_evloop *loop,
-                         const struct rl_msg_base *b_resp,
-                         const struct rl_msg_base *b_req);
+    int (*appl_register)(struct uipcp *uipcp,
+                         const struct rl_msg_base *msg);
 
     /* An application issued a flow allocation request using the DIF
      * this uipcp is part of. */
-    int (*fa_req)(struct rl_evloop *loop,
-                  const struct rl_msg_base *b_resp,
-                  const struct rl_msg_base *b_req);
+    int (*fa_req)(struct uipcp *uipcp,
+                  const struct rl_msg_base *msg);
 
     /* An application issued a flow allocation response managed by
      * this uipcp. */
-    int (*fa_resp)(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req);
+    int (*fa_resp)(struct uipcp *uipcp,
+                   const struct rl_msg_base *msg);
 
     /* An application deallocated a flow managed by this uipcp. */
-    int (*flow_deallocated)(struct rl_evloop *loop,
-                            const struct rl_msg_base *b_resp,
-                            const struct rl_msg_base *b_req);
+    int (*flow_deallocated)(struct uipcp *uipcp,
+                            const struct rl_msg_base *msg);
 
     /* Flow allocation request received from a remote uipcp, who
      * wants to establish a neighborhood relationship. This could
      * be an N-1-flow or an N-flow. */
-    int (*neigh_fa_req_arrived)(struct rl_evloop *loop,
-                                const struct rl_msg_base *b_resp,
-                                const struct rl_msg_base *b_req);
+    int (*neigh_fa_req_arrived)(struct uipcp *uipcp,
+                                const struct rl_msg_base *msg);
 
     /* The uipcp address gets updated. */
     void (*update_address)(struct uipcp *uipcp, rl_addr_t new_addr);
@@ -154,9 +149,6 @@ struct flow_edge {
 };
 
 struct uipcp {
-    /* Parent object. */
-    struct rl_evloop loop;
-
     pthread_t th;
     int cfd;
     int eventfd;
@@ -256,6 +248,15 @@ typedef void (*uipcp_tmr_cb_t)(struct uipcp *uipcp, void *arg);
 
 /* The signature of file descriptor callback. */
 typedef void (*uipcp_fdcb_t)(struct uipcp *uipcp, int fd);
+
+int uipcp_fdcb_add(struct uipcp *uipcp, int fd, uipcp_fdcb_t cb);
+
+int uipcp_fdcb_del(struct uipcp *uipcp, int fd);
+
+int uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
+                        uipcp_tmr_cb_t cb, void *arg);
+
+int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
 
 #define UPRINT(_u, LEV, FMT, ...)    \
     DOPRINT("[%s:" LEV "][%u]%s: " FMT, hms_string(), (_u)->id, __func__, ##__VA_ARGS__)

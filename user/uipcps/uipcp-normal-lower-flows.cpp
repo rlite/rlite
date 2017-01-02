@@ -362,7 +362,7 @@ uipcp_rib::pduft_sync()
 }
 
 void
-age_incr_cb(struct rl_evloop *loop, void *arg)
+age_incr_cb(struct uipcp *uipcp, void *arg)
 {
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
     ScopeLock(rib->lock);
@@ -404,6 +404,7 @@ age_incr_cb(struct rl_evloop *loop, void *arg)
     }
 
     /* Reschedule */
-    rib->age_incr_tmrid = rl_evloop_schedule(loop, RL_AGE_INCR_INTERVAL * 1000,
-                                             age_incr_cb, rib);
+    rib->age_incr_tmrid = uipcp_loop_schedule(uipcp,
+                                        RL_AGE_INCR_INTERVAL * 1000,
+                                        age_incr_cb, rib);
 }

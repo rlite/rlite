@@ -210,7 +210,7 @@ NeighFlow::enrollment_state_set(enroll_state_t st)
 }
 
 static void
-keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
+keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     uipcp_rib *rib = nf->neigh->rib;
@@ -249,7 +249,7 @@ keepalive_timeout_cb(struct rl_evloop *loop, void *arg)
 }
 
 static void
-enroll_timeout_cb(struct rl_evloop *loop, void *arg)
+enroll_timeout_cb(struct uipcp *uipcp, void *arg)
 {
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     ScopeLock(nf->neigh->rib->lock);
@@ -263,16 +263,16 @@ enroll_timeout_cb(struct rl_evloop *loop, void *arg)
 void
 NeighFlow::enroll_tmr_start()
 {
-    enroll_tmrid = rl_evloop_schedule(&neigh->rib->uipcp->loop,
-                                      NEIGH_ENROLL_TO,
-                                      enroll_timeout_cb, this);
+    enroll_tmrid = uipcp_loop_schedule(neigh->rib->uipcp,
+                                       NEIGH_ENROLL_TO,
+                                       enroll_timeout_cb, this);
 }
 
 void
 NeighFlow::enroll_tmr_stop()
 {
     if (enroll_tmrid > 0) {
-        rl_evloop_schedule_canc(&neigh->rib->uipcp->loop, enroll_tmrid);
+        uipcp_loop_schedule_canc(neigh->rib->uipcp, enroll_tmrid);
         enroll_tmrid = 0;
     }
 }
@@ -288,16 +288,16 @@ NeighFlow::keepalive_tmr_start()
         return;
     }
 
-    keepalive_tmrid = rl_evloop_schedule(&neigh->rib->uipcp->loop,
-                                         keepalive * 1000,
-                                         keepalive_timeout_cb, this);
+    keepalive_tmrid = uipcp_loop_schedule(neigh->rib->uipcp,
+                                          keepalive * 1000,
+                                          keepalive_timeout_cb, this);
 }
 
 void
 NeighFlow::keepalive_tmr_stop()
 {
     if (keepalive_tmrid > 0) {
-        rl_evloop_schedule_canc(&neigh->rib->uipcp->loop, keepalive_tmrid);
+        uipcp_loop_schedule_canc(neigh->rib->uipcp, keepalive_tmrid);
         keepalive_tmrid = 0;
     }
 }
@@ -1061,7 +1061,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
 }
 
 void
-sync_timeout_cb(struct rl_evloop *loop, void *arg)
+sync_timeout_cb(struct uipcp *uipcp, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
     ScopeLock(rib->lock);
@@ -1069,9 +1069,9 @@ sync_timeout_cb(struct rl_evloop *loop, void *arg)
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
     rib->remote_refresh_lower_flows();
-    rib->sync_tmrid = rl_evloop_schedule(&rib->uipcp->loop,
-					 RL_NEIGH_SYNC_INTVAL * 1000,
-                                         sync_timeout_cb, rib);
+    rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
+					  RL_NEIGH_SYNC_INTVAL * 1000,
+                                          sync_timeout_cb, rib);
 }
 
 int

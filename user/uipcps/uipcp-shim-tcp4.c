@@ -205,7 +205,7 @@ open_bound_socket(struct shim_tcp4 *shim, int *fd, struct sockaddr_in *addr)
     return 0;
 }
 
-static void accept_conn(struct rl_evloop *loop, int lfd);
+static void accept_conn(struct uipcp *uipcp, int lfd);
 
 static int
 shim_tcp4_appl_unregister(struct uipcp *uipcp,
@@ -217,7 +217,7 @@ shim_tcp4_appl_unregister(struct uipcp *uipcp,
 
     list_for_each_entry(bp, &shim->bindpoints, node) {
         if (strcmp(req->appl_name, bp->appl_name_s) == 0) {
-            rl_evloop_fdcb_del(&uipcp->loop, bp->fd);
+            uipcp_fdcb_del(uipcp, bp->fd);
             list_del(&bp->node);
             close(bp->fd);
             free(bp->appl_name_s);
@@ -237,13 +237,11 @@ shim_tcp4_appl_unregister(struct uipcp *uipcp,
 }
 
 static int
-shim_tcp4_appl_register(struct rl_evloop *loop,
-                         const struct rl_msg_base *b_resp,
-                         const struct rl_msg_base *b_req)
+shim_tcp4_appl_register(struct uipcp *uipcp,
+                         const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
-                (struct rl_kmsg_appl_register *)b_resp;
+                (struct rl_kmsg_appl_register *)msg;
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct tcp4_bindpoint *bp;
     int ret;
@@ -287,7 +285,7 @@ shim_tcp4_appl_register(struct rl_evloop *loop,
 
     /* The accept_conn() callback will be invoked on new incoming
      * connections. */
-    rl_evloop_fdcb_add(&uipcp->loop, bp->fd, accept_conn);
+    uipcp_fdcb_add(uipcp, bp->fd, accept_conn);
 
     list_add_tail(&bp->node, &shim->bindpoints);
 
@@ -306,12 +304,10 @@ err0:
 }
 
 static int
-shim_tcp4_fa_req(struct rl_evloop *loop,
-                  const struct rl_msg_base *b_resp,
-                  const struct rl_msg_base *b_req)
+shim_tcp4_fa_req(struct uipcp *uipcp,
+                 const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     struct rl_flow_config cfg;
@@ -319,8 +315,6 @@ shim_tcp4_fa_req(struct rl_evloop *loop,
     int ret;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    assert(b_req == NULL);
 
     ep = malloc(sizeof(*ep));
     if (!ep) {
@@ -387,9 +381,8 @@ lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, char **name)
 }
 
 static void
-accept_conn(struct rl_evloop *loop, int lfd)
+accept_conn(struct uipcp *uipcp, int lfd)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
     socklen_t addrlen = sizeof(remote_addr);
@@ -480,18 +473,14 @@ remove_endpoint_by_port_id(struct shim_tcp4 *shim, rl_port_t port_id)
 }
 
 static int
-shim_tcp4_fa_resp(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req)
+shim_tcp4_fa_resp(struct uipcp *uipcp,
+                  const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct shim_tcp4 *shim = SHIM(uipcp);
-    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)b_resp;
+    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     struct tcp4_endpoint *ep;
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    assert(b_req == NULL);
 
     ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
     if (!ep) {
@@ -517,13 +506,11 @@ shim_tcp4_fa_resp(struct rl_evloop *loop,
 }
 
 static int
-shim_tcp4_flow_deallocated(struct rl_evloop *loop,
-                       const struct rl_msg_base *b_resp,
-                       const struct rl_msg_base *b_req)
+shim_tcp4_flow_deallocated(struct uipcp *uipcp,
+                           const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
-                (struct rl_kmsg_flow_deallocated *)b_resp;
+                (struct rl_kmsg_flow_deallocated *)msg;
     struct shim_tcp4 *shim = SHIM(uipcp);
     int ret;
 

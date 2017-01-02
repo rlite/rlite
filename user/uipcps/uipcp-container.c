@@ -55,7 +55,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     resp.response = response;
     resp.appl_name = strdup(req->appl_name);
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&resp), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -78,7 +78,7 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     req.dst_addr = dst_addr;
     req.local_port = local_port;
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -98,7 +98,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     req.event_id = 1;
     req.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -152,7 +152,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     req.local_appl = strdup(local_appl);
     req.remote_appl = strdup(remote_appl);
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -185,7 +185,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
         rl_flow_cfg_default(&req.flowcfg);
     }
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -206,7 +206,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
     req.ipcp_id = uipcp->id;
     req.port_id = local_port;
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         if (errno == ENXIO) {
             UPD(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
@@ -233,7 +233,7 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
     req.port_id = port_id;
     memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -253,7 +253,7 @@ uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     req.event_id = 1;
     req.ipcp_id = ipcp_id;
 
-    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
@@ -314,7 +314,7 @@ uipcp_loop(void *opaque)
 
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
-        rl_resp_handler_t handler = NULL;
+        uipcp_msg_handler_t handler = NULL;
         struct uipcp_fdcb *fdcb;
         struct timeval *top = NULL;
         struct rl_msg_base *msg;
@@ -478,8 +478,9 @@ uipcp_loop(void *opaque)
             break;
         }
 
-        // TODO call the handler
-        (void)handler;
+        if (handler) {
+            handler(uipcp, msg);
+        }
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(msg));
         free(msg);
@@ -795,48 +796,18 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
     if (!ops) {
-            /* This is IPCP without userspace implementation.
-             * We have created an entry, there is nothing more
-             * to do. */
-            PD("Added entry for kernel-space IPCP %u\n", upd->ipcp_id);
-            return 0;
+        /* This is IPCP without userspace implementation.
+         * We have created an entry, there is nothing more
+         * to do. */
+        PD("Added entry for kernel-space IPCP %u\n", upd->ipcp_id);
+        return 0;
     }
 
     uipcp->ops = *ops;
 
-    /* We are not setting the RL_F_IPCPS flags, so we will need to
-     * use uipcp->uipcps->loop to get information about IPCPs in the
-     * system. */
-    ret = rl_evloop_init(&uipcp->loop, NULL, 0);
-    if (ret) {
-        goto err0;
-    }
-
     ret = uipcp->ops.init(uipcp);
     if (ret) {
         goto err1;
-    }
-
-    /* Set the evloop handlers for flow allocation request/response and
-     * registration reflected messages. */
-    ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ,
-                                 uipcp->ops.fa_req);
-
-    ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_RESP,
-                                 uipcp->ops.fa_resp);
-
-    ret |= rl_evloop_set_handler(&uipcp->loop,
-                                 RLITE_KER_APPL_REGISTER,
-                                 uipcp->ops.appl_register);
-
-    ret |= rl_evloop_set_handler(&uipcp->loop,
-                                 RLITE_KER_FLOW_DEALLOCATED,
-                                 uipcp->ops.flow_deallocated);
-
-    ret |= rl_evloop_set_handler(&uipcp->loop, RLITE_KER_FA_REQ_ARRIVED,
-                                 uipcp->ops.neigh_fa_req_arrived);
-    if (ret) {
-        goto err2;
     }
 
     /* Tell the kernel what is the control device to be associated to
@@ -847,6 +818,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err2;
     }
 
+    /* Start the main loop thread. */
     ret = pthread_create(&uipcp->th, NULL, uipcp_loop, uipcp);
     if (ret) {
         goto err2;
@@ -859,8 +831,6 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 err2:
     uipcp->ops.fini(uipcp);
 err1:
-    rl_evloop_fini(&uipcp->loop);
-err0:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
 errx:
@@ -935,7 +905,6 @@ uipcp_put(struct uipcp *uipcp, int locked)
         close(uipcp->cfd);
 
         uipcp->ops.fini(uipcp);
-        ret = rl_evloop_fini(&uipcp->loop);
     }
 
     if (uipcp->dif_type) free(uipcp->dif_type);

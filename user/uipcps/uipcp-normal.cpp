@@ -229,9 +229,8 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 }
 
 static void
-mgmt_fd_ready(struct rl_evloop *loop, int fd)
+mgmt_fd_ready(struct uipcp *uipcp, int fd)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rl_mgmt_hdr *mhdr;
@@ -277,7 +276,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
         throw std::exception();
     }
 
-    ret = rl_evloop_fdcb_add(&uipcp->loop, mgmtfd, mgmt_fd_ready);
+    ret = uipcp_fdcb_add(uipcp, mgmtfd, mgmt_fd_ready);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
@@ -300,24 +299,24 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                               &uipcp_rib::keepalive_handler));
 
     /* Start timers for periodic tasks. */
-    age_incr_tmrid = rl_evloop_schedule(&uipcp->loop,
-                                        RL_AGE_INCR_INTERVAL * 1000,
-                                        age_incr_cb, this);
-    sync_tmrid = rl_evloop_schedule(&uipcp->loop, RL_NEIGH_SYNC_INTVAL * 1000,
-                                    sync_timeout_cb, this);
+    age_incr_tmrid = uipcp_loop_schedule(uipcp,
+                                         RL_AGE_INCR_INTERVAL * 1000,
+                                         age_incr_cb, this);
+    sync_tmrid = uipcp_loop_schedule(uipcp, RL_NEIGH_SYNC_INTVAL * 1000,
+                                     sync_timeout_cb, this);
 }
 
 uipcp_rib::~uipcp_rib()
 {
-    rl_evloop_schedule_canc(&uipcp->loop, sync_tmrid);
-    rl_evloop_schedule_canc(&uipcp->loop, age_incr_tmrid);
+    uipcp_loop_schedule_canc(uipcp, sync_tmrid);
+    uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
 
     for (map<string, Neighbor*>::iterator mit = neighbors.begin();
                                     mit != neighbors.end(); mit++) {
         delete mit->second;
     }
 
-    rl_evloop_fdcb_del(&uipcp->loop, mgmtfd);
+    uipcp_fdcb_del(uipcp, mgmtfd);
     close(mgmtfd);
     pthread_mutex_destroy(&lock);
 }
@@ -747,13 +746,11 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 }
 
 static int
-normal_appl_register(struct rl_evloop *loop,
-                     const struct rl_msg_base *b_resp,
-                     const struct rl_msg_base *b_req)
+normal_appl_register(struct uipcp *uipcp,
+                     const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_appl_register *req =
-                (struct rl_kmsg_appl_register *)b_resp;
+                (struct rl_kmsg_appl_register *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
@@ -763,17 +760,13 @@ normal_appl_register(struct rl_evloop *loop,
 }
 
 static int
-normal_fa_req(struct rl_evloop *loop,
-             const struct rl_msg_base *b_resp,
-             const struct rl_msg_base *b_req)
+normal_fa_req(struct uipcp *uipcp,
+             const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)b_resp;
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    assert(b_req == NULL);
 
     ScopeLock(rib->lock);
 
@@ -790,7 +783,7 @@ uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id,
     rl_fa_resp_fill(&resp, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
 
     PV("Responding to flow allocation request...\n");
-    return rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&resp), 1);
+    return rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
 }
 
 static int
@@ -842,13 +835,11 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
 }
 
 static int
-normal_neigh_fa_req_arrived(struct rl_evloop *loop,
-                            const struct rl_msg_base *b_resp,
-                            const struct rl_msg_base *b_req)
+normal_neigh_fa_req_arrived(struct uipcp *uipcp,
+                            const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_fa_req_arrived *req =
-                    (struct rl_kmsg_fa_req_arrived *)b_resp;
+                    (struct rl_kmsg_fa_req_arrived *)msg;
     rl_port_t neigh_port_id = req->port_id;
     const char *supp_dif = req->dif_name;
     rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
@@ -856,8 +847,6 @@ normal_neigh_fa_req_arrived(struct rl_evloop *loop,
     int flow_fd;
     int result = RLITE_SUCC;
     int ret;
-
-    assert(b_req == NULL);
 
     if (strcmp(req->dif_name, uipcp->dif_name) == 0) {
         /* This an N-flow coming from a remote uipcp which should already be
@@ -928,18 +917,13 @@ err:
 }
 
 static int
-normal_fa_resp(struct rl_evloop *loop,
-              const struct rl_msg_base *b_resp,
-              const struct rl_msg_base *b_req)
+normal_fa_resp(struct uipcp *uipcp,
+              const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
-    struct rl_kmsg_fa_resp *resp =
-                (struct rl_kmsg_fa_resp *)b_resp;
+    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     UPD(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    assert(b_req == NULL);
 
     ScopeLock(rib->lock);
 
@@ -947,13 +931,11 @@ normal_fa_resp(struct rl_evloop *loop,
 }
 
 static int
-normal_flow_deallocated(struct rl_evloop *loop,
-                       const struct rl_msg_base *b_resp,
-                       const struct rl_msg_base *b_req)
+normal_flow_deallocated(struct uipcp *uipcp,
+                       const struct rl_msg_base *msg)
 {
-    struct uipcp *uipcp = container_of(loop, struct uipcp, loop);
     struct rl_kmsg_flow_deallocated *req =
-                (struct rl_kmsg_flow_deallocated *)b_resp;
+                (struct rl_kmsg_flow_deallocated *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
@@ -1008,10 +990,10 @@ do_registration(struct uipcp *uipcp, const char *dif_name,
     int ret;
 
     if (reg) {
-        pfd.fd = rina_register(uipcp->loop.ctrl.rfd, dif_name,
+        pfd.fd = rina_register(uipcp->cfd, dif_name,
                                local_name, RINA_F_NOWAIT);
     } else {
-        pfd.fd = rina_unregister(uipcp->loop.ctrl.rfd, dif_name,
+        pfd.fd = rina_unregister(uipcp->cfd, dif_name,
                                  local_name, RINA_F_NOWAIT);
     }
 
@@ -1032,7 +1014,7 @@ do_registration(struct uipcp *uipcp, const char *dif_name,
         return ret;
     }
 
-    return rina_register_wait(uipcp->loop.ctrl.rfd, pfd.fd);
+    return rina_register_wait(uipcp->cfd, pfd.fd);
 }
 
 static int

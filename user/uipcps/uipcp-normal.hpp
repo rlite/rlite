@@ -403,8 +403,8 @@ void normal_trigger_tasks(struct uipcp *uipcp);
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
-void age_incr_cb(struct rl_evloop *loop, void *arg);
-void sync_timeout_cb(struct rl_evloop *loop, void *arg);
+void age_incr_cb(struct uipcp *uipcp, void *arg);
+void sync_timeout_cb(struct uipcp *uipcp, void *arg);
 void re_enroll_timeout_cb(struct rl_evloop *loop, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
