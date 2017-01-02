@@ -58,9 +58,6 @@ pending_queue_remove_by_msg_type(struct list_head *list,
                                                        unsigned int msg_type);
 
 int
-rl_ctrl_ipcp_update(struct rl_ctrl *ctrl,
-                    const struct rl_kmsg_ipcp_update *upd);
-int
 rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
                      const char *appl_name);
