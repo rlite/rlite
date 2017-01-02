@@ -756,26 +756,6 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
-    uipcp->cfd = rina_open();
-    if (uipcp->cfd < 0) {
-        PE("rina_open() failed [%s]\n", strerror(errno));
-        ret = uipcp->cfd;
-        goto erry;
-    }
-
-    ret = fcntl(uipcp->cfd, F_SETFL, O_NONBLOCK);
-    if (ret) {
-        PE("fcntl(F_SETFL, O_NONBLOCK) failed [%s]\n", strerror(errno));
-        goto errz;
-    }
-
-    uipcp->eventfd = eventfd(0, 0);
-    if (uipcp->eventfd < 0) {
-        PE("eventfd() failed [%s]\n", strerror(errno));
-        ret = uipcp->eventfd;
-        goto errz;
-    }
-
     pthread_mutex_init(&uipcp->lock, NULL);
     list_init(&uipcp->fdcbs);
     list_init(&uipcp->timer_events);
@@ -785,7 +765,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
         PE("uipcp %u already created\n", upd->ipcp_id);
-        goto errx;
+        goto err1;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
     pthread_mutex_unlock(&uipcps->lock);
@@ -804,9 +784,29 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->ops = *ops;
 
+    uipcp->cfd = rina_open();
+    if (uipcp->cfd < 0) {
+        PE("rina_open() failed [%s]\n", strerror(errno));
+        ret = uipcp->cfd;
+        goto err2;
+    }
+
+    ret = fcntl(uipcp->cfd, F_SETFL, O_NONBLOCK);
+    if (ret) {
+        PE("fcntl(F_SETFL, O_NONBLOCK) failed [%s]\n", strerror(errno));
+        goto err3;
+    }
+
+    uipcp->eventfd = eventfd(0, 0);
+    if (uipcp->eventfd < 0) {
+        PE("eventfd() failed [%s]\n", strerror(errno));
+        ret = uipcp->eventfd;
+        goto err3;
+    }
+
     ret = uipcp->ops.init(uipcp);
     if (ret) {
-        goto err1;
+        goto err4;
     }
 
     /* Tell the kernel what is the control device to be associated to
@@ -814,30 +814,30 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
      * IPCP are redirected to this uipcp. */
     ret = uipcp_loop_set(uipcp, upd->ipcp_id);
     if (ret) {
-        goto err2;
+        goto err5;
     }
 
     /* Start the main loop thread. */
     ret = pthread_create(&uipcp->th, NULL, uipcp_loop, uipcp);
     if (ret) {
-        goto err2;
+        goto err5;
     }
 
     PI("userspace IPCP %u created\n", upd->ipcp_id);
 
     return 0;
 
-err2:
+err5:
     uipcp->ops.fini(uipcp);
-err1:
+err4:
+    close(uipcp->eventfd);
+err3:
+    close(uipcp->cfd);
+err2:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
-errx:
+err1:
     pthread_mutex_unlock(&uipcps->lock);
-    close(uipcp->eventfd);
-errz:
-    close(uipcp->cfd);
-erry:
     free(uipcp);
 
     return ret;
