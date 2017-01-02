@@ -317,20 +317,6 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
 }
 
 int
-rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
-                    const char *param_name, const char *param_value)
-{
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_IPCP_CONFIG;
-    req->event_id = 1;
-    req->ipcp_id = ipcp_id;
-    req->name = strdup(param_name);
-    req->value = strdup(param_value);
-
-    return 0;
-}
-
-int
 rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags)
 {
     int ret;

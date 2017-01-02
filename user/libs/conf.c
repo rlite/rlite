@@ -30,7 +30,6 @@
 #include <unistd.h>
 
 #include "rlite/conf.h"
-#include "ctrl-utils.h"
 
 
 static struct rl_msg_base *
@@ -148,6 +147,20 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
     close(fd);
 
     return ret;
+}
+
+static int
+rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
+                    const char *param_name, const char *param_value)
+{
+    memset(req, 0, sizeof(*req));
+    req->msg_type = RLITE_KER_IPCP_CONFIG;
+    req->event_id = 1;
+    req->ipcp_id = ipcp_id;
+    req->name = strdup(param_name);
+    req->value = strdup(param_value);
+
+    return 0;
 }
 
 /* Configure an IPC process. */
