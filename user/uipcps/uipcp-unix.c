@@ -374,11 +374,12 @@ unix_server(struct uipcps *uipcps)
 #undef RL_MAX_THREADS
 }
 
-/* Time interval (in seconds) between two consecutive re-enrollments. */
-#define RL_RE_ENROLL_INTVAL             10
+/* Time interval (in seconds) between two consecutive run of
+ * per-ipcp periodic tasks (e.g. re-enrollments). */
+#define PERIODIC_TASK_INTVAL             10
 
 static void
-re_enroll(struct uipcps *uipcps)
+periodic_tasks(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
 
@@ -417,15 +418,15 @@ uipcps_loop(void *opaque)
         pfd.fd = uipcps->cfd;
         pfd.events = POLLIN;
 
-        ret = poll(&pfd, 1, RL_RE_ENROLL_INTVAL * 1000);
+        ret = poll(&pfd, 1, PERIODIC_TASK_INTVAL * 1000);
         if (ret < 0) {
             PE("poll() failed [%s]\n", strerror(errno));
             break;
         }
 
         if (ret == 0) {
-            /* Timeout */
-            re_enroll(uipcps);
+            /* Timeout, run the periodic task. */
+            periodic_tasks(uipcps);
             continue;
         }
 
