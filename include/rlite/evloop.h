@@ -119,15 +119,6 @@ rl_evloop_schedule(struct rl_evloop *loop, unsigned long delta_ms,
 int
 rl_evloop_schedule_canc(struct rl_evloop *loop, int id);
 
-int rl_evloop_flow_alloc(struct rl_evloop *loop,
-                        uint32_t event_id,
-                        const char *dif_name,
-                        const char *local_appl,
-                        const char *remote_appl,
-                        const struct rina_flow_spec *flowcfg,
-                        rl_ipcp_id_t upper_ipcp_id,
-                        rl_port_t *port_id, unsigned int wait_ms);
-
 int rl_evloop_fa_resp(struct rl_evloop *loop,
                       uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
                       rl_ipcp_id_t upper_ipcp_id, rl_port_t port_id,
