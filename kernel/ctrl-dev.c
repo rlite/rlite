@@ -1918,6 +1918,7 @@ upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
         return -ENXIO;
     }
 
+#if 0
     if (upper_ipcp->uipcp != rc) {
         PE("Control device %p cannot bind flow to kernel datapath "
            "without first declaring itself an IPCP\n", rc);
@@ -1925,6 +1926,7 @@ upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
 
         return -EINVAL;
     }
+#endif
 
     flow->upper.ipcp = upper_ipcp;
 

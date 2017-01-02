@@ -65,37 +65,39 @@ struct rl_ctrl {
  * API for initialization.
  */
 
-int
-rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags);
+int rl_ctrl_init(struct rl_ctrl *ctrl, unsigned flags);
 
-int
-rl_ctrl_fini(struct rl_ctrl *ctrl);
+int rl_ctrl_fini(struct rl_ctrl *ctrl);
 
-void
-rl_flow_cfg_default(struct rl_flow_config *cfg);
+void rl_flow_cfg_default(struct rl_flow_config *cfg);
 
-int
-rl_open_appl_port(rl_port_t port_id);
+int rl_open_appl_port(rl_port_t port_id);
 
+struct rl_msg_base *rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id,
+                                 unsigned int wait_ms);
 
-struct rl_msg_base *
-rl_ctrl_wait(struct rl_ctrl *ctrl, uint32_t event_id, unsigned int wait_ms);
+struct rl_msg_base *rl_ctrl_wait_any(struct rl_ctrl *ctrl,
+                                     unsigned int msg_type,
+                                     unsigned int wait_ms);
 
-struct rl_msg_base *
-rl_ctrl_wait_any(struct rl_ctrl *ctrl, unsigned int msg_type,
-                 unsigned int wait_ms);
+uint32_t rl_ctrl_get_id(struct rl_ctrl *ctrl);
 
-uint32_t
-rl_ctrl_get_id(struct rl_ctrl *ctrl);
+int rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
 
 struct rl_msg_base * read_next_msg(int rfd, int quiet);
+
+int rl_fa_req_fill(struct rl_kmsg_fa_req *req,
+                   uint32_t event_id, const char *dif_name,
+                   const char *local_appl,
+                   const char *remote_appl,
+                   const struct rina_flow_spec *flowspec,
+                   rl_ipcp_id_t upper_ipcp_id);
 
 /*
  * API calls for userspace IPCPs, not to be used by applications.
  */
 
-int
-rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
+int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id);
 
 #ifdef __cplusplus
 }

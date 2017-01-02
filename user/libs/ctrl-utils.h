@@ -64,13 +64,6 @@ int
 rina_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
                      const char *appl_name);
-int
-rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-               uint32_t event_id, const char *dif_name,
-               const char *local_appl,
-               const char *remote_appl,
-               const struct rina_flow_spec *flowspec,
-               rl_ipcp_id_t upper_ipcp_id);
 
 void rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
                     rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
@@ -79,8 +72,5 @@ void rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
 int
 rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
                     const char *param_name, const char *param_value);
-
-int
-rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
 
 #endif  /* __CTRL_UTILS_H__ */

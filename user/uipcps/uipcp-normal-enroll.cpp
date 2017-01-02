@@ -1325,6 +1325,81 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
     return -1;
 }
 
+static int
+uipcp_flow_alloc(struct uipcp *uipcp, const char *dif_name,
+                 const char *local_appl, const char *remote_appl,
+                 const struct rina_flow_spec *flowspec,
+                 rl_ipcp_id_t upper_ipcp_id, rl_port_t *port_id)
+{
+    struct rl_kmsg_fa_resp_arrived *kresp;
+    struct rl_kmsg_fa_req req;
+    struct pollfd pfd;
+    int ret;
+    int fd;
+
+    if (port_id) {
+        *port_id = ~0U;
+    }
+
+    fd = rina_open();
+    if (fd < 0) {
+        UPE(uipcp, "rina_open() failed [%s]\n", strerror(errno));
+        return fd;
+    }
+
+    /* Create a request message. */
+    ret = rl_fa_req_fill(&req, 1, dif_name, local_appl, remote_appl,
+                         flowspec, upper_ipcp_id);
+    if (ret) {
+        UPE(uipcp, "rl_fa_req_fill() failed\n");
+        goto out;
+    }
+
+    /* Submit the request. */
+    PV("Requesting flow allocation...\n");
+    ret = rl_write_msg(fd, RLITE_MB(&req), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+        goto out;
+    }
+
+    /* Wait for the response and get it. */
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 2000);
+    if (ret <= 0) {
+        if (ret == 0) {
+            UPE(uipcp, "poll() timed out\n");
+            ret = -1;
+        } else {
+            UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
+        }
+        goto out;
+    }
+
+    kresp = (struct rl_kmsg_fa_resp_arrived *)read_next_msg(fd, 1);
+    if (!kresp) {
+        UPE(uipcp, "read_next_msg failed() [%s]\n", strerror(errno));
+        goto out;
+    }
+    assert(kresp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
+    assert(kresp->event_id == req.event_id);
+
+    /* Ccollect the verdict and the port_id. */
+    PV("Flow allocation response: ret = %u, port-id = %u\n",
+       kresp->response, kresp->port_id);
+    ret = kresp->response;
+    if (port_id) {
+        *port_id = kresp->port_id;
+    }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(kresp));
+    free(kresp);
+out:
+    close(fd);
+
+    return ret;
+}
 int
 Neighbor::alloc_flow(const char *supp_dif)
 {
@@ -1332,7 +1407,6 @@ Neighbor::alloc_flow(const char *supp_dif)
     bool have_reliable_flow;
     rl_ipcp_id_t lower_ipcp_id_;
     rl_port_t port_id_;
-    unsigned int event_id;
     int flow_fd_;
     int ret;
 
@@ -1349,19 +1423,17 @@ Neighbor::alloc_flow(const char *supp_dif)
         return -1;
     }
 
-    event_id = rl_ctrl_get_id(&rib->uipcp->loop.ctrl);
-
     reliable_spec(&relspec);
     have_reliable_flow = (rl_conf_ipcp_qos_supported(lower_ipcp_id_,
                                                      &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
                                              (have_reliable_flow ? "" : " not"));
 
-    /* Allocate a flow for the enrollment. */
-    ret = rl_evloop_flow_alloc(&rib->uipcp->loop, event_id, supp_dif,
-                               rib->uipcp->name, ipcp_name.c_str(),
-                               have_reliable_flow ? &relspec : NULL,
-                               rib->uipcp->id, &port_id_, 2000);
+    /* Allocate an N-1 flow for the enrollment. */
+    ret = uipcp_flow_alloc(rib->uipcp, supp_dif,
+                           rib->uipcp->name, ipcp_name.c_str(),
+                           have_reliable_flow ? &relspec : NULL,
+                           rib->uipcp->id, &port_id_);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
         return -1;
