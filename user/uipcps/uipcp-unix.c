@@ -39,6 +39,8 @@
 #include <endian.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <poll.h>
+#include <sys/ioctl.h>
 
 #include "rlite/kernel-msg.h"
 #include "rlite/uipcps-msg.h"
@@ -372,58 +374,12 @@ unix_server(struct uipcps *uipcps)
 #undef RL_MAX_THREADS
 }
 
-static int
-uipcps_ipcp_update(struct rl_evloop *loop,
-                   const struct rl_msg_base *b_resp,
-                   const struct rl_msg_base *b_req)
-{
-    struct uipcps *uipcps = container_of(loop, struct uipcps, loop);
-    struct rl_kmsg_ipcp_update *upd = (struct rl_kmsg_ipcp_update *)b_resp;
-    int ret = 0;
-
-    switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
-        case RLITE_UPDATE_UPD:
-            if (!upd->dif_type || !upd->dif_name ||
-                    !rina_sername_valid(upd->ipcp_name)) {
-                PE("Invalid ipcp update\n");
-                return -1;
-            }
-        break;
-    }
-
-    switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
-            ret = uipcp_add(uipcps, upd);
-            break;
-
-        case RLITE_UPDATE_DEL:
-            /* This can be an IPCP with no userspace implementation. */
-            ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
-            break;
-
-        case RLITE_UPDATE_UPD:
-            ret = uipcp_update(uipcps, upd);
-            break;
-    }
-
-    if (ret) {
-        PE("IPCP update synchronization failed\n");
-    }
-#if 0
-    uipcps_print(uipcps);
-#endif
-    return 0;
-}
-
-/* Time interval (in seconds) between two consecutive periodic
- * RIB synchronizations. */
+/* Time interval (in seconds) between two consecutive re-enrollments. */
 #define RL_RE_ENROLL_INTVAL             10
 
 static void
-re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
+re_enroll(struct uipcps *uipcps)
 {
-    struct uipcps *uipcps = arg;
     struct uipcp *uipcp;
 
     /* Get a reference to each uipcp. */
@@ -445,38 +401,74 @@ re_enroll_timeout_cb(struct rl_evloop *loop, void *arg)
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         uipcp_put(uipcp, 0);
     }
-    uipcps->re_enroll_tmrid = rl_evloop_schedule(loop,
-                                                 RL_RE_ENROLL_INTVAL * 1000,
-                                                 re_enroll_timeout_cb, uipcps);
     pthread_mutex_unlock(&uipcps->lock);
 }
 
-static int
-uipcps_init(struct uipcps *uipcps)
+static void *
+uipcps_loop(void *opaque)
 {
-    rl_resp_handler_t handlers[RLITE_KER_MSG_MAX+1];
-    int ret = 0;
+    struct uipcps *uipcps = opaque;
 
-    memset(handlers, 0, sizeof(handlers));
-    handlers[RLITE_KER_IPCP_UPDATE] = uipcps_ipcp_update;
+    for (;;) {
+        struct rl_kmsg_ipcp_update *upd;
+        struct pollfd pfd;
+        int ret = 0;
 
-    /* The main control loop will take care of IPCP updates, to
-     * align userspace IPCPs with kernelspace ones. */
-    ret = rl_evloop_init(&uipcps->loop, handlers, RL_F_IPCPS);
-    if (ret) {
-        return ret;
+        pfd.fd = uipcps->cfd;
+        pfd.events = POLLIN;
+
+        ret = poll(&pfd, 1, RL_RE_ENROLL_INTVAL * 1000);
+        if (ret < 0) {
+            PE("poll() failed [%s]\n", strerror(errno));
+            break;
+        }
+
+        if (ret == 0) {
+            /* Timeout */
+            re_enroll(uipcps);
+            continue;
+        }
+
+        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(uipcps->cfd, 1);
+        if (!upd) {
+            break;
+        }
+
+        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+
+        switch (upd->update_type) {
+            case RLITE_UPDATE_ADD:
+            case RLITE_UPDATE_UPD:
+                if (!upd->dif_type || !upd->dif_name ||
+                        !rina_sername_valid(upd->ipcp_name)) {
+                    PE("Invalid ipcp update\n");
+                }
+            break;
+        }
+
+        switch (upd->update_type) {
+            case RLITE_UPDATE_ADD:
+                ret = uipcp_add(uipcps, upd);
+                break;
+
+            case RLITE_UPDATE_DEL:
+                /* This can be an IPCP with no userspace implementation. */
+                ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
+                break;
+
+            case RLITE_UPDATE_UPD:
+                ret = uipcp_update(uipcps, upd);
+                break;
+        }
+
+        if (ret) {
+            PE("IPCP update synchronization failed\n");
+        }
     }
 
-    /* At this point an userspace IPCP for each existing IPCP has been
-     * created. */
-#if 0
-    uipcps_print(uipcps);
-#endif
+    PE("uipcps main loop exits [%s]\n", strerror(errno));
 
-    uipcps->re_enroll_tmrid = rl_evloop_schedule(&uipcps->loop,
-                                                 RL_RE_ENROLL_INTVAL * 1000,
-                                                 re_enroll_timeout_cb, uipcps);
-    return 0;
+    return NULL;
 }
 
 static void
@@ -486,8 +478,6 @@ sigint_handler(int signum)
     struct uipcp *uipcp, *tmp;
 
     PI("Signal %d received, terminating...\n", signum);
-
-    rl_evloop_schedule_canc(&uipcps->loop, uipcps->re_enroll_tmrid);
 
     /* We need to destroy all the IPCPs. This requires to take the uipcps
      * lock, but this lock may be already taken; we therefore trylock
@@ -689,15 +679,29 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Init main evloop and create userspace IPCPs as needed. This
+    /* Init the main loop which will take care of IPCP updates, to
+     * align userspace IPCPs with kernelspace ones. This
      * must be done before launching the unix server in order to
      * avoid race conditions between main thread fetching and unix
      * server thread serving a client. That is, a client could see
      * incomplete state and its operation may fail or behave
      * unexpectedly.*/
-    ret = uipcps_init(uipcps);
+    uipcps->cfd = rina_open();
+    if (uipcps->cfd < 0) {
+        PE("rina_open() failed [%s]\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    /* The main control loop */
+    ret = ioctl(uipcps->cfd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
     if (ret) {
-        PE("Failed to load userspace ipcps\n");
+        PE("ioctl() failed [%s]\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    ret = pthread_create(&uipcps->th, NULL, uipcps_loop, uipcps);
+    if (ret) {
+        PE("pthread_create() failed [%s]\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 

@@ -42,12 +42,10 @@ struct uipcps {
      * control/management applications. */
     int lfd;
 
-    /* List of userspace IPCPs: There is one for each non-shim IPCP. */
+    /* List of userspace IPCPs: There is one for each IPCP, even for those
+     * who don't have an user-space part. */
     struct list_head uipcps;
     pthread_mutex_t lock;
-
-    /* Timer ID for re-enrollments. */
-    int re_enroll_tmrid;
 
     /* Keepalive timeout in seconds. */
     unsigned int keepalive;
@@ -56,7 +54,12 @@ struct uipcps {
      * of IPCP depth and maximum SDU size. */
     struct list_head ipcp_nodes;
 
-    struct rl_evloop loop;
+    /* Main loop thread, listening for IPCP updates (e.g. new IPCPs, deleted
+     * IPCPs, IPCP configuration, etc). */
+    pthread_t th;
+
+    /* Control file descriptor for the main loop. */
+    int cfd;
 };
 
 struct enrolled_neigh {
