@@ -51,10 +51,10 @@ pending_queue_fini(struct list_head *list);
 
 struct pending_entry *
 pending_queue_remove_by_event_id(struct list_head *list,
-                                                       uint32_t event_id);
+                                 uint32_t event_id);
 
 struct pending_entry *
 pending_queue_remove_by_msg_type(struct list_head *list,
-                                                       unsigned int msg_type);
+                                 unsigned int msg_type);
 
 #endif  /* __CTRL_UTILS_H__ */

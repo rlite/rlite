@@ -41,94 +41,67 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                          uint8_t response,
                          const struct rl_kmsg_appl_register *req)
 {
-    struct rl_kmsg_appl_register_resp *resp;
-    struct rl_msg_base *fkresp;
-    int result;
+    struct rl_kmsg_appl_register_resp resp;
+    int ret;
 
-    /* Allocate and create a request message. */
-    resp = malloc(sizeof(*resp));
-    if (!resp) {
-        PE("Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&resp, 0, sizeof(resp));
+    resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
+    resp.event_id = req->event_id;  /* This is just 0 for now. */
+    resp.ipcp_id = ipcp_id;
+    resp.reg = 1;
+    resp.response = response;
+    resp.appl_name = strdup(req->appl_name);
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&resp), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(resp, 0, sizeof(*resp));
-    resp->msg_type = RLITE_KER_APPL_REGISTER_RESP;
-    resp->event_id = req->event_id;  /* This is just 0 for now. */
-    resp->ipcp_id = ipcp_id;
-    resp->reg = 1;
-    resp->response = response;
-    resp->appl_name = strdup(req->appl_name);
-
-    UPV(uipcp, "Issuing application register response ...\n");
-
-    fkresp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(resp),
-                               sizeof(*resp), 0, 0, &result);
-    assert(!fkresp); (void)fkresp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 int
 uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                 rl_addr_t dst_addr, rl_port_t local_port)
 {
-    struct rl_kmsg_ipcp_pduft_set *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_ipcp_pduft_set req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_IPCP_PDUFT_SET;
+    req.event_id = 1;
+    req.ipcp_id = ipcp_id;
+    req.dst_addr = dst_addr;
+    req.local_port = local_port;
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_IPCP_PDUFT_SET;
-    req->event_id = 1;
-    req->ipcp_id = ipcp_id;
-    req->dst_addr = dst_addr;
-    req->local_port = local_port;
-
-    UPV(uipcp, "Requesting IPCP pdu forwarding table set...\n");
-
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 int
 uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
-    struct rl_kmsg_ipcp_pduft_flush *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_ipcp_pduft_flush req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
+    req.event_id = 1;
+    req.ipcp_id = ipcp_id;
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
-    req->event_id = 1;
-    req->ipcp_id = ipcp_id;
-
-    UPV(uipcp, "Requesting IPCP pdu forwarding table flush...\n");
-
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req),
-                                  sizeof(*req), 0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 /* This function is the inverse of flowspec2flowcfg(), and this property
@@ -156,42 +129,33 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
 {
-    struct rl_kmsg_uipcp_fa_req_arrived *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_uipcp_fa_req_arrived req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
-    req->event_id = 1;
-    req->kevent_id = kevent_id;
-    req->ipcp_id = uipcp->id;
-    req->remote_port = remote_port;
-    req->remote_cep = remote_cep;
-    req->remote_addr = remote_addr;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
+    req.event_id = 1;
+    req.kevent_id = kevent_id;
+    req.ipcp_id = uipcp->id;
+    req.remote_port = remote_port;
+    req.remote_cep = remote_cep;
+    req.remote_addr = remote_addr;
     if (flowcfg) {
-        memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+        memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
-        memset(&req->flowcfg, 0, sizeof(*flowcfg));
+        memset(&req.flowcfg, 0, sizeof(*flowcfg));
     }
-    flowcfg2flowspec(&req->flowspec, &req->flowcfg);
-    req->local_appl = strdup(local_appl);
-    req->remote_appl = strdup(remote_appl);
+    flowcfg2flowspec(&req.flowspec, &req.flowcfg);
+    req.local_appl = strdup(local_appl);
+    req.remote_appl = strdup(remote_appl);
 
-    UPV(uipcp, "Issuing UIPCP_FA_REQ_ARRIVED message...\n");
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+    }
 
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 int
@@ -200,131 +164,95 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                             rl_addr_t remote_addr,
                             uint8_t response, const struct rl_flow_config *flowcfg)
 {
-    struct rl_kmsg_uipcp_fa_resp_arrived *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_uipcp_fa_resp_arrived req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
-    }
-
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
-    req->event_id = 1;
-    req->ipcp_id = uipcp->id;
-    req->local_port = local_port;
-    req->remote_port = remote_port;
-    req->remote_cep = remote_cep;
-    req->remote_addr = remote_addr;
-    req->response = response;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
+    req.event_id = 1;
+    req.ipcp_id = uipcp->id;
+    req.local_port = local_port;
+    req.remote_port = remote_port;
+    req.remote_cep = remote_cep;
+    req.remote_addr = remote_addr;
+    req.response = response;
     if (flowcfg) {
-        memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
+        memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
-        rl_flow_cfg_default(&req->flowcfg);
+        rl_flow_cfg_default(&req.flowcfg);
     }
 
-    UPV(uipcp, "Issuing UIPCP_FA_RESP_ARRIVED message...\n");
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+    }
 
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                         0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 int
 uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
 {
-    struct rl_kmsg_flow_dealloc *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_flow_dealloc req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_FLOW_DEALLOC;
+    req.event_id = 1;
+    req.ipcp_id = uipcp->id;
+    req.port_id = local_port;
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_FLOW_DEALLOC;
-    req->event_id = 1;
-    req->ipcp_id = uipcp->id;
-    req->port_id = local_port;
-
-    UPV(uipcp, "Issuing FLOW_DEALLOC message...\n");
-
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                               0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result); /* this often returns -1 */
-
-    return result;
+    return ret;
 }
 
 int
 uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
                             const struct rl_flow_config *flowcfg)
 {
-    struct rl_kmsg_flow_cfg_update *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_flow_cfg_update req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_FLOW_CFG_UPDATE;
+    req.event_id = 1;
+    req.ipcp_id = uipcp->id;
+    req.port_id = port_id;
+    memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_FLOW_CFG_UPDATE;
-    req->event_id = 1;
-    req->ipcp_id = uipcp->id;
-    req->port_id = port_id;
-    memcpy(&req->flowcfg, flowcfg, sizeof(*flowcfg));
-
-    UPD(uipcp, "Issuing FLOW_CFG_UPDATE message...\n");
-
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                                   0, 0, &result);
-    assert(!resp); (void)resp;
-    UPD(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 static int
 uipcp_evloop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 {
-    struct rl_kmsg_ipcp_uipcp_set *req;
-    struct rl_msg_base *resp;
-    int result;
+    struct rl_kmsg_ipcp_uipcp_set req;
+    int ret;
 
-    /* Allocate and create a request message. */
-    req = malloc(sizeof(*req));
-    if (!req) {
-        UPE(uipcp, "Out of memory\n");
-        return ENOMEM;
+    /* Create a request message. */
+    memset(&req, 0, sizeof(req));
+    req.msg_type = RLITE_KER_IPCP_UIPCP_SET;
+    req.event_id = 1;
+    req.ipcp_id = ipcp_id;
+
+    ret = rl_write_msg(uipcp->loop.ctrl.rfd, RLITE_MB(&req), 1);
+    if (ret) {
+        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_IPCP_UIPCP_SET;
-    req->event_id = 1;
-    req->ipcp_id = ipcp_id;
-
-    UPV(uipcp, "Requesting IPCP uipcp set...\n");
-
-    resp = rl_evloop_issue_request(&uipcp->loop, RLITE_MB(req), sizeof(*req),
-                               0, 0, &result);
-    assert(!resp); (void)resp;
-    UPV(uipcp, "result: %d\n", result);
-
-    return result;
+    return ret;
 }
 
 extern struct uipcp_ops normal_ops;
