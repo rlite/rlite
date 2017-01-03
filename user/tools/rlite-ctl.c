@@ -505,19 +505,22 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
         return ret;
     }
 
-    printf( "    snd_lwe=%lu snd_rwe=%lu\n"
-            "    next_seq_num_to_send=%lu\n"
-            "    last_seq_num_sent=%lu\n"
-            "    last_ctrl_seq_num_rcvd=%lu\n"
-            "    cwq_len=%lu (max=%lu)\n"
-            "    rtxq_len=%lu (max=%lu)\n"
-            "    rtt=%lu (stddev=%lu)\n"
-            "    rcv_lwe=%lu rcv_lwe_priv=%lu rcv_rwe=%lu\n"
-            "    max_seq_num_cvd=%lu\n"
-            "    last_snd_data_ack=%lu\n"
-            "    next_snd_ctl_seq=%lu\n"
-            "    last_lwe_sent=%lu\n"
-            "    seqq_len=%lu\n",
+    printf( "    snd_lwe                = %lu\n"
+            "    snd_rwe                = %lu\n"
+            "    next_seq_num_to_send   = %lu\n"
+            "    last_seq_num_sent      = %lu\n"
+            "    last_ctrl_seq_num_rcvd = %lu\n"
+            "    cwq_len                = %lu [max=%lu]\n"
+            "    rtxq_len               = %lu [max=%lu]\n"
+            "    rtt                    = %lu [stddev=%lu]\n"
+            "    rcv_lwe                = %lu\n"
+            "    rcv_lwe_priv           = %lu\n"
+            "    rcv_rwe                = %lu\n"
+            "    max_seq_num_rcvd       = %lu\n"
+            "    last_snd_data_ack      = %lu\n"
+            "    next_snd_ctl_seq       = %lu\n"
+            "    last_lwe_sent          = %lu\n"
+            "    seqq_len               = %lu\n",
             (unsigned long)dtp.snd_lwe, (unsigned long)dtp.snd_rwe,
             (unsigned long)dtp.next_seq_num_to_send,
             (unsigned long)dtp.last_seq_num_sent,
