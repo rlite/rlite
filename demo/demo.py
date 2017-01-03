@@ -190,7 +190,7 @@ argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
 argparser.add_argument('--keepalive', default = 5,
                        help = "Neighbor keepalive timeout in seconds", type = int)
-argparser.add_argument('--register', action='store_true',
+argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
 args = argparser.parse_args()
 
