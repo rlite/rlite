@@ -161,7 +161,7 @@ struct uipcp {
 
     /* Used to store the list of file descriptor callbacks registered within
      * the uipcp main loop. */
-    struct list_head fdcbs;
+    struct list_head fdhs;
 
     /* Container object. */
     struct uipcps *uipcps;

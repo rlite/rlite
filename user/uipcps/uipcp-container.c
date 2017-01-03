@@ -315,7 +315,7 @@ uipcp_loop(void *opaque)
     for (;;) {
         int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
         uipcp_msg_handler_t handler = NULL;
-        struct uipcp_loop_fdh *fdcb;
+        struct uipcp_loop_fdh *fdh;
         struct timeval *top = NULL;
         struct rl_msg_base *msg;
         struct timeval to;
@@ -328,9 +328,9 @@ uipcp_loop(void *opaque)
 
         pthread_mutex_lock(&uipcp->lock);
 
-        list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
-            FD_SET(fdcb->fd, &rdfs);
-            maxfd = MAX(maxfd, fdcb->fd);
+        list_for_each_entry(fdh, &uipcp->fdhs, node) {
+            FD_SET(fdh->fd, &rdfs);
+            maxfd = MAX(maxfd, fdh->fd);
         }
 
         {
@@ -439,18 +439,18 @@ uipcp_loop(void *opaque)
 
             /* Collect fdh entries that are ready. */
             pthread_mutex_lock(&uipcp->lock);
-            list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
-                if (FD_ISSET(fdcb->fd, &rdfs)) {
-                    list_add_tail(&fdcb->tmpnode, &ready);
+            list_for_each_entry(fdh, &uipcp->fdhs, node) {
+                if (FD_ISSET(fdh->fd, &rdfs)) {
+                    list_add_tail(&fdh->tmpnode, &ready);
                 }
             }
             pthread_mutex_unlock(&uipcp->lock);
 
             /* Process ready events out of the lock. Callbacks are allowed to
              * add/remove fdh entries. */
-            list_for_each_entry_safe(fdcb, tmp, &ready, tmpnode) {
-                list_del_init(&fdcb->tmpnode);
-                fdcb->cb(uipcp, fdcb->fd);
+            list_for_each_entry_safe(fdh, tmp, &ready, tmpnode) {
+                list_del_init(&fdh->tmpnode);
+                fdh->cb(uipcp, fdh->fd);
             }
         }
 
@@ -615,25 +615,25 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
 int
 uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
 {
-    struct uipcp_loop_fdh *fdcb;
+    struct uipcp_loop_fdh *fdh;
 
     if (!cb || fd < 0) {
         PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
         return -1;
     }
 
-    fdcb = malloc(sizeof(*fdcb));
-    if (!fdcb) {
+    fdh = malloc(sizeof(*fdh));
+    if (!fdh) {
         return -1;
     }
 
 
-    memset(fdcb, 0, sizeof(*fdcb));
-    fdcb->fd = fd;
-    fdcb->cb = cb;
+    memset(fdh, 0, sizeof(*fdh));
+    fdh->fd = fd;
+    fdh->cb = cb;
 
     pthread_mutex_lock(&uipcp->lock);
-    list_add_tail(&fdcb->node, &uipcp->fdcbs);
+    list_add_tail(&fdh->node, &uipcp->fdhs);
     pthread_mutex_unlock(&uipcp->lock);
 
     uipcp_loop_signal(uipcp, RL_SIGNAL_REPOLL);
@@ -644,14 +644,14 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
 int
 uipcp_loop_fdh_del(struct uipcp *uipcp, int fd)
 {
-    struct uipcp_loop_fdh *fdcb;
+    struct uipcp_loop_fdh *fdh;
 
     pthread_mutex_lock(&uipcp->lock);
-    list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
-        if (fdcb->fd == fd) {
-            list_del(&fdcb->node);
+    list_for_each_entry(fdh, &uipcp->fdhs, node) {
+        if (fdh->fd == fd) {
+            list_del(&fdh->node);
             pthread_mutex_unlock(&uipcp->lock);
-            free(fdcb);
+            free(fdh);
 
             return 0;
         }
@@ -772,7 +772,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
 
     pthread_mutex_init(&uipcp->lock, NULL);
-    list_init(&uipcp->fdcbs);
+    list_init(&uipcp->fdhs);
     list_init(&uipcp->timer_events);
     uipcp->timer_events_cnt = 0;
     uipcp->timer_next_id = 1;
@@ -904,12 +904,12 @@ uipcp_put(struct uipcp *uipcp, int locked)
         }
 
         {
-            /* Clean up the fdcbs list. */
-            struct uipcp_loop_fdh *fdcb, *tmp;
+            /* Clean up the fdhs list. */
+            struct uipcp_loop_fdh *fdh, *tmp;
 
-            list_for_each_entry_safe(fdcb, tmp, &uipcp->fdcbs, node) {
-                list_del(&fdcb->node);
-                free(fdcb);
+            list_for_each_entry_safe(fdh, tmp, &uipcp->fdhs, node) {
+                list_del(&fdh->node);
+                free(fdh);
             }
         }
 
