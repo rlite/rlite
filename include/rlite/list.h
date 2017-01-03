@@ -89,6 +89,13 @@ list_del(struct list_head *elem)
     elem->succ->prev = elem->prev;
 }
 
+static inline void
+list_del_init(struct list_head *elem)
+{
+    list_del(elem);
+    list_init(elem);
+}
+
 #define offsetof1(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 #define container_of(ptr, type, member) ({                      \

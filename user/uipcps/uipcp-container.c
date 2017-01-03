@@ -304,6 +304,7 @@ struct uipcp_loop_fdh {
     uipcp_loop_fdh_t cb;
 
     struct list_head node;
+    struct list_head tmpnode; /* private for the uipcp_loop */
 };
 
 static void *
@@ -431,11 +432,25 @@ uipcp_loop(void *opaque)
         }
 
         {
-            /* Process fdcb events. TODO take uipcp lock */
+            struct list_head ready;
+            struct uipcp_loop_fdh *tmp;
+
+            list_init(&ready);
+
+            /* Collect fdh entries that are ready. */
+            pthread_mutex_lock(&uipcp->lock);
             list_for_each_entry(fdcb, &uipcp->fdcbs, node) {
                 if (FD_ISSET(fdcb->fd, &rdfs)) {
-                    fdcb->cb(uipcp, fdcb->fd);
+                    list_add_tail(&fdcb->tmpnode, &ready);
                 }
+            }
+            pthread_mutex_unlock(&uipcp->lock);
+
+            /* Process ready events out of the lock. Callbacks are allowed to
+             * add/remove fdh entries. */
+            list_for_each_entry_safe(fdcb, tmp, &ready, tmpnode) {
+                list_del_init(&fdcb->tmpnode);
+                fdcb->cb(uipcp, fdcb->fd);
             }
         }
 
