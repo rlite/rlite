@@ -485,6 +485,60 @@ flows_show(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_flow_dtp dtp;
+    unsigned long port_id;
+    int ret;
+
+    assert(argc >= 1);
+    errno = 0;
+    port_id = strtoul(argv[0], NULL, 10);
+    if (errno) {
+        PE("Invalid flow id %s\n", argv[0]);
+        return -1;
+    }
+
+    ret = rl_conf_flow_get_dtp(port_id, &dtp);
+    if (ret) {
+        PE("Could not find flow with port id %lu\n", port_id);
+        return ret;
+    }
+
+    printf( "    snd_lwe=%lu snd_rwe=%lu\n"
+            "    next_seq_num_to_send=%lu\n"
+            "    last_seq_num_sent=%lu\n"
+            "    last_ctrl_seq_num_rcvd=%lu\n"
+            "    cwq_len=%lu (max=%lu)\n"
+            "    rtxq_len=%lu (max=%lu)\n"
+            "    rtt=%lu (stddev=%lu)\n"
+            "    rcv_lwe=%lu rcv_lwe_priv=%lu rcv_rwe=%lu\n"
+            "    max_seq_num_cvd=%lu\n"
+            "    last_snd_data_ack=%lu\n"
+            "    next_snd_ctl_seq=%lu\n"
+            "    last_lwe_sent=%lu\n"
+            "    seqq_len=%lu\n",
+            (unsigned long)dtp.snd_lwe, (unsigned long)dtp.snd_rwe,
+            (unsigned long)dtp.next_seq_num_to_send,
+            (unsigned long)dtp.last_seq_num_sent,
+            (unsigned long)dtp.last_ctrl_seq_num_rcvd,
+            (unsigned long)dtp.cwq_len, (unsigned long)dtp.max_cwq_len,
+            (unsigned long)dtp.rtxq_len, (unsigned long)dtp.max_rtxq_len,
+            (unsigned long)dtp.rtt, (unsigned long)dtp.rtt_stddev,
+
+            (unsigned long)dtp.rcv_lwe, (unsigned long)dtp.rcv_lwe_priv,
+            (unsigned long)dtp.rcv_rwe,
+            (unsigned long)dtp.max_seq_num_rcvd,
+            (unsigned long)dtp.last_snd_data_ack,
+            (unsigned long)dtp.next_snd_ctl_seq,
+            (unsigned long)dtp.last_lwe_sent,
+            (unsigned long)dtp.seqq_len
+            );
+
+    return 0;
+}
+
+static int
 ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
 {
     struct rl_cmsg_ipcp_rib_show_resp *resp =
@@ -669,6 +723,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "",
         .num_args = 0,
         .func = flows_show,
+    },
+    {
+        .name = "flow-dump",
+        .usage = "PORT_ID",
+        .num_args = 1,
+        .func = flow_dump,
     },
 };
 

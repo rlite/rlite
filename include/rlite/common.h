@@ -230,6 +230,33 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
 }
 
+/* DTP state exported to userspace. */
+struct rl_flow_dtp
+{
+    /* Sender state. */
+    rl_seq_t snd_lwe;
+    rl_seq_t snd_rwe;
+    rl_seq_t next_seq_num_to_send;
+    rl_seq_t last_seq_num_sent;
+    rl_seq_t last_ctrl_seq_num_rcvd;
+    unsigned int cwq_len;
+    unsigned int max_cwq_len;
+    unsigned int rtxq_len;
+    unsigned int max_rtxq_len;
+    unsigned rtt; /* estimated round trip time, in jiffies. */
+    unsigned rtt_stddev;
+
+    /* Receiver state. */
+    rl_seq_t rcv_lwe;
+    rl_seq_t rcv_lwe_priv;
+    rl_seq_t rcv_rwe;
+    rl_seq_t max_seq_num_rcvd;
+    rl_seq_t last_snd_data_ack; /* almost unused */
+    rl_seq_t next_snd_ctl_seq;
+    rl_seq_t last_lwe_sent;
+    unsigned int seqq_len;
+};
+
 #define RL_SHIM_UDP_PORT    0x0d1f
 
 #define NPD(FMT, ...)

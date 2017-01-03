@@ -291,7 +291,8 @@ rl_conf_flows_purge(struct list_head *flows)
 }
 
 static int
-rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
+rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
+                      struct rl_flow_dtp *dtp)
 {
     struct rl_kmsg_flow_stats_req msg;
     struct rl_kmsg_flow_stats_resp *resp;
@@ -321,7 +322,13 @@ rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
     }
     assert(resp->event_id == msg.event_id);
 
-    *stats = resp->stats;
+    if (stats) {
+        *stats = resp->stats;
+    }
+
+    if (dtp) {
+        *dtp = resp->dtp;
+    }
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
@@ -330,6 +337,18 @@ out:
     close(fd);
 
     return ret;
+}
+
+int
+rl_conf_flow_get_dtp(rl_port_t port_id, struct rl_flow_dtp *dtp)
+{
+    return rl_conf_flow_get_info(port_id, NULL, dtp);
+}
+
+int
+rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats)
+{
+    return rl_conf_flow_get_info(port_id, stats, NULL);
 }
 
 int

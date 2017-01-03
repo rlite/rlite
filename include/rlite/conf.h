@@ -44,32 +44,28 @@ struct rl_flow {
     struct list_head node;
 };
 
-long int
-rl_conf_ipcp_create(const char *name, const char *dif_type,
-                    const char *dif_name);
+long int rl_conf_ipcp_create(const char *name, const char *dif_type,
+                             const char *dif_name);
 
-int
-rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id);
+int rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id);
 
-int
-rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id);
+int rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id);
 
-int
-rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
-                    const char *param_value);
+int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
+                        const char *param_value);
 
 /* Fetch information about all flows in the system. */
-int
-rl_conf_flows_print(struct list_head *flows);
+int rl_conf_flows_print(struct list_head *flows);
 
-int
-rl_conf_flows_fetch(struct list_head *flows);
+int rl_conf_flows_fetch(struct list_head *flows);
 
-void
-rl_conf_flows_purge(struct list_head *flows);
+void rl_conf_flows_purge(struct list_head *flows);
 
-int
-rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec);
+int rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec);
+
+int rl_conf_flow_get_dtp(rl_port_t port_id, struct rl_flow_dtp *dtp);
+
+int rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats);
 
 #ifdef __cplusplus
 }
