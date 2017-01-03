@@ -1857,6 +1857,7 @@ rl_flow_get_stats(struct rl_ctrl *rc,
                 (struct rl_kmsg_flow_stats_req *)bmsg;
     struct rl_kmsg_flow_stats_resp resp;
     struct flow_entry *flow;
+    struct dtp *dtp;
     int ret = 0;
 
     flow = flow_get(req->port_id);
@@ -1871,6 +1872,29 @@ rl_flow_get_stats(struct rl_ctrl *rc,
     if (flow->txrx.ipcp->ops.flow_get_stats) {
         ret = flow->txrx.ipcp->ops.flow_get_stats(flow, &resp.stats);
     }
+
+    /* Copy in DTP state. */
+    dtp = &flow->dtp;
+    resp.dtp.snd_lwe                = dtp->snd_lwe;
+    resp.dtp.snd_rwe                = dtp->snd_rwe;
+    resp.dtp.next_seq_num_to_send   = dtp->next_seq_num_to_send;
+    resp.dtp.last_seq_num_sent      = dtp->last_seq_num_sent;
+    resp.dtp.last_ctrl_seq_num_rcvd = dtp->last_ctrl_seq_num_rcvd;
+    resp.dtp.cwq_len                = dtp->cwq_len;
+    resp.dtp.max_cwq_len            = dtp->max_cwq_len;
+    resp.dtp.rtxq_len               = dtp->rtxq_len;
+    resp.dtp.max_rtxq_len           = dtp->max_rtxq_len;
+    resp.dtp.rtt                    = dtp->rtt;
+    resp.dtp.rtt_stddev             = dtp->rtt_stddev;
+    resp.dtp.rcv_lwe                = dtp->rcv_lwe;
+    resp.dtp.rcv_lwe_priv           = dtp->rcv_lwe_priv;
+    resp.dtp.rcv_rwe                = dtp->rcv_rwe;
+    resp.dtp.max_seq_num_rcvd       = dtp->max_seq_num_rcvd;
+    resp.dtp.last_snd_data_ack      = dtp->last_snd_data_ack;
+    resp.dtp.next_snd_ctl_seq       = dtp->next_snd_ctl_seq;
+    resp.dtp.last_lwe_sent          = dtp->last_lwe_sent;
+    resp.dtp.seqq_len               = dtp->seqq_len;
+
     flow_put(flow);
 
     ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
