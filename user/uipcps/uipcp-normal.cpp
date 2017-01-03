@@ -658,7 +658,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 
         if (pos != string::npos) {
             container_obj_name = rm->obj_name.substr(0, pos);
-            UPD(uipcp, "Falling back to container object '%s'\n",
+            UPV(uipcp, "Falling back to container object '%s'\n",
                 container_obj_name.c_str());
             hi = handlers.find(container_obj_name);
         }
