@@ -396,7 +396,6 @@ uipcp_rib::dump() const
         ss << "}" << endl << endl;
     }
 
-    // TODO simplify this? only scan neighbors_cand
     ss << "Candidate Neighbors:" << endl;
     for (map<string, NeighborCandidate>::const_iterator
             mit = neighbors_seen.begin();
@@ -414,7 +413,7 @@ uipcp_rib::dump() const
 
         neigh = neighbors.find(neigh_name);
 
-        ss << "    Name: " << cand.apn << "/" << cand.api
+        ss << "    Name: " << cand.apn << ":" << cand.api
             << ", Address: " << cand.address << ", Lower DIFs: {";
 
         {
