@@ -51,25 +51,40 @@ uipcp_rib::_lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
     return jt == it->second.end() ? NULL : &jt->second;
 }
 
-/* The add method has overwrite semantic. */
-void
+/* The add method has overwrite semantic.
+ * Returns true if something changed. */
+bool
 uipcp_rib::lfdb_add(const LowerFlow &lf)
 {
     map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
                                             = lfdb.find(lf.local_addr);
+    string repr = static_cast<string>(lf);
     LowerFlow lfz = lf;
 
     lfz.age = 0;
 
-    if (it == lfdb.end()) {
+    if (it == lfdb.end() || it->second.count(lf.remote_addr) == 0) {
+        /* Not there, we need to add the entry. */
         lfdb[lf.local_addr][lf.remote_addr] = lfz;
-        return;
+        UPD(uipcp, "Lower flow %s added\n", repr.c_str());
+        return true;
     }
 
-    it->second[lfz.remote_addr] = lfz;
+    if (lfz == it->second[lfz.remote_addr] ||
+            lfz.seqnum <= it->second[lfz.remote_addr].seqnum) {
+        /* Entry is already there, and @lf is older. */
+        return false;
+    }
+
+    it->second[lfz.remote_addr] = lfz; /* Update the entry */
+
+    UPD(uipcp, "Lower flow %s updated\n", repr.c_str());
+
+    return true;
 }
 
-void
+/* Returns true if something changed. */
+bool
 uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
 {
     map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
@@ -77,16 +92,21 @@ uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
     map<rl_addr_t, LowerFlow>::iterator jt;
 
     if (it == lfdb.end()) {
-        return;
+        return false;
     }
 
     jt = it->second.find(remote_addr);
 
     if (jt == it->second.end()) {
-        return;
+        return false;
     }
 
     it->second.erase(jt);
+
+    UPD(uipcp, "Lower flow %u-%u removed\n", (unsigned int)local_addr,
+		(unsigned int)remote_addr);
+
+    return true;
 }
 
 int
@@ -154,30 +174,17 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
                                 f != lfl.flows.end(); f++) {
-        string key = static_cast<string>(*f);
-        LowerFlow *lf = lfdb_find(f->local_addr, f->remote_addr);
-
         if (add) {
-            if (lf == NULL || f->seqnum > lf->seqnum) {
-                lfdb_add(*f);
+            if (lfdb_add(*f)) {
                 modified = true;
                 prop_lfl.flows.push_back(*f);
-                if (lf == NULL) {
-                    UPD(uipcp, "Lower flow %s added remotely\n", key.c_str());
-                }
             }
 
         } else {
-            if (lf == NULL) {
-                UPI(uipcp, "Lower flow %s does not exist\n", key.c_str());
-
-            } else {
-                lfdb_del(f->local_addr, f->remote_addr);
+            if (lfdb_del(f->local_addr, f->remote_addr)) {
                 modified = true;
                 prop_lfl.flows.push_back(*f);
-                UPD(uipcp, "Lower flow %s removed remotely\n", key.c_str());
             }
-
         }
     }
 

@@ -335,8 +335,8 @@ struct uipcp_rib {
         return _lfdb_find(local_addr, remote_addr);
     };
     LowerFlow *lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr);
-    void lfdb_add(const LowerFlow &lf);
-    void lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
+    bool lfdb_add(const LowerFlow &lf);
+    bool lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
 
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);

@@ -121,6 +121,13 @@ struct LowerFlow : public UipcpObject {
     LowerFlow() { }
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
+    bool operator==(const LowerFlow& o) {
+        return local_addr == o.local_addr && remote_addr == o.remote_addr &&
+                cost == o.cost && seqnum == o.seqnum;
+    }
+    bool operator!=(const LowerFlow& o) {
+        return !(*this == o);
+    }
 
     operator std::string() const;
 };
