@@ -697,12 +697,14 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .num_args = 4,
         .func = ipcp_lower_flow_alloc,
     },
+#ifdef WITH_DFT_SET
     {
         .name = "ipcp-dft-set",
         .usage = "IPCP_NAME APPL_NAME REMOTE_ADDR",
         .num_args = 3,
         .func = ipcp_dft_set,
     },
+#endif /* WITH_DFT_SET */
     {
         .name = "ipcps-show",
         .usage = "",
@@ -825,6 +827,8 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
+
+    (void) ipcp_dft_set;
 
     return process_args(argc, argv);
 }
