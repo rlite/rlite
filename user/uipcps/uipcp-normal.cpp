@@ -914,6 +914,10 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
 
     topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 
+    /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
+     * the local entries. */
+    rib->lfdb_update_local(neigh->ipcp_name);
+
     return 0;
 
 err:
