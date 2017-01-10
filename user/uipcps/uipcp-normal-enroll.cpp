@@ -566,7 +566,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         ncl.candidates.push_back(cand);
         sm->m_create(gpb::F_NO_FLAGS, obj_class::neighbors,
                      obj_name::neighbors, 0, 0, "");
-        rib->send_to_dst_addr(sm, rib->myaddr, &ncl);
+        rib->send_to_myself(sm, &ncl);
     }
 
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());

@@ -135,7 +135,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
     lfl.flows.push_back(lf);
 
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
-    send_to_dst_addr(sm, myaddr, &lfl);
+    send_to_myself(sm, &lfl);
 }
 
 int

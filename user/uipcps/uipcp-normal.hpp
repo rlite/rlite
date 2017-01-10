@@ -340,6 +340,7 @@ struct uipcp_rib {
 
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);
+    int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
     int neighs_sync_obj_excluding(const Neighbor *exclude, bool create,

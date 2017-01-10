@@ -644,6 +644,13 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
     return ret;
 }
 
+/* Takes ownership of 'm'. */
+int
+uipcp_rib::send_to_myself(CDAPMessage *m, const UipcpObject *obj)
+{
+    return send_to_dst_addr(m, myaddr, obj);
+}
+
 /* To be called under RIB lock. */
 int
 uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
