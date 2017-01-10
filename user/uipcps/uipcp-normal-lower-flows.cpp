@@ -78,7 +78,7 @@ uipcp_rib::lfdb_add(const LowerFlow &lf)
     if ((!local_entry && lfz.seqnum > it->second[lfz.remote_addr].seqnum)
                 || (local_entry && lfz != it->second[lfz.remote_addr])) {
         it->second[lfz.remote_addr] = lfz; /* Update the entry */
-        UPD(uipcp, "Lower flow %s updated\n", repr.c_str());
+        UPV(uipcp, "Lower flow %s updated\n", repr.c_str());
         return true;
     }
 
@@ -124,9 +124,6 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
         /* We still miss the address or the N-1 flow is not there. */
         return;
     }
-
-    UPD(uipcp, "I will add/update lower flow %u-->%u for neigh %s\n",
-               (unsigned)myaddr, (unsigned)remote_addr, neigh_name.c_str());
 
     lf.local_addr = myaddr;
     lf.remote_addr = remote_addr;
