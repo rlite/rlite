@@ -991,7 +991,7 @@ uipcps_print(struct uipcps *uipcps)
  */
 
 static void
-visit(struct uipcps *uipcps)
+topo_visit(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
@@ -1063,7 +1063,7 @@ visit(struct uipcps *uipcps)
 }
 
 static int
-uipcps_update_depths(struct uipcps *uipcps)
+topo_update_kern(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     char strbuf[10];
@@ -1101,12 +1101,12 @@ uipcps_update_depths(struct uipcps *uipcps)
 }
 
 static int
-uipcps_compute_depths(struct uipcps *uipcps)
+topo_compute(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
 
-    visit(uipcps);
+    topo_visit(uipcps);
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         PV_S("NODE %u, mss = %u\n", ipn->id,
@@ -1123,13 +1123,13 @@ uipcps_compute_depths(struct uipcps *uipcps)
         PV_S("]\n");
     }
 
-    uipcps_update_depths(uipcps);
+    topo_update_kern(uipcps);
 
     return 0;
 }
 
 static struct ipcp_node *
-uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
+topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 {
     struct ipcp_node *ipn;
 
@@ -1160,7 +1160,7 @@ uipcps_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 }
 
 static void
-uipcps_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
+topo_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
 {
     if (ipn->refcnt) {
         return;
@@ -1174,7 +1174,7 @@ uipcps_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
 }
 
 static int
-flow_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
+topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
               struct list_head *edges)
 {
     struct flow_edge *e;
@@ -1203,7 +1203,7 @@ ok:
 }
 
 static int
-flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
+topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
               struct list_head *edges)
 {
     struct flow_edge *e;
@@ -1229,36 +1229,36 @@ flow_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
 }
 
 int
-uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
-                        unsigned int lower_id)
+topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
+                      unsigned int lower_id)
 {
-    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id, 1);
-    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id, 1);
+    struct ipcp_node *upper = topo_node_get(uipcps, upper_id, 1);
+    struct ipcp_node *lower = topo_node_get(uipcps, lower_id, 1);
 
     if (!upper || !lower) {
         return -1;
     }
 
-    if (flow_edge_add(upper, lower, &upper->lowers) ||
-            flow_edge_add(lower, upper, &lower->uppers)) {
-        flow_edge_del(upper, lower, &upper->lowers);
+    if (topo_edge_add(upper, lower, &upper->lowers) ||
+            topo_edge_add(lower, upper, &lower->uppers)) {
+        topo_edge_del(upper, lower, &upper->lowers);
 
         return -1;
     }
 
     PD("Added flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
-    uipcps_compute_depths(uipcps);
+    topo_compute(uipcps);
 
     return 0;
 }
 
 int
-uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
-                         unsigned int lower_id)
+topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
+                        unsigned int lower_id)
 {
-    struct ipcp_node *upper = uipcps_node_get(uipcps, upper_id, 0);
-    struct ipcp_node *lower = uipcps_node_get(uipcps, lower_id, 0);
+    struct ipcp_node *upper = topo_node_get(uipcps, upper_id, 0);
+    struct ipcp_node *lower = topo_node_get(uipcps, lower_id, 0);
 
     if (lower == NULL) {
         PE("Could not find node %u\n", lower_id);
@@ -1270,15 +1270,15 @@ uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
         return -1;
     }
 
-    flow_edge_del(upper, lower, &upper->lowers);
-    flow_edge_del(lower, upper, &lower->uppers);
+    topo_edge_del(upper, lower, &upper->lowers);
+    topo_edge_del(lower, upper, &lower->uppers);
 
-    uipcps_node_put(uipcps, upper);
-    uipcps_node_put(uipcps, lower);
+    topo_node_put(uipcps, upper);
+    topo_node_put(uipcps, lower);
 
     PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
-    uipcps_compute_depths(uipcps);
+    topo_compute(uipcps);
 
     return 0;
 }
@@ -1326,7 +1326,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         return 0;
     }
 
-    node = uipcps_node_get(uipcps, upd->ipcp_id, 1);
+    node = topo_node_get(uipcps, upd->ipcp_id, 1);
     if (!node) {
         return 0;
     }
@@ -1337,7 +1337,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     }
 
     /* A mss was updated, restart topological ordering. */
-    uipcps_compute_depths(uipcps);
+    topo_compute(uipcps);
 
     return 0;
 }

@@ -912,7 +912,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
                     neigh->flows[neigh_port_id]->port_id,
                     neigh->flows[neigh_port_id]->reliable ? "yes" : "no");
 
-    uipcps_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
+    topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 
     return 0;
 

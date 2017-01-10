@@ -209,11 +209,11 @@ int uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
 
 int uipcps_print(struct uipcps *uipcps);
 
-int uipcps_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
-                            unsigned int lower);
+int topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
+                          unsigned int lower);
 
-int uipcps_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
-                              unsigned int lower);
+int topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
+                            unsigned int lower);
 
 int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                              uint8_t response,

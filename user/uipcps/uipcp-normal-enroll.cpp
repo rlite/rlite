@@ -90,9 +90,8 @@ NeighFlow::~NeighFlow()
         }
     }
 
-    uipcps_lower_flow_removed(neigh->rib->uipcp->uipcps,
-                              neigh->rib->uipcp->id,
-                              lower_ipcp_id);
+    topo_lower_flow_removed(neigh->rib->uipcp->uipcps, neigh->rib->uipcp->id,
+                            lower_ipcp_id);
 
     pthread_cond_destroy(&enrollment_stopped);
 }
@@ -1452,8 +1451,8 @@ Neighbor::alloc_flow(const char *supp_dif)
     UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
-    uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,
-                            lower_ipcp_id_);
+    topo_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,
+                          lower_ipcp_id_);
 
     /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
      * the local entries. */
