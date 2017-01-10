@@ -982,7 +982,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         return entry;
     }
 
-    BUG_ON(!maysleep);
+    //BUG_ON(!maysleep);
 
     if (ipcp->ops.flow_deallocated) {
         ipcp->ops.flow_deallocated(ipcp, entry);

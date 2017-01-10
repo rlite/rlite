@@ -114,49 +114,28 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
 {
     rl_addr_t remote_addr = lookup_neighbor_address(neigh_name);
     Neighbor *neigh = get_neighbor(neigh_name, false);
+    LowerFlowList lfl;
     LowerFlow lf;
+    CDAPMessage *sm = new CDAPMessage();
 
-    if (remote_addr == 0 || neigh == NULL) {
+    if (remote_addr == 0 || neigh == NULL || !neigh->has_mgmt_flow()) {
+        /* We still miss the address or the N-1 flow is not there. */
         return;
     }
 
-    UPD(uipcp, "I should add lower flow %u-->%u for neigh %s\n", (unsigned)myaddr, (unsigned)remote_addr, neigh_name.c_str());
-}
+    UPD(uipcp, "I will add lower flow %u-->%u for neigh %s\n",
+               (unsigned)myaddr, (unsigned)remote_addr, neigh_name.c_str());
 
-int
-uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
-{
-    LowerFlow lf;
-    rl_addr_t remote_addr = lookup_neighbor_address(neigh.ipcp_name);
-    int ret;
-
-    if (remote_addr == 0) {
-        UPE(uipcp, "Cannot find address for neighbor %s\n",
-            static_cast<string>(neigh.ipcp_name).c_str());
-        return -1;
-    }
-
-    /* Insert the lower flow in the database. */
-    lf.local_addr = local_addr;
+    lf.local_addr = myaddr;
     lf.remote_addr = remote_addr;
     lf.cost = 1;
     lf.seqnum = 1;
     lf.state = true;
     lf.age = 0;
-    lfdb_add(lf);
-
-    LowerFlowList lfl;
-
-    /* Send the new lower flow to the other neighbors. */
     lfl.flows.push_back(lf);
-    ret = remote_sync_obj_excluding(&neigh, true, obj_class::lfdb,
-                                    obj_name::lfdb, &lfl);
 
-    /* Update the routing table. */
-    spe.run(myaddr, this);
-    pduft_sync();
-
-    return ret;
+    sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
+    send_to_dst_addr(sm, myaddr, &lfl);
 }
 
 int
@@ -204,7 +183,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_obj_excluding(nf->neigh, add, obj_class::lfdb,
+        remote_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */

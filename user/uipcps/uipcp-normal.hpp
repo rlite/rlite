@@ -323,7 +323,6 @@ struct uipcp_rib {
     std::string lookup_neighbor_by_address(rl_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
-    int commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();

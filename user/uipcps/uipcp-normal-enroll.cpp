@@ -586,7 +586,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
 
     {
         /* Send only a neighbor representing myself, because it's
-         * required by the initiator to commit_lower_flow(). */
+         * required by the initiator to add a local LFDB entry. */
         NeighborCandidateList ncl;
         NeighborCandidate cand;
         rina_components_from_string(string(rib->uipcp->name), cand.apn,
@@ -735,10 +735,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         nf->keepalive_tmr_start();
         nf->enrollment_state_set(NEIGH_ENROLLED);
 
-        /* Add a new LowerFlow entry to the RIB, corresponding to
-         * the new neighbor. */
-        rib->commit_lower_flow(enr_info.address, *this);
-
+        /* Sync with the neighbor. */
         remote_sync_rib(nf);
         pthread_cond_signal(&nf->enrollment_stopped);
 
@@ -788,10 +785,6 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     nf->enroll_tmr_stop();
     nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
-
-    /* Add a new LowerFlow entry to the RIB, corresponding to
-     * the new neighbor. */
-    rib->commit_lower_flow(rib->myaddr, *this);
 
     remote_sync_rib(nf);
     pthread_cond_signal(&nf->enrollment_stopped);
@@ -848,9 +841,6 @@ Neighbor::s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm)
     nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
 
-    /* Add a new LowerFlow entry to the RIB, corresponding to
-     * the new neighbor. */
-    rib->commit_lower_flow(rib->myaddr, *this);
     pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
@@ -886,9 +876,6 @@ Neighbor::i_lf_wait_start_r(NeighFlow *nf, const CDAPMessage *rm)
     nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
 
-    /* Add a new LowerFlow entry to the RIB, corresponding to
-     * the new neighbor. */
-    rib->commit_lower_flow(rib->myaddr, *this);
     pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
@@ -1119,7 +1106,6 @@ uipcp_rib::get_neighbor(const string& neigh_name, bool create)
             return NULL;
         }
         neighbors[neigh_name] = new Neighbor(this, neigh_name);
-        lfdb_update_local(neigh_name);
     }
 
     return neighbors[neigh_name];
@@ -1244,9 +1230,11 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
                 neighbors_cand.insert(neigh_name);
                 UPD(uipcp, "Candidate neighbor %s %s\n", neigh_name.c_str(),
                         (mit != neighbors_seen.end() ? "updated" : "added"));
-            }
 
-            lfdb_update_local(neigh_name);
+                /* Possibly updated neighbor address, we may need to update or
+                 * insert a local LFDB entry. */
+                lfdb_update_local(neigh_name);
+            }
 
         } else {
             if (mit == neighbors_seen.end()) {
@@ -1406,6 +1394,7 @@ out:
 
     return ret;
 }
+
 int
 Neighbor::alloc_flow(const char *supp_dif)
 {
@@ -1465,6 +1454,10 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     uipcps_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,
                             lower_ipcp_id_);
+
+    /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
+     * the local entries. */
+    rib->lfdb_update_local(ipcp_name);
 
     return 0;
 }
