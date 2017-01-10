@@ -550,24 +550,6 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         enr_info.address = rib->address_allocate();
     }
 
-    {
-        /* We have to add the initiator to our set of candidate neighbors,
-         * because this is needed for neighbor address look-up (necessary when
-         * creating the lower-flow entry associated to the initiator). */
-        NeighborCandidateList ncl;
-        NeighborCandidate cand;
-        CDAPMessage *sm = new CDAPMessage();
-
-        rina_components_from_string(ipcp_name, cand.apn, cand.api,
-                                    cand.aen, cand.aei);
-        cand.address = enr_info.address;
-        cand.lower_difs = enr_info.lower_difs;
-        ncl.candidates.push_back(cand);
-        sm->m_create(gpb::F_NO_FLAGS, obj_class::neighbors,
-                     obj_name::neighbors, 0, 0, "");
-        rib->send_to_myself(sm, &ncl);
-    }
-
     m.m_start_r(gpb::F_NO_FLAGS, 0, string());
     m.obj_class = obj_class::enrollment;
     m.obj_name = obj_name::enrollment;
