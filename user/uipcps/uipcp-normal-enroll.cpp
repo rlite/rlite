@@ -952,29 +952,28 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
         map< rl_addr_t, LowerFlow >::iterator jt;
         LowerFlowList lfl;
 
-        it = rib->lfdb.begin();
-        if (it == rib->lfdb.end()) {
-            return 0;
-        }
-        jt = it->second.begin();
-
-        for (;;) {
-                    lfl.flows.push_back(jt->second);
-                    jt ++;
-                    if (jt == it->second.end()) {
-                        if (++it != rib->lfdb.end()) {
-                            jt = it->second.begin();
-                        }
+        if (rib->lfdb.size() > 0) {
+            it = rib->lfdb.begin();
+            jt = it->second.begin();
+            for (;;) {
+                if (jt == it->second.end()) {
+                    if (++it != rib->lfdb.end()) {
+                        jt = it->second.begin();
                     }
+                }
 
-                    if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
-                        ret |= neigh_sync_obj(nf, true, obj_class::lfdb,
-                                               obj_name::lfdb, &lfl);
-                        lfl.flows.clear();
-                        if (it == rib->lfdb.end()) {
-                            break;
-                        }
+                if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
+                    ret |= neigh_sync_obj(nf, true, obj_class::lfdb,
+                                           obj_name::lfdb, &lfl);
+                    lfl.flows.clear();
+                    if (it == rib->lfdb.end()) {
+                        break;
                     }
+                }
+
+                lfl.flows.push_back(jt->second);
+                jt ++;
+            }
         }
     }
 
