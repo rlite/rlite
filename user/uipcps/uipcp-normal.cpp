@@ -794,7 +794,7 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
     int ret;
 
     /* Check that the N-flow allocation request makes sense. */
-    neigh = rib->get_neighbor(req->remote_appl, false);
+    neigh = rib->get_neighbor(string(req->remote_appl), false);
     if (!neigh || !neigh->enrollment_complete()) {
         UPE(rib->uipcp, "Rejected N-flow request from non-neighbor %s\n",
                         req->remote_appl);
@@ -867,7 +867,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to add the neighbor with the associated port_id. */
-    Neighbor *neigh = rib->get_neighbor(req->remote_appl, true);
+    Neighbor *neigh = rib->get_neighbor(string(req->remote_appl), true);
 
     neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */

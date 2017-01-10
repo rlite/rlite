@@ -109,6 +109,20 @@ uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
     return true;
 }
 
+void
+uipcp_rib::lfdb_update_local(const string& neigh_name)
+{
+    rl_addr_t remote_addr = lookup_neighbor_address(neigh_name);
+    Neighbor *neigh = get_neighbor(neigh_name, false);
+    LowerFlow lf;
+
+    if (remote_addr == 0 || neigh == NULL) {
+        return;
+    }
+
+    UPD(uipcp, "I should add lower flow %u-->%u for neigh %s\n", (unsigned)myaddr, (unsigned)remote_addr, neigh_name.c_str());
+}
+
 int
 uipcp_rib::commit_lower_flow(rl_addr_t local_addr, const Neighbor& neigh)
 {
