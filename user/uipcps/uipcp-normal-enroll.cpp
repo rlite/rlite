@@ -994,26 +994,21 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
     }
 
     {
-        bool sent_myself = false;
+        NeighborCandidate cand;
+        string my_name = string(rib->uipcp->name);
+
+        /* Temporarily insert a neighbor representing myself. */
+        rina_components_from_string(my_name, cand.apn,
+                                    cand.api, cand.aen, cand.aei);
+        cand.address = rib->myaddr;
+        cand.lower_difs = rib->lower_difs;
+        rib->neighbors_seen[my_name] = cand;
 
         /* Scan all the neighbors I know about. */
         for (map<string, NeighborCandidate>::iterator cit =
                 rib->neighbors_seen.begin();
                 cit != rib->neighbors_seen.end();) {
             NeighborCandidateList ncl;
-
-            if (!sent_myself) {
-                NeighborCandidate cand;
-
-                /* A neighbor representing myself. */
-                rina_components_from_string(string(rib->uipcp->name), cand.apn,
-                                            cand.api, cand.aen, cand.aei);
-                cand.address = rib->myaddr;
-                cand.lower_difs = rib->lower_difs;
-                ncl.candidates.push_back(cand);
-
-                sent_myself = true;
-            }
 
             while (ncl.candidates.size() < limit &&
                             cit != rib->neighbors_seen.end()) {
@@ -1024,6 +1019,8 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
             ret |= neigh_sync_obj(nf, true, obj_class::neighbors,
                                    obj_name::neighbors, &ncl);
         }
+
+        rib->neighbors_seen.erase(my_name);
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
