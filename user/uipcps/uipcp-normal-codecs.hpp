@@ -100,6 +100,11 @@ struct NeighborCandidate : public UipcpObject {
     NeighborCandidate() { }
     NeighborCandidate(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
+
+    bool operator==(const NeighborCandidate &o) const;
+    bool operator!=(const NeighborCandidate &o) const {
+        return !(*this == o);
+    }
 };
 
 struct NeighborCandidateList : public UipcpObject {
@@ -122,8 +127,9 @@ struct LowerFlow : public UipcpObject {
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
     bool operator==(const LowerFlow& o) {
+        /* Don't use seqnum and age for the comparison. */
         return local_addr == o.local_addr && remote_addr == o.remote_addr &&
-                cost == o.cost && seqnum == o.seqnum;
+                cost == o.cost;
     }
     bool operator!=(const LowerFlow& o) {
         return !(*this == o);

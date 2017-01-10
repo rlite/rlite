@@ -1211,10 +1211,12 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (add) {
-            if (mit != neighbors_seen.end()) {
-                /* We've already seen this one. TODO manage update */
+            if (mit != neighbors_seen.end() &&
+                        neighbors_seen[neigh_name] == *neigh) {
+                /* We've already seen this one. */
                 continue;
             }
+
             neighbors_seen[neigh_name] = *neigh;
             prop_ncl.candidates.push_back(*neigh);
             propagate = true;

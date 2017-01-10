@@ -300,6 +300,28 @@ NeighborCandidate::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+bool
+NeighborCandidate::operator==(const NeighborCandidate &o) const
+{
+    if (api != o.api || apn != o.apn || address != o.address ||
+            lower_difs.size() != o.lower_difs.size()) {
+        return false;
+    }
+
+    set<string> s1, s2;
+
+    for (list<string>::const_iterator lit = lower_difs.begin();
+                                    lit != lower_difs.end(); lit++) {
+        s1.insert(*lit);
+    }
+    for (list<string>::const_iterator lit = o.lower_difs.begin();
+                                    lit != o.lower_difs.end(); lit++) {
+        s2.insert(*lit);
+    }
+
+    return s1 == s2;
+}
+
 NeighborCandidateList::NeighborCandidateList(const char *buf, unsigned int size)
 {
     gpb::neighbors_t gm;
