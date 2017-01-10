@@ -122,7 +122,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
             appl_name.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->id);
 
-    remote_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+    neighs_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
@@ -187,7 +187,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        remote_sync_obj_excluding(nf->neigh, add, obj_class::dft,
+        neighs_sync_obj_excluding(nf->neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
     }
@@ -213,6 +213,6 @@ uipcp_rib::dft_update_address(rl_addr_t new_addr)
 
     /* Disseminate the update. */
     if (prop_dft.entries.size()) {
-        remote_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
+        neighs_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
     }
 }

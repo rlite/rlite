@@ -683,7 +683,7 @@ uipcp_rib::address_allocate() const
 }
 
 int
-uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
+uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
                                  bool create, const string& obj_class,
                                  const string& obj_name,
                                  const UipcpObject *obj_value) const
@@ -703,7 +703,7 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        neigh->second->remote_sync_obj(NULL, create, obj_class,
+        neigh->second->neigh_sync_obj(NULL, create, obj_class,
                                       obj_name, obj_value);
     }
 
@@ -711,11 +711,11 @@ uipcp_rib::remote_sync_obj_excluding(const Neighbor *exclude,
 }
 
 int
-uipcp_rib::remote_sync_obj_all(bool create, const string& obj_class,
+uipcp_rib::neighs_sync_obj_all(bool create, const string& obj_class,
                            const string& obj_name,
                            const UipcpObject *obj_value) const
 {
-    return remote_sync_obj_excluding(NULL, create, obj_class, obj_name, obj_value);
+    return neighs_sync_obj_excluding(NULL, create, obj_class, obj_name, obj_value);
 }
 
 void uipcp_rib::neigh_flow_prune(NeighFlow *nf)

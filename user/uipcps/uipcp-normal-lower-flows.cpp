@@ -183,7 +183,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        remote_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::lfdb,
+        neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */

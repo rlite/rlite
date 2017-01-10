@@ -595,7 +595,7 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         cand.lower_difs = rib->lower_difs;
         ncl.candidates.push_back(cand);
 
-        remote_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors, &ncl);
+        neigh_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors, &ncl);
     }
 
     /* Stop the enrollment. */
@@ -736,7 +736,7 @@ Neighbor::i_wait_stop(NeighFlow *nf, const CDAPMessage *rm)
         nf->enrollment_state_set(NEIGH_ENROLLED);
 
         /* Sync with the neighbor. */
-        remote_sync_rib(nf);
+        neigh_sync_rib(nf);
         pthread_cond_signal(&nf->enrollment_stopped);
 
     } else {
@@ -786,7 +786,7 @@ Neighbor::s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm)
     nf->keepalive_tmr_start();
     nf->enrollment_state_set(NEIGH_ENROLLED);
 
-    remote_sync_rib(nf);
+    neigh_sync_rib(nf);
     pthread_cond_signal(&nf->enrollment_stopped);
 
     return 0;
@@ -923,7 +923,7 @@ Neighbor::enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm)
     return ret;
 }
 
-int Neighbor::remote_sync_obj(const NeighFlow *nf, bool create,
+int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
                               const string& obj_class,
                               const string& obj_name,
                               const UipcpObject *obj_value) const
@@ -953,7 +953,7 @@ int Neighbor::remote_sync_obj(const NeighFlow *nf, bool create,
     return ret;
 }
 
-int Neighbor::remote_sync_rib(NeighFlow *nf) const
+int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 {
     unsigned int limit = 10; /* Hardwired for now, but at least we limit. */
     int ret = 0;
@@ -983,7 +983,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                     }
 
                     if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
-                        ret |= remote_sync_obj(nf, true, obj_class::lfdb,
+                        ret |= neigh_sync_obj(nf, true, obj_class::lfdb,
                                                obj_name::lfdb, &lfl);
                         lfl.flows.clear();
                         if (it == rib->lfdb.end()) {
@@ -1004,7 +1004,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 e ++;
             }
 
-            ret |= remote_sync_obj(nf, true, obj_class::dft, obj_name::dft,
+            ret |= neigh_sync_obj(nf, true, obj_class::dft, obj_name::dft,
                                    &dft_slice);
         }
     }
@@ -1037,7 +1037,7 @@ int Neighbor::remote_sync_rib(NeighFlow *nf) const
                 cit ++;
             }
 
-            ret |= remote_sync_obj(nf, true, obj_class::neighbors,
+            ret |= neigh_sync_obj(nf, true, obj_class::neighbors,
                                    obj_name::neighbors, &ncl);
         }
     }
@@ -1056,14 +1056,14 @@ sync_timeout_cb(struct uipcp *uipcp, void *arg)
 
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
-    rib->remote_refresh_lower_flows();
+    rib->neighs_refresh_lower_flows();
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
 					  RL_NEIGH_SYNC_INTVAL * 1000,
                                           sync_timeout_cb, rib);
 }
 
 int
-uipcp_rib::remote_refresh_lower_flows()
+uipcp_rib::neighs_refresh_lower_flows()
 {
     map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
     map< rl_addr_t, LowerFlow >::iterator jt;
@@ -1089,7 +1089,7 @@ uipcp_rib::remote_refresh_lower_flows()
                 lfl.flows.push_back(jt->second);
                 jt ++;
         }
-        ret |= remote_sync_obj_all(true, obj_class::lfdb,
+        ret |= neighs_sync_obj_all(true, obj_class::lfdb,
 				   obj_name::lfdb, &lfl);
     }
 
@@ -1257,7 +1257,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (propagate) {
         /* Propagate the updated information to the other neighbors,
          * so that they can update their Neighbor objects. */
-        remote_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::neighbors,
+        neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::neighbors,
                                   obj_name::neighbors, &prop_ncl);
     }
 

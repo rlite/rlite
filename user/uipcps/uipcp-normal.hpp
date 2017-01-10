@@ -188,12 +188,12 @@ struct Neighbor {
 
     int fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
-    int remote_sync_obj(const NeighFlow *nf, bool create,
+    int neigh_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
 
-    int remote_sync_rib(NeighFlow *nf) const;
+    int neigh_sync_rib(NeighFlow *nf) const;
 
 private:
     const NeighFlow *_mgmt_conn() const;
@@ -342,14 +342,14 @@ struct uipcp_rib {
                          const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
-    int remote_sync_obj_excluding(const Neighbor *exclude, bool create,
+    int neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
                               const std::string& obj_class,
                               const std::string& obj_name,
                               const UipcpObject *obj_value) const;
-    int remote_sync_obj_all(bool create, const std::string& obj_class,
+    int neighs_sync_obj_all(bool create, const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
-    int remote_refresh_lower_flows();
+    int neighs_refresh_lower_flows();
 
     /* Receive info from neighbors. */
     int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
