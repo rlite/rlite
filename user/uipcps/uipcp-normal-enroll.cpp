@@ -583,20 +583,6 @@ Neighbor::s_wait_start(NeighFlow *nf, const CDAPMessage *rm)
         /* Send DIF static information. */
     }
 
-    {
-        /* Send only a neighbor representing myself, because it's
-         * required by the initiator to add a local LFDB entry. */
-        NeighborCandidateList ncl;
-        NeighborCandidate cand;
-        rina_components_from_string(string(rib->uipcp->name), cand.apn,
-                                    cand.api, cand.aen, cand.aei);
-        cand.address = rib->myaddr;
-        cand.lower_difs = rib->lower_difs;
-        ncl.candidates.push_back(cand);
-
-        neigh_sync_obj(nf, true, obj_class::neighbors, obj_name::neighbors, &ncl);
-    }
-
     /* Stop the enrollment. */
     enr_info.start_early = true;
 
