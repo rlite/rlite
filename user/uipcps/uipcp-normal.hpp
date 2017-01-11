@@ -112,6 +112,9 @@ struct NeighFlow {
     int enroll_tmrid;
     pthread_cond_t enrollment_stopped;
     enum enroll_state_t enrollment_state;
+    pthread_t enrollment_th;
+    std::list<const CDAPMessage *> enroll_msgs;
+    pthread_cond_t enroll_msgs_avail;
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -128,6 +131,8 @@ struct NeighFlow {
     void keepalive_tmr_stop();
 
     void enrollment_state_set(enroll_state_t st);
+
+    const CDAPMessage *next_enroll_msg();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj);
