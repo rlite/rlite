@@ -102,12 +102,12 @@ struct NeighFlow {
 
     time_t last_activity;
 
-    pthread_t enrollment_th;
-    enum enroll_state_t enrollment_state;
+    pthread_t enroll_th;
+    enum enroll_state_t enroll_state;
     std::list<const CDAPMessage *> enroll_msgs;
     pthread_cond_t enroll_msgs_avail;
-    pthread_cond_t enrollment_stopped;
-    bool enrollment_rsrc_up; /* are resources allocated */
+    pthread_cond_t enroll_stopped;
+    bool enroll_rsrc_up; /* are resources allocated */
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -120,8 +120,7 @@ struct NeighFlow {
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
-    void enrollment_state_set(enroll_state_t st);
-
+    void enroll_state_set(enroll_state_t st);
     const CDAPMessage *next_enroll_msg();
     void enrollment_start(bool initiator);
     void enrollment_cleanup();
@@ -159,7 +158,7 @@ struct Neighbor {
         { return !(*this == other); }
     ~Neighbor();
 
-    const char *enrollment_state_repr(enroll_state_t s) const;
+    const char *enroll_state_repr(enroll_state_t s) const;
 
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };

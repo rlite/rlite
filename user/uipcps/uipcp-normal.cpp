@@ -221,7 +221,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         nf->last_activity = time(NULL);
 
         /* Start the enrollment as a slave (enroller), if needed. */
-        if (nf->enrollment_state == NEIGH_NONE) {
+        if (nf->enroll_state == NEIGH_NONE) {
             nf->enrollment_start(false);
         }
 
@@ -240,10 +240,10 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
             neigh->mgmt_port_id = nf->port_id;
         }
 
-        if (nf->enrollment_state == NEIGH_ENROLLING) {
+        if (nf->enroll_state == NEIGH_ENROLLING) {
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            assert(nf->enrollment_rsrc_up);
+            assert(nf->enroll_rsrc_up);
             nf->enroll_msgs.push_back(m);
             m = NULL;
             pthread_cond_signal(&nf->enroll_msgs_avail);
@@ -475,7 +475,7 @@ uipcp_rib::dump() const
                         << " seconds ago]";
             } else {
                 ss << "[Enrollment ongoing <" <<
-                        neigh->second->mgmt_conn()->enrollment_state << ">]";
+                        neigh->second->mgmt_conn()->enroll_state << ">]";
             }
         } else {
             ss << "[Disconnected]";
@@ -738,7 +738,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
         }
 
         if (!neigh->second->has_mgmt_flow() ||
-                neigh->second->mgmt_conn()->enrollment_state
+                neigh->second->mgmt_conn()->enroll_state
                     != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet or the
              * flow is not there since the neighbor is about to

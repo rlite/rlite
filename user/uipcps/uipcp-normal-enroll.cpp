@@ -43,8 +43,8 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   port_id(pid), lower_ipcp_id(lid),
                                   flow_fd(ffd), reliable(false),
                                   upper_flow_fd(-1), conn(NULL),
-                                  enrollment_state(NEIGH_NONE),
-                                  enrollment_rsrc_up(false),
+                                  enroll_state(NEIGH_NONE),
+                                  enroll_rsrc_up(false),
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
 {
@@ -148,10 +148,10 @@ NeighFlow::abort_enrollment()
 
     UPE(neigh->rib->uipcp, "Aborting enrollment\n");
 
-    if (enrollment_state == NEIGH_NONE) {
+    if (enroll_state == NEIGH_NONE) {
         return;
     }
-    enrollment_state_set(NEIGH_NONE);
+    enroll_state_set(NEIGH_NONE);
 
     m.m_release(gpb::F_NO_FLAGS);
     ret = send_to_port_id(&m, 0, NULL);
@@ -162,18 +162,18 @@ NeighFlow::abort_enrollment()
     if (conn) {
         conn->reset();
     }
-    pthread_cond_signal(&enrollment_stopped);
+    pthread_cond_signal(&enroll_stopped);
 }
 
 void
-NeighFlow::enrollment_state_set(enroll_state_t st)
+NeighFlow::enroll_state_set(enroll_state_t st)
 {
-    enroll_state_t old = enrollment_state;
+    enroll_state_t old = enroll_state;
 
-    enrollment_state = st;
+    enroll_state = st;
 
     UPD(neigh->rib->uipcp, "switch state %s --> %s\n",
-        neigh->enrollment_state_repr(old), neigh->enrollment_state_repr(st));
+        neigh->enroll_state_repr(old), neigh->enroll_state_repr(st));
 
     if (old != NEIGH_ENROLLED && st == NEIGH_ENROLLED) {
         neigh->rib->enrolled ++;
@@ -266,7 +266,7 @@ Neighbor::~Neighbor()
 }
 
 const char *
-Neighbor::enrollment_state_repr(enroll_state_t s) const
+Neighbor::enroll_state_repr(enroll_state_t s) const
 {
     switch (s) {
         case NEIGH_NONE:
@@ -579,7 +579,7 @@ enrollee_thread(void *opaque)
 finish:
     delete rm;
     nf->keepalive_tmr_start();
-    nf->enrollment_state_set(NEIGH_ENROLLED);
+    nf->enroll_state_set(NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
     while (!nf->enroll_msgs.empty()) {
@@ -590,7 +590,7 @@ finish:
 
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(nf);
-    pthread_cond_signal(&nf->enrollment_stopped);
+    pthread_cond_signal(&nf->enroll_stopped);
 
     pthread_mutex_unlock(&rib->lock);
 
@@ -785,7 +785,7 @@ enroller_thread(void *opaque)
 finish:
     delete rm;
     nf->keepalive_tmr_start();
-    nf->enrollment_state_set(NEIGH_ENROLLED);
+    nf->enroll_state_set(NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
     while (!nf->enroll_msgs.empty()) {
@@ -796,7 +796,7 @@ finish:
 
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(nf);
-    pthread_cond_signal(&nf->enrollment_stopped);
+    pthread_cond_signal(&nf->enroll_stopped);
 
     pthread_mutex_unlock(&rib->lock);
 
@@ -814,39 +814,39 @@ err:
 void
 NeighFlow::enrollment_start(bool initiator)
 {
-    if (enrollment_rsrc_up) {
+    if (enroll_rsrc_up) {
         return;
     }
     assert(enroll_msgs.empty());
-    enrollment_state_set(NEIGH_ENROLLING);
+    enroll_state_set(NEIGH_ENROLLING);
     pthread_cond_init(&enroll_msgs_avail, NULL);
-    pthread_cond_init(&enrollment_stopped, NULL);
-    pthread_create(&enrollment_th, NULL,
+    pthread_cond_init(&enroll_stopped, NULL);
+    pthread_create(&enroll_th, NULL,
                    initiator ? enrollee_thread : enroller_thread,
                    this);
-    enrollment_rsrc_up = true;
+    enroll_rsrc_up = true;
 }
 
 /* Clean-up enrollment resources if needed. */
 void
 NeighFlow::enrollment_cleanup()
 {
-    if (!enrollment_rsrc_up) {
+    if (!enroll_rsrc_up) {
         return;
     }
     UPD(neigh->rib->uipcp, "clean up enrollment data\n");
     assert(enroll_msgs.empty());
-    enrollment_rsrc_up = false;
-    pthread_join(enrollment_th, NULL);
+    enroll_rsrc_up = false;
+    pthread_join(enroll_th, NULL);
     pthread_cond_destroy(&enroll_msgs_avail);
-    pthread_cond_destroy(&enrollment_stopped);
+    pthread_cond_destroy(&enroll_stopped);
 }
 
 /* Did we complete the enrollment procedure with the neighbor? */
 bool
 Neighbor::enrollment_complete() const
 {
-    return has_mgmt_flow() && mgmt_conn()->enrollment_state == NEIGH_ENROLLED;
+    return has_mgmt_flow() && mgmt_conn()->enroll_state == NEIGH_ENROLLED;
 }
 
 int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
@@ -1413,9 +1413,9 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     nf = neigh->mgmt_conn();
 
-    if (nf->enrollment_state != NEIGH_NONE) {
+    if (nf->enroll_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment state is %s\n",
-            neigh->enrollment_state_repr(nf->enrollment_state));
+            neigh->enroll_state_repr(nf->enroll_state));
 
     } else {
         /* Start the enrollment procedure as initiator (enrollee). */
@@ -1427,11 +1427,11 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
          * successful completion (NEIGH_ENROLLED), or because of an abort
          * (NEIGH_NONE).
          */
-        while (nf->enrollment_state == NEIGH_ENROLLING) {
-            pthread_cond_wait(&nf->enrollment_stopped, &rib->lock);
+        while (nf->enroll_state == NEIGH_ENROLLING) {
+            pthread_cond_wait(&nf->enroll_stopped, &rib->lock);
         }
 
-        ret = nf->enrollment_state == NEIGH_ENROLLED ? 0 : -1;
+        ret = nf->enroll_state == NEIGH_ENROLLED ? 0 : -1;
         nf->enrollment_cleanup();
 
     } else {
@@ -1485,7 +1485,7 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
 
             inact = time(NULL) - nf->last_activity;
 
-            if (nf->enrollment_state == NEIGH_NONE && inact > 10) {
+            if (nf->enroll_state == NEIGH_NONE && inact > 10) {
                 /* Prune the flow now, we'll try to enroll later. */
                 UPD(rib->uipcp, "Pruning flow towards %s since inactive "
                                 "for %d seconds\n", cand->c_str(), (int)inact);
