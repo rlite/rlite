@@ -141,7 +141,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 }
 
 void
-NeighFlow::abort_enrollment()
+NeighFlow::enrollment_abort()
 {
     CDAPMessage m;
     int ret;
@@ -600,7 +600,7 @@ err:
     if (rm) {
         delete rm;
     }
-    nf->abort_enrollment();
+    nf->enrollment_abort();
     pthread_mutex_unlock(&rib->lock);
     return NULL;
 }
@@ -665,6 +665,8 @@ enroller_thread(void *opaque)
         CDAPMessage m;
         int ret;
 
+        UPD(rib->uipcp, "S <-- I M_START(lowerflow)\n");
+
         m.m_start_r(gpb::F_NO_FLAGS, 0, string());
         m.obj_class = obj_class::lowerflow;
         m.obj_name = obj_name::lowerflow;
@@ -672,9 +674,9 @@ enroller_thread(void *opaque)
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed\n");
-            nf->abort_enrollment();
-            return 0;
+            goto err;
         }
+        UPD(rib->uipcp, "S --> I M_START_R(lowerflow)\n");
 
         goto finish;
     }
@@ -696,13 +698,13 @@ enroller_thread(void *opaque)
             goto err;
         }
 
+        UPD(rib->uipcp, "S <-- I M_START(enrollment)\n");
+
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_START does not contain a nested message\n");
             goto err;
         }
-
-        UPD(rib->uipcp, "S <-- I M_START(enrollment)\n");
 
         EnrollmentInfo enr_info(objbuf, objlen);
         CDAPMessage m;
@@ -806,7 +808,7 @@ err:
     if (rm) {
         delete rm;
     }
-    nf->abort_enrollment();
+    nf->enrollment_abort();
     pthread_mutex_unlock(&rib->lock);
     return NULL;
 }
@@ -1110,10 +1112,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        UPE(uipcp, "M_START does not contain a nested message\n");
-        if (nf) {
-            nf->abort_enrollment();
-        }
+        UPE(uipcp, "M_CREATE does not contain a nested message\n");
         return 0;
     }
 

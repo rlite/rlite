@@ -116,7 +116,6 @@ struct NeighFlow {
               int ffd, unsigned int lid);
     ~NeighFlow();
 
-    void abort_enrollment();
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
@@ -124,6 +123,7 @@ struct NeighFlow {
     const CDAPMessage *next_enroll_msg();
     void enrollment_start(bool initiator);
     void enrollment_cleanup();
+    void enrollment_abort();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj);
