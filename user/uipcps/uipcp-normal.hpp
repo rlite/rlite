@@ -80,16 +80,9 @@ namespace obj_name {
 
 enum enroll_state_t {
     NEIGH_NONE = 0,
-    NEIGH_I_WAIT_CONNECT_R, /* 1 */
-    NEIGH_S_WAIT_START, /* 2 */
-    NEIGH_I_WAIT_START_R, /* 3 */
-    NEIGH_S_WAIT_STOP_R, /* 4 */
-    NEIGH_I_WAIT_STOP, /* 5 */
-    NEIGH_I_WAIT_START, /* 6 */
 
-    NEIGH_I_LF_WAIT_START_R, /* 7 */
-
-    NEIGH_ENROLLED, /* 8 */
+    NEIGH_ENROLLING,
+    NEIGH_ENROLLED,
 
     NEIGH_STATE_LAST,
 };
@@ -109,12 +102,12 @@ struct NeighFlow {
 
     time_t last_activity;
 
-    int enroll_tmrid;
-    pthread_cond_t enrollment_stopped;
-    enum enroll_state_t enrollment_state;
     pthread_t enrollment_th;
+    enum enroll_state_t enrollment_state;
     std::list<const CDAPMessage *> enroll_msgs;
     pthread_cond_t enroll_msgs_avail;
+    pthread_cond_t enrollment_stopped;
+    bool enrollment_rsrc_up; /* are resources allocated */
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -123,16 +116,15 @@ struct NeighFlow {
               int ffd, unsigned int lid);
     ~NeighFlow();
 
-    bool enrollment_starting(const CDAPMessage *m) const;
     void abort_enrollment();
-    void enroll_tmr_start();
-    void enroll_tmr_stop();
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
     void enrollment_state_set(enroll_state_t st);
 
     const CDAPMessage *next_enroll_msg();
+    void enrollment_start(bool initiator);
+    void enrollment_cleanup();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
                         const UipcpObject *obj);
@@ -150,8 +142,6 @@ struct Neighbor {
      * or were we the target? */
     bool initiator;
 
-    int enroll_attempts;
-
     std::map<rl_port_t, NeighFlow *> flows;
     rl_port_t mgmt_port_id;
 
@@ -161,7 +151,6 @@ struct Neighbor {
 
     typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
                                                   const CDAPMessage *rm);
-    enroll_fsm_handler_t enroll_fsm_handlers[NEIGH_STATE_LAST];
 
     Neighbor(struct uipcp_rib *rib, const std::string& name);
     bool operator==(const Neighbor& other) const
@@ -176,7 +165,6 @@ struct Neighbor {
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_mgmt_flow() const { return flows.size() > 0; }
     bool enrollment_complete() const;
-    int enroll_fsm_run(NeighFlow *nf, const CDAPMessage *rm);
     int alloc_flow(const char *supp_dif_name);
 
     /* Enrollment state machine handlers. */

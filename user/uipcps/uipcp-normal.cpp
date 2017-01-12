@@ -141,7 +141,8 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
              char *serbuf, int serlen)
 {
     CDAPMessage *m = NULL;
-    NeighFlow *flow;
+    Neighbor *neigh;
+    NeighFlow *nf;
     int ret;
 
     try {
@@ -176,7 +177,6 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 
             rib->cdap_dispatch(adata.cdap, NULL);
 
-            delete m;
             return 0;
         }
 
@@ -196,34 +196,71 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         ScopeLock(rib->lock);
 
         /* Lookup neighbor by port id. */
-        ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &flow);
+        ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
         if (ret) {
             UPE(rib->uipcp, "Received message from unknown port id %d\n",
                 mhdr->local_port);
             return -1;
         }
 
-        if (!flow->conn) {
-            flow->conn = new CDAPConn(flow->flow_fd, 1);
+        neigh = nf->neigh;
+
+        if (!nf->conn) {
+            nf->conn = new CDAPConn(nf->flow_fd, 1);
         }
 
         /* Deserialize the received CDAP message. */
-        m = flow->conn->msg_deser(serbuf, serlen);
+        m = nf->conn->msg_deser(serbuf, serlen);
         if (!m) {
             UPE(rib->uipcp, "msg_deser() failed\n");
             /* Remove flow. */
-            rib->neigh_flow_prune(flow);
+            rib->neigh_flow_prune(nf);
             return -1;
         }
 
-        /* Feed the enrollment state machine. */
-        ret = flow->neigh->enroll_fsm_run(flow, m);
+        nf->last_activity = time(NULL);
+
+        /* Start the enrollment as a slave (enroller), if needed. */
+        if (nf->enrollment_state == NEIGH_NONE) {
+            nf->enrollment_start(false);
+        }
+
+        if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
+                !neigh->initiator && m->op_code == gpb::M_START &&
+                    m->obj_name == obj_name::enrollment &&
+                        m->obj_class == obj_class::enrollment) {
+            /* We thought we were already enrolled to this neighbor, but
+             * he is trying to start again the enrollment procedure on a
+             * different flow. We therefore assume that the neighbor
+             * crashed before we could detect it, and select the new flow
+             * as the management one. */
+            UPI(rib->uipcp, "Switch management flow, port-id %u --> port-id %u\n",
+                    neigh->mgmt_conn()->port_id,
+                    nf->port_id);
+            neigh->mgmt_port_id = nf->port_id;
+        }
+
+        if (nf->enrollment_state == NEIGH_ENROLLING) {
+            /* Enrollment is ongoing, we need to push this message to the
+             * enrolling thread (also ownership is passed) and notify it. */
+            assert(nf->enrollment_rsrc_up);
+            nf->enroll_msgs.push_back(m);
+            m = NULL;
+            pthread_cond_signal(&nf->enroll_msgs_avail);
+        } else {
+            nf->enrollment_cleanup();
+            /* We are already enrolled, we can dispatch this message to
+             * the RIB. */
+            ret = rib->cdap_dispatch(m, nf);
+        }
 
     } catch (std::bad_alloc) {
         UPE(rib->uipcp, "Out of memory\n");
     }
 
-    delete m;
+    if (m) {
+        delete m;
+    }
 
     return ret;
 }
@@ -599,10 +636,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        ret = cdap_dispatch(m, NULL);
-        delete m;
-
-        return ret;
+        return cdap_dispatch(m, NULL);
     }
 
     adata.src_addr = myaddr;
@@ -657,6 +691,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
+    int ret = 0;
 
     if (hi == handlers.end()) {
         size_t pos = rm->obj_name.rfind("/");
@@ -670,17 +705,18 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
         }
     }
 
-    if (hi == handlers.end()) {
-        UPE(uipcp, "Unable to manage CDAP message\n");
-        rm->dump();
-        return -1;
-    }
-
     if (nf && nf->neigh) {
         nf->neigh->unheard_since = time(NULL); /* update */
     }
 
-    return (this->*(hi->second))(rm, nf);
+    if (hi == handlers.end()) {
+        UPE(uipcp, "Unable to manage CDAP message\n");
+        rm->dump();
+    } else {
+        ret = (this->*(hi->second))(rm, nf);
+    }
+
+    return ret;
 }
 
 rl_addr_t

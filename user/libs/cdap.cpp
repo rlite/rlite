@@ -255,7 +255,7 @@ CDAPConn::reset()
     local_appl = string();
     remote_appl = string();
     invoke_id_mgr = InvokeIdMgr();
-    PD("Connection reset to %s\n", conn_state_repr(state));
+    PV("Connection reset to %s\n", conn_state_repr(state));
 }
 
 const char *
@@ -967,7 +967,7 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
     }
 
     if (old_state != state) {
-        PD("Connection state %s --> %s\n",
+        PV("Connection state %s --> %s\n",
                 conn_state_repr(old_state),
                 conn_state_repr(state));
     }
