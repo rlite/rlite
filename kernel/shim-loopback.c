@@ -407,17 +407,17 @@ rl_shim_loopback_flow_get_stats(struct flow_entry *flow,
 #define SHIM_DIF_TYPE   "shim-loopback"
 
 static struct ipcp_factory shim_loopback_factory = {
-    .owner = THIS_MODULE,
-    .dif_type = SHIM_DIF_TYPE,
-    .create = rl_shim_loopback_create,
-    .ops.destroy = rl_shim_loopback_destroy,
-    .ops.flow_allocate_req = rl_shim_loopback_fa_req,
-    .ops.flow_allocate_resp = rl_shim_loopback_fa_resp,
-    .ops.flow_deallocated = rl_shim_loopback_flow_deallocated,
-    .ops.sdu_write = rl_shim_loopback_sdu_write,
-    .ops.config = rl_shim_loopback_config,
-    .ops.flow_get_stats = rl_shim_loopback_flow_get_stats,
-    .ops.flow_writeable = rl_shim_loopback_flow_writeable,
+    .owner                      = THIS_MODULE,
+    .dif_type                   = SHIM_DIF_TYPE,
+    .create                     = rl_shim_loopback_create,
+    .ops.destroy                = rl_shim_loopback_destroy,
+    .ops.flow_allocate_req      = rl_shim_loopback_fa_req,
+    .ops.flow_allocate_resp     = rl_shim_loopback_fa_resp,
+    .ops.flow_deallocated       = rl_shim_loopback_flow_deallocated,
+    .ops.sdu_write              = rl_shim_loopback_sdu_write,
+    .ops.config                 = rl_shim_loopback_config,
+    .ops.flow_get_stats         = rl_shim_loopback_flow_get_stats,
+    .ops.flow_writeable         = rl_shim_loopback_flow_writeable,
 };
 
 static int __init

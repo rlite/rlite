@@ -590,11 +590,11 @@ shim_tcp4_fini(struct uipcp *uipcp)
 }
 
 struct uipcp_ops shim_tcp4_ops = {
-    .init = shim_tcp4_init,
-    .fini = shim_tcp4_fini,
-    .appl_register = shim_tcp4_appl_register,
-    .fa_req = shim_tcp4_fa_req,
-    .fa_resp = shim_tcp4_fa_resp,
-    .flow_deallocated = shim_tcp4_flow_deallocated,
+    .init               = shim_tcp4_init,
+    .fini               = shim_tcp4_fini,
+    .appl_register      = shim_tcp4_appl_register,
+    .fa_req             = shim_tcp4_fa_req,
+    .fa_resp            = shim_tcp4_fa_resp,
+    .flow_deallocated   = shim_tcp4_flow_deallocated,
 };
 

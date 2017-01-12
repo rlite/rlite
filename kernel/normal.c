@@ -1466,24 +1466,24 @@ rl_normal_flow_get_stats(struct flow_entry *flow,
 #define SHIM_DIF_TYPE   "normal"
 
 static struct ipcp_factory normal_factory = {
-    .owner = THIS_MODULE,
-    .dif_type = SHIM_DIF_TYPE,
-    .create = rl_normal_create,
-    .use_cep_ids = true,
-    .ops.destroy = rl_normal_destroy,
-    .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
+    .owner                  = THIS_MODULE,
+    .dif_type               = SHIM_DIF_TYPE,
+    .create                 = rl_normal_create,
+    .use_cep_ids            = true,
+    .ops.destroy            = rl_normal_destroy,
+    .ops.flow_allocate_req  = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rl_normal_flow_init,
-    .ops.sdu_write = rl_normal_sdu_write,
-    .ops.config = rl_normal_config,
-    .ops.pduft_set = rl_normal_pduft_set,
-    .ops.pduft_flush = rl_normal_pduft_flush,
-    .ops.pduft_del = rl_normal_pduft_del,
-    .ops.mgmt_sdu_build = rl_normal_mgmt_sdu_build,
-    .ops.sdu_rx = rl_normal_sdu_rx,
-    .ops.flow_get_stats = rl_normal_flow_get_stats,
-    .ops.flow_writeable = rl_normal_flow_writeable,
-    .ops.qos_supported = rl_normal_qos_supported,
+    .ops.flow_init          = rl_normal_flow_init,
+    .ops.sdu_write          = rl_normal_sdu_write,
+    .ops.config             = rl_normal_config,
+    .ops.pduft_set          = rl_normal_pduft_set,
+    .ops.pduft_flush        = rl_normal_pduft_flush,
+    .ops.pduft_del          = rl_normal_pduft_del,
+    .ops.mgmt_sdu_build     = rl_normal_mgmt_sdu_build,
+    .ops.sdu_rx             = rl_normal_sdu_rx,
+    .ops.flow_get_stats     = rl_normal_flow_get_stats,
+    .ops.flow_writeable     = rl_normal_flow_writeable,
+    .ops.qos_supported      = rl_normal_qos_supported,
 };
 
 static int __init

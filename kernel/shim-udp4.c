@@ -470,19 +470,19 @@ rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
 #define SHIM_DIF_TYPE   "shim-udp4"
 
 static struct ipcp_factory shim_udp4_factory = {
-    .owner = THIS_MODULE,
-    .dif_type = SHIM_DIF_TYPE,
-    .use_cep_ids = false,
-    .create = rl_shim_udp4_create,
-    .ops.destroy = rl_shim_udp4_destroy,
-    .ops.flow_allocate_req = NULL, /* Reflect to userspace. */
+    .owner                  = THIS_MODULE,
+    .dif_type               = SHIM_DIF_TYPE,
+    .use_cep_ids            = false,
+    .create                 = rl_shim_udp4_create,
+    .ops.destroy            = rl_shim_udp4_destroy,
+    .ops.flow_allocate_req  = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
-    .ops.flow_init = rl_shim_udp4_flow_init,
-    .ops.flow_deallocated = rl_shim_udp4_flow_deallocated,
-    .ops.sdu_write = rl_shim_udp4_sdu_write,
-    .ops.config = rl_shim_udp4_config,
-    .ops.flow_get_stats = rl_shim_udp4_flow_get_stats,
-    .ops.flow_writeable = rl_shim_udp4_flow_writeable,
+    .ops.flow_init          = rl_shim_udp4_flow_init,
+    .ops.flow_deallocated   = rl_shim_udp4_flow_deallocated,
+    .ops.sdu_write          = rl_shim_udp4_sdu_write,
+    .ops.config             = rl_shim_udp4_config,
+    .ops.flow_get_stats     = rl_shim_udp4_flow_get_stats,
+    .ops.flow_writeable     = rl_shim_udp4_flow_writeable,
 };
 
 static int __init

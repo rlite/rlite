@@ -651,11 +651,11 @@ shim_udp4_fini(struct uipcp *uipcp)
 }
 
 struct uipcp_ops shim_udp4_ops = {
-    .init = shim_udp4_init,
-    .fini = shim_udp4_fini,
-    .appl_register = shim_udp4_appl_register,
-    .fa_req = shim_udp4_fa_req,
-    .fa_resp = shim_udp4_fa_resp,
-    .flow_deallocated = shim_udp4_flow_deallocated,
+    .init               = shim_udp4_init,
+    .fini               = shim_udp4_fini,
+    .appl_register      = shim_udp4_appl_register,
+    .fa_req             = shim_udp4_fa_req,
+    .fa_resp            = shim_udp4_fa_resp,
+    .flow_deallocated   = shim_udp4_flow_deallocated,
 };
 

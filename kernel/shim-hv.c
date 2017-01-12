@@ -288,15 +288,15 @@ rl_shim_hv_config(struct ipcp_entry *ipcp, const char *param_name,
 #define SHIM_DIF_TYPE   "shim-hv"
 
 static struct ipcp_factory shim_hv_factory = {
-    .owner = THIS_MODULE,
-    .dif_type = SHIM_DIF_TYPE,
-    .use_cep_ids = false,
-    .create = rl_shim_hv_create,
-    .ops.destroy = rl_shim_hv_destroy,
-    .ops.flow_allocate_req = rl_shim_hv_fa_req,
-    .ops.flow_allocate_resp = rl_shim_hv_fa_resp,
-    .ops.sdu_write = rl_shim_hv_sdu_write,
-    .ops.config = rl_shim_hv_config,
+    .owner                      = THIS_MODULE,
+    .dif_type                   = SHIM_DIF_TYPE,
+    .use_cep_ids                = false,
+    .create                     = rl_shim_hv_create,
+    .ops.destroy                = rl_shim_hv_destroy,
+    .ops.flow_allocate_req      = rl_shim_hv_fa_req,
+    .ops.flow_allocate_resp     = rl_shim_hv_fa_resp,
+    .ops.sdu_write              = rl_shim_hv_sdu_write,
+    .ops.config                 = rl_shim_hv_config,
 };
 
 static int __init

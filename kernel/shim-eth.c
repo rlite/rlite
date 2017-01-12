@@ -1023,19 +1023,19 @@ rl_shim_eth_flow_get_stats(struct flow_entry *flow,
 #define SHIM_DIF_TYPE   "shim-eth"
 
 static struct ipcp_factory shim_eth_factory = {
-    .owner = THIS_MODULE,
-    .dif_type = SHIM_DIF_TYPE,
-    .use_cep_ids = false,
-    .create = rl_shim_eth_create,
-    .ops.destroy = rl_shim_eth_destroy,
-    .ops.flow_allocate_req = rl_shim_eth_fa_req,
+    .owner                  = THIS_MODULE,
+    .dif_type               = SHIM_DIF_TYPE,
+    .use_cep_ids            = false,
+    .create                 = rl_shim_eth_create,
+    .ops.destroy            = rl_shim_eth_destroy,
+    .ops.flow_allocate_req  = rl_shim_eth_fa_req,
     .ops.flow_allocate_resp = rl_shim_eth_fa_resp,
-    .ops.sdu_write = rl_shim_eth_sdu_write,
-    .ops.config = rl_shim_eth_config,
-    .ops.appl_register = rl_shim_eth_register,
-    .ops.flow_deallocated = rl_shim_eth_flow_deallocated,
-    .ops.flow_get_stats = rl_shim_eth_flow_get_stats,
-    .ops.flow_writeable = rl_shim_eth_flow_writeable,
+    .ops.sdu_write          = rl_shim_eth_sdu_write,
+    .ops.config             = rl_shim_eth_config,
+    .ops.appl_register      = rl_shim_eth_register,
+    .ops.flow_deallocated   = rl_shim_eth_flow_deallocated,
+    .ops.flow_get_stats     = rl_shim_eth_flow_get_stats,
+    .ops.flow_writeable     = rl_shim_eth_flow_writeable,
 };
 
 static int __init
