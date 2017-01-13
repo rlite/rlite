@@ -334,6 +334,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
     handlers.insert(make_pair(obj_name::keepalive,
                               &uipcp_rib::keepalive_handler));
+    handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
 
     /* Start timers for periodic tasks. */
     age_incr_tmrid = uipcp_loop_schedule(uipcp,
@@ -717,6 +718,18 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
     }
 
     return ret;
+}
+
+int
+uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
+{
+    if (rm->op_code != gpb::M_START) {
+        UPE(uipcp, "M_START expected\n");
+        return 0;
+    }
+
+    UPD(uipcp, "Ignoring M_START(status)\n");
+    return 0;
 }
 
 rl_addr_t

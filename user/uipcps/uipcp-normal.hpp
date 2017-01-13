@@ -354,6 +354,7 @@ struct uipcp_rib {
     int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf);
     int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
     int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int status_handler(const CDAPMessage *rm, NeighFlow *nf);
 
     int flows_handler_create(const CDAPMessage *rm);
     int flows_handler_create_r(const CDAPMessage *rm);
