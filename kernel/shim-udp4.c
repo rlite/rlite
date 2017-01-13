@@ -152,7 +152,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->depth, GFP_ATOMIC);
+        rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->nhdrs, GFP_ATOMIC);
         if (unlikely(!rb)) {
             flow->stats.rx_err++;
             PE("Out of memory\n");

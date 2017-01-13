@@ -766,7 +766,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->depth = upd->depth;
+    uipcp->nhdrs = upd->nhdrs;
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
@@ -969,9 +969,9 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " depth = %u, mss = %u\n",
+                " nhdrs = %u, mss = %u\n",
                 uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name, uipcp->depth, uipcp->max_sdu_size);
+                uipcp->dif_name, uipcp->nhdrs, uipcp->max_sdu_size);
     }
     pthread_mutex_unlock(&uipcps->lock);
 
@@ -1002,7 +1002,7 @@ topo_visit(struct uipcps *uipcps)
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
         ipn->marked = 0;
-        ipn->depth = 0;
+        ipn->nhdrs = 0;
         ipn->mss_computed = 0;
         if (uipcp) {
             ipn->max_sdu_size = uipcp->max_sdu_size;
@@ -1044,12 +1044,12 @@ topo_visit(struct uipcps *uipcps)
         }
 
         /* Mark (visit) the node, appling the relaxation rule to
-         * maximize depth and minimize max_sdu_size. */
+         * maximize nhdrs and minimize max_sdu_size. */
         ipn->marked = 1;
 
         list_for_each_entry(e, nexts, node) {
-            if (e->ipcp->depth < ipn->depth + 1) {
-                e->ipcp->depth = ipn->depth + 1;
+            if (e->ipcp->nhdrs < ipn->nhdrs + 1) {
+                e->ipcp->nhdrs = ipn->nhdrs + 1;
             }
             if (e->ipcp->max_sdu_size > ipn->max_sdu_size - hdrlen) {
                 e->ipcp->max_sdu_size = ipn->max_sdu_size - hdrlen;
@@ -1070,15 +1070,15 @@ topo_update_kern(struct uipcps *uipcps)
     int ret;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->depth);
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->nhdrs);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
-            PE("Impossible depth %u\n", ipn->depth);
+            PE("Impossible nhdrs %u\n", ipn->nhdrs);
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "depth", strbuf);
+        ret = rl_conf_ipcp_config(ipn->id, "nhdrs", strbuf);
         if (ret) {
-            PE("'ipcp-config depth %u' failed\n", ipn->depth);
+            PE("'ipcp-config nhdrs %u' failed\n", ipn->nhdrs);
         }
 
         if (!ipn->mss_computed) {
@@ -1307,7 +1307,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->depth = upd->depth;
+    uipcp->nhdrs = upd->nhdrs;
     mss_changed = (uipcp->max_sdu_size != upd->max_sdu_size);
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;

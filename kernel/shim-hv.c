@@ -142,7 +142,7 @@ shim_hv_read_cb(void *opaque, unsigned int channel,
         return;
     }
 
-    /* TODO priv->ipcp->depth */
+    /* TODO priv->ipcp->nhdrs */
     rl_sdu_rx(priv->ipcp, rb, channel - 1);
 }
 

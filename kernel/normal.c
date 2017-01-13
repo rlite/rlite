@@ -857,7 +857,7 @@ static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
 {
-    struct rl_buf *rb = rl_buf_alloc_ctrl(ipcp->depth, GFP_ATOMIC);
+    struct rl_buf *rb = rl_buf_alloc_ctrl(ipcp->nhdrs, GFP_ATOMIC);
     struct rina_pci_ctrl *pcic;
 
     if (rb) {

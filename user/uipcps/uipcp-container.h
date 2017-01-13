@@ -50,7 +50,7 @@ struct uipcps {
     unsigned int keepalive;
 
     /* List of IPCP "nodes", used for topological sorting and computation
-     * of IPCP depth and maximum SDU size. */
+     * of IPCP nhdrs and maximum SDU size. */
     struct list_head ipcp_nodes;
 
     /* Main loop thread, listening for IPCP updates (e.g. new IPCPs, deleted
@@ -132,7 +132,7 @@ struct uipcp_ops {
 struct ipcp_node {
     rl_ipcp_id_t id;
     unsigned int marked;
-    unsigned int depth;
+    unsigned int nhdrs;
     unsigned int refcnt;
     unsigned int mss_computed;
     int max_sdu_size;
@@ -169,7 +169,7 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    unsigned int depth;
+    unsigned int nhdrs;
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
