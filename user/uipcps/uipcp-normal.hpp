@@ -122,6 +122,7 @@ struct NeighFlow {
     void enroll_state_set(enroll_state_t st);
     const CDAPMessage *next_enroll_msg();
     void enrollment_start(bool initiator);
+    void enrollment_commit();
     void enrollment_cleanup();
     void enrollment_abort();
 

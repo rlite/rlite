@@ -303,6 +303,24 @@ Neighbor::mgmt_conn()
     return const_cast<NeighFlow *>(nf);
 }
 
+void
+NeighFlow::enrollment_commit()
+{
+    keepalive_tmr_start();
+    enroll_state_set(NEIGH_ENROLLED);
+
+    /* Dispatch queued messages. */
+    while (!enroll_msgs.empty()) {
+        neigh->rib->cdap_dispatch(enroll_msgs.front(), this);
+        delete enroll_msgs.front();
+        enroll_msgs.pop_front();
+    }
+
+    /* Sync with the neighbor. */
+    neigh->neigh_sync_rib(this);
+    pthread_cond_signal(&enroll_stopped);
+}
+
 /* To be called with RIB lock held. */
 const CDAPMessage *
 NeighFlow::next_enroll_msg()
@@ -578,20 +596,7 @@ enrollee_thread(void *opaque)
 
 finish:
     delete rm;
-    nf->keepalive_tmr_start();
-    nf->enroll_state_set(NEIGH_ENROLLED);
-
-    /* Dispatch queued messages. */
-    while (!nf->enroll_msgs.empty()) {
-        rib->cdap_dispatch(nf->enroll_msgs.front(), nf);
-        delete nf->enroll_msgs.front();
-        nf->enroll_msgs.pop_front();
-    }
-
-    /* Sync with the neighbor. */
-    neigh->neigh_sync_rib(nf);
-    pthread_cond_signal(&nf->enroll_stopped);
-
+    nf->enrollment_commit();
     pthread_mutex_unlock(&rib->lock);
 
     return NULL;
@@ -786,20 +791,7 @@ enroller_thread(void *opaque)
 
 finish:
     delete rm;
-    nf->keepalive_tmr_start();
-    nf->enroll_state_set(NEIGH_ENROLLED);
-
-    /* Dispatch queued messages. */
-    while (!nf->enroll_msgs.empty()) {
-        rib->cdap_dispatch(nf->enroll_msgs.front(), nf);
-        delete nf->enroll_msgs.front();
-        nf->enroll_msgs.pop_front();
-    }
-
-    /* Sync with the neighbor. */
-    neigh->neigh_sync_rib(nf);
-    pthread_cond_signal(&nf->enroll_stopped);
-
+    nf->enrollment_commit();
     pthread_mutex_unlock(&rib->lock);
 
     return NULL;
