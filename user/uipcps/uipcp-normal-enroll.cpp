@@ -638,6 +638,138 @@ err:
     return NULL;
 }
 
+/* Default policy for the enrollment slave (enroller). */
+static int
+enroller_default(NeighFlow *nf)
+{
+    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib = neigh->rib;
+    const CDAPMessage *rm = NULL;
+
+    rm = nf->next_enroll_msg();
+    if (!rm) {
+        return -1;
+    }
+
+    {
+        /* (3) S <-- I: M_START
+         * (4) S --> I: M_START_R
+         * (5) S --> I: M_CREATE
+         * (6) S --> I: M_STOP */
+        const char *objbuf;
+        size_t objlen;
+        bool has_address;
+        int ret;
+
+        if (rm->op_code != gpb::M_START) {
+            UPE(rib->uipcp, "M_START expected\n");
+            delete rm;
+            return -1;
+        }
+
+        if (rm->obj_class != obj_class::enrollment ||
+                rm->obj_name != obj_name::enrollment) {
+            UPE(rib->uipcp, "%s:%s object expected\n",
+                obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
+            delete rm;
+            return -1;
+        }
+
+        UPD(rib->uipcp, "S <-- I M_START(enrollment)\n");
+
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            UPE(rib->uipcp, "M_START does not contain a nested message\n");
+            delete rm;
+            return -1;
+        }
+
+        EnrollmentInfo enr_info(objbuf, objlen);
+        CDAPMessage m;
+
+        has_address = (enr_info.address != 0);
+
+        if (!has_address) {
+            /* Assign an address to the initiator. */
+            enr_info.address = rib->address_allocate();
+        }
+
+        m.m_start_r(gpb::F_NO_FLAGS, 0, string());
+        m.obj_class = obj_class::enrollment;
+        m.obj_name = obj_name::enrollment;
+
+        ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
+        if (ret) {
+            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            delete rm;
+            return -1;
+        }
+        UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
+
+        if (has_address) {
+            /* Send DIF static information. */
+        }
+
+        /* Stop the enrollment. */
+        enr_info.start_early = true;
+
+        m = CDAPMessage();
+        m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
+                 0, 0, string());
+
+        ret = nf->send_to_port_id(&m, 0, &enr_info);
+        if (ret) {
+            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            delete rm;
+            return -1;
+        }
+        UPD(rib->uipcp, "S --> I M_STOP(enrollment)\n");
+    }
+
+    delete rm;
+    rm = nf->next_enroll_msg();
+    if (!rm) {
+        return -1;
+    }
+
+    {
+        /* (7) S <-- I: M_STOP_R */
+        /* (8) S --> I: M_START(status) */
+        CDAPMessage m;
+        int ret;
+
+        if (rm->op_code != gpb::M_STOP_R) {
+            UPE(rib->uipcp, "M_START_R expected\n");
+            delete rm;
+            return -1;
+        }
+
+        if (rm->result) {
+            UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
+               rm->result, rm->result_reason.c_str());
+            delete rm;
+            return -1;
+        }
+
+        UPD(rib->uipcp, "S <-- I M_STOP_R(enrollment)\n");
+
+        /* This is not required if the initiator is allowed to start
+         * early. */
+        m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
+                  0, 0, string());
+
+        ret = nf->send_to_port_id(&m, 0, NULL);
+        if (ret) {
+            UPE(rib->uipcp, "send_to_port_id failed\n");
+            delete rm;
+            return -1;
+        }
+        UPD(rib->uipcp, "S --> I M_START(status)\n");
+    }
+
+    return 0;
+}
+
 static void *
 enroller_thread(void *opaque)
 {
@@ -684,11 +816,6 @@ enroller_thread(void *opaque)
         goto err;
     }
 
-    if (rm->op_code != gpb::M_START) {
-        UPE(rib->uipcp, "M_START expected\n");
-        goto err;
-    }
-
     if (rm->obj_class == obj_class::lowerflow &&
             rm->obj_name == obj_name::lowerflow) {
         /* (3LF) S <-- I: M_START
@@ -697,6 +824,11 @@ enroller_thread(void *opaque)
          * allocation. */
         CDAPMessage m;
         int ret;
+
+        if (rm->op_code != gpb::M_START) {
+            UPE(rib->uipcp, "M_START expected\n");
+            goto err;
+        }
 
         UPD(rib->uipcp, "S <-- I M_START(lowerflow)\n");
 
@@ -714,111 +846,21 @@ enroller_thread(void *opaque)
         goto finish;
     }
 
-    {
-        /* (3) S <-- I: M_START
-         * (4) S --> I: M_START_R
-         * (5) S --> I: M_CREATE
-         * (6) S --> I: M_STOP */
-        const char *objbuf;
-        size_t objlen;
-        bool has_address;
-        int ret;
-
-        if (rm->obj_class != obj_class::enrollment ||
-                rm->obj_name != obj_name::enrollment) {
-            UPE(rib->uipcp, "%s:%s object expected\n",
-                obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            goto err;
-        }
-
-        UPD(rib->uipcp, "S <-- I M_START(enrollment)\n");
-
-        rm->get_obj_value(objbuf, objlen);
-        if (!objbuf) {
-            UPE(rib->uipcp, "M_START does not contain a nested message\n");
-            goto err;
-        }
-
-        EnrollmentInfo enr_info(objbuf, objlen);
-        CDAPMessage m;
-
-        has_address = (enr_info.address != 0);
-
-        if (!has_address) {
-            /* Assign an address to the initiator. */
-            enr_info.address = rib->address_allocate();
-        }
-
-        m.m_start_r(gpb::F_NO_FLAGS, 0, string());
-        m.obj_class = obj_class::enrollment;
-        m.obj_name = obj_name::enrollment;
-
-        ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
-        if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
-            goto err;
-        }
-        UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
-
-        if (has_address) {
-            /* Send DIF static information. */
-        }
-
-        /* Stop the enrollment. */
-        enr_info.start_early = true;
-
-        m = CDAPMessage();
-        m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
-                 0, 0, string());
-
-        ret = nf->send_to_port_id(&m, 0, &enr_info);
-        if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
-            goto err;
-        }
-        UPD(rib->uipcp, "S --> I M_STOP(enrollment)\n");
-    }
-
-    delete rm;
-    rm = nf->next_enroll_msg();
-    if (!rm) {
-        goto err;
-    }
+    nf->enroll_msgs.push_front(rm); /* reinject, passing ownership */
+    rm = NULL;
 
     {
-        /* (7) S <-- I: M_STOP_R */
-        /* (8) S --> I: M_START(status) */
-        CDAPMessage m;
-        int ret;
+        int ret = enroller_default(nf);
 
-        if (rm->op_code != gpb::M_STOP_R) {
-            UPE(rib->uipcp, "M_START_R expected\n");
-            goto err;
-        }
-
-        if (rm->result) {
-            UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
-               rm->result, rm->result_reason.c_str());
-            goto err;
-        }
-
-        UPD(rib->uipcp, "S <-- I M_STOP_R(enrollment)\n");
-
-        /* This is not required if the initiator is allowed to start
-         * early. */
-        m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status,
-                  0, 0, string());
-
-        ret = nf->send_to_port_id(&m, 0, NULL);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id failed\n");
             goto err;
         }
-        UPD(rib->uipcp, "S --> I M_START(status)\n");
     }
 
 finish:
-    delete rm;
+    if (rm) {
+        delete rm;
+    }
     nf->enrollment_commit();
     pthread_mutex_unlock(&rib->lock);
 
