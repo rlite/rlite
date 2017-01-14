@@ -553,7 +553,7 @@ for vmname in sorted(vms):
     #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
     outs += 'qemu-system-x86_64 '
     if args.image != '': # standard buildroot image
-        outs += args.image + ' '
+        outs += args.image + ' -snapshot '
     else:
         outs += '-kernel buildroot/bzImage '                        \
                 '-append "console=ttyS0" '                          \
