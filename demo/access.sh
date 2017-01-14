@@ -1,5 +1,7 @@
 #!/bin/sh
 
+USER=$(cat user)
+
 MACHINE_ID=$1
 if [ "$MACHINE_ID" == "" ]; then
 	echo "usage: $0 NODE_NAME"
@@ -13,4 +15,4 @@ if [ "$SSH_PORT" == "" ]; then
 fi
 
 echo "Accessing buildroot VM ${MACHINE_ID}"
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentityFile=buildroot/buildroot_rsa -p ${SSH_PORT} root@localhost
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentityFile=buildroot/buildroot_rsa -p ${SSH_PORT} $USER@localhost

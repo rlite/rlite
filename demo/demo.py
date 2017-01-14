@@ -192,6 +192,12 @@ argparser.add_argument('--keepalive', default = 5,
                        help = "Neighbor keepalive timeout in seconds", type = int)
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
+argparser.add_argument('-i', '--image',
+                       help = "qcow2 image for legacy mode", type = str,
+                       default = '')
+argparser.add_argument('--user',
+                       help = "username for legacy mode", type = str,
+                       default = 'root')
 args = argparser.parse_args()
 
 
@@ -204,9 +210,8 @@ subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 # Some variables that could become options
 sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
           '-o IdentityFile=buildroot/buildroot_rsa'
-sudo = ''
+sudo = 'sudo' if args.image != '' else ''
 vmimgpath = 'buildroot/rootfs.cpio'
-username = 'root'
 
 download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rlite-images/downloads/rootfs.cpio')
 download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rlite-images/downloads/bzImage')
@@ -230,6 +235,10 @@ if args.ring != None and args.ring > 0:
     fout.close()
     args.conf = 'ring.conf'
 
+
+fout = open('user', 'w')
+fout.write(args.user)
+fout.close()
 
 ############################# Parse demo.conf ##############################
 fin = open(args.conf, 'r')
@@ -543,10 +552,13 @@ for vmname in sorted(vms):
 
     #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
     outs += 'qemu-system-x86_64 '
-    outs += '-kernel buildroot/bzImage '                        \
-            '-append "console=ttyS0" '                          \
-            '-initrd %(vmimgpath)s '                            \
-            '-nographic '                                       \
+    if args.image != '': # standard buildroot image
+        outs += args.image + ' '
+    else:
+        outs += '-kernel buildroot/bzImage '                        \
+                '-append "console=ttyS0" '                          \
+                '-initrd %(vmimgpath)s ' % vars_dict
+    outs += '-nographic '                                       \
             '-display none '                                    \
             '--enable-kvm '                                     \
             '-smp 1 '                                           \
@@ -609,7 +621,7 @@ for vmname in sorted(vms):
                     'SUDO=%(sudo)s\n'\
                     '$SUDO hostname %(name)s\n'\
                     '\n'\
-            '\n' % {'name': vm['name'], 'ssh': vm['ssh'], 'username': username,
+            '\n' % {'name': vm['name'], 'ssh': vm['ssh'], 'username': args.user,
                     'sshopts': sshopts, 'sudo': sudo}
 
     verbmap = {'QUIET': 1, 'WARN': 2, 'INFO': 3, 'DBG': 4, 'VERY': 5}
@@ -713,7 +725,7 @@ for dif in dif_ordering:
 
         vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
                      'pvid': vms[enrollment['enroller']]['id'],
-                     'username': username,
+                     'username': args.user,
                      'vmname': vm['name'],
                      'dif': dif, 'ldif': enrollment['lower_dif'],
                      'sshopts': sshopts, 'sudo': sudo,
@@ -875,7 +887,7 @@ if args.register:
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                    '#set -x\n' % {'sshopts': sshopts, 'username': username,
+                    '#set -x\n' % {'sshopts': sshopts, 'username': args.user,
                                   'ssh': vms[pivot]['ssh'], 'pivot': pivot,
                                   'dif': dif}
 
