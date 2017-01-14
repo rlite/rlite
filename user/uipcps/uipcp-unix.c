@@ -472,6 +472,25 @@ uipcps_loop(void *opaque)
     return NULL;
 }
 
+#ifdef BACKTRACE
+#include <execinfo.h>
+#endif
+
+static void
+print_backtrace(void)
+{
+#ifdef BACKTRACE
+    void *array[20];
+    size_t size;
+
+    /* get void*'s for all entries on the stack */
+    size = backtrace(array, 20);
+
+    /* print out all the frames to stderr */
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+#endif
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -495,6 +514,7 @@ sigint_handler(int signum)
     pthread_mutex_unlock(&uipcps->lock);
 
     unlink(RLITE_UIPCPS_UNIX_NAME);
+    print_backtrace();
     exit(EXIT_SUCCESS);
 }
 
