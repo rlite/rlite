@@ -686,11 +686,13 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
+#if 0
     ret = sigaction(SIGSEGV, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
         exit(EXIT_FAILURE);
     }
+#endif
     /* Handle the SIGPIPE signal, which is received when
      * trying to read/write from/to a Unix domain socket
      * that has been closed by the other end. */
