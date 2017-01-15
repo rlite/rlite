@@ -337,8 +337,13 @@ uipcp_rib::pduft_sync()
             continue;
         }
 
+        if (!neigh->second->has_mgmt_flow()) {
+            UPE(uipcp, "N-1 flow towards neigh %s just disappeared\n",
+                       neigh_name.c_str());
+            continue;
+        }
+
         /* Just take one for now. */
-        assert(neigh->second->has_mgmt_flow());
         next_hop_to_port_id[r->second] = neigh->second->mgmt_conn()->port_id;
     }
 
