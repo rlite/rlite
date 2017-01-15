@@ -635,6 +635,7 @@ for vmname in sorted(vms):
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\
                     '$SUDO mkdir -p /var/rlite\n'\
                     '$SUDO chmod -R a+rw /var/rlite\n'\
+                    '$SUDO dmesg -n8\n'\
                     '\n'\
                     '$SUDO rlite-uipcps -v %(verb)s -k %(keepalive)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
