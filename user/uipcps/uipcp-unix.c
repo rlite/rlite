@@ -539,7 +539,8 @@ usage(void)
         "   -k NUM : keepalive interval in seconds (default "
                                 "%d seconds, 0 to disable)\n"
         "   -N : use reliable N-flows if reliable N-1-flows are "
-                                                    "not available\n",
+                                                    "not available\n"
+        "   -U : use unreliable N-1-flows rather than reliable ones\n",
           NEIGH_KEEPALIVE_TO);
 }
 
@@ -570,8 +571,9 @@ int main(int argc, char **argv)
 
     uipcps->keepalive = NEIGH_KEEPALIVE_TO;
     uipcps->reliable_n_flows = 0;
+    uipcps->unreliable_flows = 0;
 
-    while ((opt = getopt(argc, argv, "hv:k:N")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:k:NU")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -595,11 +597,21 @@ int main(int argc, char **argv)
                 uipcps->reliable_n_flows = 1;
                 break;
 
+            case 'U':
+                uipcps->unreliable_flows = 1;
+                break;
+
             default:
                 printf("    Unrecognized option %c\n", opt);
                 usage();
                 return -1;
         }
+    }
+
+    if (!uipcps->unreliable_flows) {
+        /* If reliable flows are not used by the IPCPs, then it
+         * does not make sense to use (reliable) N-flows. */
+        uipcps->reliable_n_flows = 0;
     }
 
     /* Set verbosity level. */

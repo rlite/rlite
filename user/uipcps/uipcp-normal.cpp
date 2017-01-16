@@ -959,10 +959,10 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     }
 
     neigh->flows[neigh_port_id]->flow_fd = flow_fd;
-    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u,reliable=%s]\n",
+    UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
+                    neigh->flows[neigh_port_id]->reliable ? "" : "un",
                     neigh->flows[neigh_port_id]->flow_fd,
-                    neigh->flows[neigh_port_id]->port_id,
-                    neigh->flows[neigh_port_id]->reliable ? "yes" : "no");
+                    neigh->flows[neigh_port_id]->port_id);
 
     topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
 

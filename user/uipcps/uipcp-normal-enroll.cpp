@@ -1387,8 +1387,8 @@ int
 Neighbor::alloc_flow(const char *supp_dif)
 {
     struct rina_flow_spec relspec;
-    bool have_reliable_flow;
     rl_ipcp_id_t lower_ipcp_id_;
+    bool use_reliable_flow;
     rl_port_t port_id_;
     int flow_fd_;
     int ret;
@@ -1407,15 +1407,19 @@ Neighbor::alloc_flow(const char *supp_dif)
     }
 
     reliable_spec(&relspec);
-    have_reliable_flow = (rl_conf_ipcp_qos_supported(lower_ipcp_id_,
+    use_reliable_flow = (rl_conf_ipcp_qos_supported(lower_ipcp_id_,
                                                      &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
-                                             (have_reliable_flow ? "" : " not"));
+                                             (use_reliable_flow ? "" : " not"));
+    if (rib->uipcp->uipcps->unreliable_flows) {
+        /* Force unreliable flows even if we have reliable ones. */
+        use_reliable_flow = false;
+    }
 
     /* Allocate an N-1 flow for the enrollment. */
     ret = uipcp_flow_alloc(rib->uipcp, supp_dif,
                            rib->uipcp->name, ipcp_name.c_str(),
-                           have_reliable_flow ? &relspec : NULL,
+                           use_reliable_flow ? &relspec : NULL,
                            rib->uipcp->id, &port_id_);
     if (ret) {
         UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
@@ -1435,9 +1439,10 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     flows[port_id_] = new NeighFlow(this, string(supp_dif), port_id_, flow_fd_,
                                     lower_ipcp_id_);
-    flows[port_id_]->reliable = have_reliable_flow;
+    flows[port_id_]->reliable = use_reliable_flow;
 
-    UPD(rib->uipcp, "N-1 flow allocated [fd=%d, port_id=%u]\n",
+    UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
+                    use_reliable_flow ? "" : "un",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
     topo_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,
