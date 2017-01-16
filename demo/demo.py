@@ -192,6 +192,8 @@ argparser.add_argument('-k', '--keepalive', default = 5,
                        help = "Neighbor keepalive timeout in seconds (0 to disable)", type = int)
 argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
+argparser.add_argument('-U', '--unreliable-flows', action='store_true',
+                       help = "Use unreliable N-1-flows rather than reliable ones")
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
 argparser.add_argument('-i', '--image',
@@ -639,11 +641,12 @@ for vmname in sorted(vms):
                     '$SUDO chmod -R a+rw /var/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
-                    '$SUDO rlite-uipcps -v %(verb)s -k %(keepalive)s %(relnflows)s &> uipcp.log &\n'\
+                    '$SUDO rlite-uipcps -v %(verb)s -k %(keepalive)s %(relnflows)s %(unrelflows)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'keepalive': args.keepalive,
-                           'relnflows': '-N' if args.reliable_n_flows else ''}
+                           'relnflows': '-N' if args.reliable_n_flows else '',
+                           'unrelflows': '-U' if args.unreliable_flows else ''}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
