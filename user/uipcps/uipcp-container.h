@@ -49,6 +49,9 @@ struct uipcps {
     /* Keepalive timeout in seconds. */
     unsigned int keepalive;
 
+    /* Use reliable N-flows if reliable N-1-flows are not available. */
+    int reliable_n_flows;
+
     /* List of IPCP "nodes", used for topological sorting and computation
      * of IPCP nhdrs and maximum SDU size. */
     struct list_head ipcp_nodes;

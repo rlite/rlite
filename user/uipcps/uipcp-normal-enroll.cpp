@@ -1593,6 +1593,11 @@ normal_allocate_n_flows(struct uipcp *uipcp)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list<string> n_flow_allocations;
 
+    if (!uipcp->uipcps->reliable_n_flows) {
+        /* Reliable N-flows feature disabled. */
+        return;
+    }
+
     pthread_mutex_lock(&rib->lock);
     /* Scan all the enrolled neighbors. */
     for (set<string>::const_iterator
