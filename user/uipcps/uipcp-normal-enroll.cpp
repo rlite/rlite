@@ -1518,6 +1518,11 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     list< pair<string, string> > re_enrollments;
 
+    if (uipcp->uipcps->keepalive == 0) {
+        /* Keepalive mechanism disabled, don't trigger re-enrollments. */
+        return;
+    }
+
     pthread_mutex_lock(&rib->lock);
 
     /* Scan all the neighbor candidates. */
