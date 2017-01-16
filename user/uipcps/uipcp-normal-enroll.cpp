@@ -882,6 +882,8 @@ NeighFlow::enrollment_start(bool initiator)
         return;
     }
     enroll_rsrc_up = true;
+    UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
+                            neigh->ipcp_name.c_str());
     assert(enroll_msgs.empty());
     enroll_state_set(NEIGH_ENROLLING);
     pthread_cond_init(&enroll_msgs_avail, NULL);
@@ -898,10 +900,10 @@ NeighFlow::enrollment_cleanup()
     if (!enroll_rsrc_up) {
         return;
     }
+    enroll_rsrc_up = false;
     UPD(neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
                            neigh->ipcp_name.c_str());
     assert(enroll_msgs.empty());
-    enroll_rsrc_up = false;
     pthread_join(enroll_th, NULL);
     pthread_cond_destroy(&enroll_msgs_avail);
     pthread_cond_destroy(&enroll_stopped);
