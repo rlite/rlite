@@ -899,10 +899,11 @@ if args.register:
                                   'dif': dif}
 
         for vmname in sorted(difs[dif]):
-            outs += 'rina-echo-async -z rina-echo-async:%(vmname)s -d %(dif)s.DIF\n' \
+            outs += 'echo "%(pivot)s --> %(vmname)s"\n'\
+                    'rina-echo-async -z rina-echo-async:%(vmname)s -d %(dif)s.DIF\n' \
                     '[ "$?" == "0" ] || echo "Failed to reach %(vmname)s ' \
                         'in DIF %(dif)s"\n'\
-                        % {'vmname': vmname, 'dif': dif}
+                        % {'vmname': vmname, 'dif': dif, 'pivot': pivot}
 
         outs +=      'true\n'\
                 'ENDSSH\n'\
