@@ -105,6 +105,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     if (obj) {
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
+            errno = EINVAL;
             UPE(neigh->rib->uipcp, "serialization failed\n");
             return objlen;
         }
@@ -119,6 +120,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     }
 
     if (ret) {
+        errno = EINVAL;
         UPE(neigh->rib->uipcp, "message serialization failed\n");
         if (serbuf) {
             delete [] serbuf;
@@ -940,7 +942,7 @@ int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
 
     ret = const_cast<NeighFlow *>(nf)->send_to_port_id(&m, 0, obj_value);
     if (ret) {
-        UPE(rib->uipcp, "send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
 
     return ret;
