@@ -98,8 +98,8 @@ int rina_unregister(int fd, const char *dif_name, const char *local_appl,
 
 /*
  * Wait for the completion of a (un)registration procedure previosuly initiated
- * with a call to rina_[un]register() with the RINA_F_NOWAIT flag set. The @wfd
- * file descriptor must match the one returned by rina_[un]register().
+ * with a call to rina_[un]register() on @fd with the RINA_F_NOWAIT flag set.
+ * The @wfd file descriptor must match the one returned by rina_[un]register().
  *
  * On success it returns 0, on error -1, with the errno code properly set.
  */
@@ -116,13 +116,13 @@ int rina_register_wait(int fd, int wfd);
  * @spec is not NULL, the referenced data structure is filled with the QoS
  * specification specified by the requesting application.
  *
- * If @flags does not contain RINA_F_NORESP, on success it returns a file
- * descriptor that can be subsequently used with standard I/O system calls
- * (write(), read(), select(), ...) to exchange SDUs on the flow and
+ * If @flags does not contain RINA_F_NORESP, on success this function returns
+ * a file descriptor that can be subsequently used with standard I/O system
+ * calls (write(), read(), select(), ...) to exchange SDUs on the flow and
  * synchronize.
  *
  * If @flags does contain RINA_F_NORESP, on success a positive number is
- * returned as an handle to be passed to subsequent call to
+ * returned as an handle to be passed to a subsequent call to
  * rina_flow_respond().
  *
  * A call to rina_flow_accept(fd, &x, flags & ~RINA_F_NORESP) is functionally
@@ -142,16 +142,17 @@ int rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
  * response, which completes the flow allocation procedure. A non-zero
  * @response indicates that the flow allocation request is denied. In both
  * cases @response is sent to the requesting application to inform it
- * about the verdict. When the response is positive, this function returns
- * a file descriptor that can be subsequently used with standard I/O system
- * calls (write(), read(), select(), ...) to exchange SDUs on the flow and
- * synchronize. When the response is negative, 0 is returned. On error -1
- * is returned, with the errno code properly set.
+ * about the verdict. When the response is positive, on success this
+ * function returns a file descriptor that can be subsequently used with
+ * standard I/O system calls (write(), read(), select(), ...) to exchange
+ * SDUs on the flow and synchronize. When the response is negative, 0 is
+ * returned on success. In any case, -1 is returned on error, with the
+ * errno code properly set.
  */
 int rina_flow_respond(int fd, int handle, int response);
 
 /*
- * Issue a flow allocation reuqest towards the destination application called
+ * Issue a flow allocation request towards the destination application called
  * @remote_appl, using @local_appl as a source application name. If @flowspec
  * is not NULL, it specifies the QoS parameters to be used for the flow, if the
  * flow allocation request is successful. If @flowspec is NULL, an
@@ -174,7 +175,7 @@ int rina_flow_respond(int fd, int handle, int response);
  * calls (write(), read(), select(), ...) to exchange SDUs on the flow and
  * synchronize.
  *
- * On error -1 is returned, with the errno code properly set.
+ * In any case, -1 is returned on error, with the errno code properly set.
  */
 int rina_flow_alloc(const char *dif_name, const char *local_appl,
                     const char *remote_appl,
