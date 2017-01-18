@@ -322,4 +322,13 @@ struct AData : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct AddrAllocRequest : public UipcpObject {
+    rl_addr_t requestor;
+    rl_addr_t address;
+
+    AddrAllocRequest() : requestor (0), address(0) { }
+    AddrAllocRequest(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
 #endif  /* __UIPCP_CODECS_H__ */

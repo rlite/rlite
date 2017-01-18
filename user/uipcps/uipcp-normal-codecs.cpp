@@ -46,6 +46,7 @@
 #include "PolicyDescriptorMessage.pb.h"
 #include "ConnectionPoliciesMessage.pb.h"
 #include "FlowMessage.pb.h"
+#include "AddressAllocation.pb.h"
 
 using namespace std;
 
@@ -1124,4 +1125,39 @@ AData::serialize(char *buf, unsigned int size) const
     }
 
     return ret;
+}
+
+static void
+gpb2AddrAllocRequest(AddrAllocRequest& a, const gpb::AddrAllocRequest &gm)
+{
+    a.requestor = gm.requestor();
+    a.address = gm.address();
+}
+
+static int
+AddrAllocRequest2gpb(const AddrAllocRequest& a, gpb::AddrAllocRequest &gm)
+{
+    gm.set_requestor(a.requestor);
+    gm.set_address(a.address);
+
+    return 0;
+}
+
+AddrAllocRequest::AddrAllocRequest(const char *buf, unsigned int size)
+{
+    gpb::AddrAllocRequest gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2AddrAllocRequest(*this, gm);
+}
+
+int
+AddrAllocRequest::serialize(char *buf, unsigned int size) const
+{
+    gpb::AddrAllocRequest gm;
+
+    AddrAllocRequest2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
 }
