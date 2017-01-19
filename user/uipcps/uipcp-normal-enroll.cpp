@@ -660,7 +660,6 @@ enroller_default(NeighFlow *nf)
          * (6) S --> I: M_STOP */
         const char *objbuf;
         size_t objlen;
-        bool has_address;
         int ret;
 
         if (rm->op_code != gpb::M_START) {
@@ -689,9 +688,7 @@ enroller_default(NeighFlow *nf)
         EnrollmentInfo enr_info(objbuf, objlen);
         CDAPMessage m;
 
-        has_address = (enr_info.address != 0);
-
-        if (!has_address) {
+        if (/* TODO */0) {
             /* Assign an address to the initiator. */
             enr_info.address = rib->address_allocate();
         }
@@ -708,9 +705,7 @@ enroller_default(NeighFlow *nf)
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
 
-        if (has_address) {
-            /* Send DIF static information. */
-        }
+        /* Send DIF static information. */
 
         /* Stop the enrollment. */
         enr_info.start_early = true;

@@ -16,3 +16,7 @@
     - the only missing thing is to actually use the N-flow and not the N-1
 
 - periodic DFT synchronization
+
+- implement probe references functionality
+
+- use separate N-1 flows for management and data
