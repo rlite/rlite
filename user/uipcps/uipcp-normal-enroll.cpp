@@ -158,7 +158,8 @@ NeighFlow::enrollment_abort()
     m.m_release(gpb::F_NO_FLAGS);
     ret = send_to_port_id(&m, 0, NULL);
     if (ret) {
-        UPE(neigh->rib->uipcp, "send_to_port_id() failed\n");
+        UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
+                               strerror(errno));
     }
 
     if (conn) {
@@ -206,7 +207,7 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
 
     ret = nf->send_to_port_id(&m, 0, NULL);
     if (ret) {
-        UPE(rib->uipcp, "send_to_port_id() failed\n");
+        UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
     nf->pending_keepalive_reqs++;
 
@@ -382,7 +383,8 @@ enrollee_default(NeighFlow *nf)
                   obj_name::enrollment, 0, 0, string());
         ret = nf->send_to_port_id(&m, 0, obj);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                    strerror(errno));
             return -1;
         }
         UPD(rib->uipcp, "I --> S M_START(enrollment)\n");
@@ -500,7 +502,8 @@ enrollee_default(NeighFlow *nf)
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
         delete rm;
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             return -1;
         }
         UPD(rib->uipcp, "I --> S M_STOP_R(enrollment)\n");
@@ -543,7 +546,8 @@ enrollee_thread(void *opaque)
 
         ret = nf->send_to_port_id(&m, 0, NULL);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             goto err;
         }
         UPD(rib->uipcp, "I --> S M_CONNECT\n");
@@ -580,7 +584,8 @@ enrollee_thread(void *opaque)
                       obj_name::lowerflow, 0, 0, string());
             ret = nf->send_to_port_id(&m, 0, NULL);
             if (ret) {
-                UPE(rib->uipcp, "send_to_port_id() failed\n");
+                UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                                strerror(errno));
                 goto err;
             }
             UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
@@ -702,7 +707,8 @@ enroller_default(NeighFlow *nf)
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             delete rm;
             return -1;
         }
@@ -721,7 +727,8 @@ enroller_default(NeighFlow *nf)
 
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             delete rm;
             return -1;
         }
@@ -806,7 +813,8 @@ enroller_thread(void *opaque)
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             goto err;
         }
         UPD(rib->uipcp, "S --> I M_CONNECT_R\n");
@@ -840,7 +848,8 @@ enroller_thread(void *opaque)
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
         if (ret) {
-            UPE(rib->uipcp, "send_to_port_id() failed\n");
+            UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
+                            strerror(errno));
             goto err;
         }
         UPD(rib->uipcp, "S --> I M_START_R(lowerflow)\n");
@@ -1282,7 +1291,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
     if (ret) {
-        UPE(uipcp, "send_to_port_id() failed\n");
+        UPE(uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
 
     return 0;
