@@ -277,7 +277,7 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    std::map<rl_addr_t, rl_addr_t> addr_alloc_table;
+    std::map<rl_addr_t, AddrAllocRequest> addr_alloc_table;
 
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;

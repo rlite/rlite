@@ -1030,18 +1030,14 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize address allocation table. */
-        for (map<rl_addr_t, rl_addr_t>::iterator
+        for (map<rl_addr_t, AddrAllocRequest>::iterator
                         at = rib->addr_alloc_table.begin();
                                     at != rib->addr_alloc_table.end();) {
             AddrAllocEntries l;
 
             while (l.entries.size() < limit &&
                             at != rib->addr_alloc_table.end()) {
-                AddrAllocRequest aar;
-
-                aar.address = at->first;
-                aar.requestor = at->second;
-                l.entries.push_back(aar);
+                l.entries.push_back(at->second);
                 at ++;
             }
 

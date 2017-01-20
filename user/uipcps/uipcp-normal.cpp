@@ -520,11 +520,11 @@ uipcp_rib::dump() const
     ss << endl;
 
     ss << "Address Allocation Table:" << endl;
-    for (map<rl_addr_t, rl_addr_t>::const_iterator
+    for (map<rl_addr_t, AddrAllocRequest>::const_iterator
             mit = addr_alloc_table.begin();
                 mit != addr_alloc_table.end(); mit++) {
         ss << "    Address: " << mit->first
-            << ", Requestor: " << mit->second << endl;
+            << ", Requestor: " << mit->second.requestor << endl;
     }
 
     ss << endl;
@@ -756,7 +756,7 @@ uipcp_rib::address_allocate()
     rl_addr_t addr = 0;
 
     /* Look for the highest address already in use. */
-    for (map<rl_addr_t, rl_addr_t>::const_iterator
+    for (map<rl_addr_t, AddrAllocRequest>::const_iterator
                     at = addr_alloc_table.begin();
                             at != addr_alloc_table.end(); at++) {
         if (at->first > addr) {
@@ -768,7 +768,7 @@ uipcp_rib::address_allocate()
         addr ++; /* try with the next one */
 
         UPD(uipcp, "Trying with address %lu\n", (unsigned long)addr);
-        addr_alloc_table[addr] = myaddr;
+        addr_alloc_table[addr] = AddrAllocRequest(addr, myaddr);
 
         for (map<string, Neighbor*>::iterator
                     nit = neighbors.begin();
@@ -798,11 +798,17 @@ uipcp_rib::address_allocate()
         }
 
         pthread_mutex_unlock(&lock);
-        /* Wait a bit for negative responses. */
+        /* Wait a bit for possible negative responses. */
         sleep(1);
         pthread_mutex_lock(&lock);
 
-        if (addr_alloc_table.count(addr) && addr_alloc_table[addr] == myaddr) {
+        map<rl_addr_t, AddrAllocRequest>::iterator mit;
+
+        /* If the request is still there, then we consider the allocation
+         * complete. */
+        mit = addr_alloc_table.find(addr);
+        if (mit != addr_alloc_table.end() && mit->second.requestor == myaddr) {
+            addr_alloc_table[addr].pending = false;
             UPD(uipcp, "Address %lu allocated\n", (unsigned long)addr);
             break;
         }
@@ -839,7 +845,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (rm->obj_class == obj_class::addr_alloc_req) {
         /* This is an address allocation request or a negative
          * address allocation response. */
-        map<rl_addr_t, rl_addr_t>::iterator mit;
+        map<rl_addr_t, AddrAllocRequest>::iterator mit;
         bool propagate = false;
         AddrAllocRequest aar(objbuf, objlen);
 
@@ -849,13 +855,13 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
         case gpb::M_CREATE:
             if (mit == addr_alloc_table.end()) {
                 /* New address allocation request, no conflicts. */
-                addr_alloc_table[aar.address] = aar.requestor;
+                addr_alloc_table[aar.address] = aar;
                 UPD(uipcp, "Address allocation request ok, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
                 propagate = true;
 
-            } else if (mit->second != aar.requestor) {
+            } else if (mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
                 CDAPMessage *m = new CDAPMessage();
                 int ret;
@@ -903,18 +909,22 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 
         for (list<AddrAllocRequest>::const_iterator r = aal.entries.begin();
                                             r != aal.entries.end(); r++) {
+            map<rl_addr_t, AddrAllocRequest>::iterator mit;
+
+            mit = addr_alloc_table.find(r->address);
+
             if (rm->op_code == gpb::M_CREATE) {
-                if (addr_alloc_table.count(r->address) == 0 ||
-                                addr_alloc_table[r->address] != r->requestor) {
-                    addr_alloc_table[r->address] = r->requestor; /* overwrite */
+                if (mit == addr_alloc_table.end() ||
+                                mit->second.requestor != r->requestor) {
+                    addr_alloc_table[r->address] = *r; /* overwrite */
                     prop_aal.entries.push_back(*r);
                     UPD(uipcp, "Address allocation entry created (addr=%lu,"
                                 "requestor=%lu)\n", (long unsigned)r->address,
                                 (long unsigned)r->requestor);
                 }
             } else { /* M_DELETE */
-                if (addr_alloc_table.count(r->address) &&
-                                addr_alloc_table[r->address] == r->requestor) {
+                if (mit != addr_alloc_table.end() &&
+                                mit->second.requestor == r->requestor) {
                     addr_alloc_table.erase(r->address);
                     prop_aal.entries.push_back(*r);
                     UPD(uipcp, "Address allocation entry deleted (addr=%lu,"
