@@ -35,7 +35,7 @@ using namespace std;
 
 /* Timeout intervals are expressed in milliseconds. */
 #define NEIGH_KEEPALIVE_THRESH      3
-#define NEIGH_ENROLL_TO             2000
+#define NEIGH_ENROLL_TO             7000
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
@@ -334,9 +334,7 @@ NeighFlow::next_enroll_msg()
         int ret;
 
         clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_nsec += NEIGH_ENROLL_TO * 1000000;
-        to.tv_sec += to.tv_nsec / 1000000000;
-        to.tv_nsec %= 1000000000;
+        to.tv_sec += NEIGH_ENROLL_TO / 1000;
 
         ret = pthread_cond_timedwait(&enroll_msgs_avail,
                                      &neigh->rib->lock, &to);
