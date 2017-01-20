@@ -519,6 +519,16 @@ uipcp_rib::dump() const
 
     ss << endl;
 
+    ss << "Address Allocation Table:" << endl;
+    for (map<rl_addr_t, rl_addr_t>::const_iterator
+            mit = addr_alloc_table.begin();
+                mit != addr_alloc_table.end(); mit++) {
+        ss << "    Address: " << mit->first
+            << ", Requestor: " << mit->second << endl;
+    }
+
+    ss << endl;
+
     ss << "Supported flows:" << endl;
     for (map<string, FlowRequest>::const_iterator
             mit = flow_reqs.begin(); mit != flow_reqs.end(); mit++) {
