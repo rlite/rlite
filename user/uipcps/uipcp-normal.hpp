@@ -149,9 +149,6 @@ struct Neighbor {
      * We don't consider requests, as timeout on responses. */
     time_t unheard_since;
 
-    typedef int (Neighbor::*enroll_fsm_handler_t)(NeighFlow *nf,
-                                                  const CDAPMessage *rm);
-
     Neighbor(struct uipcp_rib *rib, const std::string& name);
     bool operator==(const Neighbor& other) const
         { return ipcp_name == other.ipcp_name; }
@@ -166,20 +163,6 @@ struct Neighbor {
     bool has_mgmt_flow() const { return flows.size() > 0; }
     bool enrollment_complete() const;
     int alloc_flow(const char *supp_dif_name);
-
-    /* Enrollment state machine handlers. */
-    int none(NeighFlow *nf, const CDAPMessage *rm);
-    int i_wait_connect_r(NeighFlow *nf, const CDAPMessage *rm);
-    int s_wait_start(NeighFlow *nf, const CDAPMessage *rm);
-    int i_wait_start_r(NeighFlow *nf, const CDAPMessage *rm);
-    int i_wait_stop(NeighFlow *nf, const CDAPMessage *rm);
-    int s_wait_stop_r(NeighFlow *nf, const CDAPMessage *rm);
-    int i_wait_start(NeighFlow *nf, const CDAPMessage *rm);
-
-    int s_lf_wait_start(NeighFlow *nf, const CDAPMessage *rm);
-    int i_lf_wait_start_r(NeighFlow *nf, const CDAPMessage *rm);
-
-    int fsm_enrolled(NeighFlow *nf, const CDAPMessage *rm);
 
     int neigh_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,
