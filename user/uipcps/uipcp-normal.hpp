@@ -51,7 +51,8 @@ namespace obj_class {
     extern std::string flow;
     extern std::string keepalive;
     extern std::string lowerflow;
-    extern std::string addrstable;
+    extern std::string addr_alloc_req;
+    extern std::string addr_alloc_table;
 };
 
 namespace obj_name {
@@ -66,7 +67,7 @@ namespace obj_name {
     extern std::string flows;
     extern std::string keepalive;
     extern std::string lowerflow;
-    extern std::string addrstable;
+    extern std::string addr_alloc_table;
 };
 
 /* Time interval (in seconds) between two consecutive increments
@@ -276,7 +277,7 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    std::map<rl_addr_t, rl_addr_t> addrstable;
+    std::map<rl_addr_t, rl_addr_t> addr_alloc_table;
 
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
@@ -361,7 +362,7 @@ struct uipcp_rib {
     int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
     int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
     int status_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int addrstable_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf);
 
     int flows_handler_create(const CDAPMessage *rm);
     int flows_handler_create_r(const CDAPMessage *rm);

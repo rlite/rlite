@@ -1030,11 +1030,13 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize address allocation table. */
-        for (map<rl_addr_t, rl_addr_t>::iterator at = rib->addrstable.begin();
-                                               at != rib->addrstable.end();) {
+        for (map<rl_addr_t, rl_addr_t>::iterator
+                        at = rib->addr_alloc_table.begin();
+                                    at != rib->addr_alloc_table.end();) {
             AddrAllocEntries l;
 
-            while (l.entries.size() < limit && at != rib->addrstable.end()) {
+            while (l.entries.size() < limit &&
+                            at != rib->addr_alloc_table.end()) {
                 AddrAllocRequest aar;
 
                 aar.address = at->first;
@@ -1043,8 +1045,8 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
                 at ++;
             }
 
-            ret |= neigh_sync_obj(nf, true, obj_class::addrstable,
-                                  obj_name::addrstable, &l);
+            ret |= neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
+                                  obj_name::addr_alloc_table, &l);
         }
     }
 

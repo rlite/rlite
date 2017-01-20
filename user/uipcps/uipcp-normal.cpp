@@ -56,7 +56,8 @@ namespace obj_class {
     string flow = "flow";
     string keepalive = "keepalive";
     string lowerflow = "lowerflow";
-    string addrstable = "addresses";
+    string addr_alloc_table = "addr_alloc_table";
+    string addr_alloc_req = "addr_alloc_req";
 };
 
 namespace obj_name {
@@ -71,7 +72,7 @@ namespace obj_name {
     string flows = "/dif/ra/fa/" + obj_class::flows;
     string keepalive = "/daf/mgmt/" + obj_class::keepalive;
     string lowerflow = "/daf/mgmt/" + obj_class::lowerflow;
-    string addrstable = "/dif/ra/aa/" + obj_class::addrstable;
+    string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
 };
 
 #define MGMTBUF_SIZE_MAX 8092
@@ -337,8 +338,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     handlers.insert(make_pair(obj_name::keepalive,
                               &uipcp_rib::keepalive_handler));
     handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
-    handlers.insert(make_pair(obj_name::addrstable,
-                              &uipcp_rib::addrstable_handler));
+    handlers.insert(make_pair(obj_name::addr_alloc_table,
+                              &uipcp_rib::addr_alloc_table_handler));
 
     /* Start timers for periodic tasks. */
     age_incr_tmrid = uipcp_loop_schedule(uipcp,
@@ -745,8 +746,9 @@ uipcp_rib::address_allocate()
     rl_addr_t addr = 0;
 
     /* Look for the highest address already in use. */
-    for (map<rl_addr_t, rl_addr_t>::const_iterator at = addrstable.begin();
-                                    at != addrstable.end(); at++) {
+    for (map<rl_addr_t, rl_addr_t>::const_iterator
+                    at = addr_alloc_table.begin();
+                            at != addr_alloc_table.end(); at++) {
         if (at->first > addr) {
             addr = at->first;
         }
@@ -756,7 +758,7 @@ uipcp_rib::address_allocate()
         addr ++; /* try with the next one */
 
         UPD(uipcp, "Trying with address %lu\n", (unsigned long)addr);
-        addrstable[addr] = myaddr;
+        addr_alloc_table[addr] = myaddr;
 
         for (map<string, Neighbor*>::iterator
                     nit = neighbors.begin();
@@ -766,8 +768,8 @@ uipcp_rib::address_allocate()
                 AddrAllocRequest aar;
                 int ret;
 
-                m->m_create(gpb::F_NO_FLAGS, obj_class::address,
-                            obj_name::addrstable, 0, 0, "");
+                m->m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
+                            obj_name::addr_alloc_table, 0, 0, "");
                 aar.requestor = myaddr;
                 aar.address = addr;
                 ret = nit->second->mgmt_conn()->send_to_port_id(m, 0, &aar);
@@ -790,7 +792,7 @@ uipcp_rib::address_allocate()
         sleep(1);
         pthread_mutex_lock(&lock);
 
-        if (addrstable.count(addr) && addrstable[addr] == myaddr) {
+        if (addr_alloc_table.count(addr) && addr_alloc_table[addr] == myaddr) {
             UPD(uipcp, "Address %lu allocated\n", (unsigned long)addr);
             break;
         }
@@ -800,7 +802,7 @@ uipcp_rib::address_allocate()
 }
 
 int
-uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     bool create;
     const char *objbuf;
@@ -824,20 +826,20 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
         return 0;
     }
 
-    if (rm->obj_class == obj_class::address) {
+    if (rm->obj_class == obj_class::addr_alloc_req) {
         /* This is an address allocation request or a negative
          * address allocation response. */
         map<rl_addr_t, rl_addr_t>::iterator mit;
         bool propagate = false;
         AddrAllocRequest aar(objbuf, objlen);
 
-        mit = addrstable.find(aar.address);
+        mit = addr_alloc_table.find(aar.address);
 
         switch (rm->op_code) {
         case gpb::M_CREATE:
-            if (mit == addrstable.end()) {
+            if (mit == addr_alloc_table.end()) {
                 /* New address allocation request, no conflicts. */
-                addrstable[aar.address] = aar.requestor;
+                addr_alloc_table[aar.address] = aar.requestor;
                 UPD(uipcp, "Address allocation request ok, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
@@ -851,8 +853,8 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
                 UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
-                m->m_delete(gpb::F_NO_FLAGS, obj_class::address,
-                            obj_name::addrstable, 0, 0, "");
+                m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
+                            obj_name::addr_alloc_table, 0, 0, "");
                 ret = send_to_dst_addr(m, aar.requestor, &aar);
                 if (ret) {
                     UPE(uipcp, "Failed to send message to %lu [%s]\n",
@@ -864,9 +866,9 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
             break;
 
         case gpb::M_DELETE:
-            if (mit != addrstable.end()) {
+            if (mit != addr_alloc_table.end()) {
                 /* Negative feedback on a flow allocation request. */
-                addrstable.erase(aar.address);
+                addr_alloc_table.erase(aar.address);
                 propagate = true;
                 UPI(uipcp, "Address allocation request deleted, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
@@ -883,7 +885,7 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
                                       rm->obj_name, &aar);
         }
 
-    } else if (rm->obj_class == obj_class::addrstable) {
+    } else if (rm->obj_class == obj_class::addr_alloc_table) {
         /* This is a synchronization operation targeting our
          * address allocation table. */
         AddrAllocEntries aal(objbuf, objlen);
@@ -892,18 +894,18 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
         for (list<AddrAllocRequest>::const_iterator r = aal.entries.begin();
                                             r != aal.entries.end(); r++) {
             if (rm->op_code == gpb::M_CREATE) {
-                if (addrstable.count(r->address) == 0 ||
-                                addrstable[r->address] != r->requestor) {
-                    addrstable[r->address] = r->requestor; /* overwrite */
+                if (addr_alloc_table.count(r->address) == 0 ||
+                                addr_alloc_table[r->address] != r->requestor) {
+                    addr_alloc_table[r->address] = r->requestor; /* overwrite */
                     prop_aal.entries.push_back(*r);
                     UPD(uipcp, "Address allocation entry created (addr=%lu,"
                                 "requestor=%lu)\n", (long unsigned)r->address,
                                 (long unsigned)r->requestor);
                 }
             } else { /* M_DELETE */
-                if (addrstable.count(r->address) &&
-                                addrstable[r->address] == r->requestor) {
-                    addrstable.erase(r->address);
+                if (addr_alloc_table.count(r->address) &&
+                                addr_alloc_table[r->address] == r->requestor) {
+                    addr_alloc_table.erase(r->address);
                     prop_aal.entries.push_back(*r);
                     UPD(uipcp, "Address allocation entry deleted (addr=%lu,"
                                 "requestor=%lu)\n", (long unsigned)r->address,
