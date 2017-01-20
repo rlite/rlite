@@ -688,7 +688,7 @@ enroller_default(NeighFlow *nf)
         EnrollmentInfo enr_info(objbuf, objlen);
         CDAPMessage m;
 
-        if (/* TODO */0) {
+        if (1) {
             /* Assign an address to the initiator. */
             enr_info.address = rib->address_allocate();
         }
@@ -1026,6 +1026,26 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
         }
 
         rib->neighbors_seen.erase(my_name);
+    }
+
+    {
+        /* Synchronize address allocation table. */
+        for (map<rl_addr_t, rl_addr_t>::iterator at = rib->addrstable.begin();
+                                               at != rib->addrstable.end();) {
+            AddrAllocEntries l;
+
+            while (l.entries.size() < limit && at != rib->addrstable.end()) {
+                AddrAllocRequest aar;
+
+                aar.address = at->first;
+                aar.requestor = at->second;
+                l.entries.push_back(aar);
+                at ++;
+            }
+
+            ret |= neigh_sync_obj(nf, true, obj_class::addrstable,
+                                  obj_name::addrstable, &l);
+        }
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",

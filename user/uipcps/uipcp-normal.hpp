@@ -51,6 +51,7 @@ namespace obj_class {
     extern std::string flow;
     extern std::string keepalive;
     extern std::string lowerflow;
+    extern std::string addrstable;
 };
 
 namespace obj_name {
@@ -65,6 +66,7 @@ namespace obj_name {
     extern std::string flows;
     extern std::string keepalive;
     extern std::string lowerflow;
+    extern std::string addrstable;
 };
 
 /* Time interval (in seconds) between two consecutive increments

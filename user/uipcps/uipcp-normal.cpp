@@ -802,9 +802,7 @@ uipcp_rib::address_allocate()
 int
 uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    map<rl_addr_t, rl_addr_t>::iterator mit;
-    bool propagate = false;
-    bool create = true;
+    bool create;
     const char *objbuf;
     size_t objlen;
 
@@ -814,56 +812,113 @@ uipcp_rib::addrstable_handler(const CDAPMessage *rm, NeighFlow *nf)
         return 0;
     }
 
-    AddrAllocRequest aar(objbuf, objlen);
-
-    mit = addrstable.find(aar.address);
-
     switch (rm->op_code) {
     case gpb::M_CREATE:
-        if (mit == addrstable.end()) {
-            addrstable[aar.address] = aar.requestor;
-            UPD(uipcp, "Address allocation request ok, (addr=%lu,"
-                       "requestor=%lu)\n", (long unsigned)aar.address,
-                        (long unsigned)aar.requestor);
-            propagate = true;
-
-        } else if (mit->second != aar.requestor) {
-            CDAPMessage *m = new CDAPMessage();
-            int ret;
-
-            UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
-                       "requestor=%lu)\n", (long unsigned)aar.address,
-                        (long unsigned)aar.requestor);
-            m->m_delete(gpb::F_NO_FLAGS, obj_class::address,
-                        obj_name::addrstable, 0, 0, "");
-            ret = send_to_dst_addr(m, aar.requestor, &aar);
-            if (ret) {
-                UPE(uipcp, "Failed to send message to %lu [%s]\n",
-                        (unsigned long)aar.requestor, strerror(errno));
-            }
-        } else {
-            /* We already got this request, don't propagate. */
-        }
+        create = true;
         break;
-
     case gpb::M_DELETE:
         create = false;
-        if (mit != addrstable.end()) {
-            addrstable.erase(aar.address);
-            propagate = true;
-            UPI(uipcp, "Address allocation request deleted, (addr=%lu,"
-                       "requestor=%lu)\n", (long unsigned)aar.address,
-                        (long unsigned)aar.requestor);
-        }
         break;
-
     default:
         UPE(uipcp, "M_CREATE/M_DELETE expected\n");
+        return 0;
     }
 
-    if (propagate) {
-        neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
-                                  rm->obj_name, &aar);
+    if (rm->obj_class == obj_class::address) {
+        /* This is an address allocation request or a negative
+         * address allocation response. */
+        map<rl_addr_t, rl_addr_t>::iterator mit;
+        bool propagate = false;
+        AddrAllocRequest aar(objbuf, objlen);
+
+        mit = addrstable.find(aar.address);
+
+        switch (rm->op_code) {
+        case gpb::M_CREATE:
+            if (mit == addrstable.end()) {
+                /* New address allocation request, no conflicts. */
+                addrstable[aar.address] = aar.requestor;
+                UPD(uipcp, "Address allocation request ok, (addr=%lu,"
+                           "requestor=%lu)\n", (long unsigned)aar.address,
+                            (long unsigned)aar.requestor);
+                propagate = true;
+
+            } else if (mit->second != aar.requestor) {
+                /* New address allocation request, but there is a conflict. */
+                CDAPMessage *m = new CDAPMessage();
+                int ret;
+
+                UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
+                           "requestor=%lu)\n", (long unsigned)aar.address,
+                            (long unsigned)aar.requestor);
+                m->m_delete(gpb::F_NO_FLAGS, obj_class::address,
+                            obj_name::addrstable, 0, 0, "");
+                ret = send_to_dst_addr(m, aar.requestor, &aar);
+                if (ret) {
+                    UPE(uipcp, "Failed to send message to %lu [%s]\n",
+                            (unsigned long)aar.requestor, strerror(errno));
+                }
+            } else {
+                /* We have already seen this request, don't propagate. */
+            }
+            break;
+
+        case gpb::M_DELETE:
+            if (mit != addrstable.end()) {
+                /* Negative feedback on a flow allocation request. */
+                addrstable.erase(aar.address);
+                propagate = true;
+                UPI(uipcp, "Address allocation request deleted, (addr=%lu,"
+                           "requestor=%lu)\n", (long unsigned)aar.address,
+                            (long unsigned)aar.requestor);
+            }
+            break;
+
+        default:
+            assert(0);
+        }
+
+        if (propagate) {
+            neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
+                                      rm->obj_name, &aar);
+        }
+
+    } else if (rm->obj_class == obj_class::addrstable) {
+        /* This is a synchronization operation targeting our
+         * address allocation table. */
+        AddrAllocEntries aal(objbuf, objlen);
+        AddrAllocEntries prop_aal;
+
+        for (list<AddrAllocRequest>::const_iterator r = aal.entries.begin();
+                                            r != aal.entries.end(); r++) {
+            if (rm->op_code == gpb::M_CREATE) {
+                if (addrstable.count(r->address) == 0 ||
+                                addrstable[r->address] != r->requestor) {
+                    addrstable[r->address] = r->requestor; /* overwrite */
+                    prop_aal.entries.push_back(*r);
+                    UPD(uipcp, "Address allocation entry created (addr=%lu,"
+                                "requestor=%lu)\n", (long unsigned)r->address,
+                                (long unsigned)r->requestor);
+                }
+            } else { /* M_DELETE */
+                if (addrstable.count(r->address) &&
+                                addrstable[r->address] == r->requestor) {
+                    addrstable.erase(r->address);
+                    prop_aal.entries.push_back(*r);
+                    UPD(uipcp, "Address allocation entry deleted (addr=%lu,"
+                                "requestor=%lu)\n", (long unsigned)r->address,
+                                (long unsigned)r->requestor);
+                }
+            }
+        }
+
+        if (prop_aal.entries.size() > 0) {
+            neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
+                                      rm->obj_name, &prop_aal);
+        }
+
+    } else {
+        UPE(uipcp, "Unexpected object class %s\n", rm->obj_class.c_str());
     }
 
     return 0;

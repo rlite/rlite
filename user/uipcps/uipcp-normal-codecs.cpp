@@ -1161,3 +1161,35 @@ AddrAllocRequest::serialize(char *buf, unsigned int size) const
 
     return ser_common(gm, buf, size);
 }
+
+AddrAllocEntries::AddrAllocEntries(const char *buf, unsigned int size)
+{
+    gpb::AddrAllocEntries gm;
+
+    gm.ParseFromArray(buf, size);
+
+    for (int i = 0; i < gm.entries_size(); i++) {
+        entries.push_back(AddrAllocRequest());
+        gpb2AddrAllocRequest(entries.back(), gm.entries(i));
+    }
+}
+
+int
+AddrAllocEntries::serialize(char *buf, unsigned int size) const
+{
+    gpb::AddrAllocEntries gm;
+
+    for (list<AddrAllocRequest>::const_iterator r = entries.begin();
+                    r != entries.end(); r++) {
+        gpb::AddrAllocRequest *gr;
+        int ret;
+
+        gr = gm.add_entries();
+        ret = AddrAllocRequest2gpb(*r, *gr);
+        if (ret) {
+            return ret;
+        }
+    }
+
+    return ser_common(gm, buf, size);
+}

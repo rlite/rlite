@@ -6,3 +6,6 @@ message AddrAllocRequest {
         required uint64 address = 2;
 }
 
+message AddrAllocEntries {
+    repeated AddrAllocRequest entries = 1;
+}

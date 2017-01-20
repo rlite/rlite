@@ -331,4 +331,11 @@ struct AddrAllocRequest : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct AddrAllocEntries : public UipcpObject {
+    std::list<AddrAllocRequest> entries;
+
+    AddrAllocEntries() { }
+    AddrAllocEntries(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
 #endif  /* __UIPCP_CODECS_H__ */
