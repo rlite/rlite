@@ -469,6 +469,8 @@ RoutingEngine::update_kernel_routing(rl_addr_t addr)
 {
     assert(rib != NULL);
 
+    UPV(rib->uipcp, "Recomputing routing and forwarding tables\n");
+
     /* Step 1: Run a shortest path algorithm. This phase produces the
      * 'next_hops' routing table. */
     compute_next_hops(addr);
