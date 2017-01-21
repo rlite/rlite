@@ -761,7 +761,7 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 rl_addr_t
-uipcp_rib::address_allocate()
+uipcp_rib::addr_allocate()
 {
     rl_addr_t addr = 0;
 
