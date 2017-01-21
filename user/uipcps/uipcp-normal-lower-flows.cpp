@@ -412,3 +412,34 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
                                         RL_AGE_INCR_INTERVAL * 1000,
                                         age_incr_cb, rib);
 }
+
+void
+uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
+{
+    LowerFlowList lfl;
+
+    /* Update local entries and propagate them. */
+    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::iterator
+            it = lfdb.begin(); it != lfdb.end(); it++) {
+        for (map<rl_addr_t, LowerFlow>::iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+            LowerFlow &flow = jt->second;
+
+            if (flow.local_addr == myaddr) {
+                flow.local_addr = new_addr;
+                flow.seqnum ++;
+                lfl.flows.push_back(flow);
+                UPD(uipcp, "Local lower flow entry updated: %s\n",
+                           static_cast<string>(flow).c_str());
+            }
+        }
+    }
+
+    if (lfl.flows.size()) {
+        /* Update the routing table. */
+        spe.run(new_addr, this);
+        pduft_sync();
+    }
+
+}
+

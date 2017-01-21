@@ -337,6 +337,7 @@ struct uipcp_rib {
     bool lfdb_add(const LowerFlow &lf);
     bool lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
     void lfdb_update_local(const std::string& neigh_name);
+    void lfdb_update_address(rl_addr_t new_addr);
 
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);

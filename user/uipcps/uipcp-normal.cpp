@@ -555,9 +555,18 @@ int
 uipcp_rib::set_address(rl_addr_t address)
 {
     stringstream addr_ss;
+    int ret;
 
     addr_ss << address;
-    return rl_conf_ipcp_config(uipcp->id, "address", addr_ss.str().c_str());
+    ret = rl_conf_ipcp_config(uipcp->id, "address", addr_ss.str().c_str());
+    if (ret) {
+        UPE(uipcp, "Failed to update address to %lu\n",
+                    (unsigned long)address);
+    } else {
+        //normal_update_address();
+    }
+
+    return ret;
 }
 
 int
@@ -1221,6 +1230,9 @@ normal_update_address(struct uipcp *uipcp, rl_addr_t new_addr)
         return;
     }
     rib->dft_update_address(new_addr);
+    rib->lfdb_update_address(new_addr);
+    UPD(uipcp, "Address updated %lu --> %lu\n",
+               (long unsigned)rib->myaddr, (long unsigned)new_addr);
     rib->myaddr = new_addr; /* do the update */
 }
 
