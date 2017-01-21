@@ -383,9 +383,6 @@ RoutingEngine::compute_fwd_table()
     map<rl_addr_t, rl_port_t> next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
 
-    /* Flush previous entries. */
-    uipcp_pduft_flush(uipcp, uipcp->id);
-
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
     for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
@@ -419,17 +416,34 @@ RoutingEngine::compute_fwd_table()
         next_ports_new[r->first] = neigh->second->mgmt_conn()->port_id;
     }
 
-    /* Generate PDUFT entries. */
+    /* Generate new PDUFT entries. */
     for (map<rl_addr_t, rl_port_t>::iterator f = next_ports_new.begin();
                                         f != next_ports_new.end(); f++) {
-            int ret = uipcp_pduft_set(uipcp, uipcp->id, f->first,
-                                      f->second);
+            map<rl_addr_t, rl_port_t>::const_iterator of;
+            int ret;
+
+            of = next_ports.find(f->first);
+            if (of != next_ports.end() && of->second == f->second) {
+                /* This entry was already in place. */
+                continue;
+            }
+
+            ret = uipcp_pduft_set(uipcp, uipcp->id, f->first, f->second);
             if (ret) {
                 UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry\n",
                     (long unsigned)f->first, f->second);
+                f->second = 0; /* trigger re insertion next time */
             } else {
-                UPV(uipcp, "Add PDUFT entry %lu --> %u\n",
+                UPD(uipcp, "Add PDUFT entry %lu --> %u\n",
                     (long unsigned)f->first, f->second);
+            }
+    }
+
+    /* Remove old PDUFT entries. */
+    for (map<rl_addr_t, rl_port_t>::iterator f = next_ports.begin();
+                                        f != next_ports.end(); f++) {
+            if (next_ports_new.count(f->first) == 0) {
+                /* TODO implement removal */
             }
     }
 
