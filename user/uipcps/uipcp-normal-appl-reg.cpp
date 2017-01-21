@@ -206,6 +206,7 @@ uipcp_rib::dft_update_address(rl_addr_t new_addr)
     for (mit = dft.begin(); mit != dft.end(); mit ++) {
         if (mit->second.address == myaddr) {
             mit->second.address = new_addr;
+            mit->second.timestamp = time64();
             prop_dft.entries.push_back(mit->second);
             UPD(uipcp, "Updated address for DFT entry %s\n", mit->first.c_str());
         }
