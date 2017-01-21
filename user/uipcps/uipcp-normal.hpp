@@ -51,6 +51,8 @@ namespace obj_class {
     extern std::string flow;
     extern std::string keepalive;
     extern std::string lowerflow;
+    extern std::string addr_alloc_req;
+    extern std::string addr_alloc_table;
 };
 
 namespace obj_name {
@@ -65,6 +67,7 @@ namespace obj_name {
     extern std::string flows;
     extern std::string keepalive;
     extern std::string lowerflow;
+    extern std::string addr_alloc_table;
 };
 
 /* Time interval (in seconds) between two consecutive increments
@@ -255,6 +258,10 @@ struct uipcp_rib {
     std::map< std::string, NeighborCandidate > neighbors_seen;
     std::set< std::string > neighbors_cand;
 
+    /* Table used to carry on distributed address allocation.
+     * It maps (address allocated) --> (requestor address). */
+    std::map<rl_addr_t, AddrAllocRequest> addr_alloc_table;
+
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
 
@@ -302,7 +309,7 @@ struct uipcp_rib {
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
     int pduft_sync();
-    rl_addr_t address_allocate() const;
+    rl_addr_t addr_allocate();
     void neigh_flow_prune(NeighFlow *nf);
 
     const LowerFlow *lfdb_find(rl_addr_t local_addr,
@@ -313,6 +320,7 @@ struct uipcp_rib {
     bool lfdb_add(const LowerFlow &lf);
     bool lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
     void lfdb_update_local(const std::string& neigh_name);
+    void lfdb_update_address(rl_addr_t new_addr);
 
     int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
                          const UipcpObject *obj);
@@ -338,6 +346,7 @@ struct uipcp_rib {
     int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
     int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
     int status_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf);
 
     int flows_handler_create(const CDAPMessage *rm);
     int flows_handler_create_r(const CDAPMessage *rm);

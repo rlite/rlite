@@ -35,7 +35,7 @@ using namespace std;
 
 /* Timeout intervals are expressed in milliseconds. */
 #define NEIGH_KEEPALIVE_THRESH      3
-#define NEIGH_ENROLL_TO             2000
+#define NEIGH_ENROLL_TO             7000
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
@@ -335,9 +335,7 @@ NeighFlow::next_enroll_msg()
         int ret;
 
         clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_nsec += NEIGH_ENROLL_TO * 1000000;
-        to.tv_sec += to.tv_nsec / 1000000000;
-        to.tv_nsec %= 1000000000;
+        to.tv_sec += NEIGH_ENROLL_TO / 1000;
 
         ret = pthread_cond_timedwait(&enroll_msgs_avail,
                                      &neigh->rib->lock, &to);
@@ -665,7 +663,6 @@ enroller_default(NeighFlow *nf)
          * (6) S --> I: M_STOP */
         const char *objbuf;
         size_t objlen;
-        bool has_address;
         int ret;
 
         if (rm->op_code != gpb::M_START) {
@@ -694,11 +691,10 @@ enroller_default(NeighFlow *nf)
         EnrollmentInfo enr_info(objbuf, objlen);
         CDAPMessage m;
 
-        has_address = (enr_info.address != 0);
-
-        if (!has_address) {
-            /* Assign an address to the initiator. */
-            enr_info.address = rib->address_allocate();
+        if (rib->uipcp->uipcps->auto_addr_alloc) {
+            /* Assign an address to the initiator running a distributed
+             * allocation procedure. */
+            enr_info.address = rib->addr_allocate();
         }
 
         m.m_start_r(gpb::F_NO_FLAGS, 0, string());
@@ -714,9 +710,7 @@ enroller_default(NeighFlow *nf)
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
 
-        if (has_address) {
-            /* Send DIF static information. */
-        }
+        /* Send DIF static information. */
 
         /* Stop the enrollment. */
         enr_info.start_early = true;
@@ -1040,6 +1034,24 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
         }
 
         rib->neighbors_seen.erase(my_name);
+    }
+
+    {
+        /* Synchronize address allocation table. */
+        for (map<rl_addr_t, AddrAllocRequest>::iterator
+                        at = rib->addr_alloc_table.begin();
+                                    at != rib->addr_alloc_table.end();) {
+            AddrAllocEntries l;
+
+            while (l.entries.size() < limit &&
+                            at != rib->addr_alloc_table.end()) {
+                l.entries.push_back(at->second);
+                at ++;
+            }
+
+            ret |= neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
+                                  obj_name::addr_alloc_table, &l);
+        }
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",

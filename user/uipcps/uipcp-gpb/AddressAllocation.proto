@@ -1,0 +1,11 @@
+package gpb;
+option optimize_for = LITE_RUNTIME;
+
+message AddrAllocRequest {
+        required uint64 requestor = 1;
+        required uint64 address = 2;
+}
+
+message AddrAllocEntries {
+    repeated AddrAllocRequest entries = 1;
+}

@@ -540,7 +540,8 @@ usage(void)
                                 "%d seconds, 0 to disable)\n"
         "   -N : use reliable N-flows if reliable N-1-flows are "
                                                     "not available\n"
-        "   -U : use unreliable N-1-flows rather than reliable ones\n",
+        "   -U : use unreliable N-1-flows rather than reliable ones\n"
+        "   -A : enable automatic address allocation (vs manual)\n",
           NEIGH_KEEPALIVE_TO);
 }
 
@@ -572,8 +573,9 @@ int main(int argc, char **argv)
     uipcps->keepalive = NEIGH_KEEPALIVE_TO;
     uipcps->reliable_n_flows = 0;
     uipcps->unreliable_flows = 0;
+    uipcps->auto_addr_alloc = 0;
 
-    while ((opt = getopt(argc, argv, "hv:k:NU")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:k:NUA")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -599,6 +601,10 @@ int main(int argc, char **argv)
 
             case 'U':
                 uipcps->unreliable_flows = 1;
+                break;
+
+            case 'A':
+                uipcps->auto_addr_alloc = 1;
                 break;
 
             default:

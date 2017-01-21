@@ -322,4 +322,23 @@ struct AData : public UipcpObject {
     int serialize(char *buf, unsigned int size) const;
 };
 
+struct AddrAllocRequest : public UipcpObject {
+    rl_addr_t requestor;
+    rl_addr_t address;
+    bool pending; /* not serialized */
+
+    AddrAllocRequest() : requestor (0), address(0), pending(true) { }
+    AddrAllocRequest(rl_addr_t a, rl_addr_t r) : requestor(r), address(a),
+                                                 pending(true) { }
+    AddrAllocRequest(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+struct AddrAllocEntries : public UipcpObject {
+    std::list<AddrAllocRequest> entries;
+
+    AddrAllocEntries() { }
+    AddrAllocEntries(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
 #endif  /* __UIPCP_CODECS_H__ */
