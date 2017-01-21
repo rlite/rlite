@@ -186,18 +186,15 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        spe.run(myaddr);
-        pduft_sync();
+        re.update_kernel_routing(myaddr);
     }
 
     return 0;
 }
 
 int
-SPEngine::run(rl_addr_t local_addr)
+RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 {
-    assert(rib != NULL);
-
     /* Clean up state left from the previous run. */
     next_hops.clear();
     graph.clear();
@@ -305,17 +302,18 @@ SPEngine::run(rl_addr_t local_addr)
 }
 
 int
-uipcp_rib::pduft_sync()
+RoutingEngine::compute_fwd_table()
 {
     map<rl_addr_t, rl_port_t> next_hop_to_port_id;
+    struct uipcp *uipcp = rib->uipcp;
 
     /* Flush previous entries. */
     uipcp_pduft_flush(uipcp, uipcp->id);
 
     /* Precompute the port-ids corresponding to all the possible
      * next-hops. */
-    for (map<rl_addr_t, rl_addr_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
+    for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
+                                        r !=  next_hops.end(); r++) {
         map<string, Neighbor*>::iterator neigh;
         string neigh_name;
 
@@ -324,16 +322,16 @@ uipcp_rib::pduft_sync()
         }
 
         neigh_name = static_cast<string>(
-                                lookup_neighbor_by_address(r->second));
+                                rib->lookup_neighbor_by_address(r->second));
         if (neigh_name == string()) {
             UPE(uipcp, "Could not find neighbor with address %lu\n",
                     (long unsigned)r->second);
             continue;
         }
 
-        neigh = neighbors.find(neigh_name);
+        neigh = rib->neighbors.find(neigh_name);
 
-        if (neigh == neighbors.end()) {
+        if (neigh == rib->neighbors.end()) {
             UPE(uipcp, "Could not find neighbor with name %s\n",
                     neigh_name.c_str());
             continue;
@@ -350,8 +348,8 @@ uipcp_rib::pduft_sync()
     }
 
     /* Generate PDUFT entries. */
-    for (map<rl_addr_t, rl_addr_t>::iterator r = spe.next_hops.begin();
-                                        r !=  spe.next_hops.end(); r++) {
+    for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
+                                        r != next_hops.end(); r++) {
             rl_port_t port_id = next_hop_to_port_id[r->second];
             int ret = uipcp_pduft_set(uipcp, uipcp->id, r->first,
                                       port_id);
@@ -365,6 +363,14 @@ uipcp_rib::pduft_sync()
     }
 
     return 0;
+}
+
+void
+RoutingEngine::update_kernel_routing(rl_addr_t addr)
+{
+    assert(rib != NULL);
+    compute_next_hops(addr);
+    compute_fwd_table();
 }
 
 void
@@ -405,8 +411,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     if (discarded) {
         /* Update the routing table. */
-        rib->spe.run(rib->myaddr);
-        rib->pduft_sync();
+        rib->re.update_kernel_routing(rib->myaddr);
     }
 
     /* Reschedule */
@@ -439,8 +444,7 @@ uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
 
     if (lfl.flows.size()) {
         /* Update the routing table. */
-        spe.run(new_addr);
-        pduft_sync();
+        re.update_kernel_routing(new_addr);
     }
 
 }

@@ -178,17 +178,22 @@ private:
     const NeighFlow *_mgmt_conn() const;
 };
 
-/* Shortest Path algorithm. */
-class SPEngine {
+class RoutingEngine {
 public:
-    SPEngine() : rib(NULL) { };
-    SPEngine(struct uipcp_rib *r) : rib(r) { }
-    int run(rl_addr_t);
+    RoutingEngine() : rib(NULL) { };
+    RoutingEngine(struct uipcp_rib *r) : rib(r) { }
 
-    /* The routing table computed by run(). */
-    std::map<rl_addr_t, rl_addr_t> next_hops;
+    /* Recompute routing and forwarding table and possibly
+     * update kernel forwarding data structures. */
+    void update_kernel_routing(rl_addr_t);
 
 private:
+    /* Step 1. Shortest Path algorithm. */
+    int compute_next_hops(rl_addr_t);
+
+    /* Step 2. Forwarding table computation and kernel update. */
+    int compute_fwd_table();
+
     struct Edge {
         rl_addr_t to;
         unsigned int cost;
@@ -204,6 +209,9 @@ private:
 
     std::map<rl_addr_t, std::list<Edge> > graph;
     std::map<rl_addr_t, Info> info;
+
+    /* The routing table computed by compute_next_hops(). */
+    std::map<rl_addr_t, rl_addr_t> next_hops;
 
     struct uipcp_rib *rib;
 };
@@ -271,7 +279,7 @@ struct uipcp_rib {
     /* Lower Flow Database. */
     std::map< rl_addr_t, std::map<rl_addr_t, LowerFlow > > lfdb;
 
-    SPEngine spe;
+    RoutingEngine re;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
@@ -311,7 +319,6 @@ struct uipcp_rib {
                                      NeighFlow **nfp);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
-    int pduft_sync();
     rl_addr_t addr_allocate();
     void neigh_flow_prune(NeighFlow *nf);
 

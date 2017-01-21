@@ -303,7 +303,7 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd)
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          self_registered(false),
                                          self_registration_needed(false),
-                                         myaddr(0), spe(this)
+                                         myaddr(0), re(this)
 {
     int ret;
 
