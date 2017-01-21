@@ -233,6 +233,9 @@ int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 int uipcp_pduft_set(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
                     rl_addr_t dst_addr, rl_port_t local_port);
 
+int uipcp_pduft_del(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
+                    rl_addr_t dst_addr, rl_port_t local_port);
+
 int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,

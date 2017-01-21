@@ -430,11 +430,11 @@ RoutingEngine::compute_fwd_table()
 
             ret = uipcp_pduft_set(uipcp, uipcp->id, f->first, f->second);
             if (ret) {
-                UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry\n",
-                    (long unsigned)f->first, f->second);
+                UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry [%s]\n",
+                    (long unsigned)f->first, f->second, strerror(errno));
                 f->second = 0; /* trigger re insertion next time */
             } else {
-                UPD(uipcp, "Add PDUFT entry %lu --> %u\n",
+                UPD(uipcp, "Set PDUFT entry %lu --> %u\n",
                     (long unsigned)f->first, f->second);
             }
     }
@@ -442,8 +442,20 @@ RoutingEngine::compute_fwd_table()
     /* Remove old PDUFT entries. */
     for (map<rl_addr_t, rl_port_t>::iterator f = next_ports.begin();
                                         f != next_ports.end(); f++) {
-            if (next_ports_new.count(f->first) == 0) {
-                /* TODO implement removal */
+            int ret;
+
+            if (next_ports_new.count(f->first) > 0) {
+                /* This old entry still exists, nothing to do. */
+                continue;
+            }
+
+            ret = uipcp_pduft_del(uipcp, uipcp->id, f->first, f->second);
+            if (ret) {
+                UPE(uipcp, "Failed to delete %lu --> %u PDUFT entry [%s]\n",
+                    (long unsigned)f->first, f->second, strerror(errno));
+            } else {
+                UPD(uipcp, "Delete PDUFT entry %lu --> %u\n",
+                    (long unsigned)f->first, f->second);
             }
     }
 
