@@ -380,28 +380,24 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 int
 RoutingEngine::compute_fwd_table()
 {
-    map<rl_addr_t, rl_port_t> next_hop_to_port_id;
+    map<rl_addr_t, rl_port_t> next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
 
     /* Flush previous entries. */
     uipcp_pduft_flush(uipcp, uipcp->id);
 
-    /* Precompute the port-ids corresponding to all the possible
-     * next-hops. */
+    /* Compute the forwarding table by translating the next-hop address
+     * into a port-id towards the next-hop. */
     for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
                                         r !=  next_hops.end(); r++) {
         map<string, Neighbor*>::iterator neigh;
         string neigh_name;
 
-        if (next_hop_to_port_id.count(r->second)) {
-            continue;
-        }
-
         neigh_name = static_cast<string>(
-                                rib->lookup_neighbor_by_address(r->second));
+                            rib->lookup_neighbor_by_address(r->second));
         if (neigh_name == string()) {
             UPE(uipcp, "Could not find neighbor with address %lu\n",
-                    (long unsigned)r->second);
+                        (long unsigned)r->second);
             continue;
         }
 
@@ -419,24 +415,25 @@ RoutingEngine::compute_fwd_table()
             continue;
         }
 
-        /* Just take one for now. */
-        next_hop_to_port_id[r->second] = neigh->second->mgmt_conn()->port_id;
+        /* Just take one of the flows for now. */
+        next_ports_new[r->first] = neigh->second->mgmt_conn()->port_id;
     }
 
     /* Generate PDUFT entries. */
-    for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
-                                        r != next_hops.end(); r++) {
-            rl_port_t port_id = next_hop_to_port_id[r->second];
-            int ret = uipcp_pduft_set(uipcp, uipcp->id, r->first,
-                                      port_id);
+    for (map<rl_addr_t, rl_port_t>::iterator f = next_ports_new.begin();
+                                        f != next_ports_new.end(); f++) {
+            int ret = uipcp_pduft_set(uipcp, uipcp->id, f->first,
+                                      f->second);
             if (ret) {
                 UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry\n",
-                    (long unsigned)r->first, port_id);
+                    (long unsigned)f->first, f->second);
             } else {
                 UPV(uipcp, "Add PDUFT entry %lu --> %u\n",
-                    (long unsigned)r->first, port_id);
+                    (long unsigned)f->first, f->second);
             }
     }
+
+    next_ports = next_ports_new;
 
     return 0;
 }
@@ -445,7 +442,13 @@ void
 RoutingEngine::update_kernel_routing(rl_addr_t addr)
 {
     assert(rib != NULL);
+
+    /* Step 1: Run a shortest path algorithm. This phase produces the
+     * 'next_hops' routing table. */
     compute_next_hops(addr);
+
+    /* Step 2: Using the 'next_hops' routing table, compute forwarding table
+     * (in userspace) and update the corresponding kernel data structure. */
     compute_fwd_table();
 }
 

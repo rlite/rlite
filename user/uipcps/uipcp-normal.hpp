@@ -213,6 +213,9 @@ private:
     /* The routing table computed by compute_next_hops(). */
     std::map<rl_addr_t, rl_addr_t> next_hops;
 
+    /* The forwarding table computed by compute_fwd_table(). */
+    std::map<rl_addr_t, rl_port_t> next_ports;
+
     struct uipcp_rib *rib;
 };
 
