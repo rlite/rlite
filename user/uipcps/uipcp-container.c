@@ -66,7 +66,7 @@ int
 uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                 rl_addr_t dst_addr, rl_port_t local_port)
 {
-    struct rl_kmsg_ipcp_pduft_set req;
+    struct rl_kmsg_ipcp_pduft_mod req;
     int ret;
 
     /* Create a request message. */

@@ -57,6 +57,7 @@ enum {
     RLITE_KER_FLOW_CFG_UPDATE, /* 24 */
     RLITE_KER_IPCP_QOS_SUPPORTED, /* 25 */
     RLITE_KER_APPL_MOVE, /* 26 */
+    RLITE_KER_IPCP_PDUFT_DEL, /* 27 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -227,8 +228,9 @@ struct rl_kmsg_ipcp_config {
     char *value;
 } __attribute__((packed));
 
-/* application --> kernel to set an IPCP PDUFT (PDU Forwarding Table) entry. */
-struct rl_kmsg_ipcp_pduft_set {
+/* application --> kernel to modifty an IPCP PDUFT
+ * (PDU Forwarding Table) entry. */
+struct rl_kmsg_ipcp_pduft_mod {
     rl_msg_t msg_type;
     uint32_t event_id;
 

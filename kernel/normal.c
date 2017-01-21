@@ -829,19 +829,45 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
     return 0;
 }
 
+static void
+pduft_entry_unlink(struct pduft_entry *entry)
+{
+    list_del_init(&entry->fnode);
+    hash_del(&entry->node);
+}
+
 static int
 rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
 
     write_lock_bh(&priv->pduft_lock);
-    list_del_init(&entry->fnode);
-    hash_del(&entry->node);
+    pduft_entry_unlink(entry);
     write_unlock_bh(&priv->pduft_lock);
 
     kfree(entry);
 
     return 0;
+}
+
+static int
+rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rl_addr_t dst_addr)
+{
+    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
+    struct pduft_entry *entry;
+
+    write_lock_bh(&priv->pduft_lock);
+    entry = pduft_lookup_internal(priv, dst_addr);
+    if (entry) {
+        pduft_entry_unlink(entry);
+    }
+    write_unlock_bh(&priv->pduft_lock);
+
+    if (entry) {
+        kfree(entry);
+    }
+
+    return (entry != NULL) ? 0 : -1;
 }
 
 static int
@@ -1479,6 +1505,7 @@ static struct ipcp_factory normal_factory = {
     .ops.pduft_set          = rl_normal_pduft_set,
     .ops.pduft_flush        = rl_normal_pduft_flush,
     .ops.pduft_del          = rl_normal_pduft_del,
+    .ops.pduft_del_addr     = rl_normal_pduft_del_addr,
     .ops.mgmt_sdu_build     = rl_normal_mgmt_sdu_build,
     .ops.sdu_rx             = rl_normal_sdu_rx,
     .ops.flow_get_stats     = rl_normal_flow_get_stats,

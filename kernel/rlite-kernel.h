@@ -268,6 +268,7 @@ struct ipcp_ops {
     int (*pduft_set)(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
+    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rl_addr_t dst_addr);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
                           const struct rl_mgmt_hdr *hdr,

@@ -80,7 +80,10 @@ struct rl_msg_layout rl_ker_numtables[] = {
         .strings = 2,
     },
     [RLITE_KER_IPCP_PDUFT_SET] = {
-        .copylen = sizeof(struct rl_kmsg_ipcp_pduft_set),
+        .copylen = sizeof(struct rl_kmsg_ipcp_pduft_mod),
+    },
+    [RLITE_KER_IPCP_PDUFT_DEL] = {
+        .copylen = sizeof(struct rl_kmsg_ipcp_pduft_mod),
     },
     [RLITE_KER_IPCP_PDUFT_FLUSH] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_pduft_flush),

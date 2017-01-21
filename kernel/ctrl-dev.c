@@ -200,7 +200,8 @@ rl_ipcp_factory_register(struct ipcp_factory *factory)
         goto out;
     }
 
-    if (factory->ops.pduft_set && ! factory->ops.pduft_del) {
+    if (factory->ops.pduft_set && (!factory->ops.pduft_del ||
+                            !factory->ops.pduft_del_addr)) {
         ret = -EINVAL;
         goto out;
     }
@@ -1607,10 +1608,10 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 }
 
 static int
-rl_ipcp_pduft_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
-    struct rl_kmsg_ipcp_pduft_set *req =
-                    (struct rl_kmsg_ipcp_pduft_set *)bmsg;
+    struct rl_kmsg_ipcp_pduft_mod *req =
+                    (struct rl_kmsg_ipcp_pduft_mod *)bmsg;
     struct ipcp_entry *ipcp;
     struct flow_entry *flow;
     int ret = -EINVAL;  /* Report failure by default. */
@@ -1624,7 +1625,11 @@ rl_ipcp_pduft_set(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
          * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
          * In this situation we are sure that 'ipcp' will not be deleted before
          * 'flow' is deleted, so we can rely on the internal pduft lock. */
-        ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
+        if (req->msg_type == RLITE_KER_IPCP_PDUFT_SET) {
+            ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
+        } else { /* RLITE_KER_IPCP_PDUFT_DEL */
+            ret = ipcp->ops.pduft_del_addr(ipcp, req->dst_addr);
+        }
         mutex_unlock(&ipcp->lock);
     }
 
@@ -2453,7 +2458,8 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_DESTROY] = rl_ipcp_destroy,
     [RLITE_KER_FLOW_FETCH] = rl_flow_fetch,
     [RLITE_KER_IPCP_CONFIG] = rl_ipcp_config,
-    [RLITE_KER_IPCP_PDUFT_SET] = rl_ipcp_pduft_set,
+    [RLITE_KER_IPCP_PDUFT_SET] = rl_ipcp_pduft_mod,
+    [RLITE_KER_IPCP_PDUFT_DEL] = rl_ipcp_pduft_mod,
     [RLITE_KER_IPCP_PDUFT_FLUSH] = rl_ipcp_pduft_flush,
     [RLITE_KER_APPL_REGISTER] = rl_appl_register,
     [RLITE_KER_APPL_REGISTER_RESP] = rl_appl_register_resp,
