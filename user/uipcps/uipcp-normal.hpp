@@ -181,8 +181,9 @@ private:
 /* Shortest Path algorithm. */
 class SPEngine {
 public:
-    SPEngine() {};
-    int run(rl_addr_t, struct uipcp_rib *rib);
+    SPEngine() : rib(NULL) { };
+    SPEngine(struct uipcp_rib *r) : rib(r) { }
+    int run(rl_addr_t);
 
     /* The routing table computed by run(). */
     std::map<rl_addr_t, rl_addr_t> next_hops;
@@ -203,6 +204,8 @@ private:
 
     std::map<rl_addr_t, std::list<Edge> > graph;
     std::map<rl_addr_t, Info> info;
+
+    struct uipcp_rib *rib;
 };
 
 class ScopeLock {

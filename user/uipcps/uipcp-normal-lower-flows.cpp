@@ -186,7 +186,7 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        spe.run(myaddr, this);
+        spe.run(myaddr);
         pduft_sync();
     }
 
@@ -194,8 +194,10 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 int
-SPEngine::run(rl_addr_t local_addr, struct uipcp_rib *rib)
+SPEngine::run(rl_addr_t local_addr)
 {
+    assert(rib != NULL);
+
     /* Clean up state left from the previous run. */
     next_hops.clear();
     graph.clear();
@@ -403,7 +405,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     if (discarded) {
         /* Update the routing table. */
-        rib->spe.run(rib->myaddr, rib);
+        rib->spe.run(rib->myaddr);
         rib->pduft_sync();
     }
 
@@ -437,7 +439,7 @@ uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
 
     if (lfl.flows.size()) {
         /* Update the routing table. */
-        spe.run(new_addr, this);
+        spe.run(new_addr);
         pduft_sync();
     }
 
