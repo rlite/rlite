@@ -192,6 +192,82 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
+void
+uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
+{
+    LowerFlowList lfl;
+
+    /* Update local entries and propagate them. */
+    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::iterator
+            it = lfdb.begin(); it != lfdb.end(); it++) {
+        for (map<rl_addr_t, LowerFlow>::iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+            LowerFlow &flow = jt->second;
+
+            if (flow.local_addr == myaddr) {
+                flow.local_addr = new_addr;
+                flow.seqnum ++;
+                lfl.flows.push_back(flow);
+                UPD(uipcp, "Local lower flow entry updated: %s\n",
+                           static_cast<string>(flow).c_str());
+            }
+        }
+    }
+
+    if (lfl.flows.size()) {
+        /* Update the routing table. */
+        re.update_kernel_routing(new_addr);
+    }
+
+}
+
+void
+age_incr_cb(struct uipcp *uipcp, void *arg)
+{
+    struct uipcp_rib *rib = (struct uipcp_rib *)arg;
+    ScopeLock(rib->lock);
+    bool discarded = false;
+
+    for (map<rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it
+                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+        list<map<rl_addr_t, LowerFlow >::iterator> discard_list;
+
+        if (it->first == rib->myaddr) {
+            /* Don't age local entries, we pretend they
+             * are always refreshed. */
+            continue;
+        }
+
+        for (map<rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+            jt->second.age += RL_AGE_INCR_INTERVAL;
+
+            if (jt->second.age > RL_AGE_MAX) {
+                /* Insert this into the list of entries to be discarded. */
+                discard_list.push_back(jt);
+                discarded = true;
+            }
+        }
+
+        for (list<map<rl_addr_t, LowerFlow >::iterator>::iterator dit
+                    = discard_list.begin(); dit != discard_list.end(); dit++) {
+            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+                            static_cast<string>((*dit)->second).c_str());
+            it->second.erase(*dit);
+        }
+    }
+
+    if (discarded) {
+        /* Update the routing table. */
+        rib->re.update_kernel_routing(rib->myaddr);
+    }
+
+    /* Reschedule */
+    rib->age_incr_tmrid = uipcp_loop_schedule(uipcp,
+                                        RL_AGE_INCR_INTERVAL * 1000,
+                                        age_incr_cb, rib);
+}
+
 int
 RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 {
@@ -371,81 +447,5 @@ RoutingEngine::update_kernel_routing(rl_addr_t addr)
     assert(rib != NULL);
     compute_next_hops(addr);
     compute_fwd_table();
-}
-
-void
-age_incr_cb(struct uipcp *uipcp, void *arg)
-{
-    struct uipcp_rib *rib = (struct uipcp_rib *)arg;
-    ScopeLock(rib->lock);
-    bool discarded = false;
-
-    for (map<rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it
-                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
-        list<map<rl_addr_t, LowerFlow >::iterator> discard_list;
-
-        if (it->first == rib->myaddr) {
-            /* Don't age local entries, we pretend they
-             * are always refreshed. */
-            continue;
-        }
-
-        for (map<rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
-                                                jt != it->second.end(); jt++) {
-            jt->second.age += RL_AGE_INCR_INTERVAL;
-
-            if (jt->second.age > RL_AGE_MAX) {
-                /* Insert this into the list of entries to be discarded. */
-                discard_list.push_back(jt);
-                discarded = true;
-            }
-        }
-
-        for (list<map<rl_addr_t, LowerFlow >::iterator>::iterator dit
-                    = discard_list.begin(); dit != discard_list.end(); dit++) {
-            UPI(rib->uipcp, "Discarded lower-flow %s\n",
-                            static_cast<string>((*dit)->second).c_str());
-            it->second.erase(*dit);
-        }
-    }
-
-    if (discarded) {
-        /* Update the routing table. */
-        rib->re.update_kernel_routing(rib->myaddr);
-    }
-
-    /* Reschedule */
-    rib->age_incr_tmrid = uipcp_loop_schedule(uipcp,
-                                        RL_AGE_INCR_INTERVAL * 1000,
-                                        age_incr_cb, rib);
-}
-
-void
-uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
-{
-    LowerFlowList lfl;
-
-    /* Update local entries and propagate them. */
-    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::iterator
-            it = lfdb.begin(); it != lfdb.end(); it++) {
-        for (map<rl_addr_t, LowerFlow>::iterator jt = it->second.begin();
-                                                jt != it->second.end(); jt++) {
-            LowerFlow &flow = jt->second;
-
-            if (flow.local_addr == myaddr) {
-                flow.local_addr = new_addr;
-                flow.seqnum ++;
-                lfl.flows.push_back(flow);
-                UPD(uipcp, "Local lower flow entry updated: %s\n",
-                           static_cast<string>(flow).c_str());
-            }
-        }
-    }
-
-    if (lfl.flows.size()) {
-        /* Update the routing table. */
-        re.update_kernel_routing(new_addr);
-    }
-
 }
 
