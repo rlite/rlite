@@ -430,12 +430,17 @@ RoutingEngine::compute_fwd_table()
 
             ret = uipcp_pduft_set(uipcp, uipcp->id, f->first, f->second);
             if (ret) {
-                UPE(uipcp, "Failed to insert %lu --> %u PDUFT entry [%s]\n",
-                    (long unsigned)f->first, f->second, strerror(errno));
+                UPE(uipcp, "Failed to insert %lu --> %lu (port=%u) PDUFT "
+                           "entry [%s]\n",
+                           (long unsigned)f->first,
+                           (long unsigned)next_hops[f->first],
+                           f->second, strerror(errno));
                 f->second = 0; /* trigger re insertion next time */
             } else {
-                UPD(uipcp, "Set PDUFT entry %lu --> %u\n",
-                    (long unsigned)f->first, f->second);
+                UPD(uipcp, "Set PDUFT entry %lu --> %lu (port=%u)\n",
+                           (long unsigned)f->first,
+                           (long unsigned)next_hops[f->first],
+                           f->second);
             }
     }
 
@@ -451,10 +456,11 @@ RoutingEngine::compute_fwd_table()
 
             ret = uipcp_pduft_del(uipcp, uipcp->id, f->first, f->second);
             if (ret) {
-                UPE(uipcp, "Failed to delete %lu --> %u PDUFT entry [%s]\n",
-                    (long unsigned)f->first, f->second, strerror(errno));
+                UPE(uipcp, "Failed to delete PDUFT entry for %lu "
+                           "(port=%u) [%s]\n", (long unsigned)f->first,
+                           f->second, strerror(errno));
             } else {
-                UPD(uipcp, "Delete PDUFT entry %lu --> %u\n",
+                UPD(uipcp, "Delete PDUFT entry for %lu (port=%u)\n",
                     (long unsigned)f->first, f->second);
             }
     }
