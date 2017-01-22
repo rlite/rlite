@@ -691,11 +691,7 @@ enroller_default(NeighFlow *nf)
         EnrollmentInfo enr_info(objbuf, objlen);
         CDAPMessage m;
 
-        if (rib->uipcp->uipcps->auto_addr_alloc) {
-            /* Assign an address to the initiator running a distributed
-             * allocation procedure. */
-            enr_info.address = rib->addr_allocate();
-        }
+        enr_info.address = rib->addr_allocate();
 
         m.m_start_r(gpb::F_NO_FLAGS, 0, string());
         m.obj_class = obj_class::enrollment;

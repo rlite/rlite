@@ -552,19 +552,34 @@ uipcp_rib::dump() const
     return strdup(ss.str().c_str());
 }
 
+void
+uipcp_rib::update_address(rl_addr_t new_addr)
+{
+    if (myaddr == new_addr) {
+        return;
+    }
+
+    dft_update_address(new_addr);
+    lfdb_update_address(new_addr);
+    UPD(uipcp, "Address updated %lu --> %lu\n",
+               (long unsigned)myaddr, (long unsigned)new_addr);
+    myaddr = new_addr; /* do the update */
+}
+
 int
-uipcp_rib::set_address(rl_addr_t address)
+uipcp_rib::set_address(rl_addr_t new_addr)
 {
     stringstream addr_ss;
     int ret;
 
-    addr_ss << address;
+    /* Update the address in kernel-space. */
+    addr_ss << new_addr;
     ret = rl_conf_ipcp_config(uipcp->id, "address", addr_ss.str().c_str());
     if (ret) {
         UPE(uipcp, "Failed to update address to %lu\n",
-                    (unsigned long)address);
+                    (unsigned long)new_addr);
     } else {
-        //normal_update_address();
+        update_address(new_addr);
     }
 
     return ret;
@@ -764,6 +779,14 @@ rl_addr_t
 uipcp_rib::addr_allocate()
 {
     rl_addr_t addr = 0;
+
+    if (!uipcp->uipcps->auto_addr_alloc) {
+        /* Return the void address. */
+        return 0;
+    }
+
+    /* Assign an address to the initiator running a distributed
+     * allocation procedure. */
 
     /* Look for the highest address already in use. */
     for (map<rl_addr_t, AddrAllocRequest>::const_iterator
@@ -1227,14 +1250,7 @@ normal_update_address(struct uipcp *uipcp, rl_addr_t new_addr)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    if (rib->myaddr == new_addr) {
-        return;
-    }
-    rib->dft_update_address(new_addr);
-    rib->lfdb_update_address(new_addr);
-    UPD(uipcp, "Address updated %lu --> %lu\n",
-               (long unsigned)rib->myaddr, (long unsigned)new_addr);
-    rib->myaddr = new_addr; /* do the update */
+    rib->update_address(new_addr);
 }
 
 static int
