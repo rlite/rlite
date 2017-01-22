@@ -674,8 +674,10 @@ for vmname in sorted(vms):
     for dif in dif_ordering:
         if dif not in shims and vmname in difs[dif]:
             outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal %(dif)s.DIF\n'\
-                    '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
-                        % {'dif': dif, 'id': vm['id']}
+                                                                % {'dif': dif, 'id': vm['id']}
+            if not args.auto_addr_alloc:
+                outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
+                                                                % {'dif': dif, 'id': vm['id']}
 
     # Update /etc/hosts file with DIF mappings
     for sh in dns_mappings:
