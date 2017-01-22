@@ -348,6 +348,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          age_incr_cb, this);
     sync_tmrid = uipcp_loop_schedule(uipcp, RL_NEIGH_SYNC_INTVAL * 1000,
                                      sync_timeout_cb, this);
+
+    /* Set a valid address, 0 is the null address. */
+    set_address(1);
 }
 
 uipcp_rib::~uipcp_rib()
@@ -778,7 +781,7 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 rl_addr_t
 uipcp_rib::addr_allocate()
 {
-    rl_addr_t addr = 0;
+    rl_addr_t addr = myaddr; /* exclude my address */
 
     if (!uipcp->uipcps->auto_addr_alloc) {
         /* Return the void address. */
