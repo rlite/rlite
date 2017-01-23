@@ -95,7 +95,7 @@ ipcp_register(struct uipcps *uipcps,
         result = uipcp->ops.register_to_lower(uipcp, req);
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
     return result;
 }
@@ -124,7 +124,7 @@ ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
         ret = uipcp->ops.enroll(uipcp, req, 1);
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
     return ret;
 }
@@ -157,7 +157,7 @@ rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.lower_flow_alloc(uipcp, req, 1);
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
@@ -181,7 +181,7 @@ rl_u_ipcp_dft_set(struct uipcps *uipcps, int sfd,
         resp.result = uipcp->ops.dft_set(uipcp, req);
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
 out:
     return rl_u_response(sfd, RLITE_MB(req), &resp);
@@ -216,7 +216,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         }
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
 out:
     resp.msg_type = RLITE_U_IPCP_RIB_SHOW_RESP;
@@ -409,7 +409,7 @@ periodic_tasks(struct uipcps *uipcps)
 
     /* Drop the references. */
     for (i = 0; i < n; i++) {
-        uipcp_put(tmplist[i], 1);
+        uipcp_put(tmplist[i]);
     }
 
     free(tmplist);

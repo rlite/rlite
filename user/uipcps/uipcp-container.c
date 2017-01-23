@@ -938,13 +938,11 @@ uipcp_del(struct uipcp *uipcp)
 }
 
 int
-uipcp_put(struct uipcp *uipcp, int locked)
+uipcp_put(struct uipcp *uipcp)
 {
     int destroy;
 
-    if (locked) {
-        pthread_mutex_lock(&uipcp->uipcps->lock);
-    }
+    pthread_mutex_lock(&uipcp->uipcps->lock);
 
     uipcp->refcnt--;
     destroy = (uipcp->refcnt == 0) ? 1 : 0;
@@ -954,9 +952,7 @@ uipcp_put(struct uipcp *uipcp, int locked)
         uipcp->uipcps->n_uipcps --;
     }
 
-    if (locked) {
-        pthread_mutex_unlock(&uipcp->uipcps->lock);
-    }
+    pthread_mutex_unlock(&uipcp->uipcps->lock);
 
     if (!destroy) {
         return 0;
@@ -981,9 +977,9 @@ uipcp_put_by_id(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
     pthread_mutex_unlock(&uipcps->lock);
 
     /* Double put to remove it. */
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
-    return uipcp_put(uipcp, 1);
+    return uipcp_put(uipcp);
 }
 
 /* Print the current list of uipcps, used for debugging purposes. */
@@ -1348,7 +1344,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         uipcp->ops.update_address(uipcp, upd->ipcp_addr);
     }
 
-    uipcp_put(uipcp, 1);
+    uipcp_put(uipcp);
 
     if (!mss_changed) {
         return 0;
