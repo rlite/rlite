@@ -458,6 +458,7 @@ ipcp_select_by_dif(const char *dif_name)
 
     if (selected) {
         selected->refcnt++;
+        PV("REFCNT++ %u: %u\n", selected->id, selected->refcnt);
     }
 
     PUNLOCK();
@@ -748,6 +749,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
     PLOCK();
     ipcp->refcnt++;
+    PV("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
     PUNLOCK();
 
     if (ipcp->ops.appl_register) {
@@ -1150,6 +1152,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 
         PLOCK();
         ipcp->refcnt++;
+        PV("REFCNT++ %u: %u\n", ipcp->id, ipcp->refcnt);
         PUNLOCK();
 
         if (flowcfg) {

@@ -454,7 +454,7 @@ struct ipcp_entry * __ipcp_get(rl_ipcp_id_t ipcp_id);
 
 #define ipcp_put(_ie)                                                   \
         ({								\
-            if (_ie) {PV("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt);}   \
+            if (_ie) {PV("REFCNT-- %u: %u\n", _ie->id, _ie->refcnt-1);} \
             __ipcp_put(_ie);                                            \
         })
 
