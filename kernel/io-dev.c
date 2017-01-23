@@ -567,7 +567,7 @@ rl_io_poll(struct file *f, poll_table *wait)
 }
 
 void
-rl_flows_shutdown_by_ipcp(struct ipcp_entry *ipcp)
+rl_iodevs_shutdown_by_ipcp(struct ipcp_entry *ipcp)
 {
     struct rl_io *rio;
 
@@ -577,6 +577,21 @@ rl_flows_shutdown_by_ipcp(struct ipcp_entry *ipcp)
                 rio->flow && rio->flow->txrx.ipcp == ipcp) {
             PD("Shutting down flow %u\n", rio->flow->local_port);
             rl_flow_shutdown(rio->flow);
+        }
+    }
+    IODEVS_UNLOCK();
+}
+
+void
+rl_iodevs_probe_references(struct ipcp_entry *ipcp)
+{
+    struct rl_io *rio;
+
+    IODEVS_LOCK();
+    list_for_each_entry(rio, &rl_iodevs, node) {
+        if (rio->flow && rio->flow->txrx.ipcp == ipcp) {
+            PE("iodev bound to flow %u has dangling reference to ipcp %u\n",
+                rio->flow->local_port, ipcp->id);
         }
     }
     IODEVS_UNLOCK();

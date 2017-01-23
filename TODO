@@ -17,6 +17,4 @@
 
 - periodic DFT synchronization
 
-- implement probe references functionality
-
 - use separate N-1 flows for management and data

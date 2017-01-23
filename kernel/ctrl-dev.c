@@ -1241,6 +1241,41 @@ flow_make_mortal(struct flow_entry *flow)
     FUNLOCK();
 }
 
+static void
+ipcp_probe_references(struct ipcp_entry *ipcp)
+{
+    {
+        struct flow_entry *flow;
+        int bucket;
+
+        FLOCK();
+        hash_for_each(rl_dm.flow_table, bucket, flow, node) {
+            if (flow->txrx.ipcp == ipcp) {
+                PE("Flow %u has a horizontal dangling reference to ipcp %u\n",
+                   flow->local_port, ipcp->id);
+            }
+            if (flow->upper.ipcp == ipcp) {
+                PE("Flow %u has a vertical dangling reference to ipcp %u\n",
+                   flow->local_port, ipcp->id);
+            }
+        }
+        FUNLOCK();
+    }
+
+    {
+        struct registered_appl *appl;
+
+        RALOCK(ipcp);
+        list_for_each_entry(appl, &ipcp->registered_appls, node) {
+            PE("Registered application %s has a dangling reference to "
+                "ipcp %d\n", appl->name, ipcp->id);
+        }
+        RAUNLOCK(ipcp);
+    }
+
+    rl_iodevs_probe_references(ipcp);
+}
+
 int
 __ipcp_put(struct ipcp_entry *entry)
 {
@@ -1291,6 +1326,8 @@ __ipcp_put(struct ipcp_entry *entry)
 
     if (entry->name) kfree(entry->name);
     dif_put(entry->dif);
+
+    ipcp_probe_references(entry);
 
     kfree(entry);
 
@@ -1347,7 +1384,7 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
     }
 
     /* Shutdown all the allocated flows bound by user-space applications. */
-    rl_flows_shutdown_by_ipcp(entry);
+    rl_iodevs_shutdown_by_ipcp(entry);
 
     ret = ipcp_put(entry); /* To let the recount drop to 0. */
 
