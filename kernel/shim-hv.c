@@ -93,14 +93,14 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
                                     RLITE_BUF_DATA(rb), rb->len,
                                     &req, sizeof(req));
         if (ret) {
-            PE("failed to deserialize msg type %u\n", ty);
+            PE("Failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
         ret = rl_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0,
                     req.dst_appl, req.src_appl, NULL, NULL, false);
         if (ret) {
-            PE("failed to report flow allocation request\n");
+            PE("Failed to report flow allocation request\n");
         }
 
     } else if (ty == RLITE_SHIM_HV_FA_RESP) {
@@ -111,7 +111,7 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
                                    RLITE_BUF_DATA(rb), rb->len,
                                    &resp, sizeof(resp));
         if (ret) {
-            PE("failed to deserialize msg type %u\n", ty);
+            PE("Failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
@@ -119,11 +119,11 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
                                     resp.dst_port, 0, 0, resp.response,
                                     NULL, false);
         if (ret) {
-            PE("failed to report flow allocation response\n");
+            PE("Failed to report flow allocation response\n");
         }
 
     } else {
-        PE("unknown ctrl msg type %u\n", ty);
+        PE("Unknown ctrl msg type %u\n", ty);
     }
 
 des_fail:

@@ -442,6 +442,11 @@ ipcp_select_by_dif(const char *dif_name)
 
     /* Linear scan is not efficient, but let's stick to that for now. */
     hash_for_each(rl_dm.ipcp_table, bucket, entry, node) {
+        if (entry->flags & RL_K_IPCP_ZOMBIE) {
+            /* Zombie ipcps cannot be selected. */
+            continue;
+        }
+
         if (!dif_name) {
             /* The request does not specify a DIF: select any DIF,
              * giving priority to higher ranked normal DIFs. */
@@ -1098,6 +1103,11 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 {
     struct flow_entry *entry;
     int ret = 0;
+
+    if (ipcp->flags & RL_K_IPCP_ZOMBIE) {
+        /* Zombie ipcps don't accept new flows. */
+        return -ENXIO;
+    }
 
     *pentry = entry = kzalloc(sizeof(*entry), gfp);
     if (!entry) {

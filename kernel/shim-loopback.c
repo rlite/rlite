@@ -163,7 +163,7 @@ flow_allocate_req_work(struct work_struct *w)
                             faw->local_appl, faw->remote_appl, NULL, NULL,
                             false);
     if (ret) {
-        PE("failed to report flow allocation request\n");
+        PE("Failed to report flow allocation request\n");
     }
 
     kfree(faw);

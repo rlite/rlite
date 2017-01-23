@@ -709,7 +709,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
                                 entry->tpa, NULL, NULL, false);
 
         if (ret) {
-            PD("Out of memory\n");
+            PD("Failed to report flow allocation request\n");
             goto drop;
         }
 
