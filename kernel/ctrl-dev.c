@@ -1346,6 +1346,9 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
         }
     }
 
+    /* Shutdown all the allocated flows bound by user-space applications. */
+    rl_flows_shutdown_by_ipcp(entry);
+
     ret = ipcp_put(entry); /* To let the recount drop to 0. */
 
     return ret;

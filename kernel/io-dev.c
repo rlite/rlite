@@ -38,6 +38,13 @@
 #include <linux/spinlock.h>
 #include <asm/compat.h>
 
+
+LIST_HEAD(rl_iodevs);
+DEFINE_MUTEX(rl_iodevs_lock);
+
+#define IODEVS_LOCK() mutex_lock(&rl_iodevs_lock)
+#define IODEVS_UNLOCK() mutex_unlock(&rl_iodevs_lock)
+
 #if 0
 static const char *
 hms_time(void)
@@ -54,9 +61,6 @@ hms_time(void)
     return tbuf;
 }
 #endif
-
-LIST_HEAD(rl_iodevs);
-DEFINE_MUTEX(rl_iodevs_lock);
 
 void
 tx_completion_func(unsigned long arg)
@@ -273,9 +277,9 @@ rl_io_open(struct inode *inode, struct file *f)
     }
 
     f->private_data = rio;
-    mutex_lock(&rl_iodevs_lock);
+    IODEVS_LOCK();
     list_add_tail(&rio->node, &rl_iodevs);
-    mutex_unlock(&rl_iodevs_lock);
+    IODEVS_UNLOCK();
 
     return 0;
 }
@@ -540,7 +544,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     unsigned int mask = 0;
 
     if (unlikely(!txrx)) {
-        return mask;
+        return POLLERR;
     }
 
     poll_wait(f, &txrx->rx_wqh, wait);
@@ -562,6 +566,22 @@ rl_io_poll(struct file *f, poll_table *wait)
     return mask;
 }
 
+void
+rl_flows_shutdown_by_ipcp(struct ipcp_entry *ipcp)
+{
+    struct rl_io *rio;
+
+    IODEVS_LOCK();
+    list_for_each_entry(rio, &rl_iodevs, node) {
+        if (rio->mode == RLITE_IO_MODE_APPL_BIND &&
+                rio->flow && rio->flow->txrx.ipcp == ipcp) {
+            PD("Shutting down flow %u\n", rio->flow->local_port);
+            rl_flow_shutdown(rio->flow);
+        }
+    }
+    IODEVS_UNLOCK();
+}
+
 static long
 rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
 {
@@ -574,8 +594,10 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
     }
 
     /* Bind the flow to this file descriptor. */
+    IODEVS_LOCK();
     rio->flow = flow;
     rio->txrx = &flow->txrx;
+    IODEVS_UNLOCK();
 
     /* Make sure this flow can ever be destroyed. */
     flow_make_mortal(flow);
@@ -628,10 +650,12 @@ rl_io_release_internal(struct rl_io *rio)
         case RLITE_IO_MODE_APPL_BIND:
             /* A previous flow was bound to this file descriptor,
              * so let's unbind from it. */
+            IODEVS_LOCK();
             BUG_ON(!rio->flow);
             flow_put(rio->flow);
             rio->flow = NULL;
             rio->txrx = NULL;
+            IODEVS_UNLOCK();
             break;
 
         case RLITE_IO_MODE_IPCP_MGMT:
@@ -704,9 +728,9 @@ rl_io_release(struct inode *inode, struct file *f)
     struct rl_io *rio = (struct rl_io *)f->private_data;
 
     rl_io_release_internal(rio);
-    mutex_lock(&rl_iodevs_lock);
+    IODEVS_LOCK();
     list_del(&rio->node);
-    mutex_unlock(&rl_iodevs_lock);
+    IODEVS_UNLOCK();
     kfree(rio);
 
     return 0;
