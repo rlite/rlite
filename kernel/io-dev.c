@@ -55,6 +55,9 @@ hms_time(void)
 }
 #endif
 
+LIST_HEAD(rl_iodevs);
+DEFINE_MUTEX(rl_iodevs_lock);
+
 void
 tx_completion_func(unsigned long arg)
 {
@@ -255,6 +258,8 @@ struct rl_io {
     uint8_t mode;
     struct flow_entry *flow;
     struct txrx *txrx;
+
+    struct list_head node;
 };
 
 static int
@@ -268,6 +273,9 @@ rl_io_open(struct inode *inode, struct file *f)
     }
 
     f->private_data = rio;
+    mutex_lock(&rl_iodevs_lock);
+    list_add_tail(&rio->node, &rl_iodevs);
+    mutex_unlock(&rl_iodevs_lock);
 
     return 0;
 }
@@ -696,6 +704,9 @@ rl_io_release(struct inode *inode, struct file *f)
     struct rl_io *rio = (struct rl_io *)f->private_data;
 
     rl_io_release_internal(rio);
+    mutex_lock(&rl_iodevs_lock);
+    list_del(&rio->node);
+    mutex_unlock(&rl_iodevs_lock);
     kfree(rio);
 
     return 0;
