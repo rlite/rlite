@@ -785,6 +785,21 @@ ipcp_application_del(struct ipcp_entry *ipcp, char *appl_name)
     return 0;
 }
 
+/* To be called under RALOCK, l is initialized by the caller. */
+static void
+application_steal(struct registered_appl *appl, struct list_head *l)
+{
+    if (appl->refcnt == 1) {
+        /* Just move the reference. */
+        list_del_init(&appl->node);
+        list_add_tail_safe(&appl->node, l);
+    } else {
+        /* Do what ipcp_application_put() would do, but
+         * without taking the RALOCK. */
+        appl->refcnt--;
+    }
+}
+
 static void
 application_del_by_rc(struct rl_ctrl *rc)
 {
@@ -801,23 +816,12 @@ application_del_by_rc(struct rl_ctrl *rc)
     /* For each IPC processes. */
     hash_for_each(rl_dm.ipcp_table, bucket, ipcp, node) {
         RALOCK(ipcp);
-
         /* For each application registered to this IPC process. */
-        list_for_each_entry_safe(app, tmp,
-                &ipcp->registered_appls, node) {
+        list_for_each_entry_safe(app, tmp, &ipcp->registered_appls, node) {
             if (app->rc == rc) {
-                if (app->refcnt == 1) {
-                    /* Just move the reference. */
-                    list_del_init(&app->node);
-                    list_add_tail_safe(&app->node, &remove_apps);
-                } else {
-                    /* Do what ipcp_application_put() would do, but
-                     * without taking the regapp_lock. */
-                    app->refcnt--;
-                }
+                application_steal(app, &remove_apps);
             }
         }
-
         RAUNLOCK(ipcp);
 
         /* If the control device to be deleted is an uipcp attached to
@@ -834,8 +838,7 @@ application_del_by_rc(struct rl_ctrl *rc)
     /* Remove the selected applications without holding locks (we are in
      * process context here). */
     list_for_each_entry_safe(app, tmp, &remove_apps, node) {
-        PD("Application %s will be automatically "
-                "unregistered\n", app->name);
+        PD("Application %s will be automatically unregistered\n", app->name);
 
         /* Notify userspace IPCP if needed. */
         if (app->state == APPL_REG_COMPLETE && app->ipcp->uipcp) {
@@ -1205,13 +1208,8 @@ flow_rc_unbind(struct rl_ctrl *rc)
                 flow_put(flow);
             } else {
                 /* If no rl_io device binds to this allocated flow,
-                 * the associated memory will never be released.
-                 * Two solutions:
-                 *      (a) - When the flows transitions into allocated
-                 *            state, start a timer that delete the
-                 *            flow if its refcnt is still zero.
-                 *      (b) - Delete the flow here if refcnt is
-                 *            still zero.
+                 * the RL_FLOW_NEVER_BOUND flags remains set and the
+                 * flow will be automatically destroyed after a while
                  */
             }
         }
@@ -1328,6 +1326,25 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
         return -ENXIO;
     }
     entry->flags |= RL_K_IPCP_ZOMBIE;
+
+    /* Unregister all the applications associated to this IPCP. */
+    {
+        struct list_head remove_apps;
+        struct registered_appl *app;
+        struct registered_appl *tmp;
+
+        INIT_LIST_HEAD(&remove_apps);
+        RALOCK(entry);
+        list_for_each_entry_safe(app, tmp, &entry->registered_appls, node) {
+            application_steal(app, &remove_apps);
+        }
+        RAUNLOCK(entry);
+        list_for_each_entry_safe(app, tmp, &remove_apps, node) {
+            PD("Application %s will be automatically unregistered\n",
+               app->name);
+            ipcp_application_put(app);
+        }
+    }
 
     ret = ipcp_put(entry); /* To let the recount drop to 0. */
 
