@@ -380,12 +380,24 @@ static void
 periodic_tasks(struct uipcps *uipcps)
 {
     struct uipcp *uipcp;
+    struct uipcp **tmplist;
+    int n, i = 0;
 
     /* Get a reference to each uipcp. */
     pthread_mutex_lock(&uipcps->lock);
+    n = uipcps->n_uipcps;
+    tmplist = malloc(n * sizeof(struct uipcp *));
+    if (!tmplist) {
+        pthread_mutex_unlock(&uipcps->lock);
+        PE("Out of memory\n");
+        return;
+    }
+
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         uipcp->refcnt++;
+        tmplist[i++] = uipcp;
     }
+    assert(i == n);
     pthread_mutex_unlock(&uipcps->lock);
 
     /* Carry out tasks outside the uipcps lock. */
@@ -395,12 +407,12 @@ periodic_tasks(struct uipcps *uipcps)
         }
     }
 
-    /* Drop the references and reschedule. */
-    pthread_mutex_lock(&uipcps->lock);
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        uipcp_put(uipcp, 0);
+    /* Drop the references. */
+    for (i = 0; i < n; i++) {
+        uipcp_put(tmplist[i], 1);
     }
-    pthread_mutex_unlock(&uipcps->lock);
+
+    free(tmplist);
 }
 
 static void *
@@ -499,19 +511,16 @@ sigint_handler(int signum)
 
     PI("Signal %d received, terminating...\n", signum);
 
-    /* We need to destroy all the IPCPs. This requires to take the uipcps
-     * lock, but this lock may be already taken; we therefore trylock
-     * without checking the return value. */
-    pthread_mutex_trylock(&uipcps->lock);
+    /* We need to destroy all the IPCPs. This would requires to take
+     * the uipcps lock, but this lock may be already taken. */
     list_for_each_entry_safe(uipcp, tmp, &uipcps->uipcps, node) {
         if (!uipcp_is_kernelspace(uipcp)) {
             rl_ipcp_id_t uid = uipcp->id;
 
-            uipcp_put(uipcp, 0);
+            uipcp_del(uipcp);
             rl_conf_ipcp_destroy(uid);
         }
     }
-    pthread_mutex_unlock(&uipcps->lock);
 
     unlink(RLITE_UIPCPS_UNIX_NAME);
     print_backtrace();
@@ -695,6 +704,7 @@ int main(int argc, char **argv)
     list_init(&uipcps->uipcps);
     pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcp_nodes);
+    uipcps->n_uipcps = 0;
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the uipcp server. */

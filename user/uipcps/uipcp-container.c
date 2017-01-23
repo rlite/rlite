@@ -800,6 +800,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto err1;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
+    uipcps->n_uipcps ++;
     pthread_mutex_unlock(&uipcps->lock);
 
     uipcp->uipcps = uipcps;
@@ -868,6 +869,7 @@ err3:
 err2:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
+    uipcps->n_uipcps --;
 err1:
     pthread_mutex_unlock(&uipcps->lock);
     free(uipcp);
@@ -876,30 +878,10 @@ err1:
 }
 
 int
-uipcp_put(struct uipcp *uipcp, int locked)
+uipcp_del(struct uipcp *uipcp)
 {
     int kernelspace = 0;
-    int destroy;
     int ret = 0;
-
-    if (locked) {
-        pthread_mutex_lock(&uipcp->uipcps->lock);
-    }
-
-    uipcp->refcnt--;
-    destroy = (uipcp->refcnt == 0) ? 1 : 0;
-
-    if (destroy) {
-        list_del(&uipcp->node);
-    }
-
-    if (locked) {
-        pthread_mutex_unlock(&uipcp->uipcps->lock);
-    }
-
-    if (!destroy) {
-        return 0;
-    }
 
     kernelspace = uipcp_is_kernelspace(uipcp);
 
@@ -909,6 +891,8 @@ uipcp_put(struct uipcp *uipcp, int locked)
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));
         }
+
+        uipcp->ops.fini(uipcp);
 
         {
             /* Clean up the timer_events list. */
@@ -934,8 +918,6 @@ uipcp_put(struct uipcp *uipcp, int locked)
 
         close(uipcp->eventfd);
         close(uipcp->cfd);
-
-        uipcp->ops.fini(uipcp);
     }
 
     if (uipcp->dif_type) free(uipcp->dif_type);
@@ -956,23 +938,52 @@ uipcp_put(struct uipcp *uipcp, int locked)
 }
 
 int
+uipcp_put(struct uipcp *uipcp, int locked)
+{
+    int destroy;
+
+    if (locked) {
+        pthread_mutex_lock(&uipcp->uipcps->lock);
+    }
+
+    uipcp->refcnt--;
+    destroy = (uipcp->refcnt == 0) ? 1 : 0;
+
+    if (destroy) {
+        list_del(&uipcp->node);
+        uipcp->uipcps->n_uipcps --;
+    }
+
+    if (locked) {
+        pthread_mutex_unlock(&uipcp->uipcps->lock);
+    }
+
+    if (!destroy) {
+        return 0;
+    }
+
+    return uipcp_del(uipcp);
+}
+
+int
 uipcp_put_by_id(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *uipcp;
-    int ret = 0;
 
     pthread_mutex_lock(&uipcps->lock);
     uipcp = uipcp_lookup(uipcps, ipcp_id);
     if (!uipcp) {
-        /* The specified IPCP is a Shim IPCP. */
-        goto out;
+        pthread_mutex_unlock(&uipcps->lock);
+        PE("Could not find uipcp %u\n", ipcp_id);
+        return 0;
     }
-
-    ret = uipcp_put(uipcp, 0);
-out:
+    uipcp->refcnt ++;
     pthread_mutex_unlock(&uipcps->lock);
 
-    return ret;
+    /* Double put to remove it. */
+    uipcp_put(uipcp, 1);
+
+    return uipcp_put(uipcp, 1);
 }
 
 /* Print the current list of uipcps, used for debugging purposes. */
