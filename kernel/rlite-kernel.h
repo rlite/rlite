@@ -430,7 +430,8 @@ struct flow_entry {
     void                *priv;
 
     struct rl_flow_stats stats;
-    struct delayed_work remove;
+    struct list_head    node_rm; /* for flows_removeq */
+    unsigned            expires; /* absolute time in jiffies */
     unsigned int        refcnt;
 #define RL_FLOW_NEVER_BOUND     (1 << 0) /* flow was never bound with ioctl */
 #define RL_FLOW_PENDING         (1 << 1) /* flow allocation is pending */

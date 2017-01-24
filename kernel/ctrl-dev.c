@@ -147,6 +147,11 @@ struct rl_dm {
     struct list_head appl_removeq;
     struct work_struct appl_removew;
     spinlock_t appl_removeq_lock;
+
+    /* Data structures for deferred removal of flow_entry structs. */
+    struct list_head flows_removeq;
+    struct delayed_work flows_removew;
+    spinlock_t flows_removeq_lock;
 };
 
 static struct rl_dm rl_dm;
@@ -932,6 +937,29 @@ flow_get_ref(struct flow_entry *flow)
 }
 EXPORT_SYMBOL(flow_get_ref);
 
+static void
+flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
+{
+    bool sched;
+
+    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    sched = list_empty(&rl_dm.flows_removeq);
+    flow->expires = jiffies + jdelta;
+    list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
+    if (sched) {
+        schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+    }
+    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+}
+
+static void
+flows_removeq_del(struct flow_entry *flow)
+{
+    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    list_del_init(&flow->node_rm);
+    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+}
+
 static struct flow_entry *
 __flow_put(struct flow_entry *entry, bool maysleep)
 {
@@ -982,7 +1010,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
         spin_unlock_bh(&dtp->lock);
 
-        schedule_delayed_work(&entry->remove, 10 * HZ);
+        flows_removeq_add(entry, msecs_to_jiffies(10000));
+
         /* Reference counter is zero here, but since the delayed
          * worker is going to use the flow, we reset the reference
          * counter to 1. The delayed worker will invoke flow_put()
@@ -1082,17 +1111,48 @@ flow_put(struct flow_entry *flow)
 EXPORT_SYMBOL(flow_put);
 
 static void
-flow_del_func(struct work_struct *work)
+flows_removew_func(struct work_struct *w)
 {
-    struct flow_entry *flow = container_of(work, struct flow_entry,
-                                           remove.work);
+    struct flow_entry *flow, *tmp;
+    struct list_head removeq;
+    unsigned next_expiration = ~0U;
+    unsigned j;
 
-    if (flow->flags & RL_FLOW_NEVER_BOUND) {
-        PI("Removing flow %u since it was never bound\n",
-           flow->local_port);
+    INIT_LIST_HEAD(&removeq);
+
+    /* Collect all the expires flows in a temporary list, and compute
+     * the next expiration time. */
+    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    list_for_each_entry_safe(flow, tmp, &rl_dm.flows_removeq, node_rm) {
+        if (jiffies >= flow->expires) {
+            list_del_init(&flow->node_rm);
+            list_add_tail_safe(&flow->node_rm, &removeq);
+        } else if (flow->expires < next_expiration) {
+            next_expiration = flow->expires;
+        }
+    }
+    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+
+    /* Remove all expired flows. */
+    list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
+        list_del_init(&flow->node_rm);
+        if (flow->flags & RL_FLOW_NEVER_BOUND) {
+            PI("Removing flow %u since it was never bound\n",
+                flow->local_port);
+            __flow_put(flow, true);
+        }
         __flow_put(flow, true);
     }
-    __flow_put(flow, true);
+
+    /* Reschedule if needed. */
+    j = jiffies;
+    if (next_expiration < j) {
+        next_expiration = j;
+    }
+
+    if (next_expiration != ~0U) {
+        schedule_delayed_work(&rl_dm.flows_removew, next_expiration - j);
+    }
 }
 
 static int
@@ -1158,7 +1218,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
             hash_add(rl_dm.flow_table_by_cep, &entry->node_cep,
                      entry->local_cep);
         }
-        INIT_DELAYED_WORK(&entry->remove, flow_del_func);
+        INIT_LIST_HEAD(&entry->node_rm);
+        entry->expires = ~0U;
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
         FUNLOCK();
@@ -1226,15 +1287,13 @@ flow_make_mortal(struct flow_entry *flow)
     FLOCK();
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
-        int canceled;
         /* Here reference counter is (likely) 2. Reset it to 1, so that
          * proper flow destruction happens in rl_io_release(). If we
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
-        canceled = cancel_delayed_work(&flow->remove);
-        PV("cancel_delayed_work(%u) --> %d\n", flow->local_port, canceled);
-        BUG_ON(!canceled);
+        flows_removeq_del(flow);
+        PV("Flow %u removed from removeq\n", flow->local_port);
         flow->refcnt--;
     }
 
@@ -2332,7 +2391,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (!resp->response) {
         /* Positive response. Start the unbound timer before informing the
          * userspace, see explanatin in rl_fa_resp_arrived(). */
-        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
+        flows_removeq_add(flow_entry, RL_UNBOUND_FLOW_TO);
     }
 
     /* Notify the involved IPC process about the response. */
@@ -2359,7 +2418,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     if (ret || resp->response) {
         if (!resp->response) {
-            cancel_delayed_work(&flow_entry->remove);
+            flows_removeq_del(flow_entry);
         }
         flow_put(flow_entry);
     }
@@ -2489,10 +2548,10 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
     if (!response) {
         /* Positive response. Start the unbound timer before informing
          * the application. This prevents a possible race condition
-         * with flow_make_mortal() calling cancel_delayed_work() before
-         * schedule_delayed_work() is called here (that in turn would cause
-         * flow_put() to be called by flow_del_func() when it shouldn't). */
-        schedule_delayed_work(&flow_entry->remove, RL_UNBOUND_FLOW_TO);
+         * with flow_make_mortal() calling flows_removeq_del() before
+         * flows_removeq_add() is called here (that in turn would cause
+         * flow_put() to be called by flows_removew_func() when it shouldn't). */
+        flows_removeq_add(flow_entry, RL_UNBOUND_FLOW_TO);
     }
 
     ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
@@ -2501,7 +2560,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     if (response || ret) {
         if (!response) {
-            cancel_delayed_work(&flow_entry->remove);
+            flows_removeq_del(flow_entry);
         }
         /* Negative response --> delete the flow. */
         flow_put(flow_entry);
@@ -2881,11 +2940,14 @@ rlite_init(void)
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
     spin_lock_init(&rl_dm.appl_removeq_lock);
+    spin_lock_init(&rl_dm.flows_removeq_lock);
     INIT_LIST_HEAD(&rl_dm.ipcp_factories);
     INIT_LIST_HEAD(&rl_dm.difs);
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);
     INIT_LIST_HEAD(&rl_dm.appl_removeq);
+    INIT_LIST_HEAD(&rl_dm.flows_removeq);
     INIT_WORK(&rl_dm.appl_removew, appl_removew_func);
+    INIT_DELAYED_WORK(&rl_dm.flows_removew, flows_removew_func);
 
     ret = misc_register(&rl_ctrl_misc);
     if (ret) {
@@ -2906,6 +2968,8 @@ rlite_init(void)
 static void __exit
 rlite_fini(void)
 {
+    cancel_delayed_work_sync(&rl_dm.flows_removew);
+    cancel_work_sync(&rl_dm.appl_removew);
     misc_deregister(&rl_io_misc);
     misc_deregister(&rl_ctrl_misc);
 }
