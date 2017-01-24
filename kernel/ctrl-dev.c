@@ -945,6 +945,7 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
     spin_lock_bh(&rl_dm.flows_removeq_lock);
     sched = list_empty(&rl_dm.flows_removeq);
     flow->expires = jiffies + jdelta;
+    list_del_init(&flow->node_rm);
     list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
     if (sched) {
         schedule_delayed_work(&rl_dm.flows_removew, jdelta);
@@ -1256,6 +1257,7 @@ flow_rc_unbind(struct rl_ctrl *rc)
     struct hlist_node *tmp;
     int bucket;
 
+    FLOCK();
     hash_for_each_safe(rl_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
             /* Since this 'rc' is going to disappear, we have to remove
@@ -1266,7 +1268,7 @@ flow_rc_unbind(struct rl_ctrl *rc)
                  * device is being deallocated, there won't by a way
                  * to deliver a flow allocation response, so we can
                  * remove the flow. */
-                flow_put(flow);
+                flows_removeq_add(flow, 0);
             } else {
                 /* If no rl_io device binds to this allocated flow,
                  * the RL_FLOW_NEVER_BOUND flags remains set and the
@@ -1275,6 +1277,7 @@ flow_rc_unbind(struct rl_ctrl *rc)
             }
         }
     }
+    FUNLOCK();
 }
 
 void
