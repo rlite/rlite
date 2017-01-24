@@ -1210,7 +1210,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->upper = upper;
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        entry->flags = RL_FLOW_PENDING;
+        entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
         txrx_init(&entry->txrx, ipcp);
@@ -1238,6 +1238,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
                 ipcp->ops.flow_init(ipcp, entry);
             }
         }
+
+        /* Start the unbound timer */
+        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
     } else {
         FUNLOCK();
 
@@ -1263,18 +1266,6 @@ flow_rc_unbind(struct rl_ctrl *rc)
             /* Since this 'rc' is going to disappear, we have to remove
              * the reference stored into this flow. */
             flow->upper.rc = NULL;
-            if (flow->flags & RL_FLOW_PENDING) {
-                /* This flow is still pending. Since this rl_ctrl
-                 * device is being deallocated, there won't by a way
-                 * to deliver a flow allocation response, so we can
-                 * remove the flow. */
-                flows_removeq_add(flow, 0);
-            } else {
-                /* If no rl_io device binds to this allocated flow,
-                 * the RL_FLOW_NEVER_BOUND flags remains set and the
-                 * flow will be automatically destroyed after a while
-                 */
-            }
         }
     }
     FUNLOCK();
@@ -2379,7 +2370,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
     flow_entry->flags &= ~RL_FLOW_PENDING;
     if (resp->response == 0) {
-        flow_entry->flags |= RL_FLOW_NEVER_BOUND | RL_FLOW_ALLOCATED;
+        flow_entry->flags |= RL_FLOW_ALLOCATED;
     }
     spin_unlock_bh(&flow_entry->txrx.rx_lock);
 
@@ -2389,12 +2380,6 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     if (!resp->response && resp->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(rc, resp->upper_ipcp_id, flow_entry);
-    }
-
-    if (!resp->response) {
-        /* Positive response. Start the unbound timer before informing the
-         * userspace, see explanatin in rl_fa_resp_arrived(). */
-        flows_removeq_add(flow_entry, RL_UNBOUND_FLOW_TO);
     }
 
     /* Notify the involved IPC process about the response. */
@@ -2420,9 +2405,6 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     if (ret || resp->response) {
-        if (!resp->response) {
-            flows_removeq_del(flow_entry);
-        }
         flow_put(flow_entry);
     }
 out:
@@ -2528,7 +2510,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
     }
     flow_entry->flags &= ~RL_FLOW_PENDING;
     if (response == 0) {
-        flow_entry->flags |= RL_FLOW_NEVER_BOUND | RL_FLOW_ALLOCATED;
+        flow_entry->flags |= RL_FLOW_ALLOCATED;
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;
@@ -2548,23 +2530,11 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
             "port-id %u, remote addr %llu\n", ipcp->id,
             local_port, (long long unsigned)remote_addr);
 
-    if (!response) {
-        /* Positive response. Start the unbound timer before informing
-         * the application. This prevents a possible race condition
-         * with flow_make_mortal() calling flows_removeq_del() before
-         * flows_removeq_add() is called here (that in turn would cause
-         * flow_put() to be called by flows_removew_func() when it shouldn't). */
-        flows_removeq_add(flow_entry, RL_UNBOUND_FLOW_TO);
-    }
-
     ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
                                                flow_entry->event_id,
                                                local_port, response, maysleep);
 
     if (response || ret) {
-        if (!response) {
-            flows_removeq_del(flow_entry);
-        }
         /* Negative response --> delete the flow. */
         flow_put(flow_entry);
     }
