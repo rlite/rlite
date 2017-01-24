@@ -365,9 +365,7 @@ boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
 wait_for_boot = 12  # in seconds
 if len(vms) > 8:
     print("You want to run a lot of nodes, so it's better if I give "
-          "each node some time to boot (since the boot is CPU-intensive) "
-          "and a minimum amount of memory")
-    args.memory = 128 # in megabytes
+          "each node some time to boot (since the boot is CPU-intensive)")
 
 ############ Compute registration/enrollment order for DIFs ###############
 
