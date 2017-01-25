@@ -997,7 +997,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
      * cwq and rtxq to be drained. We check the flag
      * to make sure that this flow_entry() invocation is not due to a
      * postponed removal, so that we avoid postponing forever. */
-    if (!(entry->flags & RL_FLOW_DEL_POSTPONED)) {
+    if (!(entry->flags & RL_FLOW_DEL_POSTPONED) &&
+                (entry->flags & RL_FLOW_ALLOCATED)) {
         entry->flags |= RL_FLOW_DEL_POSTPONED;
         spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
