@@ -2286,6 +2286,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             .rc = rc,
         };
     rl_ipcp_id_t ipcp_id = -1;
+    rl_port_t local_port;
     int ret = -ENXIO;
 
     /* Look up an IPC process entry for the specified DIF. */
@@ -2302,6 +2303,8 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ret) {
         goto out;
     }
+
+    local_port = flow_entry->local_port;
 
     if (req->upper_ipcp_id != 0xffff) {
         ret = upper_ipcp_flow_bind(rc, req->upper_ipcp_id, flow_entry);
@@ -2332,12 +2335,16 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         }
     }
 
+    /* The flow_entry variable cannot be used in this function after this
+     * point, because a concurrent rl_fa_resp_arrived() with a negative
+     * response may kill the flow. */
+    flow_entry = NULL;
 out:
     ipcp_put(ipcp_entry);
 
     if (ret == 0) {
         PD("Flow allocation requested to IPC process %u, "
-               "port-id %u\n", ipcp_id, flow_entry->local_port);
+               "port-id %u\n", ipcp_id, local_port);
         return 0;
     }
 
