@@ -2346,6 +2346,7 @@ out:
     ret = rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1, true);
 
     if (flow_entry) {
+        flows_removeq_del(flow_entry); /* match flow_add() */
         flow_put(flow_entry);
     }
 
@@ -2422,6 +2423,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     if (ret || resp->response) {
+        flows_removeq_del(flow_entry);
         flow_put(flow_entry);
     }
 out:
@@ -2491,6 +2493,7 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     /* Enqueue the request into the upqueue. */
     ret = rl_upqueue_append(app->rc, RLITE_MB(&req), maysleep);
     if (ret) {
+        flows_removeq_del(flow_entry);
         flow_put(flow_entry);
     }
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -2558,6 +2561,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     if (response || ret) {
         /* Negative response --> delete the flow. */
+        flows_removeq_del(flow_entry);
         flow_put(flow_entry);
     }
 
