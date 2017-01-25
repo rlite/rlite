@@ -48,13 +48,14 @@ struct rl_ctrl;
 
 /* The signature of a message handler. */
 typedef int (*rl_msg_handler_t)(struct rl_ctrl *rc,
-                                   struct rl_msg_base *bmsg);
+                                struct rl_msg_base *bmsg);
 
 /* Data structure associated to the an rlite control device. */
 struct rl_ctrl {
     char msgbuf[1024];
-
     rl_msg_handler_t *handlers;
+
+    struct file *file; /* backpointer */
 
     /* Upqueue-related data structures. */
     struct list_head upqueue;
@@ -1074,6 +1075,12 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
     }
+    if (entry->upper.rc) {
+        struct rl_ctrl *rc = entry->upper.rc;
+
+        entry->upper.rc = NULL; /* just to stay safe */
+        fput(rc->file);
+    }
     PD("flow entry %u removed\n", entry->local_port);
     kfree(entry);
 
@@ -1208,6 +1215,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->remote_cep = 0;   /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
         entry->upper = upper;
+        if (upper.rc) {
+            get_file(upper.rc->file);
+        }
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
@@ -1254,7 +1264,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
 }
 
 static void
-flow_rc_unbind(struct rl_ctrl *rc)
+flow_rc_probe_references(struct rl_ctrl *rc)
 {
     struct flow_entry *flow;
     struct hlist_node *tmp;
@@ -1263,9 +1273,8 @@ flow_rc_unbind(struct rl_ctrl *rc)
     FLOCK();
     hash_for_each_safe(rl_dm.flow_table, bucket, tmp, flow, node) {
         if (flow->upper.rc == rc) {
-            /* Since this 'rc' is going to disappear, we have to remove
-             * the reference stored into this flow. */
-            flow->upper.rc = NULL;
+            PE("Flow %u has a dangling reference to rc %p\n",
+                flow->local_port, rc);
         }
     }
     FUNLOCK();
@@ -2234,7 +2243,8 @@ rl_appl_move(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     /* Search all the applications registered to this control device. */
     list_for_each_entry(app, &ipcp->registered_appls, node) {
         if (app->rc == rc) {
-            app->rc = dst_rc; /* move */
+            /* Move the reference. */
+            app->rc = dst_rc;
         }
     }
     RAUNLOCK(ipcp);
@@ -2323,22 +2333,22 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
 out:
     ipcp_put(ipcp_entry);
-    if (ret) {
-        if (flow_entry) {
-            flow_put(flow_entry);
-        }
-
-    } else {
-        PD("Flow allocation requested to IPC process %u, "
-               "port-id %u\n", ipcp_id, flow_entry->local_port);
-    }
 
     if (ret == 0) {
+        PD("Flow allocation requested to IPC process %u, "
+               "port-id %u\n", ipcp_id, flow_entry->local_port);
         return 0;
     }
 
-    /* Create a negative response message. */
-    return rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1, true);
+    /* Create a negative response message. This must be done before
+     * calling flow_put(), which drops the reference on rc. */
+    ret = rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1, true);
+
+    if (flow_entry) {
+        flow_put(flow_entry);
+    }
+
+    return ret;
 }
 
 static int
@@ -2359,6 +2369,8 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         return ret;
     }
 
+    BUG_ON(rc != flow_entry->upper.rc);
+
     /* Check that the flow is in pending state and make the
      * transition to the allocated state. */
     spin_lock_bh(&flow_entry->txrx.rx_lock);
@@ -2371,8 +2383,12 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     flow_entry->flags &= ~RL_FLOW_PENDING;
     if (resp->response == 0) {
         flow_entry->flags |= RL_FLOW_ALLOCATED;
+        flow_entry->upper.rc = NULL;
     }
     spin_unlock_bh(&flow_entry->txrx.rx_lock);
+    if (resp->response == 0) {
+        fput(rc->file);
+    }
 
     PI("Flow allocation response [%u] issued to IPC process %u, "
             "port-id %u\n", resp->response, flow_entry->txrx.ipcp->id,
@@ -2497,6 +2513,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
 {
     struct flow_entry *flow_entry = NULL;
     int ret = -EINVAL;
+    struct rl_ctrl *rc;
 
     flow_entry = flow_get(local_port);
     if (!flow_entry) {
@@ -2508,9 +2525,11 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
         spin_unlock_bh(&flow_entry->txrx.rx_lock);
         goto out;
     }
+    rc = flow_entry->upper.rc;
     flow_entry->flags &= ~RL_FLOW_PENDING;
     if (response == 0) {
         flow_entry->flags |= RL_FLOW_ALLOCATED;
+        flow_entry->upper.rc = NULL;
     }
     flow_entry->remote_port = remote_port;
     flow_entry->remote_cep = remote_cep;
@@ -2530,9 +2549,11 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
             "port-id %u, remote addr %llu\n", ipcp->id,
             local_port, (long long unsigned)remote_addr);
 
-    ret = rl_append_allocate_flow_resp_arrived(flow_entry->upper.rc,
-                                               flow_entry->event_id,
+    ret = rl_append_allocate_flow_resp_arrived(rc, flow_entry->event_id,
                                                local_port, response, maysleep);
+    if (response == 0) {
+        fput(rc->file);
+    }
 
     if (response || ret) {
         /* Negative response --> delete the flow. */
@@ -2783,6 +2804,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
     }
 
     f->private_data = rc;
+    rc->file = f;
     INIT_LIST_HEAD(&rc->upqueue);
     rc->upqueue_size = 0;
     spin_lock_init(&rc->upqueue_lock);
@@ -2811,7 +2833,7 @@ rl_ctrl_release(struct inode *inode, struct file *f)
     /* We must invalidate (e.g. unregister) all the
      * application names registered with this ctrl device. */
     application_del_by_rc(rc);
-    flow_rc_unbind(rc);
+    flow_rc_probe_references(rc);
 
     /* Drain upqueue. */
     {
