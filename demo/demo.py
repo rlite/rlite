@@ -167,7 +167,7 @@ argparser.add_argument('-g', '--graphviz', action='store_true',
                        help = "Generate DIF graphs with graphviz")
 argparser.add_argument('-m', '--memory',
                        help = "Amount of memory in megabytes", type = int,
-                       default = 128)
+                       default = 164) # 128 without KASAN
 argparser.add_argument('-p', '--base-port',
                        help = "Base SSH port to map nodes", type = int,
                        default = 2222)
