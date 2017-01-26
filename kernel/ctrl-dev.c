@@ -2502,6 +2502,10 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     if (ret) {
         flows_removeq_del(flow_entry);
         flow_put(flow_entry);
+    } else {
+        /* The flow_entry variable is invalid from here, rl_fa_resp() may be
+         * called concurrently and call flow_put(). */
+        flow_entry = NULL;
     }
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(&req));
