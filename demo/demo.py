@@ -188,7 +188,7 @@ argparser.add_argument('-f', '--frontend',
                        default = 'virtio-net-pci')
 argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
-argparser.add_argument('-k', '--keepalive', default = 5,
+argparser.add_argument('-k', '--keepalive', default = 10,
                        help = "Neighbor keepalive timeout in seconds (0 to disable)", type = int)
 argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
