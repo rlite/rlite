@@ -33,15 +33,15 @@ rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp)
     size_t real_size = size + num_pci * sizeof(struct rina_pci);
     uint8_t *kbuf;
 
-    rb = kmalloc(sizeof(*rb), gfp);
+    rb = rl_alloc(sizeof(*rb), gfp, RL_MT_BUFHDR);
     if (unlikely(!rb)) {
         PE("Out of memory\n");
         return NULL;
     }
 
-    kbuf = kmalloc(sizeof(*rb->raw) + real_size, gfp);
+    kbuf = rl_alloc(sizeof(*rb->raw) + real_size, gfp, RL_MT_BUFDATA);
     if (unlikely(!kbuf)) {
-        kfree(rb);
+        rl_free(rb, RL_MT_BUFHDR);
         PE("Out of memory\n");
         return NULL;
     }
@@ -70,7 +70,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 {
     struct rl_buf *crb;
 
-    crb = kmalloc(sizeof(*crb), gfp);
+    crb = rl_alloc(sizeof(*crb), gfp, RL_MT_BUFHDR);
     if (unlikely(!crb)) {
         return NULL;
     }
@@ -94,10 +94,10 @@ void
 __rl_buf_free(struct rl_buf *rb)
 {
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
-        kfree(rb->raw);
+        rl_free(rb->raw, RL_MT_BUFDATA);
     }
 
-    kfree(rb);
+    rl_free(rb, RL_MT_BUFHDR);
 }
 EXPORT_SYMBOL(__rl_buf_free);
 

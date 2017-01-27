@@ -271,7 +271,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
     void *serbuf;
     int ret = 0;
 
-    entry = kzalloc(sizeof(*entry), gfp);
+    entry = rl_alloc(sizeof(*entry), gfp | __GFP_ZERO, RL_MT_UPQ);
     if (!entry) {
         PE("Out of memory\n");
         return -ENOMEM;
@@ -279,9 +279,9 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
 
     /* Serialize the response into serbuf and then put it into the upqueue. */
     serlen = rl_msg_serlen(rl_ker_numtables, RLITE_KER_MSG_MAX, rmsg);
-    serbuf = kzalloc(serlen, gfp);
+    serbuf = rl_alloc(serlen, gfp | __GFP_ZERO, RL_MT_UPQ);
     if (!serbuf) {
-        kfree(entry);
+        rl_free(entry, RL_MT_UPQ);
         PE("Out of memory\n");
         return -ENOMEM;
     }
@@ -304,8 +304,8 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
             spin_unlock(&rc->upqueue_lock);
             if (!maysleep || !time_before(jiffies, exp)) {
                 RPD(2, "upqueue overrun, dropping\n");
-                kfree(serbuf);
-                kfree(entry);
+                rl_free(serbuf, RL_MT_UPQ);
+                rl_free(entry, RL_MT_UPQ);
                 ret = -ENOSPC;
                 break;
             }
@@ -356,24 +356,24 @@ dif_get(const char *dif_name, const char *dif_type, int *err)
     }
 
     /* A DIF called 'dif_name' does not exist yet. */
-    cur = kzalloc(sizeof(*cur), GFP_ATOMIC);
+    cur = rl_alloc(sizeof(*cur), GFP_ATOMIC | __GFP_ZERO, RL_MT_DIF);
     if (!cur) {
         *err = -ENOMEM;
         goto out;
     }
 
-    cur->name = kstrdup(dif_name, GFP_ATOMIC);
+    cur->name = rl_strdup(dif_name, GFP_ATOMIC, RL_MT_DIF);
     if (!cur->name) {
-        kfree(cur);
+        rl_free(cur, RL_MT_DIF);
         cur = NULL;
         *err = -ENOMEM;
         goto out;
     }
 
-    cur->ty = kstrdup(dif_type, GFP_ATOMIC);
+    cur->ty = rl_strdup(dif_type, GFP_ATOMIC, RL_MT_DIF);
     if (!cur->ty) {
-        kfree(cur->name);
-        kfree(cur);
+        rl_free(cur->name, RL_MT_DIF);
+        rl_free(cur, RL_MT_DIF);
         cur = NULL;
         *err = -ENOMEM;
         goto out;
@@ -408,8 +408,9 @@ dif_put(struct dif *dif)
     PD("DIF %s [type '%s'] destroyed\n", dif->name, dif->ty);
 
     list_del_init(&dif->node);
-    kfree(dif->name);
-    kfree(dif);
+    // TODO missing rl_free(dif->ty, RL_MT_DIF)
+    rl_free(dif->name, RL_MT_DIF);
+    rl_free(dif, RL_MT_DIF);
 
 out:
     spin_unlock_bh(&rl_dm.difs_lock);
@@ -491,7 +492,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
 
     *pentry = NULL;
 
-    entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+    entry = rl_alloc(sizeof(*entry), GFP_KERNEL | __GFP_ZERO, RL_MT_IPCP);
     if (!entry) {
         return -ENOMEM;
     }
@@ -503,7 +504,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
     hash_for_each(rl_dm.ipcp_table, bucket, cur, node) {
         if (strcmp(cur->name, req->name) == 0) {
             PUNLOCK();
-            kfree(entry);
+            rl_free(entry, RL_MT_IPCP);
             return -EINVAL;
         }
     }
@@ -512,7 +513,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
     dif = dif_get(req->dif_name, req->dif_type, &ret);
     if (!dif) {
         PUNLOCK();
-        kfree(entry);
+        rl_free(entry, RL_MT_IPCP);
         return ret;
     }
 
@@ -543,7 +544,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
     } else {
         ret = -ENOSPC;
         dif_put(dif);
-        kfree(entry);
+        rl_free(entry, RL_MT_IPCP);
     }
 
     PUNLOCK();
@@ -649,8 +650,8 @@ appl_del(struct registered_appl *app)
 
     /* From here on registered application cannot be referenced anymore, and so
      * that we don't need locks. */
-    if (app->name) kfree(app->name);
-    kfree(app);
+    if (app->name) rl_free(app->name, RL_MT_REGAPP);
+    rl_free(app, RL_MT_REGAPP);
 }
 
 static void
@@ -739,14 +740,14 @@ ipcp_application_add(struct ipcp_entry *ipcp,
     }
 
     /* Create a new registered application. */
-    newapp = kzalloc(sizeof(*newapp), GFP_ATOMIC);
+    newapp = rl_alloc(sizeof(*newapp), GFP_ATOMIC | __GFP_ZERO, RL_MT_REGAPP);
     if (!newapp) {
         return -ENOMEM;
     }
 
-    newapp->name = kstrdup(appl_name, GFP_ATOMIC);
+    newapp->name = rl_strdup(appl_name, GFP_ATOMIC, RL_MT_REGAPP);
     if (!newapp->name) {
-        kfree(newapp);
+        rl_free(newapp, RL_MT_REGAPP);
         return -ENOMEM;
     }
     newapp->rc = rc;
@@ -1058,8 +1059,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     }
 
     hash_del(&entry->node);
-    if (entry->local_appl) kfree(entry->local_appl);
-    if (entry->remote_appl) kfree(entry->remote_appl);
+    if (entry->local_appl) rl_free(entry->local_appl, RL_MT_FLOW);
+    if (entry->remote_appl) rl_free(entry->remote_appl, RL_MT_FLOW);
     bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
     if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
         hash_del(&entry->node_cep);
@@ -1083,7 +1084,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         fput(rc->file);
     }
     PD("flow entry %u removed\n", entry->local_port);
-    kfree(entry);
+    rl_free(entry, RL_MT_FLOW);
 
     if (ipcp->uipcp) {
         /* Notify the uipcp about flow deallocation. */
@@ -1181,7 +1182,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         return -ENXIO;
     }
 
-    *pentry = entry = kzalloc(sizeof(*entry), gfp);
+    *pentry = entry = rl_alloc(sizeof(*entry), gfp | __GFP_ZERO, RL_MT_FLOW);
     if (!entry) {
         return -ENOMEM;
     }
@@ -1210,8 +1211,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         }
 
         /* Build and insert a flow entry in the hash table. */
-        entry->local_appl = kstrdup(local_appl, GFP_ATOMIC);
-        entry->remote_appl = kstrdup(remote_appl, GFP_ATOMIC);
+        entry->local_appl = rl_strdup(local_appl, GFP_ATOMIC, RL_MT_FLOW);
+        entry->remote_appl = rl_strdup(remote_appl, GFP_ATOMIC, RL_MT_FLOW);
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_cep = 0;   /* Not valid. */
         entry->remote_addr = 0;  /* Not valid. */
@@ -1255,7 +1256,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
     } else {
         FUNLOCK();
 
-        kfree(entry);
+        rl_free(entry, RL_MT_FLOW);
         *pentry = NULL;
         ret = -ENOSPC;
     }
@@ -1387,12 +1388,12 @@ __ipcp_put(struct ipcp_entry *entry)
         module_put(entry->owner);
     }
 
-    if (entry->name) kfree(entry->name);
+    if (entry->name) rl_free(entry->name, RL_MT_UTILS /* moved */);
     dif_put(entry->dif);
 
     ipcp_probe_references(entry);
 
-    kfree(entry);
+    rl_free(entry, RL_MT_IPCP);
 
     return 0;
 }
@@ -1470,7 +1471,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->nhdrs = ipcp->nhdrs;
     upd->max_sdu_size = ipcp->max_sdu_size;
     if (ipcp->name) {
-        upd->ipcp_name = kstrdup(ipcp->name, GFP_ATOMIC);
+        upd->ipcp_name = rl_strdup(ipcp->name, GFP_ATOMIC, RL_MT_UTILS);
         if (!upd->ipcp_name) {
             ret = -ENOMEM;
         }
@@ -1478,13 +1479,13 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
 
     if (ipcp->dif) {
         dif_name = ipcp->dif->name;
-        upd->dif_type = kstrdup(ipcp->dif->ty, GFP_ATOMIC);
+        upd->dif_type = rl_strdup(ipcp->dif->ty, GFP_ATOMIC, RL_MT_UTILS);
         if (!upd->dif_type) {
             ret = -ENOMEM;
         }
     }
     if (dif_name) {
-        upd->dif_name = kstrdup(dif_name, GFP_ATOMIC);
+        upd->dif_name = rl_strdup(dif_name, GFP_ATOMIC, RL_MT_UTILS);
         if (!upd->dif_name) {
             ret = -ENOMEM;
         }
@@ -1627,7 +1628,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
 
     if (list_empty(&rc->flows_fetch_q)) {
         hash_for_each(rl_dm.flow_table, bucket, entry, node) {
-            fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
+            fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
             if (!fqe) {
                 PE("Out of memory\n");
                 break;
@@ -1646,7 +1647,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
             fqe->resp.spec = entry->spec;
         }
 
-        fqe = kmalloc(sizeof(*fqe), GFP_ATOMIC);
+        fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
         if (!fqe) {
             PE("Out of memory\n");
         } else {
@@ -1664,7 +1665,7 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
         fqe->resp.event_id = req->event_id;
         ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
-        kfree(fqe);
+        rl_free(fqe, RL_MT_FFETCH);
     }
 
     FUNLOCK();
@@ -2151,7 +2152,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             resp.ipcp_id = ipcp->id;
             resp.reg = req->reg;
             resp.response = ret ? RLITE_ERR : RLITE_SUCC;
-            resp.appl_name = kstrdup(req->appl_name, GFP_ATOMIC);
+            resp.appl_name = rl_strdup(req->appl_name, GFP_ATOMIC, RL_MT_UTILS);
 
             rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -2491,10 +2492,12 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     req.kevent_id = kevent_id;
     req.ipcp_id = ipcp->id;
     req.port_id = flow_entry->local_port;
-    req.local_appl = local_appl ? kstrdup(local_appl, GFP_ATOMIC) : NULL;
-    req.remote_appl = remote_appl ? kstrdup(remote_appl, GFP_ATOMIC) : NULL;
+    req.local_appl = local_appl ? rl_strdup(local_appl, GFP_ATOMIC,
+                                            RL_MT_UTILS) : NULL;
+    req.remote_appl = remote_appl ? rl_strdup(remote_appl, GFP_ATOMIC,
+                                              RL_MT_UTILS) : NULL;
     if (ipcp->dif->name) {
-        req.dif_name = kstrdup(ipcp->dif->name, GFP_ATOMIC);
+        req.dif_name = rl_strdup(ipcp->dif->name, GFP_ATOMIC, RL_MT_UTILS);
     }
 
     /* Enqueue the request into the upqueue. */
@@ -2629,7 +2632,7 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
         return -EINVAL;
     }
 
-    kbuf = kmalloc(len, GFP_KERNEL);
+    kbuf = rl_alloc(len, GFP_KERNEL, RL_MT_MISC);
     if (!kbuf) {
         return -ENOMEM;
     }
@@ -2637,14 +2640,14 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     /* Copy the userspace serialized message into a temporary kernelspace
      * buffer. */
     if (unlikely(copy_from_user(kbuf, ubuf, len))) {
-        kfree(kbuf);
+        rl_free(kbuf, RL_MT_MISC);
         return -EFAULT;
     }
 
     ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
                                kbuf, len, rc->msgbuf, sizeof(rc->msgbuf));
     if (ret) {
-        kfree(kbuf);
+        rl_free(kbuf, RL_MT_MISC);
         return -EINVAL;
     }
 
@@ -2652,7 +2655,7 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 
     /* Demultiplex the message to the right message handler. */
     if (bmsg->msg_type > RLITE_KER_MSG_MAX || !rc->handlers[bmsg->msg_type]) {
-        kfree(kbuf);
+        rl_free(kbuf, RL_MT_MISC);
         return -EINVAL;
     }
 
@@ -2670,7 +2673,7 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
         case RLITE_KER_FLOW_DEALLOC:
 #if 1
             if (!capable(CAP_SYS_ADMIN)) {
-                kfree(kbuf);
+                rl_free(kbuf, RL_MT_MISC);
                 return -EPERM;
             }
 #endif
@@ -2682,12 +2685,12 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
     /* Carry out the requested operation. */
     ret = rc->handlers[bmsg->msg_type](rc, bmsg);
     if (ret) {
-        kfree(kbuf);
+        rl_free(kbuf, RL_MT_MISC);
         return ret;
     }
 
     *ppos += len;
-    kfree(kbuf);
+    rl_free(kbuf, RL_MT_MISC);
 
     return len;
 }
@@ -2741,8 +2744,8 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
             /* Unlink and free the upqueue entry and the associated message. */
             list_del_init(&entry->node);
             rc->upqueue_size -= upqentry_size(entry);
-            kfree(entry->sermsg);
-            kfree(entry);
+            rl_free(entry->sermsg, RL_MT_UPQ);
+            rl_free(entry, RL_MT_UPQ);
         }
 
         spin_unlock(&rc->upqueue_lock);
@@ -2814,7 +2817,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
 {
     struct rl_ctrl *rc;
 
-    rc = kzalloc(sizeof(*rc), GFP_KERNEL);
+    rc = rl_alloc(sizeof(*rc), GFP_KERNEL | __GFP_ZERO, RL_MT_CTLDEV);
     if (!rc) {
         return -ENOMEM;
     }
@@ -2857,8 +2860,8 @@ rl_ctrl_release(struct inode *inode, struct file *f)
 
         list_for_each_entry_safe(ue, uet, &rc->upqueue, node) {
             list_del_init(&ue->node);
-            kfree(ue->sermsg);
-            kfree(ue);
+            rl_free(ue->sermsg, RL_MT_UPQ);
+            rl_free(ue, RL_MT_UPQ);
         }
     }
 
@@ -2870,11 +2873,11 @@ rl_ctrl_release(struct inode *inode, struct file *f)
             list_del_init(&fqe->node);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                         RLITE_MB(&fqe->resp));
-            kfree(fqe);
+            rl_free(fqe, RL_MT_FFETCH);
         }
     }
 
-    kfree(rc);
+    rl_free(rc, RL_MT_CTLDEV);
     f->private_data = NULL;
 
     return 0;

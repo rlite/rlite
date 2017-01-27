@@ -36,6 +36,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <asm/atomic.h>
+#include <linux/slab.h>
 
 /*
  * Logging support.
@@ -546,5 +547,52 @@ void dtp_dump(struct dtp *dtp);
             BUG_ON(!list_empty(e)); \
             list_add_tail(e, h); \
         } while (0)
+
+
+/* Memtrack machinery */
+#define RL_MEMTRACK
+
+typedef enum {
+    RL_MT_UTILS = 0,
+    RL_MT_BUFHDR,
+    RL_MT_BUFDATA,
+    RL_MT_FFETCH,
+    RL_MT_PDUFT,
+    RL_MT_SHIMDATA,
+    RL_MT_SHIM,
+    RL_MT_UPQ,
+    RL_MT_DIF,
+    RL_MT_IPCP,
+    RL_MT_REGAPP,
+    RL_MT_FLOW,
+    RL_MT_CTLDEV,
+    RL_MT_IODEV,
+    RL_MT_MISC,
+} rl_memtrack_t;
+
+#ifdef RL_MEMTRACK
+static inline void *
+rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type)
+{
+    return kmalloc(size, gfp);
+}
+
+static inline char *
+rl_strdup(const char *s, gfp_t gfp, rl_memtrack_t type)
+{
+    return kstrdup(s, gfp);
+}
+
+static inline void
+rl_free(void *obj, rl_memtrack_t type)
+{
+    kfree(obj);
+}
+
+#else  /* ! RL_MEMTRACK */
+#define rl_alloc(_sz, _gfp, _ty)    kmalloc(_sz, _gfp)
+#define rl_strdup(_s, _gfp, _ty)    kstrdup(_s, _gfp)
+#define rl_free(_obj, _ty)          kfree(_obj)
+#endif /* ! RL_MEMTRACK */
 
 #endif  /* __RLITE_KERNEL_H__ */

@@ -110,7 +110,7 @@ rl_shim_loopback_create(struct ipcp_entry *ipcp)
 {
     struct rl_shim_loopback *priv;
 
-    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!priv) {
         return NULL;
     }
@@ -139,7 +139,7 @@ rl_shim_loopback_destroy(struct ipcp_entry *ipcp)
         priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
     }
 
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
 }
@@ -166,7 +166,8 @@ flow_allocate_req_work(struct work_struct *w)
         PE("Failed to report flow allocation request\n");
     }
 
-    kfree(faw);
+    /* TODO missing rl_free for local_appl and remote_appl */
+    rl_free(faw, RL_MT_SHIMDATA);
 }
 
 static int
@@ -179,7 +180,7 @@ rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return EINVAL;
     }
 
-    faw = kzalloc(sizeof(*faw), GFP_KERNEL);
+    faw = rl_alloc(sizeof(*faw), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!faw) {
         PE("Out of memory\n");
         return -ENOMEM;
@@ -187,8 +188,8 @@ rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     rl_flow_share_tx_wqh(flow);
 
-    faw->remote_appl = kstrdup(flow->local_appl, GFP_KERNEL);
-    faw->local_appl = kstrdup(flow->remote_appl, GFP_KERNEL);
+    faw->remote_appl = rl_strdup(flow->local_appl, GFP_KERNEL, RL_MT_SHIMDATA);
+    faw->local_appl = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MT_SHIMDATA);
     faw->remote_port = flow->local_port;
     faw->ipcp = ipcp;
     INIT_WORK(&faw->w, flow_allocate_req_work);
@@ -218,7 +219,7 @@ flow_allocate_resp_work(struct work_struct *w)
         PE("failed to report flow allocation response\n");
     }
 
-    kfree(farw);
+    rl_free(farw, RL_MT_SHIMDATA);
 }
 
 static int
@@ -228,7 +229,7 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 {
     struct flow_allocate_resp_work *farw;
 
-    farw = kzalloc(sizeof(*farw), GFP_KERNEL);
+    farw = rl_alloc(sizeof(*farw), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!farw) {
         PE("Out of memory\n");
         return -ENOMEM;

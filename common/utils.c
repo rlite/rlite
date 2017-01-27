@@ -30,10 +30,10 @@
 #include <linux/types.h>
 #include "rlite-kernel.h"
 
-#define COMMON_ALLOC(_sz, _sl)      kmalloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC)
-#define COMMON_FREE(_p)             kfree(_p)
+#define COMMON_ALLOC(_sz, _sl)      rl_alloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
+#define COMMON_FREE(_p)             rl_free(_p, RL_MT_UTILS)
 #define COMMON_PRINT(format, ...)   printk(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s, _sl)      kstrdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC)
+#define COMMON_STRDUP(_s, _sl)      rl_strdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
 #define COMMON_EXPORT(_n)           EXPORT_SYMBOL(_n)
 #define COMMON_STATIC
 
