@@ -944,12 +944,14 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
     bool sched;
 
     spin_lock_bh(&rl_dm.flows_removeq_lock);
-    sched = list_empty(&rl_dm.flows_removeq);
-    flow->expires = jiffies + jdelta;
-    list_del_init(&flow->node_rm);
-    list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
-    if (sched) {
-        schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+    if (flow->expires == ~0U) { /* don't reschedule */
+        sched = list_empty(&rl_dm.flows_removeq);
+        flow->expires = jiffies + jdelta;
+        list_del_init(&flow->node_rm);
+        list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
+        if (sched) {
+            schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+        }
     }
     spin_unlock_bh(&rl_dm.flows_removeq_lock);
 }
@@ -958,6 +960,7 @@ static void
 flows_removeq_del(struct flow_entry *flow)
 {
     spin_lock_bh(&rl_dm.flows_removeq_lock);
+    flow->expires = ~0U;
     list_del_init(&flow->node_rm);
     spin_unlock_bh(&rl_dm.flows_removeq_lock);
 }
@@ -1013,8 +1016,6 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
         spin_unlock_bh(&dtp->lock);
 
-        flows_removeq_add(entry, msecs_to_jiffies(10000));
-
         /* Reference counter is zero here, but since the delayed
          * worker is going to use the flow, we reset the reference
          * counter to 1. The delayed worker will invoke flow_put()
@@ -1022,6 +1023,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
          */
         entry->refcnt++;
         FUNLOCK();
+
+        flows_removeq_add(entry, msecs_to_jiffies(10000));
+
         return entry;
     }
 
@@ -2286,7 +2290,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             .rc = rc,
         };
     rl_ipcp_id_t ipcp_id = -1;
-    rl_port_t local_port;
+    rl_port_t local_port = 0;
     int ret = -ENXIO;
 
     /* Look up an IPC process entry for the specified DIF. */
