@@ -938,10 +938,13 @@ flow_get_ref(struct flow_entry *flow)
 }
 EXPORT_SYMBOL(flow_get_ref);
 
+/* To be called under FLOCK(). */
 static void
 flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
 {
     bool sched;
+
+    flow->refcnt++;
 
     spin_lock_bh(&rl_dm.flows_removeq_lock);
     if (flow->expires == ~0U) { /* don't reschedule */
@@ -963,6 +966,8 @@ flows_removeq_del(struct flow_entry *flow)
     flow->expires = ~0U;
     list_del_init(&flow->node_rm);
     spin_unlock_bh(&rl_dm.flows_removeq_lock);
+
+    flow_put(flow);
 }
 
 static struct flow_entry *
@@ -1016,15 +1021,11 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
         spin_unlock_bh(&dtp->lock);
 
-        /* Reference counter is zero here, but since the delayed
-         * worker is going to use the flow, we reset the reference
-         * counter to 1. The delayed worker will invoke flow_put()
-         * after having performed its work.
-         */
-        entry->refcnt++;
-        FUNLOCK();
-
+        /* Reference counter is zero here, we need to reset it
+         * to 1 and let the delayed remove function do its job. */
+        entry->refcnt ++;
         flows_removeq_add(entry, msecs_to_jiffies(10000));
+        FUNLOCK();
 
         return entry;
     }
@@ -1149,6 +1150,7 @@ flows_removew_func(struct work_struct *w)
     /* Remove all expired flows. */
     list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
         list_del_init(&flow->node_rm);
+        __flow_put(flow, true); /* match flows_removeq_add() */
         if (flow->flags & RL_FLOW_NEVER_BOUND) {
             PI("Removing flow %u since it was never bound\n",
                 flow->local_port);
@@ -1238,6 +1240,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->expires = ~0U;
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
+
+        /* Start the unbound timer */
+        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
         FUNLOCK();
 
         PLOCK();
@@ -1253,9 +1258,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
                 ipcp->ops.flow_init(ipcp, entry);
             }
         }
-
-        /* Start the unbound timer */
-        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
     } else {
         FUNLOCK();
 
@@ -1288,6 +1290,7 @@ flow_rc_probe_references(struct rl_ctrl *rc)
 void
 flow_make_mortal(struct flow_entry *flow)
 {
+    bool never_bound = false;
     if (!flow) {
         return;
     }
@@ -1295,17 +1298,21 @@ flow_make_mortal(struct flow_entry *flow)
     FLOCK();
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
+        never_bound = true;
         /* Here reference counter is (likely) 2. Reset it to 1, so that
          * proper flow destruction happens in rl_io_release(). If we
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
-        flows_removeq_del(flow);
-        PV("Flow %u removed from removeq\n", flow->local_port);
         flow->refcnt--;
     }
 
     FUNLOCK();
+
+    if (never_bound) {
+        flows_removeq_del(flow);
+        PV("Flow %u removed from removeq\n", flow->local_port);
+    }
 }
 
 static void
