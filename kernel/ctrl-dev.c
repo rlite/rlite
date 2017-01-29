@@ -408,7 +408,7 @@ dif_put(struct dif *dif)
     PD("DIF %s [type '%s'] destroyed\n", dif->name, dif->ty);
 
     list_del_init(&dif->node);
-    // TODO missing rl_free(dif->ty, RL_MT_DIF)
+    rl_free(dif->ty, RL_MT_DIF);
     rl_free(dif->name, RL_MT_DIF);
     rl_free(dif, RL_MT_DIF);
 
