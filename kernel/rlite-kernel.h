@@ -588,6 +588,7 @@ typedef enum {
 void *rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type);
 char *rl_strdup(const char *s, gfp_t gfp, rl_memtrack_t type);
 void rl_free(void *obj, rl_memtrack_t type);
+void rl_memtrack_dump(void);
 #else  /* ! RL_MEMTRACK */
 #define rl_alloc(_sz, _gfp, _ty)    kmalloc(_sz, _gfp)
 #define rl_strdup(_s, _gfp, _ty)    kstrdup(_s, _gfp)

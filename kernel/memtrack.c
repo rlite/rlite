@@ -29,6 +29,24 @@
 
 static atomic_t mt_count[RL_MT_MAX];
 
+static const char *mt_names[] = {
+    [RL_MT_UTILS]       = "UTILS",
+    [RL_MT_BUFHDR]      = "BUFHDR",
+    [RL_MT_BUFDATA]     = "BUFDATA",
+    [RL_MT_FFETCH]      = "FFETCH",
+    [RL_MT_PDUFT]       = "PDUFT",
+    [RL_MT_SHIMDATA]    = "SHIMDATA",
+    [RL_MT_SHIM]        = "SHIM",
+    [RL_MT_UPQ]         = "UPQ",
+    [RL_MT_DIF]         = "DIF",
+    [RL_MT_IPCP]        = "IPCP",
+    [RL_MT_REGAPP]      = "REGAPP",
+    [RL_MT_FLOW]        = "FLOW",
+    [RL_MT_CTLDEV]      = "CTLDEV",
+    [RL_MT_IODEV]       = "IODEV",
+    [RL_MT_MISC]        = "MISC",
+};
+
 void *
 rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type)
 {
@@ -65,5 +83,16 @@ rl_free(void *obj, rl_memtrack_t type)
     kfree(obj);
 }
 EXPORT_SYMBOL(rl_free);
+
+void
+rl_memtrack_dump(void)
+{
+    int i;
+
+    PI("Memtrack stats:\n");
+    for (i = 0; i < RL_MT_MAX; i++) {
+        PI("    %s:%d\n", mt_names[i], atomic_read(mt_count + i));
+    }
+}
 
 #endif /* RL_MEMTRACK */
