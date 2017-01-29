@@ -581,27 +581,13 @@ typedef enum {
     RL_MT_CTLDEV,
     RL_MT_IODEV,
     RL_MT_MISC,
+    RL_MT_MAX
 } rl_memtrack_t;
 
 #ifdef RL_MEMTRACK
-static inline void *
-rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type)
-{
-    return kmalloc(size, gfp);
-}
-
-static inline char *
-rl_strdup(const char *s, gfp_t gfp, rl_memtrack_t type)
-{
-    return kstrdup(s, gfp);
-}
-
-static inline void
-rl_free(void *obj, rl_memtrack_t type)
-{
-    kfree(obj);
-}
-
+void *rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type);
+char *rl_strdup(const char *s, gfp_t gfp, rl_memtrack_t type);
+void rl_free(void *obj, rl_memtrack_t type);
 #else  /* ! RL_MEMTRACK */
 #define rl_alloc(_sz, _gfp, _ty)    kmalloc(_sz, _gfp)
 #define rl_strdup(_s, _gfp, _ty)    kstrdup(_s, _gfp)
