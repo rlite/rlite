@@ -2708,13 +2708,13 @@ rl_ctrl_write(struct file *f, const char __user *ubuf, size_t len, loff_t *ppos)
 
     /* Carry out the requested operation. */
     ret = rc->handlers[bmsg->msg_type](rc, bmsg);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, bmsg);
+    rl_free(kbuf, RL_MT_MISC);
     if (ret) {
-        rl_free(kbuf, RL_MT_MISC);
         return ret;
     }
 
     *ppos += len;
-    rl_free(kbuf, RL_MT_MISC);
 
     return len;
 }
