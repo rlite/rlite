@@ -43,12 +43,18 @@
  */
 extern int verbosity;
 
+//#define RL_PV_ENABLE /* compile PV() conditional logs */
+
 #define DOPRINT(KLEV, LEV, FMT, ...)            \
                 printk(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
+#ifdef RL_PV_ENABLE
 #define PV(FMT, ...)    \
     if (verbosity >= RL_VERB_VERY)   \
         DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
+#else  /* ! RL_PV_ENABLE */
+#define PV(FMT, ...)
+#endif /* ! RL_PV_ENABLE */
 
 #define PD(FMT, ...)    \
     if (verbosity >= RL_VERB_DBG)   \
