@@ -895,6 +895,7 @@ flow_get(rl_port_t port_id)
     flow = flow_lookup(port_id);
     if (flow) {
         flow->refcnt++;
+        PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
     }
     FUNLOCK();
 
@@ -915,6 +916,7 @@ flow_get_by_cep(unsigned int cep_id)
     hlist_for_each_entry(entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             entry->refcnt++;
+            PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
             FUNLOCK();
             return entry;
         }
@@ -935,22 +937,29 @@ flow_get_ref(struct flow_entry *flow)
 
     FLOCK();
     flow->refcnt++;
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
     FUNLOCK();
 }
 EXPORT_SYMBOL(flow_get_ref);
 
+/* To be called under FLOCK(). */
 static void
 flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
 {
     bool sched;
 
+    flow->refcnt++;
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
+
     spin_lock_bh(&rl_dm.flows_removeq_lock);
-    sched = list_empty(&rl_dm.flows_removeq);
-    flow->expires = jiffies + jdelta;
-    list_del_init(&flow->node_rm);
-    list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
-    if (sched) {
-        schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+    if (flow->expires == ~0U) { /* don't reschedule */
+        sched = list_empty(&rl_dm.flows_removeq);
+        flow->expires = jiffies + jdelta;
+        list_del_init(&flow->node_rm);
+        list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
+        if (sched) {
+            schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+        }
     }
     spin_unlock_bh(&rl_dm.flows_removeq_lock);
 }
@@ -959,11 +968,14 @@ static void
 flows_removeq_del(struct flow_entry *flow)
 {
     spin_lock_bh(&rl_dm.flows_removeq_lock);
+    flow->expires = ~0U;
     list_del_init(&flow->node_rm);
     spin_unlock_bh(&rl_dm.flows_removeq_lock);
+
+    flow_put(flow);
 }
 
-static struct flow_entry *
+void
 __flow_put(struct flow_entry *entry, bool maysleep)
 {
     struct rl_kmsg_flow_deallocated ntfy;
@@ -975,7 +987,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     struct ipcp_entry *ipcp;
 
     if (unlikely(!entry)) {
-        return NULL;
+        return;
     }
 
     FLOCK();
@@ -986,7 +998,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
         FUNLOCK();
-        return entry;
+        return;
     }
 
     ipcp = entry->txrx.ipcp;
@@ -999,7 +1011,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
      * to make sure that this flow_entry() invocation is not due to a
      * postponed removal, so that we avoid postponing forever. */
     if (!(entry->flags & RL_FLOW_DEL_POSTPONED) &&
-                (entry->flags & RL_FLOW_ALLOCATED)) {
+                (entry->flags & RL_FLOW_ALLOCATED) &&
+                    !(entry->flags & RL_FLOW_NEVER_BOUND)) {
         entry->flags |= RL_FLOW_DEL_POSTPONED;
         spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
@@ -1014,16 +1027,14 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
         spin_unlock_bh(&dtp->lock);
 
+        /* Reference counter is zero here, we need to reset it
+         * to 1 and let the delayed remove function do its job. */
+        entry->refcnt ++;
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         flows_removeq_add(entry, msecs_to_jiffies(10000));
-
-        /* Reference counter is zero here, but since the delayed
-         * worker is going to use the flow, we reset the reference
-         * counter to 1. The delayed worker will invoke flow_put()
-         * after having performed its work.
-         */
-        entry->refcnt++;
         FUNLOCK();
-        return entry;
+
+        return;
     }
 
     //BUG_ON(!maysleep);
@@ -1110,15 +1121,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     }
     ipcp_put(ipcp);
 
-    return NULL;
+    return;
 }
-
-struct flow_entry *
-flow_put(struct flow_entry *flow)
-{
-    return __flow_put(flow, false);
-}
-EXPORT_SYMBOL(flow_put);
+EXPORT_SYMBOL(__flow_put);
 
 static void
 flows_removew_func(struct work_struct *w)
@@ -1146,12 +1151,12 @@ flows_removew_func(struct work_struct *w)
     /* Remove all expired flows. */
     list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
         list_del_init(&flow->node_rm);
+        flow_put(flow); /* match flows_removeq_add() */
         if (flow->flags & RL_FLOW_NEVER_BOUND) {
             PI("Removing flow %u since it was never bound\n",
                 flow->local_port);
-            __flow_put(flow, true);
         }
-        __flow_put(flow, true);
+        flow_put(flow);
     }
 
     /* Reschedule if needed. */
@@ -1222,6 +1227,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         }
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
@@ -1235,6 +1241,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->expires = ~0U;
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
+
+        /* Start the unbound timer */
+        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
         FUNLOCK();
 
         PLOCK();
@@ -1250,9 +1259,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
                 ipcp->ops.flow_init(ipcp, entry);
             }
         }
-
-        /* Start the unbound timer */
-        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
     } else {
         FUNLOCK();
 
@@ -1285,6 +1291,7 @@ flow_rc_probe_references(struct rl_ctrl *rc)
 void
 flow_make_mortal(struct flow_entry *flow)
 {
+    bool never_bound = false;
     if (!flow) {
         return;
     }
@@ -1292,17 +1299,22 @@ flow_make_mortal(struct flow_entry *flow)
     FLOCK();
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
-        /* Here reference counter is (likely) 2. Reset it to 1, so that
+        never_bound = true;
+        /* Here reference counter is (likely) 3. Reset it to 2, so that
          * proper flow destruction happens in rl_io_release(). If we
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
-        flows_removeq_del(flow);
-        PV("Flow %u removed from removeq\n", flow->local_port);
         flow->refcnt--;
+        PV("FLOWREFCNT %u --: %u\n", flow->local_port, flow->refcnt);
     }
 
     FUNLOCK();
+
+    if (never_bound) {
+        flows_removeq_del(flow);
+        PV("Flow %u removed from removeq\n", flow->local_port);
+    }
 }
 
 static void
@@ -2275,6 +2287,7 @@ rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
     return rl_upqueue_append(rc, RLITE_MB(&resp), maysleep);
 }
 
+/* (1): client application --> kernel IPCP */
 static int
 rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
@@ -2287,7 +2300,7 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
             .rc = rc,
         };
     rl_ipcp_id_t ipcp_id = -1;
-    rl_port_t local_port;
+    rl_port_t local_port = 0;
     int ret = -ENXIO;
 
     /* Look up an IPC process entry for the specified DIF. */
@@ -2355,12 +2368,13 @@ out:
 
     if (flow_entry) {
         flows_removeq_del(flow_entry); /* match flow_add() */
-        flow_put(flow_entry);
+        flow_put(flow_entry); /* delete */
     }
 
     return ret;
 }
 
+/* (3): server application --> kernel IPCP */
 static int
 rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
@@ -2441,7 +2455,8 @@ out:
     return ret;
 }
 
-/* This may be called from softirq context. */
+/* This may be called from softirq context.
+ * (2): server application <-- kernel IPCP */
 int
 rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                   rl_port_t remote_port, uint32_t remote_cep,
@@ -2519,6 +2534,7 @@ out:
 }
 EXPORT_SYMBOL(rl_fa_req_arrived);
 
+/* (4): client application <-- kernel IPCP */
 int
 rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      rl_port_t local_port,

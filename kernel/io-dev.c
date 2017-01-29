@@ -603,8 +603,9 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
 {
     struct flow_entry *flow = NULL;
 
-    flow = flow_get(info->port_id);
-    if (!flow) {
+    flow = flow_get(info->port_id); /* take the reference and store it */
+    if (!flow || !(flow->flags & RL_FLOW_ALLOCATED) ||
+                        (flow->flags & RL_FLOW_DEALLOCATED)) {
         PE("Error: No such flow\n");
         return -ENXIO;
     }
