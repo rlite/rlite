@@ -2051,6 +2051,12 @@ rl_flow_get_stats(struct rl_ctrl *rc,
     ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
+#ifdef RL_MEMTRACK
+    /* Temporary solution: rl_flow_get_stats() is used as an hook to dump
+     * memtrack statistics. */
+    rl_memtrack_dump();
+#endif /* RL_MEMTRACK */
+
     return ret;
 }
 
