@@ -9,8 +9,6 @@
 
 - DTCP: RTT estimate should happen using ktime_t variables
 
-- implement a first address assignment policy
-
 - allocate and use N-flows rather than N-1-flows over shim DIFs
     - logic for self-registration and N-flow allocation already in place
     - the only missing thing is to actually use the N-flow and not the N-1
@@ -18,5 +16,3 @@
 - periodic DFT synchronization
 
 - use separate N-1 flows for management and data
-
-- implement reference counting to protect flow --> upper.rc
