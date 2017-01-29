@@ -67,6 +67,10 @@ int rl_conf_flow_get_dtp(rl_port_t port_id, struct rl_flow_dtp *dtp);
 
 int rl_conf_flow_get_stats(rl_port_t port_id, struct rl_flow_stats *stats);
 
+#ifdef RL_MEMTRACK
+int rl_conf_memtrack_dump(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -562,9 +562,6 @@ void dtp_dump(struct dtp *dtp);
         } while (0)
 
 
-/* Memtrack machinery */
-#define RL_MEMTRACK
-
 typedef enum {
     RL_MT_UTILS = 0,
     RL_MT_BUFHDR,

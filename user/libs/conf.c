@@ -423,3 +423,23 @@ rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec)
 
     return ret;
 }
+
+int
+rl_conf_memtrack_dump(void)
+{
+    struct rl_msg_base msg;
+    int fd, ret;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
+
+    msg.msg_type = RLITE_KER_MEMTRACK_DUMP;
+    msg.event_id = 1;
+
+    ret = rl_write_msg(fd, &msg, 1);
+    close(fd);
+
+    return ret;
+}
