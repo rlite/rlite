@@ -85,13 +85,13 @@ rl_free(void *obj, rl_memtrack_t type)
 EXPORT_SYMBOL(rl_free);
 
 void
-rl_memtrack_dump(void)
+rl_memtrack_dump_stats(void)
 {
     int i;
 
     PI("Memtrack stats:\n");
     for (i = 0; i < RL_MT_MAX; i++) {
-        PI("    %s:%d\n", mt_names[i], atomic_read(mt_count + i));
+        PI("    %-8s:%8d\n", mt_names[i], atomic_read(mt_count + i));
     }
 }
 

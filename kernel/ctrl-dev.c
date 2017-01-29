@@ -2051,12 +2051,6 @@ rl_flow_get_stats(struct rl_ctrl *rc,
     ret = rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
-#ifdef RL_MEMTRACK
-    /* Temporary solution: rl_flow_get_stats() is used as an hook to dump
-     * memtrack statistics. */
-    rl_memtrack_dump();
-#endif /* RL_MEMTRACK */
-
     return ret;
 }
 
@@ -2616,6 +2610,13 @@ rl_flow_share_tx_wqh(struct flow_entry *flow)
 }
 EXPORT_SYMBOL(rl_flow_share_tx_wqh);
 
+static int
+rl_memtrack_dump(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
+{
+    rl_memtrack_dump_stats();
+    return 0;
+}
+
 /* The table containing all the message handlers. */
 static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_IPCP_CREATE] = rl_ipcp_create,
@@ -2638,6 +2639,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
     [RLITE_KER_IPCP_QOS_SUPPORTED] = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE] = rl_appl_move,
+    [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
