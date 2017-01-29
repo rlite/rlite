@@ -503,7 +503,14 @@ void rl_write_restart_flows(struct ipcp_entry *ipcp);
 
 void rl_flow_share_tx_wqh(struct flow_entry *flow);
 
-struct flow_entry *flow_put(struct flow_entry *flow);
+void __flow_put(struct flow_entry *flow, bool maysleep);
+
+#define flow_put(_f)    \
+        do {            \
+            if (_f)     \
+                PV("FLOWREFCNT %u --: %u\n", (_f)->local_port, (_f)->refcnt - 1); \
+            __flow_put(_f, false); \
+        } while (0)
 
 struct flow_entry *flow_lookup(rl_port_t port_id);
 

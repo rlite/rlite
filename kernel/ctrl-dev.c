@@ -894,6 +894,7 @@ flow_get(rl_port_t port_id)
     flow = flow_lookup(port_id);
     if (flow) {
         flow->refcnt++;
+        PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
     }
     FUNLOCK();
 
@@ -914,6 +915,7 @@ flow_get_by_cep(unsigned int cep_id)
     hlist_for_each_entry(entry, head, node_cep) {
         if (entry->local_cep == cep_id) {
             entry->refcnt++;
+            PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
             FUNLOCK();
             return entry;
         }
@@ -934,6 +936,7 @@ flow_get_ref(struct flow_entry *flow)
 
     FLOCK();
     flow->refcnt++;
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
     FUNLOCK();
 }
 EXPORT_SYMBOL(flow_get_ref);
@@ -945,6 +948,7 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
     bool sched;
 
     flow->refcnt++;
+    PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
     spin_lock_bh(&rl_dm.flows_removeq_lock);
     if (flow->expires == ~0U) { /* don't reschedule */
@@ -970,7 +974,7 @@ flows_removeq_del(struct flow_entry *flow)
     flow_put(flow);
 }
 
-static struct flow_entry *
+void
 __flow_put(struct flow_entry *entry, bool maysleep)
 {
     struct rl_kmsg_flow_deallocated ntfy;
@@ -982,7 +986,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     struct ipcp_entry *ipcp;
 
     if (unlikely(!entry)) {
-        return NULL;
+        return;
     }
 
     FLOCK();
@@ -993,7 +997,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
         FUNLOCK();
-        return entry;
+        return;
     }
 
     ipcp = entry->txrx.ipcp;
@@ -1006,7 +1010,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
      * to make sure that this flow_entry() invocation is not due to a
      * postponed removal, so that we avoid postponing forever. */
     if (!(entry->flags & RL_FLOW_DEL_POSTPONED) &&
-                (entry->flags & RL_FLOW_ALLOCATED)) {
+                (entry->flags & RL_FLOW_ALLOCATED) &&
+                    !(entry->flags & RL_FLOW_NEVER_BOUND)) {
         entry->flags |= RL_FLOW_DEL_POSTPONED;
         spin_lock_bh(&dtp->lock);
         if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
@@ -1024,10 +1029,11 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         /* Reference counter is zero here, we need to reset it
          * to 1 and let the delayed remove function do its job. */
         entry->refcnt ++;
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         flows_removeq_add(entry, msecs_to_jiffies(10000));
         FUNLOCK();
 
-        return entry;
+        return;
     }
 
     //BUG_ON(!maysleep);
@@ -1114,15 +1120,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     }
     ipcp_put(ipcp);
 
-    return NULL;
+    return;
 }
-
-struct flow_entry *
-flow_put(struct flow_entry *flow)
-{
-    return __flow_put(flow, false);
-}
-EXPORT_SYMBOL(flow_put);
+EXPORT_SYMBOL(__flow_put);
 
 static void
 flows_removew_func(struct work_struct *w)
@@ -1150,12 +1150,12 @@ flows_removew_func(struct work_struct *w)
     /* Remove all expired flows. */
     list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
         list_del_init(&flow->node_rm);
-        __flow_put(flow, true); /* match flows_removeq_add() */
+        flow_put(flow); /* match flows_removeq_add() */
         if (flow->flags & RL_FLOW_NEVER_BOUND) {
             PI("Removing flow %u since it was never bound\n",
                 flow->local_port);
         }
-        __flow_put(flow, true);
+        flow_put(flow);
     }
 
     /* Reschedule if needed. */
@@ -1226,6 +1226,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         }
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
+        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
@@ -1304,6 +1305,7 @@ flow_make_mortal(struct flow_entry *flow)
          * set to 1. */
         flow->flags &= ~RL_FLOW_NEVER_BOUND;
         flow->refcnt--;
+        PV("FLOWREFCNT %u --: %u\n", flow->local_port, flow->refcnt);
     }
 
     FUNLOCK();
