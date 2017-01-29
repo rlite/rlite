@@ -553,7 +553,7 @@ void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
 
-#define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(30000))
+#define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(15000))
 
 #define list_add_tail_safe(e, h) \
         do { \

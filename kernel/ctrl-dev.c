@@ -1031,7 +1031,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
          * to 1 and let the delayed remove function do its job. */
         entry->refcnt ++;
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
-        flows_removeq_add(entry, msecs_to_jiffies(10000));
+        flows_removeq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
         FUNLOCK();
 
         return;
