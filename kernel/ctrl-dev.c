@@ -1154,7 +1154,6 @@ flows_removew_func(struct work_struct *w)
         if (flow->flags & RL_FLOW_NEVER_BOUND) {
             PI("Removing flow %u since it was never bound\n",
                 flow->local_port);
-            __flow_put(flow, true);
         }
         __flow_put(flow, true);
     }
@@ -1299,7 +1298,7 @@ flow_make_mortal(struct flow_entry *flow)
 
     if (flow->flags & RL_FLOW_NEVER_BOUND) {
         never_bound = true;
-        /* Here reference counter is (likely) 2. Reset it to 1, so that
+        /* Here reference counter is (likely) 3. Reset it to 2, so that
          * proper flow destruction happens in rl_io_release(). If we
          * didn't do it, the flow would live forever with its refcount
          * set to 1. */
@@ -2285,6 +2284,7 @@ rl_append_allocate_flow_resp_arrived(struct rl_ctrl *rc, uint32_t event_id,
     return rl_upqueue_append(rc, RLITE_MB(&resp), maysleep);
 }
 
+/* (1): client application --> kernel IPCP */
 static int
 rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
@@ -2365,12 +2365,13 @@ out:
 
     if (flow_entry) {
         flows_removeq_del(flow_entry); /* match flow_add() */
-        flow_put(flow_entry);
+        flow_put(flow_entry); /* delete */
     }
 
     return ret;
 }
 
+/* (3): server application --> kernel IPCP */
 static int
 rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
@@ -2451,7 +2452,8 @@ out:
     return ret;
 }
 
-/* This may be called from softirq context. */
+/* This may be called from softirq context.
+ * (2): server application <-- kernel IPCP */
 int
 rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                   rl_port_t remote_port, uint32_t remote_cep,
@@ -2527,6 +2529,7 @@ out:
 }
 EXPORT_SYMBOL(rl_fa_req_arrived);
 
+/* (4): client application <-- kernel IPCP */
 int
 rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      rl_port_t local_port,
