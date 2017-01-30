@@ -2610,12 +2610,14 @@ rl_flow_share_tx_wqh(struct flow_entry *flow)
 }
 EXPORT_SYMBOL(rl_flow_share_tx_wqh);
 
+#ifdef RL_MEMTRACK
 static int
 rl_memtrack_dump(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     rl_memtrack_dump_stats();
     return 0;
 }
+#endif /* RL_MEMTRACK */
 
 /* The table containing all the message handlers. */
 static rl_msg_handler_t rl_ctrl_handlers[] = {
@@ -2639,7 +2641,9 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
     [RLITE_KER_IPCP_QOS_SUPPORTED] = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE] = rl_appl_move,
+#ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
+#endif /* RL_MEMTRACK */
     [RLITE_KER_MSG_MAX] = NULL,
 };
 
