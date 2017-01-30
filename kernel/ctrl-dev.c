@@ -1313,7 +1313,6 @@ flow_make_mortal(struct flow_entry *flow)
 
     if (never_bound) {
         flows_removeq_del(flow);
-        PV("Flow %u removed from removeq\n", flow->local_port);
     }
 }
 
