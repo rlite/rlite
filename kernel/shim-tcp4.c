@@ -80,7 +80,7 @@ rl_shim_tcp4_create(struct ipcp_entry *ipcp)
 {
     struct rl_shim_tcp4 *priv;
 
-    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!priv) {
         return NULL;
     }
@@ -108,7 +108,7 @@ rl_shim_tcp4_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_shim_tcp4 *priv = ipcp->priv;
 
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIM);
 
     PD("IPCP [%p] destroyed\n", priv);
 }
@@ -235,7 +235,7 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     struct socket *sock;
     int err;
 
-    priv = kmalloc(sizeof(*priv), GFP_ATOMIC);
+    priv = rl_alloc(sizeof(*priv), GFP_ATOMIC, RL_MT_SHIMDATA);
     if (!priv) {
         PE("Out of memory\n");
         return -1;
@@ -245,7 +245,7 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     sock = sockfd_lookup(flow->cfg.fd, &err);
     if (!sock) {
         PE("Cannot find socket corresponding to file descriptor %d\n", flow->cfg.fd);
-        kfree(priv);
+        rl_free(priv, RL_MT_SHIMDATA);
         return err;
     }
 
@@ -313,7 +313,7 @@ rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
     fput(sock->file);
     // mutex_destroy(&priv->rxw_lock);
     flow->priv = NULL;
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIMDATA);
 
     PD("Released socket %p\n", sock);
 
@@ -400,7 +400,7 @@ tcp4_tx_worker(struct work_struct *w)
         }
 
         flow_put(qe->flow_priv->flow);
-        kfree(qe);
+        rl_free(qe, RL_MT_SHIMDATA);
     }
 }
 
@@ -427,7 +427,8 @@ rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (!maysleep) {
-        struct txq_entry *qe = kmalloc(sizeof(*qe), GFP_ATOMIC);
+        struct txq_entry *qe = rl_alloc(sizeof(*qe), GFP_ATOMIC,
+                                        RL_MT_SHIMDATA);
         bool drop = false;
 
         if (unlikely(!qe)) {

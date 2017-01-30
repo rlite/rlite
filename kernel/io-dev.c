@@ -269,7 +269,8 @@ struct rl_io {
 static int
 rl_io_open(struct inode *inode, struct file *f)
 {
-    struct rl_io *rio = kzalloc(sizeof(*rio), GFP_KERNEL);
+    struct rl_io *rio = rl_alloc(sizeof(*rio), GFP_KERNEL | __GFP_ZERO,
+                                 RL_MT_IODEV);
 
     if (!rio) {
         PE("Out of memory\n");
@@ -633,7 +634,8 @@ rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
         return -ENXIO;
     }
 
-    rio->txrx = kzalloc(sizeof(*(rio->txrx)), GFP_KERNEL);
+    rio->txrx = rl_alloc(sizeof(*(rio->txrx)), GFP_KERNEL | __GFP_ZERO,
+                         RL_MT_MISC);
     if (!rio->txrx) {
         ipcp_put(ipcp);
         PE("Out of memory\n");
@@ -681,7 +683,7 @@ rl_io_release_internal(struct rl_io *rio)
              * descriptor, so let's unbind from it. */
             rio->txrx->ipcp->mgmt_txrx = NULL;
             ipcp_put(rio->txrx->ipcp);
-            kfree(rio->txrx);
+            rl_free(rio->txrx, RL_MT_MISC);
             rio->txrx = NULL;
             break;
 
@@ -747,7 +749,7 @@ rl_io_release(struct inode *inode, struct file *f)
     IODEVS_LOCK();
     list_del(&rio->node);
     IODEVS_UNLOCK();
-    kfree(rio);
+    rl_free(rio, RL_MT_IODEV);
 
     return 0;
 }

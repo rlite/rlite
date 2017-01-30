@@ -267,6 +267,9 @@ struct rl_flow_dtp
 #define RL_VERB_DBG     4
 #define RL_VERB_VERY    5
 
+/* Memtrack machinery */
+#define RL_MEMTRACK
+
 #ifdef __cplusplus
 }
 #endif

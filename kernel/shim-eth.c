@@ -90,7 +90,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
 {
     struct rl_shim_eth *priv;
 
-    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!priv) {
         return NULL;
     }
@@ -122,10 +122,10 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
         list_del_init(&entry->node);
         if (entry->spa) {
-            kfree(entry->spa);
+            rl_free(entry->spa, RL_MT_SHIMDATA);
         }
-        kfree(entry->tpa);
-        kfree(entry);
+        rl_free(entry->tpa, RL_MT_SHIMDATA);
+        rl_free(entry, RL_MT_SHIMDATA);
     }
     priv->arp_tmr_shutdown = true;
     spin_unlock_bh(&priv->arpt_lock);
@@ -140,10 +140,10 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
     }
 
     if (priv->upper_name) {
-        kfree(priv->upper_name);
+        rl_free(priv->upper_name, RL_MT_SHIMDATA);
     }
 
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
 }
@@ -159,7 +159,7 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
             return -EBUSY;
         }
 
-        priv->upper_name = kstrdup(appl, GFP_KERNEL);
+        priv->upper_name = rl_strdup(appl, GFP_KERNEL, RL_MT_SHIMDATA);
         if (!priv->upper_name) {
             PE("Out of memory\n");
             return -ENOMEM;
@@ -177,7 +177,7 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 
     if (strcmp(appl, priv->upper_name) == 0) {
         PD("Application %s unregistered\n", priv->upper_name);
-        kfree(priv->upper_name);
+        rl_free(priv->upper_name, RL_MT_SHIMDATA);
         priv->upper_name = NULL;
     } else {
         /* Nothing to do. Main module may be trying to clean up a
@@ -390,14 +390,14 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return ret;
     }
 
-    entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
+    entry = rl_alloc(sizeof(*entry), GFP_ATOMIC | __GFP_ZERO, RL_MT_SHIMDATA);
     if (!entry) {
         spin_unlock_bh(&priv->arpt_lock);
         goto nomem;
     }
 
-    entry->tpa = kstrdup(flow->remote_appl, GFP_ATOMIC);
-    entry->spa = kstrdup(flow->local_appl, GFP_ATOMIC);
+    entry->tpa = rl_strdup(flow->remote_appl, GFP_ATOMIC, RL_MT_SHIMDATA);
+    entry->spa = rl_strdup(flow->local_appl, GFP_ATOMIC, RL_MT_SHIMDATA);
     if (!entry->tpa || !entry->spa) {
         spin_unlock_bh(&priv->arpt_lock);
         goto nomem;
@@ -437,12 +437,12 @@ nomem:
     if (entry) {
         list_del_init(&entry->node);
         if (entry->tpa) {
-            kfree(entry->tpa);
+            rl_free(entry->tpa, RL_MT_SHIMDATA);
         }
         if (entry->spa) {
-            kfree(entry->spa);
+            rl_free(entry->spa, RL_MT_SHIMDATA);
         }
-        kfree(entry);
+        rl_free(entry, RL_MT_SHIMDATA);
     }
 
     return -ENOMEM;
@@ -543,13 +543,14 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
                          strlen(priv->upper_name),
                          spa, arp->ar_pln, sha, GFP_ATOMIC);
 
-        entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
+        entry = rl_alloc(sizeof(*entry), GFP_ATOMIC | __GFP_ZERO,
+                         RL_MT_SHIMDATA);
         if (entry) {
             size_t spa_len = arp_name_len(spa, arp->ar_pln);
 
-            entry->tpa = kmalloc(spa_len + 1, GFP_ATOMIC);
+            entry->tpa = rl_alloc(spa_len + 1, GFP_ATOMIC, RL_MT_SHIMDATA);
             if (!entry->tpa) {
-                kfree(entry);
+                rl_free(entry, RL_MT_SHIMDATA);
                 entry = NULL;
             } else {
                 memcpy(entry->tpa, spa, spa_len);

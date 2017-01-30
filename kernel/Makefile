@@ -1,5 +1,5 @@
 obj-m += rlite.o
-rlite-y := ctrl-dev.o io-dev.o utils.o ker-numtables.o bufs.o efcp-utils.o
+rlite-y := ctrl-dev.o io-dev.o utils.o ker-numtables.o bufs.o efcp-utils.o memtrack.o
 
 obj-m += rlite-shim-loopback.o
 rlite-shim-loopback-y := shim-loopback.o

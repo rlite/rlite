@@ -542,6 +542,14 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    rl_conf_memtrack_dump();
+
+    return 0;
+}
+
+static int
 ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
 {
     struct rl_cmsg_ipcp_rib_show_resp *resp =
@@ -735,6 +743,14 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .num_args = 1,
         .func = flow_dump,
     },
+#ifdef RL_MEMTRACK
+    {
+        .name = "memtrack",
+        .usage = "",
+        .num_args = 0,
+        .func = memtrack_dump,
+    },
+#endif
 };
 
 #define NUM_COMMANDS    (sizeof(cmd_descriptors)/sizeof(struct cmd_descriptor))

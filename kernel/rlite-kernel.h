@@ -36,18 +36,25 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <asm/atomic.h>
+#include <linux/slab.h>
 
 /*
  * Logging support.
  */
 extern int verbosity;
 
+//#define RL_PV_ENABLE /* compile PV() conditional logs */
+
 #define DOPRINT(KLEV, LEV, FMT, ...)            \
                 printk(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
+#ifdef RL_PV_ENABLE
 #define PV(FMT, ...)    \
     if (verbosity >= RL_VERB_VERY)   \
         DOPRINT(KERN_DEBUG, "DBG", FMT, ##__VA_ARGS__)
+#else  /* ! RL_PV_ENABLE */
+#define PV(FMT, ...)
+#endif /* ! RL_PV_ENABLE */
 
 #define PD(FMT, ...)    \
     if (verbosity >= RL_VERB_DBG)   \
@@ -546,12 +553,43 @@ void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
 
-#define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(30000))
+#define RL_UNBOUND_FLOW_TO      (msecs_to_jiffies(15000))
 
 #define list_add_tail_safe(e, h) \
         do { \
             BUG_ON(!list_empty(e)); \
             list_add_tail(e, h); \
         } while (0)
+
+
+typedef enum {
+    RL_MT_UTILS = 0,
+    RL_MT_BUFHDR,
+    RL_MT_BUFDATA,
+    RL_MT_FFETCH,
+    RL_MT_PDUFT,
+    RL_MT_SHIMDATA,
+    RL_MT_SHIM,
+    RL_MT_UPQ,
+    RL_MT_DIF,
+    RL_MT_IPCP,
+    RL_MT_REGAPP,
+    RL_MT_FLOW,
+    RL_MT_CTLDEV,
+    RL_MT_IODEV,
+    RL_MT_MISC,
+    RL_MT_MAX
+} rl_memtrack_t;
+
+#ifdef RL_MEMTRACK
+void *rl_alloc(size_t size, gfp_t gfp, rl_memtrack_t type);
+char *rl_strdup(const char *s, gfp_t gfp, rl_memtrack_t type);
+void rl_free(void *obj, rl_memtrack_t type);
+void rl_memtrack_dump_stats(void);
+#else  /* ! RL_MEMTRACK */
+#define rl_alloc(_sz, _gfp, _ty)    kmalloc(_sz, _gfp)
+#define rl_strdup(_s, _gfp, _ty)    kstrdup(_s, _gfp)
+#define rl_free(_obj, _ty)          kfree(_obj)
+#endif /* ! RL_MEMTRACK */
 
 #endif  /* __RLITE_KERNEL_H__ */

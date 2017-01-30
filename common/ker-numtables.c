@@ -123,6 +123,9 @@ struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_APPL_MOVE] = {
         .copylen = sizeof(struct rl_kmsg_appl_move),
     },
+    [RLITE_KER_MEMTRACK_DUMP] = {
+        .copylen = sizeof(struct rl_msg_base),
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

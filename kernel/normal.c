@@ -53,7 +53,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv;
 
-    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!priv) {
         return NULL;
     }
@@ -72,7 +72,7 @@ rl_normal_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv = ipcp->priv;
 
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
 }
@@ -787,7 +787,7 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
     entry = pduft_lookup_internal(priv, dst_addr);
 
     if (!entry) {
-        entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
+        entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
         if (!entry) {
             return -ENOMEM;
         }
@@ -821,7 +821,7 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
         list_del_init(&entry->fnode);
         hash_del(&entry->node);
-        kfree(entry);
+        rl_free(entry, RL_MT_PDUFT);
     }
 
     write_unlock_bh(&priv->pduft_lock);
@@ -845,7 +845,7 @@ rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
     pduft_entry_unlink(entry);
     write_unlock_bh(&priv->pduft_lock);
 
-    kfree(entry);
+    rl_free(entry, RL_MT_PDUFT);
 
     return 0;
 }
@@ -864,7 +864,7 @@ rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rl_addr_t dst_addr)
     write_unlock_bh(&priv->pduft_lock);
 
     if (entry) {
-        kfree(entry);
+        rl_free(entry, RL_MT_PDUFT);
     }
 
     return (entry != NULL) ? 0 : -1;

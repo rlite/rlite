@@ -159,7 +159,7 @@ rl_shim_hv_create(struct ipcp_entry *ipcp)
 {
     struct rl_shim_hv *priv;
 
-    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    priv = rl_alloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO, RL_MT_SHIM);
     if (!priv) {
         return NULL;
     }
@@ -179,7 +179,7 @@ rl_shim_hv_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_shim_hv *priv = ipcp->priv;
 
-    kfree(priv);
+    rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
 }
@@ -199,8 +199,8 @@ rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     req.msg_type = RLITE_SHIM_HV_FA_REQ;
     req.event_id = 0;
-    req.src_appl = kstrdup(flow->local_appl, GFP_KERNEL);
-    req.dst_appl = kstrdup(flow->remote_appl, GFP_KERNEL);
+    req.src_appl = rl_strdup(flow->local_appl, GFP_KERNEL, RL_MIT_UTILS);
+    req.dst_appl = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MIT_UTILS);
     req.src_port = flow->local_port;
 
     return shim_hv_send_ctrl_msg(ipcp, RLITE_MB(&req));
