@@ -2392,6 +2392,13 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         return ret;
     }
 
+    if (resp->kevent_id != flow_entry->event_id) {
+        PE("kevent_id mismatch: %u != %u\n", resp->kevent_id,
+            flow_entry->event_id);
+        flow_put(flow_entry);
+        return ret;
+    }
+
     BUG_ON(rc != flow_entry->upper.rc);
 
     /* Check that the flow is in pending state and make the
@@ -2489,7 +2496,7 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     /* Allocate a port id and the associated flow entry. */
     upper.rc = app->rc;
     upper.ipcp = NULL;
-    ret = flow_add(ipcp, upper, 0, local_appl, remote_appl,
+    ret = flow_add(ipcp, upper, kevent_id, local_appl, remote_appl,
                    flowcfg, &req.flowspec, &flow_entry, GFP_ATOMIC);
     if (ret) {
         goto out;
