@@ -41,7 +41,7 @@ rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
     int n;
 
     serlen = rl_msg_serlen(rl_uipcps_numtables, RLITE_U_MSG_MAX, msg);
-    serbuf = malloc(serlen);
+    serbuf = rl_alloc(serlen, RL_MT_MISC);
     if (!serbuf) {
         return -1;
     }
@@ -54,7 +54,7 @@ rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
         PE("write failed [%d/%d]\n", n, serlen);
     }
 
-    free(serbuf);
+    rl_free(serbuf, RL_MT_MISC);
 
     return (n == serlen) ? 0 : -1;
 }

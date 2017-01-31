@@ -70,9 +70,9 @@ rl_conf_ipcp_create(const char *name, const char *dif_type,
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_CREATE;
     msg.event_id = 1;
-    msg.name = name ? strdup(name) : NULL;
-    msg.dif_type = strdup(dif_type);
-    msg.dif_name = strdup(dif_name);
+    msg.name = name ? rl_strdup(name, RL_MT_UTILS) : NULL;
+    msg.dif_type = rl_strdup(dif_type, RL_MT_UTILS);
+    msg.dif_name = rl_strdup(dif_name, RL_MT_UTILS);
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     if (ret < 0) {
@@ -92,7 +92,7 @@ rl_conf_ipcp_create(const char *name, const char *dif_type,
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
-    free(resp);
+    rl_free(resp, RL_MT_MSG);
 out:
     close(fd);
 
@@ -157,8 +157,8 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
     req->msg_type = RLITE_KER_IPCP_CONFIG;
     req->event_id = 1;
     req->ipcp_id = ipcp_id;
-    req->name = strdup(param_name);
-    req->value = strdup(param_value);
+    req->name = rl_strdup(param_name, RL_MT_UTILS);
+    req->value = rl_strdup(param_value, RL_MT_UTILS);
 
     return 0;
 }
@@ -199,7 +199,7 @@ flow_fetch_resp(struct list_head *flows,
         return 0;
     }
 
-    rl_flow = malloc(sizeof(*rl_flow));
+    rl_flow = rl_alloc(sizeof(*rl_flow), RL_MT_CONF);
     if (!rl_flow) {
         PE("Out of memory\n");
         return 0;
@@ -268,7 +268,7 @@ rl_conf_flows_fetch(struct list_head *flows)
             end = resp->end;
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                            RLITE_MB(resp));
-            free(resp);
+            rl_free(resp, RL_MT_MSG);
         }
     }
 
@@ -286,7 +286,7 @@ rl_conf_flows_purge(struct list_head *flows)
     /* Purge the flows list. */
     list_for_each_entry_safe(rl_flow, tmp, flows, node) {
         list_del(&rl_flow->node);
-        free(rl_flow);
+        rl_free(rl_flow, RL_MT_CONF);
     }
 }
 
@@ -332,7 +332,7 @@ rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
-    free(resp);
+    rl_free(resp, RL_MT_MSG);
 out:
     close(fd);
 

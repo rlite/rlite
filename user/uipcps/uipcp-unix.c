@@ -225,7 +225,7 @@ out:
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
 
     if (dumpstr) {
-        free(dumpstr);
+        rl_free(dumpstr, RL_MT_UTILS);
     }
 
     return ret;
@@ -335,7 +335,7 @@ unix_server(struct uipcps *uipcps)
 
                 PV("Worker %p cleaned-up\n", wi);
                 list_del(&wi->node);
-                free(wi);
+                rl_free(wi, RL_MT_MISC);
                 threads_cnt --;
             }
 
@@ -350,7 +350,7 @@ unix_server(struct uipcps *uipcps)
             usleep(50000);
         }
 
-        wi = malloc(sizeof(*wi));
+        wi = rl_alloc(sizeof(*wi), RL_MT_MISC);
         wi->uipcps = uipcps;
 
         /* Accept a new client and create a thread to serve it. */
@@ -361,7 +361,7 @@ unix_server(struct uipcps *uipcps)
         if (ret) {
             PE("pthread_create() failed [%d]\n", errno);
             close(wi->cfd);
-            free(wi);
+            rl_free(wi, RL_MT_MISC);
         }
 
         list_add_tail(&wi->node, &threads);
@@ -386,7 +386,7 @@ periodic_tasks(struct uipcps *uipcps)
     /* Get a reference to each uipcp. */
     pthread_mutex_lock(&uipcps->lock);
     n = uipcps->n_uipcps;
-    tmplist = malloc(n * sizeof(struct uipcp *));
+    tmplist = rl_alloc(n * sizeof(struct uipcp *), RL_MT_MISC);
     if (!tmplist) {
         pthread_mutex_unlock(&uipcps->lock);
         PE("Out of memory\n");
@@ -412,7 +412,7 @@ periodic_tasks(struct uipcps *uipcps)
         uipcp_put(tmplist[i]);
     }
 
-    free(tmplist);
+    rl_free(tmplist, RL_MT_MISC);
 }
 
 static void *

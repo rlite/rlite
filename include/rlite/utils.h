@@ -142,6 +142,31 @@ extern int rl_verbosity;
 
 #define PE(FMT, ...) PRINTFUN2("ERR", FMT, ##__VA_ARGS__)
 
+/* RL_MEMTRACK */
+
+typedef enum {
+    RL_MT_UTILS = 0,
+    RL_MT_CONF,
+    RL_MT_MSG,
+    RL_MT_API,
+    RL_MT_EVLOOP,
+    RL_MT_UIPCP,
+    RL_MT_TOPO,
+    RL_MT_MISC,
+    RL_MT_SHIM,
+    RL_MT_SHIMDATA,
+} rl_memtrack_t;
+
+#ifdef RL_MEMTRACK
+#define rl_alloc(_sz, _ty)          malloc(_sz)
+#define rl_strdup(_s, _ty)          strdup(_s)
+#define rl_free(_obj, _ty)          free(_obj)
+#else   /* ! RL_MEMTRACK */
+#define rl_alloc(_sz, _ty)          malloc(_sz)
+#define rl_strdup(_s, _ty)          strdup(_s)
+#define rl_free(_obj, _ty)          free(_obj)
+#endif  /* ! RL_MEMTRACK */
+
 #endif /* !__KERNEL__ */
 
 #ifdef __cplusplus

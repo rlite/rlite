@@ -140,7 +140,7 @@ parse_directory(struct shim_tcp4 *shim, int appl2sock,
                     /* addr->sin_port == cur_addr.sin_port && */
                     memcmp(&addr->sin_addr, &cur_addr.sin_addr,
                     sizeof(cur_addr.sin_addr)) == 0) {
-                *appl_name = strdup(nm);
+                *appl_name = rl_strdup(nm, RL_MT_SHIMDATA);
                 if (!(*appl_name)) {
                     UPE(shim->uipcp, "Out of memory\n");
                     found = 0;
@@ -220,8 +220,8 @@ shim_tcp4_appl_unregister(struct uipcp *uipcp,
             uipcp_loop_fdh_del(uipcp, bp->fd);
             list_del(&bp->node);
             close(bp->fd);
-            free(bp->appl_name_s);
-            free(bp);
+            rl_free(bp->appl_name_s, RL_MT_SHIMDATA);
+            rl_free(bp, RL_MT_SHIMDATA);
             ret = 0;
 
             break;
@@ -253,13 +253,13 @@ shim_tcp4_appl_register(struct uipcp *uipcp,
 
     /* Process the registration. */
 
-    bp = malloc(sizeof(*bp));
+    bp = rl_alloc(sizeof(*bp), RL_MT_SHIMDATA);
     if (!bp) {
         UPE(uipcp, "Out of memory\n");
         goto err0;
     }
 
-    bp->appl_name_s = strdup(req->appl_name);
+    bp->appl_name_s = rl_strdup(req->appl_name, RL_MT_SHIMDATA);
     if (!bp->appl_name_s) {
         UPE(uipcp, "Out of memory\n");
         goto err1;
@@ -295,9 +295,9 @@ shim_tcp4_appl_register(struct uipcp *uipcp,
 err3:
     close(bp->fd);
 err2:
-    free(bp->appl_name_s);
+    rl_free(bp->appl_name_s, RL_MT_SHIMDATA);
 err1:
-    free(bp);
+    rl_free(bp, RL_MT_SHIMDATA);
 err0:
     return uipcp_appl_register_resp(uipcp, uipcp->id,
                                     RLITE_ERR, req);
@@ -316,7 +316,7 @@ shim_tcp4_fa_req(struct uipcp *uipcp,
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ep = malloc(sizeof(*ep));
+    ep = rl_alloc(sizeof(*ep), RL_MT_SHIMDATA);
     if (!ep) {
         UPE(uipcp, "Out of memory\n");
         return -1;
@@ -360,7 +360,7 @@ shim_tcp4_fa_req(struct uipcp *uipcp,
 err2:
     close(ep->fd);
 err1:
-    free(ep);
+    rl_free(ep, RL_MT_SHIMDATA);
 
     return -1;
 }
@@ -372,7 +372,7 @@ lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, char **name)
 
     list_for_each_entry(ep, &shim->bindpoints, node) {
         if (lfd == ep->fd) {
-            *name = strdup(ep->appl_name_s);
+            *name = rl_strdup(ep->appl_name_s, RL_MT_SHIMDATA);
             return *name ? 0 : -1;
         }
     }
@@ -407,7 +407,7 @@ accept_conn(struct uipcp *uipcp, int lfd)
         return;
     }
 
-    ep = malloc(sizeof(*ep));
+    ep = rl_alloc(sizeof(*ep), RL_MT_SHIMDATA);
     if (!ep) {
         UPE(uipcp, "Out of memory\n");
         return;
@@ -422,8 +422,8 @@ accept_conn(struct uipcp *uipcp, int lfd)
      * TCP client. */
     if (sock_addr_to_appl_name(shim, &ep->addr, &remote_appl)) {
         UPE(uipcp, "Failed to get appl_name from remote address\n");
-        if (local_appl) free(local_appl);
-        free(ep);
+        if (local_appl) rl_free(local_appl, RL_MT_SHIMDATA);
+        rl_free(ep, RL_MT_SHIMDATA);
         return;
     }
 
@@ -435,8 +435,8 @@ accept_conn(struct uipcp *uipcp, int lfd)
     cfg.fd = ep->fd;
     uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                local_appl, remote_appl, &cfg);
-    if (local_appl) free(local_appl);
-    if (remote_appl) free(remote_appl);
+    if (local_appl) rl_free(local_appl, RL_MT_SHIMDATA);
+    if (remote_appl) rl_free(remote_appl, RL_MT_SHIMDATA);
 }
 
 static struct tcp4_endpoint *
@@ -464,7 +464,7 @@ remove_endpoint_by_port_id(struct shim_tcp4 *shim, rl_port_t port_id)
                 "sfd=%d]\n", ep->port_id, ep->kevent_id, ep->fd);
             close(ep->fd);
             list_del(&ep->node);
-            free(ep);
+            rl_free(ep, RL_MT_SHIMDATA);
             return 0;
         }
     }
@@ -500,7 +500,7 @@ shim_tcp4_fa_resp(struct uipcp *uipcp,
     UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
             ep->port_id, ep->kevent_id, ep->fd);
     close(ep->fd);
-    free(ep);
+    rl_free(ep, RL_MT_SHIMDATA);
 
     return 0;
 }
@@ -529,7 +529,7 @@ shim_tcp4_init(struct uipcp *uipcp)
 {
     struct shim_tcp4 *shim;
 
-    shim = malloc(sizeof(*shim));
+    shim = rl_alloc(sizeof(*shim), RL_MT_SHIM);
     if (!shim) {
         UPE(uipcp, "Out of memory\n");
         return -1;
@@ -540,11 +540,11 @@ shim_tcp4_init(struct uipcp *uipcp)
     /* Store the name of the DIF, it will be
      * used during the registration. */
     pthread_mutex_lock(&uipcp->uipcps->lock);
-    shim->dif_name = strdup(uipcp->dif_name);
+    shim->dif_name = rl_strdup(uipcp->dif_name, RL_MT_SHIMDATA);
     pthread_mutex_unlock(&uipcp->uipcps->lock);
     if (!shim->dif_name) {
         UPE(uipcp, "Out of memory\n");
-        free(shim);
+        rl_free(shim, RL_MT_SHIM);
         return -1;
     }
 
@@ -567,8 +567,8 @@ shim_tcp4_fini(struct uipcp *uipcp)
         list_for_each_entry_safe(bp, tmp, &shim->bindpoints, node) {
             list_del(&bp->node);
             close(bp->fd);
-            free(bp->appl_name_s);
-            free(bp);
+            rl_free(bp->appl_name_s, RL_MT_SHIMDATA);
+            rl_free(bp, RL_MT_SHIMDATA);
         }
     }
 
@@ -578,13 +578,12 @@ shim_tcp4_fini(struct uipcp *uipcp)
         list_for_each_entry_safe(ep, tmp, &shim->endpoints, node) {
             list_del(&ep->node);
             close(ep->fd);
-            free(ep);
+            rl_free(ep, RL_MT_SHIMDATA);
         }
     }
 
-    free(shim->dif_name);
-
-    free(shim);
+    rl_free(shim->dif_name, RL_MT_SHIMDATA);
+    rl_free(shim, RL_MT_SHIM);
 
     return 0;
 }

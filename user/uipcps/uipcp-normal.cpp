@@ -91,7 +91,7 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
         return -1;
     }
 
-    mgmtbuf = (char *)malloc(sizeof(*mhdr) + buflen);
+    mgmtbuf = (char *)rl_alloc(sizeof(*mhdr) + buflen, RL_MT_MISC);
     if (!mgmtbuf) {
         errno = ENOMEM;
         return -1;
@@ -108,7 +108,7 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
         assert(n == (int)buflen);
     }
 
-    free(mgmtbuf);
+    rl_free(mgmtbuf, RL_MT_MISC);
 
     return ret;
 }
@@ -552,7 +552,7 @@ uipcp_rib::dump() const
         ss << "]" << endl;
     }
 
-    return strdup(ss.str().c_str());
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
 
 void

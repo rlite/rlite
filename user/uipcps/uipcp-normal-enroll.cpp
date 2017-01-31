@@ -1395,7 +1395,7 @@ uipcp_flow_alloc(struct uipcp *uipcp, const char *dif_name,
         *port_id = kresp->port_id;
     }
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(kresp));
-    free(kresp);
+    rl_free(kresp, RL_MT_MSG);
 out:
     close(fd);
 
