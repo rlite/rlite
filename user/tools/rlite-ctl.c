@@ -541,6 +541,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
     return 0;
 }
 
+#ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
 {
@@ -548,6 +549,7 @@ memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
 
     return 0;
 }
+#endif
 
 static int
 ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
