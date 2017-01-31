@@ -152,7 +152,6 @@ struct rl_dm {
     /* Data structures for deferred removal of flow_entry structs. */
     struct list_head flows_removeq;
     struct delayed_work flows_removew;
-    spinlock_t flows_removeq_lock;
 };
 
 static struct rl_dm rl_dm;
@@ -951,7 +950,6 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
     flow->refcnt++;
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
     if (flow->expires == ~0U) { /* don't reschedule */
         sched = list_empty(&rl_dm.flows_removeq);
         flow->expires = jiffies + jdelta;
@@ -961,16 +959,15 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
             schedule_delayed_work(&rl_dm.flows_removew, jdelta);
         }
     }
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
 }
 
 static void
 flows_removeq_del(struct flow_entry *flow)
 {
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    FLOCK();
     flow->expires = ~0U;
     list_del_init(&flow->node_rm);
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+    FUNLOCK();
 
     flow_put(flow);
 }
@@ -1077,7 +1074,24 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         hash_del(&entry->node_cep);
         bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
+
+    /* Probe references before freeing. */
+    if (!list_empty(&entry->node_rm)) {
+        PE("Some list has a dangling reference to flow %u\n",
+           entry->local_port);
+    }
+    {
+        struct flow_entry *rflow;
+
+        list_for_each_entry(rflow, &rl_dm.flows_removeq, node_rm) {
+            if (rflow == entry) {
+                PE("removeq has a dangling reference to flow %u\n",
+                    entry->local_port);
+            }
+        }
+    }
     FUNLOCK();
+
     if (ipcp->uipcp) {
         /* Prepare a flow deallocation message. */
         memset(&ntfy, 0, sizeof(ntfy));
@@ -1095,24 +1109,7 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         fput(rc->file);
     }
 
-    /* Probe references before freeing. */
     rl_iodevs_probe_flow_references(entry);
-    if (!list_empty(&entry->node_rm)) {
-        PE("Some list has a dangling reference to flow %u\n",
-           entry->local_port);
-    }
-    {
-        struct flow_entry *rflow;
-
-        spin_lock_bh(&rl_dm.flows_removeq_lock);
-        list_for_each_entry(rflow, &rl_dm.flows_removeq, node_rm) {
-            if (rflow == entry) {
-                PE("removeq has a dangling reference to flow %u\n",
-                    entry->local_port);
-            }
-        }
-        spin_unlock_bh(&rl_dm.flows_removeq_lock);
-    }
 
     PD("flow entry %u removed\n", entry->local_port);
     rl_free(entry, RL_MT_FLOW);
@@ -1157,7 +1154,7 @@ flows_removew_func(struct work_struct *w)
 
     /* Collect all the expires flows in a temporary list, and compute
      * the next expiration time. */
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    FLOCK();
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_removeq, node_rm) {
         if (jiffies >= flow->expires) {
             list_del_init(&flow->node_rm);
@@ -1166,7 +1163,7 @@ flows_removew_func(struct work_struct *w)
             next_expiration = flow->expires;
         }
     }
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+    FUNLOCK();
 
     /* Remove all expired flows. */
     list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
@@ -3008,7 +3005,6 @@ rlite_init(void)
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
     spin_lock_init(&rl_dm.appl_removeq_lock);
-    spin_lock_init(&rl_dm.flows_removeq_lock);
     INIT_LIST_HEAD(&rl_dm.ipcp_factories);
     INIT_LIST_HEAD(&rl_dm.difs);
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);
