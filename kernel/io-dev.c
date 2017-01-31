@@ -584,7 +584,7 @@ rl_iodevs_shutdown_by_ipcp(struct ipcp_entry *ipcp)
 }
 
 void
-rl_iodevs_probe_references(struct ipcp_entry *ipcp)
+rl_iodevs_probe_ipcp_references(struct ipcp_entry *ipcp)
 {
     struct rl_io *rio;
 
@@ -593,6 +593,21 @@ rl_iodevs_probe_references(struct ipcp_entry *ipcp)
         if (rio->flow && rio->flow->txrx.ipcp == ipcp) {
             PE("iodev bound to flow %u has dangling reference to ipcp %u\n",
                 rio->flow->local_port, ipcp->id);
+        }
+    }
+    IODEVS_UNLOCK();
+}
+
+void
+rl_iodevs_probe_flow_references(struct flow_entry *flow)
+{
+    struct rl_io *rio;
+
+    IODEVS_LOCK();
+    list_for_each_entry(rio, &rl_iodevs, node) {
+        if (rio->flow == flow) {
+            PE("iodev bound has dangling reference to flow %u\n",
+               flow->local_port);
         }
     }
     IODEVS_UNLOCK();

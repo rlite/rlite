@@ -1094,6 +1094,26 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         entry->upper.rc = NULL; /* just to stay safe */
         fput(rc->file);
     }
+
+    /* Probe references before freeing. */
+    rl_iodevs_probe_flow_references(entry);
+    if (!list_empty(&entry->node_rm)) {
+        PE("Some list has a dangling reference to flow %u\n",
+           entry->local_port);
+    }
+    {
+        struct flow_entry *rflow;
+
+        spin_lock_bh(&rl_dm.flows_removeq_lock);
+        list_for_each_entry(rflow, &rl_dm.flows_removeq, node_rm) {
+            if (rflow == entry) {
+                PE("removeq has a dangling reference to flow %u\n",
+                    entry->local_port);
+            }
+        }
+        spin_unlock_bh(&rl_dm.flows_removeq_lock);
+    }
+
     PD("flow entry %u removed\n", entry->local_port);
     rl_free(entry, RL_MT_FLOW);
 
@@ -1348,7 +1368,7 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
         RAUNLOCK(ipcp);
     }
 
-    rl_iodevs_probe_references(ipcp);
+    rl_iodevs_probe_ipcp_references(ipcp);
 }
 
 int

@@ -533,7 +533,9 @@ void rl_flow_shutdown(struct flow_entry *flow);
 
 void rl_iodevs_shutdown_by_ipcp(struct ipcp_entry *ipcp);
 
-void rl_iodevs_probe_references(struct ipcp_entry *ipcp);
+void rl_iodevs_probe_ipcp_references(struct ipcp_entry *ipcp);
+
+void rl_iodevs_probe_flow_references(struct flow_entry *flow);
 
 static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
