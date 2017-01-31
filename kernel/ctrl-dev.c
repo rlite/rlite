@@ -1244,7 +1244,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         }
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
@@ -1258,6 +1257,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->expires = ~0U;
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
+
+        entry->refcnt ++; /* on behalf of the caller */
+        PV("FLOWREFCNT %u = %u\n", entry->local_port, entry->refcnt);
 
         /* Start the unbound timer */
         flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
@@ -2365,11 +2367,15 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         }
     }
 
-    /* The flow_entry variable cannot be used in this function after this
-     * point, because a concurrent rl_fa_resp_arrived() with a negative
-     * response may kill the flow. */
-    flow_entry = NULL;
 out:
+    if (flow_entry) {
+        flow_put(flow_entry); /* match flow_add() */
+        /* The flow_entry variable cannot be used in this function after this
+         * point, because a concurrent rl_fa_resp_arrived() with a negative
+         * response may kill the flow. */
+        flow_entry = NULL;
+    }
+
     ipcp_put(ipcp_entry);
 
     if (ret == 0) {
@@ -2538,11 +2544,13 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
         req.dif_name = rl_strdup(ipcp->dif->name, GFP_ATOMIC, RL_MT_UTILS);
     }
 
+    flow_put(flow_entry); /* match flow_add() */
+
     /* Enqueue the request into the upqueue. */
     ret = rl_upqueue_append(app->rc, RLITE_MB(&req), maysleep);
     if (ret) {
-        flows_removeq_del(flow_entry);
-        flow_put(flow_entry);
+        flows_removeq_del(flow_entry); /* match flow_add() */
+        flow_put(flow_entry); /* delete */
     } else {
         /* The flow_entry variable is invalid from here, rl_fa_resp() may be
          * called concurrently and call flow_put(). */
