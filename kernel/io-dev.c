@@ -681,14 +681,19 @@ rl_io_release_internal(struct rl_io *rio)
 
     switch (rio->mode) {
         case RLITE_IO_MODE_APPL_BIND:
-            /* A previous flow was bound to this file descriptor,
-             * so let's unbind from it. */
-            IODEVS_LOCK();
-            BUG_ON(!rio->flow);
-            flow_put(rio->flow);
-            rio->flow = NULL;
-            rio->txrx = NULL;
-            IODEVS_UNLOCK();
+            {
+                struct flow_entry *flow;
+
+                /* A previous flow was bound to this file descriptor,
+                 * so let's unbind from it. */
+                IODEVS_LOCK();
+                BUG_ON(!rio->flow);
+                flow = rio->flow;
+                rio->flow = NULL;
+                rio->txrx = NULL;
+                IODEVS_UNLOCK();
+                flow_put(flow);
+            }
             break;
 
         case RLITE_IO_MODE_IPCP_MGMT:
