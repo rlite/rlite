@@ -69,8 +69,8 @@ struct registered_ipcp {
 static struct uipcps guipcps;
 
 static int
-rl_u_response(int sfd, struct rl_msg_base *req,
-                   struct rl_msg_base_resp *resp)
+rl_u_response(int sfd, const struct rl_msg_base *req,
+              struct rl_msg_base_resp *resp)
 {
     resp->msg_type = RLITE_U_BASE_RESP;
     resp->event_id = req->event_id;
