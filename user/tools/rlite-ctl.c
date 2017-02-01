@@ -658,6 +658,7 @@ ipcps_load()
         attrs->addr = upd->ipcp_addr;
         attrs->nhdrs = upd->nhdrs;
         attrs->max_sdu_size = upd->max_sdu_size;
+        rl_free(upd, RL_MT_MSG);
 
         list_for_each_entry(scan, &ipcps, node) {
             if (attrs->id < scan->id) {

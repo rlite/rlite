@@ -491,6 +491,8 @@ uipcps_loop(void *opaque)
                 break;
         }
 
+        rl_free(upd, RL_MT_MSG);
+
         if (ret) {
             PE("IPCP update synchronization failed\n");
         }

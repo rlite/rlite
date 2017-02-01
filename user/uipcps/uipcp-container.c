@@ -524,7 +524,6 @@ uipcp_loop(void *opaque)
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(msg));
         rl_free(msg, RL_MT_MSG);
-        /* Do we have an handler for this response message? */
     }
 
     return NULL;
