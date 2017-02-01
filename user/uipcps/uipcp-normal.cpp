@@ -817,15 +817,15 @@ uipcp_rib::addr_allocate()
                     nit = neighbors.begin();
                             nit != neighbors.end(); nit++) {
             if (nit->second->enrollment_complete()) {
-                CDAPMessage *m = cdap_msg_new();
                 AddrAllocRequest aar;
+                CDAPMessage m;
                 int ret;
 
-                m->m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
+                m.m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
                 aar.requestor = myaddr;
                 aar.address = addr;
-                ret = nit->second->mgmt_conn()->send_to_port_id(m, 0, &aar);
+                ret = nit->second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
                 if (ret) {
                     UPE(uipcp, "Failed to send msg to neighbot [%s]\n",
                                strerror(errno));

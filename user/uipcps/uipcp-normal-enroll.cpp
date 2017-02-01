@@ -93,6 +93,7 @@ NeighFlow::~NeighFlow()
                             lower_ipcp_id);
 }
 
+/* Does not take ownership of m. */
 int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
                           const UipcpObject *obj)
