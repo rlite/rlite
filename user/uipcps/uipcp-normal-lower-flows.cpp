@@ -118,7 +118,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
     Neighbor *neigh = get_neighbor(neigh_name, false);
     LowerFlowList lfl;
     LowerFlow lf;
-    CDAPMessage *sm = new CDAPMessage();
+    CDAPMessage *sm = cdap_msg_new();
 
     if (remote_addr == 0 || neigh == NULL || !neigh->has_mgmt_flow()) {
         /* We still miss the address or the N-1 flow is not there. */

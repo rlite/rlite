@@ -43,6 +43,13 @@ static const char *mt_names[] = {
     [RL_MT_SHIMDATA]    = "SHIMDATA"
 };
 
+void
+rl_mt_adjust(int inc, rl_memtrack_t ty)
+{
+    assert(ty < RL_MT_MAX);
+    __sync_fetch_and_add(mt_count + ty, inc);
+}
+
 void *
 rl_alloc(size_t size, rl_memtrack_t ty)
 {

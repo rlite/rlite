@@ -162,11 +162,13 @@ typedef enum {
 void *rl_alloc(size_t size, rl_memtrack_t ty);
 char *rl_strdup(const char *s, rl_memtrack_t ty);
 void rl_free(void *obj, rl_memtrack_t ty);
+void rl_mt_adjust(int val, rl_memtrack_t ty);
 void rl_memtrack_dump_stats(void);
 #else   /* ! RL_MEMTRACK */
 #define rl_alloc(_sz, _ty)          malloc(_sz)
 #define rl_strdup(_s, _ty)          strdup(_s)
 #define rl_free(_obj, _ty)          free(_obj)
+#define rl_mt_adjust(_1, _2)
 #endif  /* ! RL_MEMTRACK */
 
 #endif /* !__KERNEL__ */

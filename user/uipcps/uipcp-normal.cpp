@@ -810,7 +810,7 @@ uipcp_rib::addr_allocate()
                     nit = neighbors.begin();
                             nit != neighbors.end(); nit++) {
             if (nit->second->enrollment_complete()) {
-                CDAPMessage *m = new CDAPMessage();
+                CDAPMessage *m = cdap_msg_new();
                 AddrAllocRequest aar;
                 int ret;
 
@@ -899,7 +899,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 
             } else if (mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
-                CDAPMessage *m = new CDAPMessage();
+                CDAPMessage *m = cdap_msg_new();
                 int ret;
 
                 UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
