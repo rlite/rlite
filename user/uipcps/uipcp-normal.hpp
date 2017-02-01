@@ -377,18 +377,6 @@ private:
     uint32_t kevent_id_cnt;
 };
 
-static inline CDAPMessage *
-cdap_msg_new()
-{
-    return new CDAPMessage();
-}
-
-static inline void
-cdap_msg_delete(CDAPMessage *m)
-{
-    delete m;
-}
-
 static inline void
 reliable_spec(struct rina_flow_spec *spec)
 {

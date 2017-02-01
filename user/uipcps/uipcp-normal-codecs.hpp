@@ -32,6 +32,28 @@
 #include "rlite/cdap.hpp"
 
 
+#ifdef RL_MEMTRACK
+static inline CDAPMessage *cdap_msg_new()
+{
+    CDAPMessage *m = new CDAPMessage();
+
+    if (m) {
+        rl_mt_adjust(1, RL_MT_CDAP);
+    }
+
+    return m;
+}
+
+static inline void cdap_msg_delete(const CDAPMessage *m)
+{
+    rl_mt_adjust(-1, RL_MT_CDAP);
+    delete m;
+}
+#else  /* RL_MEMTRACK */
+#define cdap_msg_new()          new CDAPMessage()
+#define cdap_msg_delete(_m)     delete _m
+#endif /* RL_MEMTRACK */
+
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
     virtual ~UipcpObject() { }
@@ -318,7 +340,7 @@ struct AData : public UipcpObject {
 
     AData() : cdap(NULL) { }
     AData(const char *buf, unsigned int size);
-    ~AData() { if (cdap) delete cdap; }
+    ~AData() { if (cdap) cdap_msg_delete(cdap); }
     int serialize(char *buf, unsigned int size) const;
 };
 
