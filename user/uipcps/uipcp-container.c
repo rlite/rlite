@@ -59,7 +59,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
 
-    /* TODO missing rl_msg_free */
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ret;
 }
@@ -84,6 +84,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -120,6 +121,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -174,8 +176,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
-
-    /* TODO missing rl_msg_free */
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -209,6 +210,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -234,6 +236,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
             UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
         }
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -257,6 +260,7 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -277,6 +281,7 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }

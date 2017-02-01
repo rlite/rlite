@@ -1078,11 +1078,15 @@ uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id,
               rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp resp;
+    int ret;
 
     rl_fa_resp_fill(&resp, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
 
     PV("Responding to flow allocation request...\n");
-    return rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
+    ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
+
+    return ret;
 }
 
 static int

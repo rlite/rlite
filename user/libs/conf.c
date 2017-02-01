@@ -439,6 +439,7 @@ rl_conf_memtrack_dump(void)
     msg.event_id = 1;
 
     ret = rl_write_msg(fd, &msg, 1);
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, &msg);
     close(fd);
 
     return ret;
