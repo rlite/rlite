@@ -540,6 +540,7 @@ enrollee_thread(void *opaque)
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
+        assert(nf->conn == NULL);
         nf->conn = new CDAPConn(nf->flow_fd, 1);
         rl_mt_adjust(1, RL_MT_CDAP);
 
