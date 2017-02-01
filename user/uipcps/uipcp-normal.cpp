@@ -172,11 +172,11 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 
             AData adata(objbuf, objlen);
 
+            cdap_msg_delete(m); /* here it is safe to delete m */
             if (!adata.cdap) {
                 UPE(rib->uipcp, "A_DATA does not contain a valid "
                                 "encapsulated CDAP message\n");
 
-                cdap_msg_delete(m);
                 return 0;
             }
 
