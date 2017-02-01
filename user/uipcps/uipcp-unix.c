@@ -231,16 +231,33 @@ out:
     return ret;
 }
 
+#ifdef RL_MEMTRACK
+static int
+rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
+                   const struct rl_msg_base *b_req)
+{
+    struct rl_msg_base_resp resp;
+
+    rl_memtrack_dump_stats();
+    resp.result = 0; /* ok */
+
+    return rl_u_response(sfd, b_req, &resp);
+}
+#endif /* RL_MEMTRACK */
+
 typedef int (*rl_req_handler_t)(struct uipcps *uipcps, int sfd,
                                    const struct rl_msg_base * b_req);
 
 /* The table containing all application request handlers. */
 static rl_req_handler_t rl_config_handlers[] = {
-    [RLITE_U_IPCP_REGISTER] = rl_u_ipcp_register,
-    [RLITE_U_IPCP_ENROLL] = rl_u_ipcp_enroll,
+    [RLITE_U_IPCP_REGISTER]         = rl_u_ipcp_register,
+    [RLITE_U_IPCP_ENROLL]           = rl_u_ipcp_enroll,
     [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = rl_u_ipcp_lower_flow_alloc,
-    [RLITE_U_IPCP_DFT_SET] = rl_u_ipcp_dft_set,
-    [RLITE_U_IPCP_RIB_SHOW_REQ] = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_DFT_SET]          = rl_u_ipcp_dft_set,
+    [RLITE_U_IPCP_RIB_SHOW_REQ]     = rl_u_ipcp_rib_show,
+#ifdef RL_MEMTRACK
+    [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
+#endif /* RL_MEMTRACK */
     [RLITE_U_MSG_MAX] = NULL,
 };
 

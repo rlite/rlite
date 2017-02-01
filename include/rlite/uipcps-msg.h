@@ -40,6 +40,7 @@ enum {
     RLITE_U_IPCP_RIB_SHOW_REQ,          /* 5 */
     RLITE_U_IPCP_RIB_SHOW_RESP,         /* 6 */
     RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 7 */
+    RLITE_U_MEMTRACK_DUMP,              /* 8 */
 
     RLITE_U_MSG_MAX,
 };

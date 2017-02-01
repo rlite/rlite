@@ -545,9 +545,16 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
 {
+    struct rl_msg_base req;
+
+    /* trigger kernel-space dump */
     rl_conf_memtrack_dump();
 
-    return 0;
+    /* trigger user-space dump */
+    req.msg_type = RLITE_U_MEMTRACK_DUMP;
+    req.event_id = 0;
+
+    return request_response(RLITE_MB(&req), NULL);
 }
 #endif
 
