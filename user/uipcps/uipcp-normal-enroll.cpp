@@ -66,7 +66,7 @@ NeighFlow::~NeighFlow()
 
     if (conn) {
         delete conn;
-        rl_mt_adjust(-1, RL_MT_CDAP);
+        rl_mt_adjust(-1, RL_MT_SHIMDATA);
     }
 
     ret = close(flow_fd);
@@ -542,7 +542,7 @@ enrollee_thread(void *opaque)
          * M_CONNECT message. */
         assert(nf->conn == NULL);
         nf->conn = new CDAPConn(nf->flow_fd, 1);
-        rl_mt_adjust(1, RL_MT_CDAP);
+        rl_mt_adjust(1, RL_MT_SHIMDATA);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->uipcp->name,
                           neigh->ipcp_name);

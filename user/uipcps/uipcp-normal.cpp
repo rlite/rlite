@@ -214,7 +214,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 
         if (!nf->conn) {
             nf->conn = new CDAPConn(nf->flow_fd, 1);
-            rl_mt_adjust(1, RL_MT_CDAP);
+            rl_mt_adjust(1, RL_MT_SHIMDATA);
         }
 
         /* Deserialize the received CDAP message. */
