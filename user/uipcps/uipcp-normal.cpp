@@ -690,7 +690,11 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        return cdap_dispatch(m, NULL);
+        int ret = cdap_dispatch(m, NULL);
+
+        cdap_msg_delete(m);
+
+        return ret;
     }
 
     adata.src_addr = myaddr;
@@ -739,7 +743,8 @@ uipcp_rib::send_to_myself(CDAPMessage *m, const UipcpObject *obj)
     return send_to_dst_addr(m, myaddr, obj);
 }
 
-/* To be called under RIB lock. */
+/* To be called under RIB lock. This function does not take ownership
+ * of 'rm'. */
 int
 uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 {
