@@ -501,7 +501,7 @@ enrollee_default(NeighFlow *nf)
         m.obj_name = obj_name::enrollment;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
-        cdap_msg_delete(rm);
+        cdap_msg_delete(rm); rm = NULL;
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
                             strerror(errno));
@@ -573,6 +573,7 @@ enrollee_thread(void *opaque)
         }
 
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
+        cdap_msg_delete(rm); rm = NULL;
 
         if (rib->enrolled) {
             CDAPMessage m;
@@ -750,7 +751,7 @@ enroller_default(NeighFlow *nf)
 
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
-               rm->result, rm->result_reason.c_str());
+                rm->result, rm->result_reason.c_str());
             cdap_msg_delete(rm);
             return -1;
         }
@@ -770,6 +771,8 @@ enroller_default(NeighFlow *nf)
         }
         UPD(rib->uipcp, "S --> I M_START(status)\n");
     }
+
+    cdap_msg_delete(rm);
 
     return 0;
 }
