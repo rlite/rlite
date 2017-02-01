@@ -491,6 +491,7 @@ uipcps_loop(void *opaque)
                 break;
         }
 
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
         rl_free(upd, RL_MT_MSG);
 
         if (ret) {
