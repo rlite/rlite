@@ -945,7 +945,7 @@ EXPORT_SYMBOL(flow_get_ref);
 
 /* To be called under FLOCK(). */
 static void
-flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
+flows_putq_add(struct flow_entry *flow, unsigned jdelta)
 {
     flow->refcnt++;
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
@@ -962,7 +962,7 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
 }
 
 static void
-flows_removeq_del(struct flow_entry *flow)
+flows_putq_del(struct flow_entry *flow)
 {
     FLOCK();
     flow->expires = ~0U;
@@ -1022,7 +1022,7 @@ __flow_put(struct flow_entry *entry, bool lock)
          * to 1 and let the delayed remove function do its job. */
         entry->refcnt ++;
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
-        flows_removeq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
+        flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
         if (lock) FUNLOCK();
         return;
     }
@@ -1194,7 +1194,7 @@ flows_putq_drain(unsigned long unused)
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
         if (jiffies >= flow->expires) {
             list_del_init(&flow->node_rm);
-            __flow_put(flow, false); /* match flows_removeq_add() */
+            __flow_put(flow, false); /* match flows_putq_add() */
             if (flow->flags & RL_FLOW_NEVER_BOUND) {
                 PI("Removing flow %u since it was never bound\n",
                         flow->local_port);
@@ -1287,7 +1287,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         PV("FLOWREFCNT %u = %u\n", entry->local_port, entry->refcnt);
 
         /* Start the unbound timer */
-        flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
+        flows_putq_add(entry, RL_UNBOUND_FLOW_TO);
         FUNLOCK();
 
         PLOCK();
@@ -1356,7 +1356,7 @@ flow_make_mortal(struct flow_entry *flow)
     FUNLOCK();
 
     if (never_bound) {
-        flows_removeq_del(flow);
+        flows_putq_del(flow);
     }
 }
 
@@ -2414,7 +2414,7 @@ out:
     ret = rl_append_allocate_flow_resp_arrived(rc, event_id, 0, 1, true);
 
     if (flow_entry) {
-        flows_removeq_del(flow_entry); /* match flow_add() */
+        flows_putq_del(flow_entry); /* match flow_add() */
         flow_put(flow_entry); /* delete */
     }
 
@@ -2499,7 +2499,7 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     if (ret || resp->response) {
-        flows_removeq_del(flow_entry);
+        flows_putq_del(flow_entry);
         flow_put(flow_entry);
     }
 out:
@@ -2574,7 +2574,7 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     /* Enqueue the request into the upqueue. */
     ret = rl_upqueue_append(app->rc, RLITE_MB(&req), maysleep);
     if (ret) {
-        flows_removeq_del(flow_entry); /* match flow_add() */
+        flows_putq_del(flow_entry); /* match flow_add() */
         flow_put(flow_entry); /* delete */
     } else {
         /* The flow_entry variable is invalid from here, rl_fa_resp() may be
@@ -2647,7 +2647,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
 
     if (response || ret) {
         /* Negative response --> delete the flow. */
-        flows_removeq_del(flow_entry);
+        flows_putq_del(flow_entry);
         flow_put(flow_entry);
     }
 
