@@ -560,7 +560,7 @@ uipcp_rib::dump() const
     }
 
 #ifdef RL_MEMTRACK
-    ss << "Temporary tables:" << endl;
+    ss << endl << "Temporary tables:" << endl;
     ss << "    " << flow_reqs_tmp.size() << " elements in the "
           "temporary flow request table" << endl;
     ss << "    " << invoke_id_mgr.size() << " elements in the "
