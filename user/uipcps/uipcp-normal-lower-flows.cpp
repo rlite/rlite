@@ -133,7 +133,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
     lf.age = 0;
     lfl.flows.push_back(lf);
 
-    sm = cdap_msg_new();
+    sm = rl_new(CDAPMessage(), RL_MT_CDAP);
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
     send_to_myself(sm, &lfl);
 }

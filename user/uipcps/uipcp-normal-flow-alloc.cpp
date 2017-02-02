@@ -223,7 +223,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     obj_name << obj_name::flows << "/" << freq.src_addr
                 << "-" << req->local_port;
 
-    m = cdap_msg_new();
+    m = rl_new(CDAPMessage(), RL_MT_CDAP);
     m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
                0, 0, string());
 
@@ -270,7 +270,7 @@ uipcp_rib::fa_resp(struct rl_kmsg_fa_resp *resp)
         flow_reqs[obj_name.str() + string("R")] = freq;
     }
 
-    m = cdap_msg_new();
+    m = rl_new(CDAPMessage(), RL_MT_CDAP);
     m->m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                  resp->response ? -1 : 0, reason);
 
@@ -309,7 +309,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
         UPI(uipcp, "Cannot find DFT entry for %s\n",
            static_cast<string>(freq.dst_app).c_str());
 
-        m = cdap_msg_new();
+        m = rl_new(CDAPMessage(), RL_MT_CDAP);
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
@@ -322,7 +322,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
         CDAPMessage *m;
 
         UPE(uipcp, "Flow request forwarding not supported\n");
-        m = cdap_msg_new();
+        m = rl_new(CDAPMessage(), RL_MT_CDAP);
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Flow request forwarding not supported");
 
@@ -333,7 +333,7 @@ uipcp_rib::flows_handler_create(const CDAPMessage *rm)
         CDAPMessage *m;
 
         UPE(uipcp, "No connections specified on this flow\n");
-        m = cdap_msg_new();
+        m = rl_new(CDAPMessage(), RL_MT_CDAP);
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0,
                      -1, "Cannot find DFT entry");
 
@@ -440,7 +440,7 @@ uipcp_rib::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     UPD(uipcp, "Removed flow request %s\n", obj_name.str().c_str());
 
     /* We should wait 2 MPL here before notifying the peer. */
-    m = cdap_msg_new();
+    m = rl_new(CDAPMessage(), RL_MT_CDAP);
     m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
                0, 0, string());
 

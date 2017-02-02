@@ -153,7 +153,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         if (m == NULL) {
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP);
+        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         if (m->obj_class == obj_class::adata &&
                     m->obj_name == obj_name::adata) {
@@ -166,13 +166,13 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
             if (!objbuf) {
                 UPE(rib->uipcp, "CDAP message does not contain a nested message\n");
 
-                cdap_msg_delete(m);
+                rl_delete(m, RL_MT_CDAP);
                 return 0;
             }
 
             AData adata(objbuf, objlen);
 
-            cdap_msg_delete(m); /* here it is safe to delete m */
+            rl_delete(m, RL_MT_CDAP); /* here it is safe to delete m */
             if (!adata.cdap) {
                 UPE(rib->uipcp, "A_DATA does not contain a valid "
                                 "encapsulated CDAP message\n");
@@ -197,7 +197,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
          * same message to be deserialized twice. The second
          * deserialization can be avoided extending the CDAP
          * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
-        cdap_msg_delete(m);
+        rl_delete(m, RL_MT_CDAP);
         m = NULL;
 
         ScopeLock(rib->lock);
@@ -213,8 +213,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         neigh = nf->neigh;
 
         if (!nf->conn) {
-            nf->conn = new CDAPConn(nf->flow_fd, 1);
-            rl_mt_adjust(1, RL_MT_SHIMDATA);
+            nf->conn = rl_new(CDAPConn(nf->flow_fd, 1), RL_MT_SHIMDATA);
         }
 
         /* Deserialize the received CDAP message. */
@@ -225,7 +224,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
             rib->neigh_flow_prune(nf);
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP);
+        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         nf->last_activity = time(NULL);
 
@@ -268,7 +267,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
     }
 
     if (m) {
-        cdap_msg_delete(m);
+        rl_delete(m, RL_MT_CDAP);
     }
 
     return ret;
@@ -366,8 +365,7 @@ uipcp_rib::~uipcp_rib()
 
     for (map<string, Neighbor*>::iterator mit = neighbors.begin();
                                     mit != neighbors.end(); mit++) {
-        delete mit->second;
-        rl_mt_adjust(-1, RL_MT_NEIGH);
+        rl_delete(mit->second, RL_MT_NEIGH);
     }
 
     uipcp_loop_fdh_del(uipcp, mgmtfd);
@@ -678,7 +676,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
-            cdap_msg_delete(m);
+            rl_delete(m, RL_MT_CDAP);
 
             return -1;
         }
@@ -692,7 +690,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
         /* This is a message to be delivered to myself. */
         int ret = cdap_dispatch(m, NULL);
 
-        cdap_msg_delete(m);
+        rl_delete(m, RL_MT_CDAP);
 
         return ret;
     }
@@ -911,7 +909,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 
             } else if (mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
-                CDAPMessage *m = cdap_msg_new();
+                CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
                 int ret;
 
                 UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
@@ -1048,8 +1046,7 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
     }
 
     /* First delete the N-1 flow. */
-    delete nf;
-    rl_mt_adjust(-1, RL_MT_NEIGHFLOW);
+    rl_delete(nf, RL_MT_NEIGHFLOW);
 
     /* If there are no other N-1 flows, delete the neighbor. */
     if (neigh->flows.size() == 0) {
@@ -1195,10 +1192,9 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     }
 
     /* Add the flow. */
-    neigh->flows[neigh_port_id] = new NeighFlow(neigh, string(supp_dif),
-                                                neigh_port_id, 0,
-                                                lower_ipcp_id);
-    rl_mt_adjust(1, RL_MT_NEIGHFLOW);
+    neigh->flows[neigh_port_id] = rl_new(NeighFlow(neigh, string(supp_dif),
+                                         neigh_port_id, 0, lower_ipcp_id),
+                                         RL_MT_NEIGHFLOW);
     neigh->flows[neigh_port_id]->reliable = is_reliable_spec(&req->flowspec);
 
     ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
@@ -1278,9 +1274,7 @@ static int
 normal_init(struct uipcp *uipcp)
 {
     try {
-        uipcp->priv = new uipcp_rib(uipcp);
-        rl_mt_adjust(1, RL_MT_SHIM);
-
+        uipcp->priv = rl_new(uipcp_rib(uipcp), RL_MT_SHIM);
     } catch (std::bad_alloc) {
         UPE(uipcp, "Out of memory\n");
         return -1;
@@ -1295,8 +1289,7 @@ normal_init(struct uipcp *uipcp)
 static int
 normal_fini(struct uipcp *uipcp)
 {
-    delete UIPCP_RIB(uipcp);
-    rl_mt_adjust(-1, RL_MT_SHIM);
+    rl_delete(UIPCP_RIB(uipcp), RL_MT_SHIM);
 
     return 0;
 }
