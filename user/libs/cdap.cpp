@@ -233,8 +233,10 @@ CDAPValidationTable::CDAPValidationTable()
 
 static struct CDAPValidationTable vt;
 
-CDAPConn::CDAPConn(int arg_fd, long arg_version)
+CDAPConn::CDAPConn(int arg_fd, long arg_version,
+                   unsigned int ds) : invoke_id_mgr(ds)
 {
+    discard_secs = ds;
     fd = arg_fd;
     version = arg_version;
     state = NONE;
@@ -255,7 +257,7 @@ CDAPConn::reset()
     state = NONE;
     local_appl = string();
     remote_appl = string();
-    invoke_id_mgr = InvokeIdMgr();
+    invoke_id_mgr = InvokeIdMgr(discard_secs);
     PV("Connection reset to %s\n", conn_state_repr(state));
 }
 
@@ -280,17 +282,17 @@ CDAPConn::conn_state_repr(int st)
     return NULL;
 }
 
-InvokeIdMgr::InvokeIdMgr()
+InvokeIdMgr::InvokeIdMgr(unsigned int ds)
 {
+    discard_secs = ds;
     invoke_id_next = 1;
-    max_pending_ops = 1000;
 }
 
 /* Discard pending ids that have been there for too much time. */
 void
 InvokeIdMgr::__discard(set<Id>& pending)
 {
-    time_t ago = time(NULL) - 5; /* five seconds */
+    time_t ago = time(NULL) - discard_secs; /* discard_secs seconds */
     vector< set<Id>::iterator > torm;
 
     for (set<Id>::iterator i = pending.begin(); i != pending.end(); i ++) {
@@ -307,8 +309,10 @@ InvokeIdMgr::__discard(set<Id>& pending)
 void
 InvokeIdMgr::discard()
 {
-    __discard(pending_invoke_ids);
-    __discard(pending_invoke_ids_remote);
+    if (discard_secs < ~0U) {
+        __discard(pending_invoke_ids);
+        __discard(pending_invoke_ids_remote);
+    }
 }
 
 int
