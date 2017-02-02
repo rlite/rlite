@@ -37,17 +37,17 @@
 #define COMMON_EXPORT(_n)           EXPORT_SYMBOL(_n)
 #define COMMON_STATIC
 
-#else
+#else /* user-space */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#define COMMON_ALLOC(_sz, _unused)  malloc(_sz)
-#define COMMON_FREE(_p)             free(_p)
+#define COMMON_ALLOC(_sz, _unused)  rl_alloc(_sz, RL_MT_UTILS)
+#define COMMON_FREE(_p)             rl_free(_p, RL_MT_UTILS)
 #define COMMON_PRINT(format, ...)   printf(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s, _unused)  strdup(_s)
+#define COMMON_STRDUP(_s, _unused)  rl_strdup(_s, RL_MT_UTILS)
 #define COMMON_EXPORT(_n)
 #define COMMON_STATIC               static
 

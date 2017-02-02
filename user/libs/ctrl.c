@@ -64,7 +64,7 @@ rl_read_next_msg(int rfd, int quiet)
     }
 
     /* Here we can malloc the maximum kernel message size. */
-    resp = RLITE_MB(malloc(max_resp_size));
+    resp = RLITE_MB(rl_alloc(max_resp_size, RL_MT_MSG));
     if (!resp) {
         if (!quiet) {
             PE("Out of memory\n");
@@ -78,7 +78,7 @@ rl_read_next_msg(int rfd, int quiet)
                                 serbuf, ret, (void *)resp, max_resp_size);
     if (ret) {
         PE("Problems during deserialization [%d]\n", ret);
-        free(resp);
+        rl_free(resp, RL_MT_MSG);
         errno = ENOMEM;
         return NULL;
     }
@@ -193,9 +193,9 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_APPL_REGISTER;
     req->event_id = event_id;
-    req->dif_name = dif_name ? strdup(dif_name) : NULL;
+    req->dif_name = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
     req->reg = reg;
-    req->appl_name = appl_name ? strdup(appl_name) : NULL;
+    req->appl_name = appl_name ? rl_strdup(appl_name, RL_MT_UTILS) : NULL;
 
     if (dif_name && !req->dif_name) {
         return -1; /* Out of memory. */
@@ -215,7 +215,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_FA_REQ;
     req->event_id = event_id;
-    req->dif_name = dif_name ? strdup(dif_name) : NULL;
+    req->dif_name = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
     if (dif_name && !req->dif_name) {
         return -1; /* Out of memory. */
     }
@@ -225,8 +225,8 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     } else {
         rina_flow_spec_default(&req->flowspec);
     }
-    req->local_appl = local_appl ? strdup(local_appl) : NULL;
-    req->remote_appl = remote_appl ? strdup(remote_appl) : NULL;
+    req->local_appl = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
+    req->remote_appl = remote_appl ? rl_strdup(remote_appl, RL_MT_UTILS) : NULL;
 
     return 0;
 }
@@ -280,7 +280,7 @@ rina_register_wait(int fd, int wfd)
     ipcp_id = resp->ipcp_id;
     response = resp->response;
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
-    free(resp);
+    rl_free(resp, RL_MT_MSG);
 
     if (response) {
         errno = EINVAL;
@@ -385,7 +385,7 @@ rina_flow_alloc_wait(int wfd)
     }
 
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
-    free(resp);
+    rl_free(resp, RL_MT_MSG);
 out:
     close(wfd);
 
@@ -474,7 +474,7 @@ remote_appl_fill(char *src, char **remote_appl)
         return 0;
     }
 
-    *remote_appl = strdup(src);
+    *remote_appl = rl_strdup(src, RL_MT_API);
     if (*remote_appl == NULL) {
         errno = ENOMEM;
         return -1;
@@ -508,12 +508,12 @@ int rina_flow_respond(int fd, int handle, int response)
     }
 
     req = spi->req;
-    free(spi);
+    rl_free(spi, RL_MT_API);
 
     rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
                     req->port_id, (uint8_t)response);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(req));
-    free(req);
+    rl_free(req, RL_MT_MSG);
 
     ret = rl_write_msg(fd, RLITE_MB(&resp), 1);
     if (ret < 0) {
@@ -562,7 +562,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
             return -1;
         }
 
-        spi = malloc(sizeof(*spi));
+        spi = rl_alloc(sizeof(*spi), RL_MT_API);
         if (!spi) {
             errno = ENOMEM;
             return -1;
@@ -614,10 +614,10 @@ out2:
 out1:
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                    RLITE_MB(req));
-    free(req);
+    rl_free(req, RL_MT_MSG);
 out0:
     if (spi) {
-        free(spi);
+        rl_free(spi, RL_MT_API);
     }
 
     return ffd;

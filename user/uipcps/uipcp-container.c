@@ -52,12 +52,14 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     resp.ipcp_id = ipcp_id;
     resp.reg = 1;
     resp.response = response;
-    resp.appl_name = strdup(req->appl_name);
+    resp.appl_name = rl_strdup(req->appl_name, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 
     return ret;
 }
@@ -82,6 +84,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -118,6 +121,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -165,13 +169,14 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
         memset(&req.flowcfg, 0, sizeof(*flowcfg));
     }
     flowcfg2flowspec(&req.flowspec, &req.flowcfg);
-    req.local_appl = strdup(local_appl);
-    req.remote_appl = strdup(remote_appl);
+    req.local_appl = rl_strdup(local_appl, RL_MT_UTILS);
+    req.remote_appl = rl_strdup(remote_appl, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -205,6 +210,7 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -230,6 +236,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
             UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
         }
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -253,6 +260,7 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -273,6 +281,7 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     if (ret) {
         UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
     }
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
     return ret;
 }
@@ -444,7 +453,7 @@ uipcp_loop(void *opaque)
                 te = container_of(elem, struct uipcp_loop_tmr, node);
                 NPD("Exec timer callback [%d]\n", te->id);
                 te->cb(uipcp, te->arg);
-                free(te);
+                rl_free(te, RL_MT_EVLOOP);
             }
         }
 
@@ -514,8 +523,7 @@ uipcp_loop(void *opaque)
         }
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(msg));
-        free(msg);
-        /* Do we have an handler for this response message? */
+        rl_free(msg, RL_MT_MSG);
     }
 
     return NULL;
@@ -552,7 +560,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
         return -1;
     }
 
-    e = malloc(sizeof(*e));
+    e = rl_alloc(sizeof(*e), RL_MT_EVLOOP);
     if (!e) {
         PE("Out of memory\n");
         return -1;
@@ -621,7 +629,7 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
         ret = 0;
         list_del(&e->node);
         uipcp->timer_events_cnt--;
-        free(e);
+        rl_free(e, RL_MT_EVLOOP);
     }
 
     pthread_mutex_unlock(&uipcp->lock);
@@ -639,7 +647,7 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
         return -1;
     }
 
-    fdh = malloc(sizeof(*fdh));
+    fdh = rl_alloc(sizeof(*fdh), RL_MT_EVLOOP);
     if (!fdh) {
         return -1;
     }
@@ -668,7 +676,7 @@ uipcp_loop_fdh_del(struct uipcp *uipcp, int fd)
         if (fdh->fd == fd) {
             list_del(&fdh->node);
             pthread_mutex_unlock(&uipcp->lock);
-            free(fdh);
+            rl_free(fdh, RL_MT_EVLOOP);
 
             return 0;
         }
@@ -774,7 +782,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         return -1;
     }
 
-    uipcp = malloc(sizeof(*uipcp));
+    uipcp = rl_alloc(sizeof(*uipcp), RL_MT_UIPCP);
     if (!uipcp) {
         PE("Out of memory\n");
         return ret;
@@ -872,7 +880,7 @@ err2:
     uipcps->n_uipcps --;
 err1:
     pthread_mutex_unlock(&uipcps->lock);
-    free(uipcp);
+    rl_free(uipcp, RL_MT_UIPCP);
 
     return ret;
 }
@@ -900,7 +908,7 @@ uipcp_del(struct uipcp *uipcp)
 
             list_for_each_entry_safe(e, tmp, &uipcp->timer_events, node) {
                 list_del(&e->node);
-                free(e);
+                rl_free(e, RL_MT_EVLOOP);
             }
         }
 
@@ -910,7 +918,7 @@ uipcp_del(struct uipcp *uipcp)
 
             list_for_each_entry_safe(fdh, tmp, &uipcp->fdhs, node) {
                 list_del(&fdh->node);
-                free(fdh);
+                rl_free(fdh, RL_MT_EVLOOP);
             }
         }
 
@@ -920,9 +928,9 @@ uipcp_del(struct uipcp *uipcp)
         close(uipcp->cfd);
     }
 
-    if (uipcp->dif_type) free(uipcp->dif_type);
-    if (uipcp->name) free(uipcp->name);
-    if (uipcp->dif_name) free(uipcp->dif_name);
+    if (uipcp->dif_type) rl_free(uipcp->dif_type, RL_MT_UTILS /* moved */);
+    if (uipcp->name) rl_free(uipcp->name, RL_MT_UTILS /* moved */);
+    if (uipcp->dif_name) rl_free(uipcp->dif_name, RL_MT_UTILS /* moved */);
 
     if (ret == 0) {
         if (!kernelspace) {
@@ -932,7 +940,7 @@ uipcp_del(struct uipcp *uipcp)
         }
     }
 
-    free(uipcp);
+    rl_free(uipcp, RL_MT_UIPCP);
 
     return ret;
 }
@@ -1167,7 +1175,7 @@ topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
         return NULL;
     }
 
-    ipn = malloc(sizeof(*ipn));
+    ipn = rl_alloc(sizeof(*ipn), RL_MT_TOPO);
     if (!ipn) {
         PE("Out of memory\n");
         return NULL;
@@ -1194,7 +1202,7 @@ topo_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
     assert(list_empty(&ipn->lowers));
 
     list_del(&ipn->node);
-    free(ipn);
+    rl_free(ipn, RL_MT_TOPO);
 }
 
 static int
@@ -1209,7 +1217,7 @@ topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
         }
     }
 
-    e = malloc(sizeof(*e));
+    e = rl_alloc(sizeof(*e), RL_MT_TOPO);
     if (!e) {
         PE("Out of memory\n");
         return -1;
@@ -1239,7 +1247,7 @@ topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
                 /* This list_del is safe only because we exit
                  * the loop immediately. */
                 list_del(&e->node);
-                free(e);
+                rl_free(e, RL_MT_TOPO);
             }
             neigh->refcnt--;
 
@@ -1325,9 +1333,9 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->refcnt ++;
 
-    if (uipcp->dif_type) free(uipcp->dif_type);
-    if (uipcp->name) free(uipcp->name);
-    if (uipcp->dif_name) free(uipcp->dif_name);
+    if (uipcp->dif_type) rl_free(uipcp->dif_type, RL_MT_UTILS);
+    if (uipcp->name) rl_free(uipcp->name, RL_MT_UTILS);
+    if (uipcp->dif_name) rl_free(uipcp->dif_name, RL_MT_UTILS);
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;

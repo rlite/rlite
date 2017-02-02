@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <time.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -232,8 +233,10 @@ CDAPValidationTable::CDAPValidationTable()
 
 static struct CDAPValidationTable vt;
 
-CDAPConn::CDAPConn(int arg_fd, long arg_version)
+CDAPConn::CDAPConn(int arg_fd, long arg_version,
+                   unsigned int ds) : invoke_id_mgr(ds)
 {
+    discard_secs = ds;
     fd = arg_fd;
     version = arg_version;
     state = NONE;
@@ -254,7 +257,7 @@ CDAPConn::reset()
     state = NONE;
     local_appl = string();
     remote_appl = string();
-    invoke_id_mgr = InvokeIdMgr();
+    invoke_id_mgr = InvokeIdMgr(discard_secs);
     PV("Connection reset to %s\n", conn_state_repr(state));
 }
 
@@ -279,20 +282,49 @@ CDAPConn::conn_state_repr(int st)
     return NULL;
 }
 
-InvokeIdMgr::InvokeIdMgr()
+InvokeIdMgr::InvokeIdMgr(unsigned int ds)
 {
+    discard_secs = ds;
     invoke_id_next = 1;
-    max_pending_ops = 5;
+}
+
+/* Discard pending ids that have been there for too much time. */
+void
+InvokeIdMgr::__discard(set<Id>& pending)
+{
+    time_t ago = time(NULL) - discard_secs; /* discard_secs seconds */
+    vector< set<Id>::iterator > torm;
+
+    for (set<Id>::iterator i = pending.begin(); i != pending.end(); i ++) {
+        if (i->created < ago) {
+            torm.push_back(i);
+        }
+    }
+
+    for (unsigned int j = 0; j < torm.size(); j++) {
+        pending.erase(torm[j]);
+    }
+}
+
+void
+InvokeIdMgr::discard()
+{
+    if (discard_secs < ~0U) {
+        __discard(pending_invoke_ids);
+        __discard(pending_invoke_ids_remote);
+    }
 }
 
 int
-InvokeIdMgr::__put_invoke_id(set<int>& pending, int invoke_id)
+InvokeIdMgr::__put_invoke_id(set<Id>& pending, int invoke_id)
 {
-    if (!pending.count(invoke_id)) {
+    discard();
+
+    if (!pending.count(Id(invoke_id, 0))) {
         return -1;
     }
 
-    pending.erase(invoke_id);
+    pending.erase(Id(invoke_id, 0));
 
     NPD("put %d\n", invoke_id);
 
@@ -304,12 +336,14 @@ InvokeIdMgr::get_invoke_id()
 {
     int ret;
 
-    while (pending_invoke_ids.count(invoke_id_next)) {
+    discard();
+
+    while (pending_invoke_ids.count(Id(invoke_id_next, 0))) {
         invoke_id_next++;
     }
 
     ret = invoke_id_next++;
-    pending_invoke_ids.insert(ret);
+    pending_invoke_ids.insert(Id(ret, time(NULL)));
 
     NPD("got %d\n", ret);
 
@@ -325,11 +359,13 @@ InvokeIdMgr::put_invoke_id(int invoke_id)
 int
 InvokeIdMgr::get_invoke_id_remote(int invoke_id)
 {
-    if (pending_invoke_ids_remote.count(invoke_id)) {
+    discard();
+
+    if (pending_invoke_ids_remote.count(Id(invoke_id, 0))) {
         return -1;
     }
 
-    pending_invoke_ids_remote.insert(invoke_id);
+    pending_invoke_ids_remote.insert(Id(invoke_id, time(NULL)));
 
     NPD("got %d\n", invoke_id);
 
@@ -1011,7 +1047,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
         return -1;
     }
 
-    if (m->is_request()) {
+    if (invoke_id == 0 && m->is_request()) {
         /* CDAP request message (M_*). */
         m->invoke_id = invoke_id_mgr.get_invoke_id();
 
@@ -1088,7 +1124,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
     }
 
     if (m->is_response()) {
-        /* CDAP request message (M_*). */
+        /* CDAP response message (M_*_R). */
         if (invoke_id_mgr.put_invoke_id(m->invoke_id)) {
             PE("Invoke id %d does not match any pending request\n",
                m->invoke_id);
@@ -1097,7 +1133,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
         }
 
     } else {
-        /* CDAP response message (M_*_R). */
+        /* CDAP request message (M_*). */
         if (invoke_id_mgr.get_invoke_id_remote(m->invoke_id)) {
             PE("Invoke id %d already used remotely\n",
                m->invoke_id);

@@ -1101,6 +1101,9 @@ AData::AData(const char *buf, unsigned int size)
     dst_addr = gm.destaddress();
     cdap = msg_deser_stateless(gm.cdapmessage().data(),
                                gm.cdapmessage().size());
+    if (cdap) {
+        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
+    }
 }
 
 int

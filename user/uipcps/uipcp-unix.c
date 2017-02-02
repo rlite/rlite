@@ -69,8 +69,8 @@ struct registered_ipcp {
 static struct uipcps guipcps;
 
 static int
-rl_u_response(int sfd, struct rl_msg_base *req,
-                   struct rl_msg_base_resp *resp)
+rl_u_response(int sfd, const struct rl_msg_base *req,
+              struct rl_msg_base_resp *resp)
 {
     resp->msg_type = RLITE_U_BASE_RESP;
     resp->event_id = req->event_id;
@@ -225,22 +225,39 @@ out:
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
 
     if (dumpstr) {
-        free(dumpstr);
+        rl_free(dumpstr, RL_MT_UTILS);
     }
 
     return ret;
 }
+
+#ifdef RL_MEMTRACK
+static int
+rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
+                   const struct rl_msg_base *b_req)
+{
+    struct rl_msg_base_resp resp;
+
+    rl_memtrack_dump_stats();
+    resp.result = 0; /* ok */
+
+    return rl_u_response(sfd, b_req, &resp);
+}
+#endif /* RL_MEMTRACK */
 
 typedef int (*rl_req_handler_t)(struct uipcps *uipcps, int sfd,
                                    const struct rl_msg_base * b_req);
 
 /* The table containing all application request handlers. */
 static rl_req_handler_t rl_config_handlers[] = {
-    [RLITE_U_IPCP_REGISTER] = rl_u_ipcp_register,
-    [RLITE_U_IPCP_ENROLL] = rl_u_ipcp_enroll,
+    [RLITE_U_IPCP_REGISTER]         = rl_u_ipcp_register,
+    [RLITE_U_IPCP_ENROLL]           = rl_u_ipcp_enroll,
     [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = rl_u_ipcp_lower_flow_alloc,
-    [RLITE_U_IPCP_DFT_SET] = rl_u_ipcp_dft_set,
-    [RLITE_U_IPCP_RIB_SHOW_REQ] = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_DFT_SET]          = rl_u_ipcp_dft_set,
+    [RLITE_U_IPCP_RIB_SHOW_REQ]     = rl_u_ipcp_rib_show,
+#ifdef RL_MEMTRACK
+    [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
+#endif /* RL_MEMTRACK */
     [RLITE_U_MSG_MAX] = NULL,
 };
 
@@ -335,7 +352,7 @@ unix_server(struct uipcps *uipcps)
 
                 PV("Worker %p cleaned-up\n", wi);
                 list_del(&wi->node);
-                free(wi);
+                rl_free(wi, RL_MT_MISC);
                 threads_cnt --;
             }
 
@@ -350,7 +367,7 @@ unix_server(struct uipcps *uipcps)
             usleep(50000);
         }
 
-        wi = malloc(sizeof(*wi));
+        wi = rl_alloc(sizeof(*wi), RL_MT_MISC);
         wi->uipcps = uipcps;
 
         /* Accept a new client and create a thread to serve it. */
@@ -361,7 +378,7 @@ unix_server(struct uipcps *uipcps)
         if (ret) {
             PE("pthread_create() failed [%d]\n", errno);
             close(wi->cfd);
-            free(wi);
+            rl_free(wi, RL_MT_MISC);
         }
 
         list_add_tail(&wi->node, &threads);
@@ -386,7 +403,7 @@ periodic_tasks(struct uipcps *uipcps)
     /* Get a reference to each uipcp. */
     pthread_mutex_lock(&uipcps->lock);
     n = uipcps->n_uipcps;
-    tmplist = malloc(n * sizeof(struct uipcp *));
+    tmplist = rl_alloc(n * sizeof(struct uipcp *), RL_MT_MISC);
     if (!tmplist) {
         pthread_mutex_unlock(&uipcps->lock);
         PE("Out of memory\n");
@@ -412,7 +429,7 @@ periodic_tasks(struct uipcps *uipcps)
         uipcp_put(tmplist[i]);
     }
 
-    free(tmplist);
+    rl_free(tmplist, RL_MT_MISC);
 }
 
 static void *
@@ -473,6 +490,9 @@ uipcps_loop(void *opaque)
                 ret = uipcp_update(uipcps, upd);
                 break;
         }
+
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
 
         if (ret) {
             PE("IPCP update synchronization failed\n");

@@ -41,25 +41,41 @@ struct CDAPAuthValue {
                          other == std::string(); }
 };
 
-class InvokeIdMgr {
-    std::set<int> pending_invoke_ids;
-    int invoke_id_next;
-    int max_pending_ops;
-    std::set<int> pending_invoke_ids_remote;
+#define CDAP_DISCARD_SECS_DFLT  5
 
-    int __put_invoke_id(std::set<int> &pending, int invoke_id);
+class InvokeIdMgr {
+    struct Id {
+        int     iid;
+        time_t  created;
+        Id(int i, time_t t) : iid(i), created(t) { }
+        bool operator==(const Id &o) const { return iid == o.iid; }
+        bool operator!=(const Id &o) const { return iid != o.iid; }
+        bool operator<(const Id &o) const { return iid < o.iid; }
+        bool operator>(const Id &o) const { return iid > o.iid; }
+    };
+    std::set<Id> pending_invoke_ids;
+    int invoke_id_next;
+    unsigned discard_secs;
+    std::set<Id> pending_invoke_ids_remote;
+
+    int __put_invoke_id(std::set<Id> &pending, int invoke_id);
+    void __discard(std::set<Id>& pending);
+    void discard();
 
 public:
-    InvokeIdMgr();
+    InvokeIdMgr(unsigned discard_secs = CDAP_DISCARD_SECS_DFLT);
     int get_invoke_id();
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
     int put_invoke_id_remote(int invoke_id);
+    unsigned size() const { return pending_invoke_ids.size() +
+                                   pending_invoke_ids_remote.size(); }
 
 };
 
 class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
+    unsigned int discard_secs;
 
     enum {
         NONE = 1,
@@ -69,13 +85,13 @@ class CDAPConn {
     } state;
 
     const char *conn_state_repr(int st);
-
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
     CDAPConn(const CDAPConn& o);
 
 public:
-    CDAPConn(int fd, long version);
+    CDAPConn(int fd, long version,
+             unsigned int discard_secs = CDAP_DISCARD_SECS_DFLT);
     ~CDAPConn();
 
     /* @invoke_id is not meaningful for request messages. */

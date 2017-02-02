@@ -141,7 +141,7 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
     char *host;
     int ret;
 
-    host = malloc(hostlen);
+    host = rl_alloc(hostlen, RL_MT_SHIMDATA);
     if (!host) {
         UPE(shim->uipcp, "Out of memory\n");
         return -1;
@@ -150,7 +150,7 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
     ret = getnameinfo((const struct sockaddr *)addr, sizeof(*addr),
                       host, hostlen, NULL, 0, 0);
     if (ret) {
-        free(host);
+        rl_free(host, RL_MT_SHIMDATA);
         UPE(shim->uipcp, "getnameinfo() failed [%s]\n", gai_strerror(ret));
         return -1;
     }
@@ -196,7 +196,7 @@ udp4_endpoint_lookup(struct shim_udp4 *shim,
 static struct udp4_endpoint *
 udp4_endpoint_open(struct shim_udp4 *shim)
 {
-    struct udp4_endpoint *ep = malloc(sizeof(*ep));
+    struct udp4_endpoint *ep = rl_alloc(sizeof(*ep), RL_MT_SHIMDATA);
     struct sockaddr_in addr;
 
     if (!ep) {
@@ -211,7 +211,7 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     ep->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (ep->fd < 0) {
         UPE(shim->uipcp, "socket() failed [%d]\n", errno);
-        free(ep);
+        rl_free(ep, RL_MT_SHIMDATA);
         return NULL;
     }
 
@@ -222,7 +222,7 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     if (bind(ep->fd, (const struct sockaddr *)&addr, sizeof(addr))) {
         UPE(shim->uipcp, "bind() failed [%d]\n", errno);
         close(ep->fd);
-        free(ep);
+        rl_free(ep, RL_MT_SHIMDATA);
         return NULL;
     }
 
@@ -238,12 +238,12 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
 
     list_for_each_entry_safe(sdu, tmp, &ep->sduq, node) {
         list_del(&sdu->node);
-        free(sdu);
+        rl_free(sdu, RL_MT_SHIMDATA);
     }
 
     close(ep->fd);
     list_del(&ep->node);
-    free(ep);
+    rl_free(ep, RL_MT_SHIMDATA);
 }
 
 static int
@@ -334,8 +334,8 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd)
         ret = uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                          local_appl, remote_appl, &cfg);
 skip:
-        free(local_appl);
-        free(remote_appl);
+        rl_free(local_appl, RL_MT_SHIMDATA);
+        rl_free(remote_appl, RL_MT_SHIMDATA);
         if (ret) {
             UPE(uipcp, "uipcp_fa_req_arrived() failed\n");
             return;
@@ -356,7 +356,7 @@ skip:
             return;
         }
 
-        sdu = malloc(sizeof(*sdu) + payload_len);
+        sdu = rl_alloc(sizeof(*sdu) + payload_len, RL_MT_SHIMDATA);
         if (!sdu) {
             UPE(uipcp, "Out of memory\n");
             return;
@@ -388,7 +388,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
         return NULL;
     }
 
-    bp = malloc(sizeof(*bp));
+    bp = rl_alloc(sizeof(*bp), RL_MT_SHIMDATA);
     if (!bp) {
         UPE(uipcp, "Out of memory\n");
         return NULL;
@@ -405,7 +405,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
         goto err;
     }
 
-    bp->appl_name = strdup(local_name);
+    bp->appl_name = rl_strdup(local_name, RL_MT_SHIMDATA);
     if (!bp->appl_name) {
         goto err;
     }
@@ -430,9 +430,9 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
     return bp;
 
 err:
-    free(bp->appl_name);
+    rl_free(bp->appl_name, RL_MT_SHIMDATA);
     if (bp->fd >= 0) close(bp->fd);
-    free(bp);
+    rl_free(bp, RL_MT_SHIMDATA);
     return NULL;
 }
 
@@ -442,8 +442,8 @@ udp4_bindpoint_close(struct udp4_bindpoint *bp)
     uipcp_loop_fdh_del(bp->uipcp, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
-    if (bp->appl_name) free(bp->appl_name);
-    free(bp);
+    if (bp->appl_name) rl_free(bp->appl_name, RL_MT_SHIMDATA);
+    rl_free(bp, RL_MT_SHIMDATA);
 }
 
 static struct udp4_endpoint *
@@ -563,7 +563,7 @@ shim_udp4_fa_resp(struct uipcp *uipcp,
         udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
         list_del(&sdu->node);
         ep->sduq_len --;
-        free(sdu);
+        rl_free(sdu, RL_MT_SHIMDATA);
     }
 
     return 0;
@@ -598,7 +598,7 @@ shim_udp4_init(struct uipcp *uipcp)
 {
     struct shim_udp4 *shim;
 
-    shim = malloc(sizeof(*shim));
+    shim = rl_alloc(sizeof(*shim), RL_MT_SHIM);
     if (!shim) {
         UPE(uipcp, "Out of memory\n");
         return -1;
@@ -645,7 +645,7 @@ shim_udp4_fini(struct uipcp *uipcp)
         }
     }
 
-    free(shim);
+    rl_free(shim, RL_MT_SHIM);
 
     return 0;
 }

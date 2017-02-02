@@ -32,6 +32,22 @@
 #include "rlite/cdap.hpp"
 
 
+#ifdef RL_MEMTRACK
+#define rl_new(_exp, _ty)           \
+        ({                          \
+            rl_mt_adjust(1, _ty);   \
+            new _exp;               \
+        })
+#define rl_delete(_exp, _ty)        \
+        do {                        \
+            rl_mt_adjust(-1, _ty);  \
+            delete _exp;            \
+        } while (0)
+#else  /* RL_MEMTRACK */
+#define rl_new(_exp, _ty)       new _exp
+#define rl_delete(_exp, _ty)    delete _exp
+#endif /* RL_MEMTRACK */
+
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
     virtual ~UipcpObject() { }
@@ -318,7 +334,7 @@ struct AData : public UipcpObject {
 
     AData() : cdap(NULL) { }
     AData(const char *buf, unsigned int size);
-    ~AData() { if (cdap) delete cdap; }
+    ~AData() { if (cdap) rl_delete(cdap, RL_MT_CDAP); }
     int serialize(char *buf, unsigned int size) const;
 };
 

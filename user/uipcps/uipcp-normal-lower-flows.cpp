@@ -118,7 +118,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
     Neighbor *neigh = get_neighbor(neigh_name, false);
     LowerFlowList lfl;
     LowerFlow lf;
-    CDAPMessage *sm = new CDAPMessage();
+    CDAPMessage *sm;
 
     if (remote_addr == 0 || neigh == NULL || !neigh->has_mgmt_flow()) {
         /* We still miss the address or the N-1 flow is not there. */
@@ -133,6 +133,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
     lf.age = 0;
     lfl.flows.push_back(lf);
 
+    sm = rl_new(CDAPMessage(), RL_MT_CDAP);
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
     send_to_myself(sm, &lfl);
 }

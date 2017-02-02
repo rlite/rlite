@@ -152,7 +152,6 @@ struct rl_dm {
     /* Data structures for deferred removal of flow_entry structs. */
     struct list_head flows_removeq;
     struct delayed_work flows_removew;
-    spinlock_t flows_removeq_lock;
 };
 
 static struct rl_dm rl_dm;
@@ -951,7 +950,6 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
     flow->refcnt++;
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
     if (flow->expires == ~0U) { /* don't reschedule */
         sched = list_empty(&rl_dm.flows_removeq);
         flow->expires = jiffies + jdelta;
@@ -961,16 +959,15 @@ flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
             schedule_delayed_work(&rl_dm.flows_removew, jdelta);
         }
     }
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
 }
 
 static void
 flows_removeq_del(struct flow_entry *flow)
 {
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    FLOCK();
     flow->expires = ~0U;
     list_del_init(&flow->node_rm);
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+    FUNLOCK();
 
     flow_put(flow);
 }
@@ -1077,7 +1074,24 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         hash_del(&entry->node_cep);
         bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
+
+    /* Probe references before freeing. */
+    if (!list_empty(&entry->node_rm)) {
+        PE("Some list has a dangling reference to flow %u\n",
+           entry->local_port);
+    }
+    {
+        struct flow_entry *rflow;
+
+        list_for_each_entry(rflow, &rl_dm.flows_removeq, node_rm) {
+            if (rflow == entry) {
+                PE("removeq has a dangling reference to flow %u\n",
+                    entry->local_port);
+            }
+        }
+    }
     FUNLOCK();
+
     if (ipcp->uipcp) {
         /* Prepare a flow deallocation message. */
         memset(&ntfy, 0, sizeof(ntfy));
@@ -1094,6 +1108,9 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         entry->upper.rc = NULL; /* just to stay safe */
         fput(rc->file);
     }
+
+    rl_iodevs_probe_flow_references(entry);
+
     PD("flow entry %u removed\n", entry->local_port);
     rl_free(entry, RL_MT_FLOW);
 
@@ -1137,7 +1154,7 @@ flows_removew_func(struct work_struct *w)
 
     /* Collect all the expires flows in a temporary list, and compute
      * the next expiration time. */
-    spin_lock_bh(&rl_dm.flows_removeq_lock);
+    FLOCK();
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_removeq, node_rm) {
         if (jiffies >= flow->expires) {
             list_del_init(&flow->node_rm);
@@ -1146,7 +1163,7 @@ flows_removew_func(struct work_struct *w)
             next_expiration = flow->expires;
         }
     }
-    spin_unlock_bh(&rl_dm.flows_removeq_lock);
+    FUNLOCK();
 
     /* Remove all expired flows. */
     list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
@@ -1227,7 +1244,6 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         }
         entry->event_id = event_id;
         entry->refcnt = 1;  /* Cogito, ergo sum. */
-        PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         entry->flags = RL_FLOW_PENDING | RL_FLOW_NEVER_BOUND;
         memcpy(&entry->spec, flowspec, sizeof(*flowspec));
         INIT_LIST_HEAD(&entry->pduft_entries);
@@ -1241,6 +1257,9 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->expires = ~0U;
         rl_flow_stats_init(&entry->stats);
         dtp_init(&entry->dtp);
+
+        entry->refcnt ++; /* on behalf of the caller */
+        PV("FLOWREFCNT %u = %u\n", entry->local_port, entry->refcnt);
 
         /* Start the unbound timer */
         flows_removeq_add(entry, RL_UNBOUND_FLOW_TO);
@@ -1313,7 +1332,6 @@ flow_make_mortal(struct flow_entry *flow)
 
     if (never_bound) {
         flows_removeq_del(flow);
-        PV("Flow %u removed from removeq\n", flow->local_port);
     }
 }
 
@@ -1349,7 +1367,7 @@ ipcp_probe_references(struct ipcp_entry *ipcp)
         RAUNLOCK(ipcp);
     }
 
-    rl_iodevs_probe_references(ipcp);
+    rl_iodevs_probe_ipcp_references(ipcp);
 }
 
 int
@@ -2349,11 +2367,15 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         }
     }
 
-    /* The flow_entry variable cannot be used in this function after this
-     * point, because a concurrent rl_fa_resp_arrived() with a negative
-     * response may kill the flow. */
-    flow_entry = NULL;
 out:
+    if (flow_entry) {
+        flow_put(flow_entry); /* match flow_add() */
+        /* The flow_entry variable cannot be used in this function after this
+         * point, because a concurrent rl_fa_resp_arrived() with a negative
+         * response may kill the flow. */
+        flow_entry = NULL;
+    }
+
     ipcp_put(ipcp_entry);
 
     if (ret == 0) {
@@ -2390,6 +2412,13 @@ rl_fa_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (!flow_entry) {
         PE("no pending flow corresponding to port-id %u\n",
                 resp->port_id);
+        return ret;
+    }
+
+    if (resp->kevent_id != flow_entry->event_id) {
+        PE("kevent_id mismatch: %u != %u\n", resp->kevent_id,
+            flow_entry->event_id);
+        flow_put(flow_entry);
         return ret;
     }
 
@@ -2490,7 +2519,7 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
     /* Allocate a port id and the associated flow entry. */
     upper.rc = app->rc;
     upper.ipcp = NULL;
-    ret = flow_add(ipcp, upper, 0, local_appl, remote_appl,
+    ret = flow_add(ipcp, upper, kevent_id, local_appl, remote_appl,
                    flowcfg, &req.flowspec, &flow_entry, GFP_ATOMIC);
     if (ret) {
         goto out;
@@ -2515,11 +2544,13 @@ rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
         req.dif_name = rl_strdup(ipcp->dif->name, GFP_ATOMIC, RL_MT_UTILS);
     }
 
+    flow_put(flow_entry); /* match flow_add() */
+
     /* Enqueue the request into the upqueue. */
     ret = rl_upqueue_append(app->rc, RLITE_MB(&req), maysleep);
     if (ret) {
-        flows_removeq_del(flow_entry);
-        flow_put(flow_entry);
+        flows_removeq_del(flow_entry); /* match flow_add() */
+        flow_put(flow_entry); /* delete */
     } else {
         /* The flow_entry variable is invalid from here, rl_fa_resp() may be
          * called concurrently and call flow_put(). */
@@ -2982,7 +3013,6 @@ rlite_init(void)
     spin_lock_init(&rl_dm.ipcps_lock);
     spin_lock_init(&rl_dm.difs_lock);
     spin_lock_init(&rl_dm.appl_removeq_lock);
-    spin_lock_init(&rl_dm.flows_removeq_lock);
     INIT_LIST_HEAD(&rl_dm.ipcp_factories);
     INIT_LIST_HEAD(&rl_dm.difs);
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);

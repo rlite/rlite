@@ -541,13 +541,22 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
     return 0;
 }
 
+#ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
 {
+    struct rl_msg_base req;
+
+    /* trigger kernel-space dump */
     rl_conf_memtrack_dump();
 
-    return 0;
+    /* trigger user-space dump */
+    req.msg_type = RLITE_U_MEMTRACK_DUMP;
+    req.event_id = 0;
+
+    return request_response(RLITE_MB(&req), NULL);
 }
+#endif
 
 static int
 ipcp_rib_show_handler(struct rl_msg_base_resp *b_resp)
@@ -649,6 +658,7 @@ ipcps_load()
         attrs->addr = upd->ipcp_addr;
         attrs->nhdrs = upd->nhdrs;
         attrs->max_sdu_size = upd->max_sdu_size;
+        rl_free(upd, RL_MT_MSG);
 
         list_for_each_entry(scan, &ipcps, node) {
             if (attrs->id < scan->id) {
