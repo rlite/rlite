@@ -42,12 +42,23 @@ struct CDAPAuthValue {
 };
 
 class InvokeIdMgr {
-    std::set<int> pending_invoke_ids;
+    struct Id {
+        int     iid;
+        time_t  created;
+        Id(int i, time_t t) : iid(i), created(t) { }
+        bool operator==(const Id &o) const { return iid == o.iid; }
+        bool operator!=(const Id &o) const { return iid != o.iid; }
+        bool operator<(const Id &o) const { return iid < o.iid; }
+        bool operator>(const Id &o) const { return iid > o.iid; }
+    };
+    std::set<Id> pending_invoke_ids;
     int invoke_id_next;
     int max_pending_ops;
-    std::set<int> pending_invoke_ids_remote;
+    std::set<Id> pending_invoke_ids_remote;
 
-    int __put_invoke_id(std::set<int> &pending, int invoke_id);
+    int __put_invoke_id(std::set<Id> &pending, int invoke_id);
+    void __discard(std::set<Id>& pending);
+    void discard();
 
 public:
     InvokeIdMgr();

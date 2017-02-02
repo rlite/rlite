@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <time.h>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -282,17 +283,44 @@ CDAPConn::conn_state_repr(int st)
 InvokeIdMgr::InvokeIdMgr()
 {
     invoke_id_next = 1;
-    max_pending_ops = 5;
+    max_pending_ops = 1000;
+}
+
+/* Discard pending ids that have been there for too much time. */
+void
+InvokeIdMgr::__discard(set<Id>& pending)
+{
+    time_t ago = time(NULL) - 5; /* five seconds */
+    vector< set<Id>::iterator > torm;
+
+    for (set<Id>::iterator i = pending.begin(); i != pending.end(); i ++) {
+        if (i->created < ago) {
+            torm.push_back(i);
+        }
+    }
+
+    for (unsigned int j = 0; j < torm.size(); j++) {
+        pending.erase(torm[j]);
+    }
+}
+
+void
+InvokeIdMgr::discard()
+{
+    __discard(pending_invoke_ids);
+    __discard(pending_invoke_ids_remote);
 }
 
 int
-InvokeIdMgr::__put_invoke_id(set<int>& pending, int invoke_id)
+InvokeIdMgr::__put_invoke_id(set<Id>& pending, int invoke_id)
 {
-    if (!pending.count(invoke_id)) {
+    discard();
+
+    if (!pending.count(Id(invoke_id, 0))) {
         return -1;
     }
 
-    pending.erase(invoke_id);
+    pending.erase(Id(invoke_id, 0));
 
     NPD("put %d\n", invoke_id);
 
@@ -304,12 +332,14 @@ InvokeIdMgr::get_invoke_id()
 {
     int ret;
 
-    while (pending_invoke_ids.count(invoke_id_next)) {
+    discard();
+
+    while (pending_invoke_ids.count(Id(invoke_id_next, 0))) {
         invoke_id_next++;
     }
 
     ret = invoke_id_next++;
-    pending_invoke_ids.insert(ret);
+    pending_invoke_ids.insert(Id(ret, time(NULL)));
 
     NPD("got %d\n", ret);
 
@@ -325,11 +355,13 @@ InvokeIdMgr::put_invoke_id(int invoke_id)
 int
 InvokeIdMgr::get_invoke_id_remote(int invoke_id)
 {
-    if (pending_invoke_ids_remote.count(invoke_id)) {
+    discard();
+
+    if (pending_invoke_ids_remote.count(Id(invoke_id, 0))) {
         return -1;
     }
 
-    pending_invoke_ids_remote.insert(invoke_id);
+    pending_invoke_ids_remote.insert(Id(invoke_id, time(NULL)));
 
     NPD("got %d\n", invoke_id);
 
