@@ -55,6 +55,8 @@ public:
     int put_invoke_id(int invoke_id);
     int get_invoke_id_remote(int invoke_id);
     int put_invoke_id_remote(int invoke_id);
+    unsigned size() const { return pending_invoke_ids.size() +
+                                   pending_invoke_ids_remote.size(); }
 
 };
 

@@ -558,8 +558,14 @@ uipcp_rib::dump() const
         }
         ss << "]" << endl;
     }
-    ss << "    ("<< flow_reqs_tmp.size() << " elements in the "
-          "temporary flow request table)" << endl;
+
+#ifdef RL_MEMTRACK
+    ss << "Temporary tables:" << endl;
+    ss << "    " << flow_reqs_tmp.size() << " elements in the "
+          "temporary flow request table" << endl;
+    ss << "    " << invoke_id_mgr.size() << " elements in the "
+          "invoke_id_mgr object" << endl;
+#endif /* RL_MEMTRACK */
 
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
