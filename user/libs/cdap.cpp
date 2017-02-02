@@ -1011,7 +1011,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id,
         return -1;
     }
 
-    if (m->is_request()) {
+    if (invoke_id == 0 && m->is_request()) {
         /* CDAP request message (M_*). */
         m->invoke_id = invoke_id_mgr.get_invoke_id();
 
@@ -1088,7 +1088,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
     }
 
     if (m->is_response()) {
-        /* CDAP request message (M_*). */
+        /* CDAP response message (M_*_R). */
         if (invoke_id_mgr.put_invoke_id(m->invoke_id)) {
             PE("Invoke id %d does not match any pending request\n",
                m->invoke_id);
@@ -1097,7 +1097,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
         }
 
     } else {
-        /* CDAP response message (M_*_R). */
+        /* CDAP request message (M_*). */
         if (invoke_id_mgr.get_invoke_id_remote(m->invoke_id)) {
             PE("Invoke id %d already used remotely\n",
                m->invoke_id);
