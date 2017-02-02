@@ -448,7 +448,9 @@ uipcp_rib::dump() const
         ss << "}" << endl << endl;
     }
 
-    ss << "Candidate Neighbors:" << endl;
+    ss << "Neighbors: " << neighbors_seen.size() <<
+            " seen, " << neighbors.size() << " connected, "
+            << neighbors_cand.size() << " candidates" << endl;
     for (map<string, NeighborCandidate>::const_iterator
             mit = neighbors_seen.begin();
                 mit != neighbors_seen.end(); mit++) {
@@ -556,6 +558,8 @@ uipcp_rib::dump() const
         }
         ss << "]" << endl;
     }
+    ss << "    ("<< flow_reqs_tmp.size() << " elements in the "
+          "temporary flow request table)" << endl;
 
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
 }
