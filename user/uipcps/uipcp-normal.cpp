@@ -676,7 +676,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
     CDAPMessage am;
     char objbuf[4096];
     char aobjbuf[4096];
-    char *serbuf;
+    char *serbuf = NULL;
     int objlen;
     int aobjlen;
     size_t serlen;
@@ -730,7 +730,9 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
     if (ret) {
         UPE(uipcp, "message serialization failed\n");
         invoke_id_mgr.put_invoke_id(m->invoke_id);
-        delete [] serbuf;
+        if (serbuf) {
+            delete [] serbuf;
+        }
         return -1;
     }
 
