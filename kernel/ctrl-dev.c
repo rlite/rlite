@@ -150,8 +150,10 @@ struct rl_dm {
     spinlock_t appl_removeq_lock;
 
     /* Data structures for deferred removal of flow_entry structs. */
+    struct timer_list flows_putq_tmr;
     struct list_head flows_removeq;
-    struct delayed_work flows_removew;
+    struct list_head flows_putq;
+    struct work_struct flows_removew;
 };
 
 static struct rl_dm rl_dm;
@@ -945,18 +947,16 @@ EXPORT_SYMBOL(flow_get_ref);
 static void
 flows_removeq_add(struct flow_entry *flow, unsigned jdelta)
 {
-    bool sched;
-
     flow->refcnt++;
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
-    if (flow->expires == ~0U) { /* don't reschedule */
-        sched = list_empty(&rl_dm.flows_removeq);
+    if (flow->expires == ~0U) { /* don't insert twice */
+        bool sched = list_empty(&rl_dm.flows_putq);
+
         flow->expires = jiffies + jdelta;
-        list_del_init(&flow->node_rm);
-        list_add_tail_safe(&flow->node_rm, &rl_dm.flows_removeq);
+        list_add_tail_safe(&flow->node_rm, &rl_dm.flows_putq);
         if (sched) {
-            schedule_delayed_work(&rl_dm.flows_removew, jdelta);
+            mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
         }
     }
 }
@@ -973,34 +973,28 @@ flows_removeq_del(struct flow_entry *flow)
 }
 
 void
-__flow_put(struct flow_entry *entry, bool maysleep)
+__flow_put(struct flow_entry *entry, bool lock)
 {
-    struct rl_kmsg_flow_deallocated ntfy;
-    struct pduft_entry *pfte, *tmp_pfte;
-    struct rl_buf *rb;
-    struct rl_buf *tmp;
-    struct dtp *dtp;
-    struct ipcp_entry *upper_ipcp;
     struct ipcp_entry *ipcp;
+    struct dtp *dtp;
+    bool sched;
 
     if (unlikely(!entry)) {
         return;
     }
 
-    FLOCK();
+    if (lock) FLOCK();
 
     dtp = &entry->dtp;
 
     entry->refcnt--;
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
-        FUNLOCK();
+        if (lock) FUNLOCK();
         return;
     }
 
     ipcp = entry->txrx.ipcp;
-    upper_ipcp = entry->upper.ipcp;
-
     entry->flags |= RL_FLOW_DEALLOCATED;
 
     /* We postpone flow removal, at least for MPL, and also allow
@@ -1029,12 +1023,44 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         entry->refcnt ++;
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         flows_removeq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
-        FUNLOCK();
-
+        if (lock) FUNLOCK();
         return;
     }
 
-    //BUG_ON(!maysleep);
+    /* Detach from tables. */
+    hash_del(&entry->node);
+    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
+    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
+        hash_del(&entry->node_cep);
+        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
+    }
+
+    /* Enqueue into the remove list and schedule if needed. */
+    sched = list_empty(&rl_dm.flows_removeq);
+    list_add_tail_safe(&entry->node_rm, &rl_dm.flows_removeq);
+    if (sched) {
+        schedule_work(&rl_dm.flows_removew);
+    }
+
+    if (lock) FUNLOCK();
+}
+EXPORT_SYMBOL(__flow_put);
+
+/* Called in process context (workqueue worker). */
+static void
+flow_del(struct flow_entry *entry)
+{
+    struct rl_kmsg_flow_deallocated ntfy;
+    struct pduft_entry *pfte, *tmp_pfte;
+    struct ipcp_entry *upper_ipcp;
+    struct ipcp_entry *ipcp;
+    struct rl_buf *tmp;
+    struct rl_buf *rb;
+    struct dtp *dtp;
+
+    dtp = &entry->dtp;
+    ipcp = entry->txrx.ipcp;
+    upper_ipcp = entry->upper.ipcp;
 
     if (ipcp->ops.flow_deallocated) {
         ipcp->ops.flow_deallocated(ipcp, entry);
@@ -1052,8 +1078,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     entry->txrx.rx_qsize = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        int r;
         rl_addr_t dst_addr = pfte->address;
+        int r;
 
         BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
         /* Here we are sure that 'upper_ipcp' will not be destroyed
@@ -1066,14 +1092,8 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         }
     }
 
-    hash_del(&entry->node);
     if (entry->local_appl) rl_free(entry->local_appl, RL_MT_FLOW);
     if (entry->remote_appl) rl_free(entry->remote_appl, RL_MT_FLOW);
-    bitmap_clear(rl_dm.port_id_bitmap, entry->local_port, 1);
-    if (ipcp->flags & RL_K_IPCP_USE_CEP_IDS) {
-        hash_del(&entry->node_cep);
-        bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
-    }
 
     /* Probe references before freeing. */
     if (!list_empty(&entry->node_rm)) {
@@ -1083,14 +1103,15 @@ __flow_put(struct flow_entry *entry, bool maysleep)
     {
         struct flow_entry *rflow;
 
+        FLOCK();
         list_for_each_entry(rflow, &rl_dm.flows_removeq, node_rm) {
             if (rflow == entry) {
                 PE("removeq has a dangling reference to flow %u\n",
                     entry->local_port);
             }
         }
+        FUNLOCK();
     }
-    FUNLOCK();
 
     if (ipcp->uipcp) {
         /* Prepare a flow deallocation message. */
@@ -1137,54 +1158,58 @@ __flow_put(struct flow_entry *entry, bool maysleep)
         ipcp_put(upper_ipcp);
     }
     ipcp_put(ipcp);
-
-    return;
 }
-EXPORT_SYMBOL(__flow_put);
 
 static void
 flows_removew_func(struct work_struct *w)
 {
     struct flow_entry *flow, *tmp;
     struct list_head removeq;
-    unsigned next_expiration = ~0U;
-    unsigned j;
 
     INIT_LIST_HEAD(&removeq);
 
-    /* Collect all the expires flows in a temporary list, and compute
-     * the next expiration time. */
+    /* Move the entries to a temporary queue while holding the lock. */
     FLOCK();
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_removeq, node_rm) {
+        list_del_init(&flow->node_rm);
+        list_add_tail_safe(&flow->node_rm, &removeq);
+    }
+    FUNLOCK();
+
+    /* Destroy the entries without holding the lock. */
+    list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
+        list_del_init(&flow->node_rm);
+        flow_del(flow);
+    }
+}
+
+static void
+flows_putq_drain(unsigned long unused)
+{
+    unsigned next_expiration = ~0U;
+    struct flow_entry *flow, *tmp;
+
+    /* Call flow_put on all the expired flows. */
+    FLOCK();
+    list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
         if (jiffies >= flow->expires) {
             list_del_init(&flow->node_rm);
-            list_add_tail_safe(&flow->node_rm, &removeq);
+            __flow_put(flow, false); /* match flows_removeq_add() */
+            if (flow->flags & RL_FLOW_NEVER_BOUND) {
+                PI("Removing flow %u since it was never bound\n",
+                        flow->local_port);
+            }
+            __flow_put(flow, false);
         } else if (flow->expires < next_expiration) {
             next_expiration = flow->expires;
         }
     }
-    FUNLOCK();
-
-    /* Remove all expired flows. */
-    list_for_each_entry_safe(flow, tmp, &removeq, node_rm) {
-        list_del_init(&flow->node_rm);
-        flow_put(flow); /* match flows_removeq_add() */
-        if (flow->flags & RL_FLOW_NEVER_BOUND) {
-            PI("Removing flow %u since it was never bound\n",
-                flow->local_port);
-        }
-        flow_put(flow);
-    }
 
     /* Reschedule if needed. */
-    j = jiffies;
-    if (next_expiration < j) {
-        next_expiration = j;
-    }
-
     if (next_expiration != ~0U) {
-        schedule_delayed_work(&rl_dm.flows_removew, next_expiration - j);
+        mod_timer(&rl_dm.flows_putq_tmr, next_expiration);
     }
+    FUNLOCK();
 }
 
 static int
@@ -3018,8 +3043,10 @@ rlite_init(void)
     INIT_LIST_HEAD(&rl_dm.ctrl_devs);
     INIT_LIST_HEAD(&rl_dm.appl_removeq);
     INIT_LIST_HEAD(&rl_dm.flows_removeq);
+    INIT_LIST_HEAD(&rl_dm.flows_putq);
     INIT_WORK(&rl_dm.appl_removew, appl_removew_func);
-    INIT_DELAYED_WORK(&rl_dm.flows_removew, flows_removew_func);
+    INIT_WORK(&rl_dm.flows_removew, flows_removew_func);
+    setup_timer(&rl_dm.flows_putq_tmr, flows_putq_drain, /* no arg */ 0);
 
     ret = misc_register(&rl_ctrl_misc);
     if (ret) {
@@ -3040,7 +3067,8 @@ rlite_init(void)
 static void __exit
 rlite_fini(void)
 {
-    cancel_delayed_work_sync(&rl_dm.flows_removew);
+    del_timer(&rl_dm.flows_putq_tmr);
+    cancel_work_sync(&rl_dm.flows_removew);
     cancel_work_sync(&rl_dm.appl_removew);
     misc_deregister(&rl_io_misc);
     misc_deregister(&rl_ctrl_misc);
