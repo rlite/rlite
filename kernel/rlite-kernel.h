@@ -142,8 +142,8 @@ struct rl_buf {
     struct rina_pci     *pci;
     size_t              len;
 
-    unsigned            rtx_jiffies;
-    unsigned            tx_jiffies;
+    unsigned long       rtx_jiffies;
+    unsigned long       tx_jiffies;
 
     struct flow_entry   *tx_compl_flow;
     struct list_head    node;

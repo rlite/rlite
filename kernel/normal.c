@@ -230,8 +230,9 @@ rtx_tmr_cb(long unsigned arg)
     struct flow_entry *flow = (struct flow_entry *)arg;
     struct dtp *dtp = &flow->dtp;
     struct rl_buf *rb, *crb, *tmp;
-    struct list_head rrbq;
     long unsigned next_exp = ~0U;
+    bool next_exp_set = false;
+    struct list_head rrbq;
 
     RPD(1, "\n");
 
@@ -247,7 +248,7 @@ rtx_tmr_cb(long unsigned arg)
     /* We scan all the retransmission list, since it is order by
      * ascending sequence number, not by ascending expiration time. */
     list_for_each_entry(rb, &dtp->rtxq, node) {
-        if (jiffies >= rb->rtx_jiffies) {
+        if (!time_before(jiffies, rb->rtx_jiffies)) {
             /* This rb should be retransmitted. We also invalidate
              * rb->tx_jiffies, so that RTT is not updated on
              * retransmitted packets. */
@@ -261,12 +262,13 @@ rtx_tmr_cb(long unsigned arg)
                 list_add_tail_safe(&crb->node, &rrbq);
             }
 
-        } else if (rb->rtx_jiffies < next_exp) {
+        } else if (!next_exp_set || time_before(rb->rtx_jiffies, next_exp)) {
             next_exp = rb->rtx_jiffies;
+            next_exp_set = true;
         }
     }
 
-    if (next_exp != ~0U) {
+    if (next_exp_set) {
         NPD("Forward rtx timer by %u\n", jiffies_to_msecs(next_exp - jiffies));
         mod_timer(&dtp->rtx_tmr, next_exp);
     }
@@ -526,7 +528,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     dtp->rtxq_len++;
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
-                jiffies_to_msecs(crb->rtx_jiffies - jiffies));
+            jiffies_to_msecs(crb->rtx_jiffies - jiffies));
         mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
     }
     NPD("cloning [%lu] into rtxq\n",
