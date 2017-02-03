@@ -951,11 +951,21 @@ flows_putq_add(struct flow_entry *flow, unsigned jdelta)
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
     if (flow->expires == ~0U) { /* don't insert twice */
+        struct flow_entry *cur;
+
         flow->expires = jiffies + jdelta;
-        list_add_tail_safe(&flow->node_rm, &rl_dm.flows_putq);
-        if (!timer_pending(&rl_dm.flows_putq_tmr)) {
-            mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
+        /* Insert flow in the putq, keeping the putq sorted
+         * by expiration time, in ascending order. */
+        list_for_each_entry(cur, &rl_dm.flows_putq, node_rm) {
+            if (time_after(cur->expires, flow->expires)) {
+                break;
+            }
         }
+        /* Insert 'flow' right before 'cur'. */
+        list_add_tail_safe(&flow->node_rm, &cur->node_rm);
+        /* Adjust timer expiration according to the new first entry. */
+        cur = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
+        mod_timer(&rl_dm.flows_putq_tmr, cur->expires);
     }
 }
 
@@ -975,7 +985,6 @@ __flow_put(struct flow_entry *entry, bool lock)
 {
     struct ipcp_entry *ipcp;
     struct dtp *dtp;
-    bool sched;
 
     if (unlikely(!entry)) {
         return;
@@ -1033,12 +1042,9 @@ __flow_put(struct flow_entry *entry, bool lock)
         bitmap_clear(rl_dm.cep_id_bitmap, entry->local_cep, 1);
     }
 
-    /* Enqueue into the remove list and schedule if needed. */
-    sched = list_empty(&rl_dm.flows_removeq);
+    /* Enqueue into the remove list and schedule the work. */
     list_add_tail_safe(&entry->node_rm, &rl_dm.flows_removeq);
-    if (sched) {
-        schedule_work(&rl_dm.flows_removew);
-    }
+    schedule_work(&rl_dm.flows_removew);
 
     if (lock) FUNLOCK();
 }
@@ -1184,13 +1190,13 @@ flows_removew_func(struct work_struct *w)
 static void
 flows_putq_drain(unsigned long unused)
 {
-    unsigned next_expiration = ~0U;
     struct flow_entry *flow, *tmp;
 
-    /* Call flow_put on all the expired flows. */
+    /* Call flow_put on all the expired flows, which are sorted in
+     * ascending expriration ordedr. */
     FLOCK();
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
-        if (jiffies >= flow->expires) {
+        if (!time_before(jiffies, flow->expires)) {
             list_del_init(&flow->node_rm);
             flow->expires = ~0U;
             __flow_put(flow, false); /* match flows_putq_add() */
@@ -1199,14 +1205,16 @@ flows_putq_drain(unsigned long unused)
                         flow->local_port);
             }
             __flow_put(flow, false);
-        } else if (flow->expires < next_expiration) {
-            next_expiration = flow->expires;
+        } else {
+            /* We can stop here. */
+            break;
         }
     }
 
     /* Reschedule if needed. */
-    if (next_expiration != ~0U) {
-        mod_timer(&rl_dm.flows_putq_tmr, next_expiration);
+    if (!list_empty(&rl_dm.flows_putq)) {
+        flow = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
+        mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
     }
     FUNLOCK();
 }
