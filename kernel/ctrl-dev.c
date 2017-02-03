@@ -951,11 +951,9 @@ flows_putq_add(struct flow_entry *flow, unsigned jdelta)
     PV("FLOWREFCNT %u ++: %u\n", flow->local_port, flow->refcnt);
 
     if (flow->expires == ~0U) { /* don't insert twice */
-        bool sched = list_empty(&rl_dm.flows_putq);
-
         flow->expires = jiffies + jdelta;
         list_add_tail_safe(&flow->node_rm, &rl_dm.flows_putq);
-        if (sched) {
+        if (!timer_pending(&rl_dm.flows_putq_tmr)) {
             mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
         }
     }
