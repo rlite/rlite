@@ -980,6 +980,38 @@ flows_putq_del(struct flow_entry *flow)
     flow_put(flow);
 }
 
+static void
+flows_putq_drain(unsigned long unused)
+{
+    struct flow_entry *flow, *tmp;
+
+    /* Call flow_put on all the expired flows, which are sorted in
+     * ascending expriration ordedr. */
+    FLOCK();
+    list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
+        if (!time_before(jiffies, flow->expires)) {
+            list_del_init(&flow->node_rm);
+            flow->expires = ~0U;
+            __flow_put(flow, false); /* match flows_putq_add() */
+            if (flow->flags & RL_FLOW_NEVER_BOUND) {
+                PI("Removing flow %u since it was never bound\n",
+                        flow->local_port);
+            }
+            __flow_put(flow, false);
+        } else {
+            /* We can stop here. */
+            break;
+        }
+    }
+
+    /* Reschedule if needed. */
+    if (!list_empty(&rl_dm.flows_putq)) {
+        flow = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
+        mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
+    }
+    FUNLOCK();
+}
+
 void
 __flow_put(struct flow_entry *entry, bool lock)
 {
@@ -1185,38 +1217,6 @@ flows_removew_func(struct work_struct *w)
         list_del_init(&flow->node_rm);
         flow_del(flow);
     }
-}
-
-static void
-flows_putq_drain(unsigned long unused)
-{
-    struct flow_entry *flow, *tmp;
-
-    /* Call flow_put on all the expired flows, which are sorted in
-     * ascending expriration ordedr. */
-    FLOCK();
-    list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
-        if (!time_before(jiffies, flow->expires)) {
-            list_del_init(&flow->node_rm);
-            flow->expires = ~0U;
-            __flow_put(flow, false); /* match flows_putq_add() */
-            if (flow->flags & RL_FLOW_NEVER_BOUND) {
-                PI("Removing flow %u since it was never bound\n",
-                        flow->local_port);
-            }
-            __flow_put(flow, false);
-        } else {
-            /* We can stop here. */
-            break;
-        }
-    }
-
-    /* Reschedule if needed. */
-    if (!list_empty(&rl_dm.flows_putq)) {
-        flow = list_first_entry(&rl_dm.flows_putq, struct flow_entry, node_rm);
-        mod_timer(&rl_dm.flows_putq_tmr, flow->expires);
-    }
-    FUNLOCK();
 }
 
 static int
