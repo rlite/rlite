@@ -1194,6 +1194,7 @@ flows_putq_drain(unsigned long unused)
     list_for_each_entry_safe(flow, tmp, &rl_dm.flows_putq, node_rm) {
         if (jiffies >= flow->expires) {
             list_del_init(&flow->node_rm);
+            flow->expires = ~0U;
             __flow_put(flow, false); /* match flows_putq_add() */
             if (flow->flags & RL_FLOW_NEVER_BOUND) {
                 PI("Removing flow %u since it was never bound\n",
