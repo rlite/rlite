@@ -743,7 +743,6 @@ for dif in dif_ordering:
                      'sshopts': sshopts, 'sudo': sudo,
                      'oper': oper}
 
-        outs += 'sleep 1\n' # important!!
         outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
