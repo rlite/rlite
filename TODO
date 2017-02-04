@@ -16,3 +16,7 @@
 - periodic DFT synchronization
 
 - use separate N-1 flows for management and data
+
+- implement reference counting to protect flow --> upper.rc
+
+- kernel: use time_after/time_before to compare jiffies

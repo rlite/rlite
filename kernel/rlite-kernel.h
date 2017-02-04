@@ -142,8 +142,8 @@ struct rl_buf {
     struct rina_pci     *pci;
     size_t              len;
 
-    unsigned            rtx_jiffies;
-    unsigned            tx_jiffies;
+    unsigned long       rtx_jiffies;
+    unsigned long       tx_jiffies;
 
     struct flow_entry   *tx_compl_flow;
     struct list_head    node;
@@ -438,7 +438,7 @@ struct flow_entry {
 
     struct rl_flow_stats stats;
     struct list_head    node_rm; /* for flows_removeq */
-    unsigned            expires; /* absolute time in jiffies */
+    unsigned long       expires; /* absolute time in jiffies */
     unsigned int        refcnt;
 #define RL_FLOW_NEVER_BOUND     (1 << 0) /* flow was never bound with ioctl */
 #define RL_FLOW_PENDING         (1 << 1) /* flow allocation is pending */
@@ -510,13 +510,13 @@ void rl_write_restart_flows(struct ipcp_entry *ipcp);
 
 void rl_flow_share_tx_wqh(struct flow_entry *flow);
 
-void __flow_put(struct flow_entry *flow, bool maysleep);
+void __flow_put(struct flow_entry *flow, bool lock);
 
 #define flow_put(_f)    \
         do {            \
             if (_f)     \
                 PV("FLOWREFCNT %u --: %u\n", (_f)->local_port, (_f)->refcnt - 1); \
-            __flow_put(_f, false); \
+            __flow_put(_f, true); \
         } while (0)
 
 struct flow_entry *flow_lookup(rl_port_t port_id);
