@@ -166,7 +166,8 @@ flow_allocate_req_work(struct work_struct *w)
         PE("Failed to report flow allocation request\n");
     }
 
-    /* TODO missing rl_free for local_appl and remote_appl */
+    rl_free(faw->local_appl, RL_MT_SHIMDATA);
+    rl_free(faw->remote_appl, RL_MT_SHIMDATA);
     rl_free(faw, RL_MT_SHIMDATA);
 }
 
