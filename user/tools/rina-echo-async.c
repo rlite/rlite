@@ -316,7 +316,7 @@ server(struct echo_async *rea)
                     fsms[j].last_activity = time(NULL);
                     if (fsms[j].fd < 0) {
                         perror("rina_flow_respond()");
-                        return fsms[j].fd;
+                        break;
                     }
 
                     if (j <= MAX_CLIENTS) {
