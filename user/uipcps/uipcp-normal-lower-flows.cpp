@@ -22,6 +22,7 @@
  */
 
 #include <climits>
+#include <cerrno>
 
 #include "uipcp-normal.hpp"
 
