@@ -109,8 +109,8 @@ This section briefly describes the software components of *rlite*.
 
 A main kernel module **rlite** which implements core functionalities:
 
-* The control device for managing IPCPs, flows, registrations, etc.
-* The I/O device for SDU write and read
+* A control device for managing IPCPs, flows, registrations, etc.
+* An I/O device to read()/write() SDU and synchronize (poll(), select()), etc).
 * IPCP factories
 
 A separate module for each type of IPCP:
@@ -138,11 +138,21 @@ A different thread is used for each IPCP running in the system.
 
 For the normal IPCP, uipcps daemon implements the following components:
 
-* Enrollment
-* Routing, management of lower flows and neighbors
-* Application registrarion
-* Flow allocation
-* Codecs for RIB objects
+* Enrollment, a procedure by which an IPCP (the enrollee) joins an existing
+  DIF, using a second IPCP (the enroller, which is already part of the DIF)
+  as an access point.
+* Routing, forwarding, and management of lower flows (i.e. N-1-flows) and
+  neighbors.
+* Application registration and unregistration.
+* Flow allocation.
+* Address allocation for the DIF members.
+* Codecs for RIB objects.
+
+Run
+
+    # rlite-uipcps -h
+
+to see the available options.
 
 
 ### 3.3. Libraries
@@ -150,7 +160,8 @@ For the normal IPCP, uipcps daemon implements the following components:
 
 Four libraries are available:
 
-* **librlite**, the main library, wrapping the control device and I/O device.
+* **librlite**, the main library, which wraps the control device and I/O device
+                to provide the RINA POSIX-like API.
                 This is the library used by applications to register names
                 and allocate flows.
 * **librlite-conf**, implementing the management and monitoring functionalities
@@ -177,8 +188,9 @@ Available commands:
 * ipcp-rib-show: Show the RIB of an IPCP running in the system
 * flows-show: Show the allocated flows that have a local IPCP as one of the
               endpoints
+* flows-dump: Show the detailed DTP/DTCP state of a given flow
 
-In order to show all the available command and the corresponding usage, use
+To show all the available command and the corresponding usage, use
 
     $ rlite-ctl -h
 
@@ -188,11 +200,17 @@ In order to show all the available command and the corresponding usage, use
 
 Other programs are available for testing and deployment:
 
-* **rinaperf**, an application for network throughput and latency performance
-                measurement. Use `rinaperf -h` to see the availble commmands.
+* **rinaperf**, a multi-threaded client/server application for network
+                throughput and latency performance measurement. Use
+                `rinaperf -h` to see the available commmands.
+* **rina-echo-async**, a single-threaded client/server application
+                       implementing a echo service using only
+                       non-blocking I/O. This application is able to allocate
+                       and manage multiple flows in parallel, without using
+                       blocking allocation or blocking I/O.
 * **rina-gw**, a deamon program implementing a gateway between a TCP/IP
                network and a RINA network.
-* **rina-echo**, a simple echo program written using the Python bindings.
+* **rina-toy**, a simple echo program written using the Python bindings.
 
 #### Examples of rinaperf usage
 
@@ -215,14 +233,14 @@ and using 1200 bytes sized SDUs:
 ### 3.6. Python bindings
 #############################################################################
 
-If your system runs Python, you can write applications using the *rlite*
+If your system supports Python, you can write applications using the *rlite*
 Python bindings, which are a wrapper for the **librlite** library. Run
 
     >>> import rlite
     >>> help(rlite)
 
 in the Python interpreter, in order to see the available classes.
-The **rina-echo** script is an example written using these bindings.
+The **rina-echo** script is a trivial example written using these bindings.
 
 
 
@@ -556,11 +574,10 @@ It supports two configuration parameter:
 ### 5.5. Normal IPC Process
 #############################################################################
 
-In the current implementation a normal IPC Process needs to be configured
-with an address which is unique in its DIF. This step will eventually
-become unnecessary (and not allowed anymore), once a first address space
-management strategy is implemented for the normal DIF (e.g. distributed or
-centralized address allocation).
+In the current implementation a normal IPC Process can be configured
+with an address unique in its DIF. This step is not necessary, since a simple
+policy for distributed address allocation is already available, and can be
+activated passing the -A option to the **rlite-uipcps** program.
 
 In the following example
 
