@@ -29,7 +29,8 @@
 
 The *rlite* project provides a lightweight Free and Open Source implementation
 of the Recursive InterNetwork Architecture (RINA) for GNU/Linux operating
-systems.
+systems. For information about RINA, including many introductions,
+presentations and articles, visit http://www.pouzinsociety.org/.
 
 The main goal of *rlite* is to become a baseline implementation for RINA
 systems to be used in production. In order to achieve this goal, *rlite*
