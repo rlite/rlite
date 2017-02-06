@@ -624,17 +624,17 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
         return -ENXIO;
     }
 
+    spin_lock_bh(&flow->txrx.rx_lock);
     if (!(flow->flags & RL_FLOW_ALLOCATED)) {
         PE("Flow %u not allocated\n", info->port_id);
-        flow_put(flow);
-        return -ENXIO;
+        goto err;
     }
 
     if (flow->flags & RL_FLOW_DEALLOCATED) {
         PE("Flow %u deallocated\n", info->port_id);
-        flow_put(flow);
-        return -ENXIO;
+        goto err;
     }
+    spin_unlock_bh(&flow->txrx.rx_lock);
 
     /* Bind the flow to this file descriptor. */
     IODEVS_LOCK();
@@ -646,6 +646,10 @@ rl_io_ioctl_bind(struct rl_io *rio, struct rl_ioctl_info *info)
     flow_make_mortal(flow);
 
     return 0;
+err:
+    spin_unlock_bh(&flow->txrx.rx_lock);
+    flow_put(flow);
+    return -ENXIO;
 }
 
 static long
