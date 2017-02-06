@@ -220,8 +220,6 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         m = nf->conn->msg_deser(serbuf, serlen);
         if (!m) {
             UPE(rib->uipcp, "msg_deser() failed\n");
-            /* Remove flow. */
-            rib->neigh_flow_prune(nf);
             return -1;
         }
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
