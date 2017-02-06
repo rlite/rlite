@@ -158,7 +158,7 @@ to see the available options.
 ### 3.3. Libraries
 #############################################################################
 
-Four libraries are available:
+The following libraries are available:
 
 * **librlite**, the main library, which wraps the control device and I/O device
                 to provide the RINA POSIX-like API.
