@@ -641,7 +641,7 @@ for vmname in sorted(vms):
                     '$SUDO chmod -R a+rw /var/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
-                    '$SUDO rlite-uipcps -v %(verb)s -k %(keepalive)s '\
+                    '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
                                         '%(relnflows)s %(unrelflows)s '\
                                         '%(autoaddralloc)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
@@ -701,7 +701,7 @@ for vmname in sorted(vms):
             del vars_dict
 
         if args.register:
-            outs += 'rina-echo-async -z %(regname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' \
+            outs += 'nohup rina-echo-async -z %(regname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' \
                         % {'regname': 'rina-echo-async:%s' % (vm['name'],),
                            'dif': dif}
 
