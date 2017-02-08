@@ -437,6 +437,7 @@ struct flow_entry {
     void                *priv;
 
     struct rl_flow_stats stats;
+    uint32_t            uid;     /* unique id */
     struct list_head    node_rm; /* for flows_removeq */
     unsigned long       expires; /* absolute time in jiffies */
     unsigned int        refcnt;

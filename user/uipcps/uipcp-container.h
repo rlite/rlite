@@ -253,7 +253,8 @@ int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                           rl_addr_t remote_addr, uint8_t response,
                           const struct rl_flow_config *flowcfg);
 
-int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port);
+int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
+                             uint32_t uid);
 
 int uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
                                 const struct rl_flow_config *flowcfg);

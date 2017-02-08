@@ -173,6 +173,7 @@ struct rl_kmsg_fa_req {
     struct rina_flow_spec flowspec;
     rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
     uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
+    uint32_t uid;        /* unique id filled in by kernel before reflection. */
     char *local_appl;
     char *remote_appl;
     char *dif_name;
@@ -323,6 +324,9 @@ struct rl_kmsg_flow_dealloc {
 
     rl_ipcp_id_t ipcp_id;
     rl_port_t port_id;
+    uint32_t uid; /* unique id of the flow to deallocate, used to avoid
+                   * accidental removal of different flows reusing the
+                   * same port-id */
 } __attribute__((packed));
 
 /* application --> kernel message to ask for

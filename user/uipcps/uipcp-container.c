@@ -216,7 +216,8 @@ uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
 }
 
 int
-uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
+uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
+                         uint32_t uid)
 {
     struct rl_kmsg_flow_dealloc req;
     int ret;
@@ -227,6 +228,7 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port)
     req.event_id = 1;
     req.ipcp_id = uipcp->id;
     req.port_id = local_port;
+    req.uid = uid;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
