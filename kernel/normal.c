@@ -791,6 +791,7 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
     if (!entry) {
         entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
         if (!entry) {
+            write_unlock_bh(&priv->pduft_lock);
             return -ENOMEM;
         }
 
