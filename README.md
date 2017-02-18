@@ -359,10 +359,9 @@ to send and receive packets:
 
     $ sudo rlite-ctl ipcp-config ethAB.IPCP:1 netdev eth0
 
-Create a normal IPCP and give it an address in the normal DIF:
+Create a normal IPCP in the normal DIF:
 
     $ sudo rlite-ctl ipcp-create a.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-config a.IPCP:1 address 71
 
 Let the normal IPCP register to the shim DIF:
 
@@ -380,7 +379,6 @@ On node B, similar operations are carried out for both the interfaces:
     $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth1
     $
     $ sudo rlite-ctl ipcp-create b.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-config b.IPCP:1 address 72
     $ sudo rlite-ctl ipcp-register ethAB.DIF b.IPCP:1
     $ sudo rlite-ctl ipcp-register ethBC.DIF b.IPCP:1
 
@@ -391,7 +389,6 @@ On node C:
     $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth0
     $
     $ sudo rlite-ctl ipcp-create c.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-config c.IPCP:1 address 73
     $ sudo rlite-ctl ipcp-register ethBC.DIF c.IPCP:1
 
 Once the IPCPs are set up, we have to carry out the enrollments in
@@ -653,15 +650,16 @@ It supports two configuration parameter:
 ### 5.5. Normal IPC Process
 #############################################################################
 
-In the current implementation a normal IPC Process can be configured
-with an address unique in its DIF. This step is not necessary, since a simple
-policy for distributed address allocation is already available, and can be
-activated passing the -A option to the **rlite-uipcps** program.
-
-In the following example
+A normal IPC Process can be manually configured with an address unique in its
+DIF.
+This step is not necessary, since a simple default policy for distributed
+address allocation is already available.
+To deactivate automatic address allocation, you need to pass the "-A manual"
+option to the **rlite-uipcps** program, and configure addresses manually
+like in the following example:
 
     $ sudo rlite-ctl ipcp-config normal1:xyz address 7382
 
-a normal IPCP called normal1:xyz is given the address 7382 to be used
+where a normal IPCP called normal1:xyz is given the address 7382 to be used
 in its DIF.
 
