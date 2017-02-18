@@ -14,7 +14,8 @@
     * 3.6. Python bindings
 * 4. Tutorials
     * 4.1 Using the demonstrator
-    * 4.2 Hands-on tutorial
+    * 4.2 Hands-on tutorial #1: normal-over-shim-eth
+    * 4.3 Hands-on tutorial #2: normal-over-shim-udp
 * 5. Configuration of IPC Processes
     * 5.1. shim-eth IPC Process
     * 5.2. shim-udp4 IPC Process
@@ -317,7 +318,7 @@ Exit the node shell and teardown the scenario:
     $ ./down.sh
 
 
-### 4.2 Hands-on tutorial
+### 4.2 Hands-on tutorial #1: normal-over-shim-eth
 #############################################################################
 
 This tutorial shows how to manually reproduce the configuration described
@@ -327,7 +328,7 @@ The nodes can be realized either with physical or virtual machines.
 In the demo.conf configuration, three nodes (A, B and C) are connected through
 Ethernet links to form a linear topology:
 
-    A ----- B ---- C
+    A <---eth---> B <---eth---> C
 
 and a single normal DIF is stacked over the link-to-link shim DIFs.
 
@@ -435,6 +436,84 @@ On node C:
 
     $ rinaperf -d n.DIF -t perf -s 1400 -c 100000
 
+
+### 4.3 Hands-on tutorial #2: normal-over-shim-udp
+#############################################################################
+
+This tutorial illustrates a simple example of deploying the shim-udp to
+allow two RINA networks to communicate over an IP network like the
+Internet or a LAN. Using the shim-udp, the RINA traffic between the two
+RINA networks is transported through an UDP tunnel.
+
+    NETWORK_X <---udp-tunnel---> NETWORK_Y
+
+A normal DIF is also stacked over the shim over UDP, in order to provide
+reliable flows (that UDP cannot provide) and all the services of a
+fully-featured DIF.
+
+Also this tutorial can be easily realized by using two physical machines
+on the same LAN or two VMs on the same *emulated* LAN, once *rlite* is
+installed in both machines.
+
+To keep the example simple (and without loss of generality w.r.t. the
+configuration) here we will assume that each network is composed by only one
+node; let X be the node of the first network and Y the node of the second
+network. In a real deployment, of course, X and Y would be just the edge
+nodes of a bigger RINA nework (e.g. with nodes physically connected through
+shim-eth DIFs like shown in section 4.2), and act as a *gateway* towards
+the IP network.
+
+We will assume that IP connectivity has been setup properly between X and Y.
+In this particular example, we also assume that X and Y are on the same
+IP subnet, with the IP address of X being 10.10.10.4/24 and the IP address
+of Y being 10.10.10.52/24.
+Before going ahead, check that there is IP connectivity, e.g.
+trying to ping X from Y
+
+    $ ping 10.10.10.4
+
+As a first step, access both machine X and Y and append the following lines
+to /etc/hosts (making sure that they not clash with other entries):
+
+    10.10.10.4      xipgateway.IPCP
+    10.10.10.52     yipgateway.IPCP
+
+On both X and Y, load *rlite* kernel modules and run the rlite-uipcps
+deamon (in foreground in the example)
+
+    $ sudo modprobe rlite
+    $ sudo modprobe rlite-normal
+    $ sudo modprobe rlite-shim-eth
+    $ sudo rlite-uipcps
+
+On machine X, create a shim-udp IPCP and a normal IPCP, and register the
+normal IPCP in the shim-udp DIF:
+
+    $ sudo rlite-ctl ipcp-create xipgateway.IPCP shim-udp udptunnel.DIF
+    $ sudo rlite-ctl ipcp-create xnorm.IPCP normal normal.DIF
+    $ sudo rlite-ctl ipcp-register udptunnel.DIF xnorm.IPCP
+
+Carry out similar operations on node Y:
+
+    $ sudo rlite-ctl ipcp-create yipgateway.IPCP shim-udp udptunnel.DIF
+    $ sudo rlite-ctl ipcp-create ynorm.IPCP normal normal.DIF
+    $ sudo rlite-ctl ipcp-register udptunnel.DIF ynorm.IPCP
+
+Finally, access X and enroll X with Y (or the other way around) in the
+normal DIF:
+
+    $ sudo rlite-ctl ipcp-enroll normal.DIF xnorm.IPCP ynorm.IPCP udptunnel.DIF
+
+The setup is now complete and your RINA applications on X can talk with
+applications running on Y, with the traffic being forwarded through the UDP
+shim DIF. As an example, run a **rinaperf** server on X (the normal DIF
+will be automatically selected):
+
+$ rinaperf -l
+
+Access Y and run the rinaperf client (in ping mode):
+
+$ rinaperf
 
 
 #############################################################################
