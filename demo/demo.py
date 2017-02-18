@@ -194,8 +194,9 @@ argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
 argparser.add_argument('-U', '--unreliable-flows', action='store_true',
                        help = "Use unreliable N-1-flows rather than reliable ones")
-argparser.add_argument('-A', '--auto-addr-alloc', action='store_true',
-                       help = "Use automatic address allocation for all DIFs")
+argparser.add_argument('-A', '--addr-alloc-policy', type=str,
+                        choices = ["auto", "manual"], default = "auto",
+                       help = "Address allocation policy to be used for all DIFs")
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
 argparser.add_argument('-i', '--image',
@@ -643,13 +644,13 @@ for vmname in sorted(vms):
                     '\n'\
                     '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
                                         '%(relnflows)s %(unrelflows)s '\
-                                        '%(autoaddralloc)s &> uipcp.log &\n'\
+                                        '-A %(autoaddralloc)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
                            'unrelflows': '-U' if args.unreliable_flows else '',
-                           'autoaddralloc': '-A' if args.auto_addr_alloc else ''}
+                           'autoaddralloc': args.addr_alloc_policy}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
@@ -673,7 +674,7 @@ for vmname in sorted(vms):
         if dif not in shims and vmname in difs[dif]:
             outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal %(dif)s.DIF\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
-            if not args.auto_addr_alloc:
+            if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
 
