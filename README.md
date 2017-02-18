@@ -472,27 +472,27 @@ trying to ping X from Y
 As a first step, access both machine X and Y and append the following lines
 to /etc/hosts (making sure that they not clash with other entries):
 
-    10.10.10.4      xipgateway.IPCP
-    10.10.10.52     yipgateway.IPCP
+    10.10.10.4      xnorm.IPCP
+    10.10.10.52     ynorm.IPCP
 
 On both X and Y, load *rlite* kernel modules and run the rlite-uipcps
 deamon (in foreground in the example)
 
     $ sudo modprobe rlite
     $ sudo modprobe rlite-normal
-    $ sudo modprobe rlite-shim-eth
+    $ sudo modprobe rlite-shim-udp4
     $ sudo rlite-uipcps
 
-On machine X, create a shim-udp IPCP and a normal IPCP, and register the
-normal IPCP in the shim-udp DIF:
+On machine X, create a shim-udp4 IPCP and a normal IPCP, and register the
+normal IPCP in the shim-udp4 DIF:
 
-    $ sudo rlite-ctl ipcp-create xipgateway.IPCP shim-udp udptunnel.DIF
+    $ sudo rlite-ctl ipcp-create xipgateway.IPCP shim-udp4 udptunnel.DIF
     $ sudo rlite-ctl ipcp-create xnorm.IPCP normal normal.DIF
     $ sudo rlite-ctl ipcp-register udptunnel.DIF xnorm.IPCP
 
 Carry out similar operations on node Y:
 
-    $ sudo rlite-ctl ipcp-create yipgateway.IPCP shim-udp udptunnel.DIF
+    $ sudo rlite-ctl ipcp-create yipgateway.IPCP shim-udp4 udptunnel.DIF
     $ sudo rlite-ctl ipcp-create ynorm.IPCP normal normal.DIF
     $ sudo rlite-ctl ipcp-register udptunnel.DIF ynorm.IPCP
 
