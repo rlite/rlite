@@ -538,7 +538,9 @@ enrollee_thread(void *opaque)
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
-        assert(nf->conn == NULL);
+        if (nf->conn) {
+            rl_delete(nf->conn, RL_MT_SHIMDATA);
+        }
         nf->conn = rl_new(CDAPConn(nf->flow_fd, 1), RL_MT_SHIMDATA);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->uipcp->name,
