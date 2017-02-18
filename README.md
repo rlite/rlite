@@ -506,11 +506,11 @@ applications running on Y, with the traffic being forwarded through the UDP
 shim DIF. As an example, run a **rinaperf** server on X (the normal DIF
 will be automatically selected):
 
-$ rinaperf -l
+    $ rinaperf -l
 
 Access Y and run the rinaperf client (in ping mode):
 
-$ rinaperf
+    $ rinaperf
 
 
 #############################################################################
