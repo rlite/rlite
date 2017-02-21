@@ -219,14 +219,16 @@ Run the server, registering on a DIF called *n.DIF*:
 
     $ rinaperf -l -d n.DIF
 
-Note that the rinaperf server can only manage requests one by one.
+Note that rinaperf is multi-threaded, and can serve multiple requests
+concurrently.
 
-Run the client in ping mode, asking a DIF called *n.DIF* to allocate a flow:
+Run the client in ping mode, asking a DIF called *n.DIF* to allocate three
+flows in parallel:
 
-    $ rinaperf -t ping -d n.DIF
+    $ rinaperf -p 3 -t ping -d n.DIF
 
-Run the client in perf mode, asking a DIF called *n.DIF* to allocate a flow,
-and using 1200 bytes sized SDUs:
+Run the client in perf mode, asking a DIF called *n.DIF* to allocate a
+flow, using 1200 bytes sized SDUs:
 
     $ rinaperf -t perf -d -n.DIF -s 1200
 
