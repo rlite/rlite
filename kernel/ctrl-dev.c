@@ -2839,13 +2839,11 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         if (len < entry->serlen) {
             /* Not enough space? Don't pop the entry from the upqueue. */
             ret = -ENOBUFS;
+        } else if (unlikely(copy_to_user(buf, entry->sermsg, entry->serlen))) {
+            ret = -EFAULT;
         } else {
-            if (unlikely(copy_to_user(buf, entry->sermsg, entry->serlen))) {
-                ret = -EFAULT;
-            } else {
-                ret = entry->serlen;
-                *ppos += ret;
-            }
+            ret = entry->serlen;
+            *ppos += ret;
 
             /* Unlink and free the upqueue entry and the associated message. */
             list_del_init(&entry->node);
@@ -2863,10 +2861,13 @@ rl_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *ppos)
         remove_wait_queue(&rc->upqueue_wqh, &wait);
     }
 
-    if (ret == 0) {
+    if (ret > 0) {
+        /* Some space was freed up in the upqueue: wake up processes
+         * blocked on rl_upqueue_append(). */
         wake_up_interruptible_poll(&rc->upqueue_wqh, POLLOUT | POLLWRNORM |
                                                      POLLWRBAND);
     }
+
     return ret;
 }
 
