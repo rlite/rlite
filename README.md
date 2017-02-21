@@ -237,13 +237,14 @@ flow, using 1200 bytes sized SDUs:
 #############################################################################
 
 If your system supports Python, you can write applications using the *rlite*
-Python bindings, which are a wrapper for the **librlite** library. Run
+Python bindings, which are a wrapper for the POSIX-like API exported by
+the **librlite** library. Run
 
     >>> import rlite
     >>> help(rlite)
 
-in the Python interpreter, in order to see the available classes.
-The **rina-echo** script is a trivial example written using these bindings.
+in the Python interpreter, in order to see the available functionalities.
+The **rina-toy** script is a trivial example written using these bindings.
 
 
 
