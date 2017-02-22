@@ -60,15 +60,35 @@ struct rina_name {
     char *aei;
 } __attribute__((packed));
 
-typedef uint32_t rl_addr_t;
 typedef uint32_t rl_port_t;
-typedef uint64_t rl_seq_t;
-typedef uint16_t rl_pdulen_t;
-typedef uint32_t rl_cepid_t;
-typedef uint8_t  rl_qosid_t;
-
 typedef uint16_t rl_ipcp_id_t;
 typedef uint16_t rl_msg_t;
+
+/* Maximum sizes for data transfer constants, to be used in CDAP
+ * messages, user/kernel interfaces and the management layer in general. */
+typedef uint64_t rlm_addr_t;
+typedef uint64_t rlm_seq_t;
+typedef uint32_t rlm_pdulen_t;
+typedef uint32_t rlm_cepid_t;
+typedef uint32_t rlm_qosid_t;
+
+/* Actual values for data transfer constants: can be redefined at
+ * compile time, set default values here. */
+#ifndef rl_addr_t
+#define rl_addr_t uint32_t
+#endif
+#ifndef rl_seq_t
+#define rl_seq_t uint32_t
+#endif
+#ifndef rl_pdulen_t
+#define rl_pdulen_t uint16_t
+#endif
+#ifndef rl_cepid_t
+#define rl_cepid_t uint32_t
+#endif
+#ifndef rl_qosid_t
+#define rl_qosid_t uint8_t
+#endif
 
 #define RLITE_SUCC  0
 #define RLITE_ERR   1
