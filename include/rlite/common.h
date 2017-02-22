@@ -63,6 +63,10 @@ struct rina_name {
 typedef uint32_t rl_addr_t;
 typedef uint32_t rl_port_t;
 typedef uint64_t rl_seq_t;
+typedef uint16_t rl_pdulen_t;
+typedef uint32_t rl_cepid_t;
+typedef uint8_t  rl_qosid_t;
+
 typedef uint16_t rl_ipcp_id_t;
 typedef uint16_t rl_msg_t;
 

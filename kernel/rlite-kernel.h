@@ -110,13 +110,13 @@ struct rina_pci {
     rl_addr_t dst_addr;
     rl_addr_t src_addr;
     struct {
-        uint32_t qos_id;
-        uint32_t dst_cep;
-        uint32_t src_cep;
+        rl_cepid_t dst_cep;
+        rl_cepid_t src_cep;
+        rl_qosid_t qos_id;
     } conn_id;
     uint8_t pdu_type;
     uint8_t pdu_flags;
-    uint16_t pdu_len;
+    rl_pdulen_t pdu_len;
     rl_seq_t seqnum;
 } __attribute__((packed));
 
