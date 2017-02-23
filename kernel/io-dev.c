@@ -114,7 +114,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
         int ret;
 
         /* The flow is used by an upper IPCP. */
-        ret = upper_ipcp->ops.sdu_rx(upper_ipcp, rb, flow->local_port);
+        ret = upper_ipcp->ops.sdu_rx(upper_ipcp, rb, flow);
         if (likely(ret == 0)) {
             /* rb consumed */
             return 0;
@@ -175,13 +175,13 @@ rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
 {
     struct ipcp_entry *shortcut = ipcp->shortcut;
 
-    if (unlikely(shortcut == NULL || rb->len < sizeof(struct rina_pci) ||
-                 RLITE_BUF_PCI(rb)->pdu_type == PDU_T_MGMT)) {
-        /* We cannot take the shortcut optimization. */
+    if (shortcut == NULL || shortcut->ops.sdu_rx(shortcut, rb,
+                                    /* unused */ NULL) == -ENOMSG) {
+        /* We cannot take the shortcut optimization, inform the caller. */
         return 1;
     }
 
-    shortcut->ops.sdu_rx(shortcut, rb, 0 /* TODO */);
+    /* Shortcut successfully taken! */
 
     return 0;
 
