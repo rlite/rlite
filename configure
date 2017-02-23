@@ -138,7 +138,7 @@ fi
 
 # Generate kernel makefile
 cp kernel/Makefile.in kernel/Makefile
-#generate_flavours
+generate_flavours
 
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh
