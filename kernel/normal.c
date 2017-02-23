@@ -390,7 +390,7 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static struct pduft_entry *
-pduft_lookup_internal(struct rl_normal *priv, rl_addr_t dst_addr)
+pduft_lookup_internal(struct rl_normal *priv, rlm_addr_t dst_addr)
 {
     struct pduft_entry *entry;
     struct hlist_head *head;
@@ -406,7 +406,7 @@ pduft_lookup_internal(struct rl_normal *priv, rl_addr_t dst_addr)
 }
 
 static struct flow_entry *
-pduft_lookup(struct rl_normal *priv, rl_addr_t dst_addr)
+pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
 {
     struct pduft_entry *entry;
 
@@ -778,7 +778,7 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
 }
 
 static int
-rl_normal_pduft_set(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
+rl_normal_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
                       struct flow_entry *flow)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
@@ -854,7 +854,7 @@ rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
 }
 
 static int
-rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rl_addr_t dst_addr)
+rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct pduft_entry *entry;

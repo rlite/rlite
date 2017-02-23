@@ -272,10 +272,10 @@ struct ipcp_ops {
     int (*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value, int *notify);
-    int (*pduft_set)(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
+    int (*pduft_set)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
-    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rl_addr_t dst_addr);
+    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
                           const struct rl_mgmt_hdr *hdr,
@@ -315,7 +315,7 @@ struct ipcp_entry {
     rl_ipcp_id_t        id;    /* Key */
     char                *name;
     struct dif          *dif;
-    rl_addr_t           addr;
+    rlm_addr_t           addr;
 
 #define RL_K_IPCP_USE_CEP_IDS   (1<<0)
 #define RL_K_IPCP_ZOMBIE        (1<<1)
@@ -378,11 +378,11 @@ struct dtp {
     unsigned long mpl_r_a;  /* MPL + R + A */
 
     /* Sender state. */
-    rl_seq_t snd_lwe;
-    rl_seq_t snd_rwe;
-    rl_seq_t next_seq_num_to_send;
-    rl_seq_t last_seq_num_sent;
-    rl_seq_t last_ctrl_seq_num_rcvd;
+    rlm_seq_t snd_lwe;
+    rlm_seq_t snd_rwe;
+    rlm_seq_t next_seq_num_to_send;
+    rlm_seq_t last_seq_num_sent;
+    rlm_seq_t last_ctrl_seq_num_rcvd;
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
@@ -397,13 +397,13 @@ struct dtp {
     struct tkbk tkbk;
 
     /* Receiver state. */
-    rl_seq_t rcv_lwe;
-    rl_seq_t rcv_lwe_priv;
-    rl_seq_t rcv_rwe;
-    rl_seq_t max_seq_num_rcvd;
-    rl_seq_t last_snd_data_ack; /* almost unused */
-    rl_seq_t next_snd_ctl_seq;
-    rl_seq_t last_lwe_sent;
+    rlm_seq_t rcv_lwe;
+    rlm_seq_t rcv_lwe_priv;
+    rlm_seq_t rcv_rwe;
+    rlm_seq_t max_seq_num_rcvd;
+    rlm_seq_t last_snd_data_ack; /* almost unused */
+    rlm_seq_t next_snd_ctl_seq;
+    rlm_seq_t last_lwe_sent;
     struct timer_list rcv_inact_tmr;
     struct list_head seqq;
     unsigned int seqq_len;
@@ -419,7 +419,7 @@ struct flow_entry {
     uint16_t            remote_port;
     uint16_t            local_cep;
     uint16_t            remote_cep;
-    rl_addr_t           remote_addr;
+    rlm_addr_t           remote_addr;
     char                *local_appl;
     char                *remote_appl;
     struct upper_ref    upper;
@@ -452,7 +452,7 @@ struct flow_entry {
 };
 
 struct pduft_entry {
-    rl_addr_t           address;    /* pdu_ft key */
+    rlm_addr_t           address;    /* pdu_ft key */
     struct flow_entry   *flow;
     struct hlist_node   node;       /* for the pdu_ft hash table */
     struct list_head    fnode;      /* for the flow->pduft_entries list */
@@ -479,7 +479,7 @@ int rl_ipcp_factory_unregister(const char *dif_type);
 
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                       rl_port_t remote_port, uint32_t remote_cep,
-                      rl_addr_t remote_addr,
+                      rlm_addr_t remote_addr,
                       const char *local_appl,
                       const char *remote_appl,
                       const struct rl_flow_config *flowcfg,
@@ -490,7 +490,7 @@ int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                        rl_port_t local_port,
                        rl_port_t remote_port,
                        uint32_t remote_cep,
-                       rl_addr_t remote_addr,
+                       rlm_addr_t remote_addr,
                        uint8_t response,
                        struct rl_flow_config *flowcfg,
                        bool maysleep);

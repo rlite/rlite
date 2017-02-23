@@ -111,8 +111,8 @@ struct rl_kmsg_flow_fetch_resp {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     rl_port_t remote_port;
-    rl_addr_t local_addr;
-    rl_addr_t remote_addr;
+    rlm_addr_t local_addr;
+    rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
 } __attribute__((packed));
 
@@ -127,7 +127,7 @@ struct rl_kmsg_ipcp_update {
 
     uint8_t update_type;
     rl_ipcp_id_t ipcp_id;
-    rl_addr_t ipcp_addr;
+    rlm_addr_t ipcp_addr;
     uint16_t  nhdrs;
     uint32_t max_sdu_size;
     char *ipcp_name;
@@ -239,7 +239,7 @@ struct rl_kmsg_ipcp_pduft_mod {
     /* The IPCP whose PDUFT is to be modified. */
     rl_ipcp_id_t ipcp_id;
     /* The address of a remote IPCP. */
-    rl_addr_t dst_addr;
+    rlm_addr_t dst_addr;
     /* The local port through which the remote IPCP
      * can be reached. */
     uint16_t local_port;
@@ -269,7 +269,7 @@ struct rl_kmsg_uipcp_fa_req_arrived {
     rl_ipcp_id_t ipcp_id;
     rl_port_t remote_port;
     uint32_t remote_cep;
-    rl_addr_t remote_addr;
+    rlm_addr_t remote_addr;
     struct rl_flow_config flowcfg;
     struct rina_flow_spec flowspec;
     /* Requested application. */
@@ -288,7 +288,7 @@ struct rl_kmsg_uipcp_fa_resp_arrived {
     rl_port_t local_port;
     rl_port_t remote_port;
     uint32_t remote_cep;
-    rl_addr_t remote_addr;
+    rlm_addr_t remote_addr;
     uint8_t response;
     struct rl_flow_config flowcfg;
 } __attribute__((packed));
@@ -313,7 +313,7 @@ struct rl_kmsg_flow_deallocated {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port_id;
     rl_port_t remote_port_id;
-    rl_addr_t remote_addr;
+    rlm_addr_t remote_addr;
 } __attribute__((packed));
 
 /* uipcp (application) --> kernel message to ask

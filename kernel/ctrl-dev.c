@@ -1115,7 +1115,7 @@ flow_del(struct flow_entry *entry)
     entry->txrx.rx_qsize = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        rl_addr_t dst_addr = pfte->address;
+        rlm_addr_t dst_addr = pfte->address;
         int r;
 
         BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
@@ -2534,7 +2534,7 @@ out:
 int
 rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                   rl_port_t remote_port, uint32_t remote_cep,
-                  rl_addr_t remote_addr,
+                  rlm_addr_t remote_addr,
                   const char *local_appl,
                   const char *remote_appl,
                   const struct rl_flow_config *flowcfg,
@@ -2618,7 +2618,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      rl_port_t local_port,
                      rl_port_t remote_port,
                      uint32_t remote_cep,
-                     rl_addr_t remote_addr,
+                     rlm_addr_t remote_addr,
                      uint8_t response,
                      struct rl_flow_config *flowcfg,
                      bool maysleep)

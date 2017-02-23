@@ -66,7 +66,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 static int
 uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port,
+                rlm_addr_t dst_addr, rl_port_t local_port,
                 rl_msg_t msg_type)
 {
     struct rl_kmsg_ipcp_pduft_mod req;
@@ -91,7 +91,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 int
 uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port)
+                rlm_addr_t dst_addr, rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_SET);
@@ -99,7 +99,7 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 int
 uipcp_pduft_del(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port)
+                rlm_addr_t dst_addr, rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_DEL);
@@ -146,7 +146,7 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_port_t remote_port, uint32_t remote_cep,
-                           rl_addr_t remote_addr,
+                           rlm_addr_t remote_addr,
                            const char *local_appl,
                            const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
@@ -184,7 +184,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                             rl_port_t remote_port, uint32_t remote_cep,
-                            rl_addr_t remote_addr,
+                            rlm_addr_t remote_addr,
                             uint8_t response, const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived req;

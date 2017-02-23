@@ -185,20 +185,20 @@ public:
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
-    void update_kernel_routing(rl_addr_t);
+    void update_kernel_routing(rlm_addr_t);
 
 private:
     /* Step 1. Shortest Path algorithm. */
-    int compute_next_hops(rl_addr_t);
+    int compute_next_hops(rlm_addr_t);
 
     /* Step 2. Forwarding table computation and kernel update. */
     int compute_fwd_table();
 
     struct Edge {
-        rl_addr_t to;
+        rlm_addr_t to;
         unsigned int cost;
 
-        Edge(rl_addr_t to_, unsigned int cost_) :
+        Edge(rlm_addr_t to_, unsigned int cost_) :
                             to(to_), cost(cost_) { }
     };
 
@@ -207,14 +207,14 @@ private:
         bool visited;
     };
 
-    std::map<rl_addr_t, std::list<Edge> > graph;
-    std::map<rl_addr_t, Info> info;
+    std::map<rlm_addr_t, std::list<Edge> > graph;
+    std::map<rlm_addr_t, Info> info;
 
     /* The routing table computed by compute_next_hops(). */
-    std::map<rl_addr_t, rl_addr_t> next_hops;
+    std::map<rlm_addr_t, rlm_addr_t> next_hops;
 
     /* The forwarding table computed by compute_fwd_table(). */
-    std::map<rl_addr_t, rl_port_t> next_ports;
+    std::map<rlm_addr_t, rl_port_t> next_ports;
 
     struct uipcp_rib *rib;
 };
@@ -258,7 +258,7 @@ struct uipcp_rib {
     bool self_registration_needed;
 
     /* IPCP address .*/
-    rl_addr_t myaddr;
+    rlm_addr_t myaddr;
 
     /* Lower DIFs. */
     std::list< std::string > lower_difs;
@@ -274,13 +274,13 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    std::map<rl_addr_t, AddrAllocRequest> addr_alloc_table;
+    std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
     /* Directory Forwarding Table. */
     std::map< std::string, DFTEntry > dft;
 
     /* Lower Flow Database. */
-    std::map< rl_addr_t, std::map<rl_addr_t, LowerFlow > > lfdb;
+    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb;
 
     RoutingEngine re;
 
@@ -307,36 +307,36 @@ struct uipcp_rib {
 
     char *dump() const;
 
-    int set_address(rl_addr_t address);
-    void update_address(rl_addr_t new_addr);
+    int set_address(rlm_addr_t address);
+    void update_address(rlm_addr_t new_addr);
     Neighbor *get_neighbor(const std::string& neigh_name, bool create);
     int del_neighbor(const std::string& neigh_name);
-    int dft_lookup(const std::string& appl_name, rl_addr_t& dstaddr) const;
-    int dft_set(const std::string& appl_name, rl_addr_t remote_addr);
-    void dft_update_address(rl_addr_t new_addr);
+    int dft_lookup(const std::string& appl_name, rlm_addr_t& dstaddr) const;
+    int dft_set(const std::string& appl_name, rlm_addr_t remote_addr);
+    void dft_update_address(rlm_addr_t new_addr);
     int register_to_lower(int reg, std::string lower_dif);
     int appl_register(const struct rl_kmsg_appl_register *req);
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
-    rl_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
-    std::string lookup_neighbor_by_address(rl_addr_t address);
+    rlm_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
+    std::string lookup_neighbor_by_address(rlm_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
-    rl_addr_t addr_allocate();
+    rlm_addr_t addr_allocate();
     void neigh_flow_prune(NeighFlow *nf);
 
-    const LowerFlow *lfdb_find(rl_addr_t local_addr,
-                               rl_addr_t remote_addr) const {
+    const LowerFlow *lfdb_find(rlm_addr_t local_addr,
+                               rlm_addr_t remote_addr) const {
         return _lfdb_find(local_addr, remote_addr);
     };
-    LowerFlow *lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr);
+    LowerFlow *lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
     bool lfdb_add(const LowerFlow &lf);
-    bool lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr);
+    bool lfdb_del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
     void lfdb_update_local(const std::string& neigh_name);
-    void lfdb_update_address(rl_addr_t new_addr);
+    void lfdb_update_address(rlm_addr_t new_addr);
 
-    int send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
+    int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
     int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
 
@@ -371,8 +371,8 @@ private:
     int load_qos_cubes(const char *);
 #endif /* RL_USE_QOS_CUBES */
 
-    const LowerFlow *_lfdb_find(rl_addr_t local_addr,
-                                rl_addr_t remote_addr) const;
+    const LowerFlow *_lfdb_find(rlm_addr_t local_addr,
+                                rlm_addr_t remote_addr) const;
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 };

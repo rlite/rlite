@@ -135,7 +135,7 @@ struct uipcp_ops {
                                 const struct rl_msg_base *msg);
 
     /* The uipcp address gets updated. */
-    void (*update_address)(struct uipcp *uipcp, rl_addr_t new_addr);
+    void (*update_address)(struct uipcp *uipcp, rlm_addr_t new_addr);
 
     /* For tasks to be executed in the context of the uipcps event loop. */
     void  (*trigger_tasks)(struct uipcp *);
@@ -234,23 +234,23 @@ int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                              const struct rl_kmsg_appl_register *req);
 
 int uipcp_pduft_set(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rl_addr_t dst_addr, rl_port_t local_port);
+                    rlm_addr_t dst_addr, rl_port_t local_port);
 
 int uipcp_pduft_del(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rl_addr_t dst_addr, rl_port_t local_port);
+                    rlm_addr_t dst_addr, rl_port_t local_port);
 
 int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_port_t remote_port, uint32_t remote_cep,
-                               rl_addr_t remote_addr,
+                               rlm_addr_t remote_addr,
                                const char *local_appl,
                                const char *remote_appl,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                           rl_port_t remote_port, uint32_t remote_cep,
-                          rl_addr_t remote_addr, uint8_t response,
+                          rlm_addr_t remote_addr, uint8_t response,
                           const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,

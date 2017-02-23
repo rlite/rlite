@@ -127,7 +127,7 @@ mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
 }
 
 int
-mgmt_write_to_dst_addr(struct uipcp *uipcp, rl_addr_t dst_addr,
+mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr,
                        void *buf, size_t buflen)
 {
     struct rl_mgmt_hdr mhdr;
@@ -513,9 +513,9 @@ uipcp_rib::dump() const
     ss << endl;
 
     ss << "Lower Flow Database:" << endl;
-    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::const_iterator
+    for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator
             it = lfdb.begin(); it != lfdb.end(); it++) {
-        for (map<rl_addr_t, LowerFlow>::const_iterator jt = it->second.begin();
+        for (map<rlm_addr_t, LowerFlow>::const_iterator jt = it->second.begin();
                                                 jt != it->second.end(); jt++) {
         const LowerFlow& flow = jt->second;
 
@@ -529,7 +529,7 @@ uipcp_rib::dump() const
     ss << endl;
 
     ss << "Address Allocation Table:" << endl;
-    for (map<rl_addr_t, AddrAllocRequest>::const_iterator
+    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
             mit = addr_alloc_table.begin();
                 mit != addr_alloc_table.end(); mit++) {
         ss << "    Address: " << mit->first
@@ -569,7 +569,7 @@ uipcp_rib::dump() const
 }
 
 void
-uipcp_rib::update_address(rl_addr_t new_addr)
+uipcp_rib::update_address(rlm_addr_t new_addr)
 {
     if (myaddr == new_addr) {
         return;
@@ -583,7 +583,7 @@ uipcp_rib::update_address(rl_addr_t new_addr)
 }
 
 int
-uipcp_rib::set_address(rl_addr_t new_addr)
+uipcp_rib::set_address(rlm_addr_t new_addr)
 {
     stringstream addr_ss;
     int ret;
@@ -667,7 +667,7 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(CDAPMessage *m, rl_addr_t dst_addr,
+uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                             const UipcpObject *obj)
 {
     AData adata;
@@ -798,10 +798,10 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
-rl_addr_t
+rlm_addr_t
 uipcp_rib::addr_allocate()
 {
-    rl_addr_t addr = myaddr; /* exclude my address */
+    rlm_addr_t addr = myaddr; /* exclude my address */
 
     if (!uipcp->uipcps->auto_addr_alloc) {
         /* Return the void address. */
@@ -812,7 +812,7 @@ uipcp_rib::addr_allocate()
      * allocation procedure. */
 
     /* Look for the highest address already in use. */
-    for (map<rl_addr_t, AddrAllocRequest>::const_iterator
+    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
                     at = addr_alloc_table.begin();
                             at != addr_alloc_table.end(); at++) {
         if (at->first > addr) {
@@ -858,7 +858,7 @@ uipcp_rib::addr_allocate()
         sleep(1);
         pthread_mutex_lock(&lock);
 
-        map<rl_addr_t, AddrAllocRequest>::iterator mit;
+        map<rlm_addr_t, AddrAllocRequest>::iterator mit;
 
         /* If the request is still there, then we consider the allocation
          * complete. */
@@ -901,7 +901,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (rm->obj_class == obj_class::addr_alloc_req) {
         /* This is an address allocation request or a negative
          * address allocation response. */
-        map<rl_addr_t, AddrAllocRequest>::iterator mit;
+        map<rlm_addr_t, AddrAllocRequest>::iterator mit;
         bool propagate = false;
         AddrAllocRequest aar(objbuf, objlen);
 
@@ -965,7 +965,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 
         for (list<AddrAllocRequest>::const_iterator r = aal.entries.begin();
                                             r != aal.entries.end(); r++) {
-            map<rl_addr_t, AddrAllocRequest>::iterator mit;
+            map<rlm_addr_t, AddrAllocRequest>::iterator mit;
 
             mit = addr_alloc_table.find(r->address);
 
@@ -1272,7 +1272,7 @@ normal_flow_deallocated(struct uipcp *uipcp,
 }
 
 static void
-normal_update_address(struct uipcp *uipcp, rl_addr_t new_addr)
+normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);

@@ -150,7 +150,7 @@ struct rl_ioctl_info {
 struct rl_mgmt_hdr {
     uint8_t type;
     rl_port_t local_port;
-    rl_addr_t remote_addr;
+    rlm_addr_t remote_addr;
 } __attribute__((packed));
 
 
@@ -162,8 +162,8 @@ struct rate_based_config {
 } __attribute__((packed));
 
 struct window_based_config {
-    rl_seq_t max_cwq_len; /* closed window queue */
-    rl_seq_t initial_credit;
+    rlm_seq_t max_cwq_len; /* closed window queue */
+    rlm_seq_t initial_credit;
 } __attribute__((packed));
 
 #define RLITE_FC_T_NONE      0
@@ -197,7 +197,7 @@ struct rl_flow_config {
     /* Used by normal IPCP. */
     uint8_t msg_boundaries;
     uint8_t in_order_delivery;
-    rl_seq_t max_sdu_gap;
+    rlm_seq_t max_sdu_gap;
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
 
@@ -233,7 +233,7 @@ rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
 
 /* Does a flow specification correspond to best effort QoS? */
 static inline int rina_flow_spec_best_effort(struct rina_flow_spec *spec) {
-    return spec->max_sdu_gap == ((rl_seq_t)-1) && !spec->avg_bandwidth
+    return spec->max_sdu_gap == ((rlm_seq_t)-1) && !spec->avg_bandwidth
             && !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery
             && !rina_flow_spec_fc_get(spec);
 }
@@ -258,11 +258,11 @@ rl_flow_stats_init(struct rl_flow_stats *stats) {
 struct rl_flow_dtp
 {
     /* Sender state. */
-    rl_seq_t snd_lwe;
-    rl_seq_t snd_rwe;
-    rl_seq_t next_seq_num_to_send;
-    rl_seq_t last_seq_num_sent;
-    rl_seq_t last_ctrl_seq_num_rcvd;
+    rlm_seq_t snd_lwe;
+    rlm_seq_t snd_rwe;
+    rlm_seq_t next_seq_num_to_send;
+    rlm_seq_t last_seq_num_sent;
+    rlm_seq_t last_ctrl_seq_num_rcvd;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
     unsigned int rtxq_len;
@@ -271,13 +271,13 @@ struct rl_flow_dtp
     unsigned rtt_stddev;
 
     /* Receiver state. */
-    rl_seq_t rcv_lwe;
-    rl_seq_t rcv_lwe_priv;
-    rl_seq_t rcv_rwe;
-    rl_seq_t max_seq_num_rcvd;
-    rl_seq_t last_snd_data_ack; /* almost unused */
-    rl_seq_t next_snd_ctl_seq;
-    rl_seq_t last_lwe_sent;
+    rlm_seq_t rcv_lwe;
+    rlm_seq_t rcv_lwe_priv;
+    rlm_seq_t rcv_rwe;
+    rlm_seq_t max_seq_num_rcvd;
+    rlm_seq_t last_snd_data_ack; /* almost unused */
+    rlm_seq_t next_snd_ctl_seq;
+    rlm_seq_t last_lwe_sent;
     unsigned int seqq_len;
 };
 

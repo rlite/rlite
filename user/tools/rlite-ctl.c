@@ -46,7 +46,7 @@
 struct ipcp_attrs {
     rl_ipcp_id_t id;
     char *name;
-    rl_addr_t addr;
+    rlm_addr_t addr;
     unsigned int nhdrs;
     unsigned int max_sdu_size;
     char *dif_type;

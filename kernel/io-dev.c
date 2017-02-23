@@ -128,7 +128,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
             /* Management PDU for this IPC process. Post it to the userspace
              * IPCP. */
             struct rl_mgmt_hdr *mhdr;
-            rl_addr_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
+            rlm_addr_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
 
             if (!flow->upper.ipcp->mgmt_txrx) {
                 PE("Missing mgmt_txrx\n");
