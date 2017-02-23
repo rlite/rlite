@@ -54,10 +54,14 @@ generate_flavours() {
         done
 
         # Generate the makefile chunk
-        echo "EXTRA_CFLAGS := $CCMACROS"
-        echo "obj-m += rlite-normal-${FLAVOUR}.o"
-        echo "rlite-normal-${FLAVOUR}-y := normal.o"
-        echo "EXTRA_CFLAGS := \"\""
+        echo "" >> kernel/Makefile
+        echo "obj-m += rlite-normal-${FLAVOUR}.o" >> kernel/Makefile
+        echo "rlite-normal-${FLAVOUR}-y := normal-${FLAVOUR}.o" >> kernel/Makefile
+        #echo "ccflags-rlite-normal-${FLAVOUR}-y += $CCMACROS" >> kernel/Makefile
+        echo "CFLAGS_normal-${FLAVOUR}.o = $CCMACROS" >> kernel/Makefile
+
+        # Generate a symbolic link towards normal.o
+        (cd kernel && ln -s normal.c normal-${FLAVOUR}.c)
 
 done < "flavours.conf"
 }
@@ -116,6 +120,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
 cp Makefile.in Makefile
 sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
 
+# Prepare VMPI
 if [ $HAVE_VMPI == "y" ]; then
     cd kernel/vmpi
     git clean -fdx .
@@ -131,7 +136,9 @@ if [ $HAVE_VMPI == "y" ]; then
     cd ../..
 fi
 
-generate_flavours
+# Generate kernel makefile
+cp kernel/Makefile.in kernel/Makefile
+#generate_flavours
 
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh

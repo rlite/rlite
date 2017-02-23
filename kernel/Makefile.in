@@ -7,9 +7,6 @@ rlite-shim-loopback-y := shim-loopback.o
 obj-m += rlite-shim-eth.o
 rlite-shim-eth-y := shim-eth.o
 
-obj-m += rlite-normal.o
-rlite-normal-y := normal.o
-
 obj-m += rlite-shim-tcp4.o
 rlite-shim-tcp4-y := shim-tcp4.o
 
@@ -27,3 +24,6 @@ EXTRA_CFLAGS += -I\$(PWD)/vmpi
 
 obj-y += vmpi/
 endif
+
+obj-m += rlite-normal.o
+rlite-normal-y := normal.o
