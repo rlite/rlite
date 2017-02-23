@@ -205,6 +205,9 @@ argparser.add_argument('-i', '--image',
 argparser.add_argument('--user',
                        help = "username for legacy mode", type = str,
                        default = 'root')
+argparser.add_argument('--flavour',
+                       help = "flavour to use for normal IPCPs", type = str,
+                       default = '')
 args = argparser.parse_args()
 
 
@@ -219,6 +222,10 @@ sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
           '-o IdentityFile=buildroot/buildroot_rsa'
 sudo = 'sudo' if args.image != '' else ''
 vmimgpath = 'buildroot/rootfs.cpio'
+
+flavour_suffix = ''
+if args.flavour != '':
+    flavour_suffix = '-' + args.flavour
 
 download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rlite-images/downloads/rootfs.cpio')
 download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rlite-images/downloads/bzImage')
@@ -635,7 +642,7 @@ for vmname in sorted(vms):
     outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
                     '$SUDO modprobe rlite-shim-udp4\n'\
-                    '$SUDO modprobe rlite-normal\n'\
+                    '$SUDO modprobe rlite-normal%(flsuf)s\n'\
                     '$SUDO chmod a+rwx /dev/rlite\n'\
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\
                     '$SUDO mkdir -p /var/rlite\n'\
@@ -650,7 +657,8 @@ for vmname in sorted(vms):
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
                            'unrelflows': '-U' if args.unreliable_flows else '',
-                           'autoaddralloc': args.addr_alloc_policy}
+                           'autoaddralloc': args.addr_alloc_policy,
+                           'flsuf': flavour_suffix}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
@@ -672,8 +680,9 @@ for vmname in sorted(vms):
     # Create normal IPCPs (it's handy to do it in topological DIF order)
     for dif in dif_ordering:
         if dif not in shims and vmname in difs[dif]:
-            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal %(dif)s.DIF\n'\
-                                                                % {'dif': dif, 'id': vm['id']}
+            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal%(flsuf)s %(dif)s.DIF\n'\
+                                                                % {'dif': dif, 'id': vm['id'],
+                                                                   'flsuf': flavour_suffix}
             if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
