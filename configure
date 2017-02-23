@@ -6,11 +6,19 @@ no_cmake() {
     exit 255
 }
 
+
 generate_flavours() {
+    echo "Generating IPCP flavours ..."
+
     # Read the file line by line
     while read -r line || [[ -n "$line" ]]; do
         # Parse the line to get space separated items
         read -ra ITEMS <<< "$line"
+
+        if [[ ${line:0:1} == "#" ]]; then
+            # Skip comments
+            continue
+        fi
 
         FLAVOUR="${ITEMS[0]}"
         CCMACROS="-DIPCPFLAVOUR=-${FLAVOUR} "
@@ -18,7 +26,7 @@ generate_flavours() {
         # Check that flavour name is ok
         if ! [[ $FLAVOUR =~ ^[a-z]+$ ]]; then
             echo "Invalid flavour name <$FLAVOUR>"
-            continue
+            exit 255
         fi
 
         # Scan the items
@@ -38,7 +46,7 @@ generate_flavours() {
                         ;;
                     *)
                         echo "Invalid field size <$SIZE>"
-                        continue
+                        exit 255
                         ;;
                 esac
                 case ${FIELD} in
@@ -47,7 +55,7 @@ generate_flavours() {
                         ;;
                     *)
                         echo "Unknown EFCP field <$FIELD>"
-                        continue
+                        exit 255
                         ;;
                 esac
             fi
@@ -63,7 +71,8 @@ generate_flavours() {
         # Generate a symbolic link towards normal.o
         (cd kernel && ln -sf normal.c normal-${FLAVOUR}.c)
 
-done < "flavours.conf"
+    done < "flavours.conf"
+    echo "... flavours generated"
 }
 
 
