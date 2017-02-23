@@ -6,6 +6,62 @@ no_cmake() {
     exit 255
 }
 
+generate_flavours() {
+    # Read the file line by line
+    while read -r line || [[ -n "$line" ]]; do
+        # Parse the line to get space separated items
+        read -ra ITEMS <<< "$line"
+
+        FLAVOUR="${ITEMS[0]}"
+        CCMACROS=""
+
+        # Check that flavour name is ok
+        if ! [[ $FLAVOUR =~ ^[a-z]+$ ]]; then
+            echo "Invalid flavour name <$FLAVOUR>"
+            continue
+        fi
+
+        # Scan the items
+        for asstr in "${ITEMS[@]}"; do
+            # For each item, try to parse it in the form "field=size"
+            IFS='=' read -ra ASSIGN <<< "$asstr"
+            if [ ${#ASSIGN[@]} == "2" ]; then
+                # It is in the form "field=size"
+                FIELD=${ASSIGN[0]}
+                SIZE=${ASSIGN[1]}
+
+                # make sure size makes sense
+                case $SIZE in
+                    "1"|"2"|"4"|"8")
+                        # ok
+                        BITSIZE=$((SIZE * 8))
+                        ;;
+                    *)
+                        echo "Invalid field size <$SIZE>"
+                        continue
+                        ;;
+                esac
+                case ${FIELD} in
+                    "addr"|"seq"|"pdulen"|"cepid"|"qosid")
+                        CCMACROS=$CCMACROS"-Drl_${FIELD}_t=uint${BITSIZE}_t "
+                        ;;
+                    *)
+                        echo "Unknown EFCP field <$FIELD>"
+                        continue
+                        ;;
+                esac
+            fi
+        done
+
+        # Generate the makefile chunk
+        echo "EXTRA_CFLAGS := $CCMACROS"
+        echo "obj-m += rlite-normal-${FLAVOUR}.o"
+        echo "rlite-normal-${FLAVOUR}-y := normal.o"
+        echo "EXTRA_CFLAGS := \"\""
+
+done < "flavours.conf"
+}
+
 
 HAVE_VMPI="n"
 INSTALL_PREFIX="/"
@@ -74,6 +130,8 @@ if [ $HAVE_VMPI == "y" ]; then
     EXTRA_CFLAGS := -I$(PWD)/../include' Makefile
     cd ../..
 fi
+
+generate_flavours
 
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh
