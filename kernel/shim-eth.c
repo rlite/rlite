@@ -769,8 +769,10 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         return RX_HANDLER_PASS;
     }
 
-    /* Steal the skb from the Linux stack. */
-    dev_consume_skb_any(skb);
+    /* Steal the skb from the Linux stack. We should use dev_consume_skb_any(),
+     * for those kernel where this is defined (this would require figure out
+     * the kernel features at configuration time. */
+    dev_kfree_skb_any(skb);
 
     return RX_HANDLER_CONSUMED;
 }
