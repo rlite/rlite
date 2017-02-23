@@ -696,7 +696,7 @@ extern struct uipcp_ops shim_udp4_ops;
 static const struct uipcp_ops *
 select_uipcp_ops(const char *dif_type)
 {
-    if (strcmp(dif_type, "normal") == 0) {
+    if (type_is_normal_ipcp(dif_type)) {
         return &normal_ops;
     }
 

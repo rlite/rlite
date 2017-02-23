@@ -60,21 +60,17 @@ rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
 }
 
 static inline int
+type_is_normal_ipcp(const char *dif_type)
+{
+    return strncmp(dif_type, "normal", strlen("normal")) == 0;
+}
+
+static inline int
 type_has_uipcp(const char *dif_type)
 {
-    if (strcmp(dif_type, "normal") == 0) {
-        return 1;
-    }
-
-    if (strcmp(dif_type, "shim-tcp4") == 0) {
-        return 1;
-    }
-
-    if (strcmp(dif_type, "shim-udp4") == 0) {
-        return 1;
-    }
-
-    return 0;
+    return type_is_normal_ipcp(dif_type) ||
+            strcmp(dif_type, "shim-tcp4") == 0 ||
+            strcmp(dif_type, "shim-udp4") == 0;
 }
 
 
