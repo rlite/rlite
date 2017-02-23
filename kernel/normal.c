@@ -440,7 +440,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     if (!lower_flow) {
         /* This SDU gets loopbacked to this IPCP, since this is a
          * self flow (flow->remote_addr == ipcp->addr). */
-        return ipcp->ops.sdu_rx(ipcp, rb);
+        return ipcp->ops.sdu_rx(ipcp, rb, 0 /* unused */);
     }
 
     /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
@@ -1205,7 +1205,8 @@ out:
 }
 
 static int
-rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
+rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
+                 rl_port_t lower_port_id)
 {
     struct rina_pci *pci = RLITE_BUF_PCI(rb);
     struct flow_entry *flow;
@@ -1218,6 +1219,44 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb)
     bool drop;
     bool qlimit;
     int ret = 0;
+
+    if (unlikely(rb->len < sizeof(struct rina_pci))) {
+        RPD(2, "Dropping SDU shorter [%u] than PCI\n",
+                (unsigned int)rb->len);
+        rl_buf_free(rb);
+        return -EINVAL;
+    }
+
+    if (unlikely(pci->pdu_type == PDU_T_MGMT &&
+                 (pci->dst_addr == ipcp->addr ||
+                  pci->dst_addr == 0))) {
+        /* Management PDU for this IPC process. Post it to the userspace
+         * IPCP. */
+        struct rl_mgmt_hdr *mhdr;
+        rlm_addr_t src_addr = pci->src_addr;
+
+        if (!ipcp->mgmt_txrx) {
+            PE("Missing mgmt_txrx\n");
+            rl_buf_free(rb);
+            return -EINVAL;
+        }
+        ret = rl_buf_pci_pop(rb);
+        BUG_ON(ret); /* We already check bounds above. */
+        /* Push a management header using the room made available
+         * by rl_buf_pci_pop(). */
+        ret = rl_buf_custom_push(rb, sizeof(*mhdr));
+        BUG_ON(ret);
+        mhdr = (struct rl_mgmt_hdr *)RLITE_BUF_DATA(rb);
+        mhdr->type = RLITE_MGMT_HDR_T_IN;
+        mhdr->local_port = lower_port_id;
+        mhdr->remote_addr = src_addr;
+
+        /* Tell the caller to queue this rb to userspace. */
+        return -ENOMSG;
+
+    } else {
+        /* PDU which is not PDU_T_MGMT or it is to be forwarded. */
+    }
 
     if (pci->dst_addr != ipcp->addr) {
         /* The PDU is not for this IPCP, forward it. Don't propagate the

@@ -82,15 +82,13 @@ tx_completion_func(unsigned long arg)
         ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
-        RPD(2, "Sending [%lu] from rmtq\n",
-                (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
+        RPD(2, "Sending from rmtq\n");
 
         BUG_ON(!rb->tx_compl_flow);
         ret = ipcp->ops.sdu_write(ipcp, rb->tx_compl_flow, rb, false);
         if (unlikely(ret == -EAGAIN)) {
 #if 0
-            PD("Pushing [%lu] back to rmtq\n",
-                    (long unsigned)RLITE_BUF_PCI(rb)->seqnum);
+            PD("Pushing back to rmtq\n");
             spin_lock_bh(&ipcp->rmtq_lock);
             list_add_tail_safe(&rb->node, &ipcp->rmtq);
             ipcp->rmtq_size += rl_buf_truesize(rb);
@@ -107,53 +105,28 @@ tx_completion_func(unsigned long arg)
 #define RL_RXQ_SIZE_MAX         (1 << 20)
 
 int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                     struct rl_buf *rb, bool qlimit)
+                   struct rl_buf *rb, bool qlimit)
 {
+    struct ipcp_entry *upper_ipcp = flow->upper.ipcp;
     struct txrx *txrx;
-    int ret = 0;
 
-    if (flow->upper.ipcp) {
-        /* The flow on which the PDU is received is used by an IPCP. */
-        if (unlikely(rb->len < sizeof(struct rina_pci))) {
-            RPD(2, "Dropping SDU shorter [%u] than PCI\n",
-                    (unsigned int)rb->len);
-            rl_buf_free(rb);
-            ret = -EINVAL;
-            goto out;
+    if (upper_ipcp) {
+        int ret;
+
+        /* The flow is used by an upper IPCP. */
+        ret = upper_ipcp->ops.sdu_rx(upper_ipcp, rb, flow->local_port);
+        if (likely(ret == 0)) {
+            /* rb consumed */
+            return 0;
         }
 
-        if (unlikely(RLITE_BUF_PCI(rb)->pdu_type == PDU_T_MGMT &&
-                     (RLITE_BUF_PCI(rb)->dst_addr == flow->upper.ipcp->addr ||
-                      RLITE_BUF_PCI(rb)->dst_addr == 0))) {
-            /* Management PDU for this IPC process. Post it to the userspace
-             * IPCP. */
-            struct rl_mgmt_hdr *mhdr;
-            rlm_addr_t src_addr = RLITE_BUF_PCI(rb)->src_addr;
-
-            if (!flow->upper.ipcp->mgmt_txrx) {
-                PE("Missing mgmt_txrx\n");
-                rl_buf_free(rb);
-                ret = -EINVAL;
-                goto out;
-            }
-            txrx = flow->upper.ipcp->mgmt_txrx;
-            ret = rl_buf_pci_pop(rb);
-            BUG_ON(ret); /* We already check bounds above. */
-            /* Push a management header using the room made available
-             * by rl_buf_pci_pop(). */
-            ret = rl_buf_custom_push(rb, sizeof(*mhdr));
-            BUG_ON(ret);
-            mhdr = (struct rl_mgmt_hdr *)RLITE_BUF_DATA(rb);
-            mhdr->type = RLITE_MGMT_HDR_T_IN;
-            mhdr->local_port = flow->local_port;
-            mhdr->remote_addr = src_addr;
-
-        } else {
-            /* PDU which is not PDU_T_MGMT or it is to be forwarded. */
-            ret = flow->upper.ipcp->ops.sdu_rx(flow->upper.ipcp, rb);
-            goto out;
+        if (ret != -ENOMSG) {
+            /* error, rb consumed */
+            return ret;
         }
 
+        /* Management SDU to be queued to userspace. */
+        txrx = upper_ipcp->mgmt_txrx;
     } else {
         /* The flow on which the PDU is received is used by an application
          * different from an IPCP. */
@@ -173,9 +146,8 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     spin_unlock_bh(&txrx->rx_lock);
     wake_up_interruptible_poll(&txrx->rx_wqh,
                                POLLIN | POLLRDNORM | POLLRDBAND);
-out:
 
-    return ret;
+    return 0;
 }
 EXPORT_SYMBOL(rl_sdu_rx_flow);
 
@@ -209,7 +181,7 @@ rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
         return 1;
     }
 
-    shortcut->ops.sdu_rx(shortcut, rb);
+    shortcut->ops.sdu_rx(shortcut, rb, 0 /* TODO */);
 
     return 0;
 
