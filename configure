@@ -13,7 +13,7 @@ generate_flavours() {
         read -ra ITEMS <<< "$line"
 
         FLAVOUR="${ITEMS[0]}"
-        CCMACROS=""
+        CCMACROS="-DIPCPFLAVOUR=-${FLAVOUR} "
 
         # Check that flavour name is ok
         if ! [[ $FLAVOUR =~ ^[a-z]+$ ]]; then
@@ -61,7 +61,7 @@ generate_flavours() {
         echo "CFLAGS_normal-${FLAVOUR}.o = $CCMACROS" >> kernel/Makefile
 
         # Generate a symbolic link towards normal.o
-        (cd kernel && ln -s normal.c normal-${FLAVOUR}.c)
+        (cd kernel && ln -sf normal.c normal-${FLAVOUR}.c)
 
 done < "flavours.conf"
 }

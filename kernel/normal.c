@@ -1492,7 +1492,16 @@ rl_normal_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
+/* The name of this IPCP (factory) is obtained by concatenating
+ * the name of the flavour to the string "normal". For the default
+ * normal ICPP, the flavour name is the empty string (""). */
+#define __STRFY(x) #x
+#define STRFY(x) __STRFY(x)
+#ifdef IPCPFLAVOUR
+#define SHIM_DIF_TYPE   "normal" STRFY(IPCPFLAVOUR)
+#else
 #define SHIM_DIF_TYPE   "normal"
+#endif
 
 static struct ipcp_factory normal_factory = {
     .owner                  = THIS_MODULE,
