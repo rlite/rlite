@@ -291,7 +291,7 @@ rtx_tmr_cb(long unsigned arg)
 }
 
 static int rl_normal_sdu_rx_consumed(struct flow_entry *flow,
-                                       struct rina_pci *pci);
+                                     rlm_seq_t seqnum);
 
 #define TKBK_INTVAL_MSEC        2
 
@@ -1248,6 +1248,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             rl_buf_free(rb);
             return -EINVAL;
         }
+        rb->u.rx.cons_seqnum = pci->seqnum;
         ret = rl_buf_pci_pop(rb);
         BUG_ON(ret); /* We already check bounds above. */
         /* Push a management header using the room made available
@@ -1344,6 +1345,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         spin_unlock_bh(&dtp->lock);
 
+        rb->u.rx.cons_seqnum = seqnum;
         ret = rl_buf_pci_pop(rb);
         if (unlikely(ret)) {
             rl_buf_free(rb);
@@ -1454,6 +1456,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         spin_unlock_bh(&dtp->lock);
 
+        rb->u.rx.cons_seqnum = seqnum;
         ret = rl_buf_pci_pop(rb);
         if (unlikely(ret)) {
             rl_buf_free(rb);
@@ -1466,6 +1469,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * rl_sdu_rx_flow() will modify qrb->node. */
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
             list_del_init(&qrb->node);
+            qrb->u.rx.cons_seqnum = seqnum;
             if (unlikely(rl_buf_pci_pop(qrb))) {
                 rl_buf_free(qrb);
                 continue;
@@ -1505,7 +1509,7 @@ snd_crb:
 }
 
 static int
-rl_normal_sdu_rx_consumed(struct flow_entry *flow, struct rina_pci *pci)
+rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
 {
     struct ipcp_entry *ipcp = flow->txrx.ipcp;
     struct dtp *dtp = &flow->dtp;
@@ -1514,7 +1518,7 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, struct rina_pci *pci)
     spin_lock_bh(&dtp->lock);
 
     /* Update the advertised RCVLWE and send an ACK control PDU. */
-    dtp->rcv_lwe = pci->seqnum + 1;
+    dtp->rcv_lwe = seqnum + 1;
     crb = sdu_rx_sv_update(ipcp, flow, false);
 
     spin_unlock_bh(&dtp->lock);
