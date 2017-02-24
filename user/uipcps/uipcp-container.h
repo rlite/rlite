@@ -53,8 +53,8 @@ struct uipcps {
     /* Use reliable N-flows if reliable N-1-flows are not available. */
     int reliable_n_flows;
 
-    /* Use unreliable N-1-flows rather than reliable ones. */
-    int unreliable_flows;
+    /* Use reliable N-1-flows rather than unreliable ones. */
+    int reliable_flows;
 
     /* Use automated distributed address allocation (i.e. not manual).
      * This should be a per-DIF policy, but for the moment being it's

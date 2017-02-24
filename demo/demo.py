@@ -192,8 +192,8 @@ argparser.add_argument('-k', '--keepalive', default = 10,
                        help = "Neighbor keepalive timeout in seconds (0 to disable)", type = int)
 argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
-argparser.add_argument('-U', '--unreliable-flows', action='store_true',
-                       help = "Use unreliable N-1-flows rather than reliable ones")
+argparser.add_argument('-R', '--reliable-flows', action='store_true',
+                       help = "Use reliable N-1-flows rather than unreliable ones")
 argparser.add_argument('-A', '--addr-alloc-policy', type=str,
                         choices = ["auto", "manual"], default = "auto",
                        help = "Address allocation policy to be used for all DIFs")
@@ -650,13 +650,13 @@ for vmname in sorted(vms):
                     '$SUDO dmesg -n8\n'\
                     '\n'\
                     '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
-                                        '%(relnflows)s %(unrelflows)s '\
+                                        '%(relnflows)s %(relflows)s '\
                                         '-A %(autoaddralloc)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
-                           'unrelflows': '-U' if args.unreliable_flows else '',
+                           'relflows': '-R' if args.reliable_flows else '',
                            'autoaddralloc': args.addr_alloc_policy,
                            'flsuf': flavour_suffix}
 
