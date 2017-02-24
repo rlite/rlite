@@ -523,7 +523,9 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     if (!lower_flow) {
         /* This SDU gets loopbacked to this IPCP, since this is a
          * self flow (flow->remote_addr == ipcp->addr). */
-        return ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
+        rb = ipcp->ops.sdu_rx(ipcp, rb, NULL /* unused */);
+        BUG_ON(rb != NULL);
+        return 0;
     }
 
     /* This SDU will be sent to a remote IPCP, using an N-1 flow. */
@@ -1287,7 +1289,7 @@ out:
     return 0;
 }
 
-static int
+static struct rl_buf *
 rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
@@ -1307,7 +1309,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         RPD(2, "Dropping SDU shorter [%u] than PCI\n",
                 (unsigned int)rb->len);
         rl_buf_free(rb);
-        return -EINVAL;
+        return NULL; /* -EINVAL */;
     }
 
     if (unlikely(pci->pdu_type == PDU_T_MGMT &&
@@ -1322,19 +1324,35 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             /* The caller is rl_sdu_rx_shortcut(): don't touch the
              * rb and return -ENOMSG to tell him the shortcut is not
              * possible. */
-            return -ENOMSG;
+            return rb;
         }
 
         if (!ipcp->mgmt_txrx) {
             PE("Missing mgmt_txrx\n");
             rl_buf_free(rb);
-            return -EINVAL;
+            return NULL; /* -EINVAL */;
         }
         rb->u.rx.cons_seqnum = pci->seqnum;
         ret = rl_buf_pci_pop(rb);
         BUG_ON(ret); /* We already check bounds above. */
+
         /* Push a management header using the room made available
-         * by rl_buf_pci_pop(). */
+         * by rl_buf_pci_pop(), if possible. */
+        if (sizeof(*mhdr) > sizeof(struct rina_pci)) {
+            struct rl_buf *nrb = rl_buf_alloc(rb->len, sizeof(*mhdr),
+                                              GFP_ATOMIC);
+
+            if (!nrb) {
+                PE("Out of memory\n");
+                rl_buf_free(rb);
+                return NULL; /* -ENOMEM */;
+            }
+
+            memcpy(RLITE_BUF_DATA(nrb), RLITE_BUF_DATA(rb), rb->len);
+            nrb->len = rb->len;
+            rl_buf_free(rb);
+            rb = nrb;
+        }
         ret = rl_buf_custom_push(rb, sizeof(*mhdr));
         BUG_ON(ret);
         mhdr = (struct rl_mgmt_hdr *)RLITE_BUF_DATA(rb);
@@ -1343,7 +1361,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         mhdr->remote_addr = src_addr;
 
         /* Tell the caller to queue this rb to userspace. */
-        return -ENOMSG;
+        return rb;
 
     } else {
         /* PDU which is not PDU_T_MGMT or it is to be forwarded. */
@@ -1353,7 +1371,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         /* The PDU is not for this IPCP, forward it. Don't propagate the
          * error code of rmt_tx(), since caller does not need it. */
         rmt_tx(ipcp, pci->dst_addr, rb, false);
-        return 0;
+        return NULL;
     }
 
     flow = flow_get_by_cep(pci->dst_cep);
@@ -1361,15 +1379,15 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         RPD(2, "No flow for cep-id %u: dropping PDU\n",
                 pci->dst_cep);
         rl_buf_free(rb);
-        return 0;
+        return NULL;
     }
 
     if (pci->pdu_type != PDU_T_DT) {
         /* This is a control PDU. */
-        ret = sdu_rx_ctrl(ipcp, flow, rb);
+        sdu_rx_ctrl(ipcp, flow, rb);
         flow_put(flow);
 
-        return ret;
+        return NULL; /* ret */
     }
 
     /* This is data transfer PDU. */
@@ -1587,7 +1605,7 @@ snd_crb:
 
     flow_put(flow);
 
-    return ret;
+    return NULL; /* ret */
 }
 
 static int

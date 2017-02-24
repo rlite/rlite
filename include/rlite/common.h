@@ -157,9 +157,9 @@ struct rl_ioctl_info {
  * where the SDU was received and the source (remote) address that sent it.
  */
 struct rl_mgmt_hdr {
-    uint8_t type;
     rl_port_t local_port;
     rlm_addr_t remote_addr;
+    uint8_t type;
 } __attribute__((packed));
 
 

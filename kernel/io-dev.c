@@ -111,18 +111,11 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct txrx *txrx;
 
     if (upper_ipcp) {
-        int ret;
-
         /* The flow is used by an upper IPCP. */
-        ret = upper_ipcp->ops.sdu_rx(upper_ipcp, rb, flow);
-        if (likely(ret == 0)) {
+        rb = upper_ipcp->ops.sdu_rx(upper_ipcp, rb, flow);
+        if (likely(rb == NULL)) {
             /* rb consumed */
             return 0;
-        }
-
-        if (ret != -ENOMSG) {
-            /* error, rb consumed */
-            return ret;
         }
 
         /* Management SDU to be queued to userspace. */
@@ -169,21 +162,20 @@ rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb, rl_port_t local_port)
 }
 EXPORT_SYMBOL(rl_sdu_rx);
 
-/* This does not take the ownership of the packet. */
-int
+struct rl_buf *
 rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
 {
     struct ipcp_entry *shortcut = ipcp->shortcut;
 
-    if (shortcut == NULL || shortcut->ops.sdu_rx(shortcut, rb,
-                                    /* unused */ NULL) == -ENOMSG) {
+    if (shortcut == NULL || (rb = shortcut->ops.sdu_rx(shortcut, rb,
+                                    /* unused */ NULL)) != NULL) {
         /* We cannot take the shortcut optimization, inform the caller. */
-        return 1;
+        return rb;
     }
 
     /* Shortcut successfully taken! */
 
-    return 0;
+    return NULL;
 
 }
 EXPORT_SYMBOL(rl_sdu_rx_shortcut);

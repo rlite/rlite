@@ -219,8 +219,8 @@ struct ipcp_ops {
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rl_buf *rb, bool maysleep);
-    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb,
-                  struct flow_entry *lower_flow);
+    struct rl_buf *(*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb,
+                             struct flow_entry *lower_flow);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value, int *notify);
     int (*pduft_set)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
@@ -451,7 +451,7 @@ int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                    struct rl_buf *rb, bool qlimit);
 
-int rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
+struct rl_buf *rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
 
 void rl_write_restart_port(rl_port_t local_port);
 
