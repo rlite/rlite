@@ -13,6 +13,8 @@
     - logic for self-registration and N-flow allocation already in place
     - the only missing thing is to actually use the N-flow and not the N-1
 
-- periodic DFT synchronization
+- generic RIB synchronization where needed (e.g. DFT)
 
 - use separate N-1 flows for management and data
+
+- implement flavours for normal IPCP (compile normal.c many times)
