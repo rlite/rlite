@@ -1583,17 +1583,16 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     if (drop) {
         RPD(2, "dropping PDU [%lu] to meet QoS requirements\n",
                 (long unsigned)seqnum);
-        rl_buf_free(rb);
+        rl_buf_free(rb); rb = NULL;
         crb = sdu_rx_sv_update(ipcp, flow, false);
         flow->stats.rx_err++;
 
     } else {
         /* What is not dropped nor delivered goes in the sequencing queue.
          * Don't ack here, we have to wait for the gap to be filled. */
-        seqq_push(dtp, rb);
-
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
+        seqq_push(dtp, rb); rb = NULL;
     }
 
     spin_unlock_bh(&dtp->lock);
