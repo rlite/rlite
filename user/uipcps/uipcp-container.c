@@ -1038,7 +1038,6 @@ topo_visit(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
-    int hdrlen = 32; /* temporarily hardcoded, see struct rina_pci */
 
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
@@ -1092,11 +1091,11 @@ topo_visit(struct uipcps *uipcps)
         ipn->marked = 1;
 
         list_for_each_entry(e, nexts, node) {
-            if (e->ipcp->hdroom < ipn->hdroom + 1) {
-                e->ipcp->hdroom = ipn->hdroom + 1;
+            if (e->ipcp->hdroom < ipn->hdroom + e->ipcp->hdrsize) {
+                e->ipcp->hdroom = ipn->hdroom + e->ipcp->hdrsize;
             }
-            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - hdrlen) {
-                e->ipcp->max_sdu_size = ipn->max_sdu_size - hdrlen;
+            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - e->ipcp->hdrsize) {
+                e->ipcp->max_sdu_size = ipn->max_sdu_size - e->ipcp->hdrsize;
                 if (e->ipcp->max_sdu_size < 0) {
                     e->ipcp->max_sdu_size = 0;
                 }

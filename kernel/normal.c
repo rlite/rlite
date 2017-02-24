@@ -39,6 +39,12 @@
 
 #define PDUFT_HASHTABLE_BITS    3
 
+static struct rl_buf *
+rl_buf_alloc_ctrl(size_t hdroom, gfp_t gfp)
+{
+    return rl_buf_alloc(sizeof(struct rina_pci_ctrl), hdroom, gfp);
+}
+
 struct rl_normal {
     struct ipcp_entry *ipcp;
 
@@ -630,9 +636,9 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
     pci = RLITE_BUF_PCI(rb);
     pci->dst_addr = flow->remote_addr;
     pci->src_addr = ipcp->addr;
-    pci->conn_id.qos_id = 0;
-    pci->conn_id.dst_cep = flow->remote_cep;
-    pci->conn_id.src_cep = flow->local_cep;
+    pci->qos_id = 0;
+    pci->dst_cep = flow->remote_cep;
+    pci->src_cep = flow->local_cep;
     pci->pdu_type = PDU_T_DT;
     pci->pdu_flags = 0;
     pci->pdu_len = rb->len;
@@ -752,9 +758,9 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     pci = RLITE_BUF_PCI(rb);
     pci->dst_addr = dst_addr;
     pci->src_addr = ipcp->addr;
-    pci->conn_id.qos_id = 0;  /* Not valid. */
-    pci->conn_id.dst_cep = 0; /* Not valid. */
-    pci->conn_id.src_cep = 0; /* Not valid. */
+    pci->qos_id = 0;  /* Not valid. */
+    pci->dst_cep = 0; /* Not valid. */
+    pci->src_cep = 0; /* Not valid. */
     pci->pdu_type = PDU_T_MGMT;
     pci->pdu_flags = 0; /* Not valid. */
     pci->pdu_len = rb->len;
@@ -901,9 +907,9 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
         pcic = (struct rina_pci_ctrl *)RLITE_BUF_DATA(rb);
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;
-        pcic->base.conn_id.qos_id = 0;
-        pcic->base.conn_id.dst_cep = flow->remote_cep;
-        pcic->base.conn_id.src_cep = flow->local_cep;
+        pcic->base.qos_id = 0;
+        pcic->base.dst_cep = flow->remote_cep;
+        pcic->base.src_cep = flow->local_cep;
         pcic->base.pdu_type = pdu_type;
         pcic->base.pdu_flags = 0;
         pcic->base.pdu_len = rb->len;
@@ -1281,10 +1287,10 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         return 0;
     }
 
-    flow = flow_get_by_cep(pci->conn_id.dst_cep);
+    flow = flow_get_by_cep(pci->dst_cep);
     if (!flow) {
         RPD(2, "No flow for cep-id %u: dropping PDU\n",
-                pci->conn_id.dst_cep);
+                pci->dst_cep);
         rl_buf_free(rb);
         return 0;
     }
@@ -1586,6 +1592,12 @@ static struct ipcp_factory normal_factory = {
 static int __init
 rl_normal_init(void)
 {
+    if (RL_PCI_SIZE != sizeof(struct rina_pci)) {
+        PE("PCI layout not supported: %u != %u\n",
+                (unsigned)RL_PCI_SIZE, (unsigned)(sizeof(struct rina_pci)));
+        return -1;
+    }
+
     return rl_ipcp_factory_register(&normal_factory);
 }
 

@@ -107,18 +107,21 @@ extern int verbosity;
 /* PCI header to be used for transfer PDUs. */
 struct rina_pci {
     /* We miss the version field. */
+    rl_seq_t seqnum;
+    rl_cepid_t dst_cep;
+    rl_cepid_t src_cep;
     rl_addr_t dst_addr;
     rl_addr_t src_addr;
-    struct {
-        rl_cepid_t dst_cep;
-        rl_cepid_t src_cep;
-        rl_qosid_t qos_id;
-    } conn_id;
+    rl_pdulen_t pdu_len;
+    rl_qosid_t qos_id;
     uint8_t pdu_type;
     uint8_t pdu_flags;
-    rl_pdulen_t pdu_len;
-    rl_seq_t seqnum;
-} __attribute__((packed));
+} __attribute__ ((__packed__));
+
+/* In general RL_PCI_SIZE != sizeof(struct rina_pci) */
+#define RL_PCI_SIZE    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
+                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
+                        sizeof(rl_seq_t))
 
 /* PCI header to be used for control PDUs. */
 struct rina_pci_ctrl {
@@ -129,7 +132,7 @@ struct rina_pci_ctrl {
     rl_seq_t new_lwe; /* sent but unused */
     rl_seq_t my_lwe;  /* sent but unused */
     rl_seq_t my_rwe;  /* sent but unused */
-} __attribute__((packed));
+} __attribute__ ((__packed__));
 
 struct rl_rawbuf {
     size_t size;
@@ -156,9 +159,7 @@ struct rl_buf {
     struct list_head    node;
 };
 
-struct rl_buf *rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
-
-struct rl_buf * rl_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
+struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp);
 
 struct rl_buf * rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
