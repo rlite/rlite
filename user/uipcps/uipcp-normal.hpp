@@ -271,6 +271,7 @@ struct uipcp_rib {
     std::map< std::string, Neighbor* > neighbors;
     std::map< std::string, NeighborCandidate > neighbors_seen;
     std::set< std::string > neighbors_cand;
+    std::set< std::string > neighbors_deleted;
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */

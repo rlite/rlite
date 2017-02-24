@@ -555,8 +555,8 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
-/* default value for keepalive paramter */
-#define NEIGH_KEEPALIVE_TO      5
+/* default value for keepalive parameter */
+#define NEIGH_KEEPALIVE_TO      10
 
 static void
 usage(void)

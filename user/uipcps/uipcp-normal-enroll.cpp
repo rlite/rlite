@@ -181,6 +181,7 @@ NeighFlow::enroll_state_set(enroll_state_t st)
 
     if (old != NEIGH_ENROLLED && st == NEIGH_ENROLLED) {
         neigh->rib->enrolled ++;
+        neigh->rib->neighbors_deleted.erase(neigh->ipcp_name);
     } else if (old == NEIGH_ENROLLED && st == NEIGH_NONE) {
         neigh->rib->enrolled --;
     }
@@ -1138,6 +1139,8 @@ uipcp_rib::del_neighbor(const std::string& neigh_name)
     rl_delete(mit->second, RL_MT_NEIGH);
     neighbors.erase(mit);
 
+    neighbors_deleted.insert(neigh_name);
+
     return 0;
 }
 
@@ -1571,6 +1574,12 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
         NeighFlow *nf = NULL;
 
         assert(mit != rib->neighbors_seen.end());
+        if (rib->neighbors_deleted.count(*cand) == 0) {
+            /* This neighbor was not deleted, so we avoid enrolling to it,
+             * as this was not explicitely asked. */
+            continue;
+        }
+
         neigh = rib->neighbors.find(*cand);
 
         if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
