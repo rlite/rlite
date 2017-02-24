@@ -1024,6 +1024,15 @@ uipcps_print(struct uipcps *uipcps)
  *       case.
  */
 
+/* Compute the size of PCI data transfer PDU. */
+static int ipcp_hdrlen(struct uipcp *uipcp)
+{
+    struct pci_sizes *sz = &uipcp->pcisizes;
+
+    return 2 * sz->addr + 2 * sz->cepid + sz->qosid +
+           1 + 1 + sz->pdulen + sz->seq;
+}
+
 static void
 topo_visit(struct uipcps *uipcps)
 {
@@ -1040,6 +1049,7 @@ topo_visit(struct uipcps *uipcps)
         ipn->mss_computed = 0;
         if (uipcp) {
             ipn->max_sdu_size = uipcp->max_sdu_size;
+            ipn->hdrsize = ipcp_hdrlen(uipcp);
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
@@ -1346,6 +1356,7 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
+    uipcp->pcisizes = upd->pcisizes;
 
     pthread_mutex_unlock(&uipcps->lock);
 

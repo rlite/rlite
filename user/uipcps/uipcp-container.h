@@ -148,6 +148,7 @@ struct ipcp_node {
     unsigned int refcnt;
     unsigned int mss_computed;
     int max_sdu_size;
+    int hdrsize;
 
     struct list_head lowers;
     struct list_head uppers;
@@ -185,6 +186,7 @@ struct uipcp {
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
+    struct pci_sizes pcisizes;
 
     /* uIPCP implementation. */
     struct uipcp_ops ops;
