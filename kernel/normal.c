@@ -39,7 +39,10 @@
 
 #define PDUFT_HASHTABLE_BITS    3
 
-/* PCI header to be used for transfer PDUs. */
+/* PCI header to be used for transfer PDUs.
+ * The order of the fields is extremely important, because we only
+ * accept struct layouts where the compiler does not insert any
+ * padding. */
 struct rina_pci {
     /* We miss the version field. */
     rl_seq_t seqnum;
@@ -52,11 +55,6 @@ struct rina_pci {
     uint8_t pdu_type;
     uint8_t pdu_flags;
 } __attribute__ ((__packed__));
-
-/* In general RL_PCI_SIZE != sizeof(struct rina_pci) */
-#define RL_PCI_SIZE    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
-                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
-                        sizeof(rl_seq_t))
 
 /* PCI header to be used for control PDUs. */
 struct rina_pci_ctrl {
@@ -1660,14 +1658,35 @@ static struct ipcp_factory normal_factory = {
     .ops.qos_supported      = rl_normal_qos_supported,
 };
 
+/* In general RL_PCI_LEN != sizeof(struct rina_pci) and
+ * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
+ * compiler may need to insert padding. */
+#define RL_PCI_LEN    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
+                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
+                        sizeof(rl_seq_t))
+
+#define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
+
 static int __init
 rl_normal_init(void)
 {
-    if (RL_PCI_SIZE != sizeof(struct rina_pci)) {
+    /* Refuse to register this IPCP if the PCI layout is not supported by
+     * our implementation. */
+    if (RL_PCI_LEN != sizeof(struct rina_pci)) {
         PE("PCI layout not supported: %u != %u\n",
-                (unsigned)RL_PCI_SIZE, (unsigned)(sizeof(struct rina_pci)));
+                (unsigned)RL_PCI_LEN, (unsigned)(sizeof(struct rina_pci)));
         return -1;
     }
+
+    if (RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl)) {
+        PE("Control PCI layout not supported: %u != %u\n",
+                (unsigned)RL_PCI_CTRL_LEN, (unsigned)(sizeof(struct rina_pci_ctrl)));
+        return -1;
+    }
+
+    PI("Flavour %s: DT PCI %u bytes, CTRL PCI %u bytes\n",
+        SHIM_DIF_TYPE, (unsigned)sizeof(struct rina_pci),
+                       (unsigned)sizeof(struct rina_pci_ctrl));
 
     return rl_ipcp_factory_register(&normal_factory);
 }
