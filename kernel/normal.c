@@ -248,12 +248,12 @@ rtx_tmr_cb(long unsigned arg)
     /* We scan all the retransmission list, since it is order by
      * ascending sequence number, not by ascending expiration time. */
     list_for_each_entry(rb, &dtp->rtxq, node) {
-        if (!time_before(jiffies, rb->rtx_jiffies)) {
+        if (!time_before(jiffies, rb->u.tx.rtx_jiffies)) {
             /* This rb should be retransmitted. We also invalidate
-             * rb->tx_jiffies, so that RTT is not updated on
+             * rb->u.tx.jiffies, so that RTT is not updated on
              * retransmitted packets. */
-            rb->rtx_jiffies += rtt_to_rtx(dtp);
-            rb->tx_jiffies = 0;
+            rb->u.tx.rtx_jiffies += rtt_to_rtx(dtp);
+            rb->u.tx.jiffies = 0;
 
             crb = rl_buf_clone(rb, GFP_ATOMIC);
             if (unlikely(!crb)) {
@@ -262,8 +262,9 @@ rtx_tmr_cb(long unsigned arg)
                 list_add_tail_safe(&crb->node, &rrbq);
             }
 
-        } else if (!next_exp_set || time_before(rb->rtx_jiffies, next_exp)) {
-            next_exp = rb->rtx_jiffies;
+        } else if (!next_exp_set ||
+                        time_before(rb->u.tx.rtx_jiffies, next_exp)) {
+            next_exp = rb->u.tx.rtx_jiffies;
             next_exp_set = true;
         }
     }
@@ -479,7 +480,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
             spin_lock_bh(&lower_ipcp->rmtq_lock);
             if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
-                rb->tx_compl_flow = lower_flow;
+                rb->u.tx.compl_flow = lower_flow;
                 list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
                 lower_ipcp->rmtq_size += rl_buf_truesize(rb);
             } else {
@@ -519,8 +520,8 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     }
 
     /* Record the rtx expiration time and current time. */
-    crb->tx_jiffies = jiffies;
-    crb->rtx_jiffies = crb->tx_jiffies + rtt_to_rtx(dtp);
+    crb->u.tx.jiffies = jiffies;
+    crb->u.tx.rtx_jiffies = crb->u.tx.jiffies + rtt_to_rtx(dtp);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -528,8 +529,8 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     dtp->rtxq_len++;
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
-            jiffies_to_msecs(crb->rtx_jiffies - jiffies));
-        mod_timer(&dtp->rtx_tmr, crb->rtx_jiffies);
+            jiffies_to_msecs(crb->u.tx.rtx_jiffies - jiffies));
+        mod_timer(&dtp->rtx_tmr, crb->u.tx.rtx_jiffies);
     }
     NPD("cloning [%lu] into rtxq\n",
             (long unsigned)RLITE_BUF_PCI(crb)->seqnum);
@@ -1133,9 +1134,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         list_del_init(&cur->node);
                         dtp->rtxq_len--;
 
-                        if (cur->tx_jiffies) {
+                        if (cur->u.tx.jiffies) {
                             /* Update our RTT estimate. */
-                            cur_rtt = now - cur->tx_jiffies;
+                            cur_rtt = now - cur->u.tx.jiffies;
                             if (!cur_rtt) {
                                 cur_rtt = 1;
                             }
@@ -1160,8 +1161,8 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                          * stop here. Let's update the rtx timer
                          * expiration time, if necessary. */
                         NPD("Forward rtx timer by %u\n",
-                            jiffies_to_msecs(cur->rtx_jiffies - jiffies));
-                        mod_timer(&dtp->rtx_tmr, cur->rtx_jiffies);
+                            jiffies_to_msecs(cur->u.tx.rtx_jiffies - jiffies));
+                        mod_timer(&dtp->rtx_tmr, cur->u.tx.rtx_jiffies);
                         break;
                     }
                 }

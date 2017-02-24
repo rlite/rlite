@@ -142,10 +142,17 @@ struct rl_buf {
     struct rina_pci     *pci;
     size_t              len;
 
-    unsigned long       rtx_jiffies;
-    unsigned long       tx_jiffies;
+    union {
+        struct {
+            unsigned long       rtx_jiffies;
+            unsigned long       jiffies;
+            struct flow_entry   *compl_flow;
+        } tx;
+        struct {
+            rlm_seq_t           cons_seqnum;
+        } rx;
+    } u;
 
-    struct flow_entry   *tx_compl_flow;
     struct list_head    node;
 };
 
