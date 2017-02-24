@@ -461,7 +461,7 @@ ipcp_select_by_dif(const char *dif_name)
              * giving priority to higher ranked normal DIFs. */
             if (!selected || (strcmp(entry->dif->ty, "normal") == 0 &&
                     (strcmp(selected->dif->ty, "normal") != 0 ||
-                     entry->nhdrs > selected->nhdrs))) {
+                     entry->hdroom > selected->hdroom))) {
                 selected = entry;
             }
         } else if (strcmp(entry->dif->name, dif_name) == 0) {
@@ -529,7 +529,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->dif = dif;
         entry->addr = 0;
         entry->refcnt = 1;
-        entry->nhdrs = RLITE_DEFAULT_LAYERS; /* recomputed in userspace */
+        entry->hdroom = RLITE_DEFAULT_LAYERS; /* recomputed in userspace */
         entry->max_sdu_size = (1 << 16); /* default, ok for normal IPCPs */
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
@@ -1532,7 +1532,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->update_type = update_type;
     upd->ipcp_id = ipcp->id;
     upd->ipcp_addr = ipcp->addr;
-    upd->nhdrs = ipcp->nhdrs;
+    upd->hdroom = ipcp->hdroom;
     upd->max_sdu_size = ipcp->max_sdu_size;
     memcpy(&upd->pcisizes, &ipcp->pcisizes, sizeof(upd->pcisizes));
     if (ipcp->name) {
@@ -1769,12 +1769,12 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ret == -ENOSYS) {
         /* This operation was not managed by ops.config, let's see if
          *  we can manage it here. */
-        if (strcmp(req->name, "nhdrs") == 0) {
-            uint8_t nhdrs;
+        if (strcmp(req->name, "hdroom") == 0) {
+            uint8_t hdroom;
 
-            ret = kstrtou8(req->value, 10, &nhdrs);
+            ret = kstrtou8(req->value, 10, &hdroom);
             if (ret == 0) {
-                entry->nhdrs = nhdrs;
+                entry->hdroom = hdroom;
             }
 
         } else if (strcmp(req->name, "mss") == 0) {

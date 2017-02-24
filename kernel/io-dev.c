@@ -324,7 +324,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         return splitted_sdu_write(f, ubuf, ulen, ppos, ipcp->max_sdu_size);
     }
 
-    rb = rl_buf_alloc(ulen, ipcp->nhdrs, GFP_KERNEL);
+    rb = rl_buf_alloc(ulen, ipcp->hdroom, GFP_KERNEL);
     if (!rb) {
         return -ENOMEM;
     }

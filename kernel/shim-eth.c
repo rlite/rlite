@@ -629,7 +629,7 @@ out:
 static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->nhdrs,
+    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->hdroom,
                                            GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;

@@ -335,7 +335,7 @@ struct ipcp_entry {
 
     struct ipcp_ops     ops;
     void                *priv;
-    uint8_t             nhdrs; /* DIF stacking nhdrs, computed by uipcps */
+    uint8_t             hdroom; /* DIF stacking hdroom, computed by uipcps */
     uint32_t            max_sdu_size;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;

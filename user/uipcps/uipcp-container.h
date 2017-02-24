@@ -62,7 +62,7 @@ struct uipcps {
     int auto_addr_alloc;
 
     /* List of IPCP "nodes", used for topological sorting and computation
-     * of IPCP nhdrs and maximum SDU size. */
+     * of IPCP hdroom and maximum SDU size. */
     struct list_head ipcp_nodes;
 
     /* Main loop thread, listening for IPCP updates (e.g. new IPCPs, deleted
@@ -144,7 +144,7 @@ struct uipcp_ops {
 struct ipcp_node {
     rl_ipcp_id_t id;
     unsigned int marked;
-    unsigned int nhdrs;
+    unsigned int hdroom;
     unsigned int refcnt;
     unsigned int mss_computed;
     int max_sdu_size;
@@ -182,7 +182,7 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    unsigned int nhdrs;
+    unsigned int hdroom;
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
