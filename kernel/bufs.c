@@ -93,14 +93,3 @@ __rl_buf_free(struct rl_buf *rb)
     rl_free(rb, RL_MT_BUFHDR);
 }
 EXPORT_SYMBOL(__rl_buf_free);
-
-void
-rina_pci_dump(struct rina_pci *pci)
-{
-    PD("PCI: dst=%lx,src=%lx,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
-        "seq=%lu\n", (long unsigned)pci->dst_addr,
-        (long unsigned)pci->src_addr, pci->qos_id,
-        pci->dst_cep, pci->src_cep,
-        pci->pdu_type, pci->pdu_flags, (long unsigned)pci->seqnum);
-}
-EXPORT_SYMBOL(rina_pci_dump);

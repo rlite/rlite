@@ -39,11 +39,82 @@
 
 #define PDUFT_HASHTABLE_BITS    3
 
+/* PCI header to be used for transfer PDUs. */
+struct rina_pci {
+    /* We miss the version field. */
+    rl_seq_t seqnum;
+    rl_cepid_t dst_cep;
+    rl_cepid_t src_cep;
+    rl_addr_t dst_addr;
+    rl_addr_t src_addr;
+    rl_pdulen_t pdu_len;
+    rl_qosid_t qos_id;
+    uint8_t pdu_type;
+    uint8_t pdu_flags;
+} __attribute__ ((__packed__));
+
+/* In general RL_PCI_SIZE != sizeof(struct rina_pci) */
+#define RL_PCI_SIZE    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
+                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
+                        sizeof(rl_seq_t))
+
+/* PCI header to be used for control PDUs. */
+struct rina_pci_ctrl {
+    struct rina_pci base;
+    rl_seq_t last_ctrl_seq_num_rcvd;
+    rl_seq_t ack_nack_seq_num;
+    rl_seq_t new_rwe;
+    rl_seq_t new_lwe; /* sent but unused */
+    rl_seq_t my_lwe;  /* sent but unused */
+    rl_seq_t my_rwe;  /* sent but unused */
+} __attribute__ ((__packed__));
+
 static struct rl_buf *
 rl_buf_alloc_ctrl(size_t hdroom, gfp_t gfp)
 {
     return rl_buf_alloc(sizeof(struct rina_pci_ctrl), hdroom, gfp);
 }
+
+static inline int
+rl_buf_pci_pop(struct rl_buf *rb)
+{
+    if (unlikely(rb->len < sizeof(struct rina_pci))) {
+        RPD(2, "No enough data to pop another PCI\n");
+        return -1;
+    }
+
+    rb->pci++;
+    rb->len -= sizeof(struct rina_pci);
+
+    return 0;
+}
+
+static inline int
+rl_buf_pci_push(struct rl_buf *rb)
+{
+    if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
+        RPD(2, "No space to push another PCI\n");
+        return -1;
+    }
+
+    rb->pci--;
+    rb->len += sizeof(struct rina_pci);
+
+    return 0;
+}
+
+void
+rina_pci_dump(struct rina_pci *pci)
+{
+    PD("PCI: dst=%lx,src=%lx,qos=%u,dcep=%u,scep=%u,type=%x,flags=%x,"
+        "seq=%lu\n", (long unsigned)pci->dst_addr,
+        (long unsigned)pci->src_addr, pci->qos_id,
+        pci->dst_cep, pci->src_cep,
+        pci->pdu_type, pci->pdu_flags, (long unsigned)pci->seqnum);
+}
+
+
+/* Implementation of the normal IPCP. */
 
 struct rl_normal {
     struct ipcp_entry *ipcp;

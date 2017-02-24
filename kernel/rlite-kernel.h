@@ -103,36 +103,9 @@ extern int verbosity;
 #define PDU_T_SACK          2   /* Selective ACK */
 #define PDU_T_SNACK         3   /* Selective NACK */
 
-
-/* PCI header to be used for transfer PDUs. */
-struct rina_pci {
-    /* We miss the version field. */
-    rl_seq_t seqnum;
-    rl_cepid_t dst_cep;
-    rl_cepid_t src_cep;
-    rl_addr_t dst_addr;
-    rl_addr_t src_addr;
-    rl_pdulen_t pdu_len;
-    rl_qosid_t qos_id;
-    uint8_t pdu_type;
-    uint8_t pdu_flags;
-} __attribute__ ((__packed__));
-
-/* In general RL_PCI_SIZE != sizeof(struct rina_pci) */
-#define RL_PCI_SIZE    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
-                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
-                        sizeof(rl_seq_t))
-
-/* PCI header to be used for control PDUs. */
-struct rina_pci_ctrl {
-    struct rina_pci base;
-    rl_seq_t last_ctrl_seq_num_rcvd;
-    rl_seq_t ack_nack_seq_num;
-    rl_seq_t new_rwe;
-    rl_seq_t new_lwe; /* sent but unused */
-    rl_seq_t my_lwe;  /* sent but unused */
-    rl_seq_t my_rwe;  /* sent but unused */
-} __attribute__ ((__packed__));
+/* PCI header is opaque here, only the normal IPCP can use
+ * its layout. */
+struct rina_pci;
 
 struct rl_rawbuf {
     size_t size;
@@ -172,32 +145,11 @@ void __rl_buf_free(struct rl_buf *rb);
         __rl_buf_free(_rb); \
     } while (0)
 
-static inline int
-rl_buf_pci_pop(struct rl_buf *rb)
+/* Amount of memory consumed by this packet. */
+static inline unsigned int
+rl_buf_truesize(struct rl_buf *rb)
 {
-    if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(2, "No enough data to pop another PCI\n");
-        return -1;
-    }
-
-    rb->pci++;
-    rb->len -= sizeof(struct rina_pci);
-
-    return 0;
-}
-
-static inline int
-rl_buf_pci_push(struct rl_buf *rb)
-{
-    if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
-        RPD(2, "No space to push another PCI\n");
-        return -1;
-    }
-
-    rb->pci--;
-    rb->len += sizeof(struct rina_pci);
-
-    return 0;
+    return sizeof(*rb) + rb->raw->size;
 }
 
 static inline int
@@ -228,19 +180,9 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
     return 0;
 }
 
-void rina_pci_dump(struct rina_pci *pci);
-
-/* Amount of memory consumed by this packet. */
-static inline unsigned int
-rl_buf_truesize(struct rl_buf *rb)
-{
-    return sizeof(*rb) + rb->raw->size;
-}
-
 #define RLITE_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RLITE_BUF_PCI(rb) rb->pci
 #define RLITE_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
-
 
 /*
  * Kernel data-structures.
