@@ -130,6 +130,7 @@ struct rl_kmsg_ipcp_update {
     rlm_addr_t ipcp_addr;
     uint16_t  nhdrs;
     uint32_t max_sdu_size;
+    struct pci_sizes pcisizes;
     char *ipcp_name;
     char *dif_name;
     char *dif_type;

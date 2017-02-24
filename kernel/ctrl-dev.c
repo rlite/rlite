@@ -1534,6 +1534,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->ipcp_addr = ipcp->addr;
     upd->nhdrs = ipcp->nhdrs;
     upd->max_sdu_size = ipcp->max_sdu_size;
+    memcpy(&upd->pcisizes, &ipcp->pcisizes, sizeof(upd->pcisizes));
     if (ipcp->name) {
         upd->ipcp_name = rl_strdup(ipcp->name, GFP_ATOMIC, RL_MT_UTILS);
         if (!upd->ipcp_name) {

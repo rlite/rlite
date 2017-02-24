@@ -58,6 +58,13 @@ rl_normal_create(struct ipcp_entry *ipcp)
         return NULL;
     }
 
+    /* Fill in data transfer constants */
+    ipcp->pcisizes.addr     = sizeof(rl_addr_t);
+    ipcp->pcisizes.seq      = sizeof(rl_seq_t);
+    ipcp->pcisizes.pdulen   = sizeof(rl_pdulen_t);
+    ipcp->pcisizes.cepid    = sizeof(rl_cepid_t);
+    ipcp->pcisizes.qosid    = sizeof(rl_qosid_t);
+
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
     rwlock_init(&priv->pduft_lock);

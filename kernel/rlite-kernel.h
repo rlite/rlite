@@ -322,7 +322,8 @@ struct ipcp_entry {
     rl_ipcp_id_t        id;    /* Key */
     char                *name;
     struct dif          *dif;
-    rlm_addr_t           addr;
+    struct pci_sizes    pcisizes;
+    rlm_addr_t          addr;
 
 #define RL_K_IPCP_USE_CEP_IDS   (1<<0)
 #define RL_K_IPCP_ZOMBIE        (1<<1)
