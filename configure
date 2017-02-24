@@ -116,6 +116,19 @@ fi
 # Make sure CMake is installed
 which cmake || no_cmake
 
+# Generate symbolic links for common code
+(
+cd kernel
+ln -sf ../common/ker-numtables.c ker-numtables.c
+ln -sf ../common/utils.c utils.c
+)
+
+(
+cd user/libs
+ln -sf ../../common/ker-numtables.c ker-numtables.c
+ln -sf ../../common/utils.c utils.c
+)
+
 # Configure CMake for out-of-tree build
 rm -rf build &> /dev/null
 mkdir build || exit 255

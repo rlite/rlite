@@ -1,1 +1,0 @@
-../common/ker-numtables.c
