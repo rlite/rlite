@@ -180,7 +180,7 @@ for i in sorted(vms):
     outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % d
     if not args.quiet:
         outs += 'set -x\n'
     outs += 'sudo hostname %(name)s\n'\
@@ -240,7 +240,7 @@ if args.type == 'tcp4':
         outs += ''\
                 'DONE=255\n'\
                 'while [ $DONE != "0" ]; do\n'\
-                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+                '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
         for entry in tcp4_dir:
                 outs += 'sudo sh -c \'echo "%s" >> /etc/rlite/shim-tcp4-dir\'\n' % (entry, )
@@ -279,7 +279,7 @@ for br_name in sorted(bridges):
         outs += ''\
                 'DONE=255\n'\
                 'while [ $DONE != "0" ]; do\n'\
-                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+                '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % d
         if not args.quiet:
             outs += 'set -x\n'
         outs += 'sudo rlite-ctl ipcp-enroll n.1.DIF n.1.IPCP:%(id)s '\
@@ -313,7 +313,7 @@ for level in range(2, args.levels + 1):
         outs += ''\
                 'DONE=255\n'\
                 'while [ $DONE != "0" ]; do\n'\
-                '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % d
+                '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % d
         if not args.quiet:
             outs += 'set -x\n'
         outs += 'sudo rlite-ctl ipcp-enroll n.%(level)s.DIF n.%(level)s.IPCP:%(id)s '\
@@ -400,7 +400,7 @@ if not args.quiet:
 outs += ''\
         'DONE=255\n'\
         'while [ $DONE != "0" ]; do\n'\
-        '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': pvm['ssh']}
+        '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': pvm['ssh']}
 
 for level in range(1, args.levels + 1):
     outs += 'rinaperf -l -d n.%(level)s.DIF &> /dev/null &\n' % {'level' : level}
@@ -437,7 +437,7 @@ for vm_name in sorted(vms):
     outs += ''\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh -T -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
+            '   ssh -p %(ssh)s localhost << \'ENDSSH\'\n' % {'ssh': vm['ssh']}
 
     if not args.quiet:
         outs += 'set -x\n'
