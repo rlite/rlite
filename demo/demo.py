@@ -266,6 +266,7 @@ lowerflowallocs = dict()
 dif_graphs = dict()
 dns_mappings = dict()
 netems = dict()
+hostfwds = dict()
 
 linecnt = 0
 
@@ -365,6 +366,31 @@ while 1:
         netems[dif][vmname] = {'args': netem_args, 'linecnt': linecnt}
 
         continue
+
+    m = re.match(r'\s*hostfwd\s+([\w-]+)\s+((:?\d+:\d+\s*)+)$', line)
+    if m:
+        vmname = m.group(1)
+        fwdlist = m.group(2).split()
+
+        if vmname in hostfwds:
+            print('Error: Line %d: hostfwd for %s already defined' \
+                                            % (linecnt, vmname))
+            continue
+
+        # check for uniqueness
+        sh = set([int(x.split(':')[0]) for x in fwdlist])
+        sg = set([int(x.split(':')[1]) for x in fwdlist])
+        if 22 in sg or len(sh) != len(fwdlist) or len(sg) != len(fwdlist):
+            print('Error: Line %d: hostfwd for %s has conflicting mappings' \
+                                            % (linecnt, vmname))
+            continue
+
+        hostfwds[vmname] = fwdlist
+
+        continue
+
+    # No match, spit a warning
+    print('Warning: Line %d unrecognized and ignored' % linecnt)
 
 
 fin.close()
@@ -562,6 +588,14 @@ for vmname in sorted(vms):
                  'memory': args.memory, 'frontend': args.frontend,
                  'vmname': vmname}
 
+    hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
+    if vmname in hostfwds:
+        for fwdr in hostfwds[vmname]:
+            hport, gport = fwdr.split(':')
+            hostfwdstr += ',hostfwd=tcp::%s-:%s' % (hport, gport)
+
+    vars_dict['hostfwdstr'] = hostfwdstr
+
     #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
     outs += 'qemu-system-x86_64 '
     if args.image != '': # standard buildroot image
@@ -576,7 +610,7 @@ for vmname in sorted(vms):
             '-smp 1 '                                           \
             '-m %(memory)sM '                                   \
             '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
-            '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '   \
+            '-netdev user,id=mgmt,%(hostfwdstr)s '   \
             '-vga std '                                         \
             '-pidfile rina-%(id)s.pid '                         \
             '-serial file:%(vmname)s.log '                          \
