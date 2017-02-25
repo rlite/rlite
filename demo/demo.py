@@ -377,10 +377,9 @@ while 1:
                                             % (linecnt, vmname))
             continue
 
-        # check for uniqueness
-        sh = set([int(x.split(':')[0]) for x in fwdlist])
+        # check for uniqueness of guest ports
         sg = set([int(x.split(':')[1]) for x in fwdlist])
-        if 22 in sg or len(sh) != len(fwdlist) or len(sg) != len(fwdlist):
+        if 22 in sg or len(sg) != len(fwdlist):
             print('Error: Line %d: hostfwd for %s has conflicting mappings' \
                                             % (linecnt, vmname))
             continue
@@ -394,6 +393,17 @@ while 1:
 
 
 fin.close()
+
+# check for uniqueness of host ports
+fwd_hports = set()
+for vmname in hostfwds:
+    for fwdr in hostfwds[vmname]:
+        p = int(fwdr.split(':')[0])
+        if p in fwd_hports:
+            print('Error: hostfwds have mapping conflicts for port %d' % p)
+            quit()
+        fwd_hports.add(p)
+
 
 boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
 wait_for_boot = 12  # in seconds
