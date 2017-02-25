@@ -16,5 +16,3 @@
 - generic RIB synchronization where needed (e.g. DFT)
 
 - use separate N-1 flows for management and data
-
-- implement flavours for normal IPCP (compile normal.c many times)

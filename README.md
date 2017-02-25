@@ -22,6 +22,7 @@
     * 5.3. shim-tcp4 IPC Process
     * 5.4. shim-loopback IPC Process
     * 5.5. Normal IPC Process
+        * 5.5.1 IPCP flavours to support different data transfer constants
 
 
 #############################################################################
@@ -478,7 +479,7 @@ to /etc/hosts (making sure that they not clash with other entries):
     10.10.10.4      xnorm.IPCP
     10.10.10.52     ynorm.IPCP
 
-On both X and Y, load *rlite* kernel modules and run the rlite-uipcps
+On both X and Y, load *rlite* kernel modules and run the **rlite-uipcps**
 deamon (in foreground in the example)
 
     $ sudo modprobe rlite
@@ -666,3 +667,34 @@ like in the following example:
 where a normal IPCP called normal1:xyz is given the address 7382 to be used
 in its DIF.
 
+
+### 5.5.1 IPCP flavours to support different data transfer constants
+
+The data transfer constants of the normal IPCP (e.g. size of EFCP sequence
+numbers, addresses, CEP-ids, ...) are hardcoded in the **normal.ko** kernel
+module, for better performance and (way) simpler code structure.
+However, it is possible to generate (by recompilation) multiple
+_flavours_ of the normal IPCP with different combinations of the constants.
+In this sense, *rlite* supports a form of programmability of the EFCP
+header.
+The flavours are specified at configure time, so that the build system
+can create the necessary kernel modules in addition to the default one.
+The management part of the normal IPCP process, implemented by the
+**rlite-uipcps** deamon, is instead used by all the flavours.
+The flavours.conf file in the root directory contains the flavours
+specification, where each line has the following syntax
+
+    flavourname    addr=x seq=y pdulen=z cepid=w qosid=u
+
+with x,y,z,w, and u in {1,2,4,8}. By default, a _tiny_flavour is specified
+as follows:
+
+    tiny    addr=1 seq=2 pdulen=2 cepid=1 qosid=1
+
+which can be used for very small DIFs. A kernel module called
+**normal-tiny.ko** is built and can be used as it were a completely
+separate IPCP type (i.e. w.r.t. the default **normal.ko**). Actually,
+it is just the same code (normal.c) recompiled with different values
+of some macros.
+You are free to add/modify flavours depending on your needs, and use
+the different flavours together.
