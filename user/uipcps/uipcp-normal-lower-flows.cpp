@@ -30,18 +30,18 @@ using namespace std;
 
 
 LowerFlow *
-uipcp_rib::lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr)
+uipcp_rib::lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr)
 {
     const LowerFlow *lf = _lfdb_find(local_addr, remote_addr);
     return const_cast<LowerFlow *>(lf);
 }
 
 const LowerFlow *
-uipcp_rib::_lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
+uipcp_rib::_lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr) const
 {
-    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::const_iterator it
+    map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::const_iterator it
                                             = lfdb.find(local_addr);
-    map<rl_addr_t, LowerFlow>::const_iterator jt;
+    map<rlm_addr_t, LowerFlow>::const_iterator jt;
 
     if (it == lfdb.end()) {
         return NULL;
@@ -57,7 +57,7 @@ uipcp_rib::_lfdb_find(rl_addr_t local_addr, rl_addr_t remote_addr) const
 bool
 uipcp_rib::lfdb_add(const LowerFlow &lf)
 {
-    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
+    map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::iterator it
                                             = lfdb.find(lf.local_addr);
     string repr = static_cast<string>(lf);
     LowerFlow lfz = lf;
@@ -88,11 +88,11 @@ uipcp_rib::lfdb_add(const LowerFlow &lf)
 
 /* Returns true if something changed. */
 bool
-uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
+uipcp_rib::lfdb_del(rlm_addr_t local_addr, rlm_addr_t remote_addr)
 {
-    map<rl_addr_t, map<rl_addr_t, LowerFlow> >::iterator it
+    map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::iterator it
                                             = lfdb.find(local_addr);
-    map<rl_addr_t, LowerFlow>::iterator jt;
+    map<rlm_addr_t, LowerFlow>::iterator jt;
 
     if (it == lfdb.end()) {
         return false;
@@ -115,7 +115,7 @@ uipcp_rib::lfdb_del(rl_addr_t local_addr, rl_addr_t remote_addr)
 void
 uipcp_rib::lfdb_update_local(const string& neigh_name)
 {
-    rl_addr_t remote_addr = lookup_neighbor_address(neigh_name);
+    rlm_addr_t remote_addr = lookup_neighbor_address(neigh_name);
     Neighbor *neigh = get_neighbor(neigh_name, false);
     LowerFlowList lfl;
     LowerFlow lf;
@@ -195,14 +195,14 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-uipcp_rib::lfdb_update_address(rl_addr_t new_addr)
+uipcp_rib::lfdb_update_address(rlm_addr_t new_addr)
 {
     LowerFlowList lfl;
 
     /* Update local entries and propagate them. */
-    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::iterator
+    for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::iterator
             it = lfdb.begin(); it != lfdb.end(); it++) {
-        for (map<rl_addr_t, LowerFlow>::iterator jt = it->second.begin();
+        for (map<rlm_addr_t, LowerFlow>::iterator jt = it->second.begin();
                                                 jt != it->second.end(); jt++) {
             LowerFlow &flow = jt->second;
 
@@ -230,9 +230,9 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
     ScopeLock(rib->lock);
     bool discarded = false;
 
-    for (map<rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it
+    for (map<rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it
                 = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
-        list<map<rl_addr_t, LowerFlow >::iterator> discard_list;
+        list<map<rlm_addr_t, LowerFlow >::iterator> discard_list;
 
         if (it->first == rib->myaddr) {
             /* Don't age local entries, we pretend they
@@ -240,7 +240,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
             continue;
         }
 
-        for (map<rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+        for (map<rlm_addr_t, LowerFlow >::iterator jt = it->second.begin();
                                                 jt != it->second.end(); jt++) {
             jt->second.age += RL_AGE_INCR_INTERVAL;
 
@@ -251,7 +251,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
             }
         }
 
-        for (list<map<rl_addr_t, LowerFlow >::iterator>::iterator dit
+        for (list<map<rlm_addr_t, LowerFlow >::iterator>::iterator dit
                     = discard_list.begin(); dit != discard_list.end(); dit++) {
             UPI(rib->uipcp, "Discarded lower-flow %s\n",
                             static_cast<string>((*dit)->second).c_str());
@@ -271,7 +271,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 }
 
 int
-RoutingEngine::compute_next_hops(rl_addr_t local_addr)
+RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 {
     /* Clean up state left from the previous run. */
     next_hops.clear();
@@ -279,9 +279,9 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
     info.clear();
 
     /* Build the graph from the Lower Flow Database. */
-    for (map<rl_addr_t, map<rl_addr_t, LowerFlow > >::const_iterator it
+    for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator it
                 = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
-        for (map<rl_addr_t, LowerFlow>::const_iterator jt
+        for (map<rlm_addr_t, LowerFlow>::const_iterator jt
                     = it->second.begin(); jt != it->second.end(); jt++) {
             const LowerFlow *revlf;
 
@@ -300,7 +300,7 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 
 #if 1
     PV_S("Graph [%lu]:\n", rib->lfdb.size());
-    for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
+    for (map<rlm_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         PV_S("%lu: {", (long unsigned)g->first);
         for (list<Edge>::iterator l = g->second.begin();
@@ -312,7 +312,7 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 #endif
 
     /* Initialize the per-node info map. */
-    for (map<rl_addr_t, list<Edge> >::iterator g = graph.begin();
+    for (map<rlm_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         struct Info inf;
 
@@ -324,11 +324,11 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
     info[local_addr].dist = 0;
 
     for (;;) {
-        rl_addr_t min = UINT_MAX;
+        rlm_addr_t min = UINT_MAX;
         unsigned int min_dist = UINT_MAX;
 
         /* Select the closest node from the ones in the frontier. */
-        for (map<rl_addr_t, Info>::iterator i = info.begin();
+        for (map<rlm_addr_t, Info>::iterator i = info.begin();
                                         i != info.end(); i++) {
             if (!i->second.visited && i->second.dist < min_dist) {
                 min = i->first;
@@ -362,7 +362,7 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
     }
 
     PV_S("Dijkstra result:\n");
-    for (map<rl_addr_t, Info>::iterator i = info.begin();
+    for (map<rlm_addr_t, Info>::iterator i = info.begin();
                                     i != info.end(); i++) {
         PV_S("    Address: %lu, Dist: %u, Visited %u\n",
                 (long unsigned)i->first, i->second.dist,
@@ -370,7 +370,7 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
     }
 
     PV_S("Routing table:\n");
-    for (map<rl_addr_t, rl_addr_t>::iterator h = next_hops.begin();
+    for (map<rlm_addr_t, rlm_addr_t>::iterator h = next_hops.begin();
                                         h != next_hops.end(); h++) {
         PV_S("    Address: %lu, Next hop: %lu\n",
              (long unsigned)h->first, (long unsigned)h->second);
@@ -382,12 +382,12 @@ RoutingEngine::compute_next_hops(rl_addr_t local_addr)
 int
 RoutingEngine::compute_fwd_table()
 {
-    map<rl_addr_t, rl_port_t> next_ports_new;
+    map<rlm_addr_t, rl_port_t> next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
 
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
-    for (map<rl_addr_t, rl_addr_t>::iterator r = next_hops.begin();
+    for (map<rlm_addr_t, rlm_addr_t>::iterator r = next_hops.begin();
                                         r !=  next_hops.end(); r++) {
         map<string, Neighbor*>::iterator neigh;
         string neigh_name;
@@ -419,9 +419,9 @@ RoutingEngine::compute_fwd_table()
     }
 
     /* Generate new PDUFT entries. */
-    for (map<rl_addr_t, rl_port_t>::iterator f = next_ports_new.begin();
+    for (map<rlm_addr_t, rl_port_t>::iterator f = next_ports_new.begin();
                                         f != next_ports_new.end(); f++) {
-            map<rl_addr_t, rl_port_t>::const_iterator of;
+            map<rlm_addr_t, rl_port_t>::const_iterator of;
             int ret;
 
             of = next_ports.find(f->first);
@@ -447,7 +447,7 @@ RoutingEngine::compute_fwd_table()
     }
 
     /* Remove old PDUFT entries. */
-    for (map<rl_addr_t, rl_port_t>::iterator f = next_ports.begin();
+    for (map<rlm_addr_t, rl_port_t>::iterator f = next_ports.begin();
                                         f != next_ports.end(); f++) {
             int ret;
 
@@ -473,7 +473,7 @@ RoutingEngine::compute_fwd_table()
 }
 
 void
-RoutingEngine::update_kernel_routing(rl_addr_t addr)
+RoutingEngine::update_kernel_routing(rlm_addr_t addr)
 {
     assert(rib != NULL);
 

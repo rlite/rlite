@@ -103,33 +103,9 @@ extern int verbosity;
 #define PDU_T_SACK          2   /* Selective ACK */
 #define PDU_T_SNACK         3   /* Selective NACK */
 
-
-/* PCI header to be used for transfer PDUs. */
-struct rina_pci {
-    /* We miss the version field. */
-    rl_addr_t dst_addr;
-    rl_addr_t src_addr;
-    struct {
-        rl_cepid_t dst_cep;
-        rl_cepid_t src_cep;
-        rl_qosid_t qos_id;
-    } conn_id;
-    uint8_t pdu_type;
-    uint8_t pdu_flags;
-    rl_pdulen_t pdu_len;
-    rl_seq_t seqnum;
-} __attribute__((packed));
-
-/* PCI header to be used for control PDUs. */
-struct rina_pci_ctrl {
-    struct rina_pci base;
-    rl_seq_t last_ctrl_seq_num_rcvd;
-    rl_seq_t ack_nack_seq_num;
-    rl_seq_t new_rwe;
-    rl_seq_t new_lwe; /* sent but unused */
-    rl_seq_t my_lwe;  /* sent but unused */
-    rl_seq_t my_rwe;  /* sent but unused */
-} __attribute__((packed));
+/* PCI header is opaque here, only the normal IPCP can use
+ * its layout. */
+struct rina_pci;
 
 struct rl_rawbuf {
     size_t size;
@@ -142,16 +118,21 @@ struct rl_buf {
     struct rina_pci     *pci;
     size_t              len;
 
-    unsigned long       rtx_jiffies;
-    unsigned long       tx_jiffies;
+    union {
+        struct {
+            unsigned long       rtx_jiffies;
+            unsigned long       jiffies;
+            struct flow_entry   *compl_flow;
+        } tx;
+        struct {
+            rlm_seq_t           cons_seqnum;
+        } rx;
+    } u;
 
-    struct flow_entry   *tx_compl_flow;
     struct list_head    node;
 };
 
-struct rl_buf *rl_buf_alloc(size_t size, size_t num_pci, gfp_t gfp);
-
-struct rl_buf * rl_buf_alloc_ctrl(size_t num_pci, gfp_t gfp);
+struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp);
 
 struct rl_buf * rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
@@ -164,32 +145,11 @@ void __rl_buf_free(struct rl_buf *rb);
         __rl_buf_free(_rb); \
     } while (0)
 
-static inline int
-rl_buf_pci_pop(struct rl_buf *rb)
+/* Amount of memory consumed by this packet. */
+static inline unsigned int
+rl_buf_truesize(struct rl_buf *rb)
 {
-    if (unlikely(rb->len < sizeof(struct rina_pci))) {
-        RPD(2, "No enough data to pop another PCI\n");
-        return -1;
-    }
-
-    rb->pci++;
-    rb->len -= sizeof(struct rina_pci);
-
-    return 0;
-}
-
-static inline int
-rl_buf_pci_push(struct rl_buf *rb)
-{
-    if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
-        RPD(2, "No space to push another PCI\n");
-        return -1;
-    }
-
-    rb->pci--;
-    rb->len += sizeof(struct rina_pci);
-
-    return 0;
+    return sizeof(*rb) + rb->raw->size;
 }
 
 static inline int
@@ -220,19 +180,9 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
     return 0;
 }
 
-void rina_pci_dump(struct rina_pci *pci);
-
-/* Amount of memory consumed by this packet. */
-static inline unsigned int
-rl_buf_truesize(struct rl_buf *rb)
-{
-    return sizeof(*rb) + rb->raw->size;
-}
-
 #define RLITE_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RLITE_BUF_PCI(rb) rb->pci
 #define RLITE_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
-
 
 /*
  * Kernel data-structures.
@@ -269,13 +219,14 @@ struct ipcp_ops {
 
     int (*sdu_write)(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rl_buf *rb, bool maysleep);
-    int (*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb);
+    struct rl_buf *(*sdu_rx)(struct ipcp_entry *ipcp, struct rl_buf *rb,
+                             struct flow_entry *lower_flow);
     int (*config)(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value, int *notify);
-    int (*pduft_set)(struct ipcp_entry *ipcp, rl_addr_t dst_addr,
+    int (*pduft_set)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
                      struct flow_entry *flow);
     int (*pduft_del)(struct ipcp_entry *ipcp, struct pduft_entry *entry);
-    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rl_addr_t dst_addr);
+    int (*pduft_del_addr)(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
     int (*pduft_flush)(struct ipcp_entry *ipcp);
     int (*mgmt_sdu_build)(struct ipcp_entry *ipcp,
                           const struct rl_mgmt_hdr *hdr,
@@ -291,7 +242,6 @@ struct txrx {
     unsigned int        rx_qsize; /* in bytes */
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
-    struct rina_pci     *rx_cur_pci;
 #define RL_TXRX_EOF         (1 << 0)
     uint8_t             flags;
 
@@ -315,7 +265,8 @@ struct ipcp_entry {
     rl_ipcp_id_t        id;    /* Key */
     char                *name;
     struct dif          *dif;
-    rl_addr_t           addr;
+    struct pci_sizes    pcisizes;
+    rlm_addr_t          addr;
 
 #define RL_K_IPCP_USE_CEP_IDS   (1<<0)
 #define RL_K_IPCP_ZOMBIE        (1<<1)
@@ -327,7 +278,7 @@ struct ipcp_entry {
 
     struct ipcp_ops     ops;
     void                *priv;
-    uint8_t             nhdrs; /* DIF stacking nhdrs, computed by uipcps */
+    uint8_t             hdroom; /* DIF stacking hdroom, computed by uipcps */
     uint32_t            max_sdu_size;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
@@ -378,11 +329,11 @@ struct dtp {
     unsigned long mpl_r_a;  /* MPL + R + A */
 
     /* Sender state. */
-    rl_seq_t snd_lwe;
-    rl_seq_t snd_rwe;
-    rl_seq_t next_seq_num_to_send;
-    rl_seq_t last_seq_num_sent;
-    rl_seq_t last_ctrl_seq_num_rcvd;
+    rlm_seq_t snd_lwe;
+    rlm_seq_t snd_rwe;
+    rlm_seq_t next_seq_num_to_send;
+    rlm_seq_t last_seq_num_sent;
+    rlm_seq_t last_ctrl_seq_num_rcvd;
     struct list_head cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
@@ -397,13 +348,13 @@ struct dtp {
     struct tkbk tkbk;
 
     /* Receiver state. */
-    rl_seq_t rcv_lwe;
-    rl_seq_t rcv_lwe_priv;
-    rl_seq_t rcv_rwe;
-    rl_seq_t max_seq_num_rcvd;
-    rl_seq_t last_snd_data_ack; /* almost unused */
-    rl_seq_t next_snd_ctl_seq;
-    rl_seq_t last_lwe_sent;
+    rlm_seq_t rcv_lwe;
+    rlm_seq_t rcv_lwe_priv;
+    rlm_seq_t rcv_rwe;
+    rlm_seq_t max_seq_num_rcvd;
+    rlm_seq_t last_snd_data_ack; /* almost unused */
+    rlm_seq_t next_snd_ctl_seq;
+    rlm_seq_t last_lwe_sent;
     struct timer_list rcv_inact_tmr;
     struct list_head seqq;
     unsigned int seqq_len;
@@ -419,7 +370,7 @@ struct flow_entry {
     uint16_t            remote_port;
     uint16_t            local_cep;
     uint16_t            remote_cep;
-    rl_addr_t           remote_addr;
+    rlm_addr_t           remote_addr;
     char                *local_appl;
     char                *remote_appl;
     struct upper_ref    upper;
@@ -429,8 +380,7 @@ struct flow_entry {
     struct rl_flow_config cfg;
     struct rina_flow_spec spec;
 
-    int (*sdu_rx_consumed)(struct flow_entry *flow,
-                           struct rina_pci *pci);
+    int (*sdu_rx_consumed)(struct flow_entry *flow, rlm_seq_t seqnum);
 
     struct list_head    pduft_entries;
 
@@ -452,7 +402,7 @@ struct flow_entry {
 };
 
 struct pduft_entry {
-    rl_addr_t           address;    /* pdu_ft key */
+    rlm_addr_t           address;    /* pdu_ft key */
     struct flow_entry   *flow;
     struct hlist_node   node;       /* for the pdu_ft hash table */
     struct list_head    fnode;      /* for the flow->pduft_entries list */
@@ -479,7 +429,7 @@ int rl_ipcp_factory_unregister(const char *dif_type);
 
 int rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                       rl_port_t remote_port, uint32_t remote_cep,
-                      rl_addr_t remote_addr,
+                      rlm_addr_t remote_addr,
                       const char *local_appl,
                       const char *remote_appl,
                       const struct rl_flow_config *flowcfg,
@@ -490,7 +440,7 @@ int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                        rl_port_t local_port,
                        rl_port_t remote_port,
                        uint32_t remote_cep,
-                       rl_addr_t remote_addr,
+                       rlm_addr_t remote_addr,
                        uint8_t response,
                        struct rl_flow_config *flowcfg,
                        bool maysleep);
@@ -501,7 +451,7 @@ int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                    struct rl_buf *rb, bool qlimit);
 
-int rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
+struct rl_buf *rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb);
 
 void rl_write_restart_port(rl_port_t local_port);
 
@@ -544,7 +494,6 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     spin_lock_init(&txrx->rx_lock);
     INIT_LIST_HEAD(&txrx->rx_q);
     txrx->rx_qsize = 0;
-    txrx->rx_cur_pci = NULL;
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
     init_waitqueue_head(&txrx->__tx_wqh);

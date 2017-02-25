@@ -80,7 +80,7 @@ struct rl_cmsg_ipcp_dft_set {
     rl_msg_t msg_type;
     uint32_t event_id;
 
-    rl_addr_t remote_addr;
+    rlm_addr_t remote_addr;
     char *ipcp_name;
     char *appl_name;
 } __attribute__((packed));

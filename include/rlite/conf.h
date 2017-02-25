@@ -37,8 +37,8 @@ struct rl_flow {
     rl_ipcp_id_t ipcp_id;
     rl_port_t local_port;
     rl_port_t remote_port;
-    rl_addr_t local_addr;
-    rl_addr_t remote_addr;
+    rlm_addr_t local_addr;
+    rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
 
     struct list_head node;

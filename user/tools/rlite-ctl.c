@@ -46,8 +46,8 @@
 struct ipcp_attrs {
     rl_ipcp_id_t id;
     char *name;
-    rl_addr_t addr;
-    unsigned int nhdrs;
+    rlm_addr_t addr;
+    unsigned int hdroom;
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
@@ -462,10 +462,10 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
                      (long long unsigned int)attrs->addr);
         }
         PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %s, nhdrs = %u, mss = %u\n",
+                " address = %s, hdroom = %u, mss = %u\n",
                 attrs->id, attrs->name, attrs->dif_type,
                 attrs->dif_name, addrbuf,
-                attrs->nhdrs, attrs->max_sdu_size);
+                attrs->hdroom, attrs->max_sdu_size);
     }
 
     return 0;
@@ -656,7 +656,7 @@ ipcps_load()
         attrs->dif_type = upd->dif_type; upd->dif_type = NULL;
         attrs->dif_name = upd->dif_name; upd->dif_name = NULL;
         attrs->addr = upd->ipcp_addr;
-        attrs->nhdrs = upd->nhdrs;
+        attrs->hdroom = upd->hdroom;
         attrs->max_sdu_size = upd->max_sdu_size;
         rl_free(upd, RL_MT_MSG);
 

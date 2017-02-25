@@ -66,7 +66,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 static int
 uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port,
+                rlm_addr_t dst_addr, rl_port_t local_port,
                 rl_msg_t msg_type)
 {
     struct rl_kmsg_ipcp_pduft_mod req;
@@ -91,7 +91,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 int
 uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port)
+                rlm_addr_t dst_addr, rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_SET);
@@ -99,7 +99,7 @@ uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
 int
 uipcp_pduft_del(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rl_addr_t dst_addr, rl_port_t local_port)
+                rlm_addr_t dst_addr, rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_DEL);
@@ -146,7 +146,7 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_port_t remote_port, uint32_t remote_cep,
-                           rl_addr_t remote_addr,
+                           rlm_addr_t remote_addr,
                            const char *local_appl,
                            const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
@@ -184,7 +184,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                             rl_port_t remote_port, uint32_t remote_cep,
-                            rl_addr_t remote_addr,
+                            rlm_addr_t remote_addr,
                             uint8_t response, const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived req;
@@ -696,7 +696,7 @@ extern struct uipcp_ops shim_udp4_ops;
 static const struct uipcp_ops *
 select_uipcp_ops(const char *dif_type)
 {
-    if (strcmp(dif_type, "normal") == 0) {
+    if (type_is_normal_ipcp(dif_type)) {
         return &normal_ops;
     }
 
@@ -793,7 +793,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->nhdrs = upd->nhdrs;
+    uipcp->hdroom = upd->hdroom;
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
@@ -1003,9 +1003,9 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " nhdrs = %u, mss = %u\n",
+                " hdroom = %u, mss = %u\n",
                 uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name, uipcp->nhdrs, uipcp->max_sdu_size);
+                uipcp->dif_name, uipcp->hdroom, uipcp->max_sdu_size);
     }
     pthread_mutex_unlock(&uipcps->lock);
 
@@ -1024,22 +1024,31 @@ uipcps_print(struct uipcps *uipcps)
  *       case.
  */
 
+/* Compute the size of PCI data transfer PDU. */
+static int ipcp_hdrlen(struct uipcp *uipcp)
+{
+    struct pci_sizes *sz = &uipcp->pcisizes;
+
+    return 2 * sz->addr + 2 * sz->cepid + sz->qosid +
+           1 + 1 + sz->pdulen + sz->seq;
+}
+
 static void
 topo_visit(struct uipcps *uipcps)
 {
     struct ipcp_node *ipn;
     struct flow_edge *e;
-    int hdrlen = 32; /* temporarily hardcoded, see struct rina_pci */
 
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
         ipn->marked = 0;
-        ipn->nhdrs = 0;
+        ipn->hdroom = 0;
         ipn->mss_computed = 0;
         if (uipcp) {
             ipn->max_sdu_size = uipcp->max_sdu_size;
+            ipn->hdrsize = ipcp_hdrlen(uipcp);
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
@@ -1078,15 +1087,15 @@ topo_visit(struct uipcps *uipcps)
         }
 
         /* Mark (visit) the node, appling the relaxation rule to
-         * maximize nhdrs and minimize max_sdu_size. */
+         * maximize hdroom and minimize max_sdu_size. */
         ipn->marked = 1;
 
         list_for_each_entry(e, nexts, node) {
-            if (e->ipcp->nhdrs < ipn->nhdrs + 1) {
-                e->ipcp->nhdrs = ipn->nhdrs + 1;
+            if (e->ipcp->hdroom < ipn->hdroom + e->ipcp->hdrsize) {
+                e->ipcp->hdroom = ipn->hdroom + e->ipcp->hdrsize;
             }
-            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - hdrlen) {
-                e->ipcp->max_sdu_size = ipn->max_sdu_size - hdrlen;
+            if (e->ipcp->max_sdu_size > ipn->max_sdu_size - e->ipcp->hdrsize) {
+                e->ipcp->max_sdu_size = ipn->max_sdu_size - e->ipcp->hdrsize;
                 if (e->ipcp->max_sdu_size < 0) {
                     e->ipcp->max_sdu_size = 0;
                 }
@@ -1104,15 +1113,15 @@ topo_update_kern(struct uipcps *uipcps)
     int ret;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->nhdrs);
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->hdroom);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
-            PE("Impossible nhdrs %u\n", ipn->nhdrs);
+            PE("Impossible hdroom %u\n", ipn->hdroom);
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "nhdrs", strbuf);
+        ret = rl_conf_ipcp_config(ipn->id, "hdroom", strbuf);
         if (ret) {
-            PE("'ipcp-config nhdrs %u' failed\n", ipn->nhdrs);
+            PE("'ipcp-config hdroom %u' failed\n", ipn->hdroom);
         }
 
         if (!ipn->mss_computed) {
@@ -1341,11 +1350,12 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->nhdrs = upd->nhdrs;
+    uipcp->hdroom = upd->hdroom;
     mss_changed = (uipcp->max_sdu_size != upd->max_sdu_size);
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
+    uipcp->pcisizes = upd->pcisizes;
 
     pthread_mutex_unlock(&uipcps->lock);
 

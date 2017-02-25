@@ -629,7 +629,7 @@ out:
 static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->nhdrs,
+    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->hdroom,
                                            GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
@@ -649,7 +649,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     skb_copy_bits(skb, 0, RLITE_BUF_DATA(rb), skb->len);
 
     /* Try to shortcut the packet to the upper IPCP. */
-    if (!rl_sdu_rx_shortcut(priv->ipcp, rb)) {
+    if ((rb = rl_sdu_rx_shortcut(priv->ipcp, rb)) == NULL) {
         entry->stats.rx_pkt++;
         entry->stats.rx_byte += rb->len;
         return;
@@ -769,8 +769,10 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         return RX_HANDLER_PASS;
     }
 
-    /* Steal the skb from the Linux stack. */
-    dev_consume_skb_any(skb);
+    /* Steal the skb from the Linux stack. We should use dev_consume_skb_any(),
+     * for those kernel where this is defined (this would require figure out
+     * the kernel features at configuration time. */
+    dev_kfree_skb_any(skb);
 
     return RX_HANDLER_CONSUMED;
 }

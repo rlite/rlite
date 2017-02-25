@@ -54,7 +54,7 @@ struct UipcpObject {
 };
 
 struct EnrollmentInfo : public UipcpObject {
-    rl_addr_t address;
+    rlm_addr_t address;
     std::list< std::string > lower_difs;
     bool start_early;
 
@@ -85,7 +85,7 @@ struct RinaName {
 
 struct DFTEntry : public UipcpObject {
     RinaName appl_name;
-    rl_addr_t address;
+    rlm_addr_t address;
     uint64_t timestamp;
     /* Not externally visible (not serialized), true
      * if this entry refers to an application registered
@@ -110,7 +110,7 @@ struct NeighborCandidate : public UipcpObject {
     std::string api;
     std::string aen; /* not serialized */
     std::string aei; /* not serialized */
-    rl_addr_t address;
+    rlm_addr_t address;
     std::list<std::string> lower_difs;
 
     NeighborCandidate() { }
@@ -132,8 +132,8 @@ struct NeighborCandidateList : public UipcpObject {
 };
 
 struct LowerFlow : public UipcpObject {
-    rl_addr_t local_addr;
-    rl_addr_t remote_addr;
+    rlm_addr_t local_addr;
+    rlm_addr_t remote_addr;
     unsigned int cost;
     unsigned int seqnum;
     bool state;
@@ -203,8 +203,8 @@ struct PolicyDescr : public UipcpObject {
 };
 
 struct WindowBasedFlowCtrlConfig : public UipcpObject {
-    rl_seq_t max_cwq_len; /* closed window queue */
-    rl_seq_t initial_credit;
+    rlm_seq_t max_cwq_len; /* closed window queue */
+    rlm_seq_t initial_credit;
     PolicyDescr rcvr_flow_ctrl;
     PolicyDescr tx_ctrl;
 
@@ -278,7 +278,7 @@ struct DtcpConfig : public UipcpObject {
 struct ConnPolicies : public UipcpObject {
     bool dtcp_present;
     DtcpConfig dtcp_cfg;
-    rl_seq_t seq_num_rollover_th;
+    rlm_seq_t seq_num_rollover_th;
     uint32_t initial_a_timer;
     PolicyDescr rcvr_timer_inact;
     PolicyDescr sender_timer_inact;
@@ -304,8 +304,8 @@ struct FlowRequest : public UipcpObject {
     RinaName dst_app;
     rl_port_t src_port;
     rl_port_t dst_port;
-    rl_addr_t src_addr;
-    rl_addr_t dst_addr;
+    rlm_addr_t src_addr;
+    rlm_addr_t dst_addr;
     std::list<ConnId> connections;
     uint32_t cur_conn_idx;
     uint32_t state;
@@ -329,8 +329,8 @@ struct FlowRequest : public UipcpObject {
 };
 
 struct AData : public UipcpObject {
-    rl_addr_t src_addr;
-    rl_addr_t dst_addr;
+    rlm_addr_t src_addr;
+    rlm_addr_t dst_addr;
     CDAPMessage *cdap;
 
     AData() : cdap(NULL) { }
@@ -340,12 +340,12 @@ struct AData : public UipcpObject {
 };
 
 struct AddrAllocRequest : public UipcpObject {
-    rl_addr_t requestor;
-    rl_addr_t address;
+    rlm_addr_t requestor;
+    rlm_addr_t address;
     bool pending; /* not serialized */
 
     AddrAllocRequest() : requestor (0), address(0), pending(true) { }
-    AddrAllocRequest(rl_addr_t a, rl_addr_t r) : requestor(r), address(a),
+    AddrAllocRequest(rlm_addr_t a, rlm_addr_t r) : requestor(r), address(a),
                                                  pending(true) { }
     AddrAllocRequest(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;

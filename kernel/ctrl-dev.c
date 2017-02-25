@@ -461,7 +461,7 @@ ipcp_select_by_dif(const char *dif_name)
              * giving priority to higher ranked normal DIFs. */
             if (!selected || (strcmp(entry->dif->ty, "normal") == 0 &&
                     (strcmp(selected->dif->ty, "normal") != 0 ||
-                     entry->nhdrs > selected->nhdrs))) {
+                     entry->hdroom > selected->hdroom))) {
                 selected = entry;
             }
         } else if (strcmp(entry->dif->name, dif_name) == 0) {
@@ -529,7 +529,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->dif = dif;
         entry->addr = 0;
         entry->refcnt = 1;
-        entry->nhdrs = RLITE_DEFAULT_LAYERS; /* recomputed in userspace */
+        entry->hdroom = RLITE_DEFAULT_LAYERS; /* recomputed in userspace */
         entry->max_sdu_size = (1 << 16); /* default, ok for normal IPCPs */
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
@@ -1115,7 +1115,7 @@ flow_del(struct flow_entry *entry)
     entry->txrx.rx_qsize = 0;
 
     list_for_each_entry_safe(pfte, tmp_pfte, &entry->pduft_entries, fnode) {
-        rl_addr_t dst_addr = pfte->address;
+        rlm_addr_t dst_addr = pfte->address;
         int r;
 
         BUG_ON(!upper_ipcp || !upper_ipcp->ops.pduft_del);
@@ -1532,8 +1532,9 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->update_type = update_type;
     upd->ipcp_id = ipcp->id;
     upd->ipcp_addr = ipcp->addr;
-    upd->nhdrs = ipcp->nhdrs;
+    upd->hdroom = ipcp->hdroom;
     upd->max_sdu_size = ipcp->max_sdu_size;
+    memcpy(&upd->pcisizes, &ipcp->pcisizes, sizeof(upd->pcisizes));
     if (ipcp->name) {
         upd->ipcp_name = rl_strdup(ipcp->name, GFP_ATOMIC, RL_MT_UTILS);
         if (!upd->ipcp_name) {
@@ -1768,12 +1769,12 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ret == -ENOSYS) {
         /* This operation was not managed by ops.config, let's see if
          *  we can manage it here. */
-        if (strcmp(req->name, "nhdrs") == 0) {
-            uint8_t nhdrs;
+        if (strcmp(req->name, "hdroom") == 0) {
+            uint8_t hdroom;
 
-            ret = kstrtou8(req->value, 10, &nhdrs);
+            ret = kstrtou8(req->value, 10, &hdroom);
             if (ret == 0) {
-                entry->nhdrs = nhdrs;
+                entry->hdroom = hdroom;
             }
 
         } else if (strcmp(req->name, "mss") == 0) {
@@ -2534,7 +2535,7 @@ out:
 int
 rl_fa_req_arrived(struct ipcp_entry *ipcp, uint32_t kevent_id,
                   rl_port_t remote_port, uint32_t remote_cep,
-                  rl_addr_t remote_addr,
+                  rlm_addr_t remote_addr,
                   const char *local_appl,
                   const char *remote_appl,
                   const struct rl_flow_config *flowcfg,
@@ -2618,7 +2619,7 @@ rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                      rl_port_t local_port,
                      rl_port_t remote_port,
                      uint32_t remote_cep,
-                     rl_addr_t remote_addr,
+                     rlm_addr_t remote_addr,
                      uint8_t response,
                      struct rl_flow_config *flowcfg,
                      bool maysleep)

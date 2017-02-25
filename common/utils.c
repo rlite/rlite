@@ -713,7 +713,7 @@ void
 rl_flow_spec_default(struct rina_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
-    spec->max_sdu_gap = (rl_seq_t)-1;  /* unbounded allowed gap */
+    spec->max_sdu_gap = (rlm_seq_t)-1;  /* unbounded allowed gap */
     spec->avg_bandwidth = 0;        /* don't care about bandwidth */
     spec->max_delay = 0;            /* don't care about delay */
     spec->max_jitter = 0;           /* don't care about jitter */

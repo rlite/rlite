@@ -44,7 +44,7 @@ static uint64_t time64()
 
 int
 uipcp_rib::dft_lookup(const std::string& appl_name,
-                      rl_addr_t& dstaddr) const
+                      rlm_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
          = dft.find(appl_name);
@@ -59,7 +59,7 @@ uipcp_rib::dft_lookup(const std::string& appl_name,
 }
 
 int
-uipcp_rib::dft_set(const std::string& appl_name, rl_addr_t remote_addr)
+uipcp_rib::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
 {
     DFTEntry entry;
 
@@ -196,7 +196,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-uipcp_rib::dft_update_address(rl_addr_t new_addr)
+uipcp_rib::dft_update_address(rlm_addr_t new_addr)
 {
     map< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;

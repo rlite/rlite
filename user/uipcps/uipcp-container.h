@@ -53,8 +53,8 @@ struct uipcps {
     /* Use reliable N-flows if reliable N-1-flows are not available. */
     int reliable_n_flows;
 
-    /* Use unreliable N-1-flows rather than reliable ones. */
-    int unreliable_flows;
+    /* Use reliable N-1-flows rather than unreliable ones. */
+    int reliable_flows;
 
     /* Use automated distributed address allocation (i.e. not manual).
      * This should be a per-DIF policy, but for the moment being it's
@@ -62,7 +62,7 @@ struct uipcps {
     int auto_addr_alloc;
 
     /* List of IPCP "nodes", used for topological sorting and computation
-     * of IPCP nhdrs and maximum SDU size. */
+     * of IPCP hdroom and maximum SDU size. */
     struct list_head ipcp_nodes;
 
     /* Main loop thread, listening for IPCP updates (e.g. new IPCPs, deleted
@@ -135,7 +135,7 @@ struct uipcp_ops {
                                 const struct rl_msg_base *msg);
 
     /* The uipcp address gets updated. */
-    void (*update_address)(struct uipcp *uipcp, rl_addr_t new_addr);
+    void (*update_address)(struct uipcp *uipcp, rlm_addr_t new_addr);
 
     /* For tasks to be executed in the context of the uipcps event loop. */
     void  (*trigger_tasks)(struct uipcp *);
@@ -144,10 +144,11 @@ struct uipcp_ops {
 struct ipcp_node {
     rl_ipcp_id_t id;
     unsigned int marked;
-    unsigned int nhdrs;
+    unsigned int hdroom;
     unsigned int refcnt;
     unsigned int mss_computed;
     int max_sdu_size;
+    int hdrsize;
 
     struct list_head lowers;
     struct list_head uppers;
@@ -181,10 +182,11 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    unsigned int nhdrs;
+    unsigned int hdroom;
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
+    struct pci_sizes pcisizes;
 
     /* uIPCP implementation. */
     struct uipcp_ops ops;
@@ -234,23 +236,23 @@ int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                              const struct rl_kmsg_appl_register *req);
 
 int uipcp_pduft_set(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rl_addr_t dst_addr, rl_port_t local_port);
+                    rlm_addr_t dst_addr, rl_port_t local_port);
 
 int uipcp_pduft_del(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rl_addr_t dst_addr, rl_port_t local_port);
+                    rlm_addr_t dst_addr, rl_port_t local_port);
 
 int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_port_t remote_port, uint32_t remote_cep,
-                               rl_addr_t remote_addr,
+                               rlm_addr_t remote_addr,
                                const char *local_appl,
                                const char *remote_appl,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                           rl_port_t remote_port, uint32_t remote_cep,
-                          rl_addr_t remote_addr, uint8_t response,
+                          rlm_addr_t remote_addr, uint8_t response,
                           const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,

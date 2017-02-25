@@ -192,8 +192,8 @@ argparser.add_argument('-k', '--keepalive', default = 10,
                        help = "Neighbor keepalive timeout in seconds (0 to disable)", type = int)
 argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
-argparser.add_argument('-U', '--unreliable-flows', action='store_true',
-                       help = "Use unreliable N-1-flows rather than reliable ones")
+argparser.add_argument('-R', '--reliable-flows', action='store_true',
+                       help = "Use reliable N-1-flows rather than unreliable ones")
 argparser.add_argument('-A', '--addr-alloc-policy', type=str,
                         choices = ["auto", "manual"], default = "auto",
                        help = "Address allocation policy to be used for all DIFs")
@@ -205,6 +205,9 @@ argparser.add_argument('-i', '--image',
 argparser.add_argument('--user',
                        help = "username for legacy mode", type = str,
                        default = 'root')
+argparser.add_argument('--flavour',
+                       help = "flavour to use for normal IPCPs", type = str,
+                       default = '')
 args = argparser.parse_args()
 
 
@@ -219,6 +222,10 @@ sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
           '-o IdentityFile=buildroot/buildroot_rsa'
 sudo = 'sudo' if args.image != '' else ''
 vmimgpath = 'buildroot/rootfs.cpio'
+
+flavour_suffix = ''
+if args.flavour != '':
+    flavour_suffix = '-' + args.flavour
 
 download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rlite-images/downloads/rootfs.cpio')
 download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rlite-images/downloads/bzImage')
@@ -259,6 +266,7 @@ lowerflowallocs = dict()
 dif_graphs = dict()
 dns_mappings = dict()
 netems = dict()
+hostfwds = dict()
 
 linecnt = 0
 
@@ -268,9 +276,9 @@ while 1:
         break
     linecnt += 1
 
-    line = line.replace('\n', '')
+    line = line.replace('\n', '').strip()
 
-    if line.startswith('#'):
+    if line.startswith('#') or line == "":
         continue
 
     m = re.match(r'\s*eth\s+([\w-]+)\s+(\d+)([GMK])bps\s+(\w.*)$', line)
@@ -359,8 +367,43 @@ while 1:
 
         continue
 
+    m = re.match(r'\s*hostfwd\s+([\w-]+)\s+((:?\d+:\d+\s*)+)$', line)
+    if m:
+        vmname = m.group(1)
+        fwdlist = m.group(2).split()
+
+        if vmname in hostfwds:
+            print('Error: Line %d: hostfwd for %s already defined' \
+                                            % (linecnt, vmname))
+            continue
+
+        # check for uniqueness of guest ports
+        sg = set([int(x.split(':')[1]) for x in fwdlist])
+        if 22 in sg or len(sg) != len(fwdlist):
+            print('Error: Line %d: hostfwd for %s has conflicting mappings' \
+                                            % (linecnt, vmname))
+            continue
+
+        hostfwds[vmname] = fwdlist
+
+        continue
+
+    # No match, spit a warning
+    print('Warning: Line %d unrecognized and ignored' % linecnt)
+
 
 fin.close()
+
+# check for uniqueness of host ports
+fwd_hports = set()
+for vmname in hostfwds:
+    for fwdr in hostfwds[vmname]:
+        p = int(fwdr.split(':')[0])
+        if p in fwd_hports:
+            print('Error: hostfwds have mapping conflicts for port %d' % p)
+            quit()
+        fwd_hports.add(p)
+
 
 boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
 wait_for_boot = 12  # in seconds
@@ -555,6 +598,14 @@ for vmname in sorted(vms):
                  'memory': args.memory, 'frontend': args.frontend,
                  'vmname': vmname}
 
+    hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
+    if vmname in hostfwds:
+        for fwdr in hostfwds[vmname]:
+            hport, gport = fwdr.split(':')
+            hostfwdstr += ',hostfwd=tcp::%s-:%s' % (hport, gport)
+
+    vars_dict['hostfwdstr'] = hostfwdstr
+
     #'-serial tcp:127.0.0.1:%(fwdc)s,server,nowait '         \
     outs += 'qemu-system-x86_64 '
     if args.image != '': # standard buildroot image
@@ -569,7 +620,7 @@ for vmname in sorted(vms):
             '-smp 1 '                                           \
             '-m %(memory)sM '                                   \
             '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
-            '-netdev user,id=mgmt,hostfwd=tcp::%(fwdp)s-:22 '   \
+            '-netdev user,id=mgmt,%(hostfwdstr)s '   \
             '-vga std '                                         \
             '-pidfile rina-%(id)s.pid '                         \
             '-serial file:%(vmname)s.log '                          \
@@ -635,7 +686,7 @@ for vmname in sorted(vms):
     outs +=         '$SUDO modprobe rlite verbosity=%(verbidx)s\n'\
                     '$SUDO modprobe rlite-shim-eth\n'\
                     '$SUDO modprobe rlite-shim-udp4\n'\
-                    '$SUDO modprobe rlite-normal\n'\
+                    '$SUDO modprobe rlite-normal%(flsuf)s\n'\
                     '$SUDO chmod a+rwx /dev/rlite\n'\
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\
                     '$SUDO mkdir -p /var/rlite\n'\
@@ -643,14 +694,15 @@ for vmname in sorted(vms):
                     '$SUDO dmesg -n8\n'\
                     '\n'\
                     '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
-                                        '%(relnflows)s %(unrelflows)s '\
+                                        '%(relnflows)s %(relflows)s '\
                                         '-A %(autoaddralloc)s &> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
-                           'unrelflows': '-U' if args.unreliable_flows else '',
-                           'autoaddralloc': args.addr_alloc_policy}
+                           'relflows': '-R' if args.reliable_flows else '',
+                           'autoaddralloc': args.addr_alloc_policy,
+                           'flsuf': flavour_suffix}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
@@ -672,8 +724,9 @@ for vmname in sorted(vms):
     # Create normal IPCPs (it's handy to do it in topological DIF order)
     for dif in dif_ordering:
         if dif not in shims and vmname in difs[dif]:
-            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal %(dif)s.DIF\n'\
-                                                                % {'dif': dif, 'id': vm['id']}
+            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal%(flsuf)s %(dif)s.DIF\n'\
+                                                                % {'dif': dif, 'id': vm['id'],
+                                                                   'flsuf': flavour_suffix}
             if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}

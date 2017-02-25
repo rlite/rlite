@@ -965,8 +965,8 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize lower flow database. */
-        map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
-        map< rl_addr_t, LowerFlow >::iterator jt;
+        map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
+        map< rlm_addr_t, LowerFlow >::iterator jt;
         LowerFlowList lfl;
 
         if (rib->lfdb.size() > 0) {
@@ -1042,7 +1042,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize address allocation table. */
-        for (map<rl_addr_t, AddrAllocRequest>::iterator
+        for (map<rlm_addr_t, AddrAllocRequest>::iterator
                         at = rib->addr_alloc_table.begin();
                                     at != rib->addr_alloc_table.end();) {
             AddrAllocEntries l;
@@ -1081,8 +1081,8 @@ sync_timeout_cb(struct uipcp *uipcp, void *arg)
 int
 uipcp_rib::neighs_refresh_lower_flows()
 {
-    map< rl_addr_t, map< rl_addr_t, LowerFlow > >::iterator it;
-    map< rl_addr_t, LowerFlow >::iterator jt;
+    map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
+    map< rlm_addr_t, LowerFlow >::iterator jt;
     unsigned int limit = 10;
     int ret = 0;
 
@@ -1096,7 +1096,7 @@ uipcp_rib::neighs_refresh_lower_flows()
     it = lfdb.find(myaddr);
     assert(it != lfdb.end());
 
-    for (map< rl_addr_t, LowerFlow >::iterator jt = it->second.begin();
+    for (map< rlm_addr_t, LowerFlow >::iterator jt = it->second.begin();
                                         jt != it->second.end();) {
         LowerFlowList lfl;
 
@@ -1144,7 +1144,7 @@ uipcp_rib::del_neighbor(const std::string& neigh_name)
     return 0;
 }
 
-rl_addr_t
+rlm_addr_t
 uipcp_rib::lookup_neighbor_address(const std::string& neigh_name) const
 {
     map< string, NeighborCandidate >::const_iterator
@@ -1158,7 +1158,7 @@ uipcp_rib::lookup_neighbor_address(const std::string& neigh_name) const
 }
 
 std::string
-uipcp_rib::lookup_neighbor_by_address(rl_addr_t address)
+uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
 {
     map<string, NeighborCandidate>::iterator nit;
 
@@ -1441,7 +1441,7 @@ Neighbor::alloc_flow(const char *supp_dif)
                                                      &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
                                              (use_reliable_flow ? "" : " not"));
-    if (rib->uipcp->uipcps->unreliable_flows) {
+    if (!rib->uipcp->uipcps->reliable_flows) {
         /* Force unreliable flows even if we have reliable ones. */
         use_reliable_flow = false;
     }
