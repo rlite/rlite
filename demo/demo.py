@@ -275,9 +275,9 @@ while 1:
         break
     linecnt += 1
 
-    line = line.replace('\n', '')
+    line = line.replace('\n', '').strip()
 
-    if line.startswith('#'):
+    if line.startswith('#') or line == "":
         continue
 
     m = re.match(r'\s*eth\s+([\w-]+)\s+(\d+)([GMK])bps\s+(\w.*)$', line)
