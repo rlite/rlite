@@ -469,10 +469,10 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
          * implementation used to move the PDUs into another temporary
          * queue local to this function and calling rl_sdu_rx_flow()
          * out of the critical section, but it used to suffer from
-         * reordering. True is that shim-eth does not have to guarantee
-         * in order delivery, but the reordering problem complicates
-         * testing. This is bsically a tradeoff, so I went for this
-         * solution since it could not have any drawbacks. */
+         * reordering. It is true that shim-eth does not need to guarantee
+         * in order delivery, but the reordering happening at the very
+         * initial phase of the data exchange is quite problematic, so it
+         * is better to avoid it. */
         PD("Popping %u PDUs from rx_tmpq\n",
                 entry->rx_tmpq_len);
         list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
