@@ -257,7 +257,13 @@ The **rina-toy** script is a trivial example written using these bindings.
 #############################################################################
 
 The demonstrator is a tool written in Python which allows you to deploy
-arbitrarily complex RINA networks, in your PC, using light Virtual Machines.
+arbitrarily complex RINA networks, within your PC, using light Virtual
+Machines (VMs).
+The tool is conceived to run directly on your physical machine/laptop.
+All it does is to create QEMU VMs, TAP interfaces and software bridges,
+so it does not harm your computer nor it installs any files.
+Make sure QEMU is installed on your machine and kernel/processor
+support KVM (Intel VT-x or AMD-V).
 
 Enter the demo directory in the repository and run
 
@@ -273,7 +279,6 @@ following differences:
 
 1. The **policy** and **appmap** directives are not supported
 2. The name of **eth** instances does not need to be a valid VLAN id
-3. The legacy mode is not supported, only the buildroot mode is
 
 
 #### 4.1.1 Mini-tutorial
@@ -282,7 +287,9 @@ Enter the demo directory and run
 
     $ ./demo.py -c demo.conf
 
-to generate the bootstrap (up.sh) and teardown (down.sh) scripts.
+to generate the bootstrap (up.sh) and teardown (down.sh) scripts
+for a RINA network of three nodes. More examples are available
+in the demo/examples directory.
 
 Run the bootstrap script and wait for it to finish (it will take 10-20
 seconds):
