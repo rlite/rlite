@@ -716,4 +716,4 @@ projects PRISTINE and ARCFIRE.
 
 Author:         Vincenzo Maffione
 
-Contributors:
+Contributors:   Michal Koutenský
