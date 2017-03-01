@@ -28,6 +28,7 @@
 #include <map>
 #include <list>
 #include <ctime>
+#include <sstream>
 #include <pthread.h>
 
 #include "rlite/common.h"
@@ -232,6 +233,28 @@ private:
     pthread_mutex_t& mutex;
 };
 
+struct dft {
+    /* Directory Forwarding Table. */
+    std::map< std::string, DFTEntry > dft_table;
+
+    /* Backpointer to parent data structure. */
+    struct uipcp *uipcp;
+
+    /* Backpointer to parent data structure. */
+    struct uipcp_rib *rib;
+
+    dft(struct uipcp *_u, struct uipcp_rib *_ur) : uipcp(_u), rib(_ur) { }
+    ~dft() { }
+
+    void dump(std::stringstream& ss) const;
+
+    int dft_lookup(const std::string& appl_name, rlm_addr_t& dstaddr) const;
+    int dft_set(const std::string& appl_name, rlm_addr_t remote_addr);
+    int appl_register(const struct rl_kmsg_appl_register *req);
+    void dft_update_address(rlm_addr_t new_addr);
+    int dft_handler(const CDAPMessage *rm, NeighFlow *nf);
+};
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
@@ -278,7 +301,7 @@ struct uipcp_rib {
     std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
     /* Directory Forwarding Table. */
-    std::map< std::string, DFTEntry > dft;
+    struct dft dft;
 
     /* Lower Flow Database. */
     std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb;
@@ -312,11 +335,7 @@ struct uipcp_rib {
     void update_address(rlm_addr_t new_addr);
     Neighbor *get_neighbor(const std::string& neigh_name, bool create);
     int del_neighbor(const std::string& neigh_name);
-    int dft_lookup(const std::string& appl_name, rlm_addr_t& dstaddr) const;
-    int dft_set(const std::string& appl_name, rlm_addr_t remote_addr);
-    void dft_update_address(rlm_addr_t new_addr);
     int register_to_lower(int reg, std::string lower_dif);
-    int appl_register(const struct rl_kmsg_appl_register *req);
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     rlm_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);

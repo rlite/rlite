@@ -43,13 +43,13 @@ static uint64_t time64()
 }
 
 int
-uipcp_rib::dft_lookup(const std::string& appl_name,
+dft::dft_lookup(const std::string& appl_name,
                       rlm_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
-         = dft.find(appl_name);
+         = dft_table.find(appl_name);
 
-    if (mit == dft.end()) {
+    if (mit == dft_table.end()) {
         return -1;
     }
 
@@ -59,7 +59,7 @@ uipcp_rib::dft_lookup(const std::string& appl_name,
 }
 
 int
-uipcp_rib::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
+dft::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
 {
     DFTEntry entry;
 
@@ -67,7 +67,7 @@ uipcp_rib::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
     entry.appl_name = RinaName(appl_name);
     entry.timestamp = time64();
 
-    dft[appl_name] = entry;
+    dft_table[appl_name] = entry;
 
     UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->id,
         appl_name.c_str(), (long long unsigned)entry.address);
@@ -76,7 +76,7 @@ uipcp_rib::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
 }
 
 int
-uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
+dft::appl_register(const struct rl_kmsg_appl_register *req)
 {
     map< string, DFTEntry >::iterator mit;
     string appl_name(req->appl_name);
@@ -84,35 +84,35 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    dft_entry.address = myaddr;
+    dft_entry.address = rib->myaddr;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
     dft_entry.local = true;
 
-    mit = dft.find(appl_name);
+    mit = dft_table.find(appl_name);
 
     if (req->reg) {
-        if (mit != dft.end()) {
+        if (mit != dft_table.end()) {
             UPE(uipcp, "Application %s already registered on uipcp with address "
                     "[%llu], my address being [%llu]\n", appl_name.c_str(),
                     (long long unsigned)mit->second.address,
-                    (long long unsigned)myaddr);
+                    (long long unsigned)rib->myaddr);
             return uipcp_appl_register_resp(uipcp, uipcp->id,
                                             RLITE_ERR, req);
         }
 
         /* Insert the object into the RIB. */
-        dft.insert(make_pair(appl_name, dft_entry));
+        dft_table.insert(make_pair(appl_name, dft_entry));
 
     } else {
-        if (mit == dft.end()) {
+        if (mit == dft_table.end()) {
             UPE(uipcp, "Application %s was not registered here\n",
                 appl_name.c_str());
             return 0;
         }
 
         /* Remove the object from the RIB. */
-        dft.erase(mit);
+        dft_table.erase(mit);
         create = false;
     }
 
@@ -122,7 +122,7 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
             appl_name.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->id);
 
-    neighs_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+    rib->neighs_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
@@ -135,6 +135,12 @@ uipcp_rib::appl_register(const struct rl_kmsg_appl_register *req)
 
 int
 uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
+{
+    return dft.dft_handler(rm,nf);
+}
+
+int
+dft::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     const char *objbuf;
     size_t objlen;
@@ -162,21 +168,21 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
     for (list<DFTEntry>::iterator e = dft_slice.entries.begin();
                                 e != dft_slice.entries.end(); e++) {
         string key = static_cast<string>(e->appl_name);
-        map< string, DFTEntry >::iterator mit = dft.find(key);
+        map< string, DFTEntry >::iterator mit = dft_table.find(key);
 
         if (add) {
-            if (mit == dft.end() || e->timestamp > mit->second.timestamp) {
-                dft[key] = *e;
+            if (mit == dft_table.end() || e->timestamp > mit->second.timestamp) {
+                dft_table[key] = *e;
                 prop_dft.entries.push_back(*e);
                 UPD(uipcp, "DFT entry %s %s remotely\n", key.c_str(),
-                        (mit != dft.end() ? "updated" : "added"));
+                        (mit != dft_table.end() ? "updated" : "added"));
             }
 
         } else {
-            if (mit == dft.end()) {
+            if (mit == dft_table.end()) {
                 UPI(uipcp, "DFT entry does not exist\n");
             } else {
-                dft.erase(mit);
+                dft_table.erase(mit);
                 prop_dft.entries.push_back(*e);
                 UPD(uipcp, "DFT entry %s removed remotely\n", key.c_str());
             }
@@ -187,7 +193,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (prop_dft.entries.size()) {
         /* Propagate the DFT entries update to the other neighbors,
          * except for the one. */
-        neighs_sync_obj_excluding(nf->neigh, add, obj_class::dft,
+        rib->neighs_sync_obj_excluding(nf->neigh, add, obj_class::dft,
                               obj_name::dft, &prop_dft);
 
     }
@@ -196,15 +202,15 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-uipcp_rib::dft_update_address(rlm_addr_t new_addr)
+dft::dft_update_address(rlm_addr_t new_addr)
 {
     map< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;
 
     /* Update all the DFT entries corresponding to application that are
      * registered within us. */
-    for (mit = dft.begin(); mit != dft.end(); mit ++) {
-        if (mit->second.address == myaddr) {
+    for (mit = dft_table.begin(); mit != dft_table.end(); mit ++) {
+        if (mit->second.address == rib->myaddr) {
             mit->second.address = new_addr;
             mit->second.timestamp = time64();
             prop_dft.entries.push_back(mit->second);
@@ -214,6 +220,22 @@ uipcp_rib::dft_update_address(rlm_addr_t new_addr)
 
     /* Disseminate the update. */
     if (prop_dft.entries.size()) {
-        neighs_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
+        rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
     }
+}
+
+void
+dft::dump(stringstream &ss) const
+{
+    ss << "Directory Forwarding Table:" << endl;
+    for (map<string, DFTEntry>::const_iterator
+            mit = dft_table.begin(); mit != dft_table.end(); mit++) {
+        const DFTEntry& entry = mit->second;
+
+        ss << "    Application: " << static_cast<string>(entry.appl_name)
+            << ", Address: " << entry.address << ", Timestamp: "
+                << entry.timestamp << endl;
+    }
+
+    ss << endl;
 }
