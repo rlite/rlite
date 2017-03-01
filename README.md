@@ -705,3 +705,15 @@ it is just the same code (normal.c) recompiled with different values
 of some macros.
 You are free to add/modify flavours depending on your needs, and use
 the different flavours together.
+
+
+#############################################################################
+## Credits
+#############################################################################
+
+*rlite* is a community-driven project partially supported by the EU FP7
+projects PRISTINE and ARCFIRE.
+
+Author:         Vincenzo Maffione
+
+Contributors:
