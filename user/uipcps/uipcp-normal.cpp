@@ -306,7 +306,7 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd)
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          self_registered(false),
                                          self_registration_needed(false),
-                                         myaddr(0), re(this)
+                                         myaddr(0), dft(_u, this), re(this)
 {
     int ret;
 
@@ -500,17 +500,7 @@ uipcp_rib::dump() const
 
     ss << endl;
 
-    ss << "Directory Forwarding Table:" << endl;
-    for (map<string, DFTEntry>::const_iterator
-            mit = dft.begin(); mit != dft.end(); mit++) {
-        const DFTEntry& entry = mit->second;
-
-        ss << "    Application: " << static_cast<string>(entry.appl_name)
-            << ", Address: " << entry.address << ", Timestamp: "
-                << entry.timestamp << endl;
-    }
-
-    ss << endl;
+    dft.dump(ss);
 
     ss << "Lower Flow Database:" << endl;
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator
@@ -575,7 +565,7 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
         return;
     }
 
-    dft_update_address(new_addr);
+    dft.dft_update_address(new_addr);
     lfdb_update_address(new_addr);
     UPD(uipcp, "Address updated %lu --> %lu\n",
                (long unsigned)myaddr, (long unsigned)new_addr);
@@ -1073,7 +1063,7 @@ normal_appl_register(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    rib->appl_register(req);
+    rib->dft.appl_register(req);
 
     return 0;
 }
@@ -1402,7 +1392,7 @@ normal_ipcp_dft_set(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    return rib->dft_set(string(req->appl_name), req->remote_addr);
+    return rib->dft.dft_set(string(req->appl_name), req->remote_addr);
 }
 
 static char *
