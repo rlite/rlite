@@ -69,8 +69,8 @@ dft::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
 
     dft_table[appl_name] = entry;
 
-    UPD(uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n", uipcp->id,
-        appl_name.c_str(), (long long unsigned)entry.address);
+    UPD(rib->uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n",
+        rib->uipcp->id, appl_name.c_str(), (long long unsigned)entry.address);
 
     return 0;
 }
@@ -80,6 +80,7 @@ dft::appl_register(const struct rl_kmsg_appl_register *req)
 {
     map< string, DFTEntry >::iterator mit;
     string appl_name(req->appl_name);
+    struct uipcp *uipcp = rib->uipcp;
     bool create = true;
     DFTSlice dft_slice;
     DFTEntry dft_entry;
@@ -142,6 +143,7 @@ uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 int
 dft::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
+    struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
     size_t objlen;
     bool add = true;
@@ -214,7 +216,8 @@ dft::dft_update_address(rlm_addr_t new_addr)
             mit->second.address = new_addr;
             mit->second.timestamp = time64();
             prop_dft.entries.push_back(mit->second);
-            UPD(uipcp, "Updated address for DFT entry %s\n", mit->first.c_str());
+            UPD(rib->uipcp, "Updated address for DFT entry %s\n",
+                mit->first.c_str());
         }
     }
 

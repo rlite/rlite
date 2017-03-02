@@ -238,12 +238,9 @@ struct dft {
     std::map< std::string, DFTEntry > dft_table;
 
     /* Backpointer to parent data structure. */
-    struct uipcp *uipcp;
-
-    /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
-    dft(struct uipcp *_u, struct uipcp_rib *_ur) : uipcp(_u), rib(_ur) { }
+    dft(struct uipcp_rib *_ur) : rib(_ur) { }
     ~dft() { }
 
     void dump(std::stringstream& ss) const;
