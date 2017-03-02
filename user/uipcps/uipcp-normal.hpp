@@ -245,11 +245,11 @@ struct dft {
 
     void dump(std::stringstream& ss) const;
 
-    int dft_lookup(const std::string& appl_name, rlm_addr_t& dstaddr) const;
-    int dft_set(const std::string& appl_name, rlm_addr_t remote_addr);
+    int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const;
+    int set_entry(const std::string& appl_name, rlm_addr_t remote_addr);
     int appl_register(const struct rl_kmsg_appl_register *req);
-    void dft_update_address(rlm_addr_t new_addr);
-    int dft_handler(const CDAPMessage *rm, NeighFlow *nf);
+    void update_address(rlm_addr_t new_addr);
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
 struct uipcp_rib {

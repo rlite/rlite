@@ -43,8 +43,7 @@ static uint64_t time64()
 }
 
 int
-dft::dft_lookup(const std::string& appl_name,
-                      rlm_addr_t& dstaddr) const
+dft::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
          = dft_table.find(appl_name);
@@ -59,7 +58,7 @@ dft::dft_lookup(const std::string& appl_name,
 }
 
 int
-dft::dft_set(const std::string& appl_name, rlm_addr_t remote_addr)
+dft::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
 {
     DFTEntry entry;
 
@@ -137,11 +136,11 @@ dft::appl_register(const struct rl_kmsg_appl_register *req)
 int
 uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    return dft.dft_handler(rm,nf);
+    return dft.rib_handler(rm, nf);
 }
 
 int
-dft::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
+dft::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
@@ -204,7 +203,7 @@ dft::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-dft::dft_update_address(rlm_addr_t new_addr)
+dft::update_address(rlm_addr_t new_addr)
 {
     map< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;

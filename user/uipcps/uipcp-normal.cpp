@@ -565,7 +565,7 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
         return;
     }
 
-    dft.dft_update_address(new_addr);
+    dft.update_address(new_addr);
     lfdb_update_address(new_addr);
     UPD(uipcp, "Address updated %lu --> %lu\n",
                (long unsigned)myaddr, (long unsigned)new_addr);
@@ -1392,7 +1392,7 @@ normal_ipcp_dft_set(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    return rib->dft.dft_set(string(req->appl_name), req->remote_addr);
+    return rib->dft.set_entry(string(req->appl_name), req->remote_addr);
 }
 
 static char *
