@@ -241,3 +241,24 @@ dft::dump(stringstream &ss) const
 
     ss << endl;
 }
+
+int
+dft::sync_neigh(NeighFlow *nf, unsigned int limit) const
+{
+    int ret = 0;
+
+    for (map< string, DFTEntry >::iterator e = rib->dft.dft_table.begin();
+            e != rib->dft.dft_table.end();) {
+        DFTSlice dft_slice;
+
+        while (dft_slice.entries.size() < limit && e != rib->dft.dft_table.end()) {
+            dft_slice.entries.push_back(e->second);
+            e ++;
+        }
+
+        ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::dft, obj_name::dft,
+                &dft_slice);
+    }
+
+    return ret;
+}
