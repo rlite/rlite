@@ -371,6 +371,11 @@ rina_flow_alloc_wait(int wfd)
     int ret = -1;
 
     resp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(wfd, 1);
+    if (!resp && errno == EAGAIN) {
+        /* Nothing to read, propagate the error without closing wfd,
+         * because the caller will call us again. */
+        return ret;
+    }
     if (!resp) {
         goto out;
     }
