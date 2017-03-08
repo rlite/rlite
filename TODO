@@ -16,3 +16,6 @@
 - generic RIB synchronization where needed (e.g. DFT)
 
 - use separate N-1 flows for management and data
+
+- routing: use IPCP names to identify graph nodes, rather than using
+  addresses. This is a first step towards supporting live renumbering
