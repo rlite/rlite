@@ -306,7 +306,7 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd)
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          self_registered(false),
                                          self_registration_needed(false),
-                                         myaddr(0), dft(this), re(this)
+                                         myaddr(0), re(this)
 {
     int ret;
 
@@ -332,6 +332,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
         throw std::exception();
     }
 #endif /* RL_USE_QOS_CUBES */
+
+    dft = new dft_default(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -365,6 +367,8 @@ uipcp_rib::~uipcp_rib()
                                     mit != neighbors.end(); mit++) {
         rl_delete(mit->second, RL_MT_NEIGH);
     }
+
+    delete dft;
 
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
@@ -500,7 +504,7 @@ uipcp_rib::dump() const
 
     ss << endl;
 
-    dft.dump(ss);
+    dft->dump(ss);
 
     ss << "Lower Flow Database:" << endl;
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator
@@ -565,7 +569,7 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
         return;
     }
 
-    dft.update_address(new_addr);
+    dft->update_address(new_addr);
     lfdb_update_address(new_addr);
     UPD(uipcp, "Address updated %lu --> %lu\n",
                (long unsigned)myaddr, (long unsigned)new_addr);
@@ -1063,7 +1067,7 @@ normal_appl_register(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    rib->dft.appl_register(req);
+    rib->dft->appl_register(req);
 
     return 0;
 }
@@ -1392,7 +1396,7 @@ normal_ipcp_dft_set(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    return rib->dft.set_entry(string(req->appl_name), req->remote_addr);
+    return rib->dft->set_entry(string(req->appl_name), req->remote_addr);
 }
 
 static char *
