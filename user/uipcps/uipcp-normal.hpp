@@ -250,6 +250,7 @@ struct dft {
     int appl_register(const struct rl_kmsg_appl_register *req);
     void update_address(rlm_addr_t new_addr);
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
 };
 
 struct uipcp_rib {

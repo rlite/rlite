@@ -996,18 +996,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize Directory Forwarding Table. */
-        for (map< string, DFTEntry >::iterator e = rib->dft.dft_table.begin();
-                                               e != rib->dft.dft_table.end();) {
-            DFTSlice dft_slice;
-
-            while (dft_slice.entries.size() < limit && e != rib->dft.dft_table.end()) {
-                dft_slice.entries.push_back(e->second);
-                e ++;
-            }
-
-            ret |= neigh_sync_obj(nf, true, obj_class::dft, obj_name::dft,
-                                   &dft_slice);
-        }
+        ret |= rib->dft.sync_neigh(nf, limit);
     }
 
     {
