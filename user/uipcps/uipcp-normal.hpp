@@ -234,14 +234,28 @@ private:
 };
 
 struct dft {
-    /* Directory Forwarding Table. */
-    std::map< std::string, DFTEntry > dft_table;
-
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
     dft(struct uipcp_rib *_ur) : rib(_ur) { }
-    ~dft() { }
+    virtual ~dft() { }
+
+    virtual void dump(std::stringstream& ss) const = 0;
+
+    virtual int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const = 0;
+    virtual int set_entry(const std::string& appl_name, rlm_addr_t remote_addr) = 0;
+    virtual int appl_register(const struct rl_kmsg_appl_register *req) = 0;
+    virtual void update_address(rlm_addr_t new_addr) = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+};
+
+struct dft_default : public dft {
+    /* Directory Forwarding Table. */
+    std::map< std::string, DFTEntry > dft_table;
+
+    dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
+    ~dft_default() { }
 
     void dump(std::stringstream& ss) const;
 
@@ -299,7 +313,7 @@ struct uipcp_rib {
     std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
     /* Directory Forwarding Table. */
-    struct dft dft;
+    struct dft *dft;
 
     /* Lower Flow Database. */
     std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb;

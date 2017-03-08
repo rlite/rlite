@@ -43,7 +43,7 @@ static uint64_t time64()
 }
 
 int
-dft::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
+dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
 {
     map< string, DFTEntry >::const_iterator mit
          = dft_table.find(appl_name);
@@ -58,7 +58,7 @@ dft::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
 }
 
 int
-dft::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
+dft_default::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
 {
     DFTEntry entry;
 
@@ -75,7 +75,7 @@ dft::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
 }
 
 int
-dft::appl_register(const struct rl_kmsg_appl_register *req)
+dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 {
     map< string, DFTEntry >::iterator mit;
     string appl_name(req->appl_name);
@@ -136,11 +136,11 @@ dft::appl_register(const struct rl_kmsg_appl_register *req)
 int
 uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    return dft.rib_handler(rm, nf);
+    return dft->rib_handler(rm, nf);
 }
 
 int
-dft::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
@@ -203,7 +203,7 @@ dft::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-dft::update_address(rlm_addr_t new_addr)
+dft_default::update_address(rlm_addr_t new_addr)
 {
     map< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;
@@ -227,7 +227,7 @@ dft::update_address(rlm_addr_t new_addr)
 }
 
 void
-dft::dump(stringstream &ss) const
+dft_default::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
     for (map<string, DFTEntry>::const_iterator
@@ -243,15 +243,15 @@ dft::dump(stringstream &ss) const
 }
 
 int
-dft::sync_neigh(NeighFlow *nf, unsigned int limit) const
+dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
-    for (map< string, DFTEntry >::iterator e = rib->dft.dft_table.begin();
-            e != rib->dft.dft_table.end();) {
+    for (map< string, DFTEntry >::const_iterator e = dft_table.begin();
+            e != dft_table.end();) {
         DFTSlice dft_slice;
 
-        while (dft_slice.entries.size() < limit && e != rib->dft.dft_table.end()) {
+        while (dft_slice.entries.size() < limit && e != dft_table.end()) {
             dft_slice.entries.push_back(e->second);
             e ++;
         }

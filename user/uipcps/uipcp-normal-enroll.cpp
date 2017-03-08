@@ -996,7 +996,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize Directory Forwarding Table. */
-        ret |= rib->dft.sync_neigh(nf, limit);
+        ret |= rib->dft->sync_neigh(nf, limit);
     }
 
     {
