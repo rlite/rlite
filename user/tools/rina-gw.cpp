@@ -693,21 +693,29 @@ accept_inet_conn(int lfd, const RinaName &rname)
     }
 }
 
-static void
+static int
 complete_flow_alloc(int wfd, int cfd)
 {
     int rfd;
 
     /* Complete the flow allocation procedure. */
     rfd = rina_flow_alloc_wait(wfd);
+    if (rfd < 0 && errno == EAGAIN) {
+	/* Spurious wake up, tell the caller not to
+	 * remove wfd. */
+        return 1;
+    }
+
     if (rfd < 0) {
         /* Failure or negative response. */
         perror("rina_flow_alloc_wait()");
-        return;
+        return 0;
     }
 
     set_nonblocking(rfd);
     gw->workers[0]->submit(cfd, rfd);
+
+    return 0;
 }
 
 static int
@@ -922,9 +930,13 @@ int main(int argc, char **argv)
         for (map<int, int>::iterator mit = gw->pending_fa_reqs.begin();
                             mit != gw->pending_fa_reqs.end(); mit ++, n ++) {
             if (pfd[n].revents & POLLIN) {
+                int spurious;
+
                 /* Flow allocation response arrived. */
-                complete_flow_alloc(mit->first, mit->second);
-                completed_flow_allocs.push_back(mit->first);
+                spurious = complete_flow_alloc(mit->first, mit->second);
+                if (!spurious) {
+                    completed_flow_allocs.push_back(mit->first);
+                }
             }
         }
 
