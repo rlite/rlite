@@ -1389,16 +1389,6 @@ normal_register_to_lower(struct uipcp *uipcp,
     return ret;
 }
 
-static int
-normal_ipcp_dft_set(struct uipcp *uipcp,
-                    const struct rl_cmsg_ipcp_dft_set *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
-
-    return rib->dft->set_entry(string(req->appl_name), req->remote_addr);
-}
-
 static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
@@ -1414,7 +1404,6 @@ struct uipcp_ops normal_ops = {
     .register_to_lower      = normal_register_to_lower,
     .enroll                 = normal_ipcp_enroll,
     .lower_flow_alloc       = normal_ipcp_enroll,
-    .dft_set                = normal_ipcp_dft_set,
     .rib_show               = normal_ipcp_rib_show,
     .appl_register          = normal_appl_register,
     .fa_req                 = normal_fa_req,

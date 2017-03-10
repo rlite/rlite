@@ -408,45 +408,6 @@ ipcp_lower_flow_alloc(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
-ipcp_dft_set(int argc, char **argv, struct cmd_descriptor *cd)
-{
-    struct rl_cmsg_ipcp_dft_set req;
-    const char *ipcp_name;
-    const char *appl_name;
-    unsigned long remote_addr;
-    struct ipcp_attrs *attrs;
-
-    assert(argc >= 3);
-    ipcp_name = argv[0];
-    appl_name = argv[1];
-    errno = 0;
-    remote_addr = strtoul(argv[2], NULL, 10);
-    if (errno) {
-        PE("Invalid address %s\n", argv[2]);
-        return -1;
-    }
-
-    req.ipcp_name = strdup(ipcp_name);
-    if (!req.ipcp_name) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    attrs = lookup_ipcp_by_name(req.ipcp_name);
-    if (!attrs) {
-        PE("Could not find IPC process\n");
-        return -1;
-    }
-
-    req.msg_type = RLITE_U_IPCP_DFT_SET;
-    req.event_id = 0;
-    req.appl_name = strdup(appl_name);
-    req.remote_addr = remote_addr;
-
-    return request_response(RLITE_MB(&req), NULL);
-}
-
-static int
 ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
@@ -715,14 +676,6 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .num_args = 4,
         .func = ipcp_lower_flow_alloc,
     },
-#ifdef WITH_DFT_SET
-    {
-        .name = "ipcp-dft-set",
-        .usage = "IPCP_NAME APPL_NAME REMOTE_ADDR",
-        .num_args = 3,
-        .func = ipcp_dft_set,
-    },
-#endif /* WITH_DFT_SET */
     {
         .name = "ipcps-show",
         .usage = "",
@@ -853,8 +806,6 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
-
-    (void) ipcp_dft_set;
 
     return process_args(argc, argv);
 }

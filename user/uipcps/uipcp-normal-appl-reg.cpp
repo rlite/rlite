@@ -59,24 +59,6 @@ dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) con
     return 0;
 }
 
-/* Support for manual set of DFT entry (rlite-ctl), deprecated. */
-int
-dft_default::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
-{
-    DFTEntry entry;
-
-    entry.address = remote_addr;
-    entry.appl_name = RinaName(appl_name);
-    entry.timestamp = time64();
-
-    dft_table.insert(make_pair(appl_name, entry));
-
-    UPD(rib->uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n",
-        rib->uipcp->id, appl_name.c_str(), (long long unsigned)entry.address);
-
-    return 0;
-}
-
 int
 dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 {

@@ -35,12 +35,11 @@
 enum {
     RLITE_U_IPCP_REGISTER = 1,          /* 1 */
     RLITE_U_IPCP_ENROLL,                /* 2 */
-    RLITE_U_IPCP_DFT_SET,               /* 3 */
-    RLITE_U_BASE_RESP,                  /* 4 */
-    RLITE_U_IPCP_RIB_SHOW_REQ,          /* 5 */
-    RLITE_U_IPCP_RIB_SHOW_RESP,         /* 6 */
-    RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 7 */
-    RLITE_U_MEMTRACK_DUMP,              /* 8 */
+    RLITE_U_BASE_RESP,                  /* 3 */
+    RLITE_U_IPCP_RIB_SHOW_REQ,          /* 4 */
+    RLITE_U_IPCP_RIB_SHOW_RESP,         /* 5 */
+    RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 6 */
+    RLITE_U_MEMTRACK_DUMP,              /* 7 */
 
     RLITE_U_MSG_MAX,
 };
@@ -73,16 +72,6 @@ struct rl_cmsg_ipcp_enroll {
     char *neigh_name;
     char *dif_name;
     char *supp_dif_name;
-} __attribute__((packed));
-
-/* rinaconf --> uipcps message to set an IPC process DFT entry */
-struct rl_cmsg_ipcp_dft_set {
-    rl_msg_t msg_type;
-    uint32_t event_id;
-
-    rlm_addr_t remote_addr;
-    char *ipcp_name;
-    char *appl_name;
 } __attribute__((packed));
 
 /* rinaconf --> uipcps message to query the whole RIB */

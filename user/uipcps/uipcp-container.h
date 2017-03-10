@@ -103,9 +103,6 @@ struct uipcp_ops {
                             const struct rl_cmsg_ipcp_enroll *,
                             int wait_for_completion);
 
-    /* Deprecated. User wants to manually set an entry of the DFT. */
-    int (*dft_set)(struct uipcp *, const struct rl_cmsg_ipcp_dft_set *);
-
     /* User asks for a dump of the RIB. */
     char * (*rib_show)(struct uipcp *);
 

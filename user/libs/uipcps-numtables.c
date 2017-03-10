@@ -36,11 +36,6 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
                     4 * sizeof(char *),
         .strings = 4,
     },
-    [RLITE_U_IPCP_DFT_SET] = {
-        .copylen = sizeof(struct rl_cmsg_ipcp_dft_set) -
-                   2 * sizeof(char *),
-        .strings = 2,
-    },
     [RLITE_U_BASE_RESP] = {
         .copylen = sizeof(struct rl_msg_base_resp),
     },
