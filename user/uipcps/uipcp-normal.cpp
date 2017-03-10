@@ -1345,10 +1345,15 @@ normal_register_to_lower(struct uipcp *uipcp,
         return -1;
     }
 
-    /* Perform the registration. */
+    /* Perform the registration of the IPCP name. */
     ret = do_registration(uipcp, req->dif_name, req->ipcp_name, req->reg);
     if (ret) {
         return ret;
+    }
+
+    /* Also register the DAF name, i.e. the DIF that this IPCP is part of. */
+    if (do_registration(uipcp, req->dif_name, uipcp->dif_name, req->reg)) {
+        UPE(uipcp, "Registration of DAF name '%s' failed\n", uipcp->dif_name);
     }
 
     pthread_mutex_lock(&rib->lock);
