@@ -177,7 +177,7 @@ NeighFlow::enroll_state_set(enroll_state_t st)
     enroll_state = st;
 
     UPD(neigh->rib->uipcp, "switch state %s --> %s\n",
-        neigh->enroll_state_repr(old), neigh->enroll_state_repr(st));
+        Neighbor::enroll_state_repr(old), Neighbor::enroll_state_repr(st));
 
     if (old != NEIGH_ENROLLED && st == NEIGH_ENROLLED) {
         neigh->rib->enrolled ++;
@@ -271,7 +271,7 @@ Neighbor::~Neighbor()
 }
 
 const char *
-Neighbor::enroll_state_repr(enroll_state_t s) const
+Neighbor::enroll_state_repr(enroll_state_t s)
 {
     switch (s) {
         case NEIGH_NONE:
@@ -1503,7 +1503,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     if (nf->enroll_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment state is %s\n",
-            neigh->enroll_state_repr(nf->enroll_state));
+            Neighbor::enroll_state_repr(nf->enroll_state));
 
     } else {
         /* Start the enrollment procedure as initiator (enrollee). */

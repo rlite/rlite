@@ -160,7 +160,7 @@ struct Neighbor {
         { return !(*this == other); }
     ~Neighbor();
 
-    const char *enroll_state_repr(enroll_state_t s) const;
+    static const char *enroll_state_repr(enroll_state_t s);
 
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
