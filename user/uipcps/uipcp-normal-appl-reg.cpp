@@ -45,8 +45,10 @@ static uint64_t time64()
 int
 dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
 {
-    map< string, DFTEntry >::const_iterator mit
-         = dft_table.find(appl_name);
+    /* Let multimap choose one. We may use multimap::equal_range() to
+     * get them all and choose with some strategy. */
+    multimap< string, DFTEntry >::const_iterator mit
+                            = dft_table.find(appl_name);
 
     if (mit == dft_table.end()) {
         return -1;
@@ -57,6 +59,7 @@ dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) con
     return 0;
 }
 
+/* Support for manual set of DFT entry (rlite-ctl), deprecated. */
 int
 dft_default::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
 {
@@ -66,7 +69,7 @@ dft_default::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
     entry.appl_name = RinaName(appl_name);
     entry.timestamp = time64();
 
-    dft_table[appl_name] = entry;
+    dft_table.insert(make_pair(appl_name, entry));
 
     UPD(rib->uipcp, "[uipcp %u] setting DFT entry '%s' --> %llu\n",
         rib->uipcp->id, appl_name.c_str(), (long long unsigned)entry.address);
@@ -77,10 +80,11 @@ dft_default::set_entry(const std::string& appl_name, rlm_addr_t remote_addr)
 int
 dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 {
-    map< string, DFTEntry >::iterator mit;
+    pair< multimap< string, DFTEntry >::iterator,
+          multimap< string, DFTEntry >::iterator > range;
+    multimap<string, DFTEntry>::iterator mit;
     string appl_name(req->appl_name);
     struct uipcp *uipcp = rib->uipcp;
-    bool create = true;
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
@@ -89,31 +93,34 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
     dft_entry.timestamp = time64();
     dft_entry.local = true;
 
-    mit = dft_table.find(appl_name);
+    /* Get all the entries for 'appl_name', and see if there
+     * is an entry associated to this uipcp. */
+    range = dft_table.equal_range(appl_name);
+    for (mit = range.first; mit != range.second; mit ++) {
+        if (mit->second.address == rib->myaddr) {
+            break;
+        }
+    }
 
     if (req->reg) {
-        if (mit != dft_table.end()) {
-            UPE(uipcp, "Application %s already registered on uipcp with address "
-                    "[%llu], my address being [%llu]\n", appl_name.c_str(),
-                    (long long unsigned)mit->second.address,
-                    (long long unsigned)rib->myaddr);
+        if (mit != range.second) { /* local collision */
+            UPE(uipcp, "Application %s already registered on this uipcp\n",
+                        appl_name.c_str());
             return uipcp_appl_register_resp(uipcp, uipcp->id,
                                             RLITE_ERR, req);
         }
 
         /* Insert the object into the RIB. */
         dft_table.insert(make_pair(appl_name, dft_entry));
-
     } else {
-        if (mit == dft_table.end()) {
+        if (mit == range.second) {
             UPE(uipcp, "Application %s was not registered here\n",
                 appl_name.c_str());
             return 0;
         }
 
-        /* Remove the object from the RIB. */
+        /* Remove from the RIB. */
         dft_table.erase(mit);
-        create = false;
     }
 
     dft_slice.entries.push_back(dft_entry);
@@ -122,7 +129,8 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
             appl_name.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
             uipcp->id);
 
-    rib->neighs_sync_obj_all(create, obj_class::dft, obj_name::dft, &dft_slice);
+    rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
+                             &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
@@ -164,38 +172,61 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     }
 
     DFTSlice dft_slice(objbuf, objlen);
-    DFTSlice prop_dft;
+    DFTSlice prop_dft_add, prop_dft_del;
 
     for (list<DFTEntry>::iterator e = dft_slice.entries.begin();
                                 e != dft_slice.entries.end(); e++) {
         string key = static_cast<string>(e->appl_name);
-        map< string, DFTEntry >::iterator mit = dft_table.find(key);
+        pair< multimap< string, DFTEntry >::iterator,
+              multimap< string, DFTEntry >::iterator >
+                        range = dft_table.equal_range(key);
+        multimap< string, DFTEntry >::iterator mit;
+
+        for (mit = range.first; mit != range.second; mit ++) {
+            if (mit->second.address == e->address) {
+                break;
+            }
+        }
 
         if (add) {
-            if (mit == dft_table.end() || e->timestamp > mit->second.timestamp) {
-                dft_table[key] = *e;
-                prop_dft.entries.push_back(*e);
-                UPD(uipcp, "DFT entry %s %s remotely\n", key.c_str(),
-                        (mit != dft_table.end() ? "updated" : "added"));
+            bool collision = (mit != range.second);
+
+            if (!collision || e->timestamp > mit->second.timestamp) {
+                if (collision) {
+                    /* Remove the collided entry. */
+                    dft_table.erase(mit);
+                    prop_dft_del.entries.push_back(*e);
+                }
+                dft_table.insert(make_pair(key, *e));
+                prop_dft_add.entries.push_back(*e);
+                UPD(uipcp, "DFT entry %s --> %lu %s remotely\n", key.c_str(),
+                            e->address, (collision ? "updated" : "added"));
             }
 
         } else {
-            if (mit == dft_table.end()) {
+            if (mit == range.second) {
                 UPI(uipcp, "DFT entry does not exist\n");
             } else {
                 dft_table.erase(mit);
-                prop_dft.entries.push_back(*e);
-                UPD(uipcp, "DFT entry %s removed remotely\n", key.c_str());
+                prop_dft_del.entries.push_back(*e);
+                UPD(uipcp, "DFT entry %s --> %lu removed remotely\n",
+                    key.c_str(), e->address);
             }
 
         }
     }
 
-    if (prop_dft.entries.size()) {
-        /* Propagate the DFT entries update to the other neighbors,
-         * except for the one. */
-        rib->neighs_sync_obj_excluding(nf->neigh, add, obj_class::dft,
-                              obj_name::dft, &prop_dft);
+    /* Propagate the DFT entries update to the other neighbors,
+     * except for who told us. */
+    if (prop_dft_add.entries.size()) {
+        rib->neighs_sync_obj_excluding(nf->neigh, true, obj_class::dft,
+                                       obj_name::dft, &prop_dft_add);
+
+    }
+
+    if (prop_dft_del.entries.size()) {
+        rib->neighs_sync_obj_excluding(nf->neigh, false, obj_class::dft,
+                                       obj_name::dft, &prop_dft_del);
 
     }
 
@@ -205,7 +236,7 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 void
 dft_default::update_address(rlm_addr_t new_addr)
 {
-    map< string, DFTEntry >::iterator mit;
+    multimap< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;
 
     /* Update all the DFT entries corresponding to application that are
@@ -230,7 +261,7 @@ void
 dft_default::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
-    for (map<string, DFTEntry>::const_iterator
+    for (multimap<string, DFTEntry>::const_iterator
             mit = dft_table.begin(); mit != dft_table.end(); mit++) {
         const DFTEntry& entry = mit->second;
 
@@ -247,7 +278,7 @@ dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
-    for (map< string, DFTEntry >::const_iterator e = dft_table.begin();
+    for (multimap< string, DFTEntry >::const_iterator e = dft_table.begin();
             e != dft_table.end();) {
         DFTSlice dft_slice;
 

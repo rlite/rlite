@@ -251,8 +251,10 @@ struct dft {
 };
 
 struct dft_default : public dft {
-    /* Directory Forwarding Table. */
-    std::map< std::string, DFTEntry > dft_table;
+    /* Directory Forwarding Table, mapping application name (std::string)
+     * to a set of nodes that registered that name. All nodes are considered
+     * equivalent. */
+    std::multimap< std::string, DFTEntry > dft_table;
 
     dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
     ~dft_default() { }
