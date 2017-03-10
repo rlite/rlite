@@ -332,7 +332,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
 #endif /* RL_USE_QOS_CUBES */
 
     dft = new dft_default(this);
-    fa = new flow_allocator(this);
+    fa = new flow_allocator_default(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -535,9 +535,7 @@ uipcp_rib::dump() const
     fa->dump(ss);
 
 #ifdef RL_MEMTRACK
-    ss << endl << "Temporary tables:" << endl;
-    ss << "    " << fa->flow_reqs_tmp.size() << " elements in the "
-          "temporary flow request table" << endl;
+    fa->dump_memtrack(ss);
     ss << "    " << invoke_id_mgr.size() << " elements in the "
           "invoke_id_mgr object" << endl;
 #endif /* RL_MEMTRACK */
