@@ -75,7 +75,8 @@ struct rl_shim_eth {
     unsigned int ntp;
     unsigned int ntu;
 
-    char *upper_name;
+#define ETH_UPPER_NAMES     4
+    char *upper_names[ETH_UPPER_NAMES];
     struct list_head arp_table;
     spinlock_t arpt_lock;
     spinlock_t tx_lock;
@@ -98,7 +99,6 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->ipcp = ipcp;
     priv->netdev = NULL;
     priv->ntu = priv->ntp = 0;
-    priv->upper_name = NULL;
     INIT_LIST_HEAD(&priv->arp_table);
     spin_lock_init(&priv->arpt_lock);
     spin_lock_init(&priv->tx_lock);
@@ -117,6 +117,7 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
+    unsigned i;
 
     spin_lock_bh(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
@@ -139,8 +140,10 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
         dev_put(priv->netdev);
     }
 
-    if (priv->upper_name) {
-        rl_free(priv->upper_name, RL_MT_SHIMDATA);
+    for (i = 0; i < ETH_UPPER_NAMES; i ++) {
+        if (priv->upper_names[i]) {
+            rl_free(priv->upper_names[i], RL_MT_SHIMDATA);
+        }
     }
 
     rl_free(priv, RL_MT_SHIM);
@@ -152,34 +155,40 @@ static int
 rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
 {
     struct rl_shim_eth *priv = ipcp->priv;
+    unsigned i;
 
     if (reg) {
-        if (priv->upper_name) {
-            /* Only one application can be currently registered. */
+        /* Only ETH_UPPER_NAMES applications can be currently
+         * registered. */
+        for (i = 0; i < ETH_UPPER_NAMES; i++) {
+            if (priv->upper_names[i] == NULL) {
+                break;
+            }
+        }
+        if (i == ETH_UPPER_NAMES) {
             return -EBUSY;
         }
 
-        priv->upper_name = rl_strdup(appl, GFP_KERNEL, RL_MT_SHIMDATA);
-        if (!priv->upper_name) {
+        priv->upper_names[i] = rl_strdup(appl, GFP_KERNEL, RL_MT_SHIMDATA);
+        if (!priv->upper_names[i]) {
             PE("Out of memory\n");
             return -ENOMEM;
         }
 
-        PD("Application %s registered\n", priv->upper_name);
+        PD("Application #%u %s registered\n", i, priv->upper_names[i]);
 
         return 0;
     }
 
-    if (!priv->upper_name) {
-        /* Nothing to do. */
-        return 0;
+    for (i = 0; i < ETH_UPPER_NAMES; i++) {
+        if (strcmp(appl, priv->upper_names[i]) == 0) {
+            PD("Application #%u %s unregistered\n", i, priv->upper_names[i]);
+            rl_free(priv->upper_names[i], RL_MT_SHIMDATA);
+            priv->upper_names[i] = NULL;
+        }
     }
 
-    if (strcmp(appl, priv->upper_name) == 0) {
-        PD("Application %s unregistered\n", priv->upper_name);
-        rl_free(priv->upper_name, RL_MT_SHIMDATA);
-        priv->upper_name = NULL;
-    } else {
+    if (i == ETH_UPPER_NAMES) {
         /* Nothing to do. Main module may be trying to clean up a
          * failed registration, so don't report an error. */
     }
@@ -520,27 +529,24 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
 
     if (ntohs(arp->ar_op) == ARPOP_REQUEST) {
         struct arpt_entry *entry;
-        int upper_name_len;
+        unsigned i;
 
-        if (!priv->upper_name) {
-            /* No application registered here, there's nothing to do. */
-            goto out;
-        }
-        upper_name_len = strlen(priv->upper_name);
+        for (i = 0; i < ETH_UPPER_NAMES; i++) {
+            size_t upper_name_len = strlen(priv->upper_names[i]);
 
-        if (arp->ar_pln < upper_name_len) {
-            /* This ARP request cannot match us. */
-            goto out;
+            if (priv->upper_names[i] && arp->ar_pln >= upper_name_len &&
+                    memcmp(tpa, priv->upper_names[i], upper_name_len) == 0) {
+                break;
+            }
         }
 
-        if (memcmp(tpa, priv->upper_name, upper_name_len)) {
-            /* No match. */
+        if (i == ETH_UPPER_NAMES) {
             goto out;
         }
 
         /* Send an ARP reply. */
-        skb = arp_create(priv, ARPOP_REPLY, priv->upper_name,
-                         strlen(priv->upper_name),
+        skb = arp_create(priv, ARPOP_REPLY, priv->upper_names[i],
+                         strlen(priv->upper_names[i]),
                          spa, arp->ar_pln, sha, GFP_ATOMIC);
 
         entry = rl_alloc(sizeof(*entry), GFP_ATOMIC | __GFP_ZERO,
@@ -692,21 +698,30 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     /* Here 'entry' is a valid pointer. */
 
     {
+        unsigned i;
         int ret;
 
         if (entry->fa_req_arrived) {
             goto enq;
         }
 
-        /* The first PDU is interpreted as a flow allocation request. */
+        /* The first PDU is interpreted as a flow allocation request.
+         * If we have multiple names registered, just pick the first
+         * available one. */
 
-        if (!priv->upper_name) {
+        for (i = 0; i < ETH_UPPER_NAMES; i++) {
+            if (priv->upper_names[i]) {
+                break;
+            }
+        }
+
+        if (i == ETH_UPPER_NAMES) {
             RPD(2, "Flow allocation request arrived but no application "
                "registered\n");
             goto drop;
         }
 
-        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_name,
+        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_names[i],
                                 entry->tpa, NULL, NULL, false);
 
         if (ret) {
