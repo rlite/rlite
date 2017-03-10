@@ -267,6 +267,33 @@ struct dft_default : public dft {
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
 };
 
+struct flow_allocator {
+    /* Backpointer to parent data structure. */
+    struct uipcp_rib *rib;
+
+    /* Id to be used with incoming flow allocation request. */
+    uint32_t kevent_id_cnt;
+
+    flow_allocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) { }
+    ~flow_allocator() { }
+
+    void dump(std::stringstream& ss) const;
+
+    std::map< std::string, FlowRequest > flow_reqs;
+    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
+
+    int fa_req(struct rl_kmsg_fa_req *req);
+    int fa_resp(struct rl_kmsg_fa_resp *resp);
+
+    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
+
+    int flows_handler_create(const CDAPMessage *rm);
+    int flows_handler_create_r(const CDAPMessage *rm);
+    int flows_handler_delete(const CDAPMessage *rm);
+
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+};
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
@@ -327,8 +354,7 @@ struct uipcp_rib {
     InvokeIdMgr invoke_id_mgr;
 
     /* Supported flows. */
-    std::map< std::string, FlowRequest > flow_reqs;
-    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
+    struct flow_allocator *fa;
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */
@@ -348,13 +374,10 @@ struct uipcp_rib {
     Neighbor *get_neighbor(const std::string& neigh_name, bool create);
     int del_neighbor(const std::string& neigh_name);
     int register_to_lower(int reg, std::string lower_dif);
-    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
     rlm_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
-    int fa_req(struct rl_kmsg_fa_req *req);
-    int fa_resp(struct rl_kmsg_fa_resp *resp);
     rlm_addr_t addr_allocate();
     void neigh_flow_prune(NeighFlow *nf);
 
@@ -394,10 +417,6 @@ struct uipcp_rib {
     int status_handler(const CDAPMessage *rm, NeighFlow *nf);
     int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf);
 
-    int flows_handler_create(const CDAPMessage *rm);
-    int flows_handler_create_r(const CDAPMessage *rm);
-    int flows_handler_delete(const CDAPMessage *rm);
-
 private:
 #ifdef RL_USE_QOS_CUBES
     int load_qos_cubes(const char *);
@@ -405,8 +424,6 @@ private:
 
     const LowerFlow *_lfdb_find(rlm_addr_t local_addr,
                                 rlm_addr_t remote_addr) const;
-    /* Id to be used with incoming flow allocation request. */
-    uint32_t kevent_id_cnt;
 };
 
 static inline void

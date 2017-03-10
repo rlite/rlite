@@ -312,8 +312,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
 
     pthread_mutex_init(&lock, NULL);
 
-    kevent_id_cnt = 1;
-
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
         ret = mgmtfd;
@@ -334,6 +332,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
 #endif /* RL_USE_QOS_CUBES */
 
     dft = new dft_default(this);
+    fa = new flow_allocator(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -368,6 +367,7 @@ uipcp_rib::~uipcp_rib()
         rl_delete(mit->second, RL_MT_NEIGH);
     }
 
+    delete fa;
     delete dft;
 
     uipcp_loop_fdh_del(uipcp, mgmtfd);
@@ -532,28 +532,11 @@ uipcp_rib::dump() const
 
     ss << endl;
 
-    ss << "Supported flows:" << endl;
-    for (map<string, FlowRequest>::const_iterator
-            mit = flow_reqs.begin(); mit != flow_reqs.end(); mit++) {
-        const FlowRequest& freq = mit->second;
-
-        ss << "    [" << (freq.initiator ? "L" : "R") << "]" <<
-                ", Src=" << static_cast<string>(freq.src_app) <<
-                ", Dst=" << static_cast<string>(freq.dst_app) <<
-                ", SrcAddr:Port=" << freq.src_addr << ":" << freq.src_port <<
-                ", DstAddr:Port=" << freq.dst_addr << ":" << freq.dst_port <<
-                ", Connections: [";
-        for (list<ConnId>::const_iterator conn = freq.connections.begin();
-                                conn != freq.connections.end(); conn++) {
-            ss << "<SrcCep=" << conn->src_cep << ", DstCep=" << conn->dst_cep
-                << ", QosId=" << conn->qos_id << "> ";
-        }
-        ss << "]" << endl;
-    }
+    fa->dump(ss);
 
 #ifdef RL_MEMTRACK
     ss << endl << "Temporary tables:" << endl;
-    ss << "    " << flow_reqs_tmp.size() << " elements in the "
+    ss << "    " << fa->flow_reqs_tmp.size() << " elements in the "
           "temporary flow request table" << endl;
     ss << "    " << invoke_id_mgr.size() << " elements in the "
           "invoke_id_mgr object" << endl;
@@ -1083,7 +1066,7 @@ normal_fa_req(struct uipcp *uipcp,
 
     ScopeLock(rib->lock);
 
-    return rib->fa_req(req);
+    return rib->fa->fa_req(req);
 }
 
 static int
@@ -1248,7 +1231,7 @@ normal_fa_resp(struct uipcp *uipcp,
 
     ScopeLock(rib->lock);
 
-    return rib->fa_resp(resp);
+    return rib->fa->fa_resp(resp);
 }
 
 static int
@@ -1260,7 +1243,7 @@ normal_flow_deallocated(struct uipcp *uipcp,
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
 
-    rib->flow_deallocated(req);
+    rib->fa->flow_deallocated(req);
 
     return 0;
 }
