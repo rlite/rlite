@@ -275,9 +275,29 @@ struct flow_allocator {
     uint32_t kevent_id_cnt;
 
     flow_allocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) { }
-    ~flow_allocator() { }
+    virtual ~flow_allocator() { }
+
+    virtual void dump(std::stringstream& ss) const = 0;
+    virtual void dump_memtrack(std::stringstream& ss) const = 0;
+
+    virtual int fa_req(struct rl_kmsg_fa_req *req) = 0;
+    virtual int fa_resp(struct rl_kmsg_fa_resp *resp) = 0;
+
+    virtual int flow_deallocated(struct rl_kmsg_flow_deallocated *req) = 0;
+
+    virtual int flows_handler_create(const CDAPMessage *rm) = 0;
+    virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
+    virtual int flows_handler_delete(const CDAPMessage *rm) = 0;
+
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+};
+
+struct flow_allocator_default : public flow_allocator {
+    flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) { }
+    ~flow_allocator_default() { }
 
     void dump(std::stringstream& ss) const;
+    void dump_memtrack(std::stringstream& ss) const;
 
     std::map< std::string, FlowRequest > flow_reqs;
     std::map< unsigned int, FlowRequest > flow_reqs_tmp;

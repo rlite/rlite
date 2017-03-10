@@ -153,7 +153,7 @@ flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-flow_allocator::fa_req(struct rl_kmsg_fa_req *req)
+flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
 {
     string dest_appl(req->remote_appl);
     rlm_addr_t remote_addr;
@@ -238,7 +238,7 @@ flow_allocator::fa_req(struct rl_kmsg_fa_req *req)
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
 int
-flow_allocator::fa_resp(struct rl_kmsg_fa_resp *resp)
+flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
     map<unsigned int, FlowRequest>::iterator f;
@@ -285,7 +285,7 @@ flow_allocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-flow_allocator::flows_handler_create(const CDAPMessage *rm)
+flow_allocator_default::flows_handler_create(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -365,7 +365,7 @@ flow_allocator::flows_handler_create(const CDAPMessage *rm)
 
 /* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-flow_allocator::flows_handler_create_r(const CDAPMessage *rm)
+flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -399,7 +399,7 @@ flow_allocator::flows_handler_create_r(const CDAPMessage *rm)
 }
 
 int
-flow_allocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
+flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     map<string, FlowRequest>::iterator f;
     stringstream obj_name;
@@ -451,7 +451,7 @@ flow_allocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 }
 
 int
-flow_allocator::flows_handler_delete(const CDAPMessage *rm)
+flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 {
     map<string, FlowRequest>::iterator f;
     rl_port_t local_port;
@@ -484,7 +484,7 @@ flow_allocator::flows_handler_delete(const CDAPMessage *rm)
 }
 
 int
-flow_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+flow_allocator_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     switch (rm->op_code) {
         case gpb::M_CREATE:
@@ -516,7 +516,7 @@ uipcp_rib::flows_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-flow_allocator::dump(std::stringstream& ss) const
+flow_allocator_default::dump(std::stringstream& ss) const
 {
     ss << "Supported flows:" << endl;
     for (map<string, FlowRequest>::const_iterator
@@ -536,4 +536,12 @@ flow_allocator::dump(std::stringstream& ss) const
         }
         ss << "]" << endl;
     }
+}
+
+void
+flow_allocator_default::dump_memtrack(std::stringstream& ss) const
+{
+    ss << endl << "Temporary tables:" << endl;
+    ss << "    " << flow_reqs_tmp.size() << " elements in the "
+        "temporary flow request table" << endl;
 }
