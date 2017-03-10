@@ -28,10 +28,10 @@ sudo rlite-ctl ipcp-create $SHIPCP:1 shim-hv d.DIF
 sudo rlite-ctl ipcp-config $SHIPCP:1 vmpi-id ${vmpi_id}
 sudo rlite-ctl ipcp-create $NORMIPCP:1 normal n.DIF
 sudo rlite-ctl ipcp-config $NORMIPCP:1 address $ADDR
-sudo rlite-ctl ipcp-register d.DIF $NORMIPCP:1
+sudo rlite-ctl ipcp-register $NORMIPCP:1 d.DIF
 if [ "$1" == "h" ]; then
     # Host enroll to the guest --> guest up script must be run first
-    sudo rlite-ctl ipcp-enroll n.DIF $NORMIPCP:1 ng.IPCP:1 d.DIF
+    sudo rlite-ctl ipcp-enroll $NORMIPCP:1 n.DIF d.DIF ng.IPCP:1
 fi
 
 source tests/epilogue.sh

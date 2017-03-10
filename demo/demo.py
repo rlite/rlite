@@ -750,7 +750,7 @@ for vmname in sorted(vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in sorted(difs[dif][vmname]):
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP:%(id)s\n'\
+            outs += '$SUDO rlite-ctl ipcp-register %(dif)s.%(id)s.IPCP:%(id)s %(lodif)s.DIF\n'\
                         % vars_dict
             del vars_dict
 
@@ -803,8 +803,8 @@ for dif in dif_ordering:
             '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
             'set -x\n'\
             'SUDO=%(sudo)s\n'\
-            '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.DIF %(dif)s.%(id)s.IPCP:%(id)s '\
-                    '%(dif)s.%(pvid)s.IPCP:%(pvid)s %(ldif)s.DIF\n'\
+            '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
+                    '%(ldif)s.DIF %(dif)s.%(pvid)s.IPCP:%(pvid)s\n'\
             'sleep 1\n'\
             'true\n'\
             'ENDSSH\n'\

@@ -315,8 +315,8 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     struct ipcp_attrs *attrs;
 
     assert(argc >= 2);
-    dif_name = argv[0];
-    ipcp_name = argv[1];
+    ipcp_name = argv[0];
+    dif_name = argv[1];
 
     req.ipcp_name = strdup(ipcp_name);
     if (!req.ipcp_name) {
@@ -362,10 +362,10 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     int ret;
 
     assert(argc >= 4);
-    dif_name = argv[0];
-    ipcp_name = argv[1];
-    neigh_ipcp_name = argv[2];
-    supp_dif_name = argv[3];
+    ipcp_name = argv[0];
+    dif_name = argv[1];
+    supp_dif_name = argv[2];
+    neigh_ipcp_name = argv[3];
 
     req.ipcp_name = strdup(ipcp_name);
     if (!req.ipcp_name) {
@@ -654,25 +654,25 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "ipcp-register",
-        .usage = "DIF_NAME IPCP_NAME",
+        .usage = "IPCP_NAME DIF_NAME",
         .num_args = 2,
         .func = ipcp_register,
     },
     {
         .name = "ipcp-unregister",
-        .usage = "DIF_NAME IPCP_NAME",
+        .usage = "IPCP_NAME DIF_NAME",
         .num_args = 2,
         .func = ipcp_unregister,
     },
     {
         .name = "ipcp-enroll",
-        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
+        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME NEIGH_IPCP_NAME",
         .num_args = 4,
         .func = ipcp_enroll,
     },
     {
         .name = "ipcp-lower-flow-alloc",
-        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
+        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME NEIGH_IPCP_NAME",
         .num_args = 4,
         .func = ipcp_lower_flow_alloc,
     },
