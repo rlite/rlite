@@ -572,6 +572,16 @@ enrollee_thread(void *opaque)
             goto err;
         }
 
+        if (rm->src_appl != neigh->ipcp_name) {
+            /* The neighbor specified a different name, we need
+             * to update our map. */
+            UPI(rib->uipcp, "Neighbor name updated remotely %s --> %s\n",
+                neigh->ipcp_name.c_str(), rm->src_appl.c_str());
+            rib->neighbors.erase(neigh->ipcp_name);
+            neigh->ipcp_name = rm->src_appl;
+            rib->neighbors[neigh->ipcp_name] = neigh;
+        }
+
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
         rl_delete(rm, RL_MT_CDAP); rm = NULL;
 
@@ -798,8 +808,7 @@ enroller_thread(void *opaque)
         CDAPMessage m;
         int ret;
 
-        /* We are the enrollment slave, let's send an
-         * M_CONNECT_R message. */
+        /* We are the enrollment slave, let's send an M_CONNECT_R message. */
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
         ret = m.m_connect_r(rm, 0, string());
         if (ret) {
@@ -808,6 +817,14 @@ enroller_thread(void *opaque)
         }
 
         UPD(rib->uipcp, "S <-- I M_CONNECT\n");
+
+        /* Rewrite the m.src_appl just in case the enrollee used the N-DIF
+         * name as a neighbor name */
+        if (m.src_appl != rib->uipcp->name) {
+            UPI(rib->uipcp, "M_CONNECT_R::src_appl overwritten %s --> %s\n",
+                m.src_appl.c_str(), rib->uipcp->name);
+            m.src_appl = rib->uipcp->name;
+        }
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
         if (ret) {
@@ -1535,7 +1552,20 @@ int
 normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
                    int wait_for_completion)
 {
-    return normal_do_enroll(uipcp, req->neigh_name, req->supp_dif_name,
+    const char *dst_name = req->neigh_name;
+
+    if (!dst_name) {
+        /* If no neighbor name is specified, try to use the DIF name
+         * as a destination application. */
+        dst_name = req->dif_name;
+    }
+
+    if (!dst_name) {
+        UPE(uipcp, "No enrollment destination name specified\n");
+        return -1;
+    }
+
+    return normal_do_enroll(uipcp, dst_name, req->supp_dif_name,
                             wait_for_completion);
 }
 
