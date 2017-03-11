@@ -268,7 +268,7 @@ rina_register_wait(int fd, int wfd)
     struct rl_kmsg_appl_move move;
     unsigned int response;
     rl_ipcp_id_t ipcp_id;
-    int ret = 0;
+    int ret = -1;
 
     resp = (struct rl_kmsg_appl_register_resp *)rl_read_next_msg(wfd, 1);
     if (!resp) {
@@ -283,7 +283,7 @@ rina_register_wait(int fd, int wfd)
     rl_free(resp, RL_MT_MSG);
 
     if (response) {
-        errno = EINVAL;
+        errno = EBUSY;
         goto out;
     }
 

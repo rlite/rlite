@@ -315,8 +315,8 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     struct ipcp_attrs *attrs;
 
     assert(argc >= 2);
-    dif_name = argv[0];
-    ipcp_name = argv[1];
+    ipcp_name = argv[0];
+    dif_name = argv[1];
 
     req.ipcp_name = strdup(ipcp_name);
     if (!req.ipcp_name) {
@@ -361,11 +361,11 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     struct ipcp_attrs *attrs;
     int ret;
 
-    assert(argc >= 4);
-    dif_name = argv[0];
-    ipcp_name = argv[1];
-    neigh_ipcp_name = argv[2];
-    supp_dif_name = argv[3];
+    assert(argc >= 3);
+    ipcp_name = argv[0];
+    dif_name = argv[1];
+    supp_dif_name = argv[2];
+    neigh_ipcp_name = (argc >= 4) ? argv[3] : NULL;
 
     req.ipcp_name = strdup(ipcp_name);
     if (!req.ipcp_name) {
@@ -382,7 +382,7 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     req.msg_type = msg_type;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
-    req.neigh_name = strdup(neigh_ipcp_name);
+    req.neigh_name = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
     req.supp_dif_name = strdup(supp_dif_name);
 
     ret = request_response(RLITE_MB(&req), NULL);
@@ -405,45 +405,6 @@ static int
 ipcp_lower_flow_alloc(int argc, char **argv, struct cmd_descriptor *cd)
 {
     return ipcp_enroll_common(argc, argv, RLITE_U_IPCP_LOWER_FLOW_ALLOC);
-}
-
-static int
-ipcp_dft_set(int argc, char **argv, struct cmd_descriptor *cd)
-{
-    struct rl_cmsg_ipcp_dft_set req;
-    const char *ipcp_name;
-    const char *appl_name;
-    unsigned long remote_addr;
-    struct ipcp_attrs *attrs;
-
-    assert(argc >= 3);
-    ipcp_name = argv[0];
-    appl_name = argv[1];
-    errno = 0;
-    remote_addr = strtoul(argv[2], NULL, 10);
-    if (errno) {
-        PE("Invalid address %s\n", argv[2]);
-        return -1;
-    }
-
-    req.ipcp_name = strdup(ipcp_name);
-    if (!req.ipcp_name) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    attrs = lookup_ipcp_by_name(req.ipcp_name);
-    if (!attrs) {
-        PE("Could not find IPC process\n");
-        return -1;
-    }
-
-    req.msg_type = RLITE_U_IPCP_DFT_SET;
-    req.event_id = 0;
-    req.appl_name = strdup(appl_name);
-    req.remote_addr = remote_addr;
-
-    return request_response(RLITE_MB(&req), NULL);
 }
 
 static int
@@ -693,36 +654,28 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "ipcp-register",
-        .usage = "DIF_NAME IPCP_NAME",
+        .usage = "IPCP_NAME DIF_NAME",
         .num_args = 2,
         .func = ipcp_register,
     },
     {
         .name = "ipcp-unregister",
-        .usage = "DIF_NAME IPCP_NAME",
+        .usage = "IPCP_NAME DIF_NAME",
         .num_args = 2,
         .func = ipcp_unregister,
     },
     {
         .name = "ipcp-enroll",
-        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
-        .num_args = 4,
+        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .num_args = 3,
         .func = ipcp_enroll,
     },
     {
         .name = "ipcp-lower-flow-alloc",
-        .usage = "DIF_NAME IPCP_NAME NEIGH_IPCP_NAME SUPP_DIF_NAME",
-        .num_args = 4,
+        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .num_args = 3,
         .func = ipcp_lower_flow_alloc,
     },
-#ifdef WITH_DFT_SET
-    {
-        .name = "ipcp-dft-set",
-        .usage = "IPCP_NAME APPL_NAME REMOTE_ADDR",
-        .num_args = 3,
-        .func = ipcp_dft_set,
-    },
-#endif /* WITH_DFT_SET */
     {
         .name = "ipcps-show",
         .usage = "",
@@ -853,8 +806,6 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
-
-    (void) ipcp_dft_set;
 
     return process_args(argc, argv);
 }

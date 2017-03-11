@@ -376,7 +376,7 @@ Create a normal IPCP in the normal DIF:
 
 Let the normal IPCP register to the shim DIF:
 
-    $ sudo rlite-ctl ipcp-register ethAB.DIF a.IPCP:1
+    $ sudo rlite-ctl ipcp-register a.IPCP:1 ethAB.DIF
 
 
 On node B, similar operations are carried out for both the interfaces:
@@ -390,8 +390,8 @@ On node B, similar operations are carried out for both the interfaces:
     $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth1
     $
     $ sudo rlite-ctl ipcp-create b.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-register ethAB.DIF b.IPCP:1
-    $ sudo rlite-ctl ipcp-register ethBC.DIF b.IPCP:1
+    $ sudo rlite-ctl ipcp-register b.IPCP:1 ethAB.DIF
+    $ sudo rlite-ctl ipcp-register b.IPCP:1 ethBC.DIF
 
 On node C:
 
@@ -400,21 +400,21 @@ On node C:
     $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth0
     $
     $ sudo rlite-ctl ipcp-create c.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-register ethBC.DIF c.IPCP:1
+    $ sudo rlite-ctl ipcp-register c.IPCP:1 ethBC.DIF
 
 Once the IPCPs are set up, we have to carry out the enrollments in
 the normal DIF. Among the possible strategies, we can enroll A and
 C against B, so that B will be the initial node in the DIF.
 
-On node A, enroll a.IPCP:1 to the neighbor b.IPCP:1 using
-ethAB.DIF as a supporting DIF:
+On node A, enroll a.IPCP:1 into n.DIF using ethAB.DIF as a supporting
+DIF and b.IPCP:1 as a neighbor:
 
-    $ sudo rlite-ctl ipcp-enroll n.DIF a.IPCP:1 b.IPCP:1 ethAB.DIF
+    $ sudo rlite-ctl ipcp-enroll a.IPCP:1 n.DIF ethAB.DIF b.IPCP:1
 
-On node C, enroll c.IPCP:1 to the neighbor b.IPCP:1 using
-ethBC.DIF as a supporting DIF:
+On node C, enroll c.IPCP:1 into n.DIF using ethBC.DIF as a supporting
+DIF and b.IPCP:1 as a neighbor:
 
-    $ sudo rlite-ctl ipcp-enroll n.DIF c.IPCP:1 b.IPCP:1 ethBC.DIF
+    $ sudo rlite-ctl ipcp-enroll c.IPCP:1 n.DIF ethBC.DIF b.IPCP:1
 
 On any node, you can check the standard output of the userspace daemon,
 to check that the previous operations are completed with success.
@@ -499,18 +499,18 @@ normal IPCP in the shim-udp4 DIF:
 
     $ sudo rlite-ctl ipcp-create xipgateway.IPCP shim-udp4 udptunnel.DIF
     $ sudo rlite-ctl ipcp-create xnorm.IPCP normal normal.DIF
-    $ sudo rlite-ctl ipcp-register udptunnel.DIF xnorm.IPCP
+    $ sudo rlite-ctl ipcp-register xnorm.IPCP udptunnel.DIF
 
 Carry out similar operations on node Y:
 
     $ sudo rlite-ctl ipcp-create yipgateway.IPCP shim-udp4 udptunnel.DIF
     $ sudo rlite-ctl ipcp-create ynorm.IPCP normal normal.DIF
-    $ sudo rlite-ctl ipcp-register udptunnel.DIF ynorm.IPCP
+    $ sudo rlite-ctl ipcp-register ynorm.IPCP udptunnel.DIF
 
 Finally, access X and enroll X with Y (or the other way around) in the
 normal DIF:
 
-    $ sudo rlite-ctl ipcp-enroll normal.DIF xnorm.IPCP ynorm.IPCP udptunnel.DIF
+    $ sudo rlite-ctl ipcp-enroll xnorm.IPCP normal.DIF udptunnel.DIF ynorm.IPCP
 
 The setup is now complete and your RINA applications on X can talk with
 applications running on Y, with the traffic being forwarded through the UDP

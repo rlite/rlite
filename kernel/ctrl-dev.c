@@ -738,7 +738,7 @@ ipcp_application_add(struct ipcp_entry *ipcp,
 
         /* Application was already registered on a different
          * control device. */
-        return -EINVAL;
+        return -EBUSY;
     }
 
     /* Create a new registered application. */
@@ -2189,59 +2189,59 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rl_kmsg_appl_register *req =
                     (struct rl_kmsg_appl_register *)bmsg;
     struct ipcp_entry *ipcp;
-    int ret = -ENXIO;  /* Report failure by default. */
+    int ret = 0;
 
     /* Find an IPC Process entry corresponding to req->dif_name. */
     ipcp = ipcp_select_by_dif(req->dif_name);
-    if (ipcp) {
-        ret = 0;
+    if (!ipcp) {
+        return -ENXIO;
+    }
 
-        if (req->reg) {
-            ret = ipcp_application_add(ipcp, req->appl_name, rc, req->event_id,
-                                       ipcp->uipcp != NULL);
-        } else {
-            ret = ipcp_application_del(ipcp, req->appl_name);
-        }
+    if (req->reg) {
+        ret = ipcp_application_add(ipcp, req->appl_name, rc, req->event_id,
+                                   ipcp->uipcp != NULL);
+    } else {
+        ret = ipcp_application_del(ipcp, req->appl_name);
+    }
 
-        if (!ret && ipcp->uipcp) {
-            /* Reflect to userspace this (un)registration, so that
-             * userspace IPCP can take appropriate actions. */
-            req->event_id = 0;
-            rl_upqueue_append(ipcp->uipcp,
-                    (const struct rl_msg_base *)req, true);
-        }
+    if (!ret && ipcp->uipcp) {
+        /* Reflect to userspace this (un)registration, so that
+         * userspace IPCP can take appropriate actions. */
+        req->event_id = 0;
+        rl_upqueue_append(ipcp->uipcp,
+                (const struct rl_msg_base *)req, true);
+    }
 
-        if (ret || !ipcp->uipcp || !req->reg) {
-            /* Complete the (un)registration immediately notifying the
-             * requesting application. */
-            struct rl_kmsg_appl_register_resp resp;
+    if (ret || !ipcp->uipcp || !req->reg) {
+        /* Complete the (un)registration immediately notifying the
+         * requesting application. */
+        struct rl_kmsg_appl_register_resp resp;
 
-            if (ret > 0) {
-                /* ipcp_application_add() returned a positive result.
-                 * This is not an error. */
-                ret = 0;
-            }
-
-            resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
-            resp.event_id = req->event_id;
-            resp.ipcp_id = ipcp->id;
-            resp.reg = req->reg;
-            resp.response = ret ? RLITE_ERR : RLITE_SUCC;
-            resp.appl_name = rl_strdup(req->appl_name, GFP_ATOMIC, RL_MT_UTILS);
-
-            rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
-            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(&resp));
-
-            if (!ret) {
-                PI("Application process %s %sregistered to IPC process %u\n",
-                        req->appl_name, (req->reg ? "" : "un"), ipcp->id);
-            }
-
-            /* If ret != 0, we just appended a negative response, so the error
-             * code for the system call can be reset. */
+        if (ret > 0) {
+            /* ipcp_application_add() returned a positive result.
+             * This is not an error. */
             ret = 0;
         }
+
+        resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
+        resp.event_id = req->event_id;
+        resp.ipcp_id = ipcp->id;
+        resp.reg = req->reg;
+        resp.response = ret ? RLITE_ERR : RLITE_SUCC;
+        resp.appl_name = rl_strdup(req->appl_name, GFP_ATOMIC, RL_MT_UTILS);
+
+        rl_upqueue_append(rc, (const struct rl_msg_base *)&resp, false);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                       RLITE_MB(&resp));
+
+        if (!ret) {
+            PI("Application process %s %sregistered to IPC process %u\n",
+                    req->appl_name, (req->reg ? "" : "un"), ipcp->id);
+        }
+
+        /* If ret != 0, we just appended a negative response, so the error
+         * code for the system call can be reset. */
+        ret = 0;
     }
 
     ipcp_put(ipcp);

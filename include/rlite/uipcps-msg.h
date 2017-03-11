@@ -35,12 +35,11 @@
 enum {
     RLITE_U_IPCP_REGISTER = 1,          /* 1 */
     RLITE_U_IPCP_ENROLL,                /* 2 */
-    RLITE_U_IPCP_DFT_SET,               /* 3 */
-    RLITE_U_BASE_RESP,                  /* 4 */
-    RLITE_U_IPCP_RIB_SHOW_REQ,          /* 5 */
-    RLITE_U_IPCP_RIB_SHOW_RESP,         /* 6 */
-    RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 7 */
-    RLITE_U_MEMTRACK_DUMP,              /* 8 */
+    RLITE_U_BASE_RESP,                  /* 3 */
+    RLITE_U_IPCP_RIB_SHOW_REQ,          /* 4 */
+    RLITE_U_IPCP_RIB_SHOW_RESP,         /* 5 */
+    RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 6 */
+    RLITE_U_MEMTRACK_DUMP,              /* 7 */
 
     RLITE_U_MSG_MAX,
 };
@@ -52,7 +51,7 @@ extern struct rl_msg_layout rl_uipcps_numtables[RLITE_U_MSG_MAX + 1];
 /* The same message layout restrictions reported in kernel-msg.h
  * apply also here. */
 
-/* rinaconf --> uipcps message to register an IPC process
+/* rlite-ctl --> uipcps message to register an IPC process
  * to another IPC process */
 struct rl_cmsg_ipcp_register {
     rl_msg_t msg_type;
@@ -63,7 +62,7 @@ struct rl_cmsg_ipcp_register {
     char *dif_name;
 } __attribute__((packed));
 
-/* rinaconf --> uipcps message to enroll an IPC process
+/* rlite-ctl --> uipcps message to enroll an IPC process
  * to another IPC process, or to only alloc a flow. */
 struct rl_cmsg_ipcp_enroll {
     rl_msg_t msg_type;
@@ -75,17 +74,7 @@ struct rl_cmsg_ipcp_enroll {
     char *supp_dif_name;
 } __attribute__((packed));
 
-/* rinaconf --> uipcps message to set an IPC process DFT entry */
-struct rl_cmsg_ipcp_dft_set {
-    rl_msg_t msg_type;
-    uint32_t event_id;
-
-    rlm_addr_t remote_addr;
-    char *ipcp_name;
-    char *appl_name;
-} __attribute__((packed));
-
-/* rinaconf --> uipcps message to query the whole RIB */
+/* rlite-ctl --> uipcps message to query the whole RIB */
 struct rl_cmsg_ipcp_rib_show_req {
     rl_msg_t msg_type;
     uint32_t event_id;
@@ -93,7 +82,7 @@ struct rl_cmsg_ipcp_rib_show_req {
     char *ipcp_name;
 } __attribute__((packed));
 
-/* rinaconf <-- uipcps message to report a RIB dump */
+/* rlite-ctl <-- uipcps message to report a RIB dump */
 struct rl_cmsg_ipcp_rib_show_resp {
     rl_msg_t msg_type;
     uint32_t event_id;

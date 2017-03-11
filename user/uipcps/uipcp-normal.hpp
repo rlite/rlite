@@ -160,7 +160,7 @@ struct Neighbor {
         { return !(*this == other); }
     ~Neighbor();
 
-    const char *enroll_state_repr(enroll_state_t s) const;
+    static const char *enroll_state_repr(enroll_state_t s);
 
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
@@ -243,7 +243,6 @@ struct dft {
     virtual void dump(std::stringstream& ss) const = 0;
 
     virtual int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const = 0;
-    virtual int set_entry(const std::string& appl_name, rlm_addr_t remote_addr) = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req) = 0;
     virtual void update_address(rlm_addr_t new_addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
@@ -251,8 +250,10 @@ struct dft {
 };
 
 struct dft_default : public dft {
-    /* Directory Forwarding Table. */
-    std::map< std::string, DFTEntry > dft_table;
+    /* Directory Forwarding Table, mapping application name (std::string)
+     * to a set of nodes that registered that name. All nodes are considered
+     * equivalent. */
+    std::multimap< std::string, DFTEntry > dft_table;
 
     dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
     ~dft_default() { }
@@ -260,7 +261,6 @@ struct dft_default : public dft {
     void dump(std::stringstream& ss) const;
 
     int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const;
-    int set_entry(const std::string& appl_name, rlm_addr_t remote_addr);
     int appl_register(const struct rl_kmsg_appl_register *req);
     void update_address(rlm_addr_t new_addr);
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
@@ -464,6 +464,10 @@ is_reliable_spec(const struct rina_flow_spec *spec)
 int normal_ipcp_enroll(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroll *req,
                        int wait_for_completion);
+
+int
+normal_do_register(struct uipcp *uipcp, const char *dif_name,
+                   const char *local_name, int reg);
 
 void normal_trigger_tasks(struct uipcp *uipcp);
 

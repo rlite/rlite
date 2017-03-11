@@ -1279,9 +1279,9 @@ normal_fini(struct uipcp *uipcp)
     return 0;
 }
 
-static int
-do_registration(struct uipcp *uipcp, const char *dif_name,
-                const char *local_name, int reg)
+int
+normal_do_register(struct uipcp *uipcp, const char *dif_name,
+                   const char *local_name, int reg)
 {
     struct pollfd pfd;
     int ret;
@@ -1326,10 +1326,16 @@ normal_register_to_lower(struct uipcp *uipcp,
         return -1;
     }
 
-    /* Perform the registration. */
-    ret = do_registration(uipcp, req->dif_name, req->ipcp_name, req->reg);
+    /* Perform the registration of the IPCP name. */
+    ret = normal_do_register(uipcp, req->dif_name, req->ipcp_name, req->reg);
     if (ret) {
         return ret;
+    }
+
+    /* Also register the N-DIF name, i.e. the name of the DIF that
+     * this IPCP is part of. */
+    if (normal_do_register(uipcp, req->dif_name, uipcp->dif_name, req->reg)) {
+        UPE(uipcp, "Registration of DAF name '%s' failed\n", uipcp->dif_name);
     }
 
     pthread_mutex_lock(&rib->lock);
@@ -1352,7 +1358,7 @@ normal_register_to_lower(struct uipcp *uipcp,
 
         if (self_reg_pending) {
             /* Perform (un)registration out of the lock. */
-            ret = do_registration(uipcp, uipcp->dif_name,
+            ret = normal_do_register(uipcp, uipcp->dif_name,
                                   uipcp->name, self_reg);
 
             if (ret) {
@@ -1370,16 +1376,6 @@ normal_register_to_lower(struct uipcp *uipcp,
     return ret;
 }
 
-static int
-normal_ipcp_dft_set(struct uipcp *uipcp,
-                    const struct rl_cmsg_ipcp_dft_set *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
-
-    return rib->dft->set_entry(string(req->appl_name), req->remote_addr);
-}
-
 static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
@@ -1395,7 +1391,6 @@ struct uipcp_ops normal_ops = {
     .register_to_lower      = normal_register_to_lower,
     .enroll                 = normal_ipcp_enroll,
     .lower_flow_alloc       = normal_ipcp_enroll,
-    .dft_set                = normal_ipcp_dft_set,
     .rib_show               = normal_ipcp_rib_show,
     .appl_register          = normal_appl_register,
     .fa_req                 = normal_fa_req,

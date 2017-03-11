@@ -208,6 +208,11 @@ argparser.add_argument('--user',
 argparser.add_argument('--flavour',
                        help = "flavour to use for normal IPCPs", type = str,
                        default = '')
+argparser.add_argument('--broadcast-enrollment', action='store_true',
+                       help = "With broadcast enrollment, no neighbor "\
+                              "is specified for the ipcp-enroll command, so "\
+                              "that N-1 flow allocation is issued using the "\
+                              "N-DIF name as destination application")
 args = argparser.parse_args()
 
 
@@ -750,7 +755,7 @@ for vmname in sorted(vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in sorted(difs[dif][vmname]):
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            outs += '$SUDO rlite-ctl ipcp-register %(lodif)s.DIF %(dif)s.%(id)s.IPCP:%(id)s\n'\
+            outs += '$SUDO rlite-ctl ipcp-register %(dif)s.%(id)s.IPCP:%(id)s %(lodif)s.DIF\n'\
                         % vars_dict
             del vars_dict
 
@@ -784,10 +789,13 @@ for dif in dif_ordering:
         else:
             oper = 'enroll'
 
-        print("%s %s to DIF %s against neighbor %s, through "\
-                "lower DIF %s" % (oper, enrollment['enrollee'], dif,
-                                  enrollment['enroller'],
-                                  enrollment['lower_dif']))
+        info = "%s %s to DIF %s through lower DIF %s" % (oper,
+                    enrollment['enrollee'], dif, enrollment['lower_dif'])
+        if not args.broadcast_enrollment:
+            info += " [unicast to neighbor %s]" % enrollment['enroller']
+        else:
+            info += " [broadcast]"
+        print(info)
 
         vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
                      'pvid': vms[enrollment['enroller']]['id'],
@@ -797,22 +805,25 @@ for dif in dif_ordering:
                      'sshopts': sshopts, 'sudo': sudo,
                      'oper': oper}
 
-        outs += ''\
-            'DONE=255\n'\
-            'while [ $DONE != "0" ]; do\n'\
-            '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-            'set -x\n'\
-            'SUDO=%(sudo)s\n'\
-            '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.DIF %(dif)s.%(id)s.IPCP:%(id)s '\
-                    '%(dif)s.%(pvid)s.IPCP:%(pvid)s %(ldif)s.DIF\n'\
-            'sleep 1\n'\
-            'true\n'\
-            'ENDSSH\n'\
-            '   DONE=$?\n'\
-            '   if [ $DONE != "0" ]; then\n'\
-            '       sleep 1\n'\
-            '   fi\n'\
-            'done\n\n' % vars_dict
+        outs += 'DONE=255\n'\
+                'while [ $DONE != "0" ]; do\n'\
+                '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                'set -x\n'\
+                'SUDO=%(sudo)s\n'\
+                '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
+                        '%(ldif)s.DIF ' % vars_dict
+        if not args.broadcast_enrollment:
+            outs += '%(dif)s.%(pvid)s.IPCP:%(pvid)s\n' % vars_dict
+        else:
+            outs += '\n'
+        outs += 'sleep 1\n'\
+                'true\n'\
+                'ENDSSH\n'\
+                '   DONE=$?\n'\
+                '   if [ $DONE != "0" ]; then\n'\
+                '       sleep 1\n'\
+                '   fi\n'\
+                'done\n\n' % vars_dict
 
 
 # Apply netem rules. For now this step is done after enrollment in order to

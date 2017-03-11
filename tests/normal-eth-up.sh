@@ -20,6 +20,6 @@ sudo rlite-ctl ipcp-config e.IPCP:1 netdev $IF
 
 sudo rlite-ctl ipcp-create n.IPCP:${ID} normal n.DIF
 sudo rlite-ctl ipcp-config n.IPCP:${ID} address $ID
-sudo rlite-ctl ipcp-register e.DIF n.IPCP:${ID}
+sudo rlite-ctl ipcp-register n.IPCP:${ID} e.DIF
 
 source tests/epilogue.sh
