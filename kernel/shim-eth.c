@@ -181,10 +181,11 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
     }
 
     for (i = 0; i < ETH_UPPER_NAMES; i++) {
-        if (strcmp(appl, priv->upper_names[i]) == 0) {
+        if (priv->upper_names[i] && strcmp(appl, priv->upper_names[i]) == 0) {
             PD("Application #%u %s unregistered\n", i, priv->upper_names[i]);
             rl_free(priv->upper_names[i], RL_MT_SHIMDATA);
             priv->upper_names[i] = NULL;
+            break;
         }
     }
 
