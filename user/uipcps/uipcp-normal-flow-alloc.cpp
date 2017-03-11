@@ -484,7 +484,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 }
 
 int
-flow_allocator_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+flow_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     switch (rm->op_code) {
         case gpb::M_CREATE:

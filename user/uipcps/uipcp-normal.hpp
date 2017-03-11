@@ -289,7 +289,7 @@ struct flow_allocator {
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm) = 0;
 
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
 struct flow_allocator_default : public flow_allocator {
@@ -310,8 +310,6 @@ struct flow_allocator_default : public flow_allocator {
     int flows_handler_create(const CDAPMessage *rm);
     int flows_handler_create_r(const CDAPMessage *rm);
     int flows_handler_delete(const CDAPMessage *rm);
-
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
 struct uipcp_rib {
