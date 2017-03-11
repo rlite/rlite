@@ -165,6 +165,7 @@ rl_shim_eth_register(struct ipcp_entry *ipcp, char *appl, int reg)
                 break;
             }
         }
+
         if (i == ETH_UPPER_NAMES) {
             return -EBUSY;
         }

@@ -1507,10 +1507,30 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     /* Create an N-1 flow, if needed. */
     if (!neigh->has_mgmt_flow()) {
+        bool n_dif_unreg;
+
+        /* Temporarily unregister the N-DIF (broadcast) name, to avoid that
+         * DFT resolves it */
+        n_dif_unreg = (normal_do_register(uipcp, supp_dif_name,
+                                          uipcp->dif_name, 0) == 0);
+        if (n_dif_unreg) {
+            UPV(uipcp, "N-DIF name %s temporarily unregistered from N-1-DIF "
+                       "%s\n", uipcp->dif_name, supp_dif_name);
+        }
+
         ret = neigh->alloc_flow(supp_dif_name);
         if (ret) {
             pthread_mutex_unlock(&rib->lock);
             return ret;
+        }
+
+        if (n_dif_unreg) {
+            /* Register the N-DIF name again. */
+            ret = normal_do_register(uipcp, supp_dif_name, uipcp->dif_name, 1);
+            if (ret == 0) {
+                UPV(uipcp, "N-DIF name %s registered again to N-1-DIF %s\n",
+                           uipcp->dif_name, supp_dif_name);
+            }
         }
     }
 

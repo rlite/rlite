@@ -1298,9 +1298,9 @@ normal_fini(struct uipcp *uipcp)
     return 0;
 }
 
-static int
-do_registration(struct uipcp *uipcp, const char *dif_name,
-                const char *local_name, int reg)
+int
+normal_do_register(struct uipcp *uipcp, const char *dif_name,
+                   const char *local_name, int reg)
 {
     struct pollfd pfd;
     int ret;
@@ -1346,13 +1346,14 @@ normal_register_to_lower(struct uipcp *uipcp,
     }
 
     /* Perform the registration of the IPCP name. */
-    ret = do_registration(uipcp, req->dif_name, req->ipcp_name, req->reg);
+    ret = normal_do_register(uipcp, req->dif_name, req->ipcp_name, req->reg);
     if (ret) {
         return ret;
     }
 
-    /* Also register the DAF name, i.e. the DIF that this IPCP is part of. */
-    if (do_registration(uipcp, req->dif_name, uipcp->dif_name, req->reg)) {
+    /* Also register the N-DIF name, i.e. the name of the DIF that
+     * this IPCP is part of. */
+    if (normal_do_register(uipcp, req->dif_name, uipcp->dif_name, req->reg)) {
         UPE(uipcp, "Registration of DAF name '%s' failed\n", uipcp->dif_name);
     }
 
@@ -1376,7 +1377,7 @@ normal_register_to_lower(struct uipcp *uipcp,
 
         if (self_reg_pending) {
             /* Perform (un)registration out of the lock. */
-            ret = do_registration(uipcp, uipcp->dif_name,
+            ret = normal_do_register(uipcp, uipcp->dif_name,
                                   uipcp->name, self_reg);
 
             if (ret) {
