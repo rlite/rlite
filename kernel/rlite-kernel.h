@@ -85,8 +85,6 @@ extern int verbosity;
  * Packet buffers for the rlite stack.
  */
 
-#define RLITE_DEFAULT_LAYERS    3
-
 /* PDU flags */
 #define PDU_F_ECN           0x01
 #define PDU_F_DRF           0x80
