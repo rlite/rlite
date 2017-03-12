@@ -4,7 +4,7 @@
 
 import argparse
 import select
-import rlite
+import rina
 import sys
 import os
 
@@ -28,15 +28,15 @@ def buf2str(b):
 class RinaRRTool:
 
     def __init__(self):
-        self.cfd = rlite.open()
+        self.cfd = rina.open()
         if self.cfd < 0:
-            raise Exception("Could not open rlite ctrl device")
+            raise Exception("Could not open rina ctrl device")
 
         self.client_name = ''
         self.server_name = ''
         self.dif = ''
-        self.flow_spec = rlite.flow_spec()
-        rlite.flow_spec_default(self.flow_spec)
+        self.flow_spec = rina.flow_spec()
+        rina.flow_spec_default(self.flow_spec)
 
 
     def __del__(self):
@@ -44,7 +44,7 @@ class RinaRRTool:
 
 
     def client(self, args):
-        fd = rlite.flow_alloc(self.dif, self.client_name,
+        fd = rina.flow_alloc(self.dif, self.client_name,
                               self.server_name, self.flow_spec, 0)
 
         if fd < 0:
@@ -82,14 +82,14 @@ class RinaRRTool:
 
 
     def server(self, args):
-        ret = rlite.register(self.cfd, self.dif, self.server_name)
+        ret = rina.register(self.cfd, self.dif, self.server_name, 0)
         if ret:
             print('Registration failed')
             return ret
 
         while 1:
-            spec = rlite.flow_spec()
-            fd = rlite.flow_accept(self.cfd, None, spec, 0)
+            spec = rina.flow_spec()
+            fd = rina.flow_accept(self.cfd, None, spec, 0)
             if fd < 0:
                 continue
 

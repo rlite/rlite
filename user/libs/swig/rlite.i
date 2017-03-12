@@ -1,6 +1,6 @@
-%module rlite
+%module rina
 %{
-/* AGGIUNTE */
+/* additions */
 #include "rina/api.h"
 %}
 

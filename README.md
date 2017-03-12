@@ -162,14 +162,14 @@ to see the available options.
 
 The following libraries are available:
 
-* **librlite**, the main library, which wraps the control device and I/O device
+* **rina-api**, the main library, which wraps the control device and I/O device
                 to provide the RINA POSIX-like API.
                 This is the library used by applications to register names
                 and allocate flows.
-* **librlite-conf**, implementing the management and monitoring functionalities
+* **rlite-conf**, implementing the management and monitoring functionalities
                      of *rlite*, such as IPCP creation, removal and
                      configuration, flow monitoring, etc.
-* **librlite-cdap**, a C++ implementation of the CDAP protocol.
+* **rlite-cdap**, a C++ implementation of the CDAP protocol.
 
 
 ### 3.4. Control tool
@@ -239,7 +239,7 @@ flow, using 1200 bytes sized SDUs:
 
 If your system supports Python, you can write applications using the *rlite*
 Python bindings, which are a wrapper for the POSIX-like API exported by
-the **librlite** library. Run
+the **rina-api** library. Run
 
     >>> import rlite
     >>> help(rlite)

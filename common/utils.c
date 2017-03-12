@@ -1,5 +1,5 @@
 /*
- * librlite misc functionalities (serialization, rina names, ...)
+ * rlite misc functionalities (serialization, rina names, ...)
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>

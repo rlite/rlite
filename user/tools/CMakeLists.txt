@@ -9,10 +9,10 @@ if (MAC2IFNAME)
 add_executable(mac2ifname mac2ifname.c)
 endif()
 
-target_link_libraries(rinaperf rlite ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(rina-echo-async rlite)
-target_link_libraries(rlite-ctl rlite rlite-conf)
-target_link_libraries(rina-gw rlite ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(rinaperf rina-api ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(rina-echo-async rina-api)
+target_link_libraries(rlite-ctl rina-api rlite-conf)
+target_link_libraries(rina-gw rina-api ${CMAKE_THREAD_LIBS_INIT})
 
  # Installation directives
 install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async DESTINATION usr/bin)

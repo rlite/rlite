@@ -46,7 +46,7 @@ package() {
     # Install the userspace programs and libraries
     mkdir -p "$pkgdir/usr/bin"
     mkdir -p "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/user/libs/librlite.so" "$pkgdir/usr/lib"
+    cp "$srcdir/$_gitname/build/user/libs/librina-api.so" "$pkgdir/usr/lib"
     cp "$srcdir/$_gitname/build/user/libs/librlite-cdap.so" "$pkgdir/usr/lib"
     cp "$srcdir/$_gitname/build/user/libs/librlite-conf.so" "$pkgdir/usr/lib"
     cp "$srcdir/$_gitname/build/user/uipcps/rlite-uipcps" "$pkgdir/usr/bin"
