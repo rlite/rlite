@@ -241,8 +241,8 @@ If your system supports Python, you can write applications using the *rlite*
 Python bindings, which are a wrapper for the POSIX-like API exported by
 the **rina-api** library. Run
 
-    >>> import rlite
-    >>> help(rlite)
+    >>> import rina
+    >>> help(rina)
 
 in the Python interpreter, in order to see the available functionalities.
 The **rina-toy** script is a trivial example written using these bindings.
