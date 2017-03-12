@@ -165,7 +165,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     struct rl_flow_config flowcfg;
     int ret;
 
-    ret = rib->dft->lookup_entry(dest_appl, remote_addr);
+    ret = rib->dft->lookup_entry(dest_appl, remote_addr, 0);
     if (ret) {
         /* Return a negative flow allocation response immediately. */
         UPI(rib->uipcp, "No DFT matching entry for destination %s\n",
@@ -302,7 +302,7 @@ flow_allocator_default::flows_handler_create(const CDAPMessage *rm)
     rlm_addr_t dft_next_hop;
     int ret;
 
-    ret = rib->dft->lookup_entry(freq.dst_app, dft_next_hop);
+    ret = rib->dft->lookup_entry(freq.dst_app, dft_next_hop, rib->myaddr);
     if (ret) {
         /* We don't know how where this application is registered,
          * reject the request. */
@@ -394,7 +394,8 @@ flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
 
     return uipcp_issue_fa_resp_arrived(rib->uipcp, freq.src_port, freq.dst_port,
                                        freq.connections.front().dst_cep,
-                                       freq.dst_addr, rm->result,
+                                       freq.dst_addr,
+                                       rm->result ? 1 : 0,
                                        &freq.flowcfg);
 }
 

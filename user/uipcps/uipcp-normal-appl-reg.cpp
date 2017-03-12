@@ -23,6 +23,8 @@
 
 
 #include <ctime>
+#include <iterator>
+#include <cstdlib>
 
 #include "uipcp-normal.hpp"
 
@@ -43,15 +45,46 @@ static uint64_t time64()
 }
 
 int
-dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr) const
+dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
+                          const rlm_addr_t preferred) const
 {
-    /* Let multimap choose one. We may use multimap::equal_range() to
-     * get them all and choose with some strategy. */
-    multimap< string, DFTEntry >::const_iterator mit
-                            = dft_table.find(appl_name);
+    pair< multimap< string, DFTEntry >::const_iterator,
+          multimap< string, DFTEntry >::const_iterator > range;
+    multimap< string, DFTEntry >::const_iterator mit;
+    int d;
 
-    if (mit == dft_table.end()) {
+    /* Fetch all entries that hold 'appl_name'. */
+    range = dft_table.equal_range(appl_name);
+
+    d = distance(range.first, range.second);
+
+    if (d == 0) {
+        /* No entry. */
         return -1;
+    }
+
+    mit = range.first;
+    if (d > 1) {
+        if (preferred) {
+            /* Only accept the preferred address. */
+
+            for (; mit != range.second; mit ++) {
+                if (mit->second.address == preferred) {
+                    break;
+                }
+            }
+        } else {
+            int r;
+
+            /* Load balance by selecting a random entry. */
+            r = rand() % d;
+            while (r > 0 && mit != range.second) {
+                mit ++;
+                r --;
+            }
+        }
+
+        assert(mit != range.second);
     }
 
     dstaddr = mit->second.address;

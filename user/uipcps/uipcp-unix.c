@@ -734,6 +734,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    srand(time(NULL));
+
     /* Init the main loop which will take care of IPCP updates, to
      * align userspace IPCPs with kernelspace ones. This
      * must be done before launching the unix server in order to
