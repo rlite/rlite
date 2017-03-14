@@ -318,13 +318,33 @@ struct lfdb {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
+    lfdb(struct uipcp_rib *_ur) : rib(_ur) { }
+    virtual ~lfdb() { }
+
+    virtual void dump(std::stringstream& ss) const = 0;
+
+    virtual const LowerFlow *find(rlm_addr_t local_addr,
+                               rlm_addr_t remote_addr) const = 0;
+    virtual LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr) = 0;
+    virtual bool add(const LowerFlow &lf) = 0;
+    virtual bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr) = 0;
+    virtual void update_local(const std::string& neigh_name) = 0;
+    virtual void update_address(rlm_addr_t new_addr) = 0;
+
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+    virtual int neighs_refresh_lower_flows() = 0;
+};
+
+struct lfdb_default : public lfdb {
     /* Lower Flow Database. */
-    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb_db;
+    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > db;
 
     RoutingEngine re;
 
-    lfdb(struct uipcp_rib *_ur) : rib(_ur), re(_ur) { }
-    ~lfdb() { }
+    lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) { }
+    ~lfdb_default() { }
 
     void dump(std::stringstream& ss) const;
 
@@ -451,7 +471,9 @@ struct uipcp_rib {
     /* RIB handlers for received CDAP messages. */
     int dft_handler(const CDAPMessage *rm, NeighFlow *nf);
     int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf) {
+        return lfdb->rib_handler(rm,nf);
+    };
     int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
     int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
     int status_handler(const CDAPMessage *rm, NeighFlow *nf);

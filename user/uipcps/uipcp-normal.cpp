@@ -333,7 +333,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
-    lfdb = new struct lfdb(this);
+    lfdb = new lfdb_default(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
