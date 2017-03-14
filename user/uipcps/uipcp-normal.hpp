@@ -314,6 +314,39 @@ struct flow_allocator_default : public flow_allocator {
     int flows_handler_delete(const CDAPMessage *rm);
 };
 
+struct lfdb {
+    /* Backpointer to parent data structure. */
+    struct uipcp_rib *rib;
+
+    /* Lower Flow Database. */
+    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb_db;
+
+    RoutingEngine re;
+
+    lfdb(struct uipcp_rib *_ur) : rib(_ur), re(_ur) { }
+    ~lfdb() { }
+
+    void dump(std::stringstream& ss) const;
+
+    const LowerFlow *find(rlm_addr_t local_addr,
+                               rlm_addr_t remote_addr) const {
+        return _find(local_addr, remote_addr);
+    };
+    LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    bool add(const LowerFlow &lf);
+    bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    void update_local(const std::string& neigh_name);
+    void update_address(rlm_addr_t new_addr);
+
+    const LowerFlow *_find(rlm_addr_t local_addr,
+                                rlm_addr_t remote_addr) const;
+
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+    int neighs_refresh_lower_flows();
+};
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
@@ -363,9 +396,7 @@ struct uipcp_rib {
     struct dft *dft;
 
     /* Lower Flow Database. */
-    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > lfdb;
-
-    RoutingEngine re;
+    struct lfdb *lfdb;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
@@ -401,16 +432,6 @@ struct uipcp_rib {
     rlm_addr_t addr_allocate();
     void neigh_flow_prune(NeighFlow *nf);
 
-    const LowerFlow *lfdb_find(rlm_addr_t local_addr,
-                               rlm_addr_t remote_addr) const {
-        return _lfdb_find(local_addr, remote_addr);
-    };
-    LowerFlow *lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
-    bool lfdb_add(const LowerFlow &lf);
-    bool lfdb_del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
-    void lfdb_update_local(const std::string& neigh_name);
-    void lfdb_update_address(rlm_addr_t new_addr);
-
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
     int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
@@ -423,7 +444,6 @@ struct uipcp_rib {
     int neighs_sync_obj_all(bool create, const std::string& obj_class,
                         const std::string& obj_name,
                         const UipcpObject *obj_value) const;
-    int neighs_refresh_lower_flows();
 
     /* Receive info from neighbors. */
     int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
@@ -441,9 +461,6 @@ private:
 #ifdef RL_USE_QOS_CUBES
     int load_qos_cubes(const char *);
 #endif /* RL_USE_QOS_CUBES */
-
-    const LowerFlow *_lfdb_find(rlm_addr_t local_addr,
-                                rlm_addr_t remote_addr) const;
 };
 
 static inline void

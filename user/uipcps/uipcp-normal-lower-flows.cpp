@@ -30,20 +30,20 @@ using namespace std;
 
 
 LowerFlow *
-uipcp_rib::lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr)
+lfdb::find(rlm_addr_t local_addr, rlm_addr_t remote_addr)
 {
-    const LowerFlow *lf = _lfdb_find(local_addr, remote_addr);
+    const LowerFlow *lf = _find(local_addr, remote_addr);
     return const_cast<LowerFlow *>(lf);
 }
 
 const LowerFlow *
-uipcp_rib::_lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr) const
+lfdb::_find(rlm_addr_t local_addr, rlm_addr_t remote_addr) const
 {
     map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::const_iterator it
-                                            = lfdb.find(local_addr);
+                                            = lfdb_db.find(local_addr);
     map<rlm_addr_t, LowerFlow>::const_iterator jt;
 
-    if (it == lfdb.end()) {
+    if (it == lfdb_db.end()) {
         return NULL;
     }
 
@@ -55,31 +55,31 @@ uipcp_rib::_lfdb_find(rlm_addr_t local_addr, rlm_addr_t remote_addr) const
 /* The add method has overwrite semantic, and possibly resets the age.
  * Returns true if something changed. */
 bool
-uipcp_rib::lfdb_add(const LowerFlow &lf)
+lfdb::add(const LowerFlow &lf)
 {
     map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::iterator it
-                                            = lfdb.find(lf.local_addr);
+                                            = lfdb_db.find(lf.local_addr);
     string repr = static_cast<string>(lf);
     LowerFlow lfz = lf;
     bool local_entry;
 
     lfz.age = 0;
 
-    if (it == lfdb.end() || it->second.count(lf.remote_addr) == 0) {
+    if (it == lfdb_db.end() || it->second.count(lf.remote_addr) == 0) {
         /* Not there, we need to add the entry. */
-        lfdb[lf.local_addr][lf.remote_addr] = lfz;
-        UPD(uipcp, "Lower flow %s added\n", repr.c_str());
+        lfdb_db[lf.local_addr][lf.remote_addr] = lfz;
+        UPD(rib->uipcp, "Lower flow %s added\n", repr.c_str());
         return true;
     }
 
     /* Entry is already there. Update if needed (this expression
      * was obtained by means of a Karnaugh map on three variables:
      * local, newer, equal). */
-    local_entry = (lfz.local_addr == myaddr);
+    local_entry = (lfz.local_addr == rib->myaddr);
     if ((!local_entry && lfz.seqnum > it->second[lfz.remote_addr].seqnum)
                 || (local_entry && lfz != it->second[lfz.remote_addr])) {
         it->second[lfz.remote_addr] = lfz; /* Update the entry */
-        UPV(uipcp, "Lower flow %s updated\n", repr.c_str());
+        UPV(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
         return true;
     }
 
@@ -88,13 +88,13 @@ uipcp_rib::lfdb_add(const LowerFlow &lf)
 
 /* Returns true if something changed. */
 bool
-uipcp_rib::lfdb_del(rlm_addr_t local_addr, rlm_addr_t remote_addr)
+lfdb::del(rlm_addr_t local_addr, rlm_addr_t remote_addr)
 {
     map<rlm_addr_t, map<rlm_addr_t, LowerFlow> >::iterator it
-                                            = lfdb.find(local_addr);
+                                            = lfdb_db.find(local_addr);
     map<rlm_addr_t, LowerFlow>::iterator jt;
 
-    if (it == lfdb.end()) {
+    if (it == lfdb_db.end()) {
         return false;
     }
 
@@ -106,17 +106,17 @@ uipcp_rib::lfdb_del(rlm_addr_t local_addr, rlm_addr_t remote_addr)
 
     it->second.erase(jt);
 
-    UPD(uipcp, "Lower flow %u-%u removed\n", (unsigned int)local_addr,
+    UPD(rib->uipcp, "Lower flow %u-%u removed\n", (unsigned int)local_addr,
 		(unsigned int)remote_addr);
 
     return true;
 }
 
 void
-uipcp_rib::lfdb_update_local(const string& neigh_name)
+lfdb::update_local(const string& neigh_name)
 {
-    rlm_addr_t remote_addr = lookup_neighbor_address(neigh_name);
-    Neighbor *neigh = get_neighbor(neigh_name, false);
+    rlm_addr_t remote_addr = rib->lookup_neighbor_address(neigh_name);
+    Neighbor *neigh = rib->get_neighbor(neigh_name, false);
     LowerFlowList lfl;
     LowerFlow lf;
     CDAPMessage *sm;
@@ -126,7 +126,7 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
         return;
     }
 
-    lf.local_addr = myaddr;
+    lf.local_addr = rib->myaddr;
     lf.remote_addr = remote_addr;
     lf.cost = 1;
     lf.seqnum = 1; /* not meaningful */
@@ -136,28 +136,33 @@ uipcp_rib::lfdb_update_local(const string& neigh_name)
 
     sm = rl_new(CDAPMessage(), RL_MT_CDAP);
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
-    send_to_myself(sm, &lfl);
+    rib->send_to_myself(sm, &lfl);
 }
 
 int
-uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf) {
+    return lfdb->rib_handler(rm,nf);
+}
+
+int
+lfdb::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     const char *objbuf;
     size_t objlen;
-    bool add = true;
+    bool add_f = true;
 
     if (rm->op_code != gpb::M_CREATE && rm->op_code != gpb::M_DELETE) {
-        UPE(uipcp, "M_CREATE or M_DELETE expected\n");
+        UPE(rib->uipcp, "M_CREATE or M_DELETE expected\n");
         return 0;
     }
 
     if (rm->op_code == gpb::M_DELETE) {
-        add = false;
+        add_f = false;
     }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        UPE(uipcp, "M_START does not contain a nested message\n");
+        UPE(rib->uipcp, "M_START does not contain a nested message\n");
         abort();
         return 0;
     }
@@ -168,14 +173,14 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     for (list<LowerFlow>::iterator f = lfl.flows.begin();
                                 f != lfl.flows.end(); f++) {
-        if (add) {
-            if (lfdb_add(*f)) {
+        if (add_f) {
+            if (add(*f)) {
                 modified = true;
                 prop_lfl.flows.push_back(*f);
             }
 
         } else {
-            if (lfdb_del(f->local_addr, f->remote_addr)) {
+            if (del(f->local_addr, f->remote_addr)) {
                 modified = true;
                 prop_lfl.flows.push_back(*f);
             }
@@ -184,33 +189,33 @@ uipcp_rib::lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::lfdb,
+        rib->neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add_f, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        re.update_kernel_routing(myaddr);
+        re.update_kernel_routing(rib->myaddr);
     }
 
     return 0;
 }
 
 void
-uipcp_rib::lfdb_update_address(rlm_addr_t new_addr)
+lfdb::update_address(rlm_addr_t new_addr)
 {
     LowerFlowList lfl;
 
     /* Update local entries and propagate them. */
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::iterator
-            it = lfdb.begin(); it != lfdb.end(); it++) {
+            it = lfdb_db.begin(); it != lfdb_db.end(); it++) {
         for (map<rlm_addr_t, LowerFlow>::iterator jt = it->second.begin();
                                                 jt != it->second.end(); jt++) {
             LowerFlow &flow = jt->second;
 
-            if (flow.local_addr == myaddr) {
+            if (flow.local_addr == rib->myaddr) {
                 flow.local_addr = new_addr;
                 flow.seqnum ++;
                 lfl.flows.push_back(flow);
-                UPD(uipcp, "Local lower flow entry updated: %s\n",
+                UPD(rib->uipcp, "Local lower flow entry updated: %s\n",
                            static_cast<string>(flow).c_str());
             }
         }
@@ -224,6 +229,96 @@ uipcp_rib::lfdb_update_address(rlm_addr_t new_addr)
 }
 
 void
+lfdb::dump(std::stringstream& ss) const
+{
+    ss << "Lower Flow Database:" << endl;
+    for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator
+            it = lfdb_db.begin(); it != lfdb_db.end(); it++) {
+        for (map<rlm_addr_t, LowerFlow>::const_iterator jt = it->second.begin();
+                                                jt != it->second.end(); jt++) {
+        const LowerFlow& flow = jt->second;
+
+        ss << "    LocalAddr: " << flow.local_addr << ", RemoteAddr: "
+            << flow.remote_addr << ", Cost: " << flow.cost <<
+                ", Seqnum: " << flow.seqnum << ", State: " << flow.state
+                    << ", Age: " << flow.age << endl;
+        }
+    }
+
+    ss << endl;
+}
+
+int
+lfdb::sync_neigh(NeighFlow *nf, unsigned int limit) const
+{
+    int ret = 0;
+
+    map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::const_iterator it;
+    map< rlm_addr_t, LowerFlow >::const_iterator jt;
+    LowerFlowList lfl;
+
+    if (lfdb_db.size() > 0) {
+        it = lfdb_db.begin();
+        jt = it->second.begin();
+        for (;;) {
+            if (jt == it->second.end()) {
+                if (++it != lfdb_db.end()) {
+                    jt = it->second.begin();
+                }
+            }
+
+            if (lfl.flows.size() >= limit || it == lfdb_db.end()) {
+                ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::lfdb,
+                        obj_name::lfdb, &lfl);
+                lfl.flows.clear();
+                if (it == lfdb_db.end()) {
+                    break;
+                }
+            }
+
+            lfl.flows.push_back(jt->second);
+            jt ++;
+        }
+    }
+
+    return ret;
+}
+
+int
+lfdb::neighs_refresh_lower_flows()
+{
+    map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
+    map< rlm_addr_t, LowerFlow >::iterator jt;
+    unsigned int limit = 10;
+    int ret = 0;
+
+    if (lfdb_db.size() == 0) {
+        /* Still not enrolled to anyone, nothing to do. */
+        return 0;
+    }
+
+    /* Fetch the map containing all the LFDB entries with the local
+     * address corresponding to me. */
+    it = lfdb_db.find(rib->myaddr);
+    assert(it != lfdb_db.end());
+
+    for (map< rlm_addr_t, LowerFlow >::iterator jt = it->second.begin();
+                                        jt != it->second.end();) {
+        LowerFlowList lfl;
+
+        while (lfl.flows.size() < limit && jt != it->second.end()) {
+                jt->second.seqnum ++;
+                lfl.flows.push_back(jt->second);
+                jt ++;
+        }
+        ret |= rib->neighs_sync_obj_all(true, obj_class::lfdb,
+                                   obj_name::lfdb, &lfl);
+    }
+
+    return ret;
+}
+
+void
 age_incr_cb(struct uipcp *uipcp, void *arg)
 {
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
@@ -231,7 +326,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
     bool discarded = false;
 
     for (map<rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it
-                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+                = rib->lfdb->lfdb_db.begin(); it != rib->lfdb->lfdb_db.end(); it++) {
         list<map<rlm_addr_t, LowerFlow >::iterator> discard_list;
 
         if (it->first == rib->myaddr) {
@@ -261,7 +356,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     if (discarded) {
         /* Update the routing table. */
-        rib->re.update_kernel_routing(rib->myaddr);
+        rib->lfdb->re.update_kernel_routing(rib->myaddr);
     }
 
     /* Reschedule */
@@ -280,12 +375,12 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 
     /* Build the graph from the Lower Flow Database. */
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator it
-                = rib->lfdb.begin(); it != rib->lfdb.end(); it++) {
+                = rib->lfdb->lfdb_db.begin(); it != rib->lfdb->lfdb_db.end(); it++) {
         for (map<rlm_addr_t, LowerFlow>::const_iterator jt
                     = it->second.begin(); jt != it->second.end(); jt++) {
             const LowerFlow *revlf;
 
-            revlf = rib->lfdb_find(jt->second.local_addr,
+            revlf = rib->lfdb->find(jt->second.local_addr,
                                    jt->second.remote_addr);
 
             if (revlf == NULL || revlf->cost != jt->second.cost) {
@@ -299,7 +394,7 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     }
 
 #if 1
-    PV_S("Graph [%lu]:\n", rib->lfdb.size());
+    PV_S("Graph [%lu]:\n", rib->lfdb->lfdb_db.size());
     for (map<rlm_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
         PV_S("%lu: {", (long unsigned)g->first);
