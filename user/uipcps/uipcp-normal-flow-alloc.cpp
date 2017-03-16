@@ -510,12 +510,6 @@ flow_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
-int
-uipcp_rib::flows_handler(const CDAPMessage *rm, NeighFlow *nf)
-{
-    return fa->rib_handler(rm, nf);
-}
-
 void
 flow_allocator_default::dump(std::stringstream& ss) const
 {
