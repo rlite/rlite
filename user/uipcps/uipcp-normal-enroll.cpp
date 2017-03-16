@@ -982,33 +982,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize lower flow database. */
-        map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
-        map< rlm_addr_t, LowerFlow >::iterator jt;
-        LowerFlowList lfl;
-
-        if (rib->lfdb.size() > 0) {
-            it = rib->lfdb.begin();
-            jt = it->second.begin();
-            for (;;) {
-                if (jt == it->second.end()) {
-                    if (++it != rib->lfdb.end()) {
-                        jt = it->second.begin();
-                    }
-                }
-
-                if (lfl.flows.size() >= limit || it == rib->lfdb.end()) {
-                    ret |= neigh_sync_obj(nf, true, obj_class::lfdb,
-                                           obj_name::lfdb, &lfl);
-                    lfl.flows.clear();
-                    if (it == rib->lfdb.end()) {
-                        break;
-                    }
-                }
-
-                lfl.flows.push_back(jt->second);
-                jt ++;
-            }
-        }
+        ret |= rib->lfdb->sync_neigh(nf, limit);
     }
 
     {
@@ -1078,44 +1052,10 @@ sync_timeout_cb(struct uipcp *uipcp, void *arg)
 
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
-    rib->neighs_refresh_lower_flows();
+    rib->lfdb->neighs_refresh_lower_flows();
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
 					  RL_NEIGH_SYNC_INTVAL * 1000,
                                           sync_timeout_cb, rib);
-}
-
-int
-uipcp_rib::neighs_refresh_lower_flows()
-{
-    map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
-    map< rlm_addr_t, LowerFlow >::iterator jt;
-    unsigned int limit = 10;
-    int ret = 0;
-
-    if (lfdb.size() == 0) {
-        /* Still not enrolled to anyone, nothing to do. */
-        return 0;
-    }
-
-    /* Fetch the map containing all the LFDB entries with the local
-     * address corresponding to me. */
-    it = lfdb.find(myaddr);
-    assert(it != lfdb.end());
-
-    for (map< rlm_addr_t, LowerFlow >::iterator jt = it->second.begin();
-                                        jt != it->second.end();) {
-        LowerFlowList lfl;
-
-        while (lfl.flows.size() < limit && jt != it->second.end()) {
-                jt->second.seqnum ++;
-                lfl.flows.push_back(jt->second);
-                jt ++;
-        }
-        ret |= neighs_sync_obj_all(true, obj_class::lfdb,
-				   obj_name::lfdb, &lfl);
-    }
-
-    return ret;
 }
 
 Neighbor *
@@ -1257,7 +1197,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 
                 /* Possibly updated neighbor address, we may need to update or
                  * insert a local LFDB entry. */
-                lfdb_update_local(neigh_name);
+                lfdb->update_local(neigh_name);
             }
 
         } else {
@@ -1486,7 +1426,7 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
      * the local entries. */
-    rib->lfdb_update_local(ipcp_name);
+    rib->lfdb->update_local(ipcp_name);
 
     return 0;
 }

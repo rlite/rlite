@@ -306,7 +306,7 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd)
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          self_registered(false),
                                          self_registration_needed(false),
-                                         myaddr(0), re(this)
+                                         myaddr(0)
 {
     int ret;
 
@@ -333,6 +333,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
+    lfdb = new lfdb_default(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -367,6 +368,7 @@ uipcp_rib::~uipcp_rib()
         rl_delete(mit->second, RL_MT_NEIGH);
     }
 
+    delete lfdb;
     delete fa;
     delete dft;
 
@@ -505,22 +507,7 @@ uipcp_rib::dump() const
     ss << endl;
 
     dft->dump(ss);
-
-    ss << "Lower Flow Database:" << endl;
-    for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator
-            it = lfdb.begin(); it != lfdb.end(); it++) {
-        for (map<rlm_addr_t, LowerFlow>::const_iterator jt = it->second.begin();
-                                                jt != it->second.end(); jt++) {
-        const LowerFlow& flow = jt->second;
-
-        ss << "    LocalAddr: " << flow.local_addr << ", RemoteAddr: "
-            << flow.remote_addr << ", Cost: " << flow.cost <<
-                ", Seqnum: " << flow.seqnum << ", State: " << flow.state
-                    << ", Age: " << flow.age << endl;
-        }
-    }
-
-    ss << endl;
+    lfdb->dump(ss);
 
     ss << "Address Allocation Table:" << endl;
     for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
@@ -551,7 +538,7 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
     }
 
     dft->update_address(new_addr);
-    lfdb_update_address(new_addr);
+    lfdb->update_address(new_addr);
     UPD(uipcp, "Address updated %lu --> %lu\n",
                (long unsigned)myaddr, (long unsigned)new_addr);
     myaddr = new_addr; /* do the update */
@@ -1208,7 +1195,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
 
     /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
      * the local entries. */
-    rib->lfdb_update_local(neigh->ipcp_name);
+    rib->lfdb->update_local(neigh->ipcp_name);
 
     return 0;
 
