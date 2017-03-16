@@ -469,12 +469,16 @@ struct uipcp_rib {
     int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
 
     /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int dft_handler(const CDAPMessage *rm, NeighFlow *nf) {
+        return dft->rib_handler(rm, nf);
+    };
     int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf);
     int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf) {
         return lfdb->rib_handler(rm,nf);
     };
-    int flows_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int flows_handler(const CDAPMessage *rm, NeighFlow *nf) {
+        return fa->rib_handler(rm, nf);
+    };
     int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
     int status_handler(const CDAPMessage *rm, NeighFlow *nf);
     int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf);

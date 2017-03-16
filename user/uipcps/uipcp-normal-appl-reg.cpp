@@ -157,12 +157,6 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 }
 
 int
-uipcp_rib::dft_handler(const CDAPMessage *rm, NeighFlow *nf)
-{
-    return dft->rib_handler(rm, nf);
-}
-
-int
 dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     struct uipcp *uipcp = rib->uipcp;
