@@ -179,47 +179,6 @@ private:
     const NeighFlow *_mgmt_conn() const;
 };
 
-class RoutingEngine {
-public:
-    RoutingEngine() : rib(NULL) { };
-    RoutingEngine(struct uipcp_rib *r) : rib(r) { }
-
-    /* Recompute routing and forwarding table and possibly
-     * update kernel forwarding data structures. */
-    void update_kernel_routing(rlm_addr_t);
-
-private:
-    /* Step 1. Shortest Path algorithm. */
-    int compute_next_hops(rlm_addr_t);
-
-    /* Step 2. Forwarding table computation and kernel update. */
-    int compute_fwd_table();
-
-    struct Edge {
-        rlm_addr_t to;
-        unsigned int cost;
-
-        Edge(rlm_addr_t to_, unsigned int cost_) :
-                            to(to_), cost(cost_) { }
-    };
-
-    struct Info {
-        unsigned int dist;
-        bool visited;
-    };
-
-    std::map<rlm_addr_t, std::list<Edge> > graph;
-    std::map<rlm_addr_t, Info> info;
-
-    /* The routing table computed by compute_next_hops(). */
-    std::map<rlm_addr_t, rlm_addr_t> next_hops;
-
-    /* The forwarding table computed by compute_fwd_table(). */
-    std::map<rlm_addr_t, rl_port_t> next_ports;
-
-    struct uipcp_rib *rib;
-};
-
 class ScopeLock {
 public:
     ScopeLock(pthread_mutex_t& m) : mutex(m) {
@@ -250,25 +209,6 @@ struct dft {
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
-struct dft_default : public dft {
-    /* Directory Forwarding Table, mapping application name (std::string)
-     * to a set of nodes that registered that name. All nodes are considered
-     * equivalent. */
-    std::multimap< std::string, DFTEntry > dft_table;
-
-    dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
-    ~dft_default() { }
-
-    void dump(std::stringstream& ss) const;
-
-    int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
-                     const rlm_addr_t preferred) const;
-    int appl_register(const struct rl_kmsg_appl_register *req);
-    void update_address(rlm_addr_t new_addr);
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-};
-
 struct flow_allocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -294,26 +234,6 @@ struct flow_allocator {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
-struct flow_allocator_default : public flow_allocator {
-    flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) { }
-    ~flow_allocator_default() { }
-
-    void dump(std::stringstream& ss) const;
-    void dump_memtrack(std::stringstream& ss) const;
-
-    std::map< std::string, FlowRequest > flow_reqs;
-    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
-
-    int fa_req(struct rl_kmsg_fa_req *req);
-    int fa_resp(struct rl_kmsg_fa_resp *resp);
-
-    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
-
-    int flows_handler_create(const CDAPMessage *rm);
-    int flows_handler_create_r(const CDAPMessage *rm);
-    int flows_handler_delete(const CDAPMessage *rm);
-};
-
 struct lfdb {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -335,36 +255,6 @@ struct lfdb {
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
     virtual int neighs_refresh_lower_flows() = 0;
-};
-
-struct lfdb_default : public lfdb {
-    /* Lower Flow Database. */
-    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > db;
-
-    RoutingEngine re;
-
-    lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) { }
-    ~lfdb_default() { }
-
-    void dump(std::stringstream& ss) const;
-
-    const LowerFlow *find(rlm_addr_t local_addr,
-                               rlm_addr_t remote_addr) const {
-        return _find(local_addr, remote_addr);
-    };
-    LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
-    bool add(const LowerFlow &lf);
-    bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
-    void update_local(const std::string& neigh_name);
-    void update_address(rlm_addr_t new_addr);
-
-    const LowerFlow *_find(rlm_addr_t local_addr,
-                                rlm_addr_t remote_addr) const;
-
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
-
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int neighs_refresh_lower_flows();
 };
 
 struct uipcp_rib {
@@ -523,5 +413,120 @@ void age_incr_cb(struct uipcp *uipcp, void *arg);
 void sync_timeout_cb(struct uipcp *uipcp, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
+
+
+/*
+ * Default implementation for IPCP components.
+ */
+
+struct dft_default : public dft {
+    /* Directory Forwarding Table, mapping application name (std::string)
+     * to a set of nodes that registered that name. All nodes are considered
+     * equivalent. */
+    std::multimap< std::string, DFTEntry > dft_table;
+
+    dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
+    ~dft_default() { }
+
+    void dump(std::stringstream& ss) const;
+
+    int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
+                     const rlm_addr_t preferred) const;
+    int appl_register(const struct rl_kmsg_appl_register *req);
+    void update_address(rlm_addr_t new_addr);
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+};
+
+struct flow_allocator_default : public flow_allocator {
+    flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) { }
+    ~flow_allocator_default() { }
+
+    void dump(std::stringstream& ss) const;
+    void dump_memtrack(std::stringstream& ss) const;
+
+    std::map< std::string, FlowRequest > flow_reqs;
+    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
+
+    int fa_req(struct rl_kmsg_fa_req *req);
+    int fa_resp(struct rl_kmsg_fa_resp *resp);
+
+    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
+
+    int flows_handler_create(const CDAPMessage *rm);
+    int flows_handler_create_r(const CDAPMessage *rm);
+    int flows_handler_delete(const CDAPMessage *rm);
+};
+
+class RoutingEngine {
+public:
+    RoutingEngine() : rib(NULL) { };
+    RoutingEngine(struct uipcp_rib *r) : rib(r) { }
+
+    /* Recompute routing and forwarding table and possibly
+     * update kernel forwarding data structures. */
+    void update_kernel_routing(rlm_addr_t);
+
+private:
+    /* Step 1. Shortest Path algorithm. */
+    int compute_next_hops(rlm_addr_t);
+
+    /* Step 2. Forwarding table computation and kernel update. */
+    int compute_fwd_table();
+
+    struct Edge {
+        rlm_addr_t to;
+        unsigned int cost;
+
+        Edge(rlm_addr_t to_, unsigned int cost_) :
+                            to(to_), cost(cost_) { }
+    };
+
+    struct Info {
+        unsigned int dist;
+        bool visited;
+    };
+
+    std::map<rlm_addr_t, std::list<Edge> > graph;
+    std::map<rlm_addr_t, Info> info;
+
+    /* The routing table computed by compute_next_hops(). */
+    std::map<rlm_addr_t, rlm_addr_t> next_hops;
+
+    /* The forwarding table computed by compute_fwd_table(). */
+    std::map<rlm_addr_t, rl_port_t> next_ports;
+
+    struct uipcp_rib *rib;
+};
+
+struct lfdb_default : public lfdb {
+    /* Lower Flow Database. */
+    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > db;
+
+    RoutingEngine re;
+
+    lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) { }
+    ~lfdb_default() { }
+
+    void dump(std::stringstream& ss) const;
+
+    const LowerFlow *find(rlm_addr_t local_addr,
+                               rlm_addr_t remote_addr) const {
+        return _find(local_addr, remote_addr);
+    };
+    LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    bool add(const LowerFlow &lf);
+    bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    void update_local(const std::string& neigh_name);
+    void update_address(rlm_addr_t new_addr);
+
+    const LowerFlow *_find(rlm_addr_t local_addr,
+                                rlm_addr_t remote_addr) const;
+
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+    int neighs_refresh_lower_flows();
+};
 
 #endif  /* __UIPCP_RIB_H__ */
