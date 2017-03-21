@@ -334,6 +334,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
+    addra = new addr_allocator(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -368,6 +369,7 @@ uipcp_rib::~uipcp_rib()
         rl_delete(mit->second, RL_MT_NEIGH);
     }
 
+    delete addra;
     delete lfdb;
     delete fa;
     delete dft;
@@ -508,17 +510,7 @@ uipcp_rib::dump() const
 
     dft->dump(ss);
     lfdb->dump(ss);
-
-    ss << "Address Allocation Table:" << endl;
-    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
-            mit = addr_alloc_table.begin();
-                mit != addr_alloc_table.end(); mit++) {
-        ss << "    Address: " << mit->first
-            << ", Requestor: " << mit->second.requestor << endl;
-    }
-
-    ss << endl;
-
+    addra->dump(ss);
     fa->dump(ss);
 
 #ifdef RL_MEMTRACK
@@ -760,12 +752,49 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
-rlm_addr_t
-uipcp_rib::addr_allocate()
+void
+addr_allocator::dump(std::stringstream& ss) const
 {
-    rlm_addr_t addr = myaddr; /* exclude my address */
+    ss << "Address Allocation Table:" << endl;
+    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
+            mit = addr_alloc_table.begin();
+                mit != addr_alloc_table.end(); mit++) {
+        ss << "    Address: " << mit->first
+            << ", Requestor: " << mit->second.requestor << endl;
+    }
 
-    if (!uipcp->uipcps->auto_addr_alloc) {
+    ss << endl;
+}
+
+int
+addr_allocator::sync_neigh(NeighFlow *nf, unsigned int limit) const
+{
+    int ret = 0;
+
+    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
+            at = addr_alloc_table.begin();
+            at != addr_alloc_table.end();) {
+        AddrAllocEntries l;
+
+        while (l.entries.size() < limit &&
+                at != addr_alloc_table.end()) {
+            l.entries.push_back(at->second);
+            at ++;
+        }
+
+        ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
+                obj_name::addr_alloc_table, &l);
+    }
+
+    return ret;
+}
+
+rlm_addr_t
+addr_allocator::allocate()
+{
+    rlm_addr_t addr = rib->myaddr; /* exclude my address */
+
+    if (!rib->uipcp->uipcps->auto_addr_alloc) {
         /* Return the void address. */
         return 0;
     }
@@ -785,12 +814,12 @@ uipcp_rib::addr_allocate()
     for (;;) {
         addr ++; /* try with the next one */
 
-        UPD(uipcp, "Trying with address %lu\n", (unsigned long)addr);
-        addr_alloc_table[addr] = AddrAllocRequest(addr, myaddr);
+        UPD(rib->uipcp, "Trying with address %lu\n", (unsigned long)addr);
+        addr_alloc_table[addr] = AddrAllocRequest(addr, rib->myaddr);
 
         for (map<string, Neighbor*>::iterator
-                    nit = neighbors.begin();
-                            nit != neighbors.end(); nit++) {
+                    nit = rib->neighbors.begin();
+                            nit != rib->neighbors.end(); nit++) {
             if (nit->second->enrollment_complete()) {
                 AddrAllocRequest aar;
                 CDAPMessage m;
@@ -798,15 +827,15 @@ uipcp_rib::addr_allocate()
 
                 m.m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
-                aar.requestor = myaddr;
+                aar.requestor = rib->myaddr;
                 aar.address = addr;
                 ret = nit->second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
                 if (ret) {
-                    UPE(uipcp, "Failed to send msg to neighbot [%s]\n",
+                    UPE(rib->uipcp, "Failed to send msg to neighbot [%s]\n",
                                strerror(errno));
                     return 0;
                 } else {
-                    UPD(uipcp, "Sent address allocation request to neigh %s, "
+                    UPD(rib->uipcp, "Sent address allocation request to neigh %s, "
                         "(addr=%lu,requestor=%lu)\n",
                         nit->second->ipcp_name.c_str(),
                         (long unsigned)aar.address,
@@ -815,19 +844,19 @@ uipcp_rib::addr_allocate()
             }
         }
 
-        pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&rib->lock);
         /* Wait a bit for possible negative responses. */
         sleep(1);
-        pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&rib->lock);
 
         map<rlm_addr_t, AddrAllocRequest>::iterator mit;
 
         /* If the request is still there, then we consider the allocation
          * complete. */
         mit = addr_alloc_table.find(addr);
-        if (mit != addr_alloc_table.end() && mit->second.requestor == myaddr) {
+        if (mit != addr_alloc_table.end() && mit->second.requestor == rib->myaddr) {
             addr_alloc_table[addr].pending = false;
-            UPD(uipcp, "Address %lu allocated\n", (unsigned long)addr);
+            UPD(rib->uipcp, "Address %lu allocated\n", (unsigned long)addr);
             break;
         }
     }
@@ -836,7 +865,7 @@ uipcp_rib::addr_allocate()
 }
 
 int
-uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
+addr_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     bool create;
     const char *objbuf;
@@ -844,7 +873,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
-        UPE(uipcp, "No object value found\n");
+        UPE(rib->uipcp, "No object value found\n");
         return 0;
     }
 
@@ -856,7 +885,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
         create = false;
         break;
     default:
-        UPE(uipcp, "M_CREATE/M_DELETE expected\n");
+        UPE(rib->uipcp, "M_CREATE/M_DELETE expected\n");
         return 0;
     }
 
@@ -874,7 +903,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
             if (mit == addr_alloc_table.end()) {
                 /* New address allocation request, no conflicts. */
                 addr_alloc_table[aar.address] = aar;
-                UPD(uipcp, "Address allocation request ok, (addr=%lu,"
+                UPD(rib->uipcp, "Address allocation request ok, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
                 propagate = true;
@@ -884,14 +913,14 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
                 CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
                 int ret;
 
-                UPI(uipcp, "Address allocation request conflicts, (addr=%lu,"
+                UPI(rib->uipcp, "Address allocation request conflicts, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
                 m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
-                ret = send_to_dst_addr(m, aar.requestor, &aar);
+                ret = rib->send_to_dst_addr(m, aar.requestor, &aar);
                 if (ret) {
-                    UPE(uipcp, "Failed to send message to %lu [%s]\n",
+                    UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",
                             (unsigned long)aar.requestor, strerror(errno));
                 }
             } else {
@@ -904,7 +933,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
                 /* Negative feedback on a flow allocation request. */
                 addr_alloc_table.erase(aar.address);
                 propagate = true;
-                UPI(uipcp, "Address allocation request deleted, (addr=%lu,"
+                UPI(rib->uipcp, "Address allocation request deleted, (addr=%lu,"
                            "requestor=%lu)\n", (long unsigned)aar.address,
                             (long unsigned)aar.requestor);
             }
@@ -915,7 +944,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (propagate) {
-            neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
                                       rm->obj_name, &aar);
         }
 
@@ -936,7 +965,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
                                 mit->second.requestor != r->requestor) {
                     addr_alloc_table[r->address] = *r; /* overwrite */
                     prop_aal.entries.push_back(*r);
-                    UPD(uipcp, "Address allocation entry created (addr=%lu,"
+                    UPD(rib->uipcp, "Address allocation entry created (addr=%lu,"
                                 "requestor=%lu)\n", (long unsigned)r->address,
                                 (long unsigned)r->requestor);
                 }
@@ -945,7 +974,7 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
                                 mit->second.requestor == r->requestor) {
                     addr_alloc_table.erase(r->address);
                     prop_aal.entries.push_back(*r);
-                    UPD(uipcp, "Address allocation entry deleted (addr=%lu,"
+                    UPD(rib->uipcp, "Address allocation entry deleted (addr=%lu,"
                                 "requestor=%lu)\n", (long unsigned)r->address,
                                 (long unsigned)r->requestor);
                 }
@@ -953,12 +982,12 @@ uipcp_rib::addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (prop_aal.entries.size() > 0) {
-            neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
+            rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
                                       rm->obj_name, &prop_aal);
         }
 
     } else {
-        UPE(uipcp, "Unexpected object class %s\n", rm->obj_class.c_str());
+        UPE(rib->uipcp, "Unexpected object class %s\n", rm->obj_class.c_str());
     }
 
     return 0;

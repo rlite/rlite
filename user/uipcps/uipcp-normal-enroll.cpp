@@ -1022,20 +1022,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     {
         /* Synchronize address allocation table. */
-        for (map<rlm_addr_t, AddrAllocRequest>::iterator
-                        at = rib->addr_alloc_table.begin();
-                                    at != rib->addr_alloc_table.end();) {
-            AddrAllocEntries l;
-
-            while (l.entries.size() < limit &&
-                            at != rib->addr_alloc_table.end()) {
-                l.entries.push_back(at->second);
-                at ++;
-            }
-
-            ret |= neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
-                                  obj_name::addr_alloc_table, &l);
-        }
+        ret |= rib->addra->sync_neigh(nf, limit);
     }
 
     UPD(rib->uipcp, "Finished RIB sync with neighbor '%s'\n",
