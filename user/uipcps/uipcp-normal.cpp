@@ -773,7 +773,7 @@ addr_allocator_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 
     for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
             at = addr_alloc_table.begin();
-            at != addr_alloc_table.end();) {
+                at != addr_alloc_table.end();) {
         AddrAllocEntries l;
 
         while (l.entries.size() < limit &&

@@ -352,7 +352,7 @@ struct uipcp_rib {
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
-    rlm_addr_t addr_allocate() {return addra->allocate();};
+    rlm_addr_t addr_allocate() { return addra->allocate(); };
     void neigh_flow_prune(NeighFlow *nf);
 
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
