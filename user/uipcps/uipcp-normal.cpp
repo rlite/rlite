@@ -334,7 +334,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
-    addra = new addr_allocator(this);
+    addra = new addr_allocator_default(this);
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -753,7 +753,7 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-addr_allocator::dump(std::stringstream& ss) const
+addr_allocator_default::dump(std::stringstream& ss) const
 {
     ss << "Address Allocation Table:" << endl;
     for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
@@ -767,7 +767,7 @@ addr_allocator::dump(std::stringstream& ss) const
 }
 
 int
-addr_allocator::sync_neigh(NeighFlow *nf, unsigned int limit) const
+addr_allocator_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
@@ -790,7 +790,7 @@ addr_allocator::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 rlm_addr_t
-addr_allocator::allocate()
+addr_allocator_default::allocate()
 {
     rlm_addr_t addr = rib->myaddr; /* exclude my address */
 
@@ -865,7 +865,7 @@ addr_allocator::allocate()
 }
 
 int
-addr_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+addr_allocator_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     bool create;
     const char *objbuf;

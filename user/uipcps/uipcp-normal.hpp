@@ -261,17 +261,13 @@ struct addr_allocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
-    /* Table used to carry on distributed address allocation.
-     * It maps (address allocated) --> (requestor address). */
-    std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
-
     addr_allocator(struct uipcp_rib *_ur) : rib(_ur) { }
-    ~addr_allocator() { }
+    virtual ~addr_allocator() { }
 
-    void dump(std::stringstream& ss) const;
-    rlm_addr_t allocate();
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+    virtual void dump(std::stringstream& ss) const = 0;
+    virtual rlm_addr_t allocate() = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
 struct uipcp_rib {
@@ -546,6 +542,20 @@ struct lfdb_default : public lfdb {
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
     int neighs_refresh_lower_flows();
+};
+
+struct addr_allocator_default : public addr_allocator {
+    /* Table used to carry on distributed address allocation.
+     * It maps (address allocated) --> (requestor address). */
+    std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
+
+    addr_allocator_default(struct uipcp_rib *_ur) : addr_allocator(_ur) { }
+    ~addr_allocator_default() { }
+
+    void dump(std::stringstream& ss) const;
+    rlm_addr_t allocate();
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
 };
 
 #endif  /* __UIPCP_RIB_H__ */
