@@ -464,7 +464,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
         f = flow_reqs.find(rm->obj_name + string("R"));
 
         if (f == flow_reqs.end()) {
-            UPI(rib->uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
+            UPD(rib->uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
             return 0;
 
         } else {

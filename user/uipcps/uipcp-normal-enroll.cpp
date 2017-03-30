@@ -311,12 +311,14 @@ Neighbor::mgmt_conn()
 void
 NeighFlow::enrollment_commit()
 {
+    struct uipcp_rib *rib = neigh->rib;
+
     keepalive_tmr_start();
     enroll_state_set(NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
     while (!enroll_msgs.empty()) {
-        neigh->rib->cdap_dispatch(enroll_msgs.front(), this);
+        rib->cdap_dispatch(enroll_msgs.front(), this);
         rl_delete(enroll_msgs.front(), RL_MT_CDAP);
         enroll_msgs.pop_front();
     }
@@ -324,6 +326,14 @@ NeighFlow::enrollment_commit()
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(this);
     pthread_cond_signal(&enroll_stopped);
+
+    if (neigh->initiator) {
+        UPI(rib->uipcp, "Enrolled to DIF %s through neighbor %s\n",
+                rib->uipcp->dif_name, neigh->ipcp_name.c_str());
+    } else {
+        UPI(rib->uipcp, "Neighbor %s joined the DIF %s\n",
+                neigh->ipcp_name.c_str(), rib->uipcp->dif_name);
+    }
 }
 
 /* To be called with RIB lock held. */
@@ -509,9 +519,9 @@ enrollee_default(NeighFlow *nf)
         UPD(rib->uipcp, "I --> S M_STOP_R(enrollment)\n");
 
         if (enr_info.start_early) {
-            UPI(rib->uipcp, "Initiator is allowed to start early\n");
+            UPD(rib->uipcp, "Initiator is allowed to start early\n");
         } else {
-            UPI(rib->uipcp, "Not yet implemented\n");
+            UPE(rib->uipcp, "Not yet implemented\n");
             assert(false);
         }
 
@@ -1461,7 +1471,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
     nf = neigh->mgmt_conn();
 
     if (nf->enroll_state != NEIGH_NONE) {
-        UPI(rib->uipcp, "Enrollment state is %s\n",
+        UPI(rib->uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
 
     } else {
