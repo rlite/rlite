@@ -772,7 +772,7 @@ for vmname in sorted(vms):
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
-            'done\n\n' % {'vmname': vm['name']}
+            'done\n\n'
 
 if len(dns_mappings) > 0:
     print("DNS mappings: %s" % (dns_mappings))
