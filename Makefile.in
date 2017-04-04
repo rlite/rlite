@@ -34,3 +34,4 @@ usr_install:
 
 ker_install:
 	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ M=$(KERNMODDIR) modules_install
+	depmod -a
