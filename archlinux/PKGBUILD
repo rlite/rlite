@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r57.be61446
+pkgver=r1964.3ef74c5
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -13,7 +13,7 @@ makedepends=('git' 'linux-headers' 'fakeroot')
 install="rlite.install"
 source=("rlite.install" "rlite.conf" "rlite.service" "git+https://github.com/vmaffione/rlite.git")
 noextract=()
-md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "f42f582e7be0c99ed67a3cbe9e56c3ba" "ecaab3e792c1c36048a069334337b380" "SKIP")
+md5sums=("047aa5adec4c52ddbf86d12dbf300f71" "4bc1bc1402aeaca56fd22ab59dfa9fb6" "78bd22e673a5d3a5a0e62536758fce24" "SKIP")
 
 _gitname="rlite"
 
@@ -28,8 +28,7 @@ build() {
     msg "Building on kernel ${RKVER}..."
 
     cd "$srcdir/$_gitname"
-    #./configure --with-vmpi || exit 1
-    ./configure || exit 1
+    ./configure --prefix "$pkgdir" || exit 1
     make || exit 1
     msg "Build complete"
 }
@@ -43,26 +42,7 @@ package() {
     mkdir -p "$pkgdir/usr/lib/modules/${KVER1}/extra"
     cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
 
-    # Install the userspace programs and libraries
-    mkdir -p "$pkgdir/usr/bin"
-    mkdir -p "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/user/libs/librina-api.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/user/libs/librlite-cdap.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/user/libs/librlite-conf.so" "$pkgdir/usr/lib"
-    cp "$srcdir/$_gitname/build/user/uipcps/rlite-uipcps" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/user/tools/rinaperf" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/user/tools/rlite-ctl" "$pkgdir/usr/bin"
-    cp "$srcdir/$_gitname/build/user/tools/rina-gw" "$pkgdir/usr/bin"
-
-    # Install the rlite public headers
-    mkdir -p "$pkgdir/usr/include/rlite"
-    cp $srcdir/$_gitname/include/rlite/*.h "$pkgdir/usr/include/rlite"
-    cp $srcdir/$_gitname/include/rlite/cdap.hpp "$pkgdir/usr/include/rlite"
-    cp "$srcdir/$_gitname/build/user/libs/CDAP.pb.h" "$pkgdir/usr/include/rlite"
-
-    # Install configuration files
-    mkdir -p "$pkgdir/etc/rlite"
-    cp $srcdir/$_gitname/user/uipcps/shim-tcp4-dir "$pkgdir/etc/rlite"
+    make -C "$srcdir/$_gitname" usr_install
 
     # Install other system files
     mkdir -p "$pkgdir/var/rlite"
