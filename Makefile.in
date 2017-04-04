@@ -8,7 +8,7 @@ usr:
 	cd build && $(MAKE)
 
 ker:
-	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) PWD=$(PWD)/kernel modules
+	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) KERNMODDIR=$(KERNMODDIR) modules
 
 usr_count:
 	find common user include $(FINDCMD)
