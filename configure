@@ -142,6 +142,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
 cp Makefile.in Makefile
 sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}|g" Makefile
+sed -i "s|@ROOTDIR@|$PWD|g" Makefile
 
 # Prepare VMPI
 if [ $HAVE_VMPI == "y" ]; then
