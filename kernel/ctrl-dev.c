@@ -100,12 +100,12 @@ struct registered_appl {
     struct list_head node;
 };
 
-#define IPCP_ID_BITMAP_SIZE     1024
-#define PORT_ID_BITMAP_SIZE     1024
-#define CEP_ID_BITMAP_SIZE      1024
-#define IPCP_HASHTABLE_BITS     7
-#define PORT_ID_HASHTABLE_BITS  7
-#define CEP_ID_HASHTABLE_BITS  7
+#define IPCP_ID_BITMAP_SIZE     256
+#define PORT_ID_BITMAP_SIZE     65536
+#define CEP_ID_BITMAP_SIZE      PORT_ID_BITMAP_SIZE
+#define IPCP_HASHTABLE_BITS     6
+#define PORT_ID_HASHTABLE_BITS  10
+#define CEP_ID_HASHTABLE_BITS  10
 
 struct rl_dm {
     /* Bitmap to manage IPC process ids. */
