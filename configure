@@ -78,6 +78,7 @@ generate_flavours() {
 
 HAVE_VMPI="n"
 INSTALL_PREFIX="/"
+LIBMODPREFIX=""
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -94,6 +95,16 @@ do
             shift
         else
             echo "--prefix requires a path argument"
+            exit 255
+        fi
+        ;;
+
+        "--libmodprefix")
+        if [ -n "$2" ]; then
+            LIBMODPREFIX=$2
+            shift
+        else
+            echo "--libmodprefix requires a path argument"
             exit 255
         fi
         ;;
@@ -143,6 +154,7 @@ cp Makefile.in Makefile
 sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}|g" Makefile
 sed -i "s|@ROOTDIR@|$PWD|g" Makefile
+sed -i "s|@LIBMODPREFIX@|${LIBMODPREFIX}|g" Makefile
 
 # Prepare VMPI
 if [ $HAVE_VMPI == "y" ]; then

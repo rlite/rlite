@@ -1,6 +1,7 @@
 KER=`uname -r`
 FINDCMD=-type f -and \( -name "*.c" -or -name "*.h" -or -name "*.cpp" -or -name "*.hpp" -or -name "*.py" \) | grep -v vmpi | grep -v "\.mod\.c" | xargs wc -l
 KERNMODDIR=@ROOTDIR@/kernel
+KERNBUILDDIR=@LIBMODPREFIX@/lib/modules/$(KER)/build
 
 all: usr ker
 
@@ -8,7 +9,7 @@ usr:
 	cd build && $(MAKE)
 
 ker:
-	$(MAKE) -C /lib/modules/$(KER)/build HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) PWD=$(PWD)/kernel modules
+	$(MAKE) -C $(KERNBUILDDIR) HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) PWD=$(PWD)/kernel modules
 
 usr_count:
 	find common user include $(FINDCMD)
@@ -25,7 +26,7 @@ usr_clean:
 	cd build && $(MAKE) clean
 
 ker_clean:
-	$(MAKE) -C /lib/modules/$(KER)/build M=$(KERNMODDIR) clean
+	$(MAKE) -C $(KERNBUILDDIR) M=$(KERNMODDIR) clean
 
 install: usr_install ker_install
 
@@ -33,7 +34,7 @@ usr_install:
 	cd build && $(MAKE) install
 
 ker_install:
-	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ M=$(KERNMODDIR) modules_install
+	$(MAKE) -C $(KERNBUILDDIR) INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ M=$(KERNMODDIR) modules_install
 
 depmod:
 	depmod -b @INSTALL_MOD_PATH@ -a
