@@ -80,6 +80,7 @@ struct rinaperf {
     const char *dif_name;
     int cfd; /* Control file descriptor */
     int parallel;
+    int quiet;
 
     /* List of workers. */
     struct worker *workers_head;
@@ -158,8 +159,10 @@ server_test_config(struct worker *w)
         return -1;
     }
 
-    printf("Configuring test type %u, SDU count %u, SDU size %u\n",
-           cfg.ty, cfg.cnt, cfg.size);
+    if (!w->rp->quiet) {
+        printf("Configuring test type %u, SDU count %u, SDU size %u\n",
+               cfg.ty, cfg.cnt, cfg.size);
+    }
 
     w->test_config = cfg;
 
@@ -177,7 +180,7 @@ ping_client(struct worker *w)
     char buf[SDU_SIZE_MAX];
     volatile uint16_t *seqnum = (uint16_t *)buf;
     unsigned int timeouts = 0;
-    int verb = w->ping;
+    int verb = w->ping && !w->rp->quiet;
     unsigned int i = 0;
     unsigned long us;
     struct pollfd pfd;
@@ -188,7 +191,7 @@ ping_client(struct worker *w)
         size = sizeof(buf);
     }
 
-    if (!verb) {
+    if (!w->ping) {
         printf("Starting request-response test; message size: %d, "
                " number of messages: ", size);
         if (limit) {
@@ -323,7 +326,9 @@ ping_server(struct worker *w)
         }
     }
 
-    printf("received %u PDUs out of %u\n", i, limit);
+    if (!w->rp->quiet) {
+        printf("received %u PDUs out of %u\n", i, limit);
+    }
 
     return 0;
 }
@@ -450,6 +455,7 @@ perf_server(struct worker *w)
     char buf[SDU_SIZE_MAX];
     struct pollfd pfd;
     unsigned int i;
+    int verb = !w->rp->quiet;
     int n;
 
     pfd.fd = w->fd;
@@ -482,12 +488,14 @@ perf_server(struct worker *w)
         rate_bytes += n;
         rate_cnt++;
 
-        if (rate_bytes >= rate_bytes_limit) {
+        if (rate_bytes >= rate_bytes_limit && verb) {
             rate_print(&rate_bytes, &rate_cnt, &rate_bytes_limit, &rate_ts);
         }
     }
 
-    printf("Received %u PDUs out of %u\n", i, limit);
+    if (verb) {
+        printf("Received %u PDUs out of %u\n", i, limit);
+    }
 
     return 0;
 }
@@ -665,7 +673,9 @@ server(struct rinaperf *rp)
             rp->workers_tail = w;
         }
         rp->workers_num ++;
+#if 0
         printf("Active workers %u\n", rp->workers_num);
+#endif
     }
 
     if (w) {
@@ -743,6 +753,7 @@ usage(void)
         "   -a APNAME : application process name and instance of the rinaperf client\n"
         "   -z APNAME : application process name and instance of the rinaperf server\n"
         "   -p NUM : clients run NUM parallel instances, using NUM threads\n"
+        "   -q : be as quiet as possible\n"
         "   -x : use a separate control connection\n"
           );
 }
@@ -773,11 +784,12 @@ main(int argc, char **argv)
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
     rp.parallel = 1;
+    rp.quiet = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:xp:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:xp:q")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -859,6 +871,10 @@ main(int argc, char **argv)
                     printf("    Invalid 'parallel' %d\n", rp.parallel);
                     return -1;
                 }
+                break;
+
+            case 'q':
+                rp.quiet = 1;
                 break;
 
             default:
