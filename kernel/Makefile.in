@@ -13,14 +13,14 @@ rlite-shim-tcp4-y := shim-tcp4.o
 obj-m += rlite-shim-udp4.o
 rlite-shim-udp4-y := shim-udp4.o
 
-# KERNMODDIR must be the kernel/ directory
-EXTRA_CFLAGS := -I$(KERNMODDIR)/../include
+# PWD must be the kernel/ directory
+EXTRA_CFLAGS := -I$(PWD)/../include
 
 ifeq ($(HAVE_VMPI),y)
 obj-m += rlite-shim-hv.o
 rlite-shim-hv-y := shim-hv.o shim-hv-numtables.o
 
-EXTRA_CFLAGS += -I\$(KERNMODDIR)/vmpi
+EXTRA_CFLAGS += -I\$(PWD)/vmpi
 
 obj-y += vmpi/
 endif
