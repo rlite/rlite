@@ -694,8 +694,8 @@ for vmname in sorted(vms):
                     '$SUDO modprobe rlite-normal%(flsuf)s\n'\
                     '$SUDO chmod a+rwx /dev/rlite\n'\
                     '$SUDO chmod a+rwx /dev/rlite-io\n'\
-                    '$SUDO mkdir -p /var/run/rlite\n'\
-                    '$SUDO chmod -R a+rw /var/run/rlite\n'\
+                    '$SUDO mkdir -p /run/rlite\n'\
+                    '$SUDO chmod -R a+rw /run/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
                     '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\

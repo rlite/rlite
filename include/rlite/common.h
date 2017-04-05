@@ -44,7 +44,7 @@ extern "C" {
 
 #define RLITE_CTRLDEV_NAME          "/dev/rlite"
 #define RLITE_IODEV_NAME            "/dev/rlite-io"
-#define RLITE_UIPCPS_VAR            "/var/run/rlite/"
+#define RLITE_UIPCPS_VAR            "/run/rlite/"
 #define RLITE_UIPCPS_UNIX_NAME      RLITE_UIPCPS_VAR "uipcp-server"
 
 /* Application naming information:
