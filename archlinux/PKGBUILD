@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r1979.b716ec2
+pkgver=r1983.e7a0f78
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -28,7 +28,7 @@ build() {
     msg "Building on kernel ${RKVER}..."
 
     cd "$srcdir/$_gitname"
-    ./configure --prefix "$pkgdir" || exit 1
+    ./configure --prefix "$pkgdir" --libmodprefix /usr || exit 1
     make || exit 1
     msg "Build complete"
 }
