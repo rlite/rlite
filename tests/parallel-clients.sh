@@ -8,6 +8,7 @@ N=100
 P=1
 C=1000
 T=perf
+S=2
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -54,6 +55,16 @@ do
         fi
         ;;
 
+        "-s")
+        if [ -n "$2" ]; then
+            S="$2"
+            shift
+        else
+            echo "-s requires a numeric argument"
+            exit 255
+        fi
+        ;;
+
         "-h")
             usage
             exit 0
@@ -69,5 +80,5 @@ done
 
 # Run multiple client instances
 for i in $(seq 1 $N); do
-    rinaperf -q -z rinaperf-server:$i -p $P -t $T -c $C -i 10000 &
+    rinaperf -q -z rinaperf-server:$i -p $P -t $T -c $C -s $S -i 10000 &
 done

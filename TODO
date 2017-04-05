@@ -19,3 +19,6 @@
 
 - routing: use IPCP names to identify graph nodes, rather than using
   addresses. This is a first step towards supporting live renumbering
+
+- kernel: add reg-show rlite-ctl command to print all the kernel-space
+          registrations
