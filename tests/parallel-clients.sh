@@ -69,5 +69,5 @@ done
 
 # Run multiple client instances
 for i in $(seq 1 $N); do
-    rinaperf -z rinaperf-server:$i -p $P -t $T -c $C -i 10000 &
+    rinaperf -q -z rinaperf-server:$i -p $P -t $T -c $C -i 10000 &
 done

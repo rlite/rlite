@@ -37,5 +37,5 @@ done
 # Run multiple server instances
 pkill rinaperf
 for i in $(seq 1 $N); do
-    rinaperf -l -z rinaperf-server:$i &
+    rinaperf -q -l -z rinaperf-server:$i &
 done
