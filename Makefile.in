@@ -8,7 +8,7 @@ usr:
 	cd build && $(MAKE)
 
 ker:
-	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) KERNMODDIR=$(KERNMODDIR) modules
+	$(MAKE) -C /lib/modules/$(KER)/build HAVE_VMPI=@HAVE_VMPI@ M=$(KERNMODDIR) KERNMODDIR=$(KERNMODDIR) modules
 
 usr_count:
 	find common user include $(FINDCMD)
@@ -25,7 +25,7 @@ usr_clean:
 	cd build && $(MAKE) clean
 
 ker_clean:
-	$(MAKE) -C /lib/modules/$(KER)/build INSTALL_MOD_PATH=@INSTALL_MOD_PATH@ M=$(KERNMODDIR) clean
+	$(MAKE) -C /lib/modules/$(KER)/build M=$(KERNMODDIR) clean
 
 install: usr_install ker_install
 
