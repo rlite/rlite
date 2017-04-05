@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r1967.b503324
+pkgver=r1971.31019b1
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
@@ -34,15 +34,7 @@ build() {
 }
 
 package() {
-    # Compute the version numbers of the running kernel
-    KVER1=$(uname -r)
-    KVER2=$(uname -r | sed 's/\.[0-9]\+-[0-9]\+//')
-
-    # Install the rina kernel modules into the VERSION/extra directory
-    mkdir -p "$pkgdir/usr/lib/modules/${KVER1}/extra"
-    cp $srcdir/$_gitname/kernel/*.ko "$pkgdir/usr/lib/modules/${KVER1}/extra"
-
-    make -C "$srcdir/$_gitname" usr_install
+    make -C "$srcdir/$_gitname" install
 
     # Install other system files
     mkdir -p "$pkgdir/var/rlite"
