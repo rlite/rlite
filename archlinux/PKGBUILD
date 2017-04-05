@@ -3,7 +3,7 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r1971.31019b1
+pkgver=r1973.6cae790
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
