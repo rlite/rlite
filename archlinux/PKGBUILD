@@ -3,11 +3,11 @@
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
 pkgname=rlite
-pkgver=r1975.8070ae4
+pkgver=r1979.b716ec2
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
-license=('BSD')
+license=('GPL' 'LGPL')
 depends=('linux' 'protobuf' 'python')
 makedepends=('git' 'linux-headers' 'fakeroot')
 install="rlite.install"
