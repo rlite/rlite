@@ -2,8 +2,8 @@
 # for more information on packaging from GIT sources.
 
 # Maintainer: Vincenzo Maffione <v.maffione@gmail.com>
-pkgname=rlite
-pkgver=r1983.e7a0f78
+pkgname=rlite-git
+pkgver=r1985.6522969
 pkgrel=1
 pkgdesc="Recursive InterNetwork Architecture user/kernel prototype written in C."
 arch=('any')
