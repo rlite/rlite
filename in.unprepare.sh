@@ -7,7 +7,7 @@ if [ $? == "0" ]; then
     sudo systemctl stop rlite
 fi
 
-sudo rm -rf /var/rlite
+sudo rm -rf /var/run/rlite
 
 if [ HAVE_VMPI == "y" ]; then
     sudo rmmod rlite-shim-hv.ko

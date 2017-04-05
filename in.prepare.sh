@@ -24,8 +24,8 @@ fi
 sudo chmod a+rwx /dev/rlite
 sudo chmod a+rwx /dev/rlite-io
 
-sudo mkdir -p /var/rlite
-sudo chmod -R a+rwx /var/rlite
+sudo mkdir -p /var/run/rlite
+sudo chmod -R a+rwx /var/run/rlite
 
 which systemctl > /dev/null
 if [ $? == "0" ]; then
