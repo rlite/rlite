@@ -1401,6 +1401,18 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
     return rib->dump();
 }
 
+static int
+normal_policy_mod(struct uipcp *uipcp,
+                  const struct rl_cmsg_ipcp_policy_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    int ret = -1;
+
+    PE("Cannot set policy - no policies implemented.\n");
+
+    return ret;
+}
+
 struct uipcp_ops normal_ops = {
     .init                   = normal_init,
     .fini                   = normal_fini,
@@ -1415,5 +1427,6 @@ struct uipcp_ops normal_ops = {
     .neigh_fa_req_arrived   = normal_neigh_fa_req_arrived,
     .update_address         = normal_update_address,
     .trigger_tasks          = normal_trigger_tasks,
+    .policy_mod             = normal_policy_mod,
 };
 

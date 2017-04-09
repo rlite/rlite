@@ -40,6 +40,7 @@ enum {
     RLITE_U_IPCP_RIB_SHOW_RESP,         /* 5 */
     RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 6 */
     RLITE_U_MEMTRACK_DUMP,              /* 7 */
+    RLITE_U_IPCP_POLICY_MOD,            /* 8 */
 
     RLITE_U_MSG_MAX,
 };
@@ -89,6 +90,16 @@ struct rl_cmsg_ipcp_rib_show_resp {
 
     uint8_t result;
     struct rl_buf_field dump;
+} __attribute__((packed));
+
+/* rlite-ctl --> uipcps message to change an IPC policy */
+struct rl_cmsg_ipcp_policy_mod {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    char *ipcp_name;
+    char *comp_name;
+    char *policy_name;
 } __attribute__((packed));
 
 #endif  /* __RLITE_U_MSG_H__ */

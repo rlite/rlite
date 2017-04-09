@@ -502,6 +502,40 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
     return 0;
 }
 
+static int
+ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_policy_mod req;
+    const char *ipcp_name;
+    const char *comp_name;
+    const char *policy_name;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 3);
+    ipcp_name = argv[0];
+    comp_name = argv[1];
+    policy_name = argv[2];
+
+    req.ipcp_name = strdup(ipcp_name);
+    if (!req.ipcp_name) {
+        PE("Out of memory\n");
+        return -1;
+    }
+
+    attrs = lookup_ipcp_by_name(req.ipcp_name);
+    if (!attrs) {
+        PE("Could not find the IPC process to change policy\n");
+        return -1;
+    }
+
+    req.msg_type = RLITE_U_IPCP_POLICY_MOD;
+    req.event_id = 0;
+    req.comp_name = strdup(comp_name);
+    req.policy_name = strdup(policy_name);
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
 #ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
@@ -705,6 +739,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "PORT_ID",
         .num_args = 1,
         .func = flow_dump,
+    },
+    {
+        .name = "ipcp-policy-mod",
+        .usage = "IPCP_NAME COMPONENT_NAME POLICY_NAME",
+        .num_args = 3,
+        .func = ipcp_policy_mod,
     },
 #ifdef RL_MEMTRACK
     {

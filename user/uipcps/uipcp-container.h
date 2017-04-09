@@ -135,7 +135,12 @@ struct uipcp_ops {
     void (*update_address)(struct uipcp *uipcp, rlm_addr_t new_addr);
 
     /* For tasks to be executed in the context of the uipcps event loop. */
-    void  (*trigger_tasks)(struct uipcp *);
+    void (*trigger_tasks)(struct uipcp *);
+
+    /* User wants to change a policy of this uipcp. */
+    int (*policy_mod)(struct uipcp *uipcp,
+                      const struct rl_cmsg_ipcp_policy_mod *req);
+
 };
 
 struct ipcp_node {
