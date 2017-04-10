@@ -54,6 +54,11 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
                    4 * sizeof(char *),
         .strings = 4,
     },
+    [RLITE_U_IPCP_POLICY_MOD] = {
+        .copylen = sizeof(struct rl_cmsg_ipcp_policy_mod) -
+                   3 * sizeof(char *),
+        .strings = 3,
+    },
     [RLITE_U_MEMTRACK_DUMP] = {
         .copylen = sizeof(struct rl_msg_base),
     },
