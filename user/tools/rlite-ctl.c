@@ -508,26 +508,30 @@ static int
 ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_policy_mod req;
-    const char *ipcp_name;
+    const char *name;
     const char *comp_name;
     const char *policy_name;
     struct ipcp_attrs *attrs;
 
     assert(argc >= 3);
-    ipcp_name = argv[0];
+    name = argv[0];
     comp_name = argv[1];
     policy_name = argv[2];
 
-    req.ipcp_name = strdup(ipcp_name);
-    if (!req.ipcp_name) {
-        PE("Out of memory\n");
-        return -1;
-    }
-
-    attrs = lookup_ipcp_by_name(req.ipcp_name);
-    if (!attrs) {
-        PE("Could not find the IPC process to change policy\n");
-        return -1;
+    if (strcmp(cd->name, "dif-policy-mod") == 0) {
+        attrs = ipcp_by_dif(name);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", name);
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else {
+        req.ipcp_name = strdup(name);
+        attrs = lookup_ipcp_by_name(req.ipcp_name);
+        if (!attrs) {
+            PE("Could not find IPC process %s\n", name);
+            return -1;
+        }
     }
 
     req.msg_type = RLITE_U_IPCP_POLICY_MOD;
@@ -745,6 +749,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
     {
         .name = "ipcp-policy-mod",
         .usage = "IPCP_NAME COMPONENT_NAME POLICY_NAME",
+        .num_args = 3,
+        .func = ipcp_policy_mod,
+    },
+    {
+        .name = "dif-policy-mod",
+        .usage = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
         .func = ipcp_policy_mod,
     },
