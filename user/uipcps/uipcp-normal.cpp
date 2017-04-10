@@ -1405,12 +1405,9 @@ static int
 normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    int ret = -1;
+    PE("Cannot set policy: no policies implemented\n");
 
-    PE("Cannot set policy - no policies implemented.\n");
-
-    return ret;
+    return -1;
 }
 
 struct uipcp_ops normal_ops = {

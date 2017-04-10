@@ -180,7 +180,9 @@ read_response(int sfd, response_handler_t handler)
     resp = RLITE_MBR(msgbuf);
     ret = (resp->result) == 0 ? 0 : -1;
 
-    PV("uipcps response [type=%u] --> %d\n", resp->msg_type, ret);
+    if (ret) {
+        PE("Operation failed\n");
+    }
 
     if (!ret && handler) {
         ret = handler(resp);
