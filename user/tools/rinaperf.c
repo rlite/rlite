@@ -55,20 +55,34 @@ struct worker;
 
 typedef int (*perf_function_t)(struct worker *);
 
-struct rinaperf_test_config {
-    uint32_t ty;
-    uint32_t size;
-    uint32_t cnt;
+struct rp_config_msg {
+    uint32_t ty;   /* type of test: ping, perf, rr ... */
+    uint32_t size; /* packet size in bytes */
+    uint32_t cnt;  /* packet/transaction count for the test
+                    * (0 means infinite) */
+};
+
+struct rp_ticket_msg {
+    uint32_t ticket; /* ticket allocated by the server for the
+                      * client to receive the results */
+};
+
+struct rp_result_msg {
+    uint32_t rcv_cnt;   /* number of received packets or completed
+                         * transactions as seen by the receiver */
+    uint32_t rcv_rate_avg; /* average rate measured by the receiver */
+    uint32_t rcv_rate_stdev; /* standard deviation of receiver rate */
 };
 
 struct worker {
     pthread_t th;
     struct rinaperf *rp;    /* backpointer */
     struct worker *next;    /* next worker */
-    struct rinaperf_test_config test_config;
+    struct rp_config_msg test_config;
     unsigned int interval;
     unsigned int burst;
     perf_function_t fn;
+    uint32_t ticket;
     int ping;
     int fd;
 };
@@ -82,6 +96,8 @@ struct rinaperf {
     int parallel;
     int quiet;
 
+    uint32_t next_ticket; /* Next ticket to be allocated */
+
     /* List of workers. */
     struct worker *workers_head;
     struct worker *workers_tail;
@@ -89,9 +105,11 @@ struct rinaperf {
 };
 
 static int
-client_test_config(struct worker *w)
+client_do_config(struct worker *w)
 {
-    struct rinaperf_test_config cfg = w->test_config;
+    struct rp_config_msg cfg = w->test_config;
+    struct rp_ticket_msg tmsg;
+    struct pollfd pfd;
     int ret;
 
     cfg.ty = htole32(cfg.ty);
@@ -101,7 +119,7 @@ client_test_config(struct worker *w)
     ret = write(w->fd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
         if (ret < 0) {
-            perror("write(buf)");
+            perror("write(cfg)");
         } else {
             printf("Partial write %d/%lu\n", ret,
                     (unsigned long int)sizeof(cfg));
@@ -109,30 +127,55 @@ client_test_config(struct worker *w)
         return -1;
     }
 
+    pfd.fd = w->fd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 3000);
+    switch (ret) {
+        case -1:
+            perror("poll(ticket)");
+            return ret;
+
+        case 0:
+            printf("timeout while waiting for ticket message\n");
+            return -1;
+
+        default:
+            break;
+    }
+
+    ret = read(w->fd, &tmsg, sizeof(tmsg));
+    if (ret != sizeof(tmsg)) {
+        if (ret < 0) {
+            perror("read(ticket)");
+        } else {
+            printf("Error reading ticket message: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+        }
+        return -1;
+    }
+    w->ticket = le32toh(tmsg.ticket);
+
     return 0;
 }
 
 static int
-server_test_config(struct worker *w)
+server_do_config(struct worker *w)
 {
-    struct rinaperf_test_config cfg;
-    struct timeval to;
-    fd_set rfds;
+    struct rp_config_msg cfg;
+    struct rp_ticket_msg tmsg;
+    struct pollfd pfd;
     int ret;
 
-    FD_ZERO(&rfds);
-    FD_SET(w->fd, &rfds);
-    to.tv_sec = 3;
-    to.tv_usec = 0;
-
-    ret = select(w->fd + 1, &rfds, NULL, NULL, &to);
+    pfd.fd = w->fd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 3000);
     switch (ret) {
         case -1:
-            perror("select()");
+            perror("poll(cfg)");
             return ret;
 
         case 0:
-            printf("timeout while waiting for server test configuration\n");
+            printf("timeout while waiting for configuration message\n");
             return -1;
 
         default:
@@ -142,7 +185,7 @@ server_test_config(struct worker *w)
     ret = read(w->fd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
         if (ret < 0) {
-            perror("read(buf");
+            perror("read(cfg)");
         } else {
             printf("Error reading test configuration: wrong length %d "
                    "(should be %lu)\n", ret, (unsigned long int)sizeof(cfg));
@@ -159,12 +202,25 @@ server_test_config(struct worker *w)
         return -1;
     }
 
-    if (!w->rp->quiet) {
-        printf("Configuring test type %u, SDU count %u, SDU size %u\n",
-               cfg.ty, cfg.cnt, cfg.size);
+    w->test_config = cfg;
+
+    tmsg.ticket = htole32(w->ticket);
+    ret = write(w->fd, &tmsg, sizeof(tmsg));
+    if (ret != sizeof(tmsg)) {
+        if (ret < 0) {
+            perror("write(ticket)");
+        } else {
+            printf("Error writing ticket: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+        }
+        return -1;
     }
 
-    w->test_config = cfg;
+    if (!w->rp->quiet) {
+        printf("Configuring test type %u, SDU count %u, SDU size %u, "
+                "ticket %u\n",
+               cfg.ty, cfg.cnt, cfg.size, tmsg.ticket);
+    }
 
     return 0;
 }
@@ -556,7 +612,7 @@ client_worker_function(void *opaque)
         return NULL;
     }
 
-    ret = client_test_config(w);
+    ret = client_do_config(w);
     if (ret) {
         return NULL;
     }
@@ -572,7 +628,7 @@ server_worker_function(void *opaque)
     struct worker *w = opaque;
     int ret;
 
-    ret = server_test_config(w);
+    ret = server_do_config(w);
     if (ret) {
         goto out;
     }
@@ -654,6 +710,7 @@ server(struct rinaperf *rp)
         }
         memset(w, 0, sizeof(*w));
         w->rp = rp;
+        w->ticket = rp->next_ticket ++;
 
         w->fd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
         if (w->fd < 0) {
