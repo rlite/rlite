@@ -75,6 +75,10 @@ straightforward.
 * linux-headers
 * python, swig [optional, for python bindings]
 
+On Archlinux *rlite* is available from the AUR repository. It can be installed
+using yaourt:
+
+    $ yaourt --noconfirm -S rlite-git
 
 
 #############################################################################
