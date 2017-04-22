@@ -179,6 +179,7 @@ ping_client(struct worker *w)
     int size = w->test_config.size;
     char buf[SDU_SIZE_MAX];
     volatile uint16_t *seqnum = (uint16_t *)buf;
+    uint16_t expected = 0;
     unsigned int timeouts = 0;
     int verb = w->ping && !w->rp->quiet;
     unsigned int i = 0;
@@ -208,12 +209,12 @@ ping_client(struct worker *w)
 
     clock_gettime(CLOCK_MONOTONIC, &t_start);
 
-    for (i = 0; !stop && (!limit || i < limit); i++) {
+    for (i = 0; !stop && (!limit || i < limit); i++, expected++) {
         if (verb) {
             clock_gettime(CLOCK_MONOTONIC, &t1);
         }
 
-        *seqnum = (uint16_t)i;
+        *seqnum = (uint16_t)expected;
 
         ret = write(w->fd, buf, size);
         if (ret != size) {
@@ -248,7 +249,7 @@ repoll:
             }
 
             if (verb) {
-                if (*seqnum == i) {
+                if (*seqnum == expected) {
                     clock_gettime(CLOCK_MONOTONIC, &t2);
                     ns = 1000000000 * (t2.tv_sec - t1.tv_sec) +
                                       (t2.tv_nsec - t1.tv_nsec);
@@ -256,8 +257,8 @@ repoll:
                            ((float)ns)/1000000.0);
                 } else {
                     printf("Packet lost or out of order: got %u, "
-                           "expected %u\n", *seqnum, i);
-                    if (*seqnum < i) {
+                           "expected %u\n", *seqnum, expected);
+                    if (*seqnum < expected) {
                         goto repoll;
                     }
                 }
