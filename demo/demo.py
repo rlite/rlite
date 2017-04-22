@@ -168,6 +168,9 @@ argparser.add_argument('-g', '--graphviz', action='store_true',
 argparser.add_argument('-m', '--memory',
                        help = "Amount of memory in megabytes", type = int,
                        default = 164) # 128 without KASAN
+argparser.add_argument('--num-cpus',
+                       help = "Number of vCPUs to give to each node", type = int,
+                       default = 1)
 argparser.add_argument('-p', '--base-port',
                        help = "Base SSH port to map nodes", type = int,
                        default = 2222)
@@ -601,7 +604,7 @@ for vmname in sorted(vms):
     vars_dict = {'fwdp': fwdp, 'id': vmid, 'mac': mac,
                  'vmimgpath': vmimgpath, 'fwdc': fwdc,
                  'memory': args.memory, 'frontend': args.frontend,
-                 'vmname': vmname}
+                 'vmname': vmname, 'numcpus': args.num_cpus}
 
     hostfwdstr = 'hostfwd=tcp::%(fwdp)s-:22' % vars_dict
     if vmname in hostfwds:
@@ -622,7 +625,7 @@ for vmname in sorted(vms):
     outs += '-vga std '                                         \
             '-display none '                                    \
             '--enable-kvm '                                     \
-            '-smp 1 '                                           \
+            '-smp %(numcpus)s '                                 \
             '-m %(memory)sM '                                   \
             '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
             '-netdev user,id=mgmt,%(hostfwdstr)s '   \
