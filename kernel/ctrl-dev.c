@@ -2188,6 +2188,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req =
                     (struct rl_kmsg_appl_register *)bmsg;
+    uint32_t event_id = req->event_id;
     struct ipcp_entry *ipcp;
     int ret = 0;
 
@@ -2198,7 +2199,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     }
 
     if (req->reg) {
-        ret = ipcp_application_add(ipcp, req->appl_name, rc, req->event_id,
+        ret = ipcp_application_add(ipcp, req->appl_name, rc, event_id,
                                    ipcp->uipcp != NULL);
     } else {
         ret = ipcp_application_del(ipcp, req->appl_name);
@@ -2207,7 +2208,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (!ret && ipcp->uipcp) {
         /* Reflect to userspace this (un)registration, so that
          * userspace IPCP can take appropriate actions. */
-        req->event_id = 0;
+        req->event_id = 0; /* clear it, not needed */
         rl_upqueue_append(ipcp->uipcp,
                 (const struct rl_msg_base *)req, true);
     }
@@ -2224,7 +2225,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         }
 
         resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
-        resp.event_id = req->event_id;
+        resp.event_id = event_id;
         resp.ipcp_id = ipcp->id;
         resp.reg = req->reg;
         resp.response = ret ? RLITE_ERR : RLITE_SUCC;
