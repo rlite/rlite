@@ -226,8 +226,9 @@ which('qemu-system-x86_64')
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 
 # Some variables that could become options
-sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '\
-          '-o IdentityFile=buildroot/buildroot_rsa'
+sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+if not args.image:
+    sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
 sudo = 'sudo' if args.image != '' else ''
 vmimgpath = 'buildroot/rootfs.cpio'
 
@@ -258,8 +259,13 @@ if args.ring != None and args.ring > 0:
     args.conf = 'ring.conf'
 
 
+# Generated files needed by access.sh
 fout = open('user', 'w')
 fout.write(args.user)
+fout.close()
+
+fout = open('sshopts', 'w')
+fout.write(sshopts)
 fout.close()
 
 ############################# Parse demo.conf ##############################
