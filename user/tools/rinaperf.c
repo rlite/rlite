@@ -813,7 +813,6 @@ usage(void)
         "   -z APNAME : application process name and instance of the rinaperf server\n"
         "   -p NUM : clients run NUM parallel instances, using NUM threads\n"
         "   -q : be as quiet as possible\n"
-        "   -x : use a separate control connection\n"
           );
 }
 
@@ -829,7 +828,6 @@ main(int argc, char **argv)
     int size = sizeof(uint16_t);
     int interval = 0;
     int burst = 1;
-    int have_ctrl = 0;
     struct worker wt; /* template */
     int ret;
     int opt;
@@ -848,7 +846,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:xp:q")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:q")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -919,11 +917,6 @@ main(int argc, char **argv)
                 rp.srv_appl_name = optarg;
                 break;
 
-            case 'x':
-                have_ctrl = 1;
-                printf("Warning: Control connection support is incomplete\n");
-                break;
-
             case 'p':
                 rp.parallel = atoi(optarg);
                 if (rp.parallel <= 0) {
@@ -942,8 +935,6 @@ main(int argc, char **argv)
                 return -1;
         }
     }
-
-    (void)have_ctrl;
 
     /*
      * Fixups:
