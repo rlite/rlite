@@ -619,14 +619,13 @@ for vmname in sorted(vms):
         outs += '-kernel buildroot/bzImage '                        \
                 '-append "console=ttyS0" '                          \
                 '-initrd %(vmimgpath)s ' % vars_dict
-    outs += '-nographic '                                       \
+    outs += '-vga std '                                         \
             '-display none '                                    \
             '--enable-kvm '                                     \
             '-smp 1 '                                           \
             '-m %(memory)sM '                                   \
             '-device %(frontend)s,mac=%(mac)s,netdev=mgmt '     \
             '-netdev user,id=mgmt,%(hostfwdstr)s '   \
-            '-vga std '                                         \
             '-pidfile rina-%(id)s.pid '                         \
             '-serial file:%(vmname)s.log '                          \
                         % vars_dict
