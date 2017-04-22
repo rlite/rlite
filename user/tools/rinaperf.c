@@ -174,7 +174,7 @@ static int
 ping_client(struct worker *w)
 {
     unsigned int limit = w->test_config.cnt;
-    struct timeval t_start, t_end, t1, t2;
+    struct timespec t_start, t_end, t1, t2;
     unsigned int interval = w->interval;
     int size = w->test_config.size;
     char buf[SDU_SIZE_MAX];
@@ -182,7 +182,7 @@ ping_client(struct worker *w)
     unsigned int timeouts = 0;
     int verb = w->ping && !w->rp->quiet;
     unsigned int i = 0;
-    unsigned long us;
+    unsigned long long ns;
     struct pollfd pfd;
     int ret = 0;
 
@@ -206,11 +206,11 @@ ping_client(struct worker *w)
 
     memset(buf, 'x', size);
 
-    gettimeofday(&t_start, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
 
     for (i = 0; !stop && (!limit || i < limit); i++) {
         if (verb) {
-            gettimeofday(&t1, NULL);
+            clock_gettime(CLOCK_MONOTONIC, &t1);
         }
 
         *seqnum = (uint16_t)i;
@@ -249,10 +249,11 @@ repoll:
 
             if (verb) {
                 if (*seqnum == i) {
-                    gettimeofday(&t2, NULL);
-                    us = 1000000 * (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec);
+                    clock_gettime(CLOCK_MONOTONIC, &t2);
+                    ns = 1000000000 * (t2.tv_sec - t1.tv_sec) +
+                                      (t2.tv_nsec - t1.tv_nsec);
                     printf("%d bytes from server: rtt = %.3f ms\n", ret,
-                           ((float)us)/1000.0);
+                           ((float)ns)/1000000.0);
                 } else {
                     printf("Packet lost or out of order: got %u, "
                            "expected %u\n", *seqnum, i);
@@ -268,13 +269,13 @@ repoll:
         }
     }
 
-    gettimeofday(&t_end, NULL);
-    us = 1000000 * (t_end.tv_sec - t_start.tv_sec) +
-            (t_end.tv_usec - t_start.tv_usec);
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
+    ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
+            (t_end.tv_nsec - t_start.tv_nsec);
 
     if (!verb && i) {
-        printf("SDU size: %d bytes, avg latency: %lu us\n", ret,
-                (us/i) - interval);
+        printf("SDU size: %d bytes, avg latency: %llu ns\n", ret,
+                (ns/i) - interval * 1000);
     }
 
     close(w->fd);
