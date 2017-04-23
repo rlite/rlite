@@ -254,7 +254,7 @@ repoll:
 
     w->result.cnt = i;
     w->result.pps = (1000000000ULL * i) / ns;
-    w->result.bps = (8000000000ULL * i * size) / ns;
+    w->result.bps = w->result.pps * 8 * size;
     w->result.latency = (ns/i) - interval * 1000;
 
     if (!verb && i) {
@@ -321,10 +321,16 @@ ping_server(struct worker *w)
 static void
 ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
-    printf("Results: %lu/%lu packets %.3f/%.3f Kpps %.3f/%.3f Mbps\n",
-            rcv->cnt, snd->cnt,
-            (double)rcv->pps/1000.0, (double)snd->pps/1000.0,
-            (double)rcv->bps/1000000.0, (double)snd->bps/1000000.0);
+    printf("%10s %15s %10s %10s %15s\n",
+            "", "Transactions", "Kpps", "Mbps", "Latency (ns)");
+    printf("%-10s %15lu %10.3f %10.3f %15lu\n",
+            "Sender", snd->cnt, (double)snd->pps/1000.0,
+                (double)snd->bps/1000000.0, snd->latency);
+#if 0
+    printf("%-10s %15lu %10.3f %10.3f %15lu\n",
+            "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
+                (double)rcv->bps/1000000.0, rcv->latency);
+#endif
 }
 
 static int
@@ -395,7 +401,7 @@ perf_client(struct worker *w)
     if (us) {
         w->result.cnt = i;
         w->result.pps = (1000000ULL * i) / us;
-        w->result.bps = (8000000ULL * size * i) / us;
+        w->result.bps = w->result.pps * 8 * size;
 
         printf("Throughput: %.3f Kpps, %.3f Mbps\n",
                 ((float)w->result.pps) / 1000.0,
@@ -451,8 +457,9 @@ perf_server(struct worker *w)
     unsigned long long rate_cnt = 0;
     unsigned long long rate_bytes_limit = 1000;
     unsigned long long rate_bytes = 0;
-    struct timespec rate_ts;
+    struct timespec rate_ts, t_start, t_end;
     char buf[SDU_SIZE_MAX];
+    unsigned long long ns;
     struct pollfd pfd;
     unsigned int i;
     int verb = !w->rp->quiet;
@@ -462,6 +469,7 @@ perf_server(struct worker *w)
     pfd.events = POLLIN;
 
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
+    t_start = rate_ts;
 
     for (i = 0; !limit || i < limit; i++) {
         n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
@@ -494,6 +502,11 @@ perf_server(struct worker *w)
         }
     }
 
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
+    ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
+                        (t_end.tv_nsec - t_start.tv_nsec);
+    w->result.pps = (1000000000ULL * i) / ns;
+    w->result.bps = w->result.pps * 8 * w->test_config.size;
     w->result.cnt = i;
 
     if (verb) {
@@ -501,6 +514,19 @@ perf_server(struct worker *w)
     }
 
     return 0;
+}
+
+static void
+perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
+{
+    printf("%10s %12s %10s %10s\n",
+            "", "Packets", "Kpps", "Mbps");
+    printf("%-10s %12lu %10.3f %10.3f\n",
+            "Sender", snd->cnt, (double)snd->pps/1000.0,
+                (double)snd->bps/1000000.0);
+    printf("%-10s %12lu %10.3f %10.3f\n",
+            "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
+                (double)rcv->bps/1000000.0);
 }
 
 struct rp_test_desc {
@@ -537,7 +563,7 @@ static struct rp_test_desc descs[] = {
         .opcode = RP_OPCODE_PERF,
         .client_fn = perf_client,
         .server_fn = perf_server,
-        .report_fn = ping_report,
+        .report_fn = perf_report,
     },
 };
 
@@ -576,7 +602,7 @@ client_worker_function(void *opaque)
 
     /* Send test configuration to the server. */
     cfg.opcode = htole32(cfg.opcode);
-    cfg.cnt = htole32(cfg.cnt);
+    cfg.cnt = htole64(cfg.cnt);
     cfg.size = htole32(cfg.size);
 
     ret = write(w->cfd, &cfg, sizeof(cfg));
@@ -679,10 +705,10 @@ client_worker_function(void *opaque)
             goto out;
         }
 
-        rmsg.cnt        = le32toh(rmsg.cnt);
-        rmsg.pps        = le32toh(rmsg.pps);
-        rmsg.bps        = le32toh(rmsg.bps);
-        rmsg.latency    = le32toh(rmsg.latency);
+        rmsg.cnt        = le64toh(rmsg.cnt);
+        rmsg.pps        = le64toh(rmsg.pps);
+        rmsg.bps        = le64toh(rmsg.bps);
+        rmsg.latency    = le64toh(rmsg.latency);
 
         w->desc->report_fn(&w->result, &rmsg);
     }
@@ -822,9 +848,6 @@ server_worker_function(void *opaque)
             printf("pthread_cond_timedwait() failed [%d]\n", ret);
         }
         goto out;
-
-    } else {
-        printf("Got data file descriptor %d\n", w->dfd);
     }
 
     /* Serve the client on the flow file descriptor. */
@@ -835,10 +858,10 @@ server_worker_function(void *opaque)
 
     /* Write the result back to the client on the control file descriptor. */
     rmsg = w->result;
-    rmsg.cnt        = htole32(rmsg.cnt);
-    rmsg.pps        = htole32(rmsg.pps);
-    rmsg.bps        = htole32(rmsg.bps);
-    rmsg.latency    = htole32(rmsg.latency);
+    rmsg.cnt        = htole64(rmsg.cnt);
+    rmsg.pps        = htole64(rmsg.pps);
+    rmsg.bps        = htole64(rmsg.bps);
+    rmsg.latency    = htole64(rmsg.latency);
     ret = write(w->cfd, &rmsg, sizeof(rmsg));
     if (ret != sizeof(rmsg)) {
         if (ret < 0) {
