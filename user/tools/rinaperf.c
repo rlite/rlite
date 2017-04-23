@@ -674,7 +674,7 @@ client_worker_function(void *opaque)
 
     /* Send the ticket to the server to identify the data flow. */
     memset(&cfg, 0, sizeof(cfg));
-    cfg.opcode = le32toh(RP_OPCODE_DATAFLOW);
+    cfg.opcode = htole32(RP_OPCODE_DATAFLOW);
     cfg.ticket = tmsg.ticket;
     ret = write(w->dfd, &cfg, sizeof(cfg));
     if (ret != sizeof(cfg)) {
