@@ -110,7 +110,7 @@ struct rinaperf {
     const char              *dif_name;
     int                     cfd; /* Control file descriptor */
     int                     parallel;
-    int                     quiet;
+    int                     verbose;
 
     /* Ticket table. */
     pthread_mutex_t         ticket_lock;
@@ -159,7 +159,7 @@ ping_client(struct worker *w)
     volatile uint16_t *seqnum = (uint16_t *)buf;
     uint16_t expected = 0;
     unsigned int timeouts = 0;
-    int verb = w->ping && !w->rp->quiet;
+    int ping = w->ping;
     unsigned int i = 0;
     unsigned long long ns;
     struct pollfd pfd;
@@ -188,7 +188,7 @@ ping_client(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &t_start);
 
     for (i = 0; !stop && (!limit || i < limit); i++, expected++) {
-        if (verb) {
+        if (ping) {
             clock_gettime(CLOCK_MONOTONIC, &t1);
         }
 
@@ -226,7 +226,7 @@ repoll:
                 break;
             }
 
-            if (verb) {
+            if (ping) {
                 if (*seqnum == expected) {
                     clock_gettime(CLOCK_MONOTONIC, &t2);
                     ns = 1000000000 * (t2.tv_sec - t1.tv_sec) +
@@ -257,11 +257,6 @@ repoll:
     w->result.bps = w->result.pps * 8 * size;
     w->result.latency = (ns/i) - interval * 1000;
 
-    if (!verb && i) {
-        printf("SDU size: %d bytes, avg latency: %lu ns\n",
-                ret, w->result.latency);
-    }
-
     return 0;
 }
 
@@ -284,7 +279,9 @@ ping_server(struct worker *w)
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
-            printf("Timeout occurred\n");
+            if (w->rp->verbose) {
+                printf("Timeout occurred\n");
+            }
             break;
         }
 
@@ -311,7 +308,7 @@ ping_server(struct worker *w)
 
     w->result.cnt = i;
 
-    if (!w->rp->quiet) {
+    if (w->rp->verbose) {
         printf("received %u PDUs out of %u\n", i, limit);
     }
 
@@ -462,7 +459,7 @@ perf_server(struct worker *w)
     unsigned long long ns;
     struct pollfd pfd;
     unsigned int i;
-    int verb = !w->rp->quiet;
+    int verb = w->rp->verbose;
     int timeout = 0;
     int n;
 
@@ -480,7 +477,9 @@ perf_server(struct worker *w)
         } else if (n == 0) {
             /* Timeout */
             timeout = 1;
-            printf("Timeout occurred\n");
+            if (w->rp->verbose) {
+                printf("Timeout occurred\n");
+            }
             break;
         }
 
@@ -832,7 +831,7 @@ server_worker_function(void *opaque)
         goto out;
     }
 
-    if (!rp->quiet) {
+    if (rp->verbose) {
         printf("Configuring test type %u, SDU count %lu, SDU size %u, "
                 "ticket %u\n",
                cfg.opcode, cfg.cnt, cfg.size, ticket);
@@ -1055,7 +1054,7 @@ usage(void)
         "   -a APNAME : application process name and instance of the rinaperf client\n"
         "   -z APNAME : application process name and instance of the rinaperf server\n"
         "   -p NUM : clients run NUM parallel instances, using NUM threads\n"
-        "   -q : be as quiet as possible\n"
+        "   -v : be verbose\n"
           );
 }
 
@@ -1086,12 +1085,12 @@ main(int argc, char **argv)
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
     rp.parallel = 1;
-    rp.quiet = 0;
+    rp.verbose = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:q")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:v")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -1170,8 +1169,8 @@ main(int argc, char **argv)
                 }
                 break;
 
-            case 'q':
-                rp.quiet = 1;
+            case 'v':
+                rp.verbose = 1;
                 break;
 
             default:
