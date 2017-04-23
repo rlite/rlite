@@ -68,7 +68,7 @@ struct rp_config_msg {
     uint32_t opcode;    /* opcode: ping, perf, rr ... */
     uint32_t ticket;    /* valid with RP_OPCODE_DATAFLOW */
     uint32_t size;      /* packet size in bytes */
-    uint32_t cnt;       /* packet/transaction count for the test
+    uint64_t cnt;       /* packet/transaction count for the test
                          * (0 means infinite) */
 };
 
@@ -78,10 +78,11 @@ struct rp_ticket_msg {
 };
 
 struct rp_result_msg {
-    uint32_t rcv_cnt;   /* number of received packets or completed
-                         * transactions as seen by the receiver */
-    uint32_t rcv_pps; /* average packet rate measured by the receiver */
-    uint32_t rcv_bps; /* average bandwidth measured by the receiver */
+    uint64_t cnt; /* number of packets or completed transactions
+                   * as seen by the sender or the receiver */
+    uint64_t pps; /* average packet rate measured by the sender or receiver */
+    uint64_t bps; /* average bandwidth measured by the sender or receiver */
+    uint64_t latency; /* in nanoseconds */
 };
 
 struct worker {
@@ -249,9 +250,14 @@ repoll:
     ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
             (t_end.tv_nsec - t_start.tv_nsec);
 
+    w->result.cnt = i;
+    w->result.pps = (1000000000ULL * i) / ns;
+    w->result.bps = (8000000000ULL * i * size) / ns;
+    w->result.latency = (ns/i) - interval * 1000;
+
     if (!verb && i) {
-        printf("SDU size: %d bytes, avg latency: %llu ns\n", ret,
-                (ns/i) - interval * 1000);
+        printf("SDU size: %d bytes, avg latency: %lu ns\n",
+                ret, w->result.latency);
     }
 
     return 0;
@@ -300,6 +306,8 @@ ping_server(struct worker *w)
             return -1;
         }
     }
+
+    w->result.cnt = i;
 
     if (!w->rp->quiet) {
         printf("received %u PDUs out of %u\n", i, limit);
@@ -374,9 +382,13 @@ perf_client(struct worker *w)
             (t_end.tv_usec - t_start.tv_usec);
 
     if (us) {
+        w->result.cnt = i;
+        w->result.pps = (1000000ULL * i) / us;
+        w->result.bps = (8000000ULL * size * i) / us;
+
         printf("Throughput: %.3f Kpps, %.3f Mbps\n",
-                ((float)i) * 1000.0 / us,
-                ((float)size) * 8 * i / us);
+                ((float)w->result.pps) / 1000.0,
+                ((float)w->result.bps) / 1000000.0);
     }
 
     return 0;
@@ -405,8 +417,8 @@ rate_print(unsigned long long *bytes, unsigned long long *cnt,
         printf("rate: %f Kpss, %f Mbps\n", kpps, mbps);
     }
 
-    rmsg->rcv_pps = (1000000000ULL * *cnt) / elapsed_ns;
-    rmsg->rcv_bps = (8000000000ULL * *bytes) / elapsed_ns;
+    rmsg->pps = (1000000000ULL * *cnt) / elapsed_ns;
+    rmsg->bps = (8000000000ULL * *bytes) / elapsed_ns;
 
     if (elapsed_ns < 1000000000U) {
             *bytes_limit *= 2;
@@ -471,7 +483,7 @@ perf_server(struct worker *w)
         }
     }
 
-    w->result.rcv_cnt = i;
+    w->result.cnt = i;
 
     if (verb) {
         printf("Received %u PDUs out of %u\n", i, limit);
@@ -651,12 +663,15 @@ client_worker_function(void *opaque)
             goto out;
         }
 
-        rmsg.rcv_cnt = le32toh(rmsg.rcv_cnt);
-        rmsg.rcv_pps = le32toh(rmsg.rcv_pps);
-        rmsg.rcv_bps = le32toh(rmsg.rcv_bps);
+        rmsg.cnt        = le32toh(rmsg.cnt);
+        rmsg.pps        = le32toh(rmsg.pps);
+        rmsg.bps        = le32toh(rmsg.bps);
+        rmsg.latency    = le32toh(rmsg.latency);
 
-        printf("Results: packets %u/%u %u pps %u bps\n", rmsg.rcv_cnt,
-                    w->test_config.cnt, rmsg.rcv_pps, rmsg.rcv_bps);
+        printf("Results: %lu/%lu packets %.3f/%.3f Kpps %.3f/%.3f Mbps\n",
+                    rmsg.cnt, w->result.cnt,
+                    (double)rmsg.pps/1000.0, (double)w->result.pps/1000.0,
+                    (double)rmsg.bps/1000000.0, (double)w->result.bps/1000000.0);
     }
 
 out:
@@ -768,7 +783,7 @@ server_worker_function(void *opaque)
     }
 
     if (!rp->quiet) {
-        printf("Configuring test type %u, SDU count %u, SDU size %u, "
+        printf("Configuring test type %u, SDU count %lu, SDU size %u, "
                 "ticket %u\n",
                cfg.opcode, cfg.cnt, cfg.size, ticket);
     }
@@ -807,9 +822,10 @@ server_worker_function(void *opaque)
 
     /* Write the result back to the client on the control file descriptor. */
     rmsg = w->result;
-    rmsg.rcv_cnt = htole32(rmsg.rcv_cnt);
-    rmsg.rcv_pps = htole32(rmsg.rcv_pps);
-    rmsg.rcv_bps = htole32(rmsg.rcv_bps);
+    rmsg.cnt        = htole32(rmsg.cnt);
+    rmsg.pps        = htole32(rmsg.pps);
+    rmsg.bps        = htole32(rmsg.bps);
+    rmsg.latency    = htole32(rmsg.latency);
     ret = write(w->cfd, &rmsg, sizeof(rmsg));
     if (ret != sizeof(rmsg)) {
         if (ret < 0) {
