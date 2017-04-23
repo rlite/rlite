@@ -52,6 +52,9 @@
 #define RP_OPCODE_RR        2
 #define RP_OPCODE_PERF      3
 
+#define CLI_FA_TIMEOUT_MSECS    5000
+#define RP_DATA_WAIT_MSECS      2000
+
 static int stop = 0; /* Used to stop client on SIGINT. */
 static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
 
@@ -197,7 +200,7 @@ ping_client(struct worker *w)
             break;
         }
 repoll:
-        ret = poll(&pfd, 1, 2000);
+        ret = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
         if (ret < 0) {
             perror("poll(flow)");
         }
@@ -267,7 +270,7 @@ ping_server(struct worker *w)
     pfd.events = POLLIN;
 
     for (i = 0; !limit || i < limit; i++) {
-        n = poll(&pfd, 1, 4000);
+        n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
         } else if (n == 0) {
@@ -437,7 +440,7 @@ perf_server(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
 
     for (i = 0; !limit || i < limit; i++) {
-        n = poll(&pfd, 1, 3000);
+        n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
 
@@ -509,8 +512,6 @@ static struct perf_function_desc descs[] = {
     },
 };
 
-#define CLI_FA_TIMEOUT_SEC     5
-
 static void *
 client_worker_function(void *opaque)
 {
@@ -528,7 +529,7 @@ client_worker_function(void *opaque)
                              w->rp->srv_appl_name, &w->rp->flowspec,
                              RINA_F_NOWAIT);
     pfd.events = POLLIN;
-    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_SEC * 1000);
+    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
     if (ret <= 0) {
         if (ret < 0) {
             perror("poll(cfd)");
@@ -589,7 +590,7 @@ client_worker_function(void *opaque)
                              w->rp->srv_appl_name, &w->rp->flowspec,
                              RINA_F_NOWAIT);
     pfd.events = POLLIN;
-    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_SEC * 1000);
+    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
     if (ret <= 0) {
         if (ret < 0) {
             perror("poll(dfd)");
