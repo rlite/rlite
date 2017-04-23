@@ -765,10 +765,10 @@ server_worker_function(void *opaque)
         goto out;
     }
 
-    cfg.opcode = le32toh(cfg.opcode);
-    cfg.ticket = le32toh(cfg.ticket);
-    cfg.cnt = le32toh(cfg.cnt);
-    cfg.size = le32toh(cfg.size);
+    cfg.opcode  = le32toh(cfg.opcode);
+    cfg.ticket  = le32toh(cfg.ticket);
+    cfg.cnt     = le64toh(cfg.cnt);
+    cfg.size    = le32toh(cfg.size);
 
     if (cfg.opcode >= sizeof(descs)) {
         printf("Invalid test configuration: test type %u is invalid\n", cfg.opcode);
@@ -853,7 +853,7 @@ server_worker_function(void *opaque)
     pthread_mutex_unlock(&rp->ticket_lock);
     if (ret) {
         if (ret == ETIMEDOUT) {
-            printf("Timed out waiting for data flow\n");
+            printf("Timed out waiting for data flow [ticket %u]\n", ticket);
         } else {
             printf("pthread_cond_timedwait() failed [%d]\n", ret);
         }
