@@ -62,8 +62,6 @@ static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). *
 struct rinaperf;
 struct worker;
 
-typedef int (*perf_function_t)(struct worker *);
-
 struct rp_config_msg {
     uint32_t opcode;    /* opcode: ping, perf, rr ... */
     uint32_t ticket;    /* valid with RP_OPCODE_DATAFLOW */
@@ -85,6 +83,10 @@ struct rp_result_msg {
     uint64_t latency; /* in nanoseconds */
 };
 
+typedef int (*perf_fn_t)(struct worker *);
+typedef void (*report_fn_t)(struct rp_result_msg *snd,
+                                  struct rp_result_msg *rcv);
+
 struct worker {
     pthread_t th;
     struct rinaperf         *rp;   /* backpointer */
@@ -96,7 +98,7 @@ struct worker {
     unsigned int            interval;
     unsigned int            burst;
     int                     ping;
-    perf_function_t         fn;
+    struct rp_test_desc     *desc;
     int                     cfd; /* control file descriptor */
     int                     dfd; /* data file descriptor */
 };
@@ -316,6 +318,15 @@ ping_server(struct worker *w)
     return 0;
 }
 
+static void
+ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
+{
+    printf("Results: %lu/%lu packets %.3f/%.3f Kpps %.3f/%.3f Mbps\n",
+            rcv->cnt, snd->cnt,
+            (double)rcv->pps/1000.0, (double)snd->pps/1000.0,
+            (double)rcv->bps/1000000.0, (double)snd->bps/1000000.0);
+}
+
 static int
 perf_client(struct worker *w)
 {
@@ -492,36 +503,41 @@ perf_server(struct worker *w)
     return 0;
 }
 
-struct perf_function_desc {
-    const char *name;
-    unsigned int opcode;
-    perf_function_t client_function;
-    perf_function_t server_function;
+struct rp_test_desc {
+    const char      *name;
+    unsigned int    opcode;
+    perf_fn_t       client_fn;
+    perf_fn_t       server_fn;
+    report_fn_t     report_fn;
 };
 
-static struct perf_function_desc descs[] = {
+static struct rp_test_desc descs[] = {
     {   /* placeholder */
         .name = NULL,
         .opcode = RP_OPCODE_DATAFLOW,
-        .client_function = NULL,
-        .server_function = NULL,
+        .client_fn = NULL,
+        .server_fn = NULL,
+        .report_fn = NULL,
     },
     {
         .name = "ping",
         .opcode = RP_OPCODE_PING,
-        .client_function = ping_client,
-        .server_function = ping_server,
+        .client_fn = ping_client,
+        .server_fn = ping_server,
+        .report_fn = ping_report,
     },
     {
         .name = "rr",
         .opcode = RP_OPCODE_RR,
-        .client_function = ping_client,
-        .server_function = ping_server,
+        .client_fn = ping_client,
+        .server_fn = ping_server,
+        .report_fn = ping_report,
     },
     {   .name = "perf",
         .opcode = RP_OPCODE_PERF,
-        .client_function = perf_client,
-        .server_function = perf_server,
+        .client_fn = perf_client,
+        .server_fn = perf_server,
+        .report_fn = ping_report,
     },
 };
 
@@ -636,7 +652,7 @@ client_worker_function(void *opaque)
     }
 
     /* Run the test. */
-    w->fn(w);
+    w->desc->client_fn(w);
 
     if (!stop) {
         /* Wait for the result message from the server and read it. */
@@ -668,10 +684,7 @@ client_worker_function(void *opaque)
         rmsg.bps        = le32toh(rmsg.bps);
         rmsg.latency    = le32toh(rmsg.latency);
 
-        printf("Results: %lu/%lu packets %.3f/%.3f Kpps %.3f/%.3f Mbps\n",
-                    rmsg.cnt, w->result.cnt,
-                    (double)rmsg.pps/1000.0, (double)w->result.pps/1000.0,
-                    (double)rmsg.bps/1000000.0, (double)w->result.bps/1000000.0);
+        w->desc->report_fn(&w->result, &rmsg);
     }
 
 out:
@@ -816,9 +829,9 @@ server_worker_function(void *opaque)
 
     /* Serve the client on the flow file descriptor. */
     w->test_config = cfg;
-    w->fn = descs[cfg.opcode].server_function;
-    assert(w->fn);
-    w->fn(w);
+    w->desc = descs + cfg.opcode;
+    assert(w->desc);
+    w->desc->server_fn(w);
 
     /* Write the result back to the client on the control file descriptor. */
     rmsg = w->result;
@@ -1159,12 +1172,12 @@ main(int argc, char **argv)
     if (!listen) {
         for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
             if (descs[i].name && strcmp(descs[i].name, type) == 0) {
-                wt.fn = descs[i].client_function;
+                wt.desc = descs + i;
                 break;
             }
         }
 
-        if (wt.fn == NULL) {
+        if (wt.desc == NULL) {
             printf("    Unknown test type '%s'\n", type);
             usage();
             return -1;
