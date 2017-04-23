@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Nextworks
+ * Copyright (C) 2015-2017 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
  *
  * This file is part of rlite.
@@ -44,8 +44,13 @@
 #include <rina/api.h>
 
 
-#define SDU_SIZE_MAX            65535
-#define RINAPERF_MAX_WORKERS    1023
+#define SDU_SIZE_MAX        65535
+#define RP_MAX_WORKERS      1023
+
+#define RP_OPCODE_DATAFLOW  0
+#define RP_OPCODE_PING      1
+#define RP_OPCODE_RR        2
+#define RP_OPCODE_PERF      3
 
 static int stop = 0; /* Used to stop client on SIGINT. */
 static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
@@ -56,10 +61,11 @@ struct worker;
 typedef int (*perf_function_t)(struct worker *);
 
 struct rp_config_msg {
-    uint32_t ty;   /* type of test: ping, perf, rr ... */
-    uint32_t size; /* packet size in bytes */
-    uint32_t cnt;  /* packet/transaction count for the test
-                    * (0 means infinite) */
+    uint32_t opcode;    /* opcode: ping, perf, rr ... */
+    uint32_t ticket;    /* valid with RP_OPCODE_DATAFLOW */
+    uint32_t size;      /* packet size in bytes */
+    uint32_t cnt;       /* packet/transaction count for the test
+                         * (0 means infinite) */
 };
 
 struct rp_ticket_msg {
@@ -76,153 +82,61 @@ struct rp_result_msg {
 
 struct worker {
     pthread_t th;
-    struct rinaperf *rp;    /* backpointer */
-    struct worker *next;    /* next worker */
-    struct rp_config_msg test_config;
-    unsigned int interval;
-    unsigned int burst;
-    perf_function_t fn;
-    uint32_t ticket;
-    int ping;
-    int fd;
+    struct rinaperf         *rp;   /* backpointer */
+    struct worker           *next; /* next worker */
+    struct rp_config_msg    test_config;
+    uint32_t                ticket; /* ticket to be sent to the client */
+    pthread_cond_t          data_flow_ready;
+    unsigned int            interval;
+    unsigned int            burst;
+    int                     ping;
+    perf_function_t         fn;
+    int                     cfd; /* control file descriptor */
+    int                     dfd; /* data file descriptor */
 };
 
 struct rinaperf {
-    struct rina_flow_spec flowspec;
-    const char *cli_appl_name;
-    const char *srv_appl_name;
-    const char *dif_name;
-    int cfd; /* Control file descriptor */
-    int parallel;
-    int quiet;
+    struct rina_flow_spec   flowspec;
+    const char              *cli_appl_name;
+    const char              *srv_appl_name;
+    const char              *dif_name;
+    int                     cfd; /* Control file descriptor */
+    int                     parallel;
+    int                     quiet;
 
-    uint32_t next_ticket; /* Next ticket to be allocated */
+    /* Ticket table. */
+    pthread_mutex_t         ticket_lock;
+    struct worker           *ticket_table[RP_MAX_WORKERS];
 
     /* List of workers. */
-    struct worker *workers_head;
-    struct worker *workers_tail;
-    unsigned int workers_num;
+    struct worker           *workers_head;
+    struct worker           *workers_tail;
+    unsigned int            workers_num;
 };
 
-static int
-client_do_config(struct worker *w)
+static void
+worker_init(struct worker *w, struct rinaperf *rp)
 {
-    struct rp_config_msg cfg = w->test_config;
-    struct rp_ticket_msg tmsg;
-    struct pollfd pfd;
-    int ret;
-
-    cfg.ty = htole32(cfg.ty);
-    cfg.cnt = htole32(cfg.cnt);
-    cfg.size = htole32(cfg.size);
-
-    ret = write(w->fd, &cfg, sizeof(cfg));
-    if (ret != sizeof(cfg)) {
-        if (ret < 0) {
-            perror("write(cfg)");
-        } else {
-            printf("Partial write %d/%lu\n", ret,
-                    (unsigned long int)sizeof(cfg));
-        }
-        return -1;
-    }
-
-    pfd.fd = w->fd;
-    pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 3000);
-    switch (ret) {
-        case -1:
-            perror("poll(ticket)");
-            return ret;
-
-        case 0:
-            printf("timeout while waiting for ticket message\n");
-            return -1;
-
-        default:
-            break;
-    }
-
-    ret = read(w->fd, &tmsg, sizeof(tmsg));
-    if (ret != sizeof(tmsg)) {
-        if (ret < 0) {
-            perror("read(ticket)");
-        } else {
-            printf("Error reading ticket message: wrong length %d "
-                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
-        }
-        return -1;
-    }
-    w->ticket = le32toh(tmsg.ticket);
-
-    return 0;
+    memset(w, 0, sizeof(*w));
+    w->rp = rp;
+    w->cfd = w->dfd = -1;
+    pthread_cond_init(&w->data_flow_ready, NULL);
 }
 
-static int
-server_do_config(struct worker *w)
+static void
+worker_fini(struct worker *w)
 {
-    struct rp_config_msg cfg;
-    struct rp_ticket_msg tmsg;
-    struct pollfd pfd;
-    int ret;
+    pthread_cond_destroy(&w->data_flow_ready);
 
-    pfd.fd = w->fd;
-    pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 3000);
-    switch (ret) {
-        case -1:
-            perror("poll(cfg)");
-            return ret;
-
-        case 0:
-            printf("timeout while waiting for configuration message\n");
-            return -1;
-
-        default:
-            break;
+    if (w->cfd >= 0) {
+        close(w->cfd);
+        w->cfd = -1;
     }
 
-    ret = read(w->fd, &cfg, sizeof(cfg));
-    if (ret != sizeof(cfg)) {
-        if (ret < 0) {
-            perror("read(cfg)");
-        } else {
-            printf("Error reading test configuration: wrong length %d "
-                   "(should be %lu)\n", ret, (unsigned long int)sizeof(cfg));
-        }
-        return -1;
+    if (w->dfd >= 0) {
+        close(w->dfd);
+        w->dfd = -1;
     }
-
-    cfg.ty = le32toh(cfg.ty);
-    cfg.cnt = le32toh(cfg.cnt);
-    cfg.size = le32toh(cfg.size);
-
-    if (cfg.size < sizeof(uint16_t)) {
-        printf("Invalid test configuration: size %d is invalid\n", cfg.size);
-        return -1;
-    }
-
-    w->test_config = cfg;
-
-    tmsg.ticket = htole32(w->ticket);
-    ret = write(w->fd, &tmsg, sizeof(tmsg));
-    if (ret != sizeof(tmsg)) {
-        if (ret < 0) {
-            perror("write(ticket)");
-        } else {
-            printf("Error writing ticket: wrong length %d "
-                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
-        }
-        return -1;
-    }
-
-    if (!w->rp->quiet) {
-        printf("Configuring test type %u, SDU count %u, SDU size %u, "
-                "ticket %u\n",
-               cfg.ty, cfg.cnt, cfg.size, tmsg.ticket);
-    }
-
-    return 0;
 }
 
 /* Used for both ping and rr tests. */
@@ -258,7 +172,7 @@ ping_client(struct worker *w)
         }
     }
 
-    pfd.fd = w->fd;
+    pfd.fd = w->dfd;
     pfd.events = POLLIN;
 
     memset(buf, 'x', size);
@@ -272,7 +186,7 @@ ping_client(struct worker *w)
 
         *seqnum = (uint16_t)expected;
 
-        ret = write(w->fd, buf, size);
+        ret = write(w->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
                 perror("write(buf)");
@@ -296,7 +210,7 @@ repoll:
         } else {
             /* Ready to read. */
             timeouts = 0;
-            ret = read(w->fd, buf, sizeof(buf));
+            ret = read(w->dfd, buf, sizeof(buf));
             if (ret <= 0) {
                 if (ret) {
                     perror("read(buf");
@@ -335,8 +249,6 @@ repoll:
                 (ns/i) - interval * 1000);
     }
 
-    close(w->fd);
-
     return 0;
 }
 
@@ -350,7 +262,7 @@ ping_server(struct worker *w)
     unsigned int i;
     int n, ret;
 
-    pfd.fd = w->fd;
+    pfd.fd = w->dfd;
     pfd.events = POLLIN;
 
     for (i = 0; !limit || i < limit; i++) {
@@ -364,7 +276,7 @@ ping_server(struct worker *w)
         }
 
         /* File descriptor is ready for reading. */
-        n = read(w->fd, buf, sizeof(buf));
+        n = read(w->dfd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
             return -1;
@@ -373,7 +285,7 @@ ping_server(struct worker *w)
             break;
         }
 
-        ret = write(w->fd, buf, n);
+        ret = write(w->dfd, buf, n);
         if (ret != n) {
             if (ret < 0) {
                 perror("write(flow)");
@@ -424,7 +336,7 @@ perf_client(struct worker *w)
     gettimeofday(&t_start, NULL);
 
     for (i = 0; !stop && (!limit || i < limit); i++) {
-        ret = write(w->fd, buf, size);
+        ret = write(w->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
                 perror("write(buf)");
@@ -461,8 +373,6 @@ perf_client(struct worker *w)
                 ((float)i) * 1000.0 / us,
                 ((float)size) * 8 * i / us);
     }
-
-    close(w->fd);
 
     return 0;
 }
@@ -516,7 +426,7 @@ perf_server(struct worker *w)
     int verb = !w->rp->quiet;
     int n;
 
-    pfd.fd = w->fd;
+    pfd.fd = w->dfd;
     pfd.events = POLLIN;
 
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
@@ -533,7 +443,7 @@ perf_server(struct worker *w)
         }
 
         /* Ready to read. */
-        n = read(w->fd, buf, sizeof(buf));
+        n = read(w->dfd, buf, sizeof(buf));
         if (n < 0) {
             perror("read(flow)");
             return -1;
@@ -560,22 +470,32 @@ perf_server(struct worker *w)
 
 struct perf_function_desc {
     const char *name;
+    unsigned int opcode;
     perf_function_t client_function;
     perf_function_t server_function;
 };
 
 static struct perf_function_desc descs[] = {
+    {   /* placeholder */
+        .name = NULL,
+        .opcode = RP_OPCODE_DATAFLOW,
+        .client_function = NULL,
+        .server_function = NULL,
+    },
     {
         .name = "ping",
+        .opcode = RP_OPCODE_PING,
         .client_function = ping_client,
         .server_function = ping_server,
     },
     {
         .name = "rr",
+        .opcode = RP_OPCODE_RR,
         .client_function = ping_client,
         .server_function = ping_server,
     },
     {   .name = "perf",
+        .opcode = RP_OPCODE_PERF,
         .client_function = perf_client,
         .server_function = perf_server,
     },
@@ -587,10 +507,14 @@ static void *
 client_worker_function(void *opaque)
 {
     struct worker *w = opaque;
+    struct rp_config_msg cfg = w->test_config;
+    struct rp_ticket_msg tmsg;
     struct pollfd pfd;
     int ret;
 
-    /* We're the client: allocate a flow and run the perf function. */
+    /* Allocate the control flow to be used for test configuration and
+     * to receive test results.
+     * We should always use reliable flows. */
     pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
                              w->rp->srv_appl_name, &w->rp->flowspec,
                              RINA_F_NOWAIT);
@@ -598,26 +522,101 @@ client_worker_function(void *opaque)
     ret = poll(&pfd, 1, CLI_FA_TIMEOUT_SEC * 1000);
     if (ret <= 0) {
         if (ret < 0) {
-            perror("poll()");
+            perror("poll(cfd)");
         } else {
-            printf("Flow allocation timed out\n");
+            printf("Flow allocation timed out for control flow\n");
         }
         close(pfd.fd);
         return NULL;
     }
-    w->fd = rina_flow_alloc_wait(pfd.fd);
+    w->cfd = rina_flow_alloc_wait(pfd.fd);
+    if (w->cfd < 0) {
+        perror("rina_flow_alloc(cfd)");
+        goto out;
+    }
+
+    /* Send test configuration to the server. */
+    cfg.opcode = htole32(cfg.opcode);
+    cfg.cnt = htole32(cfg.cnt);
+    cfg.size = htole32(cfg.size);
+
+    ret = write(w->cfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("write(cfg)");
+        } else {
+            printf("Partial write %d/%lu\n", ret,
+                    (unsigned long int)sizeof(cfg));
+        }
+        goto out;
+    }
+
+    /* Wait for the ticket message from the server and read it. */
+    pfd.fd = w->cfd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 3000);
+    if (ret <= 0) {
+        if (ret < 0) {
+            perror("poll(ticket)");
+        } else {
+            printf("timeout while waiting for ticket message\n");
+        }
+        goto out;
+    }
+
+    ret = read(w->cfd, &tmsg, sizeof(tmsg));
+    if (ret != sizeof(tmsg)) {
+        if (ret < 0) {
+            perror("read(ticket)");
+        } else {
+            printf("Error reading ticket message: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+        }
+        goto out;
+    }
+
+    /* Allocate a data flow for the test. */
+    pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
+                             w->rp->srv_appl_name, &w->rp->flowspec,
+                             RINA_F_NOWAIT);
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, CLI_FA_TIMEOUT_SEC * 1000);
+    if (ret <= 0) {
+        if (ret < 0) {
+            perror("poll(dfd)");
+        } else {
+            printf("Flow allocation timed out for data flow\n");
+        }
+        close(pfd.fd);
+        goto out;
+    }
+    w->dfd = rina_flow_alloc_wait(pfd.fd);
     cli_flow_allocated = 1;
-    if (w->fd < 0) {
-        perror("rina_flow_alloc()");
-        return NULL;
+    if (w->dfd < 0) {
+        perror("rina_flow_alloc(dfd)");
+        goto out;
     }
 
-    ret = client_do_config(w);
-    if (ret) {
-        return NULL;
+    /* Send the ticket to the server to identify the data flow. */
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.opcode = le32toh(RP_OPCODE_DATAFLOW);
+    cfg.ticket = tmsg.ticket;
+    ret = write(w->dfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("write(identify)");
+        } else {
+            printf("Partial write %d/%lu\n", ret,
+                    (unsigned long int)sizeof(cfg));
+        }
+        goto out;
     }
 
+    /* Run the test. */
     w->fn(w);
+
+out:
+    worker_fini(w);
 
     return NULL;
 }
@@ -626,24 +625,143 @@ static void *
 server_worker_function(void *opaque)
 {
     struct worker *w = opaque;
+    struct rinaperf *rp = w->rp;
+    struct rp_config_msg cfg;
+    struct rp_ticket_msg tmsg;
+    struct pollfd pfd;
+    uint32_t ticket;
     int ret;
 
-    ret = server_do_config(w);
+    /* Wait for test configuration message and read it. */
+    pfd.fd = w->cfd;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 3000);
+    if (ret <= 0) {
+        if (ret < 0) {
+            perror("poll(cfg)");
+        } else {
+            printf("timeout while waiting for configuration message\n");
+        }
+        goto out;
+    }
+
+    ret = read(w->cfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("read(cfg)");
+        } else {
+            printf("Error reading test configuration: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(cfg));
+        }
+        goto out;
+    }
+
+    cfg.opcode = le32toh(cfg.opcode);
+    cfg.ticket = le32toh(cfg.ticket);
+    cfg.cnt = le32toh(cfg.cnt);
+    cfg.size = le32toh(cfg.size);
+
+    if (cfg.opcode >= sizeof(descs)) {
+        printf("Invalid test configuration: test type %u is invalid\n", cfg.opcode);
+        goto out;
+    }
+
+    if (cfg.opcode == RP_OPCODE_DATAFLOW) {
+        /* This is a data flow. We need to pass the file descriptor to the worker
+         * associated to the ticket, and notify it. */
+        int err = 0;
+
+        pthread_mutex_lock(&rp->ticket_lock);
+        if (cfg.ticket >= RP_MAX_WORKERS || !rp->ticket_table[cfg.ticket]) {
+            printf("Invalid ticket request: ticket %u is invalid\n", cfg.ticket);
+            err = -1;
+        } else {
+            struct worker *tw = rp->ticket_table[cfg.ticket];
+
+            tw->dfd = w->cfd;
+            w->cfd = -1;
+            pthread_cond_signal(&tw->data_flow_ready);
+        }
+        pthread_mutex_unlock(&rp->ticket_lock);
+
+        if (err) {
+            goto out;
+        }
+
+        return NULL;
+    }
+
+    if (cfg.size < sizeof(uint16_t)) {
+        printf("Invalid test configuration: size %u is invalid\n", cfg.size);
+        goto out;
+    }
+
+    /* Allocate a ticket for the client. */
+    {
+        pthread_mutex_lock(&rp->ticket_lock);
+        for (ticket = 0; ticket < RP_MAX_WORKERS; ticket ++) {
+            if (rp->ticket_table[ticket] == NULL) {
+                rp->ticket_table[ticket] = w;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&rp->ticket_lock);
+        assert(ticket < RP_MAX_WORKERS);
+    }
+
+    /* Send ticket back to the client. */
+    tmsg.ticket = htole32(ticket);
+    ret = write(w->cfd, &tmsg, sizeof(tmsg));
+    if (ret != sizeof(tmsg)) {
+        if (ret < 0) {
+            perror("write(ticket)");
+        } else {
+            printf("Error writing ticket: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+        }
+        goto out;
+    }
+
+    if (!rp->quiet) {
+        printf("Configuring test type %u, SDU count %u, SDU size %u, "
+                "ticket %u\n",
+               cfg.opcode, cfg.cnt, cfg.size, ticket);
+    }
+
+    /* Wait for the client to allocate a data flow and come back to us. */
+    pthread_mutex_lock(&rp->ticket_lock);
+    ret = 0;
+    while (w->dfd == -1 && ret == 0) {
+        struct timespec to;
+
+        clock_gettime(CLOCK_REALTIME, &to);
+        to.tv_sec += 2;
+
+        ret = pthread_cond_timedwait(&w->data_flow_ready,
+                                     &rp->ticket_lock, &to);
+    }
+    rp->ticket_table[ticket] = NULL;
+    pthread_mutex_unlock(&rp->ticket_lock);
     if (ret) {
+        if (ret == ETIMEDOUT) {
+            printf("Timed out waiting for data flow\n");
+        } else {
+            printf("pthread_cond_timedwait() failed [%d]\n", ret);
+        }
         goto out;
+
+    } else {
+        printf("Got data file descriptor %d\n", w->dfd);
     }
 
-    w->fn = descs[w->test_config.ty].server_function;
+    /* Serve the client. */
+    w->test_config = cfg;
+    w->fn = descs[cfg.opcode].server_function;
     assert(w->fn);
-
-    if (w->test_config.ty >= sizeof(descs)) {
-        goto out;
-    }
-
     w->fn(w);
+
 out:
-    close(w->fd);
-    w->fd = -1;
+    worker_fini(w);
 
     return NULL;
 }
@@ -683,6 +801,7 @@ server(struct rinaperf *rp)
                         struct worker *tmp;
                         tmp = w;
                         w = w->next;
+                        worker_fini(tmp);
                         free(tmp);
                     }
                     rp->workers_num --;
@@ -696,7 +815,7 @@ server(struct rinaperf *rp)
                 }
             }
 
-            if (rp->workers_num < RINAPERF_MAX_WORKERS) {
+            if (rp->workers_num < RP_MAX_WORKERS) {
                 break;
             }
             usleep(10000);
@@ -709,11 +828,10 @@ server(struct rinaperf *rp)
             return -1;
         }
         memset(w, 0, sizeof(*w));
-        w->rp = rp;
-        w->ticket = rp->next_ticket ++;
+        worker_init(w, rp);
 
-        w->fd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
-        if (w->fd < 0) {
+        w->cfd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
+        if (w->cfd < 0) {
             perror("rina_flow_accept()");
             break;
         }
@@ -738,6 +856,7 @@ server(struct rinaperf *rp)
     }
 
     if (w) {
+        worker_fini(w);
         free(w);
     }
 
@@ -834,9 +953,11 @@ main(int argc, char **argv)
     int i;
 
     memset(&rp, 0, sizeof(rp));
+    pthread_mutex_init(&rp.ticket_lock, NULL);
+
     memset(&wt, 0, sizeof(wt));
     wt.rp = &rp;
-    wt.fd = -1;
+    wt.cfd = -1;
 
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
@@ -960,7 +1081,7 @@ main(int argc, char **argv)
     /* Function selection. */
     if (!listen) {
         for (i = 0; i < sizeof(descs)/sizeof(descs[0]); i++) {
-            if (strcmp(descs[i].name, type) == 0) {
+            if (descs[i].name && strcmp(descs[i].name, type) == 0) {
                 wt.fn = descs[i].client_function;
                 break;
             }
@@ -971,7 +1092,7 @@ main(int argc, char **argv)
             usage();
             return -1;
         }
-        wt.test_config.ty = i;
+        wt.test_config.opcode = descs[i].opcode;
         wt.test_config.cnt = cnt;
         wt.test_config.size = size;
     }
