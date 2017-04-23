@@ -787,6 +787,9 @@ server_worker_function(void *opaque)
         } else {
             struct worker *tw = rp->ticket_table[cfg.ticket];
 
+#if 0
+            printf("TicketTable: data flow for ticket %u\n", cfg.ticket);
+#endif
             tw->dfd = w->cfd;
             w->cfd = -1;
             pthread_cond_signal(&tw->data_flow_ready);
@@ -814,6 +817,9 @@ server_worker_function(void *opaque)
                 break;
             }
         }
+#if 0
+        printf("TicketTable: allocated ticket %u\n", ticket);
+#endif
         pthread_mutex_unlock(&rp->ticket_lock);
         assert(ticket < RP_MAX_WORKERS);
     }
@@ -859,6 +865,9 @@ server_worker_function(void *opaque)
         }
         goto out;
     }
+#if 0
+    printf("TicketTable: got data flow for ticket %u\n", ticket);
+#endif
 
     /* Serve the client on the flow file descriptor. */
     w->test_config = cfg;
@@ -924,7 +933,6 @@ server(struct rinaperf *rp)
                         struct worker *tmp;
                         tmp = w;
                         w = w->next;
-                        worker_fini(tmp);
                         free(tmp);
                     }
                     rp->workers_num --;
