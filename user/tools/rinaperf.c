@@ -399,10 +399,6 @@ perf_client(struct worker *w)
         w->result.cnt = i;
         w->result.pps = (1000000ULL * i) / us;
         w->result.bps = w->result.pps * 8 * size;
-
-        printf("Throughput: %.3f Kpps, %.3f Mbps\n",
-                ((float)w->result.pps) / 1000.0,
-                ((float)w->result.bps) / 1000000.0);
     }
 
     return 0;
