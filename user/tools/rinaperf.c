@@ -52,8 +52,9 @@
 #define RP_OPCODE_RR        2
 #define RP_OPCODE_PERF      3
 
-#define CLI_FA_TIMEOUT_MSECS    5000
-#define RP_DATA_WAIT_MSECS      2000
+#define CLI_FA_TIMEOUT_MSECS        5000
+#define CLI_RESULT_TIMEOUT_MSECS    5000
+#define RP_DATA_WAIT_MSECS          2000
 
 static int stop = 0; /* Used to stop client on SIGINT. */
 static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
@@ -564,7 +565,7 @@ client_worker_function(void *opaque)
     /* Wait for the ticket message from the server and read it. */
     pfd.fd = w->cfd;
     pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 3000);
+    ret = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
     if (ret <= 0) {
         if (ret < 0) {
             perror("poll(ticket)");
@@ -629,7 +630,7 @@ client_worker_function(void *opaque)
         /* Wait for the result message from the server and read it. */
         pfd.fd = w->cfd;
         pfd.events = POLLIN;
-        ret = poll(&pfd, 1, 3000);
+        ret = poll(&pfd, 1, CLI_RESULT_TIMEOUT_MSECS);
         if (ret <= 0) {
             if (ret < 0) {
                 perror("poll(result)");
@@ -654,8 +655,8 @@ client_worker_function(void *opaque)
         rmsg.rcv_pps = le32toh(rmsg.rcv_pps);
         rmsg.rcv_bps = le32toh(rmsg.rcv_bps);
 
-        printf("Results: packets %u/%u %u pps %u bps\n", cfg.cnt, rmsg.rcv_cnt,
-                    rmsg.rcv_pps, rmsg.rcv_bps);
+        printf("Results: packets %u/%u %u pps %u bps\n", rmsg.rcv_cnt,
+                    w->test_config.cnt, rmsg.rcv_pps, rmsg.rcv_bps);
     }
 
 out:
@@ -679,7 +680,7 @@ server_worker_function(void *opaque)
     /* Wait for test configuration message and read it. */
     pfd.fd = w->cfd;
     pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 3000);
+    ret = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
     if (ret <= 0) {
         if (ret < 0) {
             perror("poll(cfg)");
