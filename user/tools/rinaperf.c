@@ -463,6 +463,7 @@ perf_server(struct worker *w)
     struct pollfd pfd;
     unsigned int i;
     int verb = !w->rp->quiet;
+    int timeout = 0;
     int n;
 
     pfd.fd = w->dfd;
@@ -478,6 +479,7 @@ perf_server(struct worker *w)
 
         } else if (n == 0) {
             /* Timeout */
+            timeout = 1;
             printf("Timeout occurred\n");
             break;
         }
@@ -505,6 +507,15 @@ perf_server(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &t_end);
     ns = 1000000000 * (t_end.tv_sec - t_start.tv_sec) +
                         (t_end.tv_nsec - t_start.tv_nsec);
+    if (timeout) {
+        /* There was a timeout, adjust the time measurement. */
+        if (ns < RP_DATA_WAIT_MSECS * 1000000) {
+            ns = 0;
+        } else {
+            ns -= RP_DATA_WAIT_MSECS * 1000000;
+        }
+    }
+
     w->result.pps = (1000000000ULL * i) / ns;
     w->result.bps = w->result.pps * 8 * w->test_config.size;
     w->result.cnt = i;
