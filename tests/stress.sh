@@ -1,8 +1,8 @@
 #!/bin/bash
 
-for i in $(seq 1 5 4092); do
+for i in $(seq 2 5 4092); do
     for j in $(seq 1 5); do
-        thr=$(rinaperf -t perf -c 100000 -s $i | grep "Mbps" | awk '{printf "%s\n", $4}')
+        thr=$(rinaperf -t perf -c 100000 -f -s $i)
         echo "$i $thr"
     done
 done
