@@ -686,7 +686,7 @@ client_worker_function(void *opaque)
     /* Run the test. */
     w->desc->client_fn(w);
 
-    if (!stop) {
+    if (!w->ping) {
         /* Wait for the result message from the server and read it. */
         pfd.fd = w->cfd;
         pfd.events = POLLIN;
