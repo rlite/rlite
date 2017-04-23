@@ -70,14 +70,14 @@ struct rp_config_msg {
 
 struct rp_ticket_msg {
     uint32_t ticket; /* ticket allocated by the server for the
-                      * client to receive the results */
+                      * client to identify the data flow */
 };
 
 struct rp_result_msg {
     uint32_t rcv_cnt;   /* number of received packets or completed
                          * transactions as seen by the receiver */
-    uint32_t rcv_rate_avg; /* average rate measured by the receiver */
-    uint32_t rcv_rate_stdev; /* standard deviation of receiver rate */
+    uint32_t rcv_pps; /* average packet rate measured by the receiver */
+    uint32_t rcv_bps; /* average bandwidth measured by the receiver */
 };
 
 struct worker {
@@ -85,8 +85,9 @@ struct worker {
     struct rinaperf         *rp;   /* backpointer */
     struct worker           *next; /* next worker */
     struct rp_config_msg    test_config;
+    struct rp_result_msg    result;
     uint32_t                ticket; /* ticket to be sent to the client */
-    pthread_cond_t          data_flow_ready;
+    pthread_cond_t          data_flow_ready; /* to wait for dfd */
     unsigned int            interval;
     unsigned int            burst;
     int                     ping;
@@ -379,7 +380,8 @@ perf_client(struct worker *w)
 
 static void
 rate_print(unsigned long long *bytes, unsigned long long *cnt,
-            unsigned long long *bytes_limit, struct timespec *ts)
+            unsigned long long *bytes_limit, struct timespec *ts,
+            struct rp_result_msg *rmsg)
 {
     struct timespec now;
     unsigned long long elapsed_ns;
@@ -391,13 +393,16 @@ rate_print(unsigned long long *bytes, unsigned long long *cnt,
     elapsed_ns = ((now.tv_sec - ts->tv_sec) * 1000000000 +
                     now.tv_nsec - ts->tv_nsec);
 
-    kpps = ((1000000) * (double)*cnt) / elapsed_ns;
-    mbps = ((8 * 1000) * (double)*bytes) / elapsed_ns;
+    kpps = ((1000000) * (double) *cnt) / elapsed_ns;
+    mbps = ((8 * 1000) * (double) *bytes) / elapsed_ns;
 
     /* We don't want to prints which are too close. */
     if (elapsed_ns > 500000000U) {
         printf("rate: %f Kpss, %f Mbps\n", kpps, mbps);
     }
+
+    rmsg->rcv_pps = (1000000000ULL * *cnt) / elapsed_ns;
+    rmsg->rcv_bps = (8000000000ULL * *bytes) / elapsed_ns;
 
     if (elapsed_ns < 1000000000U) {
             *bytes_limit *= 2;
@@ -457,9 +462,12 @@ perf_server(struct worker *w)
         rate_cnt++;
 
         if (rate_bytes >= rate_bytes_limit && verb) {
-            rate_print(&rate_bytes, &rate_cnt, &rate_bytes_limit, &rate_ts);
+            rate_print(&rate_bytes, &rate_cnt, &rate_bytes_limit,
+                       &rate_ts, &w->result);
         }
     }
+
+    w->result.rcv_cnt = i;
 
     if (verb) {
         printf("Received %u PDUs out of %u\n", i, limit);
@@ -509,11 +517,12 @@ client_worker_function(void *opaque)
     struct worker *w = opaque;
     struct rp_config_msg cfg = w->test_config;
     struct rp_ticket_msg tmsg;
+    struct rp_result_msg rmsg;
     struct pollfd pfd;
     int ret;
 
     /* Allocate the control flow to be used for test configuration and
-     * to receive test results.
+     * to receive test result.
      * We should always use reliable flows. */
     pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
                              w->rp->srv_appl_name, &w->rp->flowspec,
@@ -615,6 +624,39 @@ client_worker_function(void *opaque)
     /* Run the test. */
     w->fn(w);
 
+    if (!stop) {
+        /* Wait for the result message from the server and read it. */
+        pfd.fd = w->cfd;
+        pfd.events = POLLIN;
+        ret = poll(&pfd, 1, 3000);
+        if (ret <= 0) {
+            if (ret < 0) {
+                perror("poll(result)");
+            } else {
+                printf("timeout while waiting for result message\n");
+            }
+            goto out;
+        }
+
+        ret = read(w->cfd, &rmsg, sizeof(rmsg));
+        if (ret != sizeof(rmsg)) {
+            if (ret < 0) {
+                perror("read(result)");
+            } else {
+                printf("Error reading result message: wrong length %d "
+                       "(should be %lu)\n", ret, (unsigned long int)sizeof(rmsg));
+            }
+            goto out;
+        }
+
+        rmsg.rcv_cnt = le32toh(rmsg.rcv_cnt);
+        rmsg.rcv_pps = le32toh(rmsg.rcv_pps);
+        rmsg.rcv_bps = le32toh(rmsg.rcv_bps);
+
+        printf("Results: packets %u/%u %u pps %u bps\n", cfg.cnt, rmsg.rcv_cnt,
+                    rmsg.rcv_pps, rmsg.rcv_bps);
+    }
+
 out:
     worker_fini(w);
 
@@ -628,6 +670,7 @@ server_worker_function(void *opaque)
     struct rinaperf *rp = w->rp;
     struct rp_config_msg cfg;
     struct rp_ticket_msg tmsg;
+    struct rp_result_msg rmsg;
     struct pollfd pfd;
     uint32_t ticket;
     int ret;
@@ -754,11 +797,27 @@ server_worker_function(void *opaque)
         printf("Got data file descriptor %d\n", w->dfd);
     }
 
-    /* Serve the client. */
+    /* Serve the client on the flow file descriptor. */
     w->test_config = cfg;
     w->fn = descs[cfg.opcode].server_function;
     assert(w->fn);
     w->fn(w);
+
+    /* Write the result back to the client on the control file descriptor. */
+    rmsg = w->result;
+    rmsg.rcv_cnt = htole32(rmsg.rcv_cnt);
+    rmsg.rcv_pps = htole32(rmsg.rcv_pps);
+    rmsg.rcv_bps = htole32(rmsg.rcv_bps);
+    ret = write(w->cfd, &rmsg, sizeof(rmsg));
+    if (ret != sizeof(rmsg)) {
+        if (ret < 0) {
+            perror("write(result)");
+        } else {
+            printf("Error writing result: wrong length %d "
+                   "(should be %lu)\n", ret, (unsigned long int)sizeof(rmsg));
+        }
+        goto out;
+    }
 
 out:
     worker_fini(w);
