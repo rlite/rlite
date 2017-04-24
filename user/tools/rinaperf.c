@@ -56,7 +56,7 @@
 #define CLI_RESULT_TIMEOUT_MSECS    5000
 #define RP_DATA_WAIT_MSECS          2000
 
-static int stop = 0; /* Used to stop client on SIGINT. */
+static int stop = 0; /* Used to stop client (e.g. on SIGINT) */
 static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
 
 struct rinaperf;
@@ -109,7 +109,8 @@ struct rinaperf {
     const char              *srv_appl_name;
     const char              *dif_name;
     int                     cfd; /* Control file descriptor */
-    int                     parallel;
+    int                     parallel; /* num of parallel clients */
+    int                     duration; /* duration of client test (secs) */
     int                     verbose;
 
     /* Ticket table. */
@@ -1069,6 +1070,7 @@ main(int argc, char **argv)
     struct rinaperf rp;
     const char *type = "ping";
     int interval_specified = 0;
+    int duration_specified = 0;
     int listen = 0;
     int cnt = 0;
     int size = sizeof(uint16_t);
@@ -1089,12 +1091,13 @@ main(int argc, char **argv)
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
     rp.parallel = 1;
+    rp.duration = 10; /* seconds */
     rp.verbose = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp.flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:v")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:D:v")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -1173,6 +1176,14 @@ main(int argc, char **argv)
                 }
                 break;
 
+            case 'D':
+                rp.duration = atoi(optarg);
+                if (rp.duration < 0) {
+                    printf("    Invalid 'duration' %d\n", rp.duration);
+                }
+                duration_specified = 1;
+                break;
+
             case 'v':
                 rp.verbose = 1;
                 break;
@@ -1194,6 +1205,9 @@ main(int argc, char **argv)
     if (strcmp(type, "ping") == 0) {
         if (!interval_specified) {
             interval = 1000000;
+        }
+        if (!duration_specified) {
+            rp.duration = 0;
         }
         wt.ping = 1;
 
@@ -1248,8 +1262,6 @@ main(int argc, char **argv)
 
     if (listen) {
         server(&rp);
-    } else if (rp.parallel == 1) {
-        client_worker_function(&wt);
     } else {
         struct worker *workers = calloc(rp.parallel, sizeof(*workers));
 
@@ -1266,6 +1278,11 @@ main(int argc, char **argv)
                 printf("pthread_create(#%d) failed: %s\n", i, strerror(ret));
                 break;
             }
+        }
+
+        if (rp.duration > 0) {
+            sleep(rp.duration);
+            stop = 1; /* tell the clients to stop */
         }
 
         for (i = 0; i < rp.parallel; i++) {
