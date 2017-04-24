@@ -12,14 +12,6 @@ import os
 import pickle
 
 
-def stats_init(x):
-    x['kpps'] =  []
-    x['mbps'] = []
-    x['packets'] = []
-    x['transactions'] = []
-    x['latency'] = []
-
-
 description = "Python script to perform automated tests based on rinaperf"
 epilog = "2017 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -32,7 +24,8 @@ argparser.add_argument('--size-max', type = int, default = 1400,
 argparser.add_argument('--size-step', type = int, default = 10,
                        help = "Packet size increment")
 argparser.add_argument('--trials', type = int, default = 3,
-                       help = "Number of trials for each combination of parameters")
+                       help = "Number of trials for each combination "
+                              "of parameters")
 argparser.add_argument('--count', type = int, default = 100000,
                        help = "Packet/transaction count for each test")
 argparser.add_argument('-f', '--flow-control', action='store_true',
@@ -41,23 +34,32 @@ argparser.add_argument('-g', '--max-sdu-gap', type = int, default = -1,
                        help = "Max SDU gap")
 argparser.add_argument('-t', '--test-type', type = str, default = "perf",
                        help = "Test type", choices = ["perf", "rr"])
+argparser.add_argument('-d', '--dif', type = str,
+                        help = "DIF to use for the tests")
 argparser.add_argument('--load', type = str, help = "Dump file to recover")
+argparser.add_argument('--dump', type = str, help = "Dump file to output",
+                        default = 'perftests.dump')
 args = argparser.parse_args()
 
 
 if args.load:
     fin = open(args.load, 'rb')
-    sndstats = pickle.load(fin)
-    rcvstats = pickle.load(fin)
+    stats = pickle.load(fin)
     fin.close()
     print("Restarting from")
-    print(sndstats)
-    print(rcvstats)
+    print(stats)
 else:
-    sndstats = dict()
-    rcvstats = dict()
-    stats_init(sndstats)
-    stats_init(rcvstats)
+    stats = dict()
+    stats['size'] = []
+    stats['snd_kpps'] =  []
+    stats['rcv_kpps'] =  []
+    stats['snd_mbps'] = []
+    stats['rcv_mbps'] = []
+    stats['snd_packets'] = []
+    stats['rcv_packets'] = []
+    stats['snd_transactions'] = []
+    stats['snd_latency'] = []
+
 
 # build QoS
 qos = ""
@@ -90,9 +92,9 @@ try:
                 packets = int(m.group(1))
                 kpps = float(m.group(2))
                 mbps = float(m.group(3))
-                sndstats['packets'].append(packets)
-                sndstats['kpps'].append(kpps)
-                sndstats['mbps'].append(mbps)
+                stats['snd_packets'].append(packets)
+                stats['snd_kpps'].append(kpps)
+                stats['snd_mbps'].append(mbps)
 
                 m = re.match(r'^Receiver\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', outl[3])
                 if m is None:
@@ -102,14 +104,16 @@ try:
                 packets = int(m.group(1))
                 kpps = float(m.group(2))
                 mbps = float(m.group(3))
-                rcvstats['packets'].append(packets)
-                rcvstats['kpps'].append(kpps)
-                rcvstats['mbps'].append(mbps)
+                stats['rcv_packets'].append(packets)
+                stats['rcv_kpps'].append(kpps)
+                stats['rcv_mbps'].append(mbps)
+
+                stats['size'].append(sz)
 
                 print("%d/%d pkts %.3f/%.3f Kpps %.3f/%.3f Mbps" %
-                        (sndstats['packets'][-1], rcvstats['packets'][-1],
-                            sndstats['kpps'][-1], rcvstats['kpps'][-1],
-                            sndstats['mbps'][-1], rcvstats['mbps'][-1]))
+                        (stats['snd_packets'][-1], stats['rcv_packets'][-1],
+                            stats['snd_kpps'][-1], stats['rcv_kpps'][-1],
+                            stats['snd_mbps'][-1], stats['rcv_mbps'][-1]))
 
             elif args.test_type == 'rr':
 
@@ -126,14 +130,16 @@ try:
                 kpps = float(m.group(2))
                 mbps = float(m.group(3))
                 latency = int(m.group(4))
-                sndstats['transactions'].append(transactions)
-                sndstats['kpps'].append(kpps)
-                sndstats['mbps'].append(mbps)
-                sndstats['latency'].append(latency)
+                stats['snd_transactions'].append(transactions)
+                stats['snd_kpps'].append(kpps)
+                stats['snd_mbps'].append(mbps)
+                stats['snd_latency'].append(latency)
+
+                stats['size'].append(sz)
 
                 print("%d transactions %.3f Kpps %.3f Mbps %d ns" %
-                        (sndstats['transactions'][-1], sndstats['kpps'][-1],
-                            sndstats['mbps'][-1], sndstats['latency'][-1]))
+                        (stats['snd_transactions'][-1], stats['snd_kpps'][-1],
+                            stats['snd_mbps'][-1], stats['snd_latency'][-1]))
 
             else:
                 assert(False)
@@ -142,7 +148,7 @@ except KeyboardInterrupt:
     pass
 
 # dump results
-fout = open('perftests.dump', 'wb')
-pickle.dump(sndstats, fout)
-pickle.dump(rcvstats, fout)
+fout = open(args.dump, 'wb')
+pickle.dump(stats, fout)
+pickle.dump(stats, fout)
 fout.close()
