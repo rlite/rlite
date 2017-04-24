@@ -166,21 +166,6 @@ ping_client(struct worker *w)
     struct pollfd pfd;
     int ret = 0;
 
-    if (size > sizeof(buf)) {
-        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
-        size = sizeof(buf);
-    }
-
-    if (!w->ping) {
-        printf("Starting request-response test; message size: %d, "
-               " number of messages: ", size);
-        if (limit) {
-            printf("%d\n", limit);
-        } else {
-            printf("inf\n");
-        }
-    }
-
     pfd.fd = w->dfd;
     pfd.events = POLLIN;
 
@@ -345,19 +330,6 @@ perf_client(struct worker *w)
     unsigned long us;
     unsigned int i = 0;
     int ret;
-
-    if (size > sizeof(buf)) {
-        printf("Warning: size truncated to %u\n", (unsigned int)sizeof(buf));
-        size = sizeof(buf);
-    }
-
-    printf("Starting unidirectional throughput test; message size: %d, "
-            " number of messages: ", size);
-    if (limit) {
-        printf("%d\n", limit);
-    } else {
-        printf("inf\n");
-    }
 
     memset(buf, 'x', size);
 
@@ -538,6 +510,7 @@ perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 
 struct rp_test_desc {
     const char      *name;
+    const char      *description;
     unsigned int    opcode;
     perf_fn_t       client_fn;
     perf_fn_t       server_fn;
@@ -547,6 +520,7 @@ struct rp_test_desc {
 static struct rp_test_desc descs[] = {
     {   /* placeholder */
         .name = NULL,
+        .description = NULL,
         .opcode = RP_OPCODE_DATAFLOW,
         .client_fn = NULL,
         .server_fn = NULL,
@@ -561,12 +535,14 @@ static struct rp_test_desc descs[] = {
     },
     {
         .name = "rr",
+        .description = "request-response test",
         .opcode = RP_OPCODE_RR,
         .client_fn = ping_client,
         .server_fn = ping_server,
         .report_fn = ping_report,
     },
     {   .name = "perf",
+        .description = "unidirectional throughput test",
         .opcode = RP_OPCODE_PERF,
         .client_fn = perf_client,
         .server_fn = perf_server,
@@ -682,6 +658,21 @@ client_worker_function(void *opaque)
                     (unsigned long int)sizeof(cfg));
         }
         goto out;
+    }
+
+    if (w->test_config.size > SDU_SIZE_MAX) {
+        printf("Warning: size truncated to %u\n", SDU_SIZE_MAX);
+        w->test_config.size = SDU_SIZE_MAX;
+    }
+
+    if (!w->ping) {
+        printf("Starting %s; message size: %u, number of messages: ",
+                w->desc->description, w->test_config.size);
+        if (w->test_config.cnt) {
+            printf("%lu\n", w->test_config.cnt);
+        } else {
+            printf("inf\n");
+        }
     }
 
     /* Run the test. */
