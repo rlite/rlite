@@ -1082,7 +1082,7 @@ main(int argc, char **argv)
     rp.cli_appl_name = "rinaperf-data:client";
     rp.srv_appl_name = "rinaperf-data:server";
     rp.parallel = 1;
-    rp.duration = 10; /* seconds */
+    rp.duration = 0;
     rp.verbose = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
@@ -1192,6 +1192,9 @@ main(int argc, char **argv)
      *     specify the interval explicitly.
      *   - Set rp.ping variable to distinguish between ping and rr tests,
      *     which share the same functions.
+     *   - When not in ping mode, ff user did not specify the number of
+     *     packets (or transactions) nor the test duration, use a 10 seconds
+     *     test duration.
      */
     if (strcmp(type, "ping") == 0) {
         if (!interval_specified) {
@@ -1204,6 +1207,9 @@ main(int argc, char **argv)
 
     } else if (strcmp(type, "rr") == 0) {
         wt.ping = 0;
+        if (!duration_specified && !cnt) {
+            rp.duration = 10; /* seconds */
+        }
     }
 
     /* Set defaults. */
