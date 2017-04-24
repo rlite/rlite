@@ -26,7 +26,7 @@ argparser.add_argument('--size-step', type = int, default = 10,
 argparser.add_argument('--trials', type = int, default = 3,
                        help = "Number of trials for each combination "
                               "of parameters")
-argparser.add_argument('--count', type = int, default = 100000,
+argparser.add_argument('-c', '--count', type = int, default = 100000,
                        help = "Packet/transaction count for each test")
 argparser.add_argument('-f', '--flow-control', action='store_true',
                        help = "Enable flow control")
@@ -62,16 +62,20 @@ else:
 
 
 # build QoS
-qos = ""
+qosarg = ""
 if args.flow_control:
-    qos += " -f"
+    qosarg += " -f"
 if args.max_sdu_gap >= 0:
-    qos += " -g %s" % args.max_sdu_gap
+    qosarg += " -g %s" % args.max_sdu_gap
+
+difarg = ""
+if args.dif:
+    difarg = " -d %s" % args.dif
 
 try:
     for sz in range(args.size_min, args.size_max, args.size_step):
-        cmd = ("rinaperf -s %s -t %s -c %s %s"
-                % (sz, args.test_type, args.count, qos))
+        cmd = ("rinaperf -s %s -t %s -c %s %s %s"
+                % (sz, args.test_type, args.count, qosarg, difarg))
         print("Running: %s" % cmd)
         for t in range(args.trials):
             out = subprocess.check_output(cmd.split())
