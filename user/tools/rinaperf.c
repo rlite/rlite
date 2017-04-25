@@ -101,6 +101,7 @@ struct worker {
     struct rp_test_desc     *desc;
     int                     cfd; /* control file descriptor */
     int                     dfd; /* data file descriptor */
+    int                     stop; /* synchronization variable */
 };
 
 struct rinaperf {
@@ -259,7 +260,7 @@ ping_server(struct worker *w)
     pfd.fd = w->dfd;
     pfd.events = POLLIN;
 
-    for (i = 0; !limit || i < limit; i++) {
+    for (i = 0; !w->stop && (!limit || i < limit); i++) {
         n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
@@ -438,7 +439,7 @@ perf_server(struct worker *w)
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
     t_start = rate_ts;
 
-    for (i = 0; !limit || i < limit; i++) {
+    for (i = 0; !w->stop && (!limit || i < limit); i++) {
         n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
