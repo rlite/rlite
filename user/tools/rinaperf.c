@@ -47,10 +47,10 @@
 #define SDU_SIZE_MAX        65535
 #define RP_MAX_WORKERS      1023
 
-#define RP_OPCODE_DATAFLOW  0
-#define RP_OPCODE_PING      1
-#define RP_OPCODE_RR        2
-#define RP_OPCODE_PERF      3
+#define RP_OPCODE_PING      0
+#define RP_OPCODE_RR        1
+#define RP_OPCODE_PERF      2
+#define RP_OPCODE_DATAFLOW  3
 
 #define CLI_FA_TIMEOUT_MSECS        5000
 #define CLI_RESULT_TIMEOUT_MSECS    5000
@@ -518,14 +518,6 @@ struct rp_test_desc {
 };
 
 static struct rp_test_desc descs[] = {
-    {   /* placeholder */
-        .name = NULL,
-        .description = NULL,
-        .opcode = RP_OPCODE_DATAFLOW,
-        .client_fn = NULL,
-        .server_fn = NULL,
-        .report_fn = NULL,
-    },
     {
         .name = "ping",
         .opcode = RP_OPCODE_PING,
