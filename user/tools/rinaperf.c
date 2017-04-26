@@ -127,7 +127,6 @@ struct rinaperf {
 static void
 worker_init(struct worker *w, struct rinaperf *rp)
 {
-    memset(w, 0, sizeof(*w));
     w->rp = rp;
     w->cfd = w->dfd = -1;
     pthread_cond_init(&w->data_flow_ready, NULL);
@@ -759,12 +758,10 @@ server_worker_function(void *opaque)
     if (cfg.opcode == RP_OPCODE_DATAFLOW) {
         /* This is a data flow. We need to pass the file descriptor to the worker
          * associated to the ticket, and notify it. */
-        int err = 0;
 
         pthread_mutex_lock(&rp->ticket_lock);
         if (cfg.ticket >= RP_MAX_WORKERS || !rp->ticket_table[cfg.ticket]) {
             printf("Invalid ticket request: ticket %u is invalid\n", cfg.ticket);
-            err = -1;
         } else {
             struct worker *tw = rp->ticket_table[cfg.ticket];
 
@@ -776,101 +773,96 @@ server_worker_function(void *opaque)
             pthread_cond_signal(&tw->data_flow_ready);
         }
         pthread_mutex_unlock(&rp->ticket_lock);
-
-        if (err) {
+    } else {
+        /* This is a control flow. */
+        if (cfg.size < sizeof(uint16_t)) {
+            printf("Invalid test configuration: size %u is invalid\n", cfg.size);
             goto out;
         }
 
-        return NULL;
-    }
-
-    if (cfg.size < sizeof(uint16_t)) {
-        printf("Invalid test configuration: size %u is invalid\n", cfg.size);
-        goto out;
-    }
-
-    /* Allocate a ticket for the client. */
-    {
-        pthread_mutex_lock(&rp->ticket_lock);
-        for (ticket = 0; ticket < RP_MAX_WORKERS; ticket ++) {
-            if (rp->ticket_table[ticket] == NULL) {
-                rp->ticket_table[ticket] = w;
-                break;
+        /* Allocate a ticket for the client. */
+        {
+            pthread_mutex_lock(&rp->ticket_lock);
+            for (ticket = 0; ticket < RP_MAX_WORKERS; ticket ++) {
+                if (rp->ticket_table[ticket] == NULL) {
+                    rp->ticket_table[ticket] = w;
+                    break;
+                }
             }
-        }
 #if 0
-        printf("TicketTable: allocated ticket %u\n", ticket);
+            printf("TicketTable: allocated ticket %u\n", ticket);
 #endif
+            pthread_mutex_unlock(&rp->ticket_lock);
+            assert(ticket < RP_MAX_WORKERS);
+        }
+
+        /* Send ticket back to the client. */
+        tmsg.ticket = htole32(ticket);
+        ret = write(w->cfd, &tmsg, sizeof(tmsg));
+        if (ret != sizeof(tmsg)) {
+            if (ret < 0) {
+                perror("write(ticket)");
+            } else {
+                printf("Error writing ticket: wrong length %d "
+                       "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+            }
+            goto out;
+        }
+
+        if (rp->verbose) {
+            printf("Configuring test type %u, SDU count %lu, SDU size %u, "
+                    "ticket %u\n",
+                   cfg.opcode, cfg.cnt, cfg.size, ticket);
+        }
+
+        /* Wait for the client to allocate a data flow and come back to us. */
+        pthread_mutex_lock(&rp->ticket_lock);
+        ret = 0;
+        while (w->dfd == -1 && ret == 0) {
+            struct timespec to;
+
+            clock_gettime(CLOCK_REALTIME, &to);
+            to.tv_sec += 2;
+
+            ret = pthread_cond_timedwait(&w->data_flow_ready,
+                                         &rp->ticket_lock, &to);
+        }
+        rp->ticket_table[ticket] = NULL;
         pthread_mutex_unlock(&rp->ticket_lock);
-        assert(ticket < RP_MAX_WORKERS);
-    }
-
-    /* Send ticket back to the client. */
-    tmsg.ticket = htole32(ticket);
-    ret = write(w->cfd, &tmsg, sizeof(tmsg));
-    if (ret != sizeof(tmsg)) {
-        if (ret < 0) {
-            perror("write(ticket)");
-        } else {
-            printf("Error writing ticket: wrong length %d "
-                   "(should be %lu)\n", ret, (unsigned long int)sizeof(tmsg));
+        if (ret) {
+            if (ret == ETIMEDOUT) {
+                printf("Timed out waiting for data flow [ticket %u]\n", ticket);
+            } else {
+                printf("pthread_cond_timedwait() failed [%d]\n", ret);
+            }
+            goto out;
         }
-        goto out;
-    }
-
-    if (rp->verbose) {
-        printf("Configuring test type %u, SDU count %lu, SDU size %u, "
-                "ticket %u\n",
-               cfg.opcode, cfg.cnt, cfg.size, ticket);
-    }
-
-    /* Wait for the client to allocate a data flow and come back to us. */
-    pthread_mutex_lock(&rp->ticket_lock);
-    ret = 0;
-    while (w->dfd == -1 && ret == 0) {
-        struct timespec to;
-
-        clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_sec += 2;
-
-        ret = pthread_cond_timedwait(&w->data_flow_ready,
-                                     &rp->ticket_lock, &to);
-    }
-    rp->ticket_table[ticket] = NULL;
-    pthread_mutex_unlock(&rp->ticket_lock);
-    if (ret) {
-        if (ret == ETIMEDOUT) {
-            printf("Timed out waiting for data flow [ticket %u]\n", ticket);
-        } else {
-            printf("pthread_cond_timedwait() failed [%d]\n", ret);
-        }
-        goto out;
-    }
 #if 0
-    printf("TicketTable: got data flow for ticket %u\n", ticket);
+        printf("TicketTable: got data flow for ticket %u\n", ticket);
 #endif
 
-    /* Serve the client on the flow file descriptor. */
-    w->test_config = cfg;
-    w->desc = descs + cfg.opcode;
-    assert(w->desc);
-    w->desc->server_fn(w);
+        /* Serve the client on the flow file descriptor. */
+        w->test_config = cfg;
+        w->desc = descs + cfg.opcode;
+        assert(w->desc);
+        w->desc->server_fn(w);
 
-    /* Write the result back to the client on the control file descriptor. */
-    rmsg = w->result;
-    rmsg.cnt        = htole64(rmsg.cnt);
-    rmsg.pps        = htole64(rmsg.pps);
-    rmsg.bps        = htole64(rmsg.bps);
-    rmsg.latency    = htole64(rmsg.latency);
-    ret = write(w->cfd, &rmsg, sizeof(rmsg));
-    if (ret != sizeof(rmsg)) {
-        if (ret < 0) {
-            perror("write(result)");
-        } else {
-            printf("Error writing result: wrong length %d "
-                   "(should be %lu)\n", ret, (unsigned long int)sizeof(rmsg));
+        /* Write the result back to the client on the control file descriptor. */
+        rmsg = w->result;
+        rmsg.cnt        = htole64(rmsg.cnt);
+        rmsg.pps        = htole64(rmsg.pps);
+        rmsg.bps        = htole64(rmsg.bps);
+        rmsg.latency    = htole64(rmsg.latency);
+        ret = write(w->cfd, &rmsg, sizeof(rmsg));
+        if (ret != sizeof(rmsg)) {
+            if (ret < 0) {
+                perror("write(result)");
+            } else {
+                printf("Error writing result: wrong length %d "
+                       "(should be %lu)\n", ret, (unsigned long int)sizeof(rmsg));
+            }
+            goto out;
         }
-        goto out;
     }
 
 out:
@@ -1262,6 +1254,7 @@ main(int argc, char **argv)
 
         for (i = 0; i < rp.parallel; i++) {
             memcpy(workers + i, &wt, sizeof(wt));
+            worker_init(workers + i, &rp);
             ret = pthread_create(&workers[i].th, NULL, client_worker_function,
                                  workers + i);
             if (ret) {
