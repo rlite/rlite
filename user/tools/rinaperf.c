@@ -151,6 +151,25 @@ worker_fini(struct worker *w)
     }
 }
 
+/* Sleep at most 'usecs' microseconds, waking up earlier if receiving
+ * a stop signal from the stop pipe */
+static void
+stoppable_usleep(struct rinaperf *rp, unsigned int usecs)
+{
+    struct timeval to = {
+        .tv_sec = 0,
+        .tv_usec = usecs,
+    };
+    fd_set rfds;
+
+    FD_ZERO(&rfds);
+    FD_SET(rp->stop_pipe[0], &rfds);
+
+    if (select(rp->stop_pipe[0] + 1, &rfds, NULL, NULL, &to) < 0) {
+        perror("select()");
+    }
+}
+
 /* Used for both ping and rr tests. */
 static int
 ping_client(struct worker *w)
@@ -236,7 +255,7 @@ repoll:
         }
 
         if (interval) {
-            usleep(interval);
+            stoppable_usleep(w->rp, interval);
         }
     }
 
@@ -364,7 +383,7 @@ perf_client(struct worker *w)
 
         if (interval && --cdown == 0) {
             if (interval > 50) { /* slack default is 50 us*/
-                usleep(interval);
+                stoppable_usleep(rp, interval);
             } else {
                 gettimeofday(&w1, NULL);
                 for (;;) {
