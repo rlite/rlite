@@ -592,6 +592,7 @@ static void *
 client_worker_function(void *opaque)
 {
     struct worker *w = opaque;
+    struct rinaperf *rp = w->rp;
     struct rp_config_msg cfg = w->test_config;
     struct rp_ticket_msg tmsg;
     struct rp_result_msg rmsg;
@@ -601,8 +602,8 @@ client_worker_function(void *opaque)
     /* Allocate the control flow to be used for test configuration and
      * to receive test result.
      * We should always use reliable flows. */
-    pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
-                             w->rp->srv_appl_name, &w->rp->flowspec,
+    pfd.fd = rina_flow_alloc(rp->dif_name, rp->cli_appl_name,
+                             rp->srv_appl_name, &rp->flowspec,
                              RINA_F_NOWAIT);
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
@@ -645,7 +646,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(ticket)");
         } else {
-            printf("timeout while waiting for ticket message\n");
+            printf("Timeout while waiting for ticket message\n");
         }
         goto out;
     }
@@ -662,8 +663,8 @@ client_worker_function(void *opaque)
     }
 
     /* Allocate a data flow for the test. */
-    pfd.fd = rina_flow_alloc(w->rp->dif_name, w->rp->cli_appl_name,
-                             w->rp->srv_appl_name, &w->rp->flowspec,
+    pfd.fd = rina_flow_alloc(rp->dif_name, rp->cli_appl_name,
+                             rp->srv_appl_name, &rp->flowspec,
                              RINA_F_NOWAIT);
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
@@ -677,7 +678,7 @@ client_worker_function(void *opaque)
         goto out;
     }
     w->dfd = rina_flow_alloc_wait(pfd.fd);
-    w->rp->cli_flow_allocated = 1;
+    rp->cli_flow_allocated = 1;
     if (w->dfd < 0) {
         perror("rina_flow_alloc(dfd)");
         goto out;
@@ -704,13 +705,24 @@ client_worker_function(void *opaque)
     }
 
     if (!w->ping) {
-        printf("Starting %s; message size: %u, number of messages: ",
-                w->desc->description, w->test_config.size);
+        char countbuf[64];
+        char durbuf[64];
+
         if (w->test_config.cnt) {
-            printf("%lu\n", w->test_config.cnt);
+            snprintf(countbuf, sizeof(countbuf), "%lu", w->test_config.cnt);
         } else {
-            printf("inf\n");
+            strncpy(countbuf, "inf", sizeof(countbuf));
         }
+
+        if (rp->duration) {
+            snprintf(durbuf, sizeof(durbuf), "%d secs", rp->duration);
+        } else {
+            strncpy(durbuf, "inf", sizeof(durbuf));
+        }
+
+        printf("Starting %s; message size: %u, number of messages: %s,"
+                " duration: %s\n", w->desc->description, w->test_config.size,
+                countbuf, durbuf);
     }
 
     /* Run the test. */
@@ -739,7 +751,7 @@ client_worker_function(void *opaque)
             if (ret < 0) {
                 perror("poll(result)");
             } else {
-                printf("timeout while waiting for result message\n");
+                printf("Timeout while waiting for result message\n");
             }
             goto out;
         }
@@ -789,7 +801,7 @@ server_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(cfg)");
         } else {
-            printf("timeout while waiting for configuration message\n");
+            printf("Timeout while waiting for configuration message\n");
         }
         goto out;
     }
