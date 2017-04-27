@@ -57,8 +57,6 @@
 #define CLI_RESULT_TIMEOUT_MSECS    5000
 #define RP_DATA_WAIT_MSECS          2000
 
-static int cli_flow_allocated = 0; /* Avoid to get stuck in rina_flow_alloc(). */
-
 struct rinaperf;
 struct worker;
 
@@ -113,7 +111,8 @@ struct rinaperf {
     int                     duration; /* duration of client test (secs) */
     int                     verbose;
     int                     stop_pipe[2]; /* to stop client threads */
-    int                     stop; /* another way to stop client threads */
+    int                     cli_stop; /* another way to stop client threads */
+    int                     cli_flow_allocated; /* client flows allocated ? */
 
     /* Ticket table. */
     pthread_mutex_t         ticket_lock;
@@ -370,7 +369,7 @@ perf_client(struct worker *w)
 
     gettimeofday(&t_start, NULL);
 
-    for (i = 0; !rp->stop && (!limit || i < limit); i++) {
+    for (i = 0; !rp->cli_stop && (!limit || i < limit); i++) {
         ret = write(w->dfd, buf, size);
         if (ret != size) {
             if (ret < 0) {
@@ -675,7 +674,7 @@ client_worker_function(void *opaque)
         goto out;
     }
     w->dfd = rina_flow_alloc_wait(pfd.fd);
-    cli_flow_allocated = 1;
+    w->rp->cli_flow_allocated = 1;
     if (w->dfd < 0) {
         perror("rina_flow_alloc(dfd)");
         goto out;
@@ -1035,13 +1034,13 @@ stop_clients(struct rinaperf *rp)
         perror("write(stop_pipe)");
     }
     /* ... and set the stop global variable. */
-    rp->stop = 1;
+    rp->cli_stop = 1;
 }
 
 static void
 sigint_handler_client(int signum)
 {
-    if (!cli_flow_allocated) {
+    if (!_rp.cli_flow_allocated) {
         /* Nothing to stop. */
         exit(EXIT_SUCCESS);
     }
@@ -1145,7 +1144,7 @@ main(int argc, char **argv)
     rp->verbose = 0;
     rp->cfd = -1;
     rp->stop_pipe[0] = rp->stop_pipe[1] = -1;
-    rp->stop = 0;
+    rp->cli_stop = rp->cli_flow_allocated = 0;
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp->flowspec);
