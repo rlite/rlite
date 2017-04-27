@@ -40,6 +40,7 @@
 #include <poll.h>
 #include <time.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #include <rina/api.h>
 
@@ -121,7 +122,7 @@ struct rinaperf {
     /* List of workers. */
     struct worker           *workers_head;
     struct worker           *workers_tail;
-    unsigned int            workers_num;
+    sem_t                   workers_free;
 };
 
 static struct rinaperf _rp;
@@ -148,6 +149,8 @@ worker_fini(struct worker *w)
         close(w->dfd);
         w->dfd = -1;
     }
+
+    sem_post(&w->rp->workers_free);
 }
 
 /* Sleep at most 'usecs' microseconds, waking up earlier if receiving
@@ -610,7 +613,7 @@ client_worker_function(void *opaque)
             printf("Flow allocation timed out for control flow\n");
         }
         close(pfd.fd);
-        return NULL;
+        goto out;
     }
     w->cfd = rina_flow_alloc_wait(pfd.fd);
     if (w->cfd < 0) {
@@ -945,41 +948,36 @@ server(struct rinaperf *rp)
         struct worker *p;
         int ret;
 
-        for (;;) {
-            /* Try to join terminated threads. */
-            for (p = NULL, w = rp->workers_head; w; ) {
-                ret = pthread_tryjoin_np(w->th, NULL);
-                if (ret == 0) {
-                    if (w == rp->workers_head) {
-                        rp->workers_head = w->next;
-                    }
-                    if (p) {
-                        p->next = w->next;
-                    }
-                    if (w == rp->workers_tail) {
-                        rp->workers_tail = p;
-                    }
-                    {
-                        struct worker *tmp;
-                        tmp = w;
-                        w = w->next;
-                        free(tmp);
-                    }
-                    rp->workers_num --;
+        /* Wait for more free workers. */
+        sem_wait(&rp->workers_free);
 
-                } else {
-                    if (ret != EBUSY) {
-                        printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
-                    }
-                    p = w;
-                    w = w->next;
+        /* Try to join terminated threads. */
+        for (p = NULL, w = rp->workers_head; w; ) {
+            ret = pthread_tryjoin_np(w->th, NULL);
+            if (ret == 0) {
+                if (w == rp->workers_head) {
+                    rp->workers_head = w->next;
                 }
-            }
+                if (p) {
+                    p->next = w->next;
+                }
+                if (w == rp->workers_tail) {
+                    rp->workers_tail = p;
+                }
+                {
+                    struct worker *tmp;
+                    tmp = w;
+                    w = w->next;
+                    free(tmp);
+                }
 
-            if (rp->workers_num < RP_MAX_WORKERS) {
-                break;
+            } else {
+                if (ret != EBUSY) {
+                    printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                }
+                p = w;
+                w = w->next;
             }
-            usleep(10000);
         }
 
         /* Allocate new worker and accept a new flow. */
@@ -1010,10 +1008,6 @@ server(struct rinaperf *rp)
             rp->workers_tail->next = w;
             rp->workers_tail = w;
         }
-        rp->workers_num ++;
-#if 0
-        printf("Active workers %u\n", rp->workers_num);
-#endif
     }
 
     if (w) {
@@ -1145,6 +1139,7 @@ main(int argc, char **argv)
     rp->cfd = -1;
     rp->stop_pipe[0] = rp->stop_pipe[1] = -1;
     rp->cli_stop = rp->cli_flow_allocated = 0;
+    sem_init(&rp->workers_free, 0, RP_MAX_WORKERS);
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp->flowspec);
