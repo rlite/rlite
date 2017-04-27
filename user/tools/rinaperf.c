@@ -51,6 +51,7 @@
 #define RP_OPCODE_RR        1
 #define RP_OPCODE_PERF      2
 #define RP_OPCODE_DATAFLOW  3
+#define RP_OPCODE_STOP      4 /* must be the last */
 
 #define CLI_FA_TIMEOUT_MSECS        5000
 #define CLI_RESULT_TIMEOUT_MSECS    5000
@@ -101,7 +102,6 @@ struct worker {
     struct rp_test_desc     *desc;
     int                     cfd; /* control file descriptor */
     int                     dfd; /* data file descriptor */
-    int                     stop; /* synchronization variable */
 };
 
 struct rinaperf {
@@ -252,21 +252,30 @@ ping_server(struct worker *w)
 {
     unsigned int limit = w->test_config.cnt;
     char buf[SDU_SIZE_MAX];
-    struct pollfd pfd;
+    struct pollfd pfd[2];
     unsigned int i;
     int n, ret;
 
-    pfd.fd = w->dfd;
-    pfd.events = POLLIN;
+    pfd[0].fd = w->dfd;
+    pfd[1].fd = w->cfd;
+    pfd[0].events = pfd[1].events = POLLIN;
 
-    for (i = 0; !w->stop && (!limit || i < limit); i++) {
-        n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
+    for (i = 0; !limit || i < limit; i++) {
+        n = poll(pfd, 2, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
         } else if (n == 0) {
             /* Timeout */
             if (w->rp->verbose) {
                 printf("Timeout occurred\n");
+            }
+            break;
+        }
+
+        if (pfd[1].revents & POLLIN) {
+            /* Stop signal received. */
+            if (w->rp->verbose) {
+                printf("Stopped remotely\n");
             }
             break;
         }
@@ -426,28 +435,37 @@ perf_server(struct worker *w)
     struct timespec rate_ts, t_start, t_end;
     char buf[SDU_SIZE_MAX];
     unsigned long long ns;
-    struct pollfd pfd;
+    struct pollfd pfd[2];
     unsigned int i;
     int verb = w->rp->verbose;
     int timeout = 0;
     int n;
 
-    pfd.fd = w->dfd;
-    pfd.events = POLLIN;
+    pfd[0].fd = w->dfd;
+    pfd[1].fd = w->cfd;
+    pfd[0].events = pfd[1].events = POLLIN;
 
     clock_gettime(CLOCK_MONOTONIC, &rate_ts);
     t_start = rate_ts;
 
-    for (i = 0; !w->stop && (!limit || i < limit); i++) {
-        n = poll(&pfd, 1, RP_DATA_WAIT_MSECS);
+    for (i = 0; !limit || i < limit; i++) {
+        n = poll(pfd, 2, RP_DATA_WAIT_MSECS);
         if (n < 0) {
             perror("poll(flow)");
 
         } else if (n == 0) {
             /* Timeout */
             timeout = 1;
-            if (w->rp->verbose) {
+            if (verb) {
                 printf("Timeout occurred\n");
+            }
+            break;
+        }
+
+        if (pfd[1].revents & POLLIN) {
+            /* Stop signal received. */
+            if (verb) {
+                printf("Stopped remotely\n");
             }
             break;
         }
@@ -670,6 +688,20 @@ client_worker_function(void *opaque)
     /* Run the test. */
     w->desc->client_fn(w);
 
+    /* Send the stop opcode on the control file descriptor. */
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.opcode = htole32(RP_OPCODE_STOP);
+    ret = write(w->cfd, &cfg, sizeof(cfg));
+    if (ret != sizeof(cfg)) {
+        if (ret < 0) {
+            perror("write(stop)");
+        } else {
+            printf("Partial write %d/%lu\n", ret,
+                    (unsigned long int)sizeof(cfg));
+        }
+        goto out;
+    }
+
     if (!w->ping) {
         /* Wait for the result message from the server and read it. */
         pfd.fd = w->cfd;
@@ -750,7 +782,7 @@ server_worker_function(void *opaque)
     cfg.cnt     = le64toh(cfg.cnt);
     cfg.size    = le32toh(cfg.size);
 
-    if (cfg.opcode >= sizeof(descs)) {
+    if (cfg.opcode >= RP_OPCODE_STOP) {
         printf("Invalid test configuration: test type %u is invalid\n", cfg.opcode);
         goto out;
     }
