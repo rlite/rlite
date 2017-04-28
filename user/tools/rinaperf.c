@@ -93,7 +93,7 @@ struct worker {
     struct rp_config_msg    test_config;
     struct rp_result_msg    result;
     uint32_t                ticket; /* ticket to be sent to the client */
-    pthread_cond_t          data_flow_ready; /* to wait for dfd */
+    sem_t                   data_flow_ready; /* to wait for dfd */
     unsigned int            interval;
     unsigned int            burst;
     int                     ping;
@@ -844,13 +844,12 @@ server_worker_function(void *opaque)
         } else {
             struct worker *tw = rp->ticket_table[cfg.ticket];
 
-            rp->ticket_table[cfg.ticket] = NULL;
 #if 0
             printf("TicketTable: data flow for ticket %u\n", cfg.ticket);
 #endif
             tw->dfd = w->cfd;
             w->cfd = -1;
-            pthread_cond_signal(&tw->data_flow_ready);
+            sem_post(&tw->data_flow_ready);
         }
         pthread_mutex_unlock(&rp->ticket_lock);
     } else {
@@ -869,7 +868,7 @@ server_worker_function(void *opaque)
                     break;
                 }
             }
-            pthread_cond_init(&w->data_flow_ready, NULL);
+            sem_init(&w->data_flow_ready, 0, 0);
 #if 0
             printf("TicketTable: allocated ticket %u\n", ticket);
 #endif
@@ -897,12 +896,12 @@ server_worker_function(void *opaque)
         }
 
         /* Wait for the client to allocate a data flow and come back to us. */
-        pthread_mutex_lock(&rp->ticket_lock);
         clock_gettime(CLOCK_REALTIME, &to);
         to.tv_sec += 5;
-        ret = pthread_cond_timedwait(&w->data_flow_ready,
-                                     &rp->ticket_lock, &to);
-        pthread_cond_destroy(&w->data_flow_ready);
+        ret = sem_timedwait(&w->data_flow_ready, &to);
+        pthread_mutex_lock(&rp->ticket_lock);
+        rp->ticket_table[ticket] = NULL;
+        sem_destroy(&w->data_flow_ready);
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
             if (ret == ETIMEDOUT) {
