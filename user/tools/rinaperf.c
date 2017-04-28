@@ -62,17 +62,17 @@ struct rinaperf;
 struct worker;
 
 struct rp_config_msg {
+    uint64_t cnt;       /* packet/transaction count for the test
+                         * (0 means infinite) */
     uint32_t opcode;    /* opcode: ping, perf, rr ... */
     uint32_t ticket;    /* valid with RP_OPCODE_DATAFLOW */
     uint32_t size;      /* packet size in bytes */
-    uint64_t cnt;       /* packet/transaction count for the test
-                         * (0 means infinite) */
-};
+} __attribute__((packed));
 
 struct rp_ticket_msg {
     uint32_t ticket; /* ticket allocated by the server for the
                       * client to identify the data flow */
-};
+} __attribute__((packed));
 
 struct rp_result_msg {
     uint64_t cnt; /* number of packets or completed transactions
@@ -80,7 +80,7 @@ struct rp_result_msg {
     uint64_t pps; /* average packet rate measured by the sender or receiver */
     uint64_t bps; /* average bandwidth measured by the sender or receiver */
     uint64_t latency; /* in nanoseconds */
-};
+} __attribute__((packed));
 
 typedef int (*perf_fn_t)(struct worker *);
 typedef void (*report_fn_t)(struct rp_result_msg *snd,
