@@ -115,6 +115,11 @@ struct rinaperf {
     int                     cli_stop; /* another way to stop client threads */
     int                     cli_flow_allocated; /* client flows allocated ? */
 
+    /* Synchronization between client threads and main thread. */
+    pthread_mutex_t         cli_barrier_lock;
+    pthread_cond_t          cli_barrier_done;
+    int                     cli_done; /* client that finished */
+
     /* Ticket table. */
     pthread_mutex_t         ticket_lock;
     struct worker           *ticket_table[RP_MAX_WORKERS];
@@ -149,8 +154,6 @@ worker_fini(struct worker *w)
         close(w->dfd);
         w->dfd = -1;
     }
-
-    sem_post(&w->rp->workers_free);
 }
 
 /* Sleep at most 'usecs' microseconds, waking up earlier if receiving
@@ -778,6 +781,12 @@ client_worker_function(void *opaque)
 out:
     worker_fini(w);
 
+    pthread_mutex_lock(&rp->cli_barrier_lock);
+    if (++rp->cli_done == rp->parallel) {
+        pthread_cond_signal(&rp->cli_barrier_done);
+    }
+    pthread_mutex_unlock(&rp->cli_barrier_lock);
+
     return NULL;
 }
 
@@ -903,9 +912,11 @@ server_worker_function(void *opaque)
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
             if (ret == ETIMEDOUT) {
-                printf("Timed out waiting for data flow [ticket %u]\n", ticket);
+                printf("Timed out waiting for data flow [ticket %u]\n",
+                        ticket);
             } else {
-                printf("pthread_cond_timedwait() failed [%d]\n", ret);
+                printf("pthread_cond_timedwait() failed [%s]\n",
+                        strerror(ret));
             }
             goto out;
         }
@@ -939,6 +950,7 @@ server_worker_function(void *opaque)
 
 out:
     worker_fini(w);
+    sem_post(&w->rp->workers_free);
 
     return NULL;
 }
@@ -1024,6 +1036,7 @@ server(struct rinaperf *rp)
 
     if (w) {
         worker_fini(w);
+        sem_post(&w->rp->workers_free);
         free(w);
     }
 
@@ -1136,13 +1149,11 @@ main(int argc, char **argv)
     int opt;
     int i;
 
-    memset(rp, 0, sizeof(*rp));
-    pthread_mutex_init(&rp->ticket_lock, NULL);
-
     memset(&wt, 0, sizeof(wt));
     wt.rp = rp;
     wt.cfd = -1;
 
+    memset(rp, 0, sizeof(*rp));
     rp->cli_appl_name = "rinaperf-data:client";
     rp->srv_appl_name = "rinaperf-data:server";
     rp->parallel = 1;
@@ -1151,7 +1162,11 @@ main(int argc, char **argv)
     rp->cfd = -1;
     rp->stop_pipe[0] = rp->stop_pipe[1] = -1;
     rp->cli_stop = rp->cli_flow_allocated = 0;
+    rp->cli_done = 0;
     sem_init(&rp->workers_free, 0, RP_MAX_WORKERS);
+    pthread_mutex_init(&rp->cli_barrier_lock, NULL);
+    pthread_cond_init(&rp->cli_barrier_done, NULL);
+    pthread_mutex_init(&rp->ticket_lock, NULL);
 
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_default(&rp->flowspec);
@@ -1353,8 +1368,29 @@ main(int argc, char **argv)
         }
 
         if (rp->duration > 0) {
-            sleep(rp->duration);
-            stop_clients(rp); /* tell the clients to stop */
+            /* Wait for the clients to finish, but no more than rp->duration
+             * seconds. */
+            struct timespec to;
+
+            clock_gettime(CLOCK_REALTIME, &to);
+            to.tv_sec += rp->duration;
+
+            pthread_mutex_lock(&rp->cli_barrier_lock);
+            ret = pthread_cond_timedwait(&rp->cli_barrier_done,
+                                        &rp->cli_barrier_lock, &to);
+            pthread_mutex_unlock(&rp->cli_barrier_lock);
+            if (ret) {
+                if (ret != ETIMEDOUT) {
+                    printf("pthread_cond_timedwait() failed [%s]\n",
+                            strerror(ret));
+                } else if (rp->verbose) {
+                    printf("Stopping clients, %d seconds elapsed\n",
+                            rp->duration);
+                }
+                stop_clients(rp); /* tell the clients to stop */
+            } else {
+                /* Client finished themselves before rp->duration seconds. */
+            }
         }
 
         for (i = 0; i < rp->parallel; i++) {
