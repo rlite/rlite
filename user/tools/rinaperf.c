@@ -137,14 +137,11 @@ worker_init(struct worker *w, struct rinaperf *rp)
 {
     w->rp = rp;
     w->cfd = w->dfd = -1;
-    pthread_cond_init(&w->data_flow_ready, NULL);
 }
 
 static void
 worker_fini(struct worker *w)
 {
-    pthread_cond_destroy(&w->data_flow_ready);
-
     if (w->cfd >= 0) {
         close(w->cfd);
         w->cfd = -1;
@@ -798,6 +795,7 @@ server_worker_function(void *opaque)
     struct rp_config_msg cfg;
     struct rp_ticket_msg tmsg;
     struct rp_result_msg rmsg;
+    struct timespec to;
     struct pollfd pfd;
     uint32_t ticket;
     int ret;
@@ -846,6 +844,7 @@ server_worker_function(void *opaque)
         } else {
             struct worker *tw = rp->ticket_table[cfg.ticket];
 
+            rp->ticket_table[cfg.ticket] = NULL;
 #if 0
             printf("TicketTable: data flow for ticket %u\n", cfg.ticket);
 #endif
@@ -870,6 +869,7 @@ server_worker_function(void *opaque)
                     break;
                 }
             }
+            pthread_cond_init(&w->data_flow_ready, NULL);
 #if 0
             printf("TicketTable: allocated ticket %u\n", ticket);
 #endif
@@ -898,17 +898,11 @@ server_worker_function(void *opaque)
 
         /* Wait for the client to allocate a data flow and come back to us. */
         pthread_mutex_lock(&rp->ticket_lock);
-        ret = 0;
-        while (w->dfd == -1 && ret == 0) {
-            struct timespec to;
-
-            clock_gettime(CLOCK_REALTIME, &to);
-            to.tv_sec += 2;
-
-            ret = pthread_cond_timedwait(&w->data_flow_ready,
-                                         &rp->ticket_lock, &to);
-        }
-        rp->ticket_table[ticket] = NULL;
+        clock_gettime(CLOCK_REALTIME, &to);
+        to.tv_sec += 5;
+        ret = pthread_cond_timedwait(&w->data_flow_ready,
+                                     &rp->ticket_lock, &to);
+        pthread_cond_destroy(&w->data_flow_ready);
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
             if (ret == ETIMEDOUT) {
