@@ -728,6 +728,11 @@ client_worker_function(void *opaque)
     /* Run the test. */
     w->desc->client_fn(w);
 
+    /* Wait some milliseconds before asking the server to stop and get
+     * results. This heuristic is useful to let the last retransmissions
+     * happen before we get the server-side measurements. */
+    usleep(100000);
+
     /* Send the stop opcode on the control file descriptor. */
     memset(&cfg, 0, sizeof(cfg));
     cfg.opcode = htole32(RP_OPCODE_STOP);
