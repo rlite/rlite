@@ -1312,6 +1312,11 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         return NULL; /* -EINVAL */;
     }
 
+    if (pci->pdu_len < rb->len) {
+        /* Make up for tail padding introduced at lower layers. */
+        rb->len = pci->pdu_len;
+    }
+
     if (unlikely(pci->pdu_type == PDU_T_MGMT &&
                  (pci->dst_addr == ipcp->addr ||
                   pci->dst_addr == 0))) {
