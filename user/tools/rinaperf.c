@@ -939,7 +939,7 @@ server_worker_function(void *opaque)
                 printf("Timed out waiting for data flow [ticket %u]\n",
                         ticket);
             } else {
-                perror("pthread_cond_timedwait() failed");
+                perror("sem_timedwait() failed");
             }
             goto out;
         }
@@ -1400,14 +1400,16 @@ main(int argc, char **argv)
 
             pthread_mutex_lock(&rp->cli_barrier_lock);
             ret = pthread_cond_timedwait(&rp->cli_barrier_done,
-                                        &rp->cli_barrier_lock, &to);
+                                         &rp->cli_barrier_lock, &to);
             pthread_mutex_unlock(&rp->cli_barrier_lock);
             if (ret) {
-                if (errno != ETIMEDOUT) {
+                if (ret == ETIMEDOUT) {
+                    if (rp->verbose) {
+                        printf("Stopping clients, %d seconds elapsed\n",
+                                rp->duration);
+                    }
+                } else {
                     perror("pthread_cond_timedwait() failed");
-                } else if (rp->verbose) {
-                    printf("Stopping clients, %d seconds elapsed\n",
-                            rp->duration);
                 }
                 stop_clients(rp); /* tell the clients to stop */
             } else {
