@@ -187,8 +187,8 @@ rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
 }
 
 static int
-flow_fetch_resp(struct list_head *flows,
-                const struct rl_kmsg_flow_fetch_resp *resp)
+flow_fetch_append(struct list_head *flows,
+                  const struct rl_kmsg_flow_fetch_resp *resp)
 {
     struct rl_flow *rl_flow, *scan;
 
@@ -263,7 +263,7 @@ rl_conf_flows_fetch(struct list_head *flows)
         } else {
             assert(resp->event_id == msg.event_id);
             /* Consume and free the response. */
-            flow_fetch_resp(flows, resp);
+            flow_fetch_append(flows, resp);
 
             end = resp->end;
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
@@ -309,7 +309,7 @@ rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
     msg.event_id = 1;
     msg.port_id = port_id;
 
-    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
     if (ret < 0) {
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
         goto out;
@@ -365,6 +365,8 @@ rl_conf_flows_print(struct list_head *flows)
 
         ret = rl_conf_flow_get_stats(rl_flow->local_port, &stats);
         if (ret) {
+            /* This can fail because the flow disappeared since
+             * it was fetched into 'flows'. */
             continue;
         }
 
