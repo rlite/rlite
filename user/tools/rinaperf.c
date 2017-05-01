@@ -827,6 +827,7 @@ server_worker_function(void *opaque)
     struct timespec to;
     struct pollfd pfd;
     uint32_t ticket;
+    int saved_errno;
     int ret;
 
     /* Wait for test configuration message and read it. */
@@ -928,12 +929,13 @@ server_worker_function(void *opaque)
         clock_gettime(CLOCK_REALTIME, &to);
         to.tv_sec += 5;
         ret = sem_timedwait(&w->data_flow_ready, &to);
+        saved_errno = errno;
         pthread_mutex_lock(&rp->ticket_lock);
         rp->ticket_table[ticket] = NULL;
         sem_destroy(&w->data_flow_ready);
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
-            if (errno == ETIMEDOUT) {
+            if (saved_errno == ETIMEDOUT) {
                 printf("Timed out waiting for data flow [ticket %u]\n",
                         ticket);
             } else {
