@@ -728,10 +728,12 @@ client_worker_function(void *opaque)
     /* Run the test. */
     w->desc->client_fn(w);
 
-    /* Wait some milliseconds before asking the server to stop and get
-     * results. This heuristic is useful to let the last retransmissions
-     * happen before we get the server-side measurements. */
-    usleep(100000);
+    if (!w->ping) {
+        /* Wait some milliseconds before asking the server to stop and get
+         * results. This heuristic is useful to let the last retransmissions
+         * happen before we get the server-side measurements. */
+        usleep(100000);
+    }
 
     /* Send the stop opcode on the control file descriptor. */
     memset(&cfg, 0, sizeof(cfg));
@@ -909,12 +911,11 @@ server_worker_function(void *opaque)
         sem_destroy(&w->data_flow_ready);
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
-            if (ret == ETIMEDOUT) {
+            if (errno == ETIMEDOUT) {
                 printf("Timed out waiting for data flow [ticket %u]\n",
                         ticket);
             } else {
-                printf("pthread_cond_timedwait() failed [%s]\n",
-                        strerror(ret));
+                perror("pthread_cond_timedwait() failed");
             }
             goto out;
         }
@@ -1378,9 +1379,8 @@ main(int argc, char **argv)
                                         &rp->cli_barrier_lock, &to);
             pthread_mutex_unlock(&rp->cli_barrier_lock);
             if (ret) {
-                if (ret != ETIMEDOUT) {
-                    printf("pthread_cond_timedwait() failed [%s]\n",
-                            strerror(ret));
+                if (errno != ETIMEDOUT) {
+                    perror("pthread_cond_timedwait() failed");
                 } else if (rp->verbose) {
                     printf("Stopping clients, %d seconds elapsed\n",
                             rp->duration);
