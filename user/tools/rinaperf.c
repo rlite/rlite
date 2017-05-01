@@ -41,6 +41,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
 #include <rina/api.h>
 
@@ -469,6 +470,12 @@ perf_server(struct worker *w)
     int timeout = 0;
     int n;
 
+    n = fcntl(w->dfd, F_SETFL, O_NONBLOCK);
+    if (n) {
+        perror("fcntl(F_SETFL)");
+        return -1;
+    }
+
     pfd[0].fd = w->dfd;
     pfd[1].fd = w->cfd;
     pfd[0].events = pfd[1].events = POLLIN;
@@ -477,29 +484,44 @@ perf_server(struct worker *w)
     t_start = rate_ts;
 
     for (i = 0; !limit || i < limit; i++) {
-        n = poll(pfd, 2, RP_DATA_WAIT_MSECS);
-        if (n < 0) {
-            perror("poll(flow)");
-
-        } else if (n == 0) {
-            /* Timeout */
-            timeout = 1;
-            if (verb) {
-                printf("Timeout occurred\n");
-            }
-            break;
-        }
-
-        if (pfd[1].revents & POLLIN) {
-            /* Stop signal received. */
-            if (verb) {
-                printf("Stopped remotely\n");
-            }
-            break;
-        }
-
-        /* Ready to read. */
+        /* Do a non-blocking read on the data flow. If we are in a livelock
+         * situation (or near so), it is highly likely that we will find
+         * some data to read; we can therefore read the data directly,
+         * without calling poll(). If we are not under pressure, read()
+         * will return EAGAIN and we can wait for the next packet with
+         * poll(). This strategy is convenient because it allows the receiver
+         * to operate at one syscall per packet when under pressure, rather
+         * than the usual two syscalls per packet. As a result, the receiver
+         * becomes a bit faster. The only drawback is that we pay the cost of
+         * an additional syscall when the receiver is not under pressure, but
+         * this is acceptable if we want to maximize throughput.
+         */
         n = read(w->dfd, buf, sizeof(buf));
+        if (n < 0 && errno == EAGAIN) {
+            n = poll(pfd, 2, RP_DATA_WAIT_MSECS);
+            if (n < 0) {
+                perror("poll(flow)");
+
+            } else if (n == 0) {
+                /* Timeout */
+                timeout = 1;
+                if (verb) {
+                    printf("Timeout occurred\n");
+                }
+                break;
+            }
+
+            if (pfd[1].revents & POLLIN) {
+                /* Stop signal received. */
+                if (verb) {
+                    printf("Stopped remotely\n");
+                }
+                break;
+            }
+
+            /* Ready to read. */
+            n = read(w->dfd, buf, sizeof(buf));
+        }
         if (n < 0) {
             perror("read(flow)");
             return -1;
