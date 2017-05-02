@@ -265,7 +265,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
                   bool maysleep)
 {
     gfp_t gfp = maysleep ? GFP_KERNEL : GFP_ATOMIC;
-    unsigned long to = msecs_to_jiffies(2000);
+    unsigned long to = msecs_to_jiffies(5);
     DECLARE_WAITQUEUE(wait, current);
     struct upqueue_entry *entry;
     unsigned long exp;
