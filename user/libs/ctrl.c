@@ -443,6 +443,7 @@ static volatile char sa_lock_var = 0;
 static int sa_handle = 0;
 static unsigned int sa_pending_len = 0;
 LIST_STATIC_DECL(sa_pending);
+#define SA_PENDING_MAXLEN   (1 << 11)
 
 struct sa_pending_item {
     int handle;
@@ -562,7 +563,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     }
 
     if (flags & RINA_F_NORESP) {
-        if (sa_pending_len >= 128) {
+        if (sa_pending_len >= SA_PENDING_MAXLEN) {
             errno = ENOSPC;
             return -1;
         }
