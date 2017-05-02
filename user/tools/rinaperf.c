@@ -625,6 +625,10 @@ client_worker_function(void *opaque)
     pfd.fd = rina_flow_alloc(rp->dif_name, rp->cli_appl_name,
                              rp->srv_appl_name, &rp->flowspec,
                              RINA_F_NOWAIT);
+    if (pfd.fd < 0) {
+        perror("rina_flow_alloc(cfd)");
+        goto out;
+    }
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
     if (ret <= 0) {
@@ -638,7 +642,7 @@ client_worker_function(void *opaque)
     }
     w->cfd = rina_flow_alloc_wait(pfd.fd);
     if (w->cfd < 0) {
-        perror("rina_flow_alloc(cfd)");
+        perror("rina_flow_alloc_wait(cfd)");
         goto out;
     }
 
@@ -686,6 +690,10 @@ client_worker_function(void *opaque)
     pfd.fd = rina_flow_alloc(rp->dif_name, rp->cli_appl_name,
                              rp->srv_appl_name, &rp->flowspec,
                              RINA_F_NOWAIT);
+    if (pfd.fd < 0) {
+        perror("rina_flow_alloc(cfd)");
+        goto out;
+    }
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, CLI_FA_TIMEOUT_MSECS);
     if (ret <= 0) {
@@ -700,7 +708,7 @@ client_worker_function(void *opaque)
     w->dfd = rina_flow_alloc_wait(pfd.fd);
     rp->cli_flow_allocated = 1;
     if (w->dfd < 0) {
-        perror("rina_flow_alloc(dfd)");
+        perror("rina_flow_alloc_wait(dfd)");
         goto out;
     }
 
