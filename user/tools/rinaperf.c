@@ -118,7 +118,7 @@ struct rinaperf {
 
     /* Synchronization between client threads and main thread. */
     pthread_mutex_t         cli_barrier_lock;
-    pthread_cond_t          cli_barrier_done;
+    sem_t                   cli_barrier_done;
     int                     cli_done; /* client that finished */
 
     /* Ticket table. */
@@ -809,7 +809,7 @@ out:
 
     pthread_mutex_lock(&rp->cli_barrier_lock);
     if (++rp->cli_done == rp->parallel) {
-        pthread_cond_signal(&rp->cli_barrier_done);
+        sem_post(&rp->cli_barrier_done);
     }
     pthread_mutex_unlock(&rp->cli_barrier_lock);
 
@@ -1188,7 +1188,7 @@ main(int argc, char **argv)
     rp->cli_done = 0;
     sem_init(&rp->workers_free, 0, RP_MAX_WORKERS);
     pthread_mutex_init(&rp->cli_barrier_lock, NULL);
-    pthread_cond_init(&rp->cli_barrier_done, NULL);
+    sem_init(&rp->cli_barrier_done, 0, 0);
     pthread_mutex_init(&rp->ticket_lock, NULL);
 
     /* Start with a default flow configuration (unreliable flow). */
@@ -1398,12 +1398,9 @@ main(int argc, char **argv)
             clock_gettime(CLOCK_REALTIME, &to);
             to.tv_sec += rp->duration;
 
-            pthread_mutex_lock(&rp->cli_barrier_lock);
-            ret = pthread_cond_timedwait(&rp->cli_barrier_done,
-                                         &rp->cli_barrier_lock, &to);
-            pthread_mutex_unlock(&rp->cli_barrier_lock);
+            ret = sem_timedwait(&rp->cli_barrier_done, &to);
             if (ret) {
-                if (ret == ETIMEDOUT) {
+                if (errno == ETIMEDOUT) {
                     if (rp->verbose) {
                         printf("Stopping clients, %d seconds elapsed\n",
                                 rp->duration);
@@ -1413,7 +1410,7 @@ main(int argc, char **argv)
                 }
                 stop_clients(rp); /* tell the clients to stop */
             } else {
-                /* Client finished themselves before rp->duration seconds. */
+                /* Client finished before rp->duration seconds. */
             }
         }
 
