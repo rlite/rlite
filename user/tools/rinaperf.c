@@ -996,6 +996,7 @@ server(struct rinaperf *rp)
     for (;;) {
         struct worker *p;
         int ret;
+        int cfd;
 
         /* Wait for more free workers. */
         sem_wait(&rp->workers_free);
@@ -1029,6 +1030,19 @@ server(struct rinaperf *rp)
             }
         }
 
+        /* Wait and accept an incoming flow. */
+        cfd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
+        if (cfd < 0) {
+            if (errno == ENOSPC) {
+                /* Flow allocation response message was dropped,
+                 * so flow allocation failed. */
+                sem_post(&rp->workers_free);
+                continue;
+            }
+            perror("rina_flow_accept()");
+            break;
+        }
+
         /* Allocate new worker and accept a new flow. */
         w = malloc(sizeof(*w));
         if (!w) {
@@ -1037,12 +1051,7 @@ server(struct rinaperf *rp)
         }
         memset(w, 0, sizeof(*w));
         worker_init(w, rp);
-
-        w->cfd = rina_flow_accept(rp->cfd, NULL, NULL, 0);
-        if (w->cfd < 0) {
-            perror("rina_flow_accept()");
-            break;
-        }
+        w->cfd = cfd;
 
         ret = pthread_create(&w->th, NULL, server_worker_function, w);
         if (ret) {
@@ -1061,7 +1070,7 @@ server(struct rinaperf *rp)
 
     if (w) {
         worker_fini(w);
-        sem_post(&w->rp->workers_free);
+        sem_post(&rp->workers_free);
         free(w);
     }
 
