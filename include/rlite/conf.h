@@ -57,7 +57,7 @@ int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
 /* Fetch information about all flows in the system. */
 int rl_conf_flows_print(struct list_head *flows);
 
-int rl_conf_flows_fetch(struct list_head *flows);
+int rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id);
 
 void rl_conf_flows_purge(struct list_head *flows);
 

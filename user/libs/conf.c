@@ -227,7 +227,7 @@ flow_fetch_append(struct list_head *flows,
 }
 
 int
-rl_conf_flows_fetch(struct list_head *flows)
+rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
 {
     struct rl_kmsg_flow_fetch_resp *resp;
     struct rl_kmsg_flow_fetch msg;
@@ -242,7 +242,7 @@ rl_conf_flows_fetch(struct list_head *flows)
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_FLOW_FETCH;
-    msg.ipcp_id = 0xffff; /* no ipcp specified */
+    msg.ipcp_id = ipcp_id;
 
     /* Fill the flows list. */
 

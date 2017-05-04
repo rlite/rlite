@@ -438,9 +438,21 @@ static int
 flows_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct list_head flows;
+    rl_ipcp_id_t ipcp_id = 0xffff; /* no IPCP */
+
+    if (argc > 0) {
+        struct ipcp_attrs *attrs;
+
+        attrs = ipcp_by_dif(argv[0]);
+        if (!attrs) {
+            PE("Could not find IPC process in DIF %s\n", argv[0]);
+            return -1;
+        }
+        ipcp_id = attrs->id;
+    }
 
     list_init(&flows);
-    rl_conf_flows_fetch(&flows);
+    rl_conf_flows_fetch(&flows, ipcp_id);
     rl_conf_flows_print(&flows);
     rl_conf_flows_purge(&flows);
 
@@ -736,7 +748,7 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "flows-show",
-        .usage = "",
+        .usage = "[DIF_NAME]",
         .num_args = 0,
         .func = flows_show,
     },
