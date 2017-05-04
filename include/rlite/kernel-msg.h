@@ -102,6 +102,16 @@ struct rl_kmsg_ipcp_create_resp {
 /* application --> kernel message to destroy an IPC process. */
 #define rl_kmsg_ipcp_destroy rl_kmsg_ipcp_create_resp
 
+/* application --> kernel message ask for flow list. */
+struct rl_kmsg_flow_fetch {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    /* If ipcp_id != ~0 filter flows by ipcp_id, otherwise
+     * fetch all of them. */
+    rl_ipcp_id_t ipcp_id;
+};
+
 /* application <-- kernel message to fetch flow information. */
 struct rl_kmsg_flow_fetch_resp {
     rl_msg_t msg_type;

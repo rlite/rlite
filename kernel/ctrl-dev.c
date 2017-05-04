@@ -1682,17 +1682,35 @@ struct flows_fetch_q_entry {
 };
 
 static int
-rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *req)
+rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
 {
+    struct rl_kmsg_flow_fetch *req = (struct rl_kmsg_flow_fetch *)b_req;
     struct flows_fetch_q_entry *fqe;
     struct flow_entry *entry;
     int bucket;
     int ret = -ENOMEM;
 
+    if (req->ipcp_id != 0xffff) {
+        /* Validate req->ipcp_id. */
+        struct ipcp_entry *ipcp = ipcp_get(req->ipcp_id);
+
+        if (!ipcp) {
+            return -EINVAL;
+        }
+        ipcp_put(ipcp);
+    }
+
     FLOCK();
 
     if (list_empty(&rc->flows_fetch_q)) {
         hash_for_each(rl_dm.flow_table, bucket, entry, node) {
+            if (req->ipcp_id != 0xffff &&
+                        entry->txrx.ipcp->id != req->ipcp_id) {
+                /* Filter out this flow as user asked only for flows
+                 * belonging to a specific IPCP. */
+                continue;
+            }
+
             fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
             if (!fqe) {
                 PE("Out of memory\n");

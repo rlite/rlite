@@ -38,7 +38,7 @@ struct rl_msg_layout rl_ker_numtables[] = {
         .copylen = sizeof(struct rl_kmsg_ipcp_destroy),
     },
     [RLITE_KER_FLOW_FETCH] = {
-        .copylen = sizeof(struct rl_msg_base),
+        .copylen = sizeof(struct rl_kmsg_flow_fetch),
     },
     [RLITE_KER_FLOW_FETCH_RESP] = {
         .copylen = sizeof(struct rl_kmsg_flow_fetch_resp),
