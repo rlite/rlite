@@ -65,6 +65,7 @@ struct rl_ctrl {
     wait_queue_head_t upqueue_wqh;
 
     struct list_head flows_fetch_q;
+    struct list_head regs_fetch_q;
     struct list_head node;
 
     unsigned flags;
@@ -1756,6 +1757,87 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
     return ret;
 }
 
+struct regs_fetch_q_entry {
+    struct rl_kmsg_reg_fetch_resp resp;
+    struct list_head node;
+};
+
+static int
+rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
+{
+    struct rl_kmsg_reg_fetch *req = (struct rl_kmsg_reg_fetch *)b_req;
+    struct regs_fetch_q_entry *fqe;
+    struct registered_appl *appl;
+    struct ipcp_entry *ipcp;
+    int bucket;
+    int ret = -ENOMEM;
+
+    if (req->ipcp_id != 0xffff) {
+        /* Validate req->ipcp_id. */
+        ipcp = ipcp_get(req->ipcp_id);
+        if (!ipcp) {
+            return -EINVAL;
+        }
+        ipcp_put(ipcp);
+    }
+
+    PLOCK();
+
+    if (list_empty(&rc->regs_fetch_q)) {
+        hash_for_each(rl_dm.ipcp_table, bucket, ipcp, node) {
+            if (req->ipcp_id != 0xffff && ipcp->id != req->ipcp_id) {
+                /* Filter out this ipcp as user asked only for application
+                 * names registered within a specific IPCP. */
+                continue;
+            }
+
+            RALOCK(ipcp);
+            list_for_each_entry(appl, &ipcp->registered_appls, node) {
+                fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
+                if (!fqe) {
+                    PE("Out of memory\n");
+                    break;
+                }
+
+                memset(fqe, 0, sizeof(*fqe));
+                list_add_tail(&fqe->node, &rc->regs_fetch_q);
+
+                fqe->resp.msg_type = RLITE_KER_REG_FETCH_RESP;
+                fqe->resp.end = 0;
+                fqe->resp.ipcp_id = ipcp->id;
+                fqe->resp.pending = appl->state != APPL_REG_COMPLETE;
+                fqe->resp.appl_name = rl_strdup(appl->name, GFP_ATOMIC,
+                                                RL_MT_FFETCH);
+            }
+            RAUNLOCK(ipcp);
+        }
+
+        fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);
+        if (!fqe) {
+            PE("Out of memory\n");
+        } else {
+            memset(fqe, 0, sizeof(*fqe));
+            list_add_tail(&fqe->node, &rc->regs_fetch_q);
+            fqe->resp.msg_type = RLITE_KER_REG_FETCH_RESP;
+            fqe->resp.end = 1;
+        }
+    }
+
+    if (!list_empty(&rc->regs_fetch_q)) {
+        fqe = list_first_entry(&rc->regs_fetch_q, struct regs_fetch_q_entry,
+                               node);
+        list_del_init(&fqe->node);
+        fqe->resp.event_id = req->event_id;
+        ret = rl_upqueue_append(rc, RLITE_MB(&fqe->resp), false);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&fqe->resp));
+        rl_free(fqe, RL_MT_FFETCH);
+    }
+
+    PUNLOCK();
+
+    return ret;
+}
+
 static int
 rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
@@ -2739,6 +2821,7 @@ static rl_msg_handler_t rl_ctrl_handlers[] = {
     [RLITE_KER_FLOW_CFG_UPDATE] = rl_flow_cfg_update,
     [RLITE_KER_IPCP_QOS_SUPPORTED] = rl_ipcp_qos_supported,
     [RLITE_KER_APPL_MOVE] = rl_appl_move,
+    [RLITE_KER_REG_FETCH] = rl_reg_fetch,
 #ifdef RL_MEMTRACK
     [RLITE_KER_MEMTRACK_DUMP] = rl_memtrack_dump,
 #endif /* RL_MEMTRACK */
@@ -2957,6 +3040,7 @@ rl_ctrl_open(struct inode *inode, struct file *f)
     init_waitqueue_head(&rc->upqueue_wqh);
 
     INIT_LIST_HEAD(&rc->flows_fetch_q);
+    INIT_LIST_HEAD(&rc->regs_fetch_q);
 
     rc->handlers = rl_ctrl_handlers;
 
@@ -2997,6 +3081,18 @@ rl_ctrl_release(struct inode *inode, struct file *f)
         struct flows_fetch_q_entry *fqe, *fqet;
 
         list_for_each_entry_safe(fqe, fqet, &rc->flows_fetch_q, node) {
+            list_del_init(&fqe->node);
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                        RLITE_MB(&fqe->resp));
+            rl_free(fqe, RL_MT_FFETCH);
+        }
+    }
+
+    /* Drain regs-fetch queue. */
+    {
+        struct regs_fetch_q_entry *fqe, *fqet;
+
+        list_for_each_entry_safe(fqe, fqet, &rc->regs_fetch_q, node) {
             list_del_init(&fqe->node);
             rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                         RLITE_MB(&fqe->resp));
