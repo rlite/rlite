@@ -517,6 +517,31 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+regs_show(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct list_head regs;
+    rl_ipcp_id_t ipcp_id = 0xffff; /* no IPCP */
+
+    if (argc > 0) {
+        struct ipcp_attrs *attrs;
+
+        attrs = ipcp_by_dif(argv[0]);
+        if (!attrs) {
+            PE("Could not find IPC process in DIF %s\n", argv[0]);
+            return -1;
+        }
+        ipcp_id = attrs->id;
+    }
+
+    list_init(&regs);
+    rl_conf_regs_fetch(&regs, ipcp_id);
+    rl_conf_regs_print(&regs);
+    rl_conf_regs_purge(&regs);
+
+    return 0;
+}
+
+static int
 ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_policy_mod req;
@@ -757,6 +782,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "PORT_ID",
         .num_args = 1,
         .func = flow_dump,
+    },
+    {
+        .name = "regs-show",
+        .usage = "[DIF_NAME]",
+        .num_args = 0,
+        .func = regs_show,
     },
     {
         .name = "ipcp-policy-mod",
