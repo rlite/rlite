@@ -186,6 +186,8 @@ rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
     return ret;
 }
 
+/* Support for fetching flow information in kernel space. */
+
 static int
 flow_fetch_append(struct list_head *flows,
                   const struct rl_kmsg_flow_fetch_resp *resp)
@@ -247,7 +249,6 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     /* Fill the flows list. */
 
     while (!end) {
-        /* Fetch information about a single IPC process. */
         int ret;
 
         msg.event_id = event_id ++;
@@ -394,6 +395,124 @@ rl_conf_flows_print(struct list_head *flows)
                 stats.tx_pkt, stats.tx_byte, stats.tx_err,
                 stats.rx_pkt, stats.rx_byte, stats.rx_err
                 );
+    }
+
+    return 0;
+}
+
+/* Support for fetching registration information in kernel space. */
+
+static int
+reg_fetch_append(struct list_head *regs,
+                 struct rl_kmsg_reg_fetch_resp *resp)
+{
+    struct rl_reg *rl_reg, *scan;
+
+    if (resp->end) {
+        /* This response is just to say there are no
+         * more registered applications. */
+
+        return 0;
+    }
+
+    rl_reg = rl_alloc(sizeof(*rl_reg), RL_MT_CONF);
+    if (!rl_reg) {
+        PE("Out of memory\n");
+        return 0;
+    }
+
+    rl_reg->ipcp_id = resp->ipcp_id;
+    rl_reg->pending = resp->pending;
+    rl_reg->appl_name = resp->appl_name; resp->appl_name = NULL;
+
+    /* Insert the flow into the list sorting by IPCP id first
+     * and then by application name. */
+    list_for_each_entry(scan, regs, node) {
+        if (rl_reg->ipcp_id < scan->ipcp_id ||
+                (rl_reg->ipcp_id == scan->ipcp_id &&
+                    strcmp(rl_reg->appl_name, scan->appl_name) < 0)) {
+            break;
+        }
+    }
+    list_add_tail(&rl_reg->node, &scan->node);
+
+    return 0;
+}
+
+int
+rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
+{
+    struct rl_kmsg_reg_fetch_resp *resp;
+    struct rl_kmsg_reg_fetch msg;
+    uint32_t event_id = 1;
+    int end = 0;
+    int fd;
+
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
+
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_type = RLITE_KER_REG_FETCH;
+    msg.ipcp_id = ipcp_id;
+
+    /* Fill the regs list. */
+
+    while (!end) {
+        int ret;
+
+        msg.event_id = event_id ++;
+
+        ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+        if (ret < 0) {
+            PE("Failed to issue request to the kernel\n");
+        }
+
+        resp = (struct rl_kmsg_reg_fetch_resp *)wait_for_next_msg(fd, 3000);
+        if (!resp) {
+            end = 1;
+
+        } else {
+            assert(resp->event_id == msg.event_id);
+            /* Consume and free the response. */
+            reg_fetch_append(regs, resp);
+
+            end = resp->end;
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
+                        RLITE_MB(resp));
+            rl_free(resp, RL_MT_MSG);
+        }
+    }
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+    close(fd);
+
+    return 0;
+}
+
+void
+rl_conf_regs_purge(struct list_head *regs)
+{
+    struct rl_reg *rl_reg, *tmp;
+
+    /* Purge the regs list. */
+    list_for_each_entry_safe(rl_reg, tmp, regs, node) {
+        list_del(&rl_reg->node);
+        rl_free(rl_reg->appl_name, RL_MT_UTILS);
+        rl_free(rl_reg, RL_MT_CONF);
+    }
+}
+
+int
+rl_conf_regs_print(struct list_head *regs)
+{
+    struct rl_reg *rl_reg;
+
+    PI_S("Locally registered applications:\n");
+    list_for_each_entry(rl_reg, regs, node) {
+        PI_S("  ipcp %u, name %s%s\n", rl_reg->ipcp_id,
+                rl_reg->appl_name, rl_reg->pending ? " (incomplete)" : "");
     }
 
     return 0;

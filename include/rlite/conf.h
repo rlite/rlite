@@ -34,14 +34,22 @@ extern "C" {
 
 struct rl_flow {
     /* Flow attributes. */
-    rl_ipcp_id_t ipcp_id;
-    rl_port_t local_port;
-    rl_port_t remote_port;
-    rlm_addr_t local_addr;
-    rlm_addr_t remote_addr;
-    struct rina_flow_spec spec;
+    rl_ipcp_id_t            ipcp_id;
+    rl_port_t               local_port;
+    rl_port_t               remote_port;
+    rlm_addr_t              local_addr;
+    rlm_addr_t              remote_addr;
+    struct rina_flow_spec   spec;
 
-    struct list_head node;
+    struct list_head        node;
+};
+
+struct rl_reg {
+    rl_ipcp_id_t        ipcp_id;
+    int                 pending;
+    char *              appl_name;
+
+    struct list_head    node;
 };
 
 long int rl_conf_ipcp_create(const char *name, const char *dif_type,
@@ -54,12 +62,19 @@ int rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id);
 int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
                         const char *param_value);
 
-/* Fetch information about all flows in the system. */
+/* Fetch information about the flows in the system. */
 int rl_conf_flows_print(struct list_head *flows);
 
 int rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id);
 
 void rl_conf_flows_purge(struct list_head *flows);
+
+/* Fetch information about the application names registered in the system. */
+int rl_conf_regs_print(struct list_head *regs);
+
+int rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id);
+
+void rl_conf_regs_purge(struct list_head *regs);
 
 int rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec);
 
