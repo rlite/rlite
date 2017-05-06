@@ -204,7 +204,8 @@ flow_fetch_append(struct list_head *flows,
     rl_flow = rl_alloc(sizeof(*rl_flow), RL_MT_CONF);
     if (!rl_flow) {
         PE("Out of memory\n");
-        return 0;
+        errno = ENOMEM;
+        return -1;
     }
 
     rl_flow->ipcp_id = resp->ipcp_id;
@@ -235,6 +236,7 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     struct rl_kmsg_flow_fetch msg;
     uint32_t event_id = 1;
     int end = 0;
+    int ret = 0;
     int fd;
 
     fd = rina_open();
@@ -249,13 +251,12 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     /* Fill the flows list. */
 
     while (!end) {
-        int ret;
-
         msg.event_id = event_id ++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
             PE("Failed to issue request to the kernel\n");
+            break;
         }
 
         resp = (struct rl_kmsg_flow_fetch_resp *)wait_for_next_msg(fd, 3000);
@@ -277,7 +278,7 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     close(fd);
 
-    return 0;
+    return ret;
 }
 
 void
@@ -418,7 +419,8 @@ reg_fetch_append(struct list_head *regs,
     rl_reg = rl_alloc(sizeof(*rl_reg), RL_MT_CONF);
     if (!rl_reg) {
         PE("Out of memory\n");
-        return 0;
+        errno = ENOMEM;
+        return -1;
     }
 
     rl_reg->ipcp_id = resp->ipcp_id;
@@ -446,6 +448,7 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
     struct rl_kmsg_reg_fetch msg;
     uint32_t event_id = 1;
     int end = 0;
+    int ret = 0;
     int fd;
 
     fd = rina_open();
@@ -460,13 +463,12 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
     /* Fill the regs list. */
 
     while (!end) {
-        int ret;
-
         msg.event_id = event_id ++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
             PE("Failed to issue request to the kernel\n");
+            break;
         }
 
         resp = (struct rl_kmsg_reg_fetch_resp *)wait_for_next_msg(fd, 3000);
@@ -488,7 +490,7 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     close(fd);
 
-    return 0;
+    return ret;
 }
 
 void
