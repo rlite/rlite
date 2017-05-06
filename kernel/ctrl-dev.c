@@ -1807,7 +1807,7 @@ rl_reg_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
                 fqe->resp.ipcp_id = ipcp->id;
                 fqe->resp.pending = appl->state != APPL_REG_COMPLETE;
                 fqe->resp.appl_name = rl_strdup(appl->name, GFP_ATOMIC,
-                                                RL_MT_FFETCH);
+                                                RL_MT_UTILS);
             }
             RAUNLOCK(ipcp);
         }
