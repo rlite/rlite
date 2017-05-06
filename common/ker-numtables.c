@@ -126,6 +126,14 @@ struct rl_msg_layout rl_ker_numtables[] = {
     [RLITE_KER_MEMTRACK_DUMP] = {
         .copylen = sizeof(struct rl_msg_base),
     },
+    [RLITE_KER_REG_FETCH] = {
+        .copylen = sizeof(struct rl_kmsg_reg_fetch),
+    },
+    [RLITE_KER_REG_FETCH_RESP] = {
+        .copylen = sizeof(struct rl_kmsg_reg_fetch_resp) -
+                    1 * sizeof(char *),
+        .strings = 1,
+    },
     [RLITE_KER_MSG_MAX] = {
         .copylen = 0,
         .names = 0,

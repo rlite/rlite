@@ -59,6 +59,8 @@ enum {
     RLITE_KER_APPL_MOVE, /* 26 */
     RLITE_KER_IPCP_PDUFT_DEL, /* 27 */
     RLITE_KER_MEMTRACK_DUMP, /* 28 */
+    RLITE_KER_REG_FETCH, /* 29 */
+    RLITE_KER_REG_FETCH_RESP, /* 30 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -102,7 +104,7 @@ struct rl_kmsg_ipcp_create_resp {
 /* application --> kernel message to destroy an IPC process. */
 #define rl_kmsg_ipcp_destroy rl_kmsg_ipcp_create_resp
 
-/* application --> kernel message ask for flow list. */
+/* application --> kernel message to ask for a list of flows. */
 struct rl_kmsg_flow_fetch {
     rl_msg_t msg_type;
     uint32_t event_id;
@@ -124,6 +126,18 @@ struct rl_kmsg_flow_fetch_resp {
     rlm_addr_t local_addr;
     rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
+} __attribute__((packed));
+
+#define rl_kmsg_reg_fetch   rl_kmsg_flow_fetch
+
+struct rl_kmsg_reg_fetch_resp {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t end;
+    uint8_t pending; /* Is registration pending ? */
+    rl_ipcp_id_t ipcp_id;
+    char *appl_name;
 } __attribute__((packed));
 
 #define RLITE_UPDATE_ADD    0x01
