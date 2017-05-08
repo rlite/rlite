@@ -543,14 +543,16 @@ perf_server(struct worker *w)
                         (t_end.tv_nsec - t_start.tv_nsec);
     if (timeout) {
         /* There was a timeout, adjust the time measurement. */
-        if (ns < RP_DATA_WAIT_MSECS * 1000000) {
+        if (ns <= RP_DATA_WAIT_MSECS * 1000000) {
             ns = 1;
         } else {
             ns -= RP_DATA_WAIT_MSECS * 1000000;
         }
     }
 
-    w->result.pps = (1000000000ULL * i) / ns;
+    w->result.pps = 1000000000ULL;
+    w->result.pps *= i;
+    w->result.pps /= ns;
     w->result.bps = w->result.pps * 8 * w->test_config.size;
     w->result.cnt = i;
 
