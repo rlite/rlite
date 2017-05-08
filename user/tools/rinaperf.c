@@ -544,7 +544,7 @@ perf_server(struct worker *w)
     if (timeout) {
         /* There was a timeout, adjust the time measurement. */
         if (ns < RP_DATA_WAIT_MSECS * 1000000) {
-            ns = 0;
+            ns = 1;
         } else {
             ns -= RP_DATA_WAIT_MSECS * 1000000;
         }
