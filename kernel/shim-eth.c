@@ -82,7 +82,11 @@ struct rl_shim_eth {
     spinlock_t tx_lock;
     struct timer_list arp_resolver_tmr;
     bool arp_tmr_shutdown;
+    struct list_head node;
 };
+
+static LIST_HEAD(shims);
+static DEFINE_MUTEX(shims_lock);
 
 static void arp_resolver_cb(unsigned long arg);
 
@@ -107,6 +111,10 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.data = (unsigned long)priv;
     priv->arp_tmr_shutdown = false;
 
+    mutex_lock(&shims_lock);
+    list_add_tail(&priv->node, &shims);
+    mutex_unlock(&shims_lock);
+
     PD("New IPC created [%p]\n", priv);
 
     return priv;
@@ -118,6 +126,10 @@ rl_shim_eth_destroy(struct ipcp_entry *ipcp)
     struct rl_shim_eth *priv = ipcp->priv;
     struct arpt_entry *entry, *tmp;
     unsigned i;
+
+    mutex_lock(&shims_lock);
+    list_del(&priv->node);
+    mutex_unlock(&shims_lock);
 
     spin_lock_bh(&priv->arpt_lock);
     list_for_each_entry_safe(entry, tmp, &priv->arp_table, node) {
