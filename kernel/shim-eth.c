@@ -1052,6 +1052,41 @@ rl_shim_eth_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
+/* Called every time an event happens within the netdevice layer,
+ * e.g. link goes up or down. */
+static int
+shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
+                       void *opaque)
+{
+    struct net_device *netdev;
+    struct rl_shim_eth *priv;
+
+    netdev = netdev_notifier_info_to_dev(opaque);
+
+    mutex_lock(&shims_lock);
+
+    list_for_each_entry(priv, &shims, node) {
+        if (priv->netdev != netdev) {
+            continue;
+        }
+
+        /* This netdev is managed by one of our IPCPs. */
+        switch (event) {
+            case NETDEV_UP:
+                PD("netdev %s goes up\n", netdev->name);
+                break;
+            case NETDEV_DOWN:
+                PD("netdev %s goes down\n", netdev->name);
+                break;
+        }
+        break;
+    }
+
+    mutex_unlock(&shims_lock);
+
+    return 0;
+}
+
 #define SHIM_DIF_TYPE   "shim-eth"
 
 static struct ipcp_factory shim_eth_factory = {
@@ -1070,9 +1105,21 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.flow_writeable     = rl_shim_eth_flow_writeable,
 };
 
+static struct notifier_block shim_eth_notifier_block;
+
 static int __init
 rl_shim_eth_init(void)
 {
+    int ret;
+
+    memset(&shim_eth_notifier_block, 0, sizeof(shim_eth_notifier_block));
+    shim_eth_notifier_block.notifier_call = shim_eth_netdev_notify;
+    ret = register_netdevice_notifier(&shim_eth_notifier_block);
+    if (ret) {
+        PE("register_netdevice_notifier() failed\n");
+        return ret;
+    }
+
     return rl_ipcp_factory_register(&shim_eth_factory);
 }
 
@@ -1080,6 +1127,7 @@ static void __exit
 rl_shim_eth_fini(void)
 {
     rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    unregister_netdevice_notifier(&shim_eth_notifier_block);
 }
 
 module_init(rl_shim_eth_init);
