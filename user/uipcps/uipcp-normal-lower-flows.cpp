@@ -495,10 +495,10 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     compute_shortest_paths(local_addr, graph, info);
     for (std::map<rlm_addr_t, Info>::iterator i = info.begin();
                                         i != info.end(); i++) {
-        next_hops[i->first] = i->second.nhop;
+        next_hops[i->first].push_back(i->second.nhop);
     }
 
-    if (0 /* LFA */) {
+    if (1 /* LFA */) {
         /* Compute the shortest paths rooted at each neighbor of the local
          * node, storing the results into neigh_infos. */
         for (list<Edge>::iterator l = graph[local_addr].begin();
@@ -524,20 +524,34 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
                 if (neigh_infos[u->first][v->first].dist <
                             neigh_infos[u->first][local_addr].dist +
                                     info[v->first].dist) {
-                    UPD(rib->uipcp, "Node %lu is a possible LFA for "
-                                    "destination %lu\n",
-                                    (unsigned long)u->first,
-                                    (unsigned long)v->first);
+                    bool dupl = false;
+
+                    for (list<rlm_addr_t>::iterator
+                            lfa = next_hops[v->first].begin();
+                                lfa != next_hops[v->first].end(); lfa++) {
+                        if (*lfa == u->first) {
+                            dupl = true;
+                            break;
+                        }
+                    }
+
+                    if (!dupl) {
+                        next_hops[v->first].push_back(u->first);
+                    }
                 }
             }
         }
     }
 
     PV_S("Routing table:\n");
-    for (map<rlm_addr_t, rlm_addr_t>::iterator h = next_hops.begin();
+    for (map<rlm_addr_t, list<rlm_addr_t> >::iterator h = next_hops.begin();
                                         h != next_hops.end(); h++) {
-        PV_S("    Address: %lu, Next hop: %lu\n",
-             (long unsigned)h->first, (long unsigned)h->second);
+        PV_S("    Address: %lu, Next hops: ", (long unsigned)h->first);
+        for (list<rlm_addr_t>::iterator lfa = h->second.begin();
+                                lfa != h->second.end(); lfa ++) {
+            PV_S("%lu ", (long unsigned)*lfa);
+        }
+        PV_S("\n");
     }
 
     return 0;
@@ -551,16 +565,16 @@ RoutingEngine::compute_fwd_table()
 
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
-    for (map<rlm_addr_t, rlm_addr_t>::iterator r = next_hops.begin();
+    for (map<rlm_addr_t, list<rlm_addr_t> >::iterator r = next_hops.begin();
                                         r !=  next_hops.end(); r++) {
         map<string, Neighbor*>::iterator neigh;
         string neigh_name;
 
         neigh_name = static_cast<string>(
-                            rib->lookup_neighbor_by_address(r->second));
+                        rib->lookup_neighbor_by_address(r->second.front()));
         if (neigh_name == string()) {
             UPE(uipcp, "Could not find neighbor with address %lu\n",
-                        (long unsigned)r->second);
+                        (long unsigned)r->second.front());
             continue;
         }
 
@@ -599,13 +613,13 @@ RoutingEngine::compute_fwd_table()
                 UPE(uipcp, "Failed to insert %lu --> %lu (port=%u) PDUFT "
                            "entry [%s]\n",
                            (long unsigned)f->first,
-                           (long unsigned)next_hops[f->first],
+                           (long unsigned)next_hops[f->first].front(),
                            f->second, strerror(errno));
                 f->second = 0; /* trigger re insertion next time */
             } else {
                 UPD(uipcp, "Set PDUFT entry %lu --> %lu (port=%u)\n",
                            (long unsigned)f->first,
-                           (long unsigned)next_hops[f->first],
+                           (long unsigned)next_hops[f->first].front(),
                            f->second);
             }
     }

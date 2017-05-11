@@ -508,7 +508,7 @@ private:
     int compute_fwd_table();
 
     /* The routing table computed by compute_next_hops(). */
-    std::map<rlm_addr_t, rlm_addr_t> next_hops;
+    std::map<rlm_addr_t, std::list<rlm_addr_t> > next_hops;
 
     /* The forwarding table computed by compute_fwd_table(). */
     std::map<rlm_addr_t, rl_port_t> next_ports;
