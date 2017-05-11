@@ -1082,6 +1082,7 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
 
             if (entry->complete && flow && flow->upper.ipcp) {
                 struct rl_kmsg_flow_state ntfy;
+                bool filter = false;
 
                 memset(&ntfy, 0, sizeof(ntfy));
                 ntfy.msg_type = RLITE_KER_FLOW_STATE;
@@ -1093,11 +1094,21 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
                         ntfy.flow_state = RL_FLOW_STATE_UP;
                         PD("flow %u goes up\n", flow->local_port);
                         break;
+
                     case NETDEV_DOWN:
                         ntfy.flow_state = RL_FLOW_STATE_DOWN;
                         PD("flow %u goes down\n", flow->local_port);
                         break;
+
+                    default:
+                        filter = true;
+                        break;
                 }
+
+                if (filter) {
+                    continue;
+                }
+
                 ret = rl_upqueue_append(flow->upper.ipcp->uipcp,
                                         (const struct rl_msg_base *)&ntfy, false);
                 if (ret) {
