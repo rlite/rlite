@@ -226,7 +226,8 @@ lfdb_default::update_address(rlm_addr_t new_addr)
 int
 lfdb_default::flow_state_update(struct rl_kmsg_flow_state *upd)
 {
-    PD("FLOW STATE UPDATE %u %u %u\n", upd->ipcp_id, upd->local_port, upd->flow_state);
+    UPD(rib->uipcp, "Flow %u goes %s\n", upd->local_port,
+        upd->flow_state == RL_FLOW_STATE_UP ? "up" : "down");
     return 0;
 }
 
