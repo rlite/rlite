@@ -261,7 +261,7 @@ upqentry_size(struct upqueue_entry *entry)
     return entry->serlen + sizeof(*entry);
 }
 
-static int
+int
 rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
                   bool maysleep)
 {
@@ -334,6 +334,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
 
     return ret;
 }
+EXPORT_SYMBOL(rl_upqueue_append);
 
 static struct dif *
 dif_get(const char *dif_name, const char *dif_type, int *err)

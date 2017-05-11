@@ -443,6 +443,9 @@ int rl_fa_resp_arrived(struct ipcp_entry *ipcp,
                        struct rl_flow_config *flowcfg,
                        bool maysleep);
 
+int rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
+                      bool maysleep);
+
 int rl_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
               rl_port_t local_port);
 
