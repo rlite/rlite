@@ -484,12 +484,6 @@ public:
     void update_kernel_routing(rlm_addr_t);
 
 private:
-    /* Step 1. Shortest Path algorithm. */
-    int compute_next_hops(rlm_addr_t);
-
-    /* Step 2. Forwarding table computation and kernel update. */
-    int compute_fwd_table();
-
     struct Edge {
         rlm_addr_t to;
         unsigned int cost;
@@ -502,6 +496,15 @@ private:
         unsigned int dist;
         bool visited;
     };
+
+    /* Step 1. Shortest Path algorithm. */
+    void compute_shortest_paths(rlm_addr_t source_addr,
+                        const std::map<rlm_addr_t, std::list<Edge> >& graph,
+                        std::map<rlm_addr_t, Info>& info);
+    int compute_next_hops(rlm_addr_t);
+
+    /* Step 3. Forwarding table computation and kernel update. */
+    int compute_fwd_table();
 
     /* The routing table computed by compute_next_hops(). */
     std::map<rlm_addr_t, rlm_addr_t> next_hops;

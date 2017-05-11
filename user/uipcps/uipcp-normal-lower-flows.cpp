@@ -371,6 +371,74 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
                                         age_incr_cb, rib);
 }
 
+void
+RoutingEngine::compute_shortest_paths(rlm_addr_t source_addr,
+                        const std::map<rlm_addr_t, std::list<Edge> >& graph,
+                        std::map<rlm_addr_t, Info>& info)
+{
+    /* Initialize the per-node info map. */
+    for (map<rlm_addr_t, list<Edge> >::const_iterator g = graph.begin();
+                                            g != graph.end(); g++) {
+        struct Info inf;
+
+        inf.dist = UINT_MAX;
+        inf.visited = false;
+
+        info[g->first] = inf;
+    }
+    info[source_addr].dist = 0;
+
+    for (;;) {
+        rlm_addr_t min_addr = UINT_MAX;
+        unsigned int min_dist = UINT_MAX;
+
+        /* Select the closest node from the ones in the frontier. */
+        for (map<rlm_addr_t, Info>::iterator i = info.begin();
+                                        i != info.end(); i++) {
+            if (!i->second.visited && i->second.dist < min_dist) {
+                min_addr = i->first;
+                min_dist = i->second.dist;
+            }
+        }
+
+        if (min_dist == UINT_MAX) {
+            break;
+        }
+
+        assert(min_addr != UINT_MAX);
+
+        PV_S("Selecting node %lu\n", (long unsigned)min_addr);
+
+        if (!graph.count(min_addr)) {
+            continue; /* nothing to do */
+        }
+
+        const list<Edge>& edges = graph.at(min_addr);
+        Info& info_min = info[min_addr];
+
+        info_min.visited = true;
+
+        for (list<Edge>::const_iterator edge = edges.begin();
+                                edge != edges.end(); edge++) {
+            Info& info_to = info[edge->to];
+
+            if (info_to.dist > info_min.dist + edge->cost) {
+                info_to.dist = info_min.dist + edge->cost;
+                next_hops[edge->to] = (min_addr == source_addr) ? edge->to :
+                                                    next_hops[min_addr];
+            }
+        }
+    }
+
+    PV_S("Dijkstra result:\n");
+    for (map<rlm_addr_t, Info>::iterator i = info.begin();
+                                    i != info.end(); i++) {
+        PV_S("    Address: %lu, Dist: %u, Visited %u\n",
+                (long unsigned)i->first, i->second.dist,
+                (i->second.visited));
+    }
+}
+
 int
 RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 {
@@ -383,6 +451,7 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     lfdb_default *lfdb = dynamic_cast<lfdb_default*>(rib->lfdb);
 
     /* Build the graph from the Lower Flow Database. */
+    graph[local_addr] = list<Edge>();
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::const_iterator it
                 = lfdb->db.begin(); it != lfdb->db.end(); it++) {
         for (map<rlm_addr_t, LowerFlow>::const_iterator jt
@@ -399,6 +468,11 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 
             graph[jt->second.local_addr].push_back(Edge(jt->second.remote_addr,
                         jt->second.cost));
+            if (!graph.count(jt->second.remote_addr)) {
+                /* Make sure graph contains all the nodes, even if with
+                 * empty lists. */
+                graph[jt->second.remote_addr] = list<Edge>();
+            }
         }
     }
 
@@ -415,63 +489,7 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     }
 #endif
 
-    /* Initialize the per-node info map. */
-    for (map<rlm_addr_t, list<Edge> >::iterator g = graph.begin();
-                                            g != graph.end(); g++) {
-        struct Info inf;
-
-        inf.dist = UINT_MAX;
-        inf.visited = false;
-
-        info[g->first] = inf;
-    }
-    info[local_addr].dist = 0;
-
-    for (;;) {
-        rlm_addr_t min = UINT_MAX;
-        unsigned int min_dist = UINT_MAX;
-
-        /* Select the closest node from the ones in the frontier. */
-        for (map<rlm_addr_t, Info>::iterator i = info.begin();
-                                        i != info.end(); i++) {
-            if (!i->second.visited && i->second.dist < min_dist) {
-                min = i->first;
-                min_dist = i->second.dist;
-            }
-        }
-
-        if (min_dist == UINT_MAX) {
-            break;
-        }
-
-        assert(min != UINT_MAX);
-
-        PV_S("Selecting node %lu\n", (long unsigned)min);
-
-        list<Edge>& edges = graph[min];
-        Info& info_min = info[min];
-
-        info_min.visited = true;
-
-        for (list<Edge>::iterator edge = edges.begin();
-                                edge != edges.end(); edge++) {
-            Info& info_to = info[edge->to];
-
-            if (info_to.dist > info_min.dist + edge->cost) {
-                info_to.dist = info_min.dist + edge->cost;
-                next_hops[edge->to] = (min == local_addr) ? edge->to :
-                                                    next_hops[min];
-            }
-        }
-    }
-
-    PV_S("Dijkstra result:\n");
-    for (map<rlm_addr_t, Info>::iterator i = info.begin();
-                                    i != info.end(); i++) {
-        PV_S("    Address: %lu, Dist: %u, Visited %u\n",
-                (long unsigned)i->first, i->second.dist,
-                (i->second.visited));
-    }
+    compute_shortest_paths(local_addr, graph, info);
 
     PV_S("Routing table:\n");
     for (map<rlm_addr_t, rlm_addr_t>::iterator h = next_hops.begin();
