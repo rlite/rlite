@@ -223,6 +223,13 @@ lfdb_default::update_address(rlm_addr_t new_addr)
 
 }
 
+int
+lfdb_default::flow_state_update(struct rl_kmsg_flow_state *upd)
+{
+    PD("FLOW STATE UPDATE %u %u %u\n", upd->ipcp_id, upd->local_port, upd->flow_state);
+    return 0;
+}
+
 void
 lfdb_default::dump(std::stringstream& ss) const
 {

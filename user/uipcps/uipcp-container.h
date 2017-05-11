@@ -134,6 +134,11 @@ struct uipcp_ops {
     /* The uipcp address gets updated. */
     void (*update_address)(struct uipcp *uipcp, rlm_addr_t new_addr);
 
+    /* There was an update in the up/down state of a flow used by this
+     * uipcp. */
+    int (*flow_state_update)(struct uipcp *uipcp,
+                             const struct rl_msg_base *msg);
+
     /* For tasks to be executed in the context of the uipcps event loop. */
     void (*trigger_tasks)(struct uipcp *);
 

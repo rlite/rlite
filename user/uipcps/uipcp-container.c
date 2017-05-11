@@ -515,6 +515,10 @@ uipcp_loop(void *opaque)
             handler = uipcp->ops.neigh_fa_req_arrived;
             break;
 
+        case RLITE_KER_FLOW_STATE:
+            handler = uipcp->ops.flow_state_update;
+            break;
+
         default:
             UPE(uipcp, "Message type %u not handled\n", msg->msg_type);
             break;

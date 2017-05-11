@@ -1250,7 +1250,7 @@ normal_fa_resp(struct uipcp *uipcp,
 
 static int
 normal_flow_deallocated(struct uipcp *uipcp,
-                       const struct rl_msg_base *msg)
+                        const struct rl_msg_base *msg)
 {
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)msg;
@@ -1269,6 +1269,16 @@ normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
     ScopeLock(rib->lock);
 
     rib->update_address(new_addr);
+}
+
+static int
+normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
+    ScopeLock(rib->lock);
+
+    return rib->lfdb->flow_state_update(upd);
 }
 
 static int
@@ -1423,6 +1433,7 @@ struct uipcp_ops normal_ops = {
     .flow_deallocated       = normal_flow_deallocated,
     .neigh_fa_req_arrived   = normal_neigh_fa_req_arrived,
     .update_address         = normal_update_address,
+    .flow_state_update      = normal_flow_state_update,
     .trigger_tasks          = normal_trigger_tasks,
     .policy_mod             = normal_policy_mod,
 };

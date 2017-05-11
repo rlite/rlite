@@ -250,6 +250,7 @@ struct lfdb {
     virtual bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr) = 0;
     virtual void update_local(const std::string& neigh_name) = 0;
     virtual void update_address(rlm_addr_t new_addr) = 0;
+    virtual int flow_state_update(struct rl_kmsg_flow_state *upd) = 0;
 
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
 
@@ -534,6 +535,7 @@ struct lfdb_default : public lfdb {
     bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
     void update_local(const std::string& neigh_name);
     void update_address(rlm_addr_t new_addr);
+    int flow_state_update(struct rl_kmsg_flow_state *upd);
 
     const LowerFlow *_find(rlm_addr_t local_addr,
                                 rlm_addr_t remote_addr) const;
