@@ -24,6 +24,7 @@
 #include <linux/types.h>
 #include "rlite/utils.h"
 #include "rlite-kernel.h"
+#include "rlite/kernel-msg.h"
 
 #include <linux/module.h>
 #include <linux/aio.h>
@@ -1073,17 +1074,34 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
         }
 
         /* This netdev is managed by one of our IPCPs. Scan the ARP table
-         * to fetch all the possible */
+         * to fetch the flows that are being used by upper IPCPs. */
         spin_lock_bh(&priv->arpt_lock);
         list_for_each_entry(entry, &priv->arp_table, node) {
-            if (entry->complete && entry->flow) {
+            struct flow_entry *flow = entry->flow;
+            int ret;
+
+            if (entry->complete && flow && flow->upper.ipcp) {
+                struct rl_kmsg_flow_state ntfy;
+
+                memset(&ntfy, 0, sizeof(ntfy));
+                ntfy.msg_type = RLITE_KER_FLOW_STATE;
+                ntfy.event_id = 0;
+                ntfy.ipcp_id = flow->upper.ipcp->id;
+                ntfy.local_port = flow->local_port;
                 switch (event) {
                     case NETDEV_UP:
-                        PD("flow %u goes up\n", entry->flow->local_port);
+                        ntfy.flow_state = RL_FLOW_STATE_UP;
+                        PD("flow %u goes up\n", flow->local_port);
                         break;
                     case NETDEV_DOWN:
-                        PD("flow %u goes down\n", entry->flow->local_port);
+                        ntfy.flow_state = RL_FLOW_STATE_DOWN;
+                        PD("flow %u goes down\n", flow->local_port);
                         break;
+                }
+                ret = rl_upqueue_append(flow->upper.ipcp->uipcp,
+                                        (const struct rl_msg_base *)&ntfy, false);
+                if (ret) {
+                    PE("failed to append notification [err=%d]\n", ret);
                 }
             }
         }
