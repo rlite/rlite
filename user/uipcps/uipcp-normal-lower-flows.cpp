@@ -1,7 +1,7 @@
 /*
- * N-1 ports management for normal uipcps.
+ * Management of N-1 ports for normal uipcps, including routing.
  *
- * Copyright (C) 2015-2016 Nextworks
+ * Copyright (C) 2015-2017 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
  *
  * This file is part of rlite.
@@ -374,10 +374,11 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 int
 RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 {
+    std::map<rlm_addr_t, std::list<Edge> > graph;
+    std::map<rlm_addr_t, Info> info;
+
     /* Clean up state left from the previous run. */
     next_hops.clear();
-    graph.clear();
-    info.clear();
 
     lfdb_default *lfdb = dynamic_cast<lfdb_default*>(rib->lfdb);
 

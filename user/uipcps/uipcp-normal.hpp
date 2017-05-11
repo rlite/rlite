@@ -503,9 +503,6 @@ private:
         bool visited;
     };
 
-    std::map<rlm_addr_t, std::list<Edge> > graph;
-    std::map<rlm_addr_t, Info> info;
-
     /* The routing table computed by compute_next_hops(). */
     std::map<rlm_addr_t, rlm_addr_t> next_hops;
 
