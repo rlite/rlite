@@ -442,6 +442,7 @@ RoutingEngine::compute_shortest_paths(rlm_addr_t source_addr,
 int
 RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 {
+    std::map<rlm_addr_t, std::map<rlm_addr_t, Info> > neigh_infos;
     std::map<rlm_addr_t, std::list<Edge> > graph;
     std::map<rlm_addr_t, Info> info;
 
@@ -489,12 +490,48 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     }
 #endif
 
+    /* Compute shortest paths rooted at the local node, and use the
+     * result to fill in the next_hops routing table. */
     compute_shortest_paths(local_addr, graph, info);
     for (std::map<rlm_addr_t, Info>::iterator i = info.begin();
                                         i != info.end(); i++) {
         next_hops[i->first] = i->second.nhop;
     }
-    info.clear();
+
+    if (0 /* LFA */) {
+        /* Compute the shortest paths rooted at each neighbor of the local
+         * node, storing the results into neigh_infos. */
+        for (list<Edge>::iterator l = graph[local_addr].begin();
+                                    l != graph[local_addr].end(); l++) {
+            compute_shortest_paths(l->to, graph, neigh_infos[l->to]);
+        }
+
+        /* For each node V other than the local node ... */
+        for (map<rlm_addr_t, list<Edge> >::iterator v = graph.begin();
+                                                v != graph.end(); v++) {
+            if (v->first == local_addr) {
+                continue;
+            }
+
+            /* For each neighbor U of the local node, excluding U ... */
+            for (std::map<rlm_addr_t, std::map<rlm_addr_t, Info> >::iterator
+                    u = neigh_infos.begin(); u != neigh_infos.end(); u++) {
+                if (u->first == v->first) {
+                    continue;
+                }
+
+                /* dist(U, V) < dist(U, local) + dist(local, V) */
+                if (neigh_infos[u->first][v->first].dist <
+                            neigh_infos[u->first][local_addr].dist +
+                                    info[v->first].dist) {
+                    UPD(rib->uipcp, "Node %lu is a possible LFA for "
+                                    "destination %lu\n",
+                                    (unsigned long)u->first,
+                                    (unsigned long)v->first);
+                }
+            }
+        }
+    }
 
     PV_S("Routing table:\n");
     for (map<rlm_addr_t, rlm_addr_t>::iterator h = next_hops.begin();
