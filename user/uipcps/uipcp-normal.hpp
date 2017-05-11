@@ -494,6 +494,7 @@ private:
 
     struct Info {
         unsigned int dist;
+        rlm_addr_t nhop;
         bool visited;
     };
 

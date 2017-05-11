@@ -424,8 +424,8 @@ RoutingEngine::compute_shortest_paths(rlm_addr_t source_addr,
 
             if (info_to.dist > info_min.dist + edge->cost) {
                 info_to.dist = info_min.dist + edge->cost;
-                next_hops[edge->to] = (min_addr == source_addr) ? edge->to :
-                                                    next_hops[min_addr];
+                info_to.nhop = (min_addr == source_addr) ? edge->to :
+                                                        info_min.nhop;
             }
         }
     }
@@ -490,6 +490,11 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
 #endif
 
     compute_shortest_paths(local_addr, graph, info);
+    for (std::map<rlm_addr_t, Info>::iterator i = info.begin();
+                                        i != info.end(); i++) {
+        next_hops[i->first] = i->second.nhop;
+    }
+    info.clear();
 
     PV_S("Routing table:\n");
     for (map<rlm_addr_t, rlm_addr_t>::iterator h = next_hops.begin();
