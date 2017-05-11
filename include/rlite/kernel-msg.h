@@ -61,6 +61,7 @@ enum {
     RLITE_KER_MEMTRACK_DUMP, /* 28 */
     RLITE_KER_REG_FETCH, /* 29 */
     RLITE_KER_REG_FETCH_RESP, /* 30 */
+    RLITE_KER_FLOW_STATE, /* 31 */
 
     RLITE_KER_MSG_MAX,
 };
@@ -158,6 +159,19 @@ struct rl_kmsg_ipcp_update {
     char *ipcp_name;
     char *dif_name;
     char *dif_type;
+} __attribute__((packed));
+
+#define RL_FLOW_STATE_DOWN      0
+#define RL_FLOW_STATE_UP        1
+
+/* application <-- kernel message to report flow up/down state. */
+struct rl_kmsg_flow_state {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    rl_ipcp_id_t ipcp_id;
+    rl_port_t local_port;
+    uint16_t flow_state;
 } __attribute__((packed));
 
 /* application --> kernel to register a name. */
