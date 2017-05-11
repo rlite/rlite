@@ -1066,19 +1066,28 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
     mutex_lock(&shims_lock);
 
     list_for_each_entry(priv, &shims, node) {
+        struct arpt_entry *entry;
+
         if (priv->netdev != netdev) {
             continue;
         }
 
-        /* This netdev is managed by one of our IPCPs. */
-        switch (event) {
-            case NETDEV_UP:
-                PD("netdev %s goes up\n", netdev->name);
-                break;
-            case NETDEV_DOWN:
-                PD("netdev %s goes down\n", netdev->name);
-                break;
+        /* This netdev is managed by one of our IPCPs. Scan the ARP table
+         * to fetch all the possible */
+        spin_lock_bh(&priv->arpt_lock);
+        list_for_each_entry(entry, &priv->arp_table, node) {
+            if (entry->complete && entry->flow) {
+                switch (event) {
+                    case NETDEV_UP:
+                        PD("flow %u goes up\n", entry->flow->local_port);
+                        break;
+                    case NETDEV_DOWN:
+                        PD("flow %u goes down\n", entry->flow->local_port);
+                        break;
+                }
+            }
         }
+        spin_unlock_bh(&priv->arpt_lock);
         break;
     }
 
