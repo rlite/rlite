@@ -498,6 +498,10 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     compute_shortest_paths(local_addr, graph, info);
     for (std::map<rlm_addr_t, Info>::iterator i = info.begin();
                                         i != info.end(); i++) {
+        if (i->first == local_addr || !i->second.visited) {
+            /* I don't need a next hop for myself. */
+            continue;
+        }
         next_hops[i->first].push_back(i->second.nhop);
     }
 
