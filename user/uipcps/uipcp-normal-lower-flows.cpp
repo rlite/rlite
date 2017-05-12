@@ -567,33 +567,37 @@ RoutingEngine::compute_fwd_table()
      * into a port-id towards the next-hop. */
     for (map<rlm_addr_t, list<rlm_addr_t> >::iterator r = next_hops.begin();
                                         r !=  next_hops.end(); r++) {
-        map<string, Neighbor*>::iterator neigh;
-        string neigh_name;
+        for (list<rlm_addr_t>::iterator lfa = r->second.begin();
+                                        lfa != r->second.end(); lfa++) {
+            map<string, Neighbor*>::iterator neigh;
+            string neigh_name;
 
-        neigh_name = static_cast<string>(
-                        rib->lookup_neighbor_by_address(r->second.front()));
-        if (neigh_name == string()) {
-            UPE(uipcp, "Could not find neighbor with address %lu\n",
-                        (long unsigned)r->second.front());
-            continue;
+            neigh_name = static_cast<string>(
+                        rib->lookup_neighbor_by_address(*lfa));
+            if (neigh_name == string()) {
+                UPE(uipcp, "Could not find neighbor with address %lu\n",
+                        (long unsigned)*lfa);
+                continue;
+            }
+
+            neigh = rib->neighbors.find(neigh_name);
+
+            if (neigh == rib->neighbors.end()) {
+                UPE(uipcp, "Could not find neighbor with name %s\n",
+                        neigh_name.c_str());
+                continue;
+            }
+
+            if (!neigh->second->has_mgmt_flow()) {
+                UPE(uipcp, "N-1 flow towards neigh %s just disappeared\n",
+                        neigh_name.c_str());
+                continue;
+            }
+
+            /* Just take one of the flows for now. */
+            next_ports_new[r->first] = neigh->second->mgmt_conn()->port_id;
+            break;
         }
-
-        neigh = rib->neighbors.find(neigh_name);
-
-        if (neigh == rib->neighbors.end()) {
-            UPE(uipcp, "Could not find neighbor with name %s\n",
-                    neigh_name.c_str());
-            continue;
-        }
-
-        if (!neigh->second->has_mgmt_flow()) {
-            UPE(uipcp, "N-1 flow towards neigh %s just disappeared\n",
-                       neigh_name.c_str());
-            continue;
-        }
-
-        /* Just take one of the flows for now. */
-        next_ports_new[r->first] = neigh->second->mgmt_conn()->port_id;
     }
 
     /* Generate new PDUFT entries. */
