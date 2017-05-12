@@ -476,14 +476,17 @@ struct flow_allocator_default : public flow_allocator {
 
 class RoutingEngine {
 public:
-    RoutingEngine() : rib(NULL) { };
-    RoutingEngine(struct uipcp_rib *r) : rib(r) { }
+    RoutingEngine() : lfa_enabled(false), rib(NULL) { };
+    RoutingEngine(struct uipcp_rib *r) : lfa_enabled(false), rib(r) { }
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
     void update_kernel_routing(rlm_addr_t);
 
     void flow_state_update(struct rl_kmsg_flow_state *upd);
+
+    /* Is Loop Free Alternate algorithm enabled ? */
+    bool lfa_enabled;
 
 private:
     struct Edge {

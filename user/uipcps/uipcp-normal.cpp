@@ -1415,9 +1415,39 @@ static int
 normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
-    PE("Cannot set policy: no policies implemented\n");
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    const string policy_name = req->policy_name;
+    const string component = req->comp_name;
+    ScopeLock(rib->lock);
+    int ret = 0;
 
-    return -1;
+    if (component == "routing") {
+        /* Temporary solution to support LFA policies. No pointer switching is
+         * carried out. */
+        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(rib->lfdb);
+
+        assert(lfdbd != NULL);
+
+        if (policy_name == "link-state") {
+            if (lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = false;
+                UPD(uipcp, "LFA switched off\n");
+            }
+        } else if (policy_name == "link-state-lfa") {
+            if (!lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = true;
+                UPD(uipcp, "LFA switched on\n");
+            }
+        } else {
+            UPE(uipcp, "Unknown routing policy %s\n", req->policy_name);
+            ret = -1;
+        }
+    } else {
+        UPE(uipcp, "Unknown component %s\n", req->comp_name);
+        ret = -1;
+    }
+
+    return ret;
 }
 
 struct uipcp_ops normal_ops = {

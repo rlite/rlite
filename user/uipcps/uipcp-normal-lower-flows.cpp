@@ -501,7 +501,7 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
         next_hops[i->first].push_back(i->second.nhop);
     }
 
-    if (1 /* LFA */) {
+    if (lfa_enabled) {
         /* Compute the shortest paths rooted at each neighbor of the local
          * node, storing the results into neigh_infos. */
         for (list<Edge>::iterator l = graph[local_addr].begin();
