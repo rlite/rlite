@@ -228,6 +228,9 @@ lfdb_default::flow_state_update(struct rl_kmsg_flow_state *upd)
 {
     UPD(rib->uipcp, "Flow %u goes %s\n", upd->local_port,
         upd->flow_state == RL_FLOW_STATE_UP ? "up" : "down");
+
+    re.flow_state_update(upd);
+
     return 0;
 }
 
@@ -557,6 +560,23 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
     return 0;
 }
 
+void
+RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
+{
+    /* Update ports_down accordingly. */
+    switch (upd->flow_state) {
+        case RL_FLOW_STATE_DOWN:
+            ports_down.insert(upd->local_port);
+            break;
+        case RL_FLOW_STATE_UP:
+            ports_down.erase(upd->local_port);
+            break;
+    }
+
+    /* Recompute the forwarding table. */
+    compute_fwd_table();
+}
+
 int
 RoutingEngine::compute_fwd_table()
 {
@@ -571,6 +591,7 @@ RoutingEngine::compute_fwd_table()
                                         lfa != r->second.end(); lfa++) {
             map<string, Neighbor*>::iterator neigh;
             string neigh_name;
+            rl_port_t port_id;
 
             neigh_name = static_cast<string>(
                         rib->lookup_neighbor_by_address(*lfa));
@@ -594,8 +615,15 @@ RoutingEngine::compute_fwd_table()
                 continue;
             }
 
-            /* Just take one of the flows for now. */
-            next_ports_new[r->first] = neigh->second->mgmt_conn()->port_id;
+            /* Just take one of the flows towards the neighbor for now. */
+            port_id = neigh->second->mgmt_conn()->port_id;
+            if (ports_down.count(port_id)) {
+                UPD(uipcp, "Skipping port %u as it is down\n", port_id);
+                continue;
+            }
+
+            /* We have found a suitable port, we can stop searching. */
+            next_ports_new[r->first] = port_id;
             break;
         }
     }

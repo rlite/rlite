@@ -483,6 +483,8 @@ public:
      * update kernel forwarding data structures. */
     void update_kernel_routing(rlm_addr_t);
 
+    void flow_state_update(struct rl_kmsg_flow_state *upd);
+
 private:
     struct Edge {
         rlm_addr_t to;
@@ -512,6 +514,9 @@ private:
 
     /* The forwarding table computed by compute_fwd_table(). */
     std::map<rlm_addr_t, rl_port_t> next_ports;
+
+    /* Set of ports that are currently down. */
+    std::set<rl_port_t> ports_down;
 
     struct uipcp_rib *rib;
 };
