@@ -278,6 +278,7 @@ difs = dict()
 enrollments = dict()
 lowerflowallocs = dict()
 dif_graphs = dict()
+dif_policies = dict()
 dns_mappings = dict()
 netems = dict()
 hostfwds = dict()
@@ -402,6 +403,30 @@ while 1:
 
         continue
 
+    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.-]+)*)\s*$', line)
+    if m:
+        dif = m.group(1)
+        nodes = m.group(2)
+        path = m.group(3)
+        ps = m.group(4)
+        parms = list()
+        if m.group(5) != None:
+            parms_str = m.group(5).strip()
+            if parms_str != '':
+                parms = parms_str.split(' ')
+
+        if dif not in dif_policies:
+            dif_policies[dif] = []
+
+        if nodes == '*':
+            nodes = []
+        else:
+            nodes = nodes.split(',')
+
+        dif_policies[dif].append({'path': path, 'nodes': nodes,
+                                  'ps': ps, 'parms' : parms})
+        continue
+
     # No match, spit a warning
     print('Warning: Line %d unrecognized and ignored' % linecnt)
 
@@ -477,6 +502,10 @@ if len(circular_set):
           " DIFs: %s" % circular_set)
     print("             DIFs dependency graph: %s" % difsdeps_adj);
     quit(1)
+
+for dif in dif_ordering:
+    if dif not in dif_policies:
+        dif_policies[dif] = dict()
 
 
 ####################### Compute DIF graphs #######################
@@ -743,6 +772,10 @@ for vmname in sorted(vms):
             if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
+            for p in dif_policies[dif]:
+                if len(p['nodes']) == 0 or vmname in p.nodes:
+                    outs += '$SUDO rlite-ctl dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
+                                % {'dif': dif, 'comp': p['path'], 'policy': p['ps']}
 
     # Update /etc/hosts file with DIF mappings
     for sh in dns_mappings:
