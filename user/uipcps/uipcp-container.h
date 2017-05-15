@@ -304,6 +304,8 @@ int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
 
 #define UPE(_u, FMT, ...)   UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
 
+void normal_lib_init(void);
+
 #ifdef __cplusplus
 }
 #endif

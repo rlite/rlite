@@ -674,6 +674,8 @@ int main(int argc, char **argv)
         rl_verbosity = RL_VERB_DBG;
     }
 
+    normal_lib_init();
+
     /* Open a Unix domain socket to listen to. */
     uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (uipcps->lfd < 0) {
