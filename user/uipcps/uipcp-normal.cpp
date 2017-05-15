@@ -1055,6 +1055,56 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
     }
 }
 
+int
+uipcp_rib::policy_mod(const struct rl_cmsg_ipcp_policy_mod *req)
+{
+    const string policy_name = req->policy_name;
+    const string component = req->comp_name;
+    int ret = 0;
+
+    if (!available_policies.count(component)) {
+        UPE(uipcp, "Unknown component %s\n", req->comp_name);
+        return -1;
+    }
+
+    if (!available_policies[component].count(policy_name)) {
+        UPE(uipcp, "Unknown %s policy %s\n", req->comp_name, req->policy_name);
+        return -1;
+    }
+
+    if (policies[component] == policy_name) {
+        return 0; /* nothing to do */
+    }
+
+    policies[component] = policy_name;
+
+    if (component == "routing") {
+        /* Temporary solution to support LFA policies. No pointer switching is
+         * carried out. */
+        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb);
+
+        assert(lfdbd != NULL);
+
+        if (policy_name == "link-state") {
+            if (lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = false;
+                UPD(uipcp, "LFA switched off\n");
+            }
+        } else if (policy_name == "link-state-lfa") {
+            if (!lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = true;
+                UPD(uipcp, "LFA switched on\n");
+            }
+        }
+    } else if (component == "address-allocator") {
+        if (policy_name == "manual") {
+        } else if (policy_name == "distributed") {
+        }
+    }
+
+    return ret;
+}
+
 static int
 normal_appl_register(struct uipcp *uipcp,
                      const struct rl_msg_base *msg)
@@ -1416,38 +1466,20 @@ normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    const string policy_name = req->policy_name;
-    const string component = req->comp_name;
     ScopeLock(rib->lock);
-    int ret = 0;
 
-    if (component == "routing") {
-        /* Temporary solution to support LFA policies. No pointer switching is
-         * carried out. */
-        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(rib->lfdb);
+    return rib->policy_mod(req);
+}
 
-        assert(lfdbd != NULL);
+std::map< std::string, std::set<std::string> > available_policies;
 
-        if (policy_name == "link-state") {
-            if (lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = false;
-                UPD(uipcp, "LFA switched off\n");
-            }
-        } else if (policy_name == "link-state-lfa") {
-            if (!lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = true;
-                UPD(uipcp, "LFA switched on\n");
-            }
-        } else {
-            UPE(uipcp, "Unknown routing policy %s\n", req->policy_name);
-            ret = -1;
-        }
-    } else {
-        UPE(uipcp, "Unknown component %s\n", req->comp_name);
-        ret = -1;
-    }
-
-    return ret;
+extern "C" void
+normal_lib_init(void)
+{
+    available_policies["routing"].insert("link-state");
+    available_policies["routing"].insert("link-state-lfa");
+    available_policies["address-allocator"].insert("manual");
+    available_policies["address-allocator"].insert("distributed");
 }
 
 struct uipcp_ops normal_ops = {

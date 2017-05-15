@@ -271,6 +271,8 @@ struct addr_allocator {
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
+extern std::map< std::string, std::set<std::string> > available_policies;
+
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
@@ -311,6 +313,9 @@ struct uipcp_rib {
     std::map< std::string, NeighborCandidate > neighbors_seen;
     std::set< std::string > neighbors_cand;
     std::set< std::string > neighbors_deleted;
+
+    /* A map of current policies. */
+    std::map< std::string, std::string > policies;
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
@@ -388,6 +393,8 @@ struct uipcp_rib {
     int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf) {
         return addra->rib_handler(rm, nf);
     }
+
+    int policy_mod(const struct rl_cmsg_ipcp_policy_mod *req);
 
 private:
 #ifdef RL_USE_QOS_CUBES
