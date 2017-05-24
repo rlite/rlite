@@ -36,6 +36,7 @@
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
+#include <linux/sched/signal.h>
 #include <asm/compat.h>
 
 
