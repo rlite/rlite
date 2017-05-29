@@ -394,7 +394,8 @@ struct uipcp_rib {
         return addra->rib_handler(rm, nf);
     }
 
-    int policy_mod(const struct rl_cmsg_ipcp_policy_mod *req);
+    int policy_mod(const std::string& component,
+                   const std::string& policy_name);
 
 private:
 #ifdef RL_USE_QOS_CUBES
@@ -562,18 +563,24 @@ struct lfdb_default : public lfdb {
     int neighs_refresh_lower_flows();
 };
 
-struct addr_allocator_default : public addr_allocator {
+struct addr_allocator_distributed : public addr_allocator {
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
     std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
-    addr_allocator_default(struct uipcp_rib *_ur) : addr_allocator(_ur) { }
-    ~addr_allocator_default() { }
+    addr_allocator_distributed(struct uipcp_rib *_ur) : addr_allocator(_ur) { }
+    ~addr_allocator_distributed() { }
 
     void dump(std::stringstream& ss) const;
     rlm_addr_t allocate();
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+};
+
+struct addr_allocator_manual : public addr_allocator_distributed {
+    addr_allocator_manual(struct uipcp_rib *_ur)
+        : addr_allocator_distributed(_ur) { }
+    rlm_addr_t allocate() { return 0; }
 };
 
 #endif  /* __UIPCP_RIB_H__ */

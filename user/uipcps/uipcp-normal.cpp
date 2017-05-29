@@ -334,7 +334,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
-    addra = new addr_allocator_default(this);
+    policy_mod("routing", "link-state");
+    addra = NULL;
+    policy_mod("address-allocator", "distributed");
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -753,7 +755,7 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-addr_allocator_default::dump(std::stringstream& ss) const
+addr_allocator_distributed::dump(std::stringstream& ss) const
 {
     ss << "Address Allocation Table:" << endl;
     for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
@@ -767,7 +769,7 @@ addr_allocator_default::dump(std::stringstream& ss) const
 }
 
 int
-addr_allocator_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
+addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
@@ -790,14 +792,9 @@ addr_allocator_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 rlm_addr_t
-addr_allocator_default::allocate()
+addr_allocator_distributed::allocate()
 {
     rlm_addr_t addr = rib->myaddr; /* exclude my address */
-
-    if (!rib->uipcp->uipcps->auto_addr_alloc) {
-        /* Return the void address. */
-        return 0;
-    }
 
     /* Assign an address to the initiator running a distributed
      * allocation procedure. */
@@ -865,7 +862,7 @@ addr_allocator_default::allocate()
 }
 
 int
-addr_allocator_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     bool create;
     const char *objbuf;
@@ -1056,19 +1053,19 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 }
 
 int
-uipcp_rib::policy_mod(const struct rl_cmsg_ipcp_policy_mod *req)
+uipcp_rib::policy_mod(const std::string& component,
+                      const std::string& policy_name)
 {
-    const string policy_name = req->policy_name;
-    const string component = req->comp_name;
     int ret = 0;
 
     if (!available_policies.count(component)) {
-        UPE(uipcp, "Unknown component %s\n", req->comp_name);
+        UPE(uipcp, "Unknown component %s\n", component.c_str());
         return -1;
     }
 
     if (!available_policies[component].count(policy_name)) {
-        UPE(uipcp, "Unknown %s policy %s\n", req->comp_name, req->policy_name);
+        UPE(uipcp, "Unknown %s policy %s\n", component.c_str(),
+            policy_name.c_str());
         return -1;
     }
 
@@ -1097,8 +1094,15 @@ uipcp_rib::policy_mod(const struct rl_cmsg_ipcp_policy_mod *req)
             }
         }
     } else if (component == "address-allocator") {
+        struct addr_allocator *addra_old =
+            dynamic_cast<addr_allocator *>(addra);
         if (policy_name == "manual") {
+            addra = new addr_allocator_manual(this);
         } else if (policy_name == "distributed") {
+            addra = new addr_allocator_distributed(this);
+        }
+        if (addra_old != NULL) {
+            delete addra_old;
         }
     }
 
@@ -1467,8 +1471,10 @@ normal_policy_mod(struct uipcp *uipcp,
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock(rib->lock);
+    const string comp_name = req->comp_name;
+    const string policy_name = req->policy_name;
 
-    return rib->policy_mod(req);
+    return rib->policy_mod(comp_name, policy_name);
 }
 
 std::map< std::string, std::set<std::string> > available_policies;

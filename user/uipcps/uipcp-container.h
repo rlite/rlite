@@ -56,11 +56,6 @@ struct uipcps {
     /* Use reliable N-1-flows rather than unreliable ones. */
     int reliable_flows;
 
-    /* Use automated distributed address allocation (i.e. not manual).
-     * This should be a per-DIF policy, but for the moment being it's
-     * global. */
-    int auto_addr_alloc;
-
     /* List of IPCP "nodes", used for topological sorting and computation
      * of IPCP hdroom and maximum SDU size. */
     struct list_head ipcp_nodes;
