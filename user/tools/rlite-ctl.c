@@ -842,6 +842,13 @@ process_args(int argc, char **argv)
         cmd = argv[1];
     }
 
+    /* First of all check if the user is just asking for help.
+     * This must work even if rlite modules are not loaded. */
+    if (!strcmp(cmd, "-h") || !strcmp(cmd, "--help")) {
+        usage(-1);
+        return 0;
+    }
+
     for (i = 0; i < NUM_COMMANDS; i++) {
         if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
             int ret;
@@ -867,9 +874,7 @@ process_args(int argc, char **argv)
         }
     }
 
-    if (strcmp(cmd, "-h") != 0 && strcmp(cmd, "--help") != 0) {
-        PE("Unknown command '%s'\n", cmd);
-    }
+    PE("Unknown command '%s'\n", cmd);
     usage(-1);
 
     return -1;
