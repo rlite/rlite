@@ -1074,6 +1074,7 @@ uipcp_rib::policy_mod(const std::string& component,
     }
 
     policies[component] = policy_name;
+    UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
 
     if (component == "routing") {
         /* Temporary solution to support LFA policies. No pointer switching is
