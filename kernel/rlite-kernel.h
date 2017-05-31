@@ -37,6 +37,14 @@
 #include <linux/list.h>
 #include <asm/atomic.h>
 #include <linux/slab.h>
+#include <linux/version.h>
+
+/* Include for signal_pending() */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0)
+#include <linux/sched.h>
+#else
+#include <linux/sched/signal.h>
+#endif
 
 /*
  * Logging support.
