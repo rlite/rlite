@@ -1160,7 +1160,7 @@ usage(void)
         "   -s NUM : size of the SDUs that are sent during the test\n"
         "   -i NUM : number of microseconds to wait after each SDUs is sent\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
-        "   -B NUM : average bandwitdh for the data flow, in bits per second\n"
+        "   -B NUM : average bandwidth for the data flow, in bits per second\n"
         "   -f : enable flow control\n"
         "   -b NUM : How many SDUs to send before waiting as "
                 "specified by -i option (default b=1)\n"
