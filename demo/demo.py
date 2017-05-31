@@ -737,13 +737,12 @@ for vmname in sorted(vms):
                     '\n'\
                     '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
                                         '%(relnflows)s %(relflows)s '\
-                                        '-A %(autoaddralloc)s &> uipcp.log &\n'\
+                                        '&> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
                            'relflows': '-R' if args.reliable_flows else '',
-                           'autoaddralloc': args.addr_alloc_policy,
                            'flsuf': flavour_suffix}
 
     # Create and configure shim IPCPs
