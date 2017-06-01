@@ -35,7 +35,6 @@
 #include <linux/ktime.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
-#include <linux/sched/signal.h>
 
 
 #define PDUFT_HASHTABLE_BITS    3
