@@ -1051,6 +1051,7 @@ topo_visit(struct uipcps *uipcps)
 
         /* Start from safe values. */
         ipn->marked = 0;
+        ipn->update_kern = 0;
         ipn->hdroom = 0;
         ipn->max_sdu_size = 65536;
 
@@ -1069,6 +1070,7 @@ topo_visit(struct uipcps *uipcps)
             /* There are some lowers, so we start from the maximum
              * value, which will be overridden during the minimization
              * process. */
+            ipn->update_kern = 1;
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
@@ -1133,6 +1135,10 @@ topo_update_kern(struct uipcps *uipcps)
     int ret;
 
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        if (!ipn->update_kern) {
+            continue;  /* nothing to do */
+        }
+
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->hdroom);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
             PE("Impossible hdroom %u\n", ipn->hdroom);

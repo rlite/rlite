@@ -150,11 +150,12 @@ struct uipcp_ops {
 
 struct ipcp_node {
     rl_ipcp_id_t id;
-    unsigned int marked;
-    unsigned int hdroom;
+    unsigned int marked;  /* used to visit the graph */
     unsigned int refcnt;
-    int max_sdu_size;
-    int hdrsize;
+    unsigned int update_kern;  /* should we push MSS and hdroom to kernel ? */
+    unsigned int hdroom;
+    unsigned int max_sdu_size;
+    unsigned int hdrsize;
 
     struct list_head lowers;
     struct list_head uppers;
