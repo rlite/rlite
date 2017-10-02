@@ -884,9 +884,10 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 #endif
-    /* Handle the SIGPIPE signal, which is received when
+    /* Ignore the SIGPIPE signal, which is received when
      * trying to read/write from/to a Unix domain socket
      * that has been closed by the other end. */
+    sa.sa_handler = SIG_IGN;
     ret = sigaction(SIGPIPE, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGPIPE)");
