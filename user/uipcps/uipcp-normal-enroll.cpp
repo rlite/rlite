@@ -1041,10 +1041,12 @@ sync_timeout_cb(struct uipcp *uipcp, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
     ScopeLock(rib->lock);
+    size_t limit = 10;
 
-    UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
+    UPV(rib->uipcp, "Refreshing neighbors\n");
 
-    rib->lfdb->neighs_refresh();
+    rib->lfdb->neighs_refresh(limit);
+    rib->dft->neighs_refresh(limit);
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
 					  RL_NEIGH_SYNC_INTVAL * 1000,
                                           sync_timeout_cb, rib);

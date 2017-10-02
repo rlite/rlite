@@ -207,6 +207,7 @@ struct dft {
     virtual void update_address(rlm_addr_t new_addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+    virtual int neighs_refresh(size_t limit) = 0;
 };
 
 struct flow_allocator {
@@ -255,7 +256,7 @@ struct lfdb {
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int neighs_refresh() = 0;
+    virtual int neighs_refresh(size_t limit) = 0;
 };
 
 struct addr_allocator {
@@ -460,6 +461,7 @@ struct dft_default : public dft {
     void update_address(rlm_addr_t new_addr);
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+    int neighs_refresh(size_t limit);
 };
 
 struct flow_allocator_default : public flow_allocator {
@@ -560,7 +562,7 @@ struct lfdb_default : public lfdb {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int neighs_refresh();
+    int neighs_refresh(size_t limit);
 };
 
 struct addr_allocator_distributed : public addr_allocator {
