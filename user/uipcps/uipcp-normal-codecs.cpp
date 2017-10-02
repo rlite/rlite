@@ -1082,6 +1082,8 @@ FlowRequest::FlowRequest(const char *buf, unsigned int size)
     gm.ParseFromArray(buf, size);
 
     gpb2FlowRequest(*this, gm);
+
+    flags = 0;
 }
 
 int
