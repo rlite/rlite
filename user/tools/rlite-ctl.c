@@ -463,8 +463,8 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
             snprintf(addrbuf, sizeof(addrbuf), "%llu",
                      (long long unsigned int)attrs->addr);
         }
-        PI_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " address = %s, hdroom = %u, troom = %u, mss = %u\n",
+        PI_S("    id=%d, name='%s', dif_type='%s', dif_name='%s',"
+                " address=%s, hdroom=%u, troom=%u, mss=%u\n",
                 attrs->id, attrs->name, attrs->dif_type,
                 attrs->dif_name, addrbuf,
                 attrs->hdroom, attrs->tailroom, attrs->max_sdu_size);
