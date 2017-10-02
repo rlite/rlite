@@ -268,7 +268,7 @@ FwdWorker::run()
 
         pthread_mutex_lock(&lock);
 
-        for (int i = 0, n = 0; n < nrdy; i ++) {
+        for (int i = 0, n = 0; n < nrdy && i < nfds; i ++) {
             int j;
 
             if (!pfds[i].revents || fds[i].close) {
