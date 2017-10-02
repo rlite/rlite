@@ -184,6 +184,7 @@ struct uipcp {
     rl_ipcp_id_t id;
     char *name;
     unsigned int hdroom;
+    unsigned int tailroom;
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
