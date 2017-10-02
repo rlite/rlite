@@ -337,12 +337,12 @@ rtx_tmr_cb(long unsigned arg)
     /* We scan all the retransmission list, since it is order by
      * ascending sequence number, not by ascending expiration time. */
     list_for_each_entry(rb, &dtp->rtxq, node) {
-        if (!time_before(jiffies, rb->u.rtx.rtx_jiffies)) {
+        if (!time_before(jiffies, RL_BUF_RTX(rb).rtx_jiffies)) {
             /* This rb should be retransmitted. We also invalidate
-             * rb->u.rtx.jiffies, so that RTT is not updated on
+             * RL_BUF_RTX(rb).jiffies, so that RTT is not updated on
              * retransmitted packets. */
-            rb->u.rtx.rtx_jiffies += rtt_to_rtx(dtp);
-            rb->u.rtx.jiffies = 0;
+            RL_BUF_RTX(rb).rtx_jiffies += rtt_to_rtx(dtp);
+            RL_BUF_RTX(rb).jiffies = 0;
 
             crb = rl_buf_clone(rb, GFP_ATOMIC);
             if (unlikely(!crb)) {
@@ -352,8 +352,8 @@ rtx_tmr_cb(long unsigned arg)
             }
 
         } else if (!next_exp_set ||
-                        time_before(rb->u.rtx.rtx_jiffies, next_exp)) {
-            next_exp = rb->u.rtx.rtx_jiffies;
+                        time_before(RL_BUF_RTX(rb).rtx_jiffies, next_exp)) {
+            next_exp = RL_BUF_RTX(rb).rtx_jiffies;
             next_exp_set = true;
         }
     }
@@ -571,7 +571,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
             spin_lock_bh(&lower_ipcp->rmtq_lock);
             if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
-                rb->u.rmt.compl_flow = lower_flow;
+                RL_BUF_RMT(rb).compl_flow = lower_flow;
                 list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
                 lower_ipcp->rmtq_size += rl_buf_truesize(rb);
             } else {
@@ -611,8 +611,8 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     }
 
     /* Record the rtx expiration time and current time. */
-    crb->u.rtx.jiffies = jiffies;
-    crb->u.rtx.rtx_jiffies = crb->u.rtx.jiffies + rtt_to_rtx(dtp);
+    RL_BUF_RTX(crb).jiffies = jiffies;
+    RL_BUF_RTX(crb).rtx_jiffies = RL_BUF_RTX(crb).jiffies + rtt_to_rtx(dtp);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -620,8 +620,8 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
     dtp->rtxq_len++;
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
-            jiffies_to_msecs(crb->u.rtx.rtx_jiffies - jiffies));
-        mod_timer(&dtp->rtx_tmr, crb->u.rtx.rtx_jiffies);
+            jiffies_to_msecs(RL_BUF_RTX(crb).rtx_jiffies - jiffies));
+        mod_timer(&dtp->rtx_tmr, RL_BUF_RTX(crb).rtx_jiffies);
     }
     NPD("cloning [%lu] into rtxq\n",
             (long unsigned)RL_BUF_PCI(crb)->seqnum);
@@ -1227,9 +1227,9 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         list_del_init(&cur->node);
                         dtp->rtxq_len--;
 
-                        if (cur->u.rtx.jiffies) {
+                        if (RL_BUF_RTX(cur).jiffies) {
                             /* Update our RTT estimate. */
-                            cur_rtt = now - cur->u.rtx.jiffies;
+                            cur_rtt = now - RL_BUF_RTX(cur).jiffies;
                             if (!cur_rtt) {
                                 cur_rtt = 1;
                             }
@@ -1254,8 +1254,8 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                          * stop here. Let's update the rtx timer
                          * expiration time, if necessary. */
                         NPD("Forward rtx timer by %u\n",
-                            jiffies_to_msecs(cur->u.rtx.rtx_jiffies - jiffies));
-                        mod_timer(&dtp->rtx_tmr, cur->u.rtx.rtx_jiffies);
+                            jiffies_to_msecs(RL_BUF_RTX(cur).rtx_jiffies - jiffies));
+                        mod_timer(&dtp->rtx_tmr, RL_BUF_RTX(cur).rtx_jiffies);
                         break;
                     }
                 }
@@ -1346,7 +1346,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             rl_buf_free(rb);
             return NULL; /* -EINVAL */;
         }
-        rb->u.rx.cons_seqnum = pci->seqnum;
+        RL_BUF_RX(rb).cons_seqnum = pci->seqnum;
         ret = rl_buf_pci_pop(rb);
         BUG_ON(ret); /* We already check bounds above. */
 
@@ -1459,7 +1459,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         spin_unlock_bh(&dtp->lock);
 
-        rb->u.rx.cons_seqnum = seqnum;
+        RL_BUF_RX(rb).cons_seqnum = seqnum;
         ret = rl_buf_pci_pop(rb);
         if (unlikely(ret)) {
             rl_buf_free(rb);
@@ -1570,7 +1570,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
         spin_unlock_bh(&dtp->lock);
 
-        rb->u.rx.cons_seqnum = seqnum;
+        RL_BUF_RX(rb).cons_seqnum = seqnum;
         ret = rl_buf_pci_pop(rb);
         if (unlikely(ret)) {
             rl_buf_free(rb);
@@ -1583,7 +1583,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * rl_sdu_rx_flow() will modify qrb->node. */
         list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
             list_del_init(&qrb->node);
-            qrb->u.rx.cons_seqnum = seqnum;
+            RL_BUF_RX(qrb).cons_seqnum = seqnum;
             if (unlikely(rl_buf_pci_pop(qrb))) {
                 rl_buf_free(qrb);
                 continue;

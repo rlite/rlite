@@ -147,6 +147,15 @@ struct rl_buf {
     struct list_head    node;
 };
 
+#define RL_BUF_DATA(rb)         ((uint8_t *)rb->pci)
+#define RL_BUF_PCI(rb)          rb->pci
+#define RL_BUF_PCI_CTRL(rb)     ((struct rina_pci_ctrl *)rb->pci)
+#define RL_BUF_PCI_POP(rb)      rb->pci++
+#define RL_BUF_PCI_PUSH(rb)     rb->pci--
+#define RL_BUF_RTX(rb)          (rb)->u.rtx
+#define RL_BUF_RX(rb)           (rb)->u.rx
+#define RL_BUF_RMT(rb)          (rb)->u.rmt
+
 struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp);
 
 struct rl_buf *rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
@@ -194,12 +203,6 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
     return 0;
 }
-
-#define RL_BUF_DATA(rb) ((uint8_t *)rb->pci)
-#define RL_BUF_PCI(rb) rb->pci
-#define RL_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
-#define RL_BUF_PCI_POP(rb) rb->pci++
-#define RL_BUF_PCI_PUSH(rb) rb->pci--
 
 /*
  * Kernel data-structures.
