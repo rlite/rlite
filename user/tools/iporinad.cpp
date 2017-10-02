@@ -787,11 +787,25 @@ int
 Remote::mss_configure() const
 {
     stringstream cmdss;
+    unsigned int mss = rina_flow_mss_get(rfd);
 
-    cmdss << "ip link set mtu " << 1400
-            << " dev " << tun_name;
+    if (!mss) { /* fallback */
+        mss = 1200;
+        cout << "Warning: using tentative MSS = " << mss << " bytes" << endl;
+    }
 
-    return execute_command(cmdss);
+    if (mss > 65535) {
+        /* Linux does not support MTU larger than that for tun devices. */
+        mss = 65535;
+    }
+
+    cmdss << "ip link set mtu " << mss << " dev " << tun_name;
+
+    if (execute_command(cmdss)) {
+        cerr << "Failed to set MTU for device " << tun_name << endl;
+    }
+
+    return 0;
 }
 
 static int
