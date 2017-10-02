@@ -41,8 +41,7 @@ lfdb_default::find(const NodeId& local_node, const NodeId& remote_node)
 const LowerFlow *
 lfdb_default::_find(const NodeId& local_node, const NodeId& remote_node) const
 {
-    map<NodeId, map<NodeId, LowerFlow> >::const_iterator it =
-                                            db.find(local_node);
+    const auto it = db.find(local_node);
     map<NodeId, LowerFlow>::const_iterator jt;
 
     if (it == db.end()) {
@@ -59,7 +58,7 @@ lfdb_default::_find(const NodeId& local_node, const NodeId& remote_node) const
 bool
 lfdb_default::add(const LowerFlow &lf)
 {
-    map<NodeId, map<NodeId, LowerFlow> >::iterator it = db.find(lf.local_node);
+    auto it = db.find(lf.local_node);
     string repr = static_cast<string>(lf);
     LowerFlow lfz = lf;
     bool local_entry;
@@ -91,8 +90,7 @@ lfdb_default::add(const LowerFlow &lf)
 bool
 lfdb_default::del(const NodeId& local_node, const NodeId& remote_node)
 {
-    map<NodeId, map<NodeId, LowerFlow> >::iterator it
-                                            = db.find(local_node);
+    auto it = db.find(local_node);
     map<NodeId, LowerFlow>::iterator jt;
     string repr;
 
@@ -165,18 +163,17 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     LowerFlowList prop_lfl;
     bool modified = false;
 
-    for (list<LowerFlow>::iterator f = lfl.flows.begin();
-                                f != lfl.flows.end(); f++) {
+    for (const LowerFlow& f : lfl.flows) {
         if (add_f) {
-            if (add(*f)) {
+            if (add(f)) {
                 modified = true;
-                prop_lfl.flows.push_back(*f);
+                prop_lfl.flows.push_back(f);
             }
 
         } else {
-            if (del(f->local_node, f->remote_node)) {
+            if (del(f.local_node, f.remote_node)) {
                 modified = true;
-                prop_lfl.flows.push_back(*f);
+                prop_lfl.flows.push_back(f);
             }
         }
     }
@@ -215,11 +212,9 @@ void
 lfdb_default::dump(std::stringstream& ss) const
 {
     ss << "Lower Flow Database:" << endl;
-    for (map<NodeId, map<NodeId, LowerFlow > >::const_iterator
-            it = db.begin(); it != db.end(); it++) {
-        for (map<NodeId, LowerFlow>::const_iterator jt = it->second.begin();
-                                                jt != it->second.end(); jt++) {
-        const LowerFlow& flow = jt->second;
+    for (const auto& kvi : db) {
+        for (const auto& kvj : kvi.second) {
+        const LowerFlow& flow = kvj.second;
 
         ss << "    Local: " << flow.local_node << ", Remote: "
             << flow.remote_node << ", Cost: " << flow.cost <<
@@ -240,15 +235,12 @@ lfdb_default::dump_routing(std::stringstream& ss) const
 int
 lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
+    LowerFlowList lfl;
     int ret = 0;
 
-    map< NodeId, map< NodeId, LowerFlow > >::const_iterator it;
-    map< NodeId, LowerFlow >::const_iterator jt;
-    LowerFlowList lfl;
-
     if (db.size() > 0) {
-        it = db.begin();
-        jt = it->second.begin();
+        auto it = db.begin();
+        auto jt = it->second.begin();
         for (;;) {
             if (jt == it->second.end()) {
                 if (++it != db.end()) {
@@ -276,7 +268,6 @@ lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 int
 lfdb_default::neighs_refresh(size_t limit)
 {
-    map< NodeId, map< NodeId, LowerFlow > >::iterator it;
     map< NodeId, LowerFlow >::iterator jt;
     int ret = 0;
 
@@ -287,11 +278,10 @@ lfdb_default::neighs_refresh(size_t limit)
 
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
-    it = db.find(rib->myname);
+    auto it = db.find(rib->myname);
     assert(it != db.end());
 
-    for (map< NodeId, LowerFlow >::iterator jt = it->second.begin();
-                                        jt != it->second.end();) {
+    for (auto jt = it->second.begin(); jt != it->second.end();) {
         LowerFlowList lfl;
 
         while (lfl.flows.size() < limit && jt != it->second.end()) {
@@ -316,18 +306,16 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
     lfdb_default *lfdb = dynamic_cast<lfdb_default*>(rib->lfdb);
     assert(lfdb);
 
-    for (map<NodeId, map< NodeId, LowerFlow > >::iterator it
-                = lfdb->db.begin(); it != lfdb->db.end(); it++) {
+    for (auto& kvi : lfdb->db) {
         list<map<NodeId, LowerFlow >::iterator> discard_list;
 
-        if (it->first == rib->myname) {
+        if (kvi.first == rib->myname) {
             /* Don't age local entries, we pretend they
              * are always refreshed. */
             continue;
         }
 
-        for (map<NodeId, LowerFlow >::iterator jt = it->second.begin();
-                                                jt != it->second.end(); jt++) {
+        for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             jt->second.age += RL_AGE_INCR_INTERVAL;
 
             if (jt->second.age > RL_AGE_MAX) {
@@ -337,11 +325,10 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
             }
         }
 
-        for (list<map<NodeId, LowerFlow >::iterator>::iterator dit
-                    = discard_list.begin(); dit != discard_list.end(); dit++) {
+        for (const auto& dit : discard_list) {
             UPI(rib->uipcp, "Discarded lower-flow %s\n",
-                            static_cast<string>((*dit)->second).c_str());
-            it->second.erase(*dit);
+                            static_cast<string>(dit->second).c_str());
+            kvi.second.erase(dit);
         }
     }
 
@@ -362,14 +349,13 @@ RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
                         std::map<NodeId, Info>& info)
 {
     /* Initialize the per-node info map. */
-    for (map<NodeId, list<Edge> >::const_iterator g = graph.begin();
-                                            g != graph.end(); g++) {
+    for (const auto& kvg : graph) {
         struct Info inf;
 
         inf.dist = UINT_MAX;
         inf.visited = false;
 
-        info[g->first] = inf;
+        info[kvg.first] = inf;
     }
     info[source_addr].dist = 0;
 
@@ -378,11 +364,10 @@ RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
         unsigned int min_dist = UINT_MAX;
 
         /* Select the closest node from the ones in the frontier. */
-        for (map<NodeId, Info>::iterator i = info.begin();
-                                        i != info.end(); i++) {
-            if (!i->second.visited && i->second.dist < min_dist) {
-                min_addr = i->first;
-                min_dist = i->second.dist;
+        for (auto& kvi : info) {
+            if (!kvi.second.visited && kvi.second.dist < min_dist) {
+                min_addr = kvi.first;
+                min_dist = kvi.second.dist;
             }
         }
 
@@ -403,24 +388,21 @@ RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
 
         info_min.visited = true;
 
-        for (list<Edge>::const_iterator edge = edges.begin();
-                                edge != edges.end(); edge++) {
-            Info& info_to = info[edge->to];
+        for (const Edge& edge : edges) {
+            Info& info_to = info[edge.to];
 
-            if (info_to.dist > info_min.dist + edge->cost) {
-                info_to.dist = info_min.dist + edge->cost;
-                info_to.nhop = (min_addr == source_addr) ? edge->to :
+            if (info_to.dist > info_min.dist + edge.cost) {
+                info_to.dist = info_min.dist + edge.cost;
+                info_to.nhop = (min_addr == source_addr) ? edge.to :
                                                         info_min.nhop;
             }
         }
     }
 
     PV_S("Dijkstra result:\n");
-    for (map<NodeId, Info>::iterator i = info.begin();
-                                    i != info.end(); i++) {
-        PV_S("    Node: %s, Dist: %u, Visited %u\n",
-                 i->first.c_str(), i->second.dist,
-                (i->second.visited));
+    for (const auto& kvi : info) {
+        PV_S("    Node: %s, Dist: %u, Visited %u\n", kvi.first.c_str(),
+             kvi.second.dist, (kvi.second.visited));
     }
 }
 
@@ -438,37 +420,33 @@ RoutingEngine::compute_next_hops(const NodeId& local_node)
 
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();
-    for (map<NodeId, map<NodeId, LowerFlow > >::const_iterator it
-                = lfdb->db.begin(); it != lfdb->db.end(); it++) {
-        for (map<NodeId, LowerFlow>::const_iterator jt
-                    = it->second.begin(); jt != it->second.end(); jt++) {
+    for (const auto& kvi : lfdb->db) {
+        for (const auto& kvj : kvi.second) {
             const LowerFlow *revlf;
 
-            revlf = rib->lfdb->find(jt->second.local_node,
-                                   jt->second.remote_node);
+            revlf = rib->lfdb->find(kvj.second.local_node,
+                                   kvj.second.remote_node);
 
-            if (revlf == NULL || revlf->cost != jt->second.cost) {
+            if (revlf == NULL || revlf->cost != kvj.second.cost) {
                 /* Something is wrong, this could be malicious or erroneous. */
                 continue;
             }
 
-            graph[jt->second.local_node].push_back(Edge(jt->second.remote_node,
-                        jt->second.cost));
-            if (!graph.count(jt->second.remote_node)) {
+            graph[kvj.second.local_node].push_back(Edge(kvj.second.remote_node,
+                        kvj.second.cost));
+            if (!graph.count(kvj.second.remote_node)) {
                 /* Make sure graph contains all the nodes, even if with
                  * empty lists. */
-                graph[jt->second.remote_node] = list<Edge>();
+                graph[kvj.second.remote_node] = list<Edge>();
             }
         }
     }
 
     PV_S("Graph [%lu nodes]:\n", lfdb->db.size());
-    for (map<NodeId, list<Edge> >::iterator g = graph.begin();
-                                            g != graph.end(); g++) {
-        PV_S("%s: {", g->first.c_str());
-        for (list<Edge>::iterator l = g->second.begin();
-                                    l != g->second.end(); l++) {
-            PV_S("(%s, %u), ", l->to.c_str(), l->cost);
+    for (const auto& kvg : graph) {
+        PV_S("%s: {", kvg.first.c_str());
+        for (const Edge& edge : kvg.second) {
+            PV_S("(%s, %u), ", edge.to.c_str(), edge.cost);
         }
         PV_S("}\n");
     }
@@ -476,54 +454,50 @@ RoutingEngine::compute_next_hops(const NodeId& local_node)
     /* Compute shortest paths rooted at the local node, and use the
      * result to fill in the next_hops routing table. */
     compute_shortest_paths(local_node, graph, info);
-    for (std::map<NodeId, Info>::iterator i = info.begin();
-                                        i != info.end(); i++) {
-        if (i->first == local_node || !i->second.visited) {
+    for (const auto& kvi : info) {
+        if (kvi.first == local_node || !kvi.second.visited) {
             /* I don't need a next hop for myself. */
             continue;
         }
-        next_hops[i->first].push_back(i->second.nhop);
+        next_hops[kvi.first].push_back(kvi.second.nhop);
     }
 
     if (lfa_enabled) {
         /* Compute the shortest paths rooted at each neighbor of the local
          * node, storing the results into neigh_infos. */
-        for (list<Edge>::iterator l = graph[local_node].begin();
-                                    l != graph[local_node].end(); l++) {
-            compute_shortest_paths(l->to, graph, neigh_infos[l->to]);
+        for (const Edge& edge : graph[local_node]) {
+            compute_shortest_paths(edge.to, graph, neigh_infos[edge.to]);
         }
 
         /* For each node V other than the local node ... */
-        for (map<NodeId, list<Edge> >::iterator v = graph.begin();
-                                                v != graph.end(); v++) {
-            if (v->first == local_node) {
+        for (const auto& kvv : graph) {
+            if (kvv.first == local_node) {
                 continue;
             }
 
             /* For each neighbor U of the local node, excluding U ... */
-            for (std::map<NodeId, std::map<NodeId, Info> >::iterator
-                    u = neigh_infos.begin(); u != neigh_infos.end(); u++) {
-                if (u->first == v->first) {
+            for (const auto& kvu : neigh_infos) {
+                if (kvu.first == kvv.first) {
                     continue;
                 }
 
                 /* dist(U, V) < dist(U, local) + dist(local, V) */
-                if (neigh_infos[u->first][v->first].dist <
-                            neigh_infos[u->first][local_node].dist +
-                                    info[v->first].dist) {
+                if (neigh_infos[kvu.first][kvv.first].dist <
+                            neigh_infos[kvu.first][local_node].dist +
+                                    info[kvv.first].dist) {
                     bool dupl = false;
 
                     for (list<NodeId>::iterator
-                            lfa = next_hops[v->first].begin();
-                                lfa != next_hops[v->first].end(); lfa++) {
-                        if (*lfa == u->first) {
+                            lfa = next_hops[kvv.first].begin();
+                                lfa != next_hops[kvv.first].end(); lfa++) {
+                        if (*lfa == kvu.first) {
                             dupl = true;
                             break;
                         }
                     }
 
                     if (!dupl) {
-                        next_hops[v->first].push_back(u->first);
+                        next_hops[kvv.first].push_back(kvu.first);
                     }
                 }
             }
@@ -568,24 +542,22 @@ RoutingEngine::compute_fwd_table()
 
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
-    for (map<NodeId, list<NodeId> >::iterator r = next_hops.begin();
-                                        r !=  next_hops.end(); r++) {
-        for (list<NodeId>::iterator lfa = r->second.begin();
-                                        lfa != r->second.end(); lfa++) {
+    for (const auto& kvr : next_hops) {
+        for (const NodeId& lfa : kvr.second) {
             map<string, Neighbor*>::iterator neigh;
             rlm_addr_t dst_addr;
             rl_port_t port_id;
 
-            neigh = rib->neighbors.find(*lfa);
+            neigh = rib->neighbors.find(lfa);
             if (neigh == rib->neighbors.end()) {
                 UPE(uipcp, "Could not find neighbor with name %s\n",
-                           lfa->c_str());
+                           lfa.c_str());
                 continue;
             }
 
             if (!neigh->second->has_flows()) {
                 UPE(uipcp, "N-1 flow towards neigh %s just disappeared\n",
-                           lfa->c_str());
+                           lfa.c_str());
                 continue;
             }
 
@@ -597,21 +569,21 @@ RoutingEngine::compute_fwd_table()
             }
 
             /* Also make sure we know the address for this destination. */
-            dst_addr = rib->lookup_node_address(r->first);
+            dst_addr = rib->lookup_node_address(kvr.first);
             if (dst_addr == RL_ADDR_NULL) {
                 /* We still miss the address of this destination. */
                 UPV(uipcp, "Can't find address for destination %s\n",
-                            r->first.c_str());
+                            kvr.first.c_str());
                 continue;
             }
 
             /* We have found a suitable port for the destination, we can
              * stop searching. */
-            next_ports_new_[dst_addr] = make_pair(r->first, port_id);
+            next_ports_new_[dst_addr] = make_pair(kvr.first, port_id);
             if (++ port_hits[port_id] > dflt_hits) {
                 dflt_hits = port_hits[port_id];
                 dflt_port = port_id;
-                dflt_nhop = *lfa;
+                dflt_nhop = lfa;
             }
             break;
         }
@@ -623,10 +595,9 @@ RoutingEngine::compute_fwd_table()
 
         /* Prune out those entries corresponding to the default port, and
          * replace them with the default entry. */
-        for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
-                    next_ports_new_.begin(); f != next_ports_new_.end(); f++) {
-            if (f->second.second != dflt_port) {
-                next_ports_new[f->first] = f->second;
+        for (const auto& kve : next_ports_new_) {
+            if (kve.second.second != dflt_port) {
+                next_ports_new[kve.first] = kve.second;
             }
         }
         next_ports_new[RL_ADDR_NULL] = make_pair(any, dflt_port);
@@ -637,71 +608,67 @@ RoutingEngine::compute_fwd_table()
 #endif
 
     /* Remove old PDUFT entries first. */
-    for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
-                next_ports.begin(); f != next_ports.end(); f++) {
-            map<rlm_addr_t, pair<NodeId, rl_port_t> >::const_iterator nf;
-            rlm_addr_t dst_addr;
-            rl_port_t port_id;
-            NodeId dst_node;
-            int ret;
+    for (const auto& kve : next_ports) {
+        rlm_addr_t dst_addr;
+        rl_port_t port_id;
+        NodeId dst_node;
+        int ret;
 
-            nf = next_ports_new.find(f->first);
-            if (nf != next_ports_new.end() &&
-                            f->second.second == nf->second.second) {
-                /* This old entry still exists, nothing to do. */
-                continue;
-            }
+        auto nf = next_ports_new.find(kve.first);
+        if (nf != next_ports_new.end() &&
+                        kve.second.second == nf->second.second) {
+            /* This old entry still exists, nothing to do. */
+            continue;
+        }
 
-            /* Delete the old one. */
-            dst_addr = f->first;
-            dst_node = f->second.first;
-            port_id = f->second.second;
-            ret = uipcp_pduft_del(uipcp, uipcp->id, dst_addr, port_id);
-            if (ret) {
-                UPE(uipcp, "Failed to delete PDUFT entry for %s(%lu) "
-                           "(port=%u) [%s]\n",
-                           node_id_pretty(dst_node).c_str(),
-                           (long unsigned)dst_addr, port_id, strerror(errno));
-            } else {
-                UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port=%u)\n",
-                           node_id_pretty(dst_node).c_str(),
-                           (long unsigned)dst_addr, port_id);
-            }
+        /* Delete the old one. */
+        dst_addr = kve.first;
+        dst_node = kve.second.first;
+        port_id = kve.second.second;
+        ret = uipcp_pduft_del(uipcp, uipcp->id, dst_addr, port_id);
+        if (ret) {
+            UPE(uipcp, "Failed to delete PDUFT entry for %s(%lu) "
+                       "(port=%u) [%s]\n",
+                       node_id_pretty(dst_node).c_str(),
+                       (long unsigned)dst_addr, port_id, strerror(errno));
+        } else {
+            UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port=%u)\n",
+                       node_id_pretty(dst_node).c_str(),
+                       (long unsigned)dst_addr, port_id);
+        }
     }
 
     /* Generate new PDUFT entries. */
-    for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
-                next_ports_new.begin(); f != next_ports_new.end(); f++) {
-            map<rlm_addr_t, pair<NodeId, rl_port_t> >::const_iterator of;
-            rlm_addr_t dst_addr;
-            rl_port_t port_id;
-            NodeId dst_node;
-            int ret;
+    for (auto& kve : next_ports_new) {
+        rlm_addr_t dst_addr;
+        rl_port_t port_id;
+        NodeId dst_node;
+        int ret;
 
-            of = next_ports.find(f->first);
-            if (of != next_ports.end() &&
-                            of->second.second == f->second.second) {
-                /* This entry is already in place. */
-                continue;
-            }
+        auto of = next_ports.find(kve.first);
+        if (of != next_ports.end() &&
+                        of->second.second == kve.second.second) {
+            /* This entry is already in place. */
+            continue;
+        }
 
-            /* Add the new one. */
-            dst_addr = f->first;
-            dst_node = f->second.first;
-            port_id = f->second.second;
-            ret = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
-            if (ret) {
-                UPE(uipcp, "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
-                           "entry [%s]\n",
-                           node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
-                           next_hops[dst_node].front().c_str(), port_id, strerror(errno));
-                /* Trigger re insertion next time. */
-                f->second = make_pair(NodeId(), 0);
-            } else {
-                UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
-                           node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
-                           next_hops[dst_node].front().c_str(), port_id);
-            }
+        /* Add the new one. */
+        dst_addr = kve.first;
+        dst_node = kve.second.first;
+        port_id = kve.second.second;
+        ret = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
+        if (ret) {
+            UPE(uipcp, "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
+                       "entry [%s]\n",
+                       node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                       next_hops[dst_node].front().c_str(), port_id, strerror(errno));
+            /* Trigger re insertion next time. */
+            kve.second = make_pair(NodeId(), 0);
+        } else {
+            UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
+                       node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                       next_hops[dst_node].front().c_str(), port_id);
+        }
     }
 
     next_ports = next_ports_new;
@@ -729,20 +696,18 @@ void
 RoutingEngine::dump(std::stringstream& ss) const
 {
     ss << "Routing table for node " << rib->myname << ":" << endl;
-    for (map<NodeId, list<NodeId> >::const_iterator
-                h = next_hops.begin(); h != next_hops.end(); h++) {
-        string dst_node = h->first;
+    for (const auto& kvr : next_hops) {
+        string dst_node = kvr.first;
 
-        if (dst_node.size() && h->second.size() == 1 &&
-                            h->second.front() == dflt_nhop) {
+        if (dst_node.size() && kvr.second.size() == 1 &&
+                            kvr.second.front() == dflt_nhop) {
             /* Hide this entry, as it is covered by the default one. */
             continue;
         }
 
         ss << "    Remote: " << node_id_pretty(dst_node) << ", Next hops: ";
-        for (list<NodeId>::const_iterator lfa = h->second.begin();
-                                lfa != h->second.end(); lfa ++) {
-            ss << *lfa;
+        for (const NodeId& lfa : kvr.second) {
+            ss << lfa;
         }
         ss << endl;
     }
