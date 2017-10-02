@@ -223,11 +223,13 @@ rl_buf_append(struct rl_buf *rb, size_t len)
     BUG_ON((uint8_t *)(rb->pci) + rb->len > rb->raw->buf + rb->raw->size);
 }
 
+#ifdef RL_HAVE_CHRDEV_RW_ITER
 static inline int
 rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 {
     return copy_to_iter(RL_BUF_DATA(rb), bytes, to);
 }
+#endif
 
 #define rl_buf_free(_rb) \
     do { \
@@ -294,6 +296,7 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
 #define rl_buf_append(_rb, _len)        skb_put(_rb, _len)
 
+#ifdef RL_HAVE_CHRDEV_RW_ITER
 static inline int
 rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 {
@@ -301,6 +304,7 @@ rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 
     return ret ? ret : bytes;
 }
+#endif
 
 #define rl_buf_free(_rb) \
     do { \
