@@ -88,6 +88,7 @@ configure options:
     --without-shim-tcp4         Disable shim-tcp4
     --with-skbuffs              Use Linux native skbuffs for PDU data/metadata (better performance)
     --without-skbuffs           Use custom packet representation for PDU data/metadata
+    --verbose-kernel            Compile (conditional) verbose kernel logs (may slow down a bit)
 EOF
 }
 
@@ -95,6 +96,7 @@ WITH_VMPI="n"
 WITH_SHIM_TCP4="y"
 WITH_SHIM_UDP4="y"
 WITH_SKBUFFS="n"
+VERB_KERN_LOGS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
 
@@ -155,6 +157,10 @@ do
 
         "--without-skbuffs")
         WITH_SKBUFFS="n"
+        ;;
+
+        "--verbose-kernel")
+        VERB_KERN_LOGS="y"
         ;;
 
         "--with-vmpi")
@@ -243,7 +249,11 @@ cat > $KCF <<EOF
 EOF
 
 if [ $WITH_SKBUFFS == "y" ]; then
-    echo '#define RL_SKB' >> $KCF
+    echo '#define RL_SKB /* Use native Linux sk_buff */' >> $KCF
+fi
+
+if [ $VERB_KERN_LOGS == "y" ]; then
+    echo '#define RL_PV_ENABLE /* Compile PV() conditional logs */' >> $KCF
 fi
 
 echo '#endif' >> $KCF
