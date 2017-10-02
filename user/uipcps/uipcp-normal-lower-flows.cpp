@@ -565,7 +565,6 @@ RoutingEngine::compute_fwd_table()
     map<rl_port_t, int> port_hits;
     rl_port_t dflt_port;
     int dflt_hits = 0;
-    string dflt_nhop;
 
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
@@ -729,9 +728,16 @@ RoutingEngine::update_kernel_routing(const NodeId& addr)
 void
 RoutingEngine::dump(std::stringstream& ss) const
 {
+    string any = "any";
+
     ss << "Routing table for node " << rib->myname << ":" << endl;
     for (map<NodeId, list<NodeId> >::const_iterator
                 h = next_hops.begin(); h != next_hops.end(); h++) {
+        if (h->first != any && h->second.size() == 1 &&
+                            h->second.front() == dflt_nhop) {
+            /* Hide this entry, as it is covered by the default one. */
+            continue;
+        }
         ss << "    Remote: " << h->first << ", Next hops: ";
         for (list<NodeId>::const_iterator lfa = h->second.begin();
                                 lfa != h->second.end(); lfa ++) {
