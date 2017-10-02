@@ -506,6 +506,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     }
 
     poll_wait(f, &txrx->rx_wqh, wait);
+    poll_wait(f, txrx->tx_wqh, wait);
 
     spin_lock_bh(&txrx->rx_lock);
     if (!rb_list_empty(&txrx->rx_q) || (txrx->flags & RL_TXRX_EOF)) {
