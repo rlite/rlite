@@ -88,14 +88,14 @@ class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
     unsigned int discard_secs;
 
-    enum state_t {
+    enum class ConnState {
         NONE = 1,
         AWAITCON,
         CONNECTED,
         AWAITCLOSE,
     } state;
 
-    const char *conn_state_repr(int st);
+    const char *conn_state_repr(ConnState st);
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
 
     CDAPConn(const CDAPConn& o);
@@ -114,8 +114,8 @@ public:
     struct CDAPMessage * msg_deser(const char *serbuf, size_t serlen);
 
     void reset();
-    bool connected() const { return state == CONNECTED; }
-    void state_set(unsigned int s) { state = static_cast<state_t>(s); }
+    bool connected() const { return state == ConnState::CONNECTED; }
+    void state_set(unsigned int s) { state = static_cast<ConnState>(s); }
     unsigned int state_get() { return static_cast<unsigned int>(state); }
 
     /* Helper function to send M_CONNECT and wait for the M_CONNECT_R
@@ -157,7 +157,7 @@ struct CDAPMessage {
     int                 scope;
     long                version;
 
-    enum obj_value_t {
+    enum class ObjValType {
         NONE,
         I32,
         I64,
@@ -168,7 +168,7 @@ struct CDAPMessage {
         STRING,
     };
 
-    bool is_type(obj_value_t tt) const;
+    bool is_type(ObjValType tt) const;
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
 
@@ -294,7 +294,7 @@ private:
 
     /* Representation of the object value. */
     struct {
-        obj_value_t         ty;
+        ObjValType         ty;
         union {
             int32_t         i32; /* intval and sintval */
             int64_t         i64; /* int64val and sint64val */

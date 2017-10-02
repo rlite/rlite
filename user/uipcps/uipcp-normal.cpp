@@ -238,7 +238,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
             rib->neigh_flow_prune(neigh->mgmt_conn());
         }
 
-        if (nf->enroll_state != NEIGH_ENROLLED) {
+        if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
             /* Start the enrollment as a slave (enroller), if needed. */
             nf->enrollment_rsrc_get(false);
 
@@ -515,7 +515,8 @@ uipcp_rib::dump() const
                         << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD
                         << "s]";
             } else {
-                ss << "[Enrollment ongoing <" << nf->enroll_state << ">]";
+                ss << "[Enrollment ongoing <" <<
+                    Neighbor::enroll_state_repr(nf->enroll_state) << ">]";
             }
         } else if (!neighbors_cand.count(neigh_name)) {
             ss << "[Not a neighbor]";
@@ -1111,7 +1112,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
 
         if (!kvn.second->has_flows() ||
                 kvn.second->mgmt_conn()->enroll_state
-                    != NEIGH_ENROLLED) {
+                    != EnrollState::NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet or the
              * flow is not there since the neighbor is about to
              * be removed. */

@@ -42,7 +42,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   neigh(n), supp_dif(supdif),
                                   port_id(pid), lower_ipcp_id(lid),
                                   flow_fd(ffd), reliable(false),
-                                  conn(NULL), enroll_state(NEIGH_NONE),
+                                  conn(NULL), enroll_state(EnrollState::NEIGH_NONE),
                                   enrollment_rsrc(NULL),
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
@@ -160,10 +160,10 @@ NeighFlow::enrollment_abort()
 {
     UPW(neigh->rib->uipcp, "Aborting enrollment\n");
 
-    if (enroll_state == NEIGH_NONE) {
+    if (enroll_state == EnrollState::NEIGH_NONE) {
         return;
     }
-    enroll_state_set(NEIGH_NONE);
+    enroll_state_set(EnrollState::NEIGH_NONE);
 
     if (conn->connected()) {
         CDAPMessage m;
@@ -184,19 +184,19 @@ NeighFlow::enrollment_abort()
 }
 
 void
-NeighFlow::enroll_state_set(enroll_state_t st)
+NeighFlow::enroll_state_set(EnrollState st)
 {
-    enroll_state_t old = enroll_state;
+    EnrollState old = enroll_state;
 
     enroll_state = st;
 
     UPD(neigh->rib->uipcp, "switch state %s --> %s\n",
         Neighbor::enroll_state_repr(old), Neighbor::enroll_state_repr(st));
 
-    if (old != NEIGH_ENROLLED && st == NEIGH_ENROLLED) {
+    if (old != EnrollState::NEIGH_ENROLLED && st == EnrollState::NEIGH_ENROLLED) {
         neigh->rib->enrolled ++;
         neigh->rib->neighbors_deleted.erase(neigh->ipcp_name);
-    } else if (old == NEIGH_ENROLLED && st == NEIGH_NONE) {
+    } else if (old == EnrollState::NEIGH_ENROLLED && st == EnrollState::NEIGH_NONE) {
         neigh->rib->enrolled --;
     }
 
@@ -338,16 +338,16 @@ Neighbor::n_flow_set(NeighFlow *nf)
 }
 
 const char *
-Neighbor::enroll_state_repr(enroll_state_t s)
+Neighbor::enroll_state_repr(EnrollState s)
 {
     switch (s) {
-        case NEIGH_NONE:
+        case EnrollState::NEIGH_NONE:
             return "NONE";
 
-        case NEIGH_ENROLLING:
+        case EnrollState::NEIGH_ENROLLING:
             return "ENROLLING";
 
-        case NEIGH_ENROLLED:
+        case EnrollState::NEIGH_ENROLLED:
             return "ENROLLED";
 
         default:
@@ -386,7 +386,7 @@ NeighFlow::enrollment_commit()
     struct uipcp_rib *rib = neigh->rib;
 
     keepalive_tmr_start();
-    enroll_state_set(NEIGH_ENROLLED);
+    enroll_state_set(EnrollState::NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
     while (!enrollment_rsrc->msgs.empty()) {
@@ -1003,7 +1003,7 @@ NeighFlow::enrollment_rsrc_get(bool initiator)
     }
     UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
                             neigh->ipcp_name.c_str());
-    enroll_state_set(NEIGH_ENROLLING);
+    enroll_state_set(EnrollState::NEIGH_ENROLLING);
     enrollment_rsrc = rl_new(EnrollmentResources(this, initiator),
                              RL_MT_NEIGHFLOW);
     return enrollment_rsrc;
@@ -1046,7 +1046,7 @@ EnrollmentResources::~EnrollmentResources()
 bool
 Neighbor::enrollment_complete() const
 {
-    return has_flows() && mgmt_conn()->enroll_state == NEIGH_ENROLLED;
+    return has_flows() && mgmt_conn()->enroll_state == EnrollState::NEIGH_ENROLLED;
 }
 
 int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
@@ -1563,12 +1563,12 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
 
     nf = neigh->mgmt_conn();
 
-    if (nf->enroll_state != NEIGH_NONE) {
+    if (nf->enroll_state != EnrollState::NEIGH_NONE) {
         UPI(uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
     }
 
-    if (nf->enroll_state != NEIGH_ENROLLED) {
+    if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
         rsrc = nf->enrollment_rsrc_get(true);
     }
 
@@ -1577,11 +1577,11 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
          * successful completion (NEIGH_ENROLLED), or because of an abort
          * (NEIGH_NONE).
          */
-        while (nf->enroll_state == NEIGH_ENROLLING) {
+        while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {
             pthread_cond_wait(&rsrc->stopped, &lock);
         }
 
-        ret = nf->enroll_state == NEIGH_ENROLLED ? 0 : -1;
+        ret = nf->enroll_state == EnrollState::NEIGH_ENROLLED ? 0 : -1;
     } else {
         ret = 0;
     }
@@ -1680,7 +1680,7 @@ uipcp_rib::trigger_re_enrollments()
 
             inact = time(NULL) - nf->last_activity;
 
-            if (nf->enroll_state == NEIGH_NONE && inact > 10) {
+            if (nf->enroll_state == EnrollState::NEIGH_NONE && inact > 10) {
                 /* Prune the flow now, we'll try to enroll later. */
                 UPD(uipcp, "Pruning flow towards %s since inactive "
                                 "for %d seconds\n", nc.c_str(), (int)inact);
