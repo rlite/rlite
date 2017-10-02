@@ -211,7 +211,9 @@ argparser.add_argument('-k', '--keepalive', default = 10,
 argparser.add_argument('-N', '--reliable-n-flows', action='store_true',
                        help = "Use reliable N-flows if reliable N-1-flows are not available")
 argparser.add_argument('-R', '--reliable-flows', action='store_true',
-                       help = "Use reliable N-1-flows rather than unreliable ones")
+                       help = "If possible, use dedicated reliable N-1-flows "
+                              "for management traffic rather than reusing "
+                              "kernel-bound unreliable N-1 flows")
 argparser.add_argument('-A', '--addr-alloc-policy', type=str,
                         choices = ["auto", "manual"], default = "auto",
                        help = "Address allocation policy to be used for all DIFs")
@@ -242,7 +244,7 @@ argparser.add_argument('--broadcast-enrollment', action='store_true',
                               "that N-1 flow allocation is issued using the "\
                               "N-DIF name as destination application")
 argparser.add_argument('--parallelize', action='store_true',
-                       help = "[EXPERIMENTAL] Parallelize enrollment")
+                       help = "Allow enrollments to run in parallel")
 args = argparser.parse_args()
 
 

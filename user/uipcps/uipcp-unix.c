@@ -666,7 +666,9 @@ usage(void)
                                 "%d seconds, 0 to disable)\n"
         "   -N : use reliable N-flows if reliable N-1-flows are "
                                                     "not available\n"
-        "   -R : use reliable N-1-flows rather than unreliable ones\n",
+        "   -R : if possible, use dedicated reliable N-1-flows "
+                              "for management traffic rather than reusing "
+                              "kernel-bound unreliable N-1 flows\n",
           NEIGH_KEEPALIVE_TO);
 }
 
