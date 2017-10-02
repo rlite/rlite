@@ -348,6 +348,7 @@ int exec_command (int flowfd, int argc, const char **argv, int *ret_pid)
 		VERBOSE("Fork successful, pid %d\n", pid);
 	} else if (pid == 0) { // child
 		int newfd;
+		int i;
 		close(0);
 		newfd = dup(flowfd);
 		if (newfd) {
@@ -360,7 +361,7 @@ int exec_command (int flowfd, int argc, const char **argv, int *ret_pid)
 			PRINTERRORMSG("ERROR: Dup(flowfd) returned %d, not expected 1, error %s\n", newfd, strerror(errno));
 			return (-1);
 		}
-		for (int i = 3; i < 100; i++)	// disconnect from control fd or any other irrelevant fds
+		for (i = 3; i < 100; i++)	// disconnect from control fd or any other irrelevant fds
 			close(i);
 		setpgid(0, pgrp);	// ensure that child sees parent's signals, can access parent's controlling terminal
 		execvp(argv[0], (char * const *)argv);
