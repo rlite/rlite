@@ -148,7 +148,6 @@ struct ipcp_node {
     unsigned int marked;
     unsigned int hdroom;
     unsigned int refcnt;
-    unsigned int mss_computed;
     int max_sdu_size;
     int hdrsize;
 

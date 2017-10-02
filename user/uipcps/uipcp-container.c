@@ -1049,7 +1049,6 @@ topo_visit(struct uipcps *uipcps)
 
         ipn->marked = 0;
         ipn->hdroom = 0;
-        ipn->mss_computed = 0;
         if (uipcp) {
             ipn->max_sdu_size = uipcp->max_sdu_size;
             ipn->hdrsize = ipcp_hdrlen(uipcp);
@@ -1114,7 +1113,6 @@ topo_visit(struct uipcps *uipcps)
                     e->ipcp->max_sdu_size = 0;
                 }
             }
-            e->ipcp->mss_computed = 1;
         }
     }
 }
@@ -1136,10 +1134,6 @@ topo_update_kern(struct uipcps *uipcps)
         ret = rl_conf_ipcp_config(ipn->id, "hdroom", strbuf);
         if (ret) {
             PE("'ipcp-config hdroom %u' failed\n", ipn->hdroom);
-        }
-
-        if (!ipn->mss_computed) {
-            continue;
         }
 
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->max_sdu_size);
@@ -1386,11 +1380,6 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     node = topo_node_get(uipcps, upd->ipcp_id, 1);
     if (!node) {
-        return 0;
-    }
-    if (node->mss_computed) {
-        /* mss changed, but this is just a consequence of the
-         * previous topological ordering computation. */
         return 0;
     }
 
