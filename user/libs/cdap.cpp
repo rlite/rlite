@@ -1169,7 +1169,7 @@ CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
     op_code = gpb::M_CONNECT;
     abs_syntax = CDAP_ABS_SYNTAX;
     auth_mech = auth_mech_;
-    auth_value = *auth_value_;
+    auth_value = auth_value_? *auth_value_ : CDAPAuthValue();
     src_appl = local_appl;
     dst_appl = remote_appl;
 
