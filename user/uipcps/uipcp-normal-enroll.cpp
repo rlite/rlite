@@ -1480,8 +1480,8 @@ Neighbor::flow_alloc(const char *supp_dif)
                                       rib->uipcp->name, ipcp_name.c_str(),
                                       NULL, rib->uipcp->id, &port_id_);
     if (flow_fd_ < 0) {
-        UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor "
-                    "failed [%s]\n", strerror(errno));
+        UPW(rib->uipcp, "Failed to allocate N-1 flow towards neighbor %s "
+                    "[%s]\n", ipcp_name.c_str(), strerror(errno));
         return -1;
     }
 
