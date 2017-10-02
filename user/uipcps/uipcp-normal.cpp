@@ -91,8 +91,8 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr, void *buf,
         return -1;
     }
 
-    mgmtbuf = (char *)rl_alloc(sizeof(*mhdr) + buflen, RL_MT_MISC);
-    if (!mgmtbuf) {
+    mgmtbuf = static_cast<char *>(rl_alloc(sizeof(*mhdr) + buflen, RL_MT_MISC));
+    if (mgmtbuf == nullptr) {
         errno = ENOMEM;
         return -1;
     }
