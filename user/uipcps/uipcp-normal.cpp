@@ -249,10 +249,10 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         if (nf->enroll_state == NEIGH_ENROLLING) {
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            assert(nf->enroll_rsrc_up);
-            nf->enroll_msgs.push_back(m);
+            assert(nf->enrollment_rsrc);
+            nf->enrollment_rsrc->msgs.push_back(m);
             m = NULL;
-            pthread_cond_signal(&nf->enroll_msgs_avail);
+            pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
         } else {
             nf->enrollment_cleanup();
             /* We are already enrolled, we can dispatch this message to
@@ -559,7 +559,7 @@ uipcp_rib::set_address(rlm_addr_t new_addr)
 }
 
 int
-uipcp_rib::register_to_lower(int reg, string lower_dif)
+uipcp_rib::update_lower_difs(int reg, string lower_dif)
 {
     list<string>::iterator lit;
 
@@ -617,6 +617,49 @@ uipcp_rib::register_to_lower(int reg, string lower_dif)
                 break;
             }
         }
+    }
+
+    return 0;
+}
+
+static int
+register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
+{
+    int ret;
+
+    /* Perform the registration of the IPCP name. */
+    if ((ret = normal_do_register(uipcp, lower_dif, uipcp->name, reg))) {
+        UPE(uipcp, "Registration of IPCP name %s into DIF %s failed\n",
+                    uipcp->dif_name, lower_dif);
+        return ret;
+    }
+
+    /* Also register the N-DIF name, i.e. the name of the DIF that
+     * this IPCP is part of. */
+    if ((ret = normal_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
+        UPE(uipcp, "Registration of DAF name %s into DIF %s failed\n",
+                    uipcp->dif_name, lower_dif);
+        return ret;
+    }
+
+    return 0;
+}
+
+
+/* To be called out of RIB lock */
+int
+uipcp_rib::realize_registrations(bool reg)
+{
+    list<string>::iterator lit;
+    list<string> snapshot;
+
+    {
+        ScopeLock(this->lock);
+        snapshot = lower_difs;
+    }
+
+    for (lit = snapshot.begin(); lit != snapshot.end(); lit++) {
+        register_to_lower_one(uipcp, lit->c_str(), reg);
     }
 
     return 0;
@@ -1408,20 +1451,12 @@ normal_register_to_lower(struct uipcp *uipcp,
         return -1;
     }
 
-    /* Perform the registration of the IPCP name. */
-    ret = normal_do_register(uipcp, req->dif_name, req->ipcp_name, req->reg);
-    if (ret) {
-        return ret;
-    }
-
-    /* Also register the N-DIF name, i.e. the name of the DIF that
-     * this IPCP is part of. */
-    if (normal_do_register(uipcp, req->dif_name, uipcp->dif_name, req->reg)) {
-        UPE(uipcp, "Registration of DAF name '%s' failed\n", uipcp->dif_name);
+    if (rib->enroller_enabled || !req->reg) {
+        register_to_lower_one(uipcp, req->dif_name, req->reg);
     }
 
     pthread_mutex_lock(&rib->lock);
-    ret = rib->register_to_lower(req->reg, string(req->dif_name));
+    ret = rib->update_lower_difs(req->reg, string(req->dif_name));
     if (ret) {
         pthread_mutex_unlock(&rib->lock);
         return ret;
@@ -1484,21 +1519,8 @@ normal_enroller_enable(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroller_enable *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
-    bool enable = !!req->enable;
 
-    if (rib->enroller_enabled == enable) {
-        return 0; /* nothing to do */
-    }
-
-    rib->enroller_enabled = enable;
-    if (rib->enroller_enabled) {
-        UPD(uipcp, "Enroller enabled\n");
-    } else{
-        UPD(uipcp, "Enroller disabled\n");
-    }
-
-    return 0;
+    return rib->enroller_enable(!!req->enable);
 }
 
 std::map< std::string, std::set<std::string> > available_policies;

@@ -492,7 +492,7 @@ uipcps_loop(void *opaque)
         }
 
         if (ret == 0) {
-            /* Timeout, run the periodic task. */
+            /* Timeout, run the periodic tasks. */
             periodic_tasks(uipcps);
             continue;
         }
