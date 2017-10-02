@@ -195,7 +195,7 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
     NeighFlow *nf = static_cast<NeighFlow *>(arg);
     uipcp_rib *rib = nf->neigh->rib;
     Neighbor *neigh = nf->neigh;
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
     CDAPMessage m;
     int ret;
 
@@ -1058,7 +1058,7 @@ void
 neighs_refresh_cb(struct uipcp *uipcp, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
     size_t limit = 10;
 
     UPV(rib->uipcp, "Refreshing neighbors RIB\n");
@@ -1571,7 +1571,7 @@ int
 uipcp_rib::enroller_enable(bool enable)
 {
     {
-        ScopeLock(this->lock);
+        ScopeLock lock_(this->lock);
 
         if (enroller_enabled == enable) {
             return 0; /* nothing to do */
@@ -1787,7 +1787,7 @@ normal_check_for_address_conflicts(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     map<rlm_addr_t, string> m;
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     for (map<string, NeighborCandidate>::iterator cit =
             rib->neighbors_seen.begin();
