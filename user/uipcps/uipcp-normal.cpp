@@ -270,7 +270,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 }
 
 static void
-mgmt_fd_ready(struct uipcp *uipcp, int fd)
+mgmt_fd_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
@@ -317,7 +317,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
         throw std::exception();
     }
 
-    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_fd_ready);
+    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_fd_ready, NULL);
     if (ret) {
         close(mgmtfd);
         throw std::exception();

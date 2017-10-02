@@ -277,7 +277,7 @@ udp4_fwd_sdu(struct shim_udp4 *shim, struct udp4_endpoint *ep,
 }
 
 static void
-udp4_recv_dgram(struct uipcp *uipcp, int bfd)
+udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
 {
     struct shim_udp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;
@@ -420,7 +420,7 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
 
     /* The udp4_recv_dgram() callback will be invoked to receive UDP packets
      * for port 0x0D1F. */
-    if (uipcp_loop_fdh_add(uipcp, bp->fd, udp4_recv_dgram)) {
+    if (uipcp_loop_fdh_add(uipcp, bp->fd, udp4_recv_dgram, NULL)) {
         UPE(uipcp, "uipcp_loop_fdh_add() failed\n");
         goto err;
     }
