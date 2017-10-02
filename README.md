@@ -329,7 +329,6 @@ Exit the node shell and teardown the scenario:
 
 
 ### 5.2 Hands-on tutorial #1: normal-over-shim-eth
-#############################################################################
 
 This tutorial shows how to manually reproduce the configuration described
 in demo/demo.conf, assuming that *rlite* is installed on all the three nodes.
@@ -684,8 +683,8 @@ specification, where each line has the following syntax
 
     flavourname    addr=x seq=y pdulen=z cepid=w qosid=u
 
-with x,y,z,w, and u in {1,2,4,8}. By default, a _tiny_flavour is specified
-as follows:
+with x,y,z,w, and u in {1,2,4,8}. By default, a _tiny_ flavour is
+specified as follows:
 
     tiny    addr=1 seq=2 pdulen=2 cepid=1 qosid=1
 
@@ -791,12 +790,12 @@ implemented using a **tun** device. The iporinad programs implements the
 encapsulation and decapsulation by forwarding the IP traffic from the tun
 device towards the associated RINA flow endpoint, and the other way around.
 
-The iporinad daemon creates tunnel towards its peers and advertise IP routes
+The iporinad daemon creates tunnel towards its peers and advertises IP routes
 according to its configuration file.
 In the following example, two iporinad daemons run on different edge nodes
-that belong to the same DIF n.DIF. In this case, n.DIF is the RINA network
-that supports the IP tunnels. Each daemon is configured to register within
-RINA, connect to the other peer, and advertise to the other some routes that
+that belong to the same DIF _n.DIF_. In this case, _n.DIF_ is the RINA network
+that provides the IP tunnels. Each daemon is configured to register within
+RINA, connect to the other peer, and advertise to the peer some routes that
 are reachable on its side.
 
     # Configuration file for the first iporina daemon
@@ -820,7 +819,7 @@ and the DIFs to register to.
 Each `remote` directive specifies application and DIF name of a remote
 iporina daemon to connect to, together with an IP subnet to use for
 the IP tunnel (a /30 is preferable, as only two IP addresses are needed).
-More `remote` directive are possible, one for each peer. A different tun
+Many `remote` directives are possible, one for each peer. A different tun
 device will be created for each remote peer.
 The `route` directive specifies a locally reachable route that the daemon
 will advertise to all its peers.
