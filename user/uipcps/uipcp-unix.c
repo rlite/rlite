@@ -199,7 +199,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_rib_show_req *req =
                     (struct rl_cmsg_ipcp_rib_show_req *)b_req;
     struct rl_cmsg_ipcp_rib_show_resp resp;
-    char * (*show)(struct uipcp *);
+    char * (*show)(struct uipcp *) = NULL;
     struct uipcp *uipcp;
     char *dumpstr = NULL;
     int ret;
