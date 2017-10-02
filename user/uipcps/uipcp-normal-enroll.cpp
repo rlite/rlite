@@ -38,7 +38,7 @@ using namespace std;
 #define NEIGH_ENROLL_TO             7000
 
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
-                     unsigned int pid, int ffd, unsigned int lid) :
+                     rl_port_t pid, int ffd, rl_ipcp_id_t lid) :
                                   neigh(n), supp_dif(supdif),
                                   port_id(pid), lower_ipcp_id(lid),
                                   flow_fd(ffd), reliable(false),

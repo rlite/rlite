@@ -111,13 +111,29 @@ struct EnrollmentResources {
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
 struct NeighFlow {
+    /* Backpointer to the parent data structure. */
     Neighbor *neigh;
+
     std::string supp_dif;
+
+    /* If this is a kernel-bound flow, port_id and lower_ipcp_id are
+     * valid. */
     rl_port_t port_id;
     rl_ipcp_id_t lower_ipcp_id;
-    int flow_fd; /* only used for close() */
+
+    /* If this is a kernel-bound flow, flow_fd is only used for close().
+     * Otherwise, this is a management-only flow, and the file descriptor
+     * is also used for I/O. */
+    int flow_fd;
+
+    /* Is this flow reliable or not? A management-only flow must be
+     * reliable. */
     bool reliable;
-    int upper_flow_fd; /* TODO currently unused */
+
+    /* File descriptor of an associated N-flow, currently unused. */
+    int upper_flow_fd;
+
+    /* CDAP connection associated to this flow, if any. */
     CDAPConn *conn;
 
     time_t last_activity;
@@ -130,8 +146,8 @@ struct NeighFlow {
     int keepalive_tmrid;
     int pending_keepalive_reqs;
 
-    NeighFlow(Neighbor *n, const std::string& supp_dif, unsigned int pid,
-              int ffd, unsigned int lid);
+    NeighFlow(Neighbor *n, const std::string& supp_dif, rl_port_t pid,
+              int ffd, rl_ipcp_id_t lid);
     ~NeighFlow();
 
     void keepalive_tmr_start();
