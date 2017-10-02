@@ -190,9 +190,10 @@ argparser.add_argument('-e', '--enrollment-strategy',
                        help = "Minimal uses a spanning tree of each DIF",
                        type = str, choices = ['minimal', 'full-mesh'],
                        default = 'minimal')
-argparser.add_argument('--ring',
-                       help = "Use ring topology with variable number of nodes",
-                       type = int)
+argparser.add_argument('--ring', type = int,
+                       help = "Use ring topology with variable number of nodes")
+argparser.add_argument('--star', type = int,
+                       help = "Use star topology with variable number of nodes")
 argparser.add_argument('--verbosity',
                        help = "Set verbosity level for kernel and userspace",
                        choices = ['VERY', 'DBG', 'INFO', 'WARN', 'QUIET'],
@@ -283,6 +284,21 @@ if args.ring != None and args.ring > 0:
     fout.close()
     args.conf = 'ring.conf'
 
+
+# Possibly autogenerate star topology
+if args.star != None and args.star > 0:
+    print("Ignoring %s, generating star topology" % (args.conf,))
+    fout = open('star.conf', 'w')
+    for i in range(args.star):
+        fout.write('eth b%(i)s 0Mbps m%(i)03d mc\n' % {'i': i+1})
+    for i in range(args.star):
+        fout.write('dif n m%(i)03d b%(i)s\n' % {'i': i+1})
+    ds = ""
+    for i in range(args.star):
+        ds += 'b%(i)s ' % {'i': i+1}
+    fout.write('dif n mc %s\n' % ds)
+    fout.close()
+    args.conf = 'star.conf'
 
 # Generated files needed by access.sh
 fout = open('user', 'w')
