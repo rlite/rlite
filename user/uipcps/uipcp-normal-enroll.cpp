@@ -1465,7 +1465,7 @@ Neighbor::flow_alloc(const char *supp_dif)
      * the local entries. */
     rib->lfdb->update_local(ipcp_name);
 
-    if (use_reliable_flow) {
+    if (mgmt_only == NULL && use_reliable_flow) {
         /* Try to allocate a management-only reliable flow. */
         int mgmt_fd;
 
