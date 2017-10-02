@@ -1847,8 +1847,14 @@ static void
 normal_check_for_address_conflicts(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    map<rlm_addr_t, string> m;
     ScopeLock lock_(rib->lock);
+    NeighborCandidate cand = rib->neighbor_cand_get();
+    string my_name = string(rib->uipcp->name);
+    bool need_to_change = false;
+    map<rlm_addr_t, string> m;
+
+    /* Temporarily insert a neighbor representing myself. */
+    rib->neighbors_seen[my_name] = cand;
 
     for (map<string, NeighborCandidate>::iterator cit =
             rib->neighbors_seen.begin();
@@ -1858,8 +1864,22 @@ normal_check_for_address_conflicts(struct uipcp *uipcp)
         if (m.count(addr)) {
             UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
                        m[addr].c_str(), cit->first.c_str(), addr);
+            need_to_change = ((my_name == m[addr] && my_name < cit->first) ||
+                                (my_name == cit->first && my_name < m[addr]));
         } else {
             m[addr] = cit->first;
+        }
+    }
+
+    rib->neighbors_seen.erase(my_name); /* Remove temporary. */
+
+    if (need_to_change) {
+        /* My address conflicts with someone else, and I am the
+         * designated one to change it. */
+        rlm_addr_t newaddr = rib->addra->allocate();
+
+        if (newaddr) {
+            rib->set_address(newaddr);
         }
     }
 }
