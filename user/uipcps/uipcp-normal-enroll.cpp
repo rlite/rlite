@@ -322,7 +322,6 @@ Neighbor::n_flow_set(NeighFlow *nf)
     kbnf = flows.begin()->second;
     nf->enroll_state = kbnf->enroll_state;
     nf->conn = kbnf->conn;
-    kbnf->conn = NULL;
     kbnf->keepalive_tmr_stop();
     nf->keepalive_tmr_start();
 
