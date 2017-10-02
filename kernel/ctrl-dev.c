@@ -529,7 +529,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         /* Build and insert an IPC process entry in the hash table. */
         entry->name = req->name; req->name = NULL; /* move */
         entry->dif = dif;
-        entry->addr = 0;
+        entry->addr = RL_ADDR_NULL;
         entry->refcnt = 1;
         entry->hdroom = 0;
         entry->tailroom = 0;
@@ -1273,7 +1273,7 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         entry->remote_appl = rl_strdup(remote_appl, GFP_ATOMIC, RL_MT_FLOW);
         entry->remote_port = 0;  /* Not valid. */
         entry->remote_cep = 0;   /* Not valid. */
-        entry->remote_addr = 0;  /* Not valid. */
+        entry->remote_addr = RL_ADDR_NULL;  /* Not valid. */
         entry->upper = upper;
         if (upper.rc) {
             get_file(upper.rc->file);

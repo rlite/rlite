@@ -687,7 +687,7 @@ struct addr_allocator_distributed : public addr_allocator {
 struct addr_allocator_manual : public addr_allocator_distributed {
     addr_allocator_manual(struct uipcp_rib *_ur)
         : addr_allocator_distributed(_ur) { }
-    rlm_addr_t allocate() { return 0; }
+    rlm_addr_t allocate() { return RL_ADDR_NULL; }
 };
 
 #endif  /* __UIPCP_RIB_H__ */

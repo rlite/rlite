@@ -813,7 +813,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct rina_pci *pci;
-    rl_addr_t dst_addr = 0; /* Not valid. */
+    rl_addr_t dst_addr = RL_ADDR_NULL; /* Not valid. */
 
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
         *lower_flow = pduft_lookup(priv, mhdr->remote_addr);
@@ -896,7 +896,7 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
 
     write_lock_bh(&priv->pduft_lock);
 
-    if (dst_addr == 0) {
+    if (dst_addr == RL_ADDR_NULL) {
         /* Default entry. */
         priv->pduft_dflt = flow;
     } else {
@@ -981,7 +981,7 @@ rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
     int ret = -1;
 
     write_lock_bh(&priv->pduft_lock);
-    if (dst_addr == 0) {
+    if (dst_addr == RL_ADDR_NULL) {
         /* Default entry. */
         if (priv->pduft_dflt) {
             flow_put(priv->pduft_dflt);
@@ -1367,7 +1367,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
 
     if (unlikely(pci->pdu_type == PDU_T_MGMT &&
                  (pci->dst_addr == ipcp->addr ||
-                  pci->dst_addr == 0))) {
+                  pci->dst_addr == RL_ADDR_NULL))) {
         /* Management PDU for this IPC process. Post it to the userspace
          * IPCP. */
         struct rl_mgmt_hdr *mhdr;
