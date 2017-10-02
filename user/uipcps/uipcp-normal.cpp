@@ -389,9 +389,8 @@ uipcp_rib::~uipcp_rib()
     uipcp_loop_schedule_canc(uipcp, sync_tmrid);
     uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
 
-    for (map<string, Neighbor*>::iterator mit = neighbors.begin();
-                                    mit != neighbors.end(); mit++) {
-        rl_delete(mit->second, RL_MT_NEIGH);
+    for (const auto& kvn : neighbors) {
+        rl_delete(kvn.second, RL_MT_NEIGH);
     }
 
     delete addra;
@@ -467,14 +466,13 @@ uipcp_rib::dump() const
         bool first = true;
 
         ss << "LowerDIFs: {";
-        for (list<string>::const_iterator lit = lower_difs.begin();
-                                lit != lower_difs.end(); lit++) {
-                if (first) {
-                    first = false;
-                } else {
-                    ss << ", ";
-                }
-                ss << *lit;
+        for (const string& lower : lower_difs) {
+            if (first) {
+                first = false;
+            } else {
+                ss << ", ";
+            }
+            ss << lower;
         }
         ss << "}" << endl << endl;
     }
@@ -482,10 +480,8 @@ uipcp_rib::dump() const
     ss << "Neighbors: " << neighbors_seen.size() <<
             " seen, " << neighbors.size() << " connected, "
             << neighbors_cand.size() << " candidates" << endl;
-    for (map<string, NeighborCandidate>::const_iterator
-            mit = neighbors_seen.begin();
-                mit != neighbors_seen.end(); mit++) {
-        const NeighborCandidate& cand = mit->second;
+    for (const auto& kvn : neighbors_seen) {
+        const NeighborCandidate& cand = kvn.second;
         string neigh_name = rina_string_from_components(cand.apn, cand.api,
                                                         string(), string());
         map<string, Neighbor*>::const_iterator neigh;
@@ -498,14 +494,13 @@ uipcp_rib::dump() const
         {
             bool first = true;
 
-            for (list<string>::const_iterator lit = cand.lower_difs.begin();
-                        lit != cand.lower_difs.end(); lit++) {
+            for (const string& lower : cand.lower_difs) {
                 if (first) {
                     first = false;
                 } else {
                     ss << ", ";
                 }
-                ss << *lit;
+                ss << lower;
             }
             ss << "} ";
         }
@@ -621,15 +616,15 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
 
         self_registration_needed = false;
         /* Scan all the (updated) lower DIFs. */
-        for (lit = lower_difs.begin(); lit != lower_difs.end(); lit++) {
+        for (const string& lower : lower_difs) {
             rl_ipcp_id_t lower_ipcp_id;
             int ret;
 
-            ret = uipcp_lookup_id_by_dif(uipcp->uipcps, lit->c_str(),
+            ret = uipcp_lookup_id_by_dif(uipcp->uipcps, lower.c_str(),
                                          &lower_ipcp_id);
             if (ret) {
                 UPE(uipcp, "Failed to find lower IPCP for dif %s\n",
-                           lit->c_str());
+                           lower.c_str());
                 continue;
             }
 
@@ -673,7 +668,6 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
 int
 uipcp_rib::realize_registrations(bool reg)
 {
-    list<string>::iterator lit;
     list<string> snapshot;
 
     {
@@ -681,8 +675,8 @@ uipcp_rib::realize_registrations(bool reg)
         snapshot = lower_difs;
     }
 
-    for (lit = snapshot.begin(); lit != snapshot.end(); lit++) {
-        register_to_lower_one(uipcp, lit->c_str(), reg);
+    for (const string& lower : snapshot) {
+        register_to_lower_one(uipcp, lower.c_str(), reg);
     }
 
     return 0;
@@ -781,7 +775,7 @@ int
 uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
 {
     /* Dispatch depending on the obj_name specified in the request. */
-    map< string, rib_handler_t >::iterator hi = handlers.find(rm->obj_name);
+    auto hi = handlers.find(rm->obj_name);
     int ret = 0;
 
     if (hi == handlers.end()) {
@@ -826,11 +820,9 @@ void
 addr_allocator_distributed::dump(std::stringstream& ss) const
 {
     ss << "Address Allocation Table:" << endl;
-    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
-            mit = addr_alloc_table.begin();
-                mit != addr_alloc_table.end(); mit++) {
-        ss << "    Address: " << mit->first
-            << ", Requestor: " << mit->second.requestor << endl;
+    for (const auto& kva : addr_alloc_table) {
+        ss << "    Address: " << kva.first
+            << ", Requestor: " << kva.second.requestor << endl;
     }
 
     ss << endl;
@@ -841,15 +833,13 @@ addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
-    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
-            at = addr_alloc_table.begin();
-                at != addr_alloc_table.end();) {
+    for (auto ati = addr_alloc_table.begin(); ati != addr_alloc_table.end();) {
         AddrAllocEntries l;
 
         while (l.entries.size() < limit &&
-                at != addr_alloc_table.end()) {
-            l.entries.push_back(at->second);
-            at ++;
+                ati != addr_alloc_table.end()) {
+            l.entries.push_back(ati->second);
+            ati ++;
         }
 
         ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
@@ -889,10 +879,8 @@ addr_allocator_distributed::allocate()
         UPD(rib->uipcp, "Trying with address %lu\n", (unsigned long)addr);
         addr_alloc_table[addr] = AddrAllocRequest(addr, rib->myaddr);
 
-        for (map<string, Neighbor*>::iterator
-                    nit = rib->neighbors.begin();
-                            nit != rib->neighbors.end(); nit++) {
-            if (nit->second->enrollment_complete()) {
+        for (const auto& kvn : rib->neighbors) {
+            if (kvn.second->enrollment_complete()) {
                 AddrAllocRequest aar;
                 CDAPMessage m;
                 int ret;
@@ -901,7 +889,7 @@ addr_allocator_distributed::allocate()
                             obj_name::addr_alloc_table, 0, 0, "");
                 aar.requestor = rib->myaddr;
                 aar.address = addr;
-                ret = nit->second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
+                ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send msg to neighbot [%s]\n",
                                strerror(errno));
@@ -909,7 +897,7 @@ addr_allocator_distributed::allocate()
                 } else {
                     UPD(rib->uipcp, "Sent address allocation request to neigh %s, "
                         "(addr=%lu,requestor=%lu)\n",
-                        nit->second->ipcp_name.c_str(),
+                        kvn.second->ipcp_name.c_str(),
                         (long unsigned)aar.address,
                         (long unsigned)aar.requestor);
                 }
@@ -921,11 +909,9 @@ addr_allocator_distributed::allocate()
         sleep(nack_wait_secs);
         pthread_mutex_lock(&rib->lock);
 
-        map<rlm_addr_t, AddrAllocRequest>::iterator mit;
-
         /* If the request is still there, then we consider the allocation
          * complete. */
-        mit = addr_alloc_table.find(addr);
+        auto mit = addr_alloc_table.find(addr);
         if (mit != addr_alloc_table.end() && mit->second.requestor == rib->myaddr) {
             addr_alloc_table[addr].pending = false;
             UPD(rib->uipcp, "Address %lu allocated\n", (unsigned long)addr);
@@ -964,7 +950,6 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (rm->obj_class == obj_class::addr_alloc_req) {
         /* This is an address allocation request or a negative
          * address allocation response. */
-        map<rlm_addr_t, AddrAllocRequest>::iterator mit;
         bool propagate = false;
         bool cand_neigh_conflict;
         AddrAllocRequest aar(objbuf, objlen);
@@ -972,7 +957,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         /* Lookup the address contained in the request into the allocation
          * table and among the neighbor candidates. Also check if the proposed
          * address conflicts with our own address. */
-        mit = addr_alloc_table.find(aar.address);
+        auto mit = addr_alloc_table.find(aar.address);
         cand_neigh_conflict = aar.address == rib->myaddr ||
                     rib->lookup_neighbor_by_address(aar.address) != string();
 
@@ -1045,29 +1030,26 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         AddrAllocEntries aal(objbuf, objlen);
         AddrAllocEntries prop_aal;
 
-        for (list<AddrAllocRequest>::const_iterator r = aal.entries.begin();
-                                            r != aal.entries.end(); r++) {
-            map<rlm_addr_t, AddrAllocRequest>::iterator mit;
-
-            mit = addr_alloc_table.find(r->address);
+        for (const AddrAllocRequest& r : aal.entries) {
+            auto mit = addr_alloc_table.find(r.address);
 
             if (rm->op_code == gpb::M_CREATE) {
                 if (mit == addr_alloc_table.end() ||
-                                mit->second.requestor != r->requestor) {
-                    addr_alloc_table[r->address] = *r; /* overwrite */
-                    prop_aal.entries.push_back(*r);
+                                mit->second.requestor != r.requestor) {
+                    addr_alloc_table[r.address] = r; /* overwrite */
+                    prop_aal.entries.push_back(r);
                     UPD(rib->uipcp, "Address allocation entry created (addr=%lu,"
-                                "requestor=%lu)\n", (long unsigned)r->address,
-                                (long unsigned)r->requestor);
+                                "requestor=%lu)\n", (long unsigned)r.address,
+                                (long unsigned)r.requestor);
                 }
             } else { /* M_DELETE */
                 if (mit != addr_alloc_table.end() &&
-                                mit->second.requestor == r->requestor) {
-                    addr_alloc_table.erase(r->address);
-                    prop_aal.entries.push_back(*r);
+                                mit->second.requestor == r.requestor) {
+                    addr_alloc_table.erase(r.address);
+                    prop_aal.entries.push_back(r);
                     UPD(rib->uipcp, "Address allocation entry deleted (addr=%lu,"
-                                "requestor=%lu)\n", (long unsigned)r->address,
-                                (long unsigned)r->requestor);
+                                "requestor=%lu)\n", (long unsigned)r.address,
+                                (long unsigned)r.requestor);
                 }
             }
         }
@@ -1124,14 +1106,13 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
                                  const string& obj_name,
                                  const UipcpObject *obj_value) const
 {
-    for (map<string, Neighbor*>::const_iterator neigh = neighbors.begin();
-                        neigh != neighbors.end(); neigh++) {
-        if (exclude && neigh->second == exclude) {
+    for (const auto& kvn : neighbors) {
+        if (exclude && kvn.second == exclude) {
             continue;
         }
 
-        if (!neigh->second->has_flows() ||
-                neigh->second->mgmt_conn()->enroll_state
+        if (!kvn.second->has_flows() ||
+                kvn.second->mgmt_conn()->enroll_state
                     != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet or the
              * flow is not there since the neighbor is about to
@@ -1139,8 +1120,8 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        neigh->second->neigh_sync_obj(NULL, create, obj_class,
-                                      obj_name, obj_value);
+        kvn.second->neigh_sync_obj(NULL, create, obj_class,
+                                   obj_name, obj_value);
     }
 
     return 0;
