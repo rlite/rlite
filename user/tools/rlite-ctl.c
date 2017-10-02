@@ -278,6 +278,26 @@ ipcp_destroy(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+reset(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct ipcp_attrs *attrs;
+    int ret = 0;
+
+    list_for_each_entry(attrs, &ipcps, node) {
+        int r;
+
+        r = rl_conf_ipcp_destroy(attrs->id);
+        if (r) {
+            PE("Failed to destroy IPCP %u\n", attrs->id);
+        }
+
+        ret |= r;
+    }
+
+    return ret;
+}
+
+static int
 ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
 {
     const char *ipcp_name;
@@ -722,6 +742,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_NAME",
         .num_args = 1,
         .func = ipcp_destroy,
+    },
+    {
+        .name = "reset",
+        .usage = "",
+        .num_args = 0,
+        .func = reset,
     },
     {
         .name = "ipcp-config",
