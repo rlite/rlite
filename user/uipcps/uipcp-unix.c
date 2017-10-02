@@ -718,22 +718,6 @@ int main(int argc, char **argv)
     int ret, opt;
     int iarg;
 
-    /* We require root permissions. */
-    if (geteuid() != 0) {
-        PE("uipcps daemon needs root permissions\n");
-        return -1;
-    }
-
-    if (!char_device_exists(RLITE_CTRLDEV_NAME)) {
-        PE("Device %s not found\n", RLITE_CTRLDEV_NAME);
-        return -1;
-    }
-
-    if (!char_device_exists(RLITE_IODEV_NAME)) {
-        PE("Device %s not found\n", RLITE_IODEV_NAME);
-        return -1;
-    }
-
     uipcps->keepalive = NEIGH_KEEPALIVE_TO;
     uipcps->reliable_n_flows = 0;
     uipcps->reliable_flows = 0;
@@ -790,6 +774,22 @@ int main(int argc, char **argv)
         rl_verbosity = RL_VERB_QUIET;
     } else {
         rl_verbosity = RL_VERB_DBG;
+    }
+
+    /* We require root permissions. */
+    if (geteuid() != 0) {
+        PE("uipcps daemon needs root permissions\n");
+        return -1;
+    }
+
+    if (!char_device_exists(RLITE_CTRLDEV_NAME)) {
+        PE("Device %s not found\n", RLITE_CTRLDEV_NAME);
+        return -1;
+    }
+
+    if (!char_device_exists(RLITE_IODEV_NAME)) {
+        PE("Device %s not found\n", RLITE_IODEV_NAME);
+        return -1;
     }
 
     normal_lib_init();
