@@ -32,3 +32,5 @@ install(TARGETS mac2ifname DESTINATION usr/bin)
 endif()
 install(FILES rina-gw.conf iporinad.conf initscript DESTINATION etc/rina)
 install(PROGRAMS inet-toy rina-toy rlite-node-config DESTINATION usr/bin)
+
+add_subdirectory(rinacat)
