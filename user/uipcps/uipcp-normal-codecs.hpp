@@ -56,6 +56,18 @@
     _CLA() = delete; \
     RL_NONCOPIABLE(_CLA)
 
+#define RL_COPIABLE(_CLA) \
+    _CLA(const _CLA&) = default; \
+    _CLA& operator=(const _CLA&) = default
+
+#define RL_MOVABLE(_CLA) \
+    _CLA(_CLA&&) = default; \
+    _CLA& operator=(_CLA&&) = default
+
+#define RL_COPIABLE_MOVABLE(_CLA) \
+    RL_COPIABLE(_CLA); \
+    RL_MOVABLE(_CLA)
+
 using NodeId = std::string;
 
 /* Helper for pretty printing of default route. */
