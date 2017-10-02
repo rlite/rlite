@@ -84,8 +84,8 @@ tx_completion_func(unsigned long arg)
 
         RPD(2, "Sending from rmtq\n");
 
-        BUG_ON(!rb->u.rmt.compl_flow);
-        ret = ipcp->ops.sdu_write(ipcp, rb->u.rmt.compl_flow, rb, false);
+        BUG_ON(!RL_BUF_RMT(rb).compl_flow);
+        ret = ipcp->ops.sdu_write(ipcp, RL_BUF_RMT(rb).compl_flow, rb, false);
         if (unlikely(ret == -EAGAIN)) {
 #if 0
             PD("Pushing back to rmtq\n");
@@ -475,7 +475,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             }
 
             if (flow && flow->sdu_rx_consumed) {
-                flow->sdu_rx_consumed(flow, rb->u.rx.cons_seqnum);
+                flow->sdu_rx_consumed(flow, RL_BUF_RX(rb).cons_seqnum);
             }
 
             rl_buf_free(rb);
