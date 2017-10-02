@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -58,7 +59,8 @@ tun_alloc(char *dev, int flags)
     return fd;
 }
 
-int main()
+void
+alloc_tun()
 {
     char tun_name[IFNAMSIZ];
     int tunfd;
@@ -66,6 +68,56 @@ int main()
     strcpy(tun_name, "tun1");
     tunfd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
     close(tunfd);
+}
+
+static int
+parse_conf(const char *path)
+{
+    ifstream fin(path);
+
+    if (fin.fail()) {
+        cerr << "Cannot open configuration file " << path << endl;
+        return -1;
+    }
+
+    fin.close();
+
+    return 0;
+}
+
+static void
+usage(void)
+{
+    cout << "iporinad [OPTIONS]" << endl <<
+        "   -h : show this help" << endl <<
+        "   -c CONF_FILE: path to configuration file" << endl;
+}
+
+int main(int argc, char **argv)
+{
+    const char *confpath = "/etc/iporinad.conf";
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hc:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
+            case 'c':
+		confpath = optarg;
+                break;
+
+            default:
+                printf("    Unrecognized option %c\n", opt);
+                usage();
+                return -1;
+        }
+    }
+
+    if (parse_conf(confpath)) {
+        return -1;
+    }
 
     return 0;
 }
