@@ -90,6 +90,7 @@ NeighFlow::~NeighFlow()
     }
 
     if (mgmt_flow_fd >= 0) {
+        uipcp_loop_fdh_del(neigh->rib->uipcp, mgmt_flow_fd);
         ret = close(mgmt_flow_fd);
         if (ret) {
             UPE(neigh->rib->uipcp, "Error deallocating only-management "
@@ -1485,6 +1486,8 @@ Neighbor::alloc_flow(const char *supp_dif)
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
         } else {
             UPD(rib->uipcp, "Management-only N-1 flow allocated\n");
+            uipcp_loop_fdh_add(rib->uipcp, flows[port_id_]->mgmt_flow_fd,
+                               normal_mgmt_only_flow_ready, &flows[port_id_]);
         }
     }
 

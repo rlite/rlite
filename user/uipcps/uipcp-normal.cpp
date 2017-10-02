@@ -141,12 +141,11 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr,
 }
 
 static int
-rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
-             char *serbuf, int serlen)
+rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
+             NeighFlow *nf)
 {
     CDAPMessage *m = NULL;
     Neighbor *neigh;
-    NeighFlow *nf;
     int ret;
 
     try {
@@ -181,8 +180,6 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
                 return 0;
             }
 
-            ScopeLock lock_(rib->lock);
-
             rib->cdap_dispatch(adata.cdap, NULL);
 
             return 0;
@@ -201,13 +198,8 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         rl_delete(m, RL_MT_CDAP);
         m = NULL;
 
-        ScopeLock lock_(rib->lock);
-
-        /* Lookup neighbor by port id. */
-        ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
-        if (ret) {
-            UPE(rib->uipcp, "Received message from unknown port id %d\n",
-                mhdr->local_port);
+        if (!nf) {
+            UPE(rib->uipcp, "Received message from unknown port id\n");
             return -1;
         }
 
@@ -270,11 +262,12 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 }
 
 static void
-mgmt_fd_ready(struct uipcp *uipcp, int fd, void *opaque)
+mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char mgmtbuf[MGMTBUF_SIZE_MAX];
     struct rl_mgmt_hdr *mhdr;
+    NeighFlow *nf;
     int n;
 
     assert(fd == rib->mgmtfd);
@@ -296,10 +289,36 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd, void *opaque)
     mhdr = (struct rl_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
+    ScopeLock lock_(rib->lock);
+
+    /* Lookup neighbor by port id. If ADATA, it is not an error
+     * if the lookup fails (nf == NULL). */
+    rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
+
     /* Hand off the message to the RIB. */
-    rib_recv_msg(rib, mhdr, ((char *)(mhdr + 1)),
-                 n - sizeof(*mhdr));
+    rib_recv_msg(rib, ((char *)(mhdr + 1)), n - sizeof(*mhdr), nf);
 }
+
+void
+normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
+{
+    struct NeighFlow *nf = (struct NeighFlow *)opaque;
+    char mgmtbuf[MGMTBUF_SIZE_MAX];
+    uipcp_rib *rib = nf->neigh->rib;
+    int n;
+
+    n = read(nf->mgmt_flow_fd, mgmtbuf, sizeof(mgmtbuf));
+    if (n < 0) {
+        UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n",
+                strerror(errno));
+        return;
+    }
+
+    ScopeLock lock_(rib->lock);
+
+    rib_recv_msg(rib, mgmtbuf, n, nf);
+}
+
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
                                          enroller_enabled(false),
@@ -317,7 +336,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
         throw std::exception();
     }
 
-    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_fd_ready, NULL);
+    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_bound_flow_ready, NULL);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
