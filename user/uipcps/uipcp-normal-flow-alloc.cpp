@@ -533,9 +533,8 @@ void
 flow_allocator_default::dump(std::stringstream& ss) const
 {
     ss << "Supported flows:" << endl;
-    for (map<string, FlowRequest>::const_iterator
-            mit = flow_reqs.begin(); mit != flow_reqs.end(); mit++) {
-        const FlowRequest& freq = mit->second;
+    for (const auto& kvf : flow_reqs) {
+        const FlowRequest& freq = kvf.second;
 
         ss << "    [" << ((freq.flags & RL_FLOWREQ_INITIATOR) ? "L" : "R")
             << "]" <<
@@ -544,10 +543,9 @@ flow_allocator_default::dump(std::stringstream& ss) const
                 ", SrcAddr:Port=" << freq.src_addr << ":" << freq.src_port <<
                 ", DstAddr:Port=" << freq.dst_addr << ":" << freq.dst_port <<
                 ", Connections: [";
-        for (list<ConnId>::const_iterator conn = freq.connections.begin();
-                                conn != freq.connections.end(); conn++) {
-            ss << "<SrcCep=" << conn->src_cep << ", DstCep=" << conn->dst_cep
-                << ", QosId=" << conn->qos_id << "> ";
+        for (const ConnId& conn : freq.connections) {
+            ss << "<SrcCep=" << conn.src_cep << ", DstCep=" << conn.dst_cep
+                << ", QosId=" << conn.qos_id << "> ";
         }
         ss << "]" << endl;
     }
