@@ -483,6 +483,14 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
         return 0;
     }
 
+    if (addr == rib->myaddr) {
+        /* We were the initiator. */
+        assert(f->second.flags & RL_FLOWREQ_INITIATOR);
+    } else {
+        /* We were the target. */
+        assert(!(f->second.flags & RL_FLOWREQ_INITIATOR));
+    }
+
     local_port = (f->second.flags & RL_FLOWREQ_INITIATOR) ?
                  f->second.src_port : f->second.dst_port;
 
