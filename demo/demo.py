@@ -159,6 +159,32 @@ def vm_get_mac(vmid, idx):
     return '00:0a:0a:%02x:%02x:%02x' % ((vmid >> 8) & 0xff, vmid & 0xff, idx)
 
 
+# BFS on a DIF graph to compute the number of levels we need to complete
+# the BFS. We stop early once the level reaches 'ub', as the caller
+# knows it's not worth going ahead.
+def graph_node_depth(graph, node, ub):
+    frontier = FrontierSet()
+    marked = set()
+    frontier.add(node)
+    marked.add(node)
+    level = 0
+    while not frontier.empty():
+        new_frontier = FrontierSet()
+        level += 1
+        if level == ub:
+            return level # not worth going on
+
+        while not frontier.empty():
+            cur = frontier.pop()
+            for (neigh, lower_dif) in graph[cur]:
+                if neigh not in marked:
+                    new_frontier.add(neigh)
+                    marked.add(neigh)
+        frontier = new_frontier
+
+    return level
+
+
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -641,6 +667,18 @@ for dif in sorted(difs):
 
     #print(neighsets)
     #print(dif_graphs[dif])
+
+# Compute the center of each DIF, to speed up parallel enrollment
+dif_center = dict()
+for dif in sorted(difs):
+    master = None
+    master_level = len(vms) + 1
+    for vmname in dif_graphs[dif]:
+        level = graph_node_depth(dif_graphs[dif], vmname, master_level)
+        if level < master_level:
+            master = vmname
+            master_level = level
+    dif_center[dif] = master
 
 shim_id = 1
 for shim in shims:
