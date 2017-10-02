@@ -112,7 +112,38 @@ extern int verbosity;
 /* PCI header is opaque here, only the normal IPCP can use
  * its layout. */
 struct rina_pci;
+struct rl_buf;
 
+//#define RL_SKB
+
+struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom,
+                            size_t tailroom, gfp_t gfp);
+
+struct rl_buf *rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
+
+void __rl_buf_free(struct rl_buf *rb);
+
+union rl_buf_ctx {
+    struct {
+        /* Used in the TX datapath when this rb ends up into
+         * a retransmission queue. */
+        unsigned long       rtx_jiffies;
+        unsigned long       jiffies;
+    } rtx;
+
+    struct {
+        /* Used in the TX datapath when this rb ends up into
+         * an RMT queue. */
+        struct flow_entry   *compl_flow;
+    } rmt;
+
+    struct {
+        /* Used in the RX datapath for flow control. */
+        rlm_seq_t           cons_seqnum;
+    } rx;
+};
+
+#ifndef RL_SKB
 struct rl_rawbuf {
     size_t size;
     atomic_t refcnt;
@@ -123,27 +154,7 @@ struct rl_buf {
     struct rl_rawbuf    *raw;
     struct rina_pci     *pci;
     size_t              len;
-
-    union {
-        struct {
-            /* Used in the TX datapath when this rb ends up into
-             * a retransmission queue. */
-            unsigned long       rtx_jiffies;
-            unsigned long       jiffies;
-        } rtx;
-
-        struct {
-            /* Used in the TX datapath when this rb ends up into
-             * an RMT queue. */
-            struct flow_entry   *compl_flow;
-        } rmt;
-
-        struct {
-            /* Used in the RX datapath for flow control. */
-            rlm_seq_t           cons_seqnum;
-        } rx;
-    } u;
-
+    union rl_buf_ctx    u;
     struct list_head    node;
 };
 
@@ -155,20 +166,6 @@ struct rl_buf {
 #define RL_BUF_RTX(rb)          (rb)->u.rtx
 #define RL_BUF_RX(rb)           (rb)->u.rx
 #define RL_BUF_RMT(rb)          (rb)->u.rmt
-
-struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom,
-                            size_t tailroom, gfp_t gfp);
-
-struct rl_buf *rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
-
-void __rl_buf_free(struct rl_buf *rb);
-
-#define rl_buf_free(_rb) \
-    do { \
-        BUG_ON((_rb) == NULL); \
-        BUG_ON(!list_empty(&(_rb)->node)); \
-        __rl_buf_free(_rb); \
-    } while (0)
 
 /* Amount of memory consumed by this packet. */
 static inline unsigned int
@@ -204,6 +201,60 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
     return 0;
 }
+
+#define rl_buf_free(_rb) \
+    do { \
+        BUG_ON((_rb) == NULL); \
+        BUG_ON(!list_empty(&(_rb)->node)); \
+        __rl_buf_free(_rb); \
+    } while (0)
+
+#else  /* RL_SKB */
+
+#include <linux/skbuff.h>
+
+#define rl_buf  sk_buff
+
+#define RL_BUF_DATA(rb)         ((uint8_t *)(rb)->data)
+#define RL_BUF_PCI(rb)          ((struct rina_pci *)(rb)->data)
+#define RL_BUF_PCI_CTRL(rb)     ((struct rina_pci_ctrl *)(rb)->data)
+#define RL_BUF_RTX(rb)          ((union rl_buf_ctx *)((rb)->cb))->rtx
+#define RL_BUF_RX(rb)          ((union rl_buf_ctx *)((rb)->cb))->rx
+#define RL_BUF_RMT(rb)          ((union rl_buf_ctx *)((rb)->cb))->rmt
+
+static inline unsigned int
+rl_buf_truesize(struct rl_buf *rb)
+{
+    return rb->truesize;
+}
+
+static inline int
+rl_buf_custom_pop(struct rl_buf *rb, size_t len)
+{
+    if (unlikely(rb->len < len)) {
+        RPD(2, "No enough data to pop %d bytes\n", (int)len);
+        return -1;
+    }
+
+    skb_pull(rb, len);
+
+    return 0;
+}
+
+static inline int
+rl_buf_custom_push(struct rl_buf *rb, size_t len)
+{
+    if (unlikely(skb_headroom(rb) < len) {
+        RPD(2, "No space to push %d bytes\n", (int)len);
+        return -1;
+    }
+
+    skb_push(rb, len);
+
+    return 0;
+}
+
+#endif /* RL_SKB */
 
 /*
  * Kernel data-structures.

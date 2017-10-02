@@ -25,6 +25,9 @@
 #include <linux/slab.h>
 #include "rlite-kernel.h"
 
+#ifdef RL_SKB
+#include <linux/skbuff.h>
+#endif
 
 /*
  * Allocate a buffer to hold PDU header and data.
@@ -34,6 +37,7 @@ struct rl_buf *
 rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
 {
     struct rl_buf *rb;
+#ifndef RL_SKB
     size_t real_size = hdroom + size + tailroom;
     uint8_t *kbuf;
 
@@ -55,8 +59,20 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + hdroom);
     rb->len = 0;
-    RL_BUF_RMT(rb).compl_flow = NULL;
     INIT_LIST_HEAD(&rb->node);
+
+#else  /* RL_SKB */
+    rb = alloc_skb(hdroom + size + tailroom, gfp);
+
+    if (unlikely(!rb)) {
+        PE("Out of memory\n");
+        return NULL;
+    }
+
+    skb_reserve(rb, hdroom);
+#endif /* RL_SKB */
+
+    RL_BUF_RMT(rb).compl_flow = NULL;
 
     return rb;
 }
@@ -67,6 +83,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
 {
     struct rl_buf *crb;
 
+#ifndef RL_SKB
     crb = rl_alloc(sizeof(*crb), gfp, RL_MT_BUFHDR);
     if (unlikely(!crb)) {
         return NULL;
@@ -80,8 +97,17 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
     memcpy(crb, rb, sizeof(*rb));
 
     /* Reset some fields. */
-    RL_BUF_RMT(crb).compl_flow = NULL;
     INIT_LIST_HEAD(&crb->node);
+#else  /* RL_SKB */
+
+    crb = skb_clone(rb);
+    if (unlikely(!crb)) {
+        return NULL;
+    }
+#endif /* RL_SKB */
+
+    /* Reset common fields. */
+    RL_BUF_RMT(crb).compl_flow = NULL;
 
     return crb;
 }
@@ -90,10 +116,14 @@ EXPORT_SYMBOL(rl_buf_clone);
 void
 __rl_buf_free(struct rl_buf *rb)
 {
+#ifndef RL_SKB
     if (atomic_dec_and_test(&rb->raw->refcnt)) {
         rl_free(rb->raw, RL_MT_BUFDATA);
     }
 
     rl_free(rb, RL_MT_BUFHDR);
+#else  /* RL_SKB */
+    dev_kfree_skb_any(rb);
+#endif /* RL_SKB */
 }
 EXPORT_SYMBOL(__rl_buf_free);
