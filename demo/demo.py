@@ -236,8 +236,8 @@ flavour_suffix = ''
 if args.flavour != '':
     flavour_suffix = '-' + args.flavour
 
-download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rlite-images/downloads/rootfs.cpio')
-download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rlite-images/downloads/bzImage')
+download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/rlite.rootfs.cpio')
+download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/rlite.bzImage')
 
 # Possibly autogenerate ring topology
 if args.ring != None and args.ring > 0:
