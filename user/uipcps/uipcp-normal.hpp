@@ -255,6 +255,7 @@ struct lfdb {
     virtual ~lfdb() { }
 
     virtual void dump(std::stringstream& ss) const = 0;
+    virtual void dump_routing(std::stringstream& ss) const = 0;
 
     virtual const LowerFlow *find(rlm_addr_t local_addr,
                                rlm_addr_t remote_addr) const = 0;
@@ -520,6 +521,9 @@ public:
     /* Is Loop Free Alternate algorithm enabled ? */
     bool lfa_enabled;
 
+    /* Dump the routing table. */
+    void dump(std::stringstream& ss) const;
+
 private:
     struct Edge {
         rlm_addr_t to;
@@ -566,6 +570,7 @@ struct lfdb_default : public lfdb {
     ~lfdb_default() { }
 
     void dump(std::stringstream& ss) const;
+    void dump_routing(std::stringstream& ss) const;
 
     const LowerFlow *find(rlm_addr_t local_addr,
                                rlm_addr_t remote_addr) const {

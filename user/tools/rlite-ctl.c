@@ -664,7 +664,7 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
     assert(argc >= 1);
     name = argv[0];
 
-    if (strcmp(cd->name, "dif-rib-show") == 0) {
+    if (strncmp(cd->name, "dif-", 4) == 0) {
         attrs = ipcp_by_dif(name);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", name);
@@ -680,7 +680,15 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
+    if (strcmp(cd->name, "dif-rib-show") == 0 ||
+            strcmp(cd->name, "ipcp-rib-show") == 0) {
+        req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
+    } else if (strcmp(cd->name, "dif-routing-show") == 0 ||
+            strcmp(cd->name, "ipcp-routing-show") == 0) {
+        req.msg_type = RLITE_U_IPCP_ROUTING_SHOW_REQ;
+    } else {
+        return -1;
+    }
     req.event_id = 0;
 
     return request_response(RLITE_MB(&req),
@@ -819,6 +827,18 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "dif-rib-show",
+        .usage = "DIF_NAME",
+        .num_args = 1,
+        .func = ipcp_rib_show,
+    },
+    {
+        .name = "ipcp-routing-show",
+        .usage = "IPCP_NAME",
+        .num_args = 1,
+        .func = ipcp_rib_show,
+    },
+    {
+        .name = "dif-routing-show",
         .usage = "DIF_NAME",
         .num_args = 1,
         .func = ipcp_rib_show,

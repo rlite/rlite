@@ -194,11 +194,12 @@ rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
 
 static int
 rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
-                        const struct rl_msg_base *b_req)
+                   const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_rib_show_req *req =
                     (struct rl_cmsg_ipcp_rib_show_req *)b_req;
     struct rl_cmsg_ipcp_rib_show_resp resp;
+    char * (*show)(struct uipcp *);
     struct uipcp *uipcp;
     char *dumpstr = NULL;
     int ret;
@@ -212,8 +213,18 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
         goto out;
     }
 
-    if (uipcp->ops.rib_show) {
-        dumpstr = uipcp->ops.rib_show(uipcp);
+    switch (req->msg_type) {
+    case RLITE_U_IPCP_RIB_SHOW_REQ:
+        show = uipcp->ops.rib_show;
+        break;
+
+    case RLITE_U_IPCP_ROUTING_SHOW_REQ:
+        show = uipcp->ops.routing_show;
+        break;
+    }
+
+    if (show) {
+        dumpstr = show(uipcp);
         if (dumpstr) {
             resp.result = RLITE_SUCC;
             resp.dump.buf = dumpstr;
@@ -224,7 +235,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     uipcp_put(uipcp);
 
 out:
-    resp.msg_type = RLITE_U_IPCP_RIB_SHOW_RESP;
+    resp.msg_type = req->msg_type + 1;
     resp.event_id = req->event_id;
 
     ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
@@ -295,6 +306,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_RIB_SHOW_REQ]     = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_MOD]       = rl_u_ipcp_policy_mod,
     [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
+    [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

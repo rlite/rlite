@@ -1507,6 +1507,18 @@ normal_ipcp_rib_show(struct uipcp *uipcp)
     return rib->dump();
 }
 
+static char *
+normal_ipcp_routing_show(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
+    stringstream ss;
+
+    rib->lfdb->dump_routing(ss);
+
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
+}
+
 static int
 normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
@@ -1547,6 +1559,7 @@ struct uipcp_ops normal_ops = {
     .enroller_enable        = normal_enroller_enable,
     .lower_flow_alloc       = normal_ipcp_enroll,
     .rib_show               = normal_ipcp_rib_show,
+    .routing_show           = normal_ipcp_routing_show,
     .appl_register          = normal_appl_register,
     .fa_req                 = normal_fa_req,
     .fa_resp                = normal_fa_resp,
