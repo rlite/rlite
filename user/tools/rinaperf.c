@@ -111,6 +111,7 @@ struct rinaperf {
     int                     cfd; /* Control file descriptor */
     int                     parallel; /* num of parallel clients */
     int                     duration; /* duration of client test (secs) */
+    int                     use_mss_size; /* use flow MSS as packet size */
     int                     verbose;
     int                     stop_pipe[2]; /* to stop client threads */
     int                     cli_stop; /* another way to stop client threads */
@@ -650,6 +651,16 @@ client_worker_function(void *opaque)
     if (w->cfd < 0) {
         perror("rina_flow_alloc_wait(cfd)");
         goto out;
+    }
+
+    /* Override packet size with the MSS size if necessary. */
+    if (rp->use_mss_size) {
+        unsigned int mss = rina_flow_mss_get(w->cfd);
+
+        if (mss) {
+            cfg.size = mss;
+            w->test_config.size = mss;
+        }
     }
 
     /* Send test configuration to the server. */
@@ -1198,6 +1209,7 @@ main(int argc, char **argv)
     rp->srv_appl_name = "rinaperf-data:server";
     rp->parallel = 1;
     rp->duration = 0;
+    rp->use_mss_size = 1;
     rp->verbose = 0;
     rp->cfd = -1;
     rp->stop_pipe[0] = rp->stop_pipe[1] = -1;
@@ -1241,6 +1253,8 @@ main(int argc, char **argv)
                     printf("    Invalid 'size' %d\n", size);
                     return -1;
                 }
+                /* Explicit size was specified, so we don't override it. */
+                rp->use_mss_size = 0;
                 break;
 
             case 'i':
@@ -1316,6 +1330,8 @@ main(int argc, char **argv)
      *   - When not in ping mode, ff user did not specify the number of
      *     packets (or transactions) nor the test duration, use a 10 seconds
      *     test duration.
+     *   - When in perf mode, use the flow MSS as a packet size, unless the
+     *     user has specified the size explicitely.
      */
     if (strcmp(type, "ping") == 0) {
         if (!interval_specified) {
@@ -1326,11 +1342,15 @@ main(int argc, char **argv)
         }
         wt.ping = 1;
 
-    } else if (strcmp(type, "rr") == 0) {
+    } else {
         wt.ping = 0;
         if (!duration_specified && !cnt) {
             rp->duration = 10; /* seconds */
         }
+    }
+
+     if (strcmp(type, "perf") != 0) {
+        rp->use_mss_size = 0; /* default MTU size only for perf */
     }
 
     /* Set defaults. */
