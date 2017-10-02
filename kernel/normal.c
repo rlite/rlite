@@ -510,12 +510,14 @@ static struct flow_entry *
 pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
 {
     struct pduft_entry *entry;
+    struct flow_entry *flow;
 
     read_lock_bh(&priv->pduft_lock);
     entry = pduft_lookup_internal(priv, dst_addr);
+    flow = entry ? entry->flow : NULL;
     read_unlock_bh(&priv->pduft_lock);
 
-    return entry ? entry->flow : NULL;
+    return flow;
 }
 
 #define RMTQ_MAX_SIZE    (1 << 17)
