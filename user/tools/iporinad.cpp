@@ -946,7 +946,7 @@ connect_to_remotes(void *opaque)
                      * message to inform the remote peer. */
                     m.m_start(gpb::F_NO_FLAGS, "data", "/data",
                                 0, 0, string());
-                    if (cdap_obj_send(&conn, &m, 0, NULL)) {
+                    if (cdap_obj_send(&conn, &m, 0, NULL) < 0) {
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
                     }
@@ -975,7 +975,7 @@ connect_to_remotes(void *opaque)
                     hello.tun_subnet = re->second.tun_subnet;
                     hello.tun_src_addr = re->second.tun_local_addr;
                     hello.tun_dst_addr = re->second.tun_remote_addr;
-                    if (cdap_obj_send(&conn, &m, 0, &hello)) {
+                    if (cdap_obj_send(&conn, &m, 0, &hello) < 0) {
                         cerr << "Failed to send M_START(hello)" << endl;
                         goto abor;
                     }
@@ -986,7 +986,7 @@ connect_to_remotes(void *opaque)
 
                         m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
                                     0, 0, string());
-                        if (cdap_obj_send(&conn, &m, 0, &robj)) {
+                        if (cdap_obj_send(&conn, &m, 0, &robj) < 0) {
                             cerr << "Failed to send M_WRITE" << endl;
                             goto abor;
                         }
