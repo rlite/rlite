@@ -28,6 +28,7 @@
 #include <string.h>
 #include <sys/eventfd.h>
 #include <fcntl.h>
+#include <poll.h>
 
 #include <rlite/conf.h>
 #include <rlite/utils.h>
@@ -36,6 +37,41 @@
 #include "../helpers.h"
 #include "uipcp-container.h"
 
+
+int
+uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
+                  const char *local_name, int reg)
+{
+    struct pollfd pfd;
+    int ret;
+
+    if (reg) {
+        pfd.fd = rina_register(uipcp->cfd, dif_name,
+                               local_name, RINA_F_NOWAIT);
+    } else {
+        pfd.fd = rina_unregister(uipcp->cfd, dif_name,
+                                 local_name, RINA_F_NOWAIT);
+    }
+
+    if (pfd.fd < 0) {
+        UPE(uipcp, "rina_register() failed [%s]\n", strerror(errno));
+        return -1;
+    }
+
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, 2000);
+    if (ret <= 0) {
+        if (ret == 0) {
+            UPE(uipcp, "poll() timed out\n");
+            ret = -1;
+        } else {
+            UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
+        }
+        return ret;
+    }
+
+    return rina_register_wait(uipcp->cfd, pfd.fd);
+}
 
 int
 uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
