@@ -250,7 +250,7 @@ which('qemu-system-x86_64')
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
 
 # Some variables that could become options
-sshopts = '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+sshopts = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
 if not args.image:
     sshopts += '-o IdentityFile=buildroot/buildroot_rsa '
 sudo = 'sudo' if args.image != '' else ''
@@ -1137,3 +1137,38 @@ if args.register:
     fout.write(outs)
     fout.close()
     subprocess.call(['chmod', '+x', 'echo.sh'])
+
+
+###### Generate grep script for uipcps log inspection ######
+fout = open('greplog.sh', 'w')
+
+outs =  '#!/bin/bash\n'             \
+        '\n'                        \
+        'if [ -z "$1" ]; then\n'\
+        '   echo "Regular expression missing"\n'\
+        '   exit 255\n'\
+        'fi\n'\
+
+for vmname in sorted(vms):
+    vm = vms[vmname]
+    outs += ''\
+        'DONE=255\n'\
+        'while [ $DONE != "0" ]; do\n'\
+        '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
+                        % {'sshopts': sshopts, 'username': args.user,
+                              'ssh': vm['ssh'],
+                              'dif': dif}
+
+    outs += 'grep "$1" uipcp.log\n'
+
+    outs +=      'true\n'\
+            'ENDSSH\n'\
+        '   DONE=$?\n'\
+        '   if [ $DONE != "0" ]; then\n'\
+        '       sleep 1\n'\
+        '   fi\n'\
+        'done\n\n'
+
+fout.write(outs)
+fout.close()
+subprocess.call(['chmod', '+x', 'greplog.sh'])
