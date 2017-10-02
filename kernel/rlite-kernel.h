@@ -551,8 +551,8 @@ struct dtp {
 };
 
 struct flow_entry {
-    uint16_t            local_port;  /* flow table key */
-    uint16_t            remote_port;
+    rl_port_t           local_port;  /* flow table key */
+    rl_port_t           remote_port;
     uint16_t            local_cep;
     uint16_t            remote_cep;
     rlm_addr_t           remote_addr;

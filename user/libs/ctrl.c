@@ -182,7 +182,7 @@ int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
-    return open_port_common(~0U, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
+    return open_port_common(RL_PORT_ID_NONE, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
 static int
@@ -379,7 +379,7 @@ __rina_flow_alloc_wait(int wfd, rl_port_t *port_id)
     int ret = -1;
 
     if (port_id) {
-        *port_id = ~0U;
+        *port_id = RL_PORT_ID_NONE;
     }
 
     resp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(wfd, 1);
