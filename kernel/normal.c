@@ -170,11 +170,14 @@ rl_normal_create(struct ipcp_entry *ipcp)
     return priv;
 }
 
+static int rl_normal_pduft_flush(struct ipcp_entry *ipcp);
+
 static void
 rl_normal_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv = ipcp->priv;
 
+    rl_normal_pduft_flush(ipcp);
     rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
