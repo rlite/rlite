@@ -41,8 +41,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      unsigned int pid, int ffd, unsigned int lid) :
                                   neigh(n), supp_dif(supdif),
                                   port_id(pid), lower_ipcp_id(lid),
-                                  flow_fd(ffd), mgmt_flow_fd(-1),
-                                  reliable(false),
+                                  flow_fd(ffd), reliable(false),
                                   upper_flow_fd(-1), conn(NULL),
                                   enroll_state(NEIGH_NONE),
                                   enrollment_rsrc(NULL),
@@ -86,18 +85,6 @@ NeighFlow::~NeighFlow()
         } else {
             UPD(neigh->rib->uipcp, "N-flow deallocated [fd=%d]\n",
                                    upper_flow_fd);
-        }
-    }
-
-    if (mgmt_flow_fd >= 0) {
-        uipcp_loop_fdh_del(neigh->rib->uipcp, mgmt_flow_fd);
-        ret = close(mgmt_flow_fd);
-        if (ret) {
-            UPE(neigh->rib->uipcp, "Error deallocating only-management "
-                    "N-1-flow [fd %d]\n", flow_fd);
-        } else {
-            UPD(neigh->rib->uipcp, "Only-management N-1-flow deallocated "
-                    "[fd=%d]\n", flow_fd);
         }
     }
 
@@ -272,6 +259,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string& name)
 {
     rib = rib_;
     initiator = false;
+    mgmt_only = NULL;
     ipcp_name = name;
     unheard_since = time(NULL);
 }
@@ -281,6 +269,11 @@ Neighbor::~Neighbor()
     for (map<rl_port_t, NeighFlow *>::iterator mit = flows.begin();
                                             mit != flows.end(); mit++) {
         rl_delete(mit->second, RL_MT_NEIGHFLOW);
+    }
+
+    if (mgmt_only) {
+        uipcp_loop_fdh_del(rib->uipcp, mgmt_only->flow_fd);
+        rl_delete(mgmt_only, RL_MT_NEIGHFLOW);
     }
 }
 
@@ -1422,7 +1415,7 @@ Neighbor::flow_alloc(const char *supp_dif)
     flows[port_id_] = rl_new(NeighFlow(this, string(supp_dif), port_id_,
                                        flow_fd_, lower_ipcp_id_),
                                        RL_MT_NEIGHFLOW);
-    flows[port_id_]->reliable = use_reliable_flow;
+    flows[port_id_]->reliable = false;
 
     UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
                     use_reliable_flow ? "" : "un",
@@ -1436,16 +1429,21 @@ Neighbor::flow_alloc(const char *supp_dif)
     rib->lfdb->update_local(ipcp_name);
 
     if (use_reliable_flow) {
+        int mgmt_fd;
         /* Try to allocate a management-only reliable flow. */
-        flows[port_id_]->mgmt_flow_fd = rina_flow_alloc(supp_dif,
-                                            rib->uipcp->name,
-                                            ipcp_name.c_str(), &relspec, 0);
-        if (flows[port_id_]->mgmt_flow_fd < 0) {
+        mgmt_fd = rina_flow_alloc(supp_dif, rib->uipcp->name,
+                                  ipcp_name.c_str(), &relspec, 0);
+        if (mgmt_fd < 0) {
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
         } else {
+            mgmt_only = rl_new(NeighFlow(this, string(supp_dif),
+                                         RL_PORT_ID_NONE, mgmt_fd,
+                                         RL_IPCP_ID_NONE),
+                                RL_MT_NEIGHFLOW);
+            mgmt_only->reliable = true;
             UPD(rib->uipcp, "Management-only N-1 flow allocated\n");
-            uipcp_loop_fdh_add(rib->uipcp, flows[port_id_]->mgmt_flow_fd,
-                               normal_mgmt_only_flow_ready, &flows[port_id_]);
+            uipcp_loop_fdh_add(rib->uipcp, mgmt_fd,
+                               normal_mgmt_only_flow_ready, this);
         }
     }
 

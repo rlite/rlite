@@ -116,7 +116,6 @@ struct NeighFlow {
     rl_port_t port_id;
     rl_ipcp_id_t lower_ipcp_id;
     int flow_fd; /* only used for close() */
-    int mgmt_flow_fd; /* if different from -1, use for management */
     bool reliable;
     int upper_flow_fd; /* TODO currently unused */
     CDAPConn *conn;
@@ -159,7 +158,13 @@ struct Neighbor {
      * or were we the target? */
     bool initiator;
 
+    /* Kernel-bound N-1 flows used for data transfers and optionally
+     * management. */
     std::map<rl_port_t, NeighFlow *> flows;
+
+    /* If not NULL, a regular (non-kernel-bound) N-1 flow used for
+     * management purposes. */
+    NeighFlow *mgmt_only;
 
     /* Last time we received a keepalive response from this neighbor.
      * We don't consider requests, as timeout on responses. */
