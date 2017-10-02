@@ -1009,12 +1009,24 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 
         case gpb::M_DELETE:
             if (mit != addr_alloc_table.end()) {
-                /* Negative feedback on a flow allocation request. */
-                addr_alloc_table.erase(aar.address);
-                propagate = true;
-                UPI(rib->uipcp, "Address allocation request deleted, (addr=%lu,"
-                           "requestor=%lu)\n", (long unsigned)aar.address,
-                            (long unsigned)aar.requestor);
+                if (mit->second.pending) {
+                    /* Negative feedback on a flow allocation request. */
+                    addr_alloc_table.erase(aar.address);
+                    propagate = true;
+                    UPI(rib->uipcp, "Address allocation request deleted, "
+                                "(addr=%lu,requestor=%lu)\n",
+                                (long unsigned)aar.address,
+                                (long unsigned)aar.requestor);
+                } else {
+                    /* Late negative feedback. This is a serious problem
+                     * that we don't manage for now. */
+                    UPE(rib->uipcp, "Conflict on a committed address! "
+                                    "Part of the network may be "
+                                    "unreachable "
+                                    "(addr=%lu,requestor=%lu)\n",
+                                    (long unsigned)aar.address,
+                                    (long unsigned)aar.requestor);
+                }
             }
             break;
 
