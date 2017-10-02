@@ -235,6 +235,9 @@ enroller node is not up yet, or network is temporarily down; for this reason,
 on failure the program waits for a few seconds and tries again, as many times
 as it is necessary. When the current enrollment succeeds, it proceeds to
 the next one, until all the enrollments are completed.
+By default **rlite-node-config** starts with a reset operation to remove all
+the existing IPCPs, and then reads the initscript stored at
+`/etc/rina/initscript`.
 
 
 ### 4.5. Other tools
