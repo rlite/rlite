@@ -412,6 +412,11 @@ Once the IPCPs are set up, we have to carry out the enrollments in
 the normal DIF. Among the possible strategies, we can enroll A and
 C against B, so that B will be the initial node in the DIF.
 
+On node B, enable b.IPCP:1 to act as an enroller even if it is not
+enrolled to any other node (as it is the first node):
+
+    $ sudo rlite-ctl ipcp-enroller-enable b.IPCP:1
+
 On node A, enroll a.IPCP:1 into n.DIF using ethAB.DIF as a supporting
 DIF and b.IPCP:1 as a neighbor:
 
@@ -512,7 +517,11 @@ Carry out similar operations on node Y:
     $ sudo rlite-ctl ipcp-create ynorm.IPCP normal normal.DIF
     $ sudo rlite-ctl ipcp-register ynorm.IPCP udptunnel.DIF
 
-Finally, access X and enroll X with Y (or the other way around) in the
+Finally, enable Y to be the first enroller for the normal DIF
+
+    $ sudo rlite-ctl ipcp-enroller-enable ynorm.IPCP
+
+and access X and enroll X with Y (or the other way around) in the
 normal DIF:
 
     $ sudo rlite-ctl ipcp-enroll xnorm.IPCP normal.DIF udptunnel.DIF ynorm.IPCP
