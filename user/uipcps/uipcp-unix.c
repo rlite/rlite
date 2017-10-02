@@ -477,7 +477,7 @@ eventfd_drain(int efd)
 int
 uipcps_loop_signal(struct uipcps *uipcps)
 {
-    return eventfd_signal(uipcps->efd, 0);
+    return eventfd_signal(uipcps->efd, 1);
 }
 
 /* Time interval (in seconds) between two consecutive run of
