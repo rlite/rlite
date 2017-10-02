@@ -847,19 +847,11 @@ connect_to_remotes(void *opaque)
                 Hello hello;
 
                 /* CDAP connection setup. */
-                m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
-                                    /* dst */ re->second.app_name);
-                if (conn.msg_send(&m, 0)) {
-                    cerr << "Failed to send M_CONNECT" << endl;
+                if (conn.connect(myname, re->second.app_name,
+                                 gpb::AUTH_NONE, NULL)) {
+                    cerr << "CDAP connection failed" << endl;
                     goto abor;
                 }
-
-                rm = conn.msg_recv();
-                if (rm->op_code != gpb::M_CONNECT_R) {
-                    cerr << "M_CONNECT_R expected" << endl;
-                    goto abor;
-                }
-                delete rm; rm = NULL;
 
                 if (i == IPOR_DATA) {
                     /* This is a data connection, send an empty CDAP start
@@ -1041,20 +1033,13 @@ int main(int argc, char **argv)
         Hello hello;
         string remote_name;
 
-        /* CDAP connection setup. */
-        rm = conn.msg_recv();
-        if (rm->op_code != gpb::M_CONNECT) {
-            cerr << "M_CONNECT expected" << endl;
+        /* CDAP server-side connection setup. */
+        rm = conn.accept();
+        if (!rm) {
+            cerr << "Error while accepting CDAP connection" << endl;
             goto abor;
         }
-
         remote_name = rm->src_appl;
-
-        m.m_connect_r(rm, 0, string());
-        if (conn.msg_send(&m, rm->invoke_id)) {
-            cerr << "Failed to send M_CONNECT_R" << endl;
-            goto abor;
-        }
         delete rm; rm = NULL;
 
         /* Receive Hello or Data message. */
