@@ -615,6 +615,7 @@ sigint_handler(int signum)
 
     if (signum == SIGPIPE) {
         PI("SIGPIPE received, ignoring...\n");
+        return;
     }
 
     print_backtrace();
