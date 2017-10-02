@@ -248,14 +248,14 @@ int
 flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
-    map<unsigned int, FlowRequest>::iterator f;
     string reason;
     CDAPMessage *m;
     int ret;
 
     /* Lookup the corresponding FlowRequest. */
 
-    f = flow_reqs_tmp.find(resp->kevent_id);
+    auto f = flow_reqs_tmp.find(resp->kevent_id);
+
     if (f == flow_reqs_tmp.end()) {
         UPE(rib->uipcp, "Spurious flow allocation response, no request for kevent_id %u\n",
            resp->kevent_id);
@@ -385,8 +385,7 @@ flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
     }
 
     FlowRequest remote_freq(objbuf, objlen);
-    map<string, FlowRequest>::iterator f = flow_reqs.find(rm->obj_name +
-                                                          string("L"));
+    auto f = flow_reqs.find(rm->obj_name + string("L"));
 
     if (f == flow_reqs.end()) {
         UPE(rib->uipcp, "M_CREATE_R for '%s' does not match any pending request\n",
@@ -410,7 +409,6 @@ flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
 int
 flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
-    map<string, FlowRequest>::iterator f;
     stringstream obj_name_ext;
     string obj_name;
     rlm_addr_t remote_addr;
@@ -431,7 +429,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
         obj_name_ext <<  "R";
     }
 
-    f = flow_reqs.find(obj_name_ext.str());
+    auto f = flow_reqs.find(obj_name_ext.str());
     if (f == flow_reqs.end()) {
         UPE(rib->uipcp, "Spurious flow deallocated notification, no object with name %s\n",
                 obj_name_ext.str().c_str());
@@ -461,7 +459,6 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 int
 flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 {
-    map<string, FlowRequest>::iterator f;
     rl_port_t local_port;
     stringstream decode;
     string objname;
@@ -479,7 +476,8 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
         /* We were the target. */
         objname = rm->obj_name + string("R");
     }
-    f = flow_reqs.find(objname);
+    auto f = flow_reqs.find(objname);
+
     if (f == flow_reqs.end()) {
         UPV(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
         return 0;

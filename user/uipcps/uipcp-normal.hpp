@@ -26,6 +26,8 @@
 
 #include <string>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <list>
 #include <ctime>
 #include <sstream>
@@ -186,7 +188,7 @@ struct Neighbor {
 
     /* Kernel-bound N-1 flows used for data transfers and optionally
      * management. */
-    std::map<rl_port_t, NeighFlow *> flows;
+    std::unordered_map<rl_port_t, NeighFlow *> flows;
 
     /* If not NULL, a regular (non-kernel-bound) N-1 flow used for
      * management purposes. */
@@ -348,7 +350,8 @@ struct addr_allocator {
                           const std::string& value) {return -1;}
 };
 
-extern std::map< std::string, std::set<std::string> > available_policies;
+extern std::unordered_map< std::string,
+        std::unordered_set<std::string> > available_policies;
 
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
@@ -365,7 +368,7 @@ struct uipcp_rib {
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             NeighFlow *nf);
-    std::map< std::string, rib_handler_t > handlers;
+    std::unordered_map< std::string, rib_handler_t > handlers;
 
     /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
      * When we allocate a flow towards a candidate neighbor, we don't
@@ -395,13 +398,13 @@ struct uipcp_rib {
      * is used to implement propagation of the CandidateNeighbors information,
      * so that all the IPCPs in the DIF know their potential candidate
      * neighbors.*/
-    std::map< std::string, Neighbor* > neighbors;
-    std::map< std::string, NeighborCandidate > neighbors_seen;
-    std::set< std::string > neighbors_cand;
-    std::set< std::string > neighbors_deleted;
+    std::unordered_map< std::string, Neighbor* > neighbors;
+    std::unordered_map< std::string, NeighborCandidate > neighbors_seen;
+    std::unordered_set< std::string > neighbors_cand;
+    std::unordered_set< std::string > neighbors_deleted;
 
     /* A map of current policies. */
-    std::map< std::string, std::string > policies;
+    std::unordered_map< std::string, std::string > policies;
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
@@ -576,8 +579,8 @@ struct flow_allocator_default : public flow_allocator {
     void dump(std::stringstream& ss) const;
     void dump_memtrack(std::stringstream& ss) const;
 
-    std::map< std::string, FlowRequest > flow_reqs;
-    std::map< unsigned int, FlowRequest > flow_reqs_tmp;
+    std::unordered_map< std::string, FlowRequest > flow_reqs;
+    std::unordered_map< unsigned int, FlowRequest > flow_reqs_tmp;
 
     int fa_req(struct rl_kmsg_fa_req *req);
     int fa_resp(struct rl_kmsg_fa_resp *resp);
@@ -623,30 +626,30 @@ private:
 
     /* Step 1. Shortest Path algorithm. */
     void compute_shortest_paths(const NodeId& source_node,
-                        const std::map<NodeId, std::list<Edge> >& graph,
-                        std::map<NodeId, Info>& info);
+            const std::unordered_map<NodeId, std::list<Edge> >& graph,
+            std::unordered_map<NodeId, Info>& info);
     int compute_next_hops(const NodeId&);
 
     /* Step 3. Forwarding table computation and kernel update. */
     int compute_fwd_table();
 
     /* The routing table computed by compute_next_hops(). */
-    std::map<NodeId, std::list<NodeId> > next_hops;
+    std::unordered_map<NodeId, std::list<NodeId> > next_hops;
     NodeId dflt_nhop;
 
     /* The forwarding table computed by compute_fwd_table().
      * It maps a NodeId --> (dst_addr, local_port). */
-    std::map<rlm_addr_t, std::pair<NodeId, rl_port_t> > next_ports;
+    std::unordered_map<rlm_addr_t, std::pair<NodeId, rl_port_t> > next_ports;
 
     /* Set of ports that are currently down. */
-    std::set<rl_port_t> ports_down;
+    std::unordered_set<rl_port_t> ports_down;
 
     struct uipcp_rib *rib;
 };
 
 struct lfdb_default : public lfdb {
     /* Lower Flow Database. */
-    std::map< NodeId, std::map<NodeId, LowerFlow > > db;
+    std::unordered_map< NodeId, std::unordered_map<NodeId, LowerFlow > > db;
 
     RoutingEngine re;
 
@@ -679,7 +682,7 @@ struct lfdb_default : public lfdb {
 struct addr_allocator_distributed : public addr_allocator {
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
+    std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
     addr_allocator_distributed(struct uipcp_rib *_ur) :
                 addr_allocator(_ur), nack_wait_secs(4) { }
