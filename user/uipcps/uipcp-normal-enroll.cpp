@@ -1001,7 +1001,7 @@ EnrollmentResources::~EnrollmentResources()
 bool
 Neighbor::enrollment_complete() const
 {
-    return has_mgmt_flow() && mgmt_conn()->enroll_state == NEIGH_ENROLLED;
+    return has_flows() && mgmt_conn()->enroll_state == NEIGH_ENROLLED;
 }
 
 int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
@@ -1013,7 +1013,7 @@ int Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
     int ret;
 
     if (!nf) {
-        assert(has_mgmt_flow());
+        assert(has_flows());
         nf = mgmt_conn();
     }
 
@@ -1407,7 +1407,7 @@ Neighbor::flow_alloc(const char *supp_dif)
     int flow_fd_;
     int ret;
 
-    if (has_mgmt_flow()) {
+    if (has_flows()) {
         UPI(rib->uipcp, "Trying to allocate additional N-1 flow\n");
     }
 
@@ -1494,7 +1494,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
     neigh->initiator = true;
 
     /* Create an N-1 flow, if needed. */
-    if (!neigh->has_mgmt_flow()) {
+    if (!neigh->has_flows()) {
 #if 0
         bool n_dif_unreg;
 
@@ -1524,7 +1524,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 #endif
     }
 
-    assert(neigh->has_mgmt_flow());
+    assert(neigh->has_flows());
 
     nf = neigh->mgmt_conn();
 
@@ -1636,11 +1636,11 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
 
         neigh = rib->neighbors.find(*cand);
 
-        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
             nf = neigh->second->mgmt_conn(); /* cache variable */
         }
 
-        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
             time_t inact;
 
             /* There is a management flow towards this neighbor, but we need
@@ -1766,7 +1766,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
 
         pthread_mutex_lock(&rib->lock);
         neigh = rib->neighbors.find(*lit);
-        if (neigh != rib->neighbors.end() && neigh->second->has_mgmt_flow()) {
+        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
             neigh->second->mgmt_conn()->upper_flow_fd = pfd.fd;
         } else {
             UPE(rib->uipcp, "Neighbor disappeared, closing "

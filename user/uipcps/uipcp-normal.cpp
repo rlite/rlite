@@ -510,7 +510,7 @@ uipcp_rib::dump() const
         }
 
         neigh = neighbors.find(neigh_name);
-        if (neigh != neighbors.end() && neigh->second->has_mgmt_flow()) {
+        if (neigh != neighbors.end() && neigh->second->has_flows()) {
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, last heard " <<
                     static_cast<int>(time(NULL) - neigh->second->unheard_since)
@@ -1078,7 +1078,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        if (!neigh->second->has_mgmt_flow() ||
+        if (!neigh->second->has_flows() ||
                 neigh->second->mgmt_conn()->enroll_state
                     != NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet or the
