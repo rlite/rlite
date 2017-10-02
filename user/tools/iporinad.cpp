@@ -78,11 +78,18 @@ struct Local {
 };
 
 struct Remote {
+    /* Application name and DIF of the remote */
     string app_name;
     string dif_name;
-    IPAddr tun_subnet;
+
+    /* Name of the local tun device and associated file descriptor. */
     string tun_name;
     int tun_fd;
+
+    /* IP address of the local and remote tunnel endpoint, and tunnel subnet. */
+    IPAddr tun_local_addr;
+    IPAddr tun_remote_addr;
+    IPAddr tun_subnet;
 
     /* True if we need to advertise local routes to this remote. */
     bool pending;
@@ -90,14 +97,13 @@ struct Remote {
     /* Routes reachable through this remote. */
     set<Route> routes;
 
-    /* IP address of the local and remote tunnel endpoint. */
-    IPAddr tun_local_addr;
-    IPAddr tun_remote_addr;
+    /* Data file descriptor for the flow that supports the tunnel. */
+    int rfd;
 
-    Remote() : tun_fd(-1), pending(true) { }
+    Remote() : tun_fd(-1), pending(true), rfd(-1) { }
     Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
-                        dif_name(d), tun_subnet(i), tun_fd(-1),
-                        pending(true) { }
+                        dif_name(d), tun_fd(-1), tun_subnet(i), pending(true),
+                        rfd(-1) { }
 
     /* Allocate a tunnel device for this remote. */
     int tun_alloc();
