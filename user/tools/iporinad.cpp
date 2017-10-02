@@ -269,6 +269,29 @@ parse_conf(const char *path)
 }
 
 static void
+dump_conf(void)
+{
+    cout << "Locals:" << endl;
+    for (list<Local>::iterator l = g->locals.begin();
+                            l != g->locals.end(); l ++) {
+        cout << "   " << l->app_name << " in DIF " << l->dif_name << endl;
+    }
+
+    cout << "Remotes:" << endl;
+    for (list<Remote>::iterator l = g->remotes.begin();
+                            l != g->remotes.end(); l ++) {
+        cout << "   " << l->app_name << " in DIF " << l->dif_name
+            << ", tunnel prefix " << l->tun_subnet.repr << endl;
+    }
+
+    cout << "Advertised routes:" << endl;
+    for (list<Route>::iterator l = g->routes.begin();
+                            l != g->routes.end(); l ++) {
+        cout << "   " << l->subnet.repr << endl;
+    }
+}
+
+static void
 usage(void)
 {
     cout << "iporinad [OPTIONS]" << endl <<
@@ -301,6 +324,8 @@ int main(int argc, char **argv)
     if (parse_conf(confpath)) {
         return -1;
     }
+
+    dump_conf();
 
     return 0;
 }
