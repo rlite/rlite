@@ -1144,7 +1144,7 @@ topo_update_kern(struct uipcps *uipcps)
 
         ret = rl_conf_ipcp_config(ipn->id, "hdroom", strbuf);
         if (ret) {
-            PE("'ipcp-config hdroom %u' failed\n", ipn->hdroom);
+            PE("'ipcp-config %u hdroom %u' failed\n", ipn->id, ipn->hdroom);
         }
 
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->max_sdu_size);
@@ -1155,7 +1155,7 @@ topo_update_kern(struct uipcps *uipcps)
 
         ret = rl_conf_ipcp_config(ipn->id, "mss", strbuf);
         if (ret) {
-            PE("'ipcp-config mss %u' failed\n", ipn->max_sdu_size);
+            PE("'ipcp-config %u mss %u' failed\n", ipn->id, ipn->max_sdu_size);
         }
     }
 
