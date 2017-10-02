@@ -9,11 +9,11 @@ fi
 
 sudo rm -rf /run/rlite
 
-if [ HAVE_VMPI == "y" ]; then
+if [ WITH_VMPI == "y" ]; then
     sudo rmmod rlite-shim-hv.ko
 fi
 
-if [ HAVE_VMPI == "y" ]; then
+if [ WITH_VMPI == "y" ]; then
     # unprepare VMPI-KVM
     pushd .
     cd kernel/vmpi
