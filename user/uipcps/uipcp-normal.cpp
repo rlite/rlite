@@ -1239,6 +1239,8 @@ uipcp_rib::policy_param_mod(const std::string& component,
                 keepalive = keepalive_old;
                 UPE(uipcp, "Could not convert parameter value to a number.\n");
             }
+        } else {
+            UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
         }
     }
 

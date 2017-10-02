@@ -674,7 +674,6 @@ int main(int argc, char **argv)
     struct sigaction sa;
     const char *verbosity = "DBG";
     int ret, opt;
-    int iarg;
 
     uipcps->reliable_n_flows = 0;
     uipcps->reliable_flows = 0;
