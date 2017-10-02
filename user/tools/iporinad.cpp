@@ -844,6 +844,8 @@ connect_to_remotes(void *opaque)
                         goto abor;
                     }
                     re->second.rfd = rfd;
+                    /* Submit the new fd mapping to a worker thread. */
+                    g->workers[0]->submit(re->second.rfd, re->second.tun_fd);
 
                 } else {
                     /* This is a control connection. */
@@ -1037,6 +1039,9 @@ int main(int argc, char **argv)
             }
             g->remotes[remote_name].rfd = cfd;
             g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
+            /* Submit the new fd mapping to a worker thread. */
+            g->workers[0]->submit(g->remotes[remote_name].rfd,
+                                  g->remotes[remote_name].tun_fd);
             continue;
         }
 
