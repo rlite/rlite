@@ -39,9 +39,10 @@ struct IPSubnet {
 
 struct Local {
     string app_name;
-    string dif_name;
+    list<string> dif_names;
 
-    Local(const string &a, const string &d) : app_name(a), dif_name(d) { }
+    Local() { }
+    Local(const string &a) : app_name(a) { }
 };
 
 struct Remote {
@@ -72,7 +73,7 @@ struct IPoRINA {
     /* Control device to listen for incoming connections. */
     int rfd;
 
-    list<Local>     locals;
+    Local           local;
     list<Remote>    remotes;
     list<Route>     routes;
 
@@ -365,13 +366,22 @@ parse_conf(const char *path)
         }
 
         if (tokens[0] == "local") {
-            if (tokens.size() != 3) {
+            if (tokens.size() < 3) {
                 cerr << "Invalid 'local' directive at line " <<
                         lines_cnt << endl;
                 return -1;
             }
 
-            g->locals.push_back(Local(tokens[1], tokens[2]));
+            if (g->local.app_name.size()) {
+                cerr << "Duplicated 'local' directive at line " <<
+                        lines_cnt << endl;
+                return -1;
+            }
+
+            g->local = Local(tokens[1]);
+            for (unsigned int i = 2; i < tokens.size(); i ++) {
+                g->local.dif_names.push_back(tokens[i]);
+            }
 
         } else if (tokens[0] == "remote") {
             IPSubnet subnet;
@@ -419,11 +429,12 @@ parse_conf(const char *path)
 static void
 dump_conf(void)
 {
-    cout << "Locals:" << endl;
-    for (list<Local>::iterator l = g->locals.begin();
-                            l != g->locals.end(); l ++) {
-        cout << "   " << l->app_name << " in DIF " << l->dif_name << endl;
+    cout << "Local: " << g->local.app_name << "in DIFs";
+    for (list<string>::iterator l = g->local.dif_names.begin();
+                            l != g->local.dif_names.end(); l ++) {
+        cout << " " << *l;
     }
+    cout << endl;
 
     cout << "Remotes:" << endl;
     for (list<Remote>::iterator l = g->remotes.begin();
@@ -468,16 +479,15 @@ setup(void)
     }
 
     /* Register us to one or more local DIFs. */
-    for (list<Local>::iterator l = g->locals.begin();
-                            l != g->locals.end(); l ++) {
+    for (list<string>::iterator l = g->local.dif_names.begin();
+                            l != g->local.dif_names.end(); l ++) {
         int ret;
 
-        ret = rina_register(g->rfd, l->dif_name.c_str(),
-                        l->app_name.c_str(), 0);
+        ret = rina_register(g->rfd, l->c_str(), g->local.app_name.c_str(), 0);
         if (ret) {
             perror("rina_register()");
-            cerr << "Failed to register " << l->app_name << " in DIF "
-                    << l->dif_name << endl;
+            cerr << "Failed to register " << g->local.app_name << " in DIF "
+                    << *l << endl;
             return -1;
         }
     }
@@ -497,7 +507,7 @@ setup(void)
 static void *
 connect_to_remotes(void *opaque)
 {
-    string myname = g->locals.front().app_name;
+    string myname = g->local.app_name;
 
     for (;;) {
         for (list<Remote>::iterator re = g->remotes.begin();
