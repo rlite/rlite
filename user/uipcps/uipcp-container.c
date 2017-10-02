@@ -708,6 +708,10 @@ uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
     struct uipcp *uipcp;
     int kernelspace = 0;
 
+    if (!ipcp_name) {
+        return NULL; /* invalid parameter */
+    }
+
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         if (rina_sername_valid(uipcp->name) &&
