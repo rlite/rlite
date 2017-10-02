@@ -107,9 +107,11 @@ try:
         interval = random.randint(args.I, args.I * 20) # us
         pktlen = random.randint(2, 1000)
         sizespec = '' if pktlen > 800 else "-s %d" % pktlen
+        reliable = random.choice([True, False])
+        qos = "-fg0" if reliable else ""
         dif, appl = destinations[sel]
-        cmd = 'rinaperf -t perf %s -i %d -d %s -z %s -D %d' \
-                    % (sizespec, interval, dif, appl, dur)
+        cmd = 'rinaperf -t perf %s %s -i %d -d %s -z %s -D %d' \
+                    % (sizespec, qos, interval, dif, appl, dur)
         try:
             p = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL,
                                     stderr=subprocess.DEVNULL)
