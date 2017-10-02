@@ -314,15 +314,15 @@ a_tmr_cb(long unsigned arg)
 /*
  * Compute the RTX timeout interval using the estimate of RTT mean
  * and standard deviation. However, we have to make sure that the
- * interval is bigger than the A timeout interval, otherwise the
- * sender will incur into unnecessary retransmits.
+ * interval is bigger than the A timeout interval by a good margin, otherwise
+ * the sender will incur into unnecessary retransmits.
  */
 static inline unsigned long
 rtt_to_rtx(struct dtp *dtp)
 {
     unsigned long x = dtp->rtt + (dtp->rtt_stddev << 1);
 
-    return x > RL_A_MSECS_DFLT ? x : RL_A_MSECS_DFLT;
+    return x > (RL_A_MSECS_DFLT << 1) ? x : (RL_A_MSECS_DFLT << 1);
 }
 
 static void
