@@ -799,6 +799,8 @@ Remote::mss_configure() const
         mss = 65535;
     }
 
+    mss -= 14; /* needs more investigation */
+
     cmdss << "ip link set mtu " << mss << " dev " << tun_name;
 
     if (execute_command(cmdss)) {
