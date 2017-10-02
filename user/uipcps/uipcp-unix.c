@@ -544,14 +544,14 @@ uipcps_loop(void *opaque)
     return NULL;
 }
 
-#ifdef BACKTRACE
+#ifdef RL_UIPCPS_BACKTRACE
 #include <execinfo.h>
 #endif
 
 static void
 print_backtrace(void)
 {
-#ifdef BACKTRACE
+#ifdef RL_UIPCPS_BACKTRACE
     void *array[20];
     size_t size;
 
@@ -569,6 +569,8 @@ sigint_handler(int signum)
     struct uipcps *uipcps = &guipcps;
     struct uipcp *uipcp, *tmp;
 
+    print_backtrace();
+
     PI("Signal %d received, terminating...\n", signum);
 
     /* We need to destroy all the IPCPs. This would requires to take
@@ -583,7 +585,6 @@ sigint_handler(int signum)
     }
 
     unlink(RLITE_UIPCPS_UNIX_NAME);
-    print_backtrace();
     exit(EXIT_SUCCESS);
 }
 
@@ -777,7 +778,7 @@ int main(int argc, char **argv)
         perror("sigaction(SIGTERM)");
         exit(EXIT_FAILURE);
     }
-#if 0
+#ifdef RL_UIPCPS_BACKTRACE
     ret = sigaction(SIGSEGV, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");

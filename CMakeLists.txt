@@ -23,7 +23,7 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
 message(STATUS "RLITE HEADERS: ${RLITE_HEADERS}")
 
-add_definitions("-Wall")
+add_definitions("-Wall -g")
 
 include_directories(${INCLUDE_DIR})
 
