@@ -74,26 +74,8 @@ namespace obj_name {
     extern std::string addr_alloc_table;
 };
 
-/* Time interval (in seconds) between two consecutive increments
- * of the age of LFDB entries. */
-#define RL_AGE_INCR_INTERVAL    2
-
-/* Max age (in seconds) for an LFDB entry not to be discarded. */
-#define RL_AGE_MAX              120
-
-/* Time interval (in seconds) between two consecutive periodic
- * RIB synchronizations. */
-#define RL_NEIGH_REFRESH_INTVAL     30
-
 /* Time window to compute statistics about management traffic. */
 #define RL_NEIGHFLOW_STATS_PERIOD   20
-
-/* default value for keepalive parameter */
-#define NEIGH_KEEPALIVE_TO      10
-
-/* Timeout intervals are expressed in milliseconds. */
-#define NEIGH_KEEPALIVE_THRESH      3
-#define NEIGH_ENROLL_TO             7000
 
 enum class EnrollState {
     NEIGH_NONE = 0,
@@ -474,6 +456,24 @@ struct uipcp_rib {
 
     /* Timer ID for age increment of LFDB entries. */
     int age_incr_tmrid;
+
+    /* Time interval (in seconds) between two consecutive increments
+     * of the age of LFDB entries. */
+    static constexpr int kAgeIncrIntval = 2;
+
+    /* Max age (in seconds) for an LFDB entry not to be discarded. */
+    static constexpr int kAgeMax = 120;
+
+    /* Time interval (in seconds) between two consecutive periodic
+     * RIB synchronizations. */
+    static constexpr int kRIBRefreshIntval = 30;
+
+    /* Default value for keepalive parameter. */
+    static constexpr int kKeepaliveTimeout = 10;
+
+    /* Timeout intervals are expressed in milliseconds. */
+    static constexpr int kKeepaliveThresh = 3;
+    static constexpr int kEnrollTimeout = 7000;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
