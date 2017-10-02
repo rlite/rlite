@@ -723,10 +723,11 @@ for vmname in sorted(vms):
 
 
 # Generate per-VM setup script
+outs += 'SUBSHELLS=""\n'
 for vmname in sorted(vms):
     vm = vms[vmname]
 
-    outs += ''\
+    outs += '(\n'\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
             '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
@@ -827,7 +828,11 @@ for vmname in sorted(vms):
             '   if [ $DONE != "0" ]; then\n'\
             '       sleep 1\n'\
             '   fi\n'\
-            'done\n\n'
+            'done\n'\
+            ') &\n'
+    outs += 'SUBSHELLS="$SUBSHELLS $!"\n\n'
+
+outs += 'wait $SUBSHELLS\n\n'
 
 if len(dns_mappings) > 0:
     print("DNS mappings: %s" % (dns_mappings))
