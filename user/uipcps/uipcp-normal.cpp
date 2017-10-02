@@ -304,6 +304,7 @@ mgmt_fd_ready(struct uipcp *uipcp, int fd)
 }
 
 uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
+                                         enroller_enabled(false),
                                          self_registered(false),
                                          self_registration_needed(false),
                                          myaddr(0)
@@ -1478,6 +1479,28 @@ normal_policy_mod(struct uipcp *uipcp,
     return rib->policy_mod(comp_name, policy_name);
 }
 
+static int
+normal_enroller_enable(struct uipcp *uipcp,
+                       const struct rl_cmsg_ipcp_enroller_enable *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock(rib->lock);
+    bool enable = !!req->enable;
+
+    if (rib->enroller_enabled == enable) {
+        return 0; /* nothing to do */
+    }
+
+    rib->enroller_enabled = enable;
+    if (rib->enroller_enabled) {
+        UPD(uipcp, "Enroller enabled\n");
+    } else{
+        UPD(uipcp, "Enroller disabled\n");
+    }
+
+    return 0;
+}
+
 std::map< std::string, std::set<std::string> > available_policies;
 
 extern "C" void
@@ -1494,6 +1517,7 @@ struct uipcp_ops normal_ops = {
     .fini                   = normal_fini,
     .register_to_lower      = normal_register_to_lower,
     .enroll                 = normal_ipcp_enroll,
+    .enroller_enable        = normal_enroller_enable,
     .lower_flow_alloc       = normal_ipcp_enroll,
     .rib_show               = normal_ipcp_rib_show,
     .appl_register          = normal_appl_register,

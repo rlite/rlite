@@ -41,6 +41,7 @@ enum {
     RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 6 */
     RLITE_U_MEMTRACK_DUMP,              /* 7 */
     RLITE_U_IPCP_POLICY_MOD,            /* 8 */
+    RLITE_U_IPCP_ENROLLER_ENABLE,       /* 9 */
 
     RLITE_U_MSG_MAX,
 };
@@ -100,6 +101,17 @@ struct rl_cmsg_ipcp_policy_mod {
     char *ipcp_name;
     char *comp_name;
     char *policy_name;
+} __attribute__((packed));
+
+/* rlite-ctl --> uipcp message to let the IPCP accept
+ * enrollment requests even if it is not enrolled in
+ * any DIF (used for the first IPCP in the DIF). */
+struct rl_cmsg_ipcp_enroller_enable {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    uint8_t enable;
+    char *ipcp_name;
 } __attribute__((packed));
 
 #endif  /* __RLITE_U_MSG_H__ */

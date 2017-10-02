@@ -142,6 +142,36 @@ rl_u_ipcp_enroll(struct uipcps *uipcps, int sfd,
 }
 
 static int
+ipcp_enroller_enable(struct uipcps *uipcps,
+                     const struct rl_cmsg_ipcp_enroller_enable *req)
+{
+    int ret = RLITE_ERR; /* Report failure by default. */
+    struct uipcp *uipcp;
+
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (uipcp && uipcp->ops.enroller_enable) {
+        ret = uipcp->ops.enroller_enable(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
+
+    return ret;
+}
+
+static int
+rl_u_ipcp_enroller_enable(struct uipcps *uipcps, int sfd,
+                          const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_enroller_enable *req =
+                    (struct rl_cmsg_ipcp_enroller_enable *)b_req;
+    struct rl_msg_base_resp resp;
+
+    resp.result = ipcp_enroller_enable(uipcps, req);
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
+static int
 rl_u_ipcp_lower_flow_alloc(struct uipcps *uipcps, int sfd,
                            const struct rl_msg_base *b_req)
 {
@@ -264,6 +294,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = rl_u_ipcp_lower_flow_alloc,
     [RLITE_U_IPCP_RIB_SHOW_REQ]     = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_MOD]       = rl_u_ipcp_policy_mod,
+    [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

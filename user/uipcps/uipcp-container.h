@@ -92,6 +92,10 @@ struct uipcp_ops {
     int (*enroll)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *,
                   int wait_for_completion);
 
+    /* User wants to enable this IPCP to accept enrollment requests. */
+    int (*enroller_enable)(struct uipcp *,
+                           const struct rl_cmsg_ipcp_enroller_enable *);
+
     /* User wants this uipcp to allocate an N-1-flow towards a member
      * of the DIF (no enrollment, just flow allocation). */
     int (*lower_flow_alloc)(struct uipcp *,

@@ -600,6 +600,30 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
     return request_response(RLITE_MB(&req), NULL);
 }
 
+static int
+ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_enroller_enable req;
+    const char *ipcp_name;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 1);
+    ipcp_name = argv[0];
+
+    req.ipcp_name = strdup(ipcp_name);
+    attrs = lookup_ipcp_by_name(req.ipcp_name);
+    if (!attrs) {
+        PE("Could not find IPC process %s\n", ipcp_name);
+        return -1;
+    }
+
+    req.msg_type = RLITE_U_IPCP_ENROLLER_ENABLE;
+    req.event_id = 0;
+    req.enable = 1;
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
 #ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
@@ -828,6 +852,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
         .func = ipcp_policy_mod,
+    },
+    {
+        .name = "ipcp-enroller-enable",
+        .usage = "IPCP_NAME",
+        .num_args = 1,
+        .func = ipcp_enroller_enable,
     },
 #ifdef RL_MEMTRACK
     {

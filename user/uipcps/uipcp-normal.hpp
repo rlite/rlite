@@ -294,6 +294,9 @@ struct uipcp_rib {
      * enrolled. */
     int enrolled;
 
+    /* True if this IPCP is allowed to act as enroller for other IPCPs. */
+    bool enroller_enabled;
+
     /* True if the name of this IPCP is registered to the IPCP itself.
      * Self-registration is used to receive N-flow allocation requests. */
     bool self_registered;
