@@ -334,11 +334,11 @@ InvokeIdMgr::InvokeIdMgr(unsigned int ds)
 void
 InvokeIdMgr::__discard(set<Id>& pending)
 {
-    time_t ago = time(NULL) - discard_secs; /* discard_secs seconds */
     vector< set<Id>::iterator > torm;
+    time_t now = time(NULL);
 
     for (set<Id>::iterator i = pending.begin(); i != pending.end(); i ++) {
-        if (i->created < ago) {
+        if (now - i->created > discard_secs) {
             torm.push_back(i);
         }
     }
@@ -376,20 +376,17 @@ InvokeIdMgr::__put_invoke_id(set<Id>& pending, int invoke_id)
 int
 InvokeIdMgr::get_invoke_id()
 {
-    int ret;
-
     discard();
 
     while (pending_invoke_ids.count(Id(invoke_id_next, 0))) {
         invoke_id_next++;
     }
 
-    ret = invoke_id_next++;
-    pending_invoke_ids.insert(Id(ret, time(NULL)));
+    pending_invoke_ids.insert(Id(invoke_id_next, time(NULL)));
 
-    NPD("got %d\n", ret);
+    NPD("got %d\n", invoke_id_next);
 
-    return ret;
+    return invoke_id_next;
 }
 
 int
