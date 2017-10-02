@@ -53,7 +53,11 @@ struct shim_tcp4_flow {
     struct flow_entry *flow;
     struct socket *sock;
     struct work_struct rxw;
-    void (*sk_data_ready)(struct sock *sk);
+    void (*sk_data_ready)(struct sock *sk
+#ifdef RL_SK_DATA_READY_SECOND_ARG
+                          , int unused
+#endif  /* RL_SK_DATA_READY_SECOND_ARG */
+                         );
     void (*sk_write_space)(struct sock *sk);
 
     struct rl_buf *cur_rx_rb;
