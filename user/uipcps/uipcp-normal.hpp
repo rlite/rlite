@@ -103,6 +103,7 @@ struct NeighFlow;
 /* Temporary resources needed to carry out an enrollment procedure
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
+    RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
     EnrollmentResources(struct NeighFlow *f, bool initiator);
     ~EnrollmentResources();
 
@@ -158,6 +159,7 @@ struct NeighFlow {
         time_t t_last;
     } stats;
 
+    RL_NODEFAULT_NONCOPIABLE(NeighFlow);
     NeighFlow(Neighbor *n, const std::string& supp_dif, rl_port_t pid,
               int ffd, rl_ipcp_id_t lid);
     ~NeighFlow();
@@ -203,6 +205,7 @@ struct Neighbor {
      * We don't consider requests, as timeout on responses. */
     time_t unheard_since;
 
+    RL_NODEFAULT_NONCOPIABLE(Neighbor);
     Neighbor(struct uipcp_rib *rib, const std::string& name);
     bool operator==(const Neighbor& other) const
         { return ipcp_name == other.ipcp_name; }
@@ -233,6 +236,7 @@ private:
 
 class ScopeLock {
 public:
+    RL_NODEFAULT_NONCOPIABLE(ScopeLock);
     ScopeLock(pthread_mutex_t& m, bool v = false) : mutex(m), verb(v) {
         pthread_mutex_lock(&mutex);
         if (verb) {
@@ -269,6 +273,7 @@ struct dft {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
+    RL_NODEFAULT_NONCOPIABLE(dft);
     dft(struct uipcp_rib *_ur) : rib(_ur) { }
     virtual ~dft() { }
 
@@ -291,6 +296,7 @@ struct flow_allocator {
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 
+    RL_NODEFAULT_NONCOPIABLE(flow_allocator);
     flow_allocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) { }
     virtual ~flow_allocator() { }
 
@@ -313,6 +319,7 @@ struct lfdb {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
+    RL_NODEFAULT_NONCOPIABLE(lfdb);
     lfdb(struct uipcp_rib *_ur) : rib(_ur) { }
     virtual ~lfdb() { }
 
@@ -339,6 +346,7 @@ struct addr_allocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
+    RL_NODEFAULT_NONCOPIABLE(addr_allocator);
     addr_allocator(struct uipcp_rib *_ur) : rib(_ur) { }
     virtual ~addr_allocator() { }
 
@@ -433,6 +441,7 @@ struct uipcp_rib {
     /* Timer ID for age increment of LFDB entries. */
     int age_incr_tmrid;
 
+    RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
     ~uipcp_rib();
 
@@ -558,6 +567,7 @@ struct dft_default : public dft {
      * equivalent. */
     std::multimap< std::string, DFTEntry > dft_table;
 
+    RL_NODEFAULT_NONCOPIABLE(dft_default);
     dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
     ~dft_default() { }
 
@@ -573,6 +583,7 @@ struct dft_default : public dft {
 };
 
 struct flow_allocator_default : public flow_allocator {
+    RL_NODEFAULT_NONCOPIABLE(flow_allocator_default);
     flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) { }
     ~flow_allocator_default() { }
 
@@ -594,7 +605,7 @@ struct flow_allocator_default : public flow_allocator {
 
 class RoutingEngine {
 public:
-    RoutingEngine() : lfa_enabled(false), rib(NULL) { };
+    RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
     RoutingEngine(struct uipcp_rib *r) : lfa_enabled(false), rib(r) { }
 
     /* Recompute routing and forwarding table and possibly
@@ -653,6 +664,7 @@ struct lfdb_default : public lfdb {
 
     RoutingEngine re;
 
+    RL_NODEFAULT_NONCOPIABLE(lfdb_default);
     lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) { }
     ~lfdb_default() { }
 
@@ -685,6 +697,7 @@ struct addr_allocator_distributed : public addr_allocator {
      * It maps (address allocated) --> (requestor address). */
     std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
+    RL_NODEFAULT_NONCOPIABLE(addr_allocator_distributed);
     addr_allocator_distributed(struct uipcp_rib *_ur) :
                 addr_allocator(_ur), nack_wait_secs(4) { }
     ~addr_allocator_distributed() { }
@@ -701,6 +714,7 @@ struct addr_allocator_distributed : public addr_allocator {
 };
 
 struct addr_allocator_manual : public addr_allocator_distributed {
+    RL_NODEFAULT_NONCOPIABLE(addr_allocator_manual);
     addr_allocator_manual(struct uipcp_rib *_ur)
         : addr_allocator_distributed(_ur) { }
     rlm_addr_t allocate() override { return RL_ADDR_NULL; }
