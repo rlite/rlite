@@ -94,6 +94,7 @@ lfdb_default::del(const NodeId& local_node, const NodeId& remote_node)
     map<NodeId, map<NodeId, LowerFlow> >::iterator it
                                             = db.find(local_node);
     map<NodeId, LowerFlow>::iterator jt;
+    string repr;
 
     if (it == db.end()) {
         return false;
@@ -104,11 +105,11 @@ lfdb_default::del(const NodeId& local_node, const NodeId& remote_node)
     if (jt == it->second.end()) {
         return false;
     }
+    repr = static_cast<string>(jt->second);
 
     it->second.erase(jt);
 
-    UPD(rib->uipcp, "Lower flow %s-%s removed\n", local_node.c_str(),
-	            remote_node.c_str());
+    UPD(rib->uipcp, "Lower flow %s removed\n", repr.c_str());
 
     return true;
 }
