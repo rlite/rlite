@@ -953,7 +953,7 @@ akin to those provided by the popular netperf [12] and iperf [13] tools. In part
 tries to imitate netperf. In addition to that, rinaperf can also be seen as an example program
 showing the usage of the RINA API in blocking mode, as illustrated in Figure 3.
 When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
-The server main thread runs a loop to accept new flow requests (rina flow accept()), and
+The server main thread runs a loop to accept new flow requests (`rina_flow_accept()`), and
 each request is handled by a dedicated worker thread created on-demand. The main loop is also
 responsible for joining the worker threads that finished serving their requests. A limit on the total
 number of worker threads at each moment is used to keep the memory usage under control.
@@ -1035,18 +1035,18 @@ operations and errors are however covered by the API specification (section
 9.3) and the examples (sections 7.3 and 7.4).
 
 ### 9.1 Server-side operations
-The first operation needed by the server, (1) in figure 3, is rina open, which
+The first operation needed by the server, (1) in figure 3, is `rina_open`, which
 takes no arguments and returns a listening file descriptor (an integer, as
 usual) to be used for subsequent server-side calls. This file descriptor is the
 handler for an instance of a RINA control device which acts as a receiver for
-incoming flow allocation requests. At (2), the server calls rina register to
+incoming flow allocation requests. At (2), the server calls `rina_register` to
 register a name with the RINA control device, specifying the associated
 listening file descriptor (lfd), the name of the DIF to register to (dif)
 and the name to be registered (appl). The DIF argument is optional and
 advisory: the API implementation may choose to ignore it, and use some
 namespace management strategy to decide into which DIF the name should be
 registered. After a successful registration, the server can receive flow
-allocation requests, by calling rina flow accept on the listening file
+allocation requests, by calling `rina_flow_accept` on the listening file
 descriptor (3). Since the listening file descriptor was not put in
 non-blocking mode, this call will block until a flow request arrives. When this
 happens, the function returns a new file descriptor (cfd), the name of the
@@ -1094,38 +1094,38 @@ strings are for instance "aa|bb|cc|dd", "aa|bb||", "aa|bb", "aa".
     
 This function opens a RINA control device that can be used to register/unregister names,
 and manage incoming flow allocation requests. On success, it returns a file descriptor that can
-be later passed to rina register(), rina unregister(), rina flow accept(), and
-rina flow respond(). On error -1 is returned with errno set properly. Applications typically
+be later passed to `rina_register()`, `rina_unregister()`, `rina_flow_accept()`, and
+`rina_flow_respond()`. On error -1 is returned with errno set properly. Applications typically
 call this function as a first step to implement server-side functionalities.
 
     int rina_register(int fd, const char *dif, const char *appl, int flags)
     
 This function registers the application name appl to a DIF in the system. After a successful
-registration, flow allocation requests can be received on fd by means of rina flow accept().
+registration, flow allocation requests can be received on fd by means of `rina_flow_accept()`.
 If dif is not NULL, the system may register the application to dif. However, the dif argument
 is only advisory and the implementation is free to ignore it. If DIF is NULL, the system au-
 tonomously decide to which DIF appl will be registered to.
-If RINA F NOWAIT is not specified in flags, this function will block the caller until the
+If `RINA_F_NOWAIT` is not specified in flags, this function will block the caller until the
 operation completes, and 0 is returned on success.
-If RINA F NOWAIT is specified in flags, the function returns a file descriptor (different
+If `RINA_F_NOWAIT` is specified in flags, the function returns a file descriptor (different
 from fd) which can be used to wait for the operation to complete (e.g. using POLLIN with
 poll() or select()). In this case the operation can be completed by a subsequent call to
-rina register wait().
+`rina_register` wait().
 On error -1 is returned, with the errno code properly set.
 
     int rina_unregister(int fd, const char *dif, const char *appl, int flags)
     
 This function unregisters the application name appl from the DIF where it was registered to. The
-dif argument must match the one passed to rina register(). After a successful unregistration,
-flow allocation requests can no longer be received on fd. The meaning of the RINA F NOWAIT
-flag is the same as in rina register(), allowing non-blocking unregistration, to be
-later completed by calling rina register wait().
+dif argument must match the one passed to `rina_register()`. After a successful unregistration,
+flow allocation requests can no longer be received on fd. The meaning of the `RINA_F_NOWAIT`
+flag is the same as in `rina_register()`, allowing non-blocking unregistration, to be
+later completed by calling `rina_register_wait()`.
 Returns 0 on success, -1 on error, with the errno code properly set.
 
     int rina_register_wait(int fd, int wfd)
     
 This function is called to wait for the completion of a (un)registration procedure previously
-initiated with a call to rina register() or rina unregister on fd which had the RINA F NOWAIT
+initiated with a call to `rina_register()` or `rina_unregister` on fd which had the `RINA_F_NOWAIT`
 flag set. The wfd file descriptor must match the one that was returned by
 rina[un]register(). It returns 0 on success, -1 error, with the errno code properly set.
 
@@ -1133,17 +1133,17 @@ rina[un]register(). It returns 0 on success, -1 error, with the errno code prope
                         struct rina_flow_spec *spec, unsigned int flags)
 
 This function is called to accept an incoming flow request arrived on fd. If flags does not
-contain RINA F NORESP, it also sends a positive response to the requesting application;
+contain `RINA_F_NORESP`, it also sends a positive response to the requesting application;
 otherwise, the response (positive or negative) can be sent by a subsequent call to the
-rina flow respond(). On success, the char* pointed by remote appl, if not NULL, is assigned the
+`rina_flow_respond()`. On success, the char* pointed by remote appl, if not NULL, is assigned the
 name of the requesting application. The memory for the requestor name is allocated by the callee
 and must be freed by the caller. Moreover, if spec is not NULL, the referenced data structure is
 filled with the QoS specification specified by the requesting application.
-If flags does not contain RINA F NORESP, on success this function returns a file descriptor
+If flags does not contain `RINA_F_NORESP`, on success this function returns a file descriptor
 that can be subsequently used with standard I/O system calls (write(), read(), select()...)
-to exchange SDUs on the flow and synchronize. If flags does contain RINA F NORESP, on
+to exchange SDUs on the flow and synchronize. If flags does contain `RINA_F_NORESP`, on
 success a positive number is returned as an handle to be passed to a subsequent call to
-rina flow respond(). Hence the code
+`rina_flow_respond()`. Hence the code
 
     cfd = rina_flow_accept(fd, &x, flags &  RINA_F_NORESP)
     
@@ -1157,7 +1157,7 @@ On error -1 is returned, with the errno code properly set.
     int rina_flow_respond(int fd, int handle, int response)
 
 This function is called to emit a verdict on the flow allocation request identified by handle,
-that was previously received on fd by calling rina flow accept() with the RINA F NORESP
+that was previously received on fd by calling `rina_flow_accept()` with the `RINA_F_NORESP`
 flag set. A zero response indicates a positive response, which completes the flow allocation procedure.
 A non-zero response indicates that the flow allocation request is denied. In both cases
 response is sent to the requesting application to inform it about the verdict. When the response
@@ -1178,12 +1178,12 @@ be successful. If it is NULL, an implementation-specific default QoS will be ass
 (which typically corresponds to a best-effort QoS). If dif is not NULL the system may look for
 remote appl in a DIF called dif. However, the dif argument is only advisory and the system
 is free to ignore it and take an autonomous decision.
-If flags specifies RINA F NOWAIT, a call to this function does not wait until the completion
+If flags specifies `RINA_F_NOWAIT`, a call to this function does not wait until the completion
 of the flow allocation procedure; on success, it just returns a control file descriptor that can be
 subsequently fed to `rina_flow_alloc_wait()` to wait for completion and obtain the flow I/O
 file descriptor. Moreover, the control file descriptor can be used with poll(), select() and
 similar.
-If flags does not specify RINA F NOWAIT, a call to this function waits until the flow allocation
+If flags does not specify `RINA_F_NOWAIT`, a call to this function waits until the flow allocation
 procedure is complete. On success, it returns a file descriptor that can be subsequently used
 with standard I/O system calls to exchange SDUs on the flow and synchronize.
 In any case, -1 is returned on error, with the errno code properly set.
@@ -1191,7 +1191,7 @@ In any case, -1 is returned on error, with the errno code properly set.
     int rina_flow_alloc_wait(int wfd)
     
 This function waits for the completion of a flow allocation procedure previosuly initiated with
-a call to `rina_flow_alloc()` with the RINA F NOWAIT flag set. The wfd file descriptor
+a call to `rina_flow_alloc()` with the `RINA_F_NOWAIT` flag set. The wfd file descriptor
 must match the one returned by `rina_flow_alloc()`. On success, it returns a file descriptor
 that can be subsequently used with standard I/O system calls to exchange SDUs on the flow and
 synchronize. On error -1 is returned, with the errno code properly set.
@@ -1277,7 +1277,7 @@ bind() and connect() calls:
  * The return value is a file descriptor that can be used for flow I/O, so that there is no need for
 a specific call to create the file descriptor (like socket()).
 
-The non-blocking connect functionality is supported by passing the RINA F NOWAIT flag
+The non-blocking connect functionality is supported by passing the `RINA_F_NOWAIT` flag
 to `rina_flow_alloc`; when this happens, the function does not wait for flow allocation to
 complete, but returns a control file descriptor that can then be used with select/poll to wait;
 when the control file descriptor becomes readable, it means that the flow allocation procedure is
@@ -1313,16 +1313,16 @@ mode, the server can use select() or poll() to wait for the socket to become rea
 indicates a new TCP connection has arrived and can be accepted with accept(). When the I/O
 session ends, the server closes the client socket with close().
 Similar server-side operations can be performed with the RINA API. A RINA control device
-to receive incoming flow request is open with rina open, similarly to the socket() call. This
+to receive incoming flow request is open with `rina_open`, similarly to the socket() call. This
 function returns a file descriptor that can be used to register names and accept requests. The
-rina register function is called to register an application name, possibly specifying a DIF
+`rina_register` function is called to register an application name, possibly specifying a DIF
 name; the control file descriptor is passed as a first parameter, so that the file descriptor can be
-used to accept requests for the registered name. The rina register operations corresponds
+used to accept requests for the registered name. The `rina_register` operations corresponds
 therefore to the combined effect of bind and listen for sockets. It is possible to call
-rina register multiple times to register multiple names.
+`rina_register` multiple times to register multiple names.
 At this point the server can start accepting incoming flow allocation requests by calling
-rina flow accept on the control file descriptor (passed as first argument). When the
-RINA F NOWAIT flag is not specified, this operation has the same meaning of the socket accept
+`rina_flow_accept` on the control file descriptor (passed as first argument). When the
+`RINA_F_NOWAIT` flag is not specified, this operation has the same meaning of the socket accept
 call. In detail:
  * The function blocks until a flow allocation request comes, and the request is implicitely
 accepted.
@@ -1337,10 +1337,10 @@ mode and passed to poll/select. The control file descriptor becomes readable whe
 pending flow allocation request ready to be accepted.
 Also the server-side analysis, summarized in Figure 4, uncovers some capabilities of the RINA
 API that are not possible with the socket API:
- * When the RINA F NOWAIT flag is passed to rina flow accept, the application can
+ * When the `RINA_F_NOWAIT` flag is passed to `rina_flow_accept`, the application can
 decide whether to accept or deny the flow allocation request, possibly taking into account
 the flow QoS, the remote application name and the server internal state. The verdict is
-emitted using the rina flow respond call.
+emitted using the `rina_flow_respond` call.
  * The server can use the QoS to customize its action (e.g. a video streaming server application
 could choose among different encodings).
 
