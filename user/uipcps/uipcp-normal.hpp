@@ -105,6 +105,8 @@ struct EnrollmentResources {
     pthread_t th;
     pthread_cond_t msgs_avail;
     pthread_cond_t stopped;
+
+    int refcnt;
 };
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
@@ -122,6 +124,8 @@ struct NeighFlow {
 
     enum enroll_state_t enroll_state;
     struct EnrollmentResources *enrollment_rsrc;
+    struct EnrollmentResources *enrollment_rsrc_get(bool initiator);
+    void enrollment_rsrc_put();
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -135,9 +139,7 @@ struct NeighFlow {
 
     void enroll_state_set(enroll_state_t st);
     const CDAPMessage *next_enroll_msg();
-    void enrollment_start(bool initiator);
     void enrollment_commit();
-    void enrollment_cleanup();
     void enrollment_abort();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id,
