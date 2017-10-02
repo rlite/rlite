@@ -139,7 +139,8 @@ struct LowerFlow : public UipcpObject {
     bool state;
     unsigned int age;
 
-    LowerFlow() { }
+    LowerFlow() : local_addr(0), remote_addr(0), cost(0), seqnum(0),
+                  state(false), age(0) { }
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
     bool operator==(const LowerFlow& o) {
@@ -294,7 +295,7 @@ struct ConnId : public UipcpObject {
     uint32_t src_cep;
     uint32_t dst_cep;
 
-    ConnId() { }
+    ConnId() : qos_id(0), src_cep(0), dst_cep(0) { }
     ConnId(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
