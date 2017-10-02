@@ -854,7 +854,8 @@ addr_allocator_distributed::allocate()
 
         /* Discard the address if it is invalid, or it is already (or possibly)
          * in use by us or another IPCP in the DIF. */
-        if (!addr || addr == rib->myaddr || addr_alloc_table.count(addr) > 0) {
+        if (!addr || addr == rib->myaddr || addr_alloc_table.count(addr) > 0 ||
+                rib->lookup_neighbor_by_address(addr) != string()) {
             continue;
         }
 
@@ -938,13 +939,19 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
          * address allocation response. */
         map<rlm_addr_t, AddrAllocRequest>::iterator mit;
         bool propagate = false;
+        bool cand_neigh_conflict;
         AddrAllocRequest aar(objbuf, objlen);
 
+        /* Lookup the address contained in the request into the allocation
+         * table and among the neighbor candidates. Also check if the proposed
+         * address conflicts with our own address. */
         mit = addr_alloc_table.find(aar.address);
+        cand_neigh_conflict = aar.address == rib->myaddr ||
+                    rib->lookup_neighbor_by_address(aar.address) != string();
 
         switch (rm->op_code) {
         case gpb::M_CREATE:
-            if (mit == addr_alloc_table.end()) {
+            if (!cand_neigh_conflict && mit == addr_alloc_table.end()) {
                 /* New address allocation request, no conflicts. */
                 addr_alloc_table[aar.address] = aar;
                 UPD(rib->uipcp, "Address allocation request ok, (addr=%lu,"
@@ -952,7 +959,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                             (long unsigned)aar.requestor);
                 propagate = true;
 
-            } else if (mit->second.requestor != aar.requestor) {
+            } else if (cand_neigh_conflict || mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
                 CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
                 int ret;
