@@ -21,6 +21,8 @@ argparser.add_argument('-M', type = int, default = 40,
                        help = "Max number of active clients at any time")
 argparser.add_argument('--filter-name', type = str, default = 'rinaperf',
                        help = "String to use for filtering registered names")
+argparser.add_argument('-v', '--verbose', action = 'store_true',
+                       help = "Be verbose")
 args = argparser.parse_args()
 
 if args.T < 1 or args.T > 100:
@@ -61,11 +63,14 @@ for dif in difs:
 if len(destinations) == 0:
     print("No destination application found")
     quit()
-print(destinations)
+
+if args.verbose:
+    print("Destinations: %s" % destinations)
 
 # Generate clients
 random.seed()
 clients = []
+curidx = 1
 try:
     while 1:
         # Collect non-terminated clients
@@ -74,7 +79,10 @@ try:
             if p.poll() == None:
                 nclients.append(p)
             else:
-                print("process terminated")
+                if p.returncode != 0:
+                    print("Client #%d failed (%s)" % (p.myidx, p.args))
+                elif args.verbose:
+                    print("Client #%d terminated" % p.myidx)
         clients = nclients
 
         # Sleep for a random time (T on average)
@@ -91,9 +99,15 @@ try:
         pktlen = random.randint(2, 1000)
         sizespec = '' if pktlen > 800 else "-s %d" % pktlen
         dif, appl = destinations[sel]
-        cmd = 'rinaperf -t perf %s -i %d -d %s -z %s -D %d' % (sizespec, interval, dif, appl, dur)
+        cmd = 'rinaperf -t perf %s -i %d -d %s -z %s -D %d' \
+                    % (sizespec, interval, dif, appl, dur)
         try:
-            p = subprocess.Popen(cmd.split())
+            p = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL)
+            if args.verbose:
+                print("Run #%d: %s" % (curidx, cmd))
+            p.myidx = curidx
+            curidx += 1
             clients.append(p)
         except Exception as e:
             print('Failed to run rinaperf client')
