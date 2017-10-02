@@ -22,6 +22,7 @@ if [ HAVE_VMPI == "y" ]; then
     popd
 fi
 
+sudo rmmod rlite-shim-udp4.ko
 sudo rmmod rlite-shim-tcp4.ko
 sudo rmmod rlite-normal.ko
 sudo rmmod rlite-shim-loopback.ko
