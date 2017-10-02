@@ -341,13 +341,14 @@ rtx_tmr_cb(long unsigned arg)
 
     spin_lock_bh(&dtp->lock);
 
-    /* Stop the sender inactivity timer, will be restarted
+    /* Stop the sender inactivity timer, it will be restarted
      * at the end of the function, after the burst of
      * retransmissions. */
     del_timer(&dtp->snd_inact_tmr);
 
-    /* We scan all the retransmission list, since it is order by
-     * ascending sequence number, not by ascending expiration time. */
+    /* We scan all the elements in the retransmission list, since they are
+     * sorted by ascending sequence number, and not by ascending expiration
+     * time. */
     rb_list_foreach(rb, &dtp->rtxq) {
         if (!time_before(jiffies, RL_BUF_RTX(rb).rtx_jiffies)) {
             /* This rb should be retransmitted. We also invalidate
