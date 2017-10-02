@@ -1151,13 +1151,13 @@ outs =  '#!/bin/bash\n'             \
 
 for vmname in sorted(vms):
     vm = vms[vmname]
-    outs += ''\
+    outs += 'echo "Accessing log for node %(vmname)s"\n'\
         'DONE=255\n'\
         'while [ $DONE != "0" ]; do\n'\
         '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
                         % {'sshopts': sshopts, 'username': args.user,
                               'ssh': vm['ssh'],
-                              'dif': dif}
+                              'dif': dif, 'vmname': vmname}
 
     outs += 'grep "$1" uipcp.log\n'
 
