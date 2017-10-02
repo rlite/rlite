@@ -26,7 +26,7 @@ target_link_libraries(rina-gw rina-api fdfwd)
 target_link_libraries(iporinad rina-api cdap fdfwd ${CMAKE_THREAD_LIBS_INIT})
 
  # Installation directives
-install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async DESTINATION usr/bin)
+install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async iporinad DESTINATION usr/bin)
 if (MAC2IFNAME)
 install(TARGETS mac2ifname DESTINATION usr/bin)
 endif()
