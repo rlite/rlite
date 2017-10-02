@@ -431,6 +431,24 @@ ipcp_lower_flow_alloc(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+ipcp_enroll_retry(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    int ret = -1;
+    int i;
+
+    for (i = 0; i < 3; i ++) {
+        ret = ipcp_enroll_common(argc, argv, RLITE_U_IPCP_ENROLL);
+        if (!ret) {
+            break;
+        }
+        sleep(i+1);
+        PI("Retry #%d...\n", i+1);
+    }
+
+    return ret;
+}
+
+static int
 ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
@@ -806,6 +824,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
         .func = ipcp_enroll,
+    },
+    {
+        .name = "ipcp-enroll-retry",
+        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .num_args = 3,
+        .func = ipcp_enroll_retry,
     },
     {
         .name = "ipcp-lower-flow-alloc",
