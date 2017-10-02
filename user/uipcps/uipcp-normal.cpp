@@ -354,8 +354,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     age_incr_tmrid = uipcp_loop_schedule(uipcp,
                                          RL_AGE_INCR_INTERVAL * 1000,
                                          age_incr_cb, this);
-    sync_tmrid = uipcp_loop_schedule(uipcp, RL_NEIGH_SYNC_INTVAL * 1000,
-                                     sync_timeout_cb, this);
+    sync_tmrid = uipcp_loop_schedule(uipcp, RL_NEIGH_REFRESH_INTVAL * 1000,
+                                     neighs_refresh_cb, this);
 
     /* Set a valid address, 0 is the null address. */
     set_address(1);
