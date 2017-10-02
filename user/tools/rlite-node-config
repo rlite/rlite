@@ -3,6 +3,8 @@
 import subprocess
 import argparse
 import re
+import time
+
 
 description = "Simple configuration tool for rlite"
 epilog = "2017 Vincenzo Maffione <v.maffione@gmail.com>"
@@ -53,8 +55,9 @@ for cmd in cmds:
 
 for cmd in enrolls:
     cmdargs = ['rlite-ctl'] + cmd[1]
-    try:
-        subprocess.check_call(cmdargs)
-    except Exception as e:
-        print("Failure at line %s --> %s" % (cmd[0], e))
-        quit()
+    while 1:
+        try:
+            subprocess.check_call(cmdargs)
+        except Exception as e:
+            print("Enrollment at line %s failed --> %s" % (cmd[0], e))
+            time.sleep(3)
