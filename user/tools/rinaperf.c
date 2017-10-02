@@ -1219,7 +1219,7 @@ main(int argc, char **argv)
     pthread_mutex_init(&rp->ticket_lock, NULL);
 
     /* Start with a default flow configuration (unreliable flow). */
-    rina_flow_spec_default(&rp->flowspec);
+    rina_flow_spec_unreliable(&rp->flowspec);
 
     while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:D:v")) != -1) {
         switch (opt) {

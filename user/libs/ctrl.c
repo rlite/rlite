@@ -127,7 +127,7 @@ rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet)
 }
 
 void
-rina_flow_spec_default(struct rina_flow_spec *spec)
+rina_flow_spec_unreliable(struct rina_flow_spec *spec)
 {
     rl_flow_spec_default(spec);
 }
@@ -230,7 +230,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     if (flowspec) {
         memcpy(&req->flowspec, flowspec, sizeof(*flowspec));
     } else {
-        rina_flow_spec_default(&req->flowspec);
+        rina_flow_spec_unreliable(&req->flowspec);
     }
     req->local_appl = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
     req->remote_appl = remote_appl ? rl_strdup(remote_appl, RL_MT_UTILS) : NULL;

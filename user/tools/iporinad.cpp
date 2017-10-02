@@ -878,7 +878,7 @@ connect_to_remotes(void *opaque)
 
                 /* Try to allocate a reliable flow for the control connection
                  * and an unreliable flow for the data connection. */
-                rina_flow_spec_default(&spec);
+                rina_flow_spec_unreliable(&spec);
                 if (i == IPOR_CTRL) {
                     spec.max_sdu_gap = 0;
                     spec.in_order_delivery = 1;

@@ -354,7 +354,7 @@ accept_inet_conn(int lfd, const RinaName &rname)
 
     /* Issue a non-blocking flow allocation request, asking for a reliable
      * flow without message boundaries (TCP-like). */
-    rina_flow_spec_default(&flowspec);
+    rina_flow_spec_unreliable(&flowspec);
     flowspec.max_sdu_gap = 0;
     flowspec.in_order_delivery = 1;
     flowspec.msg_boundaries = 0;
