@@ -315,7 +315,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
             continue;
         }
 
-        int age_inc_intval = rib->params_map["routing"]["age-incr-intval"].get_int_value();
+        int age_inc_intval = rib->get_param_value<int>("routing", "age-incr-intval");
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             jt->second.age += age_inc_intval;
 
@@ -340,7 +340,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     /* Reschedule */
     rib->age_incr_tmrid = uipcp_loop_schedule(uipcp,
-            rib->params_map["routing"]["age-incr-intval"].get_int_value() * 1000,
+            rib->get_param_value<int>("routing", "age-incr-intval") * 1000,
             age_incr_cb, rib);
 }
 

@@ -384,10 +384,10 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 
     /* Start timers for periodic tasks. */
     age_incr_tmrid = uipcp_loop_schedule(uipcp,
-            params_map["routing"]["age-incr-intval"].get_int_value() * 1000,
+            get_param_value<int>("routing", "age-incr-intval") * 1000,
             age_incr_cb, this);
     sync_tmrid = uipcp_loop_schedule(uipcp,
-            params_map["rib-daemon"]["refresh-intval"].get_int_value() * 1000,
+            get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
             neighs_refresh_cb, this);
 
     /* Set a valid address, 0 is the null address. */
@@ -614,7 +614,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         lower_difs.erase(lit);
     }
 
-    if (params_map["resource-allocator"]["reliable-n-flows"].get_bool_value()) {
+    if (get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
         /* Check whether we need to do or undo self-registration. */
         struct rina_flow_spec relspec;
 
@@ -1249,7 +1249,7 @@ uipcp_rib::policy_param_mod(const std::string& component,
 
         if (component == "resource-allocator" && param_name == "reliable-n-flows" &&
                 param_value == "true" &&
-                !params_map["resource-allocator"]["reliable-flows"].get_bool_value()) {
+                !get_param_value<bool>("resource-allocator", "reliable-flows")) {
             UPE(uipcp, "Cannot enable reliable N-flows as reliable "
                     "flows are disabled.\n");
             return -1;
@@ -1572,7 +1572,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
         return ret;
     }
 
-    if (!params_map["resource-allocator"]["reliable-n-flows"].get_bool_value()) {
+    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
         pthread_mutex_unlock(&lock);
     } else {
         bool self_reg_pending;
@@ -1601,6 +1601,31 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     }
 
     return ret;
+}
+
+template <class T> T
+uipcp_rib::get_param_value(const std::string& component,
+                           const std::string& param_name)
+{
+    assert(0);
+}
+
+template <> bool
+uipcp_rib::get_param_value<bool>(const std::string& component,
+                                 const std::string& param_name)
+{
+    assert(params_map.count(component)
+            && params_map[component].count(param_name));
+    return params_map[component][param_name].get_bool_value();
+}
+
+template <> int
+uipcp_rib::get_param_value<int>(const std::string& component,
+                                const std::string& param_name)
+{
+    assert(params_map.count(component)
+            && params_map[component].count(param_name));
+    return params_map[component][param_name].get_int_value();
 }
 
 static int
