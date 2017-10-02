@@ -964,7 +964,7 @@ if not args.parallelize:
             if enrollment in lowerflowallocs[dif]:
                 oper = 'lower-flow-alloc'
             else:
-                oper = 'enroll'
+                oper = 'enroll-retry'
 
             vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
                          'pvid': vms[enrollment['enroller']]['id'],
