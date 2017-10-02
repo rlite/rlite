@@ -57,8 +57,7 @@ for dif in difs:
             if args.filter_name in a:
                 destinations.append((dif, a))
     except Exception as e:
-        print("Failed to show RIB for DIF %s" % dif)
-        quit()
+        pass
 
 if len(destinations) == 0:
     print("No destination application found")
