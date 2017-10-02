@@ -3,6 +3,7 @@
 import subprocess
 import argparse
 import time
+import sys
 import re
 import os
 
@@ -85,6 +86,8 @@ for cmd in cmds:
         if len(o) > 0:
             print(o)
 
+sys.stdout.flush()
+
 i = 1
 n = len(enrolls)
 for cmd in enrolls:
@@ -96,6 +99,7 @@ for cmd in enrolls:
         except Exception as e:
             o = strclean(e.output)
             print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
+            sys.stdout.flush()
             time.sleep(3)
     o = strclean(o)
     if args.verbose and len(o) > 0:
@@ -104,4 +108,5 @@ for cmd in enrolls:
             print(o)
 
     print('Enrollment %d/%d successfully completed' % (i, n))
+    sys.stdout.flush()
     i += 1
