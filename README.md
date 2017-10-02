@@ -43,6 +43,7 @@
 The *rlite* project provides a lightweight Free and Open Source implementation
 of the Recursive InterNetwork Architecture (RINA) for GNU/Linux operating
 systems. For information about RINA, including many introductions,
+
 presentations and articles, visit http://www.pouzinsociety.org/.
 
 The main goal of *rlite* is to become a baseline implementation for RINA
@@ -70,6 +71,8 @@ Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are explicitly
 indicated here, but using other distributions should be equally
 straightforward.
 
+List of required packages:
+
 The software has been developed and tested on Linux (vanilla) kernels starting
 from the 4.1 series up to the most recent ones. Using older Linux versions is
 possible down to 3.11 kernels, as the `./configure` script is able to detect
@@ -78,6 +81,8 @@ The 3.10 kernels and older ones are not supported. In any case it is
 recommended to use recent versions (e.g. from 4.1 onward) where possible.
 
 ### Ubuntu 14.04 and Debian 8
+
+List of required packages:
 
 * gcc
 * g++
@@ -89,6 +94,8 @@ recommended to use recent versions (e.g. from 4.1 onward) where possible.
 
 ### Archlinux
 
+List of required packages:
+
 * gcc
 * cmake
 * protobuf
@@ -99,6 +106,20 @@ On Archlinux *rlite* is available from the AUR repository. It can be installed
 using yaourt:
 
     $ yaourt --noconfirm -S rlite-git
+
+### CentOS 7
+
+List of required packages:
+
+* gcc
+* gcc-c++
+* protobuf
+* protobuf-compiler
+* protobuf-devel
+* kernel-devel
+* cmake
+* python, swig [optional, for python bindings]
+
 
 
 
