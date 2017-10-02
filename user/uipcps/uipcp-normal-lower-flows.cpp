@@ -560,7 +560,7 @@ RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
 int
 RoutingEngine::compute_fwd_table()
 {
-    map<NodeId, pair<rlm_addr_t, rl_port_t> > next_ports_new;
+    map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
 
     /* Compute the forwarding table by translating the next-hop address
@@ -604,70 +604,76 @@ RoutingEngine::compute_fwd_table()
 
             /* We have found a suitable port for the destination, we can
              * stop searching. */
-            next_ports_new[r->first] = make_pair(dst_addr, port_id);
+            next_ports_new[dst_addr] = make_pair(r->first, port_id);
             break;
         }
     }
 
-    /* Generate new PDUFT entries. */
-    for (map<NodeId, pair<rlm_addr_t, rl_port_t> >::iterator f =
-                next_ports_new.begin(); f != next_ports_new.end(); f++) {
-            map<NodeId, pair<rlm_addr_t, rl_port_t> >::const_iterator of;
-            rlm_addr_t dst_addr;
-            rl_port_t port_id;
-            int ret;
-
-            of = next_ports.find(f->first);
-            if (of != next_ports.end() && of->second == f->second) {
-                /* This entry is already in place. */
-                continue;
-            }
-
-            /* Add the new one. */
-            dst_addr = f->second.first;
-            port_id = f->second.second;
-            ret = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
-            if (ret) {
-                UPE(uipcp, "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
-                           "entry [%s]\n",
-                           f->first.c_str(), (long unsigned)dst_addr,
-                           next_hops[f->first].front().c_str(),
-                           port_id, strerror(errno));
-                /* Trigger re insertion next time. */
-                f->second = make_pair(0, 0);
-            } else {
-                UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
-                           f->first.c_str(), (long unsigned)dst_addr,
-                           next_hops[f->first].front().c_str(),
-                           port_id);
-            }
-    }
-
-    /* Remove old PDUFT entries. */
-    for (map<NodeId, pair<rlm_addr_t, rl_port_t> >::iterator f =
+    /* Remove old PDUFT entries first. */
+    for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
                 next_ports.begin(); f != next_ports.end(); f++) {
-            map<NodeId, pair<rlm_addr_t, rl_port_t> >::const_iterator nf;
+            map<rlm_addr_t, pair<NodeId, rl_port_t> >::const_iterator nf;
             rlm_addr_t dst_addr;
             rl_port_t port_id;
+            NodeId dst_node;
             int ret;
 
             nf = next_ports_new.find(f->first);
-            if (nf != next_ports_new.end() && f->second == nf->second) {
+            if (nf != next_ports_new.end() &&
+                            f->second.second == nf->second.second) {
                 /* This old entry still exists, nothing to do. */
                 continue;
             }
 
             /* Delete the old one. */
-            dst_addr = f->second.first;
+            dst_addr = f->first;
+            dst_node = f->second.first;
             port_id = f->second.second;
             ret = uipcp_pduft_del(uipcp, uipcp->id, dst_addr, port_id);
             if (ret) {
                 UPE(uipcp, "Failed to delete PDUFT entry for %s(%lu) "
-                           "(port=%u) [%s]\n", f->first.c_str(),
+                           "(port=%u) [%s]\n", dst_node.c_str(),
                            (long unsigned)dst_addr, port_id, strerror(errno));
             } else {
                 UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port=%u)\n",
-                           f->first.c_str(), (long unsigned)dst_addr, port_id);
+                           dst_node.c_str(), (long unsigned)dst_addr, port_id);
+            }
+    }
+
+    /* Generate new PDUFT entries. */
+    for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
+                next_ports_new.begin(); f != next_ports_new.end(); f++) {
+            map<rlm_addr_t, pair<NodeId, rl_port_t> >::const_iterator of;
+            rlm_addr_t dst_addr;
+            rl_port_t port_id;
+            NodeId dst_node;
+            int ret;
+
+            of = next_ports.find(f->first);
+            if (of != next_ports.end() &&
+                            of->second.second == f->second.second) {
+                /* This entry is already in place. */
+                continue;
+            }
+
+            /* Add the new one. */
+            dst_addr = f->first;
+            dst_node = f->second.first;
+            port_id = f->second.second;
+            ret = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
+            if (ret) {
+                UPE(uipcp, "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
+                           "entry [%s]\n",
+                           dst_node.c_str(), (long unsigned)dst_addr,
+                           next_hops[dst_node].front().c_str(),
+                           port_id, strerror(errno));
+                /* Trigger re insertion next time. */
+                f->second = make_pair(0, 0);
+            } else {
+                UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
+                           dst_node.c_str(), (long unsigned)dst_addr,
+                           next_hops[dst_node].front().c_str(),
+                           port_id);
             }
     }
 

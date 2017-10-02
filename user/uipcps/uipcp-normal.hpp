@@ -624,7 +624,7 @@ private:
 
     /* The forwarding table computed by compute_fwd_table().
      * It maps a NodeId --> (dst_addr, local_port). */
-    std::map<NodeId, std::pair<rlm_addr_t, rl_port_t> > next_ports;
+    std::map<rlm_addr_t, std::pair<NodeId, rl_port_t> > next_ports;
 
     /* Set of ports that are currently down. */
     std::set<rl_port_t> ports_down;
