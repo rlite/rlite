@@ -193,15 +193,22 @@ private:
 
 class ScopeLock {
 public:
-    ScopeLock(pthread_mutex_t& m) : mutex(m) {
+    ScopeLock(pthread_mutex_t& m, bool v = false) : mutex(m), verb(v) {
         pthread_mutex_lock(&mutex);
+        if (verb) {
+            PD("lock.acquire\n");
+        }
     }
     ~ScopeLock() {
+        if (verb) {
+            PD("lock.release\n");
+        }
         pthread_mutex_unlock(&mutex);
     }
 
 private:
     pthread_mutex_t& mutex;
+    bool verb;
 };
 
 struct dft {

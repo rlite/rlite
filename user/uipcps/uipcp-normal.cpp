@@ -181,7 +181,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
                 return 0;
             }
 
-            ScopeLock(rib->lock);
+            ScopeLock lock_(rib->lock);
 
             rib->cdap_dispatch(adata.cdap, NULL);
 
@@ -201,7 +201,7 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
         rl_delete(m, RL_MT_CDAP);
         m = NULL;
 
-        ScopeLock(rib->lock);
+        ScopeLock lock_(rib->lock);
 
         /* Lookup neighbor by port id. */
         ret = rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
@@ -651,7 +651,7 @@ uipcp_rib::realize_registrations(bool reg)
     list<string> snapshot;
 
     {
-        ScopeLock(this->lock);
+        ScopeLock lock_(this->lock);
         snapshot = lower_difs;
     }
 
@@ -1173,7 +1173,7 @@ normal_appl_register(struct uipcp *uipcp,
     struct rl_kmsg_appl_register *req =
                 (struct rl_kmsg_appl_register *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     rib->dft->appl_register(req);
 
@@ -1189,7 +1189,7 @@ normal_fa_req(struct uipcp *uipcp,
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     return rib->fa->fa_req(req);
 }
@@ -1215,7 +1215,7 @@ static int
 neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
     Neighbor *neigh;
     int ret;
 
@@ -1286,7 +1286,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
                "port_id = %u]\n",
                req->remote_appl, supp_dif, neigh_port_id);
 
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking uipcp_fa_resp,
@@ -1354,7 +1354,7 @@ normal_fa_resp(struct uipcp *uipcp,
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     return rib->fa->fa_resp(resp);
 }
@@ -1366,7 +1366,7 @@ normal_flow_deallocated(struct uipcp *uipcp,
     struct rl_kmsg_flow_deallocated *req =
                 (struct rl_kmsg_flow_deallocated *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     rib->fa->flow_deallocated(req);
 
@@ -1377,7 +1377,7 @@ static void
 normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     rib->update_address(new_addr);
 }
@@ -1387,7 +1387,7 @@ normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     return rib->lfdb->flow_state_update(upd);
 }
@@ -1509,7 +1509,7 @@ static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
 
     return rib->dump();
 }
@@ -1518,7 +1518,7 @@ static char *
 normal_ipcp_routing_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
     stringstream ss;
 
     rib->lfdb->dump_routing(ss);
@@ -1531,7 +1531,7 @@ normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock(rib->lock);
+    ScopeLock lock_(rib->lock);
     const string comp_name = req->comp_name;
     const string policy_name = req->policy_name;
 
