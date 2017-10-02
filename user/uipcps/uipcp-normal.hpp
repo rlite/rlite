@@ -160,7 +160,6 @@ struct Neighbor {
     bool initiator;
 
     std::map<rl_port_t, NeighFlow *> flows;
-    rl_port_t mgmt_port_id;
 
     /* Last time we received a keepalive response from this neighbor.
      * We don't consider requests, as timeout on responses. */
@@ -177,9 +176,9 @@ struct Neighbor {
 
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
-    bool has_mgmt_flow() const { return flows.size() > 0; }
+    bool has_mgmt_flow() const { return !flows.empty(); }
     bool enrollment_complete() const;
-    int alloc_flow(const char *supp_dif_name);
+    int flow_alloc(const char *supp_dif_name);
 
     int neigh_sync_obj(const NeighFlow *nf, bool create,
                         const std::string& obj_class,

@@ -228,10 +228,10 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
              * different flow. We therefore assume that the neighbor
              * crashed before we could detect it, and select the new flow
              * as the management one. */
-            UPI(rib->uipcp, "Switch management flow, port-id %u --> port-id %u\n",
-                    neigh->mgmt_conn()->port_id,
-                    nf->port_id);
-            neigh->mgmt_port_id = nf->port_id;
+            UPI(rib->uipcp, "Switch management flow, port-id %u --> "
+                            "port-id %u\n", neigh->mgmt_conn()->port_id,
+                            nf->port_id);
+            rib->neigh_flow_prune(neigh->mgmt_conn());
         }
 
         if (nf->enroll_state != NEIGH_ENROLLED) {
@@ -1110,12 +1110,10 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
      * another NeighFlow as mgmt flow, if possible. */
     neigh->flows.erase(nf->port_id);
 
-    if (nf->port_id == neigh->mgmt_port_id && neigh->flows.size())
-    {
-        neigh->mgmt_port_id = neigh->flows.begin()->second->port_id;
+    if (!neigh->flows.empty()) {
         UPI(uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
                 static_cast<string>(neigh->ipcp_name).c_str(),
-                neigh->mgmt_port_id);
+                neigh->flows.begin()->second->port_id);
     }
 
     /* First delete the N-1 flow. */
@@ -1316,11 +1314,6 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
 
     neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
-
-    /* Set mgmt_port_id if required. */
-    if (!neigh->has_mgmt_flow()) {
-        neigh->mgmt_port_id = neigh_port_id;
-    }
 
     /* Add the flow. */
     neigh->flows[neigh_port_id] = rl_new(NeighFlow(neigh, string(supp_dif),

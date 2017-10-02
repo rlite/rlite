@@ -273,7 +273,6 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string& name)
     rib = rib_;
     initiator = false;
     ipcp_name = name;
-    mgmt_port_id = -1;
     unheard_since = time(NULL);
 }
 
@@ -308,12 +307,9 @@ Neighbor::enroll_state_repr(enroll_state_t s)
 const NeighFlow *
 Neighbor::_mgmt_conn() const
 {
-    map<rl_port_t, NeighFlow*>::const_iterator mit;
+    assert(!flows.empty());
 
-    mit = flows.find(mgmt_port_id);
-    assert(mit != flows.end());
-
-    return mit->second;
+    return flows.begin()->second;
 }
 
 NeighFlow *
@@ -1380,7 +1376,7 @@ uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
 }
 
 int
-Neighbor::alloc_flow(const char *supp_dif)
+Neighbor::flow_alloc(const char *supp_dif)
 {
     struct rina_flow_spec relspec;
     rl_ipcp_id_t lower_ipcp_id_;
@@ -1421,11 +1417,6 @@ Neighbor::alloc_flow(const char *supp_dif)
         UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor "
                     "failed [%s]\n", strerror(errno));
         return -1;
-    }
-
-    /* Set mgmt_port_id if required. */
-    if (!has_mgmt_flow()) {
-        mgmt_port_id = port_id_;
     }
 
     flows[port_id_] = rl_new(NeighFlow(this, string(supp_dif), port_id_,
@@ -1490,7 +1481,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
                        "%s\n", uipcp->dif_name, supp_dif_name);
         }
 #endif
-        ret = neigh->alloc_flow(supp_dif_name);
+        ret = neigh->flow_alloc(supp_dif_name);
         if (ret) {
             pthread_mutex_unlock(&rib->lock);
             return ret;
