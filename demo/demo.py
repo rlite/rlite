@@ -204,6 +204,10 @@ argparser.add_argument('-f', '--frontend',
                        help = "Choose which emulated NIC the nodes will use",
                        type = str, choices = ['virtio-net-pci', 'e1000'],
                        default = 'virtio-net-pci')
+argparser.add_argument('-b', '--backend',
+                       help = "Choose network backend used by nodes",
+                       type = str, choices = ['tap', 'udp'],
+                       default = 'tap')
 argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
 argparser.add_argument('-k', '--keepalive', default = 10,
@@ -375,7 +379,7 @@ while 1:
                                             % (linecnt, shim))
             continue
 
-        shims[shim] = {'name': shim, 'speed': speed,
+        shims[shim] = {'name': shim, 'speed': speed, 'vms': vm_list,
                        'speed_unit': speed_unit, 'type': 'eth'}
 
         for vm in vm_list:
@@ -654,44 +658,67 @@ outs =  '#!/bin/bash\n'             \
         'set -x\n'                  \
         '\n';
 
-for shim in sorted(shims):
-    outs += '(\n'                               \
-            'sudo brctl addbr %(br)s\n'         \
-            'sudo ip link set %(br)s up\n'      \
-            ') &\n' % {'br': shim}
+if args.backend == 'tap':
+    for shim in sorted(shims):
+        outs += '(\n'                               \
+                'sudo brctl addbr %(br)s\n'         \
+                'sudo ip link set %(br)s up\n'      \
+                ') &\n' % {'br': shim}
+    outs += 'wait\n'
+elif args.backend == 'udp':
+    for shim in sorted(shims):
+        if len(shims[shim]['vms']) != 2:
+            print('Error: UDP backend only supports peer-to-peer links')
+            quit()
 
-outs += 'wait\n'
+udp_idx = args.base_port
+udp_map = dict()
 
 for l in sorted(links):
     shim, vm = l
     idx = len(vms[vm]['ports']) + 1
     tap = '%s.%02x' % (vm, idx)
 
-    outs += '(\n'                                           \
-            'sudo ip tuntap add mode tap name %(tap)s\n'    \
-            'sudo ip link set %(tap)s up\n'                 \
-            'sudo brctl addif %(br)s %(tap)s\n'             \
-                % {'tap': tap, 'br': shim}
+    # Assign UDP ports
+    if shim not in udp_map:
+        udp_map[shim] = dict()
+    for shvm in shims[shim]['vms']:
+        if shvm not in udp_map[shim]:
+            udp_map[shim][shvm] = udp_idx
+            udp_idx += 1
+        if shvm == vm:
+            udp_local_port = udp_map[shim][shvm]
+        else:
+            udp_remote_port = udp_map[shim][shvm]
 
-    if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
-        speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
+    if args.backend == 'tap':
+        outs += '(\n'                                           \
+                'sudo ip tuntap add mode tap name %(tap)s\n'    \
+                'sudo ip link set %(tap)s up\n'                 \
+                'sudo brctl addif %(br)s %(tap)s\n'             \
+                    % {'tap': tap, 'br': shim}
 
-        # Rate limit the traffic transmitted on the TAP interface
-        outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
-                                'htb default 11\n'                  \
-                'sudo tc class add dev %(tap)s parent 1: classid '  \
-                                '1:1 htb rate 10gbit\n'             \
-                'sudo tc class add dev %(tap)s parent 1:1 classid ' \
-                                '1:11 htb rate %(speed)s\n'         \
-                % {'tap': tap, 'speed': speed}
+        if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
+            speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
 
-    outs += ') & \n'
+            # Rate limit the traffic transmitted on the TAP interface
+            outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
+                                    'htb default 11\n'                  \
+                    'sudo tc class add dev %(tap)s parent 1: classid '  \
+                                    '1:1 htb rate 10gbit\n'             \
+                    'sudo tc class add dev %(tap)s parent 1:1 classid ' \
+                                    '1:11 htb rate %(speed)s\n'         \
+                    % {'tap': tap, 'speed': speed}
+
+        outs += ') & \n'
 
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
-                             'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None})
+                             'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None,
+                             'udpl': udp_local_port, 'udpr': udp_remote_port,
+                            })
 
-
-outs += 'wait\n'
+if args.backend == 'tap':
+    outs += 'wait\n'
 
 vmid = 1
 budget = boot_batch_size
@@ -746,13 +773,22 @@ for vmname in sorted(vms):
         mac = vm_get_mac(vmid, port['idx'])
         port['mac'] = mac
 
-        outs += ''                                                      \
-        '-device %(frontend)s,mac=%(mac)s,netdev=data%(idx)s '          \
-        '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,'          \
-        'downscript=no%(vhost)s '\
-            % {'mac': mac, 'tap': tap, 'idx': port['idx'],
-               'frontend': args.frontend,
-               'vhost': ',vhost=on' if args.vhost else ''}
+        vars_dict = {'mac': mac, 'idx': port['idx'], 'frontend': args.frontend}
+
+        outs += '-device %(frontend)s,mac=%(mac)s,netdev=data%(idx)s ' % vars_dict
+        if args.backend == 'tap':
+            vars_dict['tap'] = tap
+            vars_dict['vhost'] = ',vhost=on' if args.vhost else ''
+            outs += '-netdev tap,ifname=%(tap)s,id=data%(idx)s,script=no,'  \
+                    'downscript=no%(vhost)s ' % vars_dict
+        elif args.backend == 'udp':
+            vars_dict['udpl'] = port['udpl']
+            vars_dict['udpr'] = port['udpr']
+            outs += '-netdev socket,localaddr=127.0.0.1:%(udpl)s,'\
+                    'udp=127.0.0.1:%(udpr)d,id=data%(idx)s ' % vars_dict
+        else:
+            assert(False)
+        del vars_dict
 
     outs += '&\n'
 
@@ -1026,17 +1062,18 @@ for dif in dif_ordering:
 # enrollments could fail. The enrollment procedure is retried for some
 # times by the uipcps daemon (to cope with losses), but with many nodes
 # the likelyhood of some enrollment failing many times is quite high.
-for shim in shims:
-    if shim not in netems:
-        continue
-    for vm in netems[shim]:
-        if not netem_validate(netems[shim][vm]['args']):
-            print('Warning: line %(linecnt)s is invalid and '\
-                  'will be ignored' % netems[shim][vm])
+if args.backend == 'tap':
+    for shim in shims:
+        if shim not in netems:
             continue
-        outs += 'sudo tc qdisc add dev %(tap)s root netem '\
-                '%(args)s\n'\
-                % {'tap': tap, 'args': netems[shim][vm]['args']}
+        for vm in netems[shim]:
+            if not netem_validate(netems[shim][vm]['args']):
+                print('Warning: line %(linecnt)s is invalid and '\
+                      'will be ignored' % netems[shim][vm])
+                continue
+            outs += 'sudo tc qdisc add dev %(tap)s root netem '\
+                    '%(args)s\n'\
+                    % {'tap': tap, 'args': netems[shim][vm]['args']}
 
 
 fout.write(outs)
@@ -1072,28 +1109,28 @@ for vmname in sorted(vms):
 
 outs += 'wait\n'
 
-for vmname in sorted(vms):
-    vm = vms[vmname]
-    for port in vm['ports']:
-        tap = port['tap']
-        shim = port['shim']
+if args.backend == 'tap':
+    for vmname in sorted(vms):
+        vm = vms[vmname]
+        for port in vm['ports']:
+            tap = port['tap']
+            shim = port['shim']
 
-        outs += '(\n'                                           \
-                'sudo brctl delif %(br)s %(tap)s\n'             \
-                'sudo ip link set %(tap)s down\n'               \
-                'sudo ip tuntap del mode tap name %(tap)s\n'    \
-                ') &\n'                                         \
-                    % {'tap': tap, 'br': shim}
+            outs += '(\n'                                           \
+                    'sudo brctl delif %(br)s %(tap)s\n'             \
+                    'sudo ip link set %(tap)s down\n'               \
+                    'sudo ip tuntap del mode tap name %(tap)s\n'    \
+                    ') &\n'                                         \
+                        % {'tap': tap, 'br': shim}
+    outs += 'wait\n'
 
-outs += 'wait\n'
-
-for shim in sorted(shims):
-    outs += '(\n'                                   \
-            'sudo ip link set %(br)s down\n'        \
-            'sudo brctl delbr %(br)s\n'             \
-            ') &\n' % {'br': shim}
-
-outs += 'wait\n'
+if args.backend == 'tap':
+    for shim in sorted(shims):
+        outs += '(\n'                                   \
+                'sudo ip link set %(br)s down\n'        \
+                'sudo brctl delbr %(br)s\n'             \
+                ') &\n' % {'br': shim}
+    outs += 'wait\n'
 
 fout.write(outs)
 
