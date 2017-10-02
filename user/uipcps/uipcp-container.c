@@ -1053,6 +1053,16 @@ topo_visit(struct uipcps *uipcps)
         if (uipcp) {
             ipn->max_sdu_size = uipcp->max_sdu_size;
             ipn->hdrsize = ipcp_hdrlen(uipcp);
+            if (type_is_normal_ipcp(uipcp->dif_type)) {
+                /* Any normal IPCP needs at least some hdroom for
+                 * its own header. If this IPCP has no lowers, this
+                 * hdroom will be used (and not zero). If there is
+                 * at least a lower, then the hdroom will be for
+                 * sure greater or equal than ipn->hdrsize, depending
+                 * on the lowers (see algorithm below).
+                 */
+                ipn->hdroom = ipn->hdrsize;
+            }
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
