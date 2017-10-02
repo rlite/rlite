@@ -155,6 +155,10 @@ class FrontierSet:
         return x
 
 
+def vm_get_mac(vmid, idx):
+    return '00:0a:0a:%02x:%02x:%02x' % ((vmid >> 8) & 0xff, vmid & 0xff, idx)
+
+
 description = "Python script to generate rlite deployments based on light VMs"
 epilog = "2015-2016 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -635,7 +639,7 @@ for vmname in sorted(vms):
 
     fwdp = args.base_port + vmid
     fwdc = fwdp + 10000
-    mac = '00:0a:0a:0a:%02x:%02x' % (vmid, 99)
+    mac = vm_get_mac(vmid, 99)
 
     vm['ssh'] = fwdp
 
@@ -675,7 +679,7 @@ for vmname in sorted(vms):
 
     for port in vm['ports']:
         tap = port['tap']
-        mac = '00:0a:0a:0a:%02x:%02x' % (vmid, port['idx'])
+        mac = vm_get_mac(vmid, port['idx'])
         port['mac'] = mac
 
         outs += ''                                                      \
