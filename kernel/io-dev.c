@@ -251,7 +251,11 @@ rl_io_open(struct inode *inode, struct file *f)
 }
 
 static ssize_t
-rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
+rl_io_write_iter(struct kiocb *iocb,
+#ifdef RL_HAVE_CHRDEV_RW_ITER
+                 struct iov_iter *from
+#endif
+)
 {
     struct file *f = iocb->ki_filp;
     struct rl_io *rio = (struct rl_io *)f->private_data;
@@ -259,7 +263,9 @@ rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
     struct ipcp_entry *ipcp;
     struct rl_buf *rb;
     struct rl_mgmt_hdr mhdr;
+#ifdef RL_HAVE_CHRDEV_RW_ITER
     size_t left = iov_iter_count(from);
+#endif
     size_t tot = 0;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     bool mgmt_sdu;
@@ -279,10 +285,12 @@ rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
     if (unlikely(mgmt_sdu)) {
         /* Copy in the management header. */
+#ifdef RL_HAVE_CHRDEV_RW_ITER
         if (copy_from_iter(&mhdr, sizeof(mhdr), from) != sizeof(mhdr)) {
             PE("copy_from_iter(mgmthdr)\n");
             return -EINVAL;
         }
+#endif
         left -= sizeof(mhdr);
         tot += sizeof(mhdr);
     }
@@ -304,12 +312,14 @@ rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
         }
 
         /* Copy in the userspace SDU. */
+#ifdef RL_HAVE_CHRDEV_RW_ITER
         if (unlikely(copy_from_iter(RL_BUF_DATA(rb), copylen, from) != copylen)) {
             PE("copy_from_iter(data)\n");
             rl_buf_free(rb);
             ret = -EINVAL;
             break;
         }
+#endif
         rl_buf_append(rb, copylen);
 
         if (unlikely(mgmt_sdu)) {
@@ -392,7 +402,11 @@ rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
 }
 
 static ssize_t
-rl_io_read_iter(struct kiocb *iocb, struct iov_iter *to)
+rl_io_read_iter(struct kiocb *iocb,
+#ifdef RL_HAVE_CHRDEV_RW_ITER
+                struct iov_iter *to
+#endif
+)
 {
     struct file *f = iocb->ki_filp;
     struct rl_io *rio = (struct rl_io *)f->private_data;
@@ -400,7 +414,9 @@ rl_io_read_iter(struct kiocb *iocb, struct iov_iter *to)
     bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
+#ifdef RL_HAVE_CHRDEV_RW_ITER
     size_t ulen = iov_iter_count(to);
+#endif
     ssize_t ret = 0;
 
     if (unlikely(!txrx)) {
@@ -760,8 +776,10 @@ static const struct file_operations rl_io_fops = {
     .owner          = THIS_MODULE,
     .release        = rl_io_release,
     .open           = rl_io_open,
+#ifdef RL_HAVE_CHRDEV_RW_ITER
     .write_iter     = rl_io_write_iter,
     .read_iter      = rl_io_read_iter,
+#endif
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,
 #ifdef CONFIG_COMPAT
