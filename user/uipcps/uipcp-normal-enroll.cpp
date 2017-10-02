@@ -278,9 +278,8 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string& name)
 
 Neighbor::~Neighbor()
 {
-    for (map<rl_port_t, NeighFlow *>::iterator mit = flows.begin();
-                                            mit != flows.end(); mit++) {
-        rl_delete(mit->second, RL_MT_NEIGHFLOW);
+    for (const auto& kvf : flows) {
+        rl_delete(kvf.second, RL_MT_NEIGHFLOW);
     }
 
     mgmt_only_set(NULL);
@@ -1098,9 +1097,8 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
         rib->neighbors_seen[my_name] = cand;
 
         /* Scan all the neighbors I know about. */
-        for (map<string, NeighborCandidate>::iterator cit =
-                rib->neighbors_seen.begin();
-                cit != rib->neighbors_seen.end();) {
+        for (auto cit = rib->neighbors_seen.begin();
+                    cit != rib->neighbors_seen.end();) {
             NeighborCandidateList ncl;
 
             while (ncl.candidates.size() < limit &&
@@ -1203,13 +1201,10 @@ uipcp_rib::lookup_node_address(const std::string& node_name) const
 std::string
 uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
 {
-    map<string, NeighborCandidate>::iterator nit;
-
-    for (nit = neighbors_seen.begin();
-                        nit != neighbors_seen.end(); nit++) {
-        if (nit->second.address == address) {
-            return rina_string_from_components(nit->second.apn,
-                                               nit->second.api,
+    for (const auto& kvn : neighbors_seen) {
+        if (kvn.second.address == address) {
+            return rina_string_from_components(kvn.second.apn,
+                                               kvn.second.api,
                                                string(), string());
         }
     }
@@ -1220,10 +1215,10 @@ uipcp_rib::lookup_neighbor_by_address(rlm_addr_t address)
 static string
 common_lower_dif(const list<string> l1, const list<string> l2)
 {
-    for (list<string>::const_iterator i = l1.begin(); i != l1.end(); i++) {
-        for (list<string>::const_iterator j = l2.begin(); j != l2.end(); j++) {
-            if (*i == *j) {
-                return *i;
+    for (const string& i : l1) {
+        for (const string& j : l2) {
+            if (i == j) {
+                return i;
             }
         }
     }
@@ -1257,12 +1252,10 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
     NeighborCandidateList ncl(objbuf, objlen);
     NeighborCandidateList prop_ncl;
 
-    for (list<NeighborCandidate>::iterator neigh = ncl.candidates.begin();
-                                neigh != ncl.candidates.end(); neigh++) {
-        string neigh_name = rina_string_from_components(neigh->apn, neigh->api,
+    for (const NeighborCandidate& nc : ncl.candidates) {
+        string neigh_name = rina_string_from_components(nc.apn, nc.api,
                                                         string(), string());
-        map< string, NeighborCandidate >::iterator
-                                    mit = neighbors_seen.find(neigh_name);
+        auto mit = neighbors_seen.find(neigh_name);
 
         if (neigh_name == myname) {
             /* Skip myself (as a neighbor of the slave). */
@@ -1271,17 +1264,17 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 
         if (add) {
             if (mit != neighbors_seen.end() &&
-                        neighbors_seen[neigh_name] == *neigh) {
+                        neighbors_seen[neigh_name] == nc) {
                 /* We've already seen this one. */
                 continue;
             }
 
-            neighbors_seen[neigh_name] = *neigh;
-            prop_ncl.candidates.push_back(*neigh);
+            neighbors_seen[neigh_name] = nc;
+            prop_ncl.candidates.push_back(nc);
             propagate = true;
 
             /* Check if it can be a candidate neighbor. */
-            string common_dif = common_lower_dif(neigh->lower_difs,
+            string common_dif = common_lower_dif(nc.lower_difs,
                     lower_difs);
             if (common_dif == string()) {
                 UPD(uipcp, "Neighbor %s discarded because there are no lower DIFs in "
@@ -1304,7 +1297,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 
             /* Let's forget about this neighbor. */
             neighbors_seen.erase(mit);
-            prop_ncl.candidates.push_back(*neigh);
+            prop_ncl.candidates.push_back(nc);
             propagate = true;
             if (neighbors_cand.count(neigh_name)) {
                 neighbors_cand.erase(neigh_name);
@@ -1366,9 +1359,8 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
 {
     *nfp = NULL;
 
-    for (map<string, Neighbor*>::iterator nit = neighbors.begin();
-                        nit != neighbors.end(); nit++) {
-        Neighbor *neigh = nit->second;
+    for (const auto& kvn : neighbors) {
+        Neighbor *neigh = kvn.second;
 
         if (neigh->flows.count(port_id)) {
             *nfp = neigh->flows[port_id];
@@ -1663,23 +1655,20 @@ uipcp_rib::trigger_re_enrollments()
     pthread_mutex_lock(&lock);
 
     /* Scan all the neighbor candidates. */
-    for (set<string>::const_iterator
-            cand = neighbors_cand.begin();
-                cand != neighbors_cand.end(); cand++) {
-        map<string, NeighborCandidate>::const_iterator mit =
-                neighbors_seen.find(*cand);
+    for (const string& nc : neighbors_cand) {
+        auto mit = neighbors_seen.find(nc);
         map<string, Neighbor *>::iterator neigh;
         string common_dif;
         NeighFlow *nf = NULL;
 
         assert(mit != neighbors_seen.end());
-        if (neighbors_deleted.count(*cand) == 0) {
+        if (neighbors_deleted.count(nc) == 0) {
             /* This neighbor was not deleted, so we avoid enrolling to it,
              * as this was not explicitely asked. */
             continue;
         }
 
-        neigh = neighbors.find(*cand);
+        neigh = neighbors.find(nc);
 
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
             nf = neigh->second->mgmt_conn(); /* cache variable */
@@ -1697,7 +1686,7 @@ uipcp_rib::trigger_re_enrollments()
             if (nf->enroll_state == NEIGH_NONE && inact > 10) {
                 /* Prune the flow now, we'll try to enroll later. */
                 UPD(uipcp, "Pruning flow towards %s since inactive "
-                                "for %d seconds\n", cand->c_str(), (int)inact);
+                                "for %d seconds\n", nc.c_str(), (int)inact);
                 neigh_flow_prune(nf);
             }
 
@@ -1714,16 +1703,15 @@ uipcp_rib::trigger_re_enrollments()
 
         /* Start the enrollment. */
         UPD(uipcp, "Triggering re-enrollment with neighbor %s through "
-                        "lower DIF %s\n", cand->c_str(), common_dif.c_str());
-        re_enrollments.push_back(make_pair(*cand, common_dif));
+                        "lower DIF %s\n", nc.c_str(), common_dif.c_str());
+        re_enrollments.push_back(make_pair(nc, common_dif));
     }
 
     pthread_mutex_unlock(&lock);
 
     /* Start asynchronous re-enrollments outside of the lock. */
-    for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
-                                        lit != re_enrollments.end(); lit ++) {
-        enroll(lit->first.c_str(), lit->second.c_str(), 0);
+    for (const pair<string, string>& p : re_enrollments) {
+        enroll(p.first.c_str(), p.second.c_str(), 0);
     }
 }
 
@@ -1739,12 +1727,10 @@ uipcp_rib::allocate_n_flows()
 
     pthread_mutex_lock(&lock);
     /* Scan all the enrolled neighbors. */
-    for (set<string>::const_iterator
-            cand = neighbors_cand.begin();
-                cand != neighbors_cand.end(); cand++) {
+    for (const string& nc : neighbors_cand) {
         map<string, Neighbor *>::iterator neigh;
 
-        neigh = neighbors.find(*cand);
+        neigh = neighbors.find(nc);
         if (neigh == neighbors.end() ||
                 !neigh->second->enrollment_complete() ||
                         !neigh->second->initiator) {
@@ -1759,9 +1745,9 @@ uipcp_rib::allocate_n_flows()
         /* This N-1-flow towards the enrolled neighbor is not reliable.
          * We then try to allocate an N-flow, to be used in place of
          * the N-1-flow for layer management. */
-        n_flow_allocations.push_back(*cand);
+        n_flow_allocations.push_back(nc);
         UPD(uipcp, "Trying to allocate an N-flow towards neighbor %s,"
-            " because N-1-flow is unreliable\n", cand->c_str());
+            " because N-1-flow is unreliable\n", nc.c_str());
     }
     pthread_mutex_unlock(&lock);
 
@@ -1770,16 +1756,15 @@ uipcp_rib::allocate_n_flows()
 
     reliable_spec(&relspec);
 
-    for (list< string >::iterator lit = n_flow_allocations.begin();
-                            lit != n_flow_allocations.end(); lit ++) {
+    for (const string& re : n_flow_allocations) {
         struct pollfd pfd;
         int ret;
 
         pfd.fd = rina_flow_alloc(uipcp->dif_name, uipcp->name,
-                                 lit->c_str(), &relspec, RINA_F_NOWAIT);
+                                 re.c_str(), &relspec, RINA_F_NOWAIT);
         if (pfd.fd < 0) {
             UPI(uipcp, "Failed to issue N-flow allocation towards"
-                       " %s [%s]\n", lit->c_str(), strerror(errno));
+                       " %s [%s]\n", re.c_str(), strerror(errno));
             continue;
         }
         pfd.events = POLLIN;
@@ -1789,7 +1774,7 @@ uipcp_rib::allocate_n_flows()
                 perror("poll()");
             } else {
                 UPI(uipcp, "Timeout while allocating N-flow towards %s\n",
-                                lit->c_str());
+                                re.c_str());
             }
             close(pfd.fd);
             continue;
@@ -1798,7 +1783,7 @@ uipcp_rib::allocate_n_flows()
         pfd.fd = rina_flow_alloc_wait(pfd.fd);
         if (pfd.fd < 0) {
             UPI(uipcp, "Failed to allocate N-flow towards %s [%s]\n",
-                       lit->c_str(), strerror(errno));
+                       re.c_str(), strerror(errno));
             continue;
         }
 
@@ -1807,7 +1792,7 @@ uipcp_rib::allocate_n_flows()
         map<string, Neighbor *>::iterator neigh;
 
         pthread_mutex_lock(&lock);
-        neigh = neighbors.find(*lit);
+        neigh = neighbors.find(re);
         if (neigh != neighbors.end()) {
             NeighFlow *nf;
 
@@ -1835,10 +1820,8 @@ uipcp_rib::clean_enrollment_resources()
     used_enrollment_resources.clear();
     pthread_mutex_unlock(&lock);
 
-    for (list<EnrollmentResources *>::iterator
-            lit = snapshot.begin();
-                lit != snapshot.end(); lit ++) {
-        rl_delete(*lit, RL_MT_NEIGHFLOW);
+    for (const EnrollmentResources *er: snapshot) {
+        rl_delete(er, RL_MT_NEIGHFLOW);
     }
 }
 
@@ -1853,18 +1836,16 @@ uipcp_rib::check_for_address_conflicts()
     /* Temporarily insert a neighbor representing myself. */
     neighbors_seen[myname] = cand;
 
-    for (map<string, NeighborCandidate>::iterator cit =
-            neighbors_seen.begin();
-                cit != neighbors_seen.end(); cit ++) {
-        rlm_addr_t addr = cit->second.address;
+    for (const auto& kvn : neighbors_seen) {
+        rlm_addr_t addr = kvn.second.address;
 
         if (m.count(addr)) {
             UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
-                       m[addr].c_str(), cit->first.c_str(), addr);
-            need_to_change = ((myname == m[addr] && myname < cit->first) ||
-                                (myname == cit->first && myname < m[addr]));
+                       m[addr].c_str(), kvn.first.c_str(), addr);
+            need_to_change = ((myname == m[addr] && myname < kvn.first) ||
+                                (myname == kvn.first && myname < m[addr]));
         } else {
-            m[addr] = cit->first;
+            m[addr] = kvn.first;
         }
     }
 
