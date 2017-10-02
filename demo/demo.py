@@ -251,7 +251,7 @@ argparser.add_argument('-r', '--register', action='store_true',
 argparser.add_argument('-s', '--simulate', action='store_true',
                        help = "Simulate network load using the rlite-rand-clients on each node")
 argparser.add_argument('-T', '--rand-period', default = 1, type = int,
-                       help = "Average time between to rinaperf spawns")
+                       help = "Average time between two rinaperf spawns")
 argparser.add_argument('-D', '--rand-duration', default = 8, type = int,
                        help = "Average duration of a rinaperf client")
 argparser.add_argument('-M', '--rand-max', default = 40, type = int,
