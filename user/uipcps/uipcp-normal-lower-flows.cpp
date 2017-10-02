@@ -291,7 +291,7 @@ lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 int
-lfdb_default::neighs_refresh_lower_flows()
+lfdb_default::neighs_refresh()
 {
     map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
     map< rlm_addr_t, LowerFlow >::iterator jt;

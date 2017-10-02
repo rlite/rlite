@@ -255,7 +255,7 @@ struct lfdb {
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int neighs_refresh_lower_flows() = 0;
+    virtual int neighs_refresh() = 0;
 };
 
 struct addr_allocator {
@@ -560,7 +560,7 @@ struct lfdb_default : public lfdb {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int neighs_refresh_lower_flows();
+    int neighs_refresh();
 };
 
 struct addr_allocator_distributed : public addr_allocator {
