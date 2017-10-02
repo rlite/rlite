@@ -356,25 +356,25 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 }
 
 static void
-gpb2LowerFlow(LowerFlow& cand, const gpb::flowStateObject_t &gm)
+gpb2LowerFlow(LowerFlow& lf, const gpb::flowStateObject_t &gm)
 {
-    cand.local_addr = gm.address();
-    cand.remote_addr = gm.neighbor_address();
-    cand.cost = gm.cost();
-    cand.seqnum = gm.sequence_number();
-    cand.state = gm.state();
-    cand.age = gm.age();
+    lf.local_addr = gm.address();
+    lf.remote_addr = gm.neighbor_address();
+    lf.cost = gm.cost();
+    lf.seqnum = gm.sequence_number();
+    lf.state = gm.state();
+    lf.age = gm.age();
 }
 
 static int
-LowerFlow2gpb(const LowerFlow& cand, gpb::flowStateObject_t &gm)
+LowerFlow2gpb(const LowerFlow& lf, gpb::flowStateObject_t &gm)
 {
-    gm.set_address(cand.local_addr);
-    gm.set_neighbor_address(cand.remote_addr);
-    gm.set_cost(cand.cost);
-    gm.set_sequence_number(cand.seqnum);
-    gm.set_state(cand.state);
-    gm.set_age(cand.age);
+    gm.set_address(lf.local_addr);
+    gm.set_neighbor_address(lf.remote_addr);
+    gm.set_cost(lf.cost);
+    gm.set_sequence_number(lf.seqnum);
+    gm.set_state(lf.state);
+    gm.set_age(lf.age);
 
     return 0;
 }
