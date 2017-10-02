@@ -488,7 +488,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 
     /* We received a delete request from the peer, so we won't need to send
      * him a delete request. */
-    f->second.flags &= RL_FLOWREQ_SEND_DEL;
+    f->second.flags &= ~RL_FLOWREQ_SEND_DEL;
 
     return uipcp_issue_flow_dealloc(rib->uipcp, local_port, f->second.uid);
 }
