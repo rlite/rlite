@@ -368,7 +368,7 @@ NeighFlow::next_enroll_msg()
     return msg;
 }
 
-/* Default policy for the enrollment initiator (enrolee). */
+/* Default policy for the enrollment initiator (enrollee). */
 static int
 enrollee_default(NeighFlow *nf)
 {
@@ -1782,10 +1782,32 @@ normal_clean_enrollment_resources(struct uipcp *uipcp)
     }
 }
 
+static void
+normal_check_for_address_conflicts(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    map<rlm_addr_t, string> m;
+    ScopeLock(rib->lock);
+
+    for (map<string, NeighborCandidate>::iterator cit =
+            rib->neighbors_seen.begin();
+                cit != rib->neighbors_seen.end(); cit ++) {
+        rlm_addr_t addr = cit->second.address;
+
+        if (m.count(addr)) {
+            UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
+                       m[addr].c_str(), cit->first.c_str(), addr);
+        } else {
+            m[addr] = cit->first;
+        }
+    }
+}
+
 void
 normal_trigger_tasks(struct uipcp *uipcp)
 {
     normal_trigger_re_enrollments(uipcp);
     normal_allocate_n_flows(uipcp);
     normal_clean_enrollment_resources(uipcp);
+    normal_check_for_address_conflicts(uipcp);
 }
