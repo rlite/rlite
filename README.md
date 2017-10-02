@@ -1131,7 +1131,9 @@ it is only used to separate empty strings or a non-empty string from an empty st
 strings are for instance "aa|bb|cc|dd", "aa|bb||", "aa|bb", "aa".
 
 
-    int rina_open(void)
+```
+int rina_open(void)
+```
     
 This function opens a RINA control device that can be used to register/unregister names,
 and manage incoming flow allocation requests. On success, it returns a file descriptor that can
