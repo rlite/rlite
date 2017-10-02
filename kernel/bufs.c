@@ -51,7 +51,7 @@ rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp)
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + hdroom);
     rb->len = size;
-    rb->u.tx.compl_flow = NULL;
+    rb->u.rmt.compl_flow = NULL;
     INIT_LIST_HEAD(&rb->node);
 
     return rb;
@@ -76,7 +76,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
     memcpy(crb, rb, sizeof(*rb));
 
     /* Reset some fields. */
-    crb->u.tx.compl_flow = NULL;
+    crb->u.rmt.compl_flow = NULL;
     INIT_LIST_HEAD(&crb->node);
 
     return crb;

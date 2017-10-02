@@ -126,11 +126,20 @@ struct rl_buf {
 
     union {
         struct {
+            /* Used in the TX datapath when this rb ends up into
+             * a retransmission queue. */
             unsigned long       rtx_jiffies;
             unsigned long       jiffies;
-            struct flow_entry   *compl_flow;
-        } tx;
+        } rtx;
+
         struct {
+            /* Used in the TX datapath when this rb ends up into
+             * an RMT queue. */
+            struct flow_entry   *compl_flow;
+        } rmt;
+
+        struct {
+            /* Used in the RX datapath for flow control. */
             rlm_seq_t           cons_seqnum;
         } rx;
     } u;
