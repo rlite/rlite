@@ -547,11 +547,13 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
         unsigned i;
 
         for (i = 0; i < ETH_UPPER_NAMES; i++) {
-            size_t upper_name_len = strlen(priv->upper_names[i]);
+            if (priv->upper_names[i]) {
+                size_t upper_name_len = strlen(priv->upper_names[i]);
 
-            if (priv->upper_names[i] && arp->ar_pln >= upper_name_len &&
-                    memcmp(tpa, priv->upper_names[i], upper_name_len) == 0) {
-                break;
+                if (arp->ar_pln >= upper_name_len && memcmp(tpa,
+                        priv->upper_names[i], upper_name_len) == 0) {
+                    break;
+                }
             }
         }
 
