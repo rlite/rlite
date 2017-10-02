@@ -44,7 +44,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   flow_fd(ffd), reliable(false),
                                   upper_flow_fd(-1), conn(NULL),
                                   enroll_state(NEIGH_NONE),
-                                  enroll_rsrc_up(false),
+                                  enrollment_rsrc(NULL),
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
 {
@@ -166,7 +166,7 @@ NeighFlow::enrollment_abort()
     if (conn) {
         conn->reset();
     }
-    pthread_cond_signal(&enroll_stopped);
+    pthread_cond_signal(&enrollment_rsrc->stopped);
 }
 
 void
@@ -317,15 +317,15 @@ NeighFlow::enrollment_commit()
     enroll_state_set(NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
-    while (!enroll_msgs.empty()) {
-        rib->cdap_dispatch(enroll_msgs.front(), this);
-        rl_delete(enroll_msgs.front(), RL_MT_CDAP);
-        enroll_msgs.pop_front();
+    while (!enrollment_rsrc->msgs.empty()) {
+        rib->cdap_dispatch(enrollment_rsrc->msgs.front(), this);
+        rl_delete(enrollment_rsrc->msgs.front(), RL_MT_CDAP);
+        enrollment_rsrc->msgs.pop_front();
     }
 
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(this);
-    pthread_cond_signal(&enroll_stopped);
+    pthread_cond_signal(&enrollment_rsrc->stopped);
 
     if (neigh->initiator) {
         UPI(rib->uipcp, "Enrolled to DIF %s through neighbor %s\n",
@@ -342,14 +342,14 @@ NeighFlow::next_enroll_msg()
 {
     const CDAPMessage *msg = NULL;
 
-    while (enroll_msgs.empty()) {
+    while (enrollment_rsrc->msgs.empty()) {
         struct timespec to;
         int ret;
 
         clock_gettime(CLOCK_REALTIME, &to);
         to.tv_sec += NEIGH_ENROLL_TO / 1000;
 
-        ret = pthread_cond_timedwait(&enroll_msgs_avail,
+        ret = pthread_cond_timedwait(&enrollment_rsrc->msgs_avail,
                                      &neigh->rib->lock, &to);
         if (ret) {
             if (ret != ETIMEDOUT) {
@@ -362,8 +362,8 @@ NeighFlow::next_enroll_msg()
         }
     }
 
-    msg = enroll_msgs.front();
-    enroll_msgs.pop_front();
+    msg = enrollment_rsrc->msgs.front();
+    enrollment_rsrc->msgs.pop_front();
 
     return msg;
 }
@@ -657,6 +657,7 @@ finish:
     }
     nf->enrollment_commit();
     pthread_mutex_unlock(&rib->lock);
+    rib->enroller_enable(true);
 
     return NULL;
 
@@ -882,7 +883,7 @@ enroller_thread(void *opaque)
         goto finish;
     }
 
-    nf->enroll_msgs.push_front(rm); /* reinject, passing ownership */
+    nf->enrollment_rsrc->msgs.push_front(rm); /* reinject, passing ownership */
     rm = NULL;
 
     {
@@ -899,6 +900,7 @@ finish:
     }
     nf->enrollment_commit();
     pthread_mutex_unlock(&rib->lock);
+    rib->enroller_enable(true);
 
     return NULL;
 
@@ -914,35 +916,46 @@ err:
 void
 NeighFlow::enrollment_start(bool initiator)
 {
-    if (enroll_rsrc_up) {
+    if (enrollment_rsrc) {
         return;
     }
-    enroll_rsrc_up = true;
     UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
                             neigh->ipcp_name.c_str());
-    assert(enroll_msgs.empty());
     enroll_state_set(NEIGH_ENROLLING);
-    pthread_cond_init(&enroll_msgs_avail, NULL);
-    pthread_cond_init(&enroll_stopped, NULL);
-    pthread_create(&enroll_th, NULL,
-                   initiator ? enrollee_thread : enroller_thread,
-                   this);
+    enrollment_rsrc = rl_new(EnrollmentResources(this, initiator),
+                             MT_NEIGHFLOW);
 }
 
 /* Clean-up enrollment resources if needed. */
 void
 NeighFlow::enrollment_cleanup()
 {
-    if (!enroll_rsrc_up) {
+    if (!enrollment_rsrc) {
         return;
     }
-    enroll_rsrc_up = false;
     UPD(neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
                            neigh->ipcp_name.c_str());
-    assert(enroll_msgs.empty());
-    pthread_join(enroll_th, NULL);
-    pthread_cond_destroy(&enroll_msgs_avail);
-    pthread_cond_destroy(&enroll_stopped);
+    enrollment_rsrc->nf = NULL;
+    neigh->rib->used_enrollment_resources.push_back(enrollment_rsrc);
+    enrollment_rsrc = NULL;
+}
+
+EnrollmentResources::EnrollmentResources(struct NeighFlow *f,
+                                         bool initiator) : nf(f)
+{
+    pthread_cond_init(&msgs_avail, NULL);
+    pthread_cond_init(&stopped, NULL);
+    pthread_create(&th, NULL,
+            initiator ? enrollee_thread : enroller_thread,
+            nf);
+}
+
+EnrollmentResources::~EnrollmentResources()
+{
+    assert(msgs.empty());
+    pthread_join(th, NULL);
+    pthread_cond_destroy(&msgs_avail);
+    pthread_cond_destroy(&stopped);
 }
 
 /* Did we complete the enrollment procedure with the neighbor? */
@@ -1506,7 +1519,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
          * (NEIGH_NONE).
          */
         while (nf->enroll_state == NEIGH_ENROLLING) {
-            pthread_cond_wait(&nf->enroll_stopped, &rib->lock);
+            pthread_cond_wait(&nf->enrollment_rsrc->stopped, &rib->lock);
         }
 
         ret = nf->enroll_state == NEIGH_ENROLLED ? 0 : -1;
@@ -1540,6 +1553,30 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
 
     return normal_do_enroll(uipcp, dst_name, req->supp_dif_name,
                             wait_for_completion);
+}
+
+/* To be called out of RIB lock. */
+int
+uipcp_rib::enroller_enable(bool enable)
+{
+    {
+        ScopeLock(this->lock);
+
+        if (enroller_enabled == enable) {
+            return 0; /* nothing to do */
+        }
+
+        enroller_enabled = enable;
+        if (enroller_enabled) {
+            UPD(uipcp, "Enroller enabled\n");
+        } else{
+            UPD(uipcp, "Enroller disabled\n");
+        }
+    }
+
+    realize_registrations(enable);
+
+    return 0;
 }
 
 static void
@@ -1715,9 +1752,29 @@ normal_allocate_n_flows(struct uipcp *uipcp)
     }
 }
 
+/* Clean up used enrollment resources. */
+static void
+normal_clean_enrollment_resources(struct uipcp *uipcp)
+{
+    list<EnrollmentResources *> snapshot;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    pthread_mutex_lock(&rib->lock);
+    snapshot = rib->used_enrollment_resources;
+    rib->used_enrollment_resources.clear();
+    pthread_mutex_unlock(&rib->lock);
+
+    for (list<EnrollmentResources *>::iterator
+            lit = snapshot.begin();
+                lit != snapshot.end(); lit ++) {
+        rl_delete(*lit, MT_NEIGHFLOW);
+    }
+}
+
 void
 normal_trigger_tasks(struct uipcp *uipcp)
 {
     normal_trigger_re_enrollments(uipcp);
     normal_allocate_n_flows(uipcp);
+    normal_clean_enrollment_resources(uipcp);
 }

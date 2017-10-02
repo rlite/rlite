@@ -138,7 +138,8 @@ struct uipcp_ops {
     int (*flow_state_update)(struct uipcp *uipcp,
                              const struct rl_msg_base *msg);
 
-    /* For tasks to be executed in the context of the uipcps event loop. */
+    /* For periodic tasks to be executed in the context of the uipcps
+     * (main) event loop. */
     void (*trigger_tasks)(struct uipcp *);
 
     /* User wants to change a policy of this uipcp. */

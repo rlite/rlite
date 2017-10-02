@@ -92,6 +92,20 @@ enum enroll_state_t {
 };
 
 struct Neighbor;
+struct NeighFlow;
+
+/* Temporary resources needed to carry out an enrollment procedure
+ * (initiator or slave) on a NeighFlow. */
+struct EnrollmentResources {
+    EnrollmentResources(struct NeighFlow *f, bool initiator);
+    ~EnrollmentResources();
+
+    struct NeighFlow *nf;
+    std::list<const CDAPMessage *> msgs;
+    pthread_t th;
+    pthread_cond_t msgs_avail;
+    pthread_cond_t stopped;
+};
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
 struct NeighFlow {
@@ -106,12 +120,8 @@ struct NeighFlow {
 
     time_t last_activity;
 
-    pthread_t enroll_th;
     enum enroll_state_t enroll_state;
-    std::list<const CDAPMessage *> enroll_msgs;
-    pthread_cond_t enroll_msgs_avail;
-    pthread_cond_t enroll_stopped;
-    bool enroll_rsrc_up; /* are resources allocated */
+    struct EnrollmentResources *enrollment_rsrc;
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -297,6 +307,9 @@ struct uipcp_rib {
     /* True if this IPCP is allowed to act as enroller for other IPCPs. */
     bool enroller_enabled;
 
+    /* Enrollment resources that have been used and can be released. */
+    std::list<EnrollmentResources *> used_enrollment_resources;
+
     /* True if the name of this IPCP is registered to the IPCP itself.
      * Self-registration is used to receive N-flow allocation requests. */
     bool self_registered;
@@ -357,7 +370,9 @@ struct uipcp_rib {
     void update_address(rlm_addr_t new_addr);
     Neighbor *get_neighbor(const std::string& neigh_name, bool create);
     int del_neighbor(const std::string& neigh_name);
-    int register_to_lower(int reg, std::string lower_dif);
+    int update_lower_difs(int reg, std::string lower_dif);
+    int realize_registrations(bool reg);
+    int enroller_enable(bool enable);
     rlm_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
