@@ -28,7 +28,7 @@ add_definitions("-Wall")
 include_directories(${INCLUDE_DIR})
 
 install(FILES ${RLITE_HEADERS} DESTINATION usr/include/rlite)
-install(FILES include/rlite/cdap.hpp DESTINATION usr/include/rlite)
+install(FILES include/rina/cdap.hpp DESTINATION usr/include/rina)
 install(FILES "include/rina/api.h" DESTINATION usr/include/rina)
 
 add_subdirectory(user)

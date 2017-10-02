@@ -29,7 +29,7 @@
 #include <string>
 
 #include "rlite/common.h"
-#include "rlite/cdap.hpp"
+#include "rina/cdap.hpp"
 
 
 #ifdef RL_MEMTRACK

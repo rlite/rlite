@@ -173,7 +173,7 @@ The following libraries are available:
 * **rlite-conf**, implementing the management and monitoring functionalities
                      of *rlite*, such as IPCP creation, removal and
                      configuration, flow monitoring, etc.
-* **rlite-cdap**, a C++ implementation of the CDAP protocol.
+* **cdap**, a C++ implementation of the CDAP protocol.
 
 
 ### 3.4. Control tool

@@ -1,5 +1,5 @@
 /*
- * librlite-cdap library, implementing CDAP.
+ * libcdap library, implementing CDAP.
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
@@ -30,7 +30,7 @@
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
-#include "rlite/cdap.hpp"
+#include "rina/cdap.hpp"
 #include "rlite/cpputils.hpp"
 
 using namespace std;

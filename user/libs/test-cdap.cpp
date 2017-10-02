@@ -1,5 +1,5 @@
 /*
- * Test program for the librlite-cdap library.
+ * Test program for the libcdap library.
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
@@ -32,7 +32,7 @@
 #include <netinet/in.h> /* INET constants and stuff */
 #include <arpa/inet.h>  /* IP address conversion stuff */
 
-#include "rlite/cdap.hpp"
+#include "rina/cdap.hpp"
 #include "rlite/utils.h"
 
 using namespace std;

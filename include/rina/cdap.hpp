@@ -1,5 +1,5 @@
 /*
- * librlite-cdap API for applications.
+ * libcdap API for applications.
  *
  * Copyright (C) 2015-2016 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
@@ -21,8 +21,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __RLITE_CDAP_H__
-#define __RLITE_CDAP_H__
+#ifndef __CDAP_H__
+#define __CDAP_H__
 
 #include <string>
 #include <set>
@@ -285,4 +285,4 @@ private:
     } obj_value;
 };
 
-#endif /* __RLITE_CDAP_H__ */
+#endif /* __CDAP_H__ */

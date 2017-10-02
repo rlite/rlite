@@ -34,7 +34,7 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/uipcps-msg.h"
-#include "rlite/cdap.hpp"
+#include "rina/cdap.hpp"
 #include "rlite/cpputils.hpp"
 
 #include "uipcp-normal-codecs.hpp"

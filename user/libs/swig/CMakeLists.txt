@@ -16,15 +16,15 @@ else()
 
     set_source_files_properties(cdap.i PROPERTIES CPLUSPLUS ON)
     set_source_files_properties(cdap.i PROPERTIES SWIG_FLAGS "-c++")
-    swig_add_module(rlite_cdap python cdap.i)
+    swig_add_module(cdap python cdap.i)
 
     # Tell the build system to link the _rina.so python module against
     # the librina-api.so library
     swig_link_libraries(rina ${PYTHON_LIBRARIES} rina-api)
 
-    # Tell the build system to link the _rlite_cdap.so python module against
+    # Tell the build system to link the _cdap.so python module against
     # the librina-api.so library
-    swig_link_libraries(rlite_cdap ${PYTHON_LIBRARIES} rlite-cdap)
+    swig_link_libraries(cdap ${PYTHON_LIBRARIES} cdap)
 
     # Installation directives
     execute_process(COMMAND python -c "from distutils import sysconfig; print(sysconfig.get_python_lib(plat_specific=True, prefix='${CMAKE_INSTALL_PREFIX}'))"
@@ -39,6 +39,6 @@ else()
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${SWIG_MODULE_rina_REAL_NAME}.so DESTINATION ${PYTHON_MODULE_PATH})
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/rina.py DESTINATION ${PYTHON_MODULE_PATH})
 
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${SWIG_MODULE_rlite_cdap_REAL_NAME}.so DESTINATION ${PYTHON_MODULE_PATH})
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/rlite_cdap.py DESTINATION ${PYTHON_MODULE_PATH})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${SWIG_MODULE_cdap_REAL_NAME}.so DESTINATION ${PYTHON_MODULE_PATH})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cdap.py DESTINATION ${PYTHON_MODULE_PATH})
 endif()

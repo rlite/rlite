@@ -1,6 +1,6 @@
-%module rlite_cdap
+%module cdap
 %{
-#include "rlite/cdap.hpp"
+#include "rina/cdap.hpp"
 %}
 
 #define __attribute__(x)
@@ -9,4 +9,4 @@
  * Just rename it to a regular method. */
 %rename(toGPB) "operator gpb::CDAPMessage";
 
-%include "rlite/cdap.hpp"
+%include "rina/cdap.hpp"
