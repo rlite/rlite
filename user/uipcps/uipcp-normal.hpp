@@ -192,11 +192,11 @@ struct Neighbor {
      * management. */
     std::unordered_map<rl_port_t, NeighFlow *> flows;
 
-    /* If not NULL, a regular (non-kernel-bound) N-1 flow used for
+    /* If not nullptr, a regular (non-kernel-bound) N-1 flow used for
      * management purposes. */
     NeighFlow *mgmt_only;
 
-    /* If not NULL, a regular (non-kernel-bound) N flow used for
+    /* If not nullptr, a regular (non-kernel-bound) N flow used for
      * management purposes. This may be used only if the N-1 DIFs
      * towards the neighbor do not support reliable flows. */
     NeighFlow *n_flow;
