@@ -179,7 +179,7 @@ rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
 
     rl_ipcp_config_fill(&msg, ipcp_id, param_name, param_value);
 
-    ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
+    ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
     close(fd);
 
