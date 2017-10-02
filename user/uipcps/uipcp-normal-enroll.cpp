@@ -271,9 +271,24 @@ Neighbor::~Neighbor()
         rl_delete(mit->second, RL_MT_NEIGHFLOW);
     }
 
+    mgmt_only_set(NULL);
+}
+
+void
+Neighbor::mgmt_only_set(NeighFlow *nf)
+{
     if (mgmt_only) {
         uipcp_loop_fdh_del(rib->uipcp, mgmt_only->flow_fd);
         rl_delete(mgmt_only, RL_MT_NEIGHFLOW);
+    }
+
+    UPD(rib->uipcp, "Switch management-only flow (oldfd=%d --> newfd=%d)\n",
+                    mgmt_only ? mgmt_only->flow_fd : -1,
+                    nf ? nf->flow_fd : -1);
+    mgmt_only = nf;
+    if (nf) {
+        uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd,
+                           normal_mgmt_only_flow_ready, nf);
     }
 }
 
@@ -300,6 +315,10 @@ Neighbor::enroll_state_repr(enroll_state_t s)
 const NeighFlow *
 Neighbor::_mgmt_conn() const
 {
+    if (mgmt_only) {
+        return mgmt_only;
+    }
+
     assert(!flows.empty());
 
     return flows.begin()->second;
@@ -1429,21 +1448,21 @@ Neighbor::flow_alloc(const char *supp_dif)
     rib->lfdb->update_local(ipcp_name);
 
     if (use_reliable_flow) {
-        int mgmt_fd;
         /* Try to allocate a management-only reliable flow. */
+        int mgmt_fd;
+
         mgmt_fd = rina_flow_alloc(supp_dif, rib->uipcp->name,
                                   ipcp_name.c_str(), &relspec, 0);
         if (mgmt_fd < 0) {
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
         } else {
-            mgmt_only = rl_new(NeighFlow(this, string(supp_dif),
-                                         RL_PORT_ID_NONE, mgmt_fd,
-                                         RL_IPCP_ID_NONE),
-                                RL_MT_NEIGHFLOW);
-            mgmt_only->reliable = true;
+            NeighFlow *nf;
+
+            nf = rl_new(NeighFlow(this, string(supp_dif), RL_PORT_ID_NONE,
+                                  mgmt_fd, RL_IPCP_ID_NONE), RL_MT_NEIGHFLOW);
+            nf->reliable = true;
             UPD(rib->uipcp, "Management-only N-1 flow allocated\n");
-            uipcp_loop_fdh_add(rib->uipcp, mgmt_fd,
-                               normal_mgmt_only_flow_ready, this);
+            mgmt_only_set(nf);
         }
     }
 
