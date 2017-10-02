@@ -90,21 +90,30 @@ EOF
     {
         cat <<EOF
 ##############################################################################
-##            TEST:  $1
+#             TEST:  $1
 ##############################################################################
 EOF
         cat $KTESTDIR/$1.c
     } >> config.log
-    # add the compilation unit to the running list
+    # Add a new kernel module to the running list
     KTESTOBJS="$1.o $KTESTOBJS"
 }
 
-probe_kernel_version() {
+probe_kernel_features() {
+    # Clean-up leftovers.
+    rm -rf $KTESTDIR
     mkdir $KTESTDIR
 
+    cat >> config.log <<EOF
+##############################################################################
+#	      KERNEL PROBING TESTS
+##############################################################################
+EOF
+
+    # Add tests one by one.
     add_test 'have_chrdev_rw_iter' <<EOF
         #include <linux/fs.h>
-        void dummy() {
+        void dummy(void) {
             struct file_operations *fops = NULL;
             (void)fops->write_iter;
             (void)fops->read_iter;
@@ -113,9 +122,20 @@ EOF
     add_test 'signal_pending_in_sched_signal' <<EOF
         #include <linux/sched/signal.h>
 
-        int dummy() {
+        int dummy(void) {
             return signal_pending(NULL);
         }
+EOF
+
+    # Generate a Makefile for the tests.
+    cat >> $KTESTDIR/Makefile <<EOF
+ifneq (\$(KERNELRELEASE),)
+# Each test is compiled as a separate kernel module.
+obj-m := ${KTESTOBJS}
+else
+all:
+	make -C ${KERNBUILDDIR} M=\$\$PWD
+endif
 EOF
 }
 
@@ -254,6 +274,8 @@ fi
 # Make sure CMake is installed
 which cmake || no_cmake
 
+rm -f config.log
+
 # Generate symbolic links for common code
 (
 cd kernel
@@ -305,7 +327,7 @@ fi
 cp kernel/Makefile.in kernel/Makefile
 generate_flavours
 
-probe_kernel_version
+probe_kernel_features
 
 # Generate kerconfig.h file
 KCF=kernel/kerconfig.h
