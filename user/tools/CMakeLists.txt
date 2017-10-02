@@ -30,5 +30,5 @@ install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async iporinad DESTINATION 
 if (MAC2IFNAME)
 install(TARGETS mac2ifname DESTINATION usr/bin)
 endif()
-install(FILES rina-gw.conf iporinad.conf DESTINATION etc/rina)
-install(PROGRAMS inet-toy rina-toy DESTINATION usr/bin)
+install(FILES rina-gw.conf iporinad.conf initscript DESTINATION etc/rina)
+install(PROGRAMS inet-toy rina-toy rlite-node-config DESTINATION usr/bin)
