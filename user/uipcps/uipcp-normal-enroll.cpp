@@ -223,7 +223,7 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
     }
     nf->pending_keepalive_reqs++;
 
-    if (nf->pending_keepalive_reqs > neigh->rib->params_map["enrollment"]["keepalive-thresh"].get_int_value()) {
+    if (nf->pending_keepalive_reqs > neigh->rib->get_param_value<int>("enrollment", "keepalive-thresh")) {
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(rib->uipcp, "Neighbor %s is not alive on N-1 flow %u "
@@ -242,7 +242,7 @@ void
 NeighFlow::keepalive_tmr_start()
 {
     /* keepalive is in seconds, we need to convert it to milliseconds. */
-    unsigned int keepalive = neigh->rib->params_map["enrollment"]["keepalive"].get_int_value();
+    unsigned int keepalive = neigh->rib->get_param_value<int>("enrollment", "keepalive");
 
     if (keepalive == 0) {
         /* no keepalive */
@@ -415,7 +415,7 @@ NeighFlow::next_enroll_msg()
         int ret;
 
         clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_sec += neigh->rib->params_map["enrollment"]["timeout"].get_int_value() / 1000;
+        to.tv_sec += neigh->rib->get_param_value<int>("enrollment", "timeout") / 1000;
 
         ret = pthread_cond_timedwait(&enrollment_rsrc->msgs_avail,
                                      &neigh->rib->lock, &to);
@@ -1145,7 +1145,7 @@ neighs_refresh_cb(struct uipcp *uipcp, void *arg)
                                    obj_name::neighbors, &ncl);
     }
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
-            rib->params_map["rib-daemon"]["refresh-intval"].get_int_value() * 1000,
+            rib->get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
             neighs_refresh_cb, rib);
 }
 
@@ -1457,7 +1457,7 @@ Neighbor::flow_alloc(const char *supp_dif)
                                                      &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
                                         (use_reliable_flow ? "" : " not"));
-    if (!rib->params_map["resource-allocator"]["reliable-flows"].get_bool_value()) {
+    if (!rib->get_param_value<bool>("resource-allocator", "reliable-flows")) {
         /* Force unreliable flows even if we have reliable ones. */
         use_reliable_flow = false;
     }
@@ -1641,7 +1641,7 @@ uipcp_rib::trigger_re_enrollments()
 {
     list< pair<string, string> > re_enrollments;
 
-    if (params_map["enrollment"]["keepalive"].get_int_value() == 0) {
+    if (get_param_value<int>("enrollment", "keepalive") == 0) {
         /* Keepalive mechanism disabled, don't trigger re-enrollments. */
         return;
     }
@@ -1713,7 +1713,7 @@ uipcp_rib::allocate_n_flows()
 {
     list<string> n_flow_allocations;
 
-    if (!params_map["resource-allocator"]["reliable-n-flows"].get_bool_value()) {
+    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
         /* Reliable N-flows feature disabled. */
         return;
     }

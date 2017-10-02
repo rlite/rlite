@@ -547,11 +547,23 @@ struct uipcp_rib {
                          const std::string& param_name,
                          const std::string& param_value);
 
+    template <class T>
+    T get_param_value(const std::string& component,
+                      const std::string& param_name);
+
 private:
 #ifdef RL_USE_QOS_CUBES
     int load_qos_cubes(const char *);
 #endif /* RL_USE_QOS_CUBES */
 };
+
+template <> bool
+uipcp_rib::get_param_value<bool>(const std::string& component,
+                                 const std::string& param_name);
+
+template <> int
+uipcp_rib::get_param_value<int>(const std::string& component,
+                                const std::string& param_name);
 
 static inline void
 reliable_spec(struct rina_flow_spec *spec)
