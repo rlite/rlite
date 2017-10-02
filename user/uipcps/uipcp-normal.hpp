@@ -116,6 +116,7 @@ struct NeighFlow {
     rl_port_t port_id;
     rl_ipcp_id_t lower_ipcp_id;
     int flow_fd; /* only used for close() */
+    int mgmt_flow_fd; /* if different from -1, use for management */
     bool reliable;
     int upper_flow_fd; /* TODO currently unused */
     CDAPConn *conn;
