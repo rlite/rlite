@@ -10,13 +10,11 @@ else()
     include_directories(${PYTHON_INCLUDE_PATH})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     # Global swig flags
-    set(CMAKE_SWIG_FLAGS "")
 
-    swig_add_module(rina python rlite.i)
+    swig_add_library(rina LANGUAGE python SOURCES rlite.i)
 
-    set_source_files_properties(cdap.i PROPERTIES CPLUSPLUS ON)
-    set_source_files_properties(cdap.i PROPERTIES SWIG_FLAGS "-c++")
-    swig_add_module(cdap python cdap.i)
+    set_property(SOURCE cdap.i PROPERTY CPLUSPLUS ON)
+    swig_add_library(cdap LANGUAGE python SOURCES cdap.i)
 
     # Tell the build system to link the _rina.so python module against
     # the librina-api.so library
