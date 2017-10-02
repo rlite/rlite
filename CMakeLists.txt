@@ -32,3 +32,4 @@ install(FILES include/rina/cdap.hpp DESTINATION usr/include/rina)
 install(FILES "include/rina/api.h" DESTINATION usr/include/rina)
 
 add_subdirectory(user)
+add_subdirectory(tests)
