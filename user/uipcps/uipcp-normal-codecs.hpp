@@ -79,7 +79,7 @@ struct RinaName {
     std::string aen;
     std::string aei;
 
-    RinaName() { }
+    RinaName() = default;
     RinaName(const std::string& apn_,
              const std::string& api_,
              const std::string& aen_,
@@ -110,7 +110,7 @@ struct DFTEntry : public UipcpObject {
 struct DFTSlice : public UipcpObject {
     std::list<DFTEntry> entries;
 
-    DFTSlice() { }
+    DFTSlice() = default;
     DFTSlice(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -123,7 +123,7 @@ struct NeighborCandidate : public UipcpObject {
     rlm_addr_t address;
     std::list<std::string> lower_difs;
 
-    NeighborCandidate() { }
+    NeighborCandidate() = default;
     NeighborCandidate(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 
@@ -136,7 +136,7 @@ struct NeighborCandidate : public UipcpObject {
 struct NeighborCandidateList : public UipcpObject {
     std::list<NeighborCandidate> candidates;
 
-    NeighborCandidateList() { }
+    NeighborCandidateList() = default;
     NeighborCandidateList(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -167,7 +167,7 @@ struct LowerFlow : public UipcpObject {
 struct LowerFlowList : public UipcpObject {
     std::list<LowerFlow> flows;
 
-    LowerFlowList() { }
+    LowerFlowList() = default;
     LowerFlowList(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -176,7 +176,7 @@ struct Property : public UipcpObject {
     std::string name;
     std::string value;
 
-    Property() { }
+    Property() = default;
     Property(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -196,7 +196,7 @@ struct QosSpec : public UipcpObject {
     uint32_t jitter;
     std::list<Property> extra_parameters;
 
-    QosSpec() { }
+    QosSpec() = default;
     QosSpec(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -207,7 +207,7 @@ struct PolicyDescr : public UipcpObject {
     std::string version;
     std::list<Property> parameters;
 
-    PolicyDescr() { }
+    PolicyDescr() = default;
     PolicyDescr(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -218,7 +218,7 @@ struct WindowBasedFlowCtrlConfig : public UipcpObject {
     PolicyDescr rcvr_flow_ctrl;
     PolicyDescr tx_ctrl;
 
-    WindowBasedFlowCtrlConfig() { }
+    WindowBasedFlowCtrlConfig() = default;
     WindowBasedFlowCtrlConfig(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -230,7 +230,7 @@ struct RateBasedFlowCtrlConfig : public UipcpObject {
     PolicyDescr no_override_default_peak;
     PolicyDescr rate_reduction;
 
-    RateBasedFlowCtrlConfig() { }
+    RateBasedFlowCtrlConfig() = default;
     RateBasedFlowCtrlConfig(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -250,7 +250,7 @@ struct FlowCtrlConfig : public UipcpObject {
     PolicyDescr reconcile_flow_ctrl;
     PolicyDescr receiving_flow_ctrl;
 
-    FlowCtrlConfig() { }
+    FlowCtrlConfig() = default;
     FlowCtrlConfig(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -267,7 +267,7 @@ struct RtxCtrlConfig : public UipcpObject {
     PolicyDescr sending_ack;
     PolicyDescr rcvr_ctrl_ack;
 
-    RtxCtrlConfig() { }
+    RtxCtrlConfig() = default;
     RtxCtrlConfig(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -280,7 +280,7 @@ struct DtcpConfig : public UipcpObject {
     PolicyDescr lost_ctrl_pdu;
     PolicyDescr rtt_estimator;
 
-    DtcpConfig() { }
+    DtcpConfig() = default;
     DtcpConfig(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -294,7 +294,7 @@ struct ConnPolicies : public UipcpObject {
     PolicyDescr sender_timer_inact;
     PolicyDescr init_seq_num;
 
-    ConnPolicies() { }
+    ConnPolicies() = default;
     ConnPolicies(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -367,7 +367,7 @@ struct AddrAllocRequest : public UipcpObject {
 struct AddrAllocEntries : public UipcpObject {
     std::list<AddrAllocRequest> entries;
 
-    AddrAllocEntries() { }
+    AddrAllocEntries() = default;
     AddrAllocEntries(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
