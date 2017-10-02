@@ -578,12 +578,12 @@ Carry out similar operations on node Y:
     $ sudo rlite-ctl ipcp-create ynorm.IPCP normal normal.DIF
     $ sudo rlite-ctl ipcp-register ynorm.IPCP udptunnel.DIF
 
-Finally, enable Y to be the first enroller for the normal DIF
+Finally, enable Y to be the first enroller for the normal DIF (you may ignore
+errors related to failure to register DAF names)
 
     $ sudo rlite-ctl ipcp-enroller-enable ynorm.IPCP
 
-and access X and enroll X with Y (or the other way around) in the
-normal DIF:
+and access X and enroll X with Y in the normal DIF:
 
     $ sudo rlite-ctl ipcp-enroll xnorm.IPCP normal.DIF udptunnel.DIF ynorm.IPCP
 
