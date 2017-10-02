@@ -146,9 +146,6 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 void
 NeighFlow::enrollment_abort()
 {
-    CDAPMessage m;
-    int ret;
-
     UPE(neigh->rib->uipcp, "Aborting enrollment\n");
 
     if (enroll_state == NEIGH_NONE) {
@@ -156,11 +153,16 @@ NeighFlow::enrollment_abort()
     }
     enroll_state_set(NEIGH_NONE);
 
-    m.m_release(gpb::F_NO_FLAGS);
-    ret = send_to_port_id(&m, 0, NULL);
-    if (ret) {
-        UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
-                               strerror(errno));
+    if (conn->connected()) {
+        CDAPMessage m;
+        int ret;
+
+        m.m_release(gpb::F_NO_FLAGS);
+        ret = send_to_port_id(&m, 0, NULL);
+        if (ret) {
+            UPE(neigh->rib->uipcp, "send_to_port_id() failed [%s]\n",
+                    strerror(errno));
+        }
     }
 
     if (conn) {
