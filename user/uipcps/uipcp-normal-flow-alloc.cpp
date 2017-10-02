@@ -411,26 +411,29 @@ int
 flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     map<string, FlowRequest>::iterator f;
-    stringstream obj_name;
+    stringstream obj_name_ext;
+    string obj_name;
     rlm_addr_t remote_addr;
     CDAPMessage *m;
 
     /* Lookup the corresponding FlowRequest, depending on whether we were
      * the initiator or not. */
     if (req->initiator) {
-        obj_name << obj_name::flows << "/" << rib->myaddr
+        obj_name_ext << obj_name::flows << "/" << rib->myaddr
                     << "-" << req->local_port_id;
-        f = flow_reqs.find(obj_name.str() + string("L"));
+        obj_name = obj_name_ext.str();
+        obj_name_ext <<  "L";
     } else {
-        obj_name << obj_name::flows << "/" << req->remote_addr
+        obj_name_ext << obj_name::flows << "/" << req->remote_addr
             << "-" << req->remote_port_id;
-
-        f = flow_reqs.find(obj_name.str() + string("R"));
+        obj_name = obj_name_ext.str();
+        obj_name_ext <<  "R";
     }
 
+    f = flow_reqs.find(obj_name_ext.str());
     if (f == flow_reqs.end()) {
         UPE(rib->uipcp, "Spurious flow deallocated notification, no object with name %s\n",
-                obj_name.str().c_str());
+                obj_name_ext.str().c_str());
         return -1;
     }
 
@@ -439,7 +442,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     remote_addr = req->initiator ? f->second.dst_addr : f->second.src_addr;
     flow_reqs.erase(f);
 
-    UPD(rib->uipcp, "Removed flow request %s\n", obj_name.str().c_str());
+    UPD(rib->uipcp, "Removed flow request %s\n", obj_name_ext.str().c_str());
 
     if (!(f->second.flags & RL_FLOWREQ_SEND_DEL)) {
         return 0;
@@ -447,8 +450,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We should wait 2 MPL here before notifying the peer. */
     m = rl_new(CDAPMessage(), RL_MT_CDAP);
-    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(),
-               0, 0, string());
+    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name, 0, 0, string());
 
     return rib->send_to_dst_addr(m, remote_addr, NULL);
 }
