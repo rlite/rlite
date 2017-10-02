@@ -212,6 +212,14 @@ argparser.add_argument('-A', '--addr-alloc-policy', type=str,
                        help = "Address allocation policy to be used for all DIFs")
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
+argparser.add_argument('-s', '--simulate', action='store_true',
+                       help = "Simulate network load using the rlite-rand-clients on each node")
+argparser.add_argument('-T', '--rand-period', default = 1, type = int,
+                       help = "Average time between to rinaperf spawn")
+argparser.add_argument('-D', '--rand-duration', default = 8, type = int,
+                       help = "Average duration of a rinaperf client")
+argparser.add_argument('-M', '--rand-max', default = 40, type = int,
+                       help = "Max number of spawned of rinaperf client")
 argparser.add_argument('-i', '--image',
                        help = "qcow2 image for legacy mode", type = str,
                        default = '')
@@ -818,12 +826,17 @@ for vmname in sorted(vms):
                         % vars_dict
             del vars_dict
 
+        vars_dict = {'echoname': 'rina-echo-async:%s' % vm['name'],
+                       'dif': dif, 'perfname': 'rinaperf:%s' % vm['name'],
+                       'randperiod': args.rand_period,
+                       'randdur': args.rand_duration,
+                       'randmax': args.rand_max}
         if args.register:
-            outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' \
-                    'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' \
-                    'nohup rlite-rand-clients -v > rlite-rand-clients.log &\n'\
-                        % {'echoname': 'rina-echo-async:%s' % vm['name'],
-                           'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
+            outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' % vars_dict
+        if args.simulate:
+            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' \
+                    'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s '\
+                                '-v > rlite-rand-clients.log &\n' % vars_dict
 
     outs +=         '\n'\
                     'sleep 1\n'\
