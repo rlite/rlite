@@ -247,11 +247,13 @@ dft_default::update_address(rlm_addr_t new_addr)
 {
     multimap< string, DFTEntry >::iterator mit;
     DFTSlice prop_dft;
+    DFTSlice del_dft;
 
     /* Update all the DFT entries corresponding to application that are
      * registered within us. */
     for (mit = dft_table.begin(); mit != dft_table.end(); mit ++) {
-        if (mit->second.address == rib->myaddr) {
+        if (mit->second.local && mit->second.address == rib->myaddr) {
+            del_dft.entries.push_back(mit->second);
             mit->second.address = new_addr;
             mit->second.timestamp = time64();
             prop_dft.entries.push_back(mit->second);
@@ -263,6 +265,10 @@ dft_default::update_address(rlm_addr_t new_addr)
     /* Disseminate the update. */
     if (prop_dft.entries.size()) {
         rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
+    }
+
+    if (del_dft.entries.size()) {
+        rib->neighs_sync_obj_all(false, obj_class::dft, obj_name::dft, &del_dft);
     }
 }
 
