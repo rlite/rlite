@@ -8,3 +8,7 @@ message hello_msg_t {
     required string tun_subnet = 3;
     required uint32 num_routes = 4;
 }
+
+message route_msg_t {
+    required string route = 1;
+}

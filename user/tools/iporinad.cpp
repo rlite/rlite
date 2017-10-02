@@ -153,6 +153,47 @@ HelloMsg::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+struct RouteMsg : public Msg {
+    string route;   /* Route represented as a string. */
+
+    RouteMsg() { }
+    RouteMsg(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+static void
+gpb2RouteMsg(RouteMsg &m, const gpb::route_msg_t &gm)
+{
+    m.route = gm.route();
+}
+
+static int
+RouteMsg2gpb(const RouteMsg &m, gpb::route_msg_t &gm)
+{
+    gm.set_route(m.route);
+
+    return 0;
+}
+
+RouteMsg::RouteMsg(const char *buf, unsigned int size)
+{
+    gpb::route_msg_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2RouteMsg(*this, gm);
+}
+
+int
+RouteMsg::serialize(char *buf, unsigned int size) const
+{
+    gpb::route_msg_t gm;
+
+    RouteMsg2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
 /*
  * Global variables to hold the daemon state.
  */
