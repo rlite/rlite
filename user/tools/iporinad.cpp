@@ -54,12 +54,13 @@ struct Remote {
     string tun_name;
     int tun_fd;
 
-    /* Flow for control connection. */
-    int rfd;
+    /* True if we need to publish our routes to this remote. */
+    bool pending;
 
-    Remote() : tun_fd(-1) { }
+    Remote() : tun_fd(-1), pending(true) { }
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
-                        dif_name(d), tun_subnet(i), tun_fd(-1), rfd(-1) { }
+                        dif_name(d), tun_subnet(i), tun_fd(-1),
+                        pending(true) { }
     int tun_alloc();
 };
 
@@ -525,11 +526,12 @@ connect_to_remotes(void *opaque)
                             re != g->remotes.end(); re ++) {
             struct rina_flow_spec spec;
             struct pollfd pfd;
+            int rfd;
             int ret;
             int wfd;
 
-            if (re->second.rfd >= 0) {
-                /* We are already connected to this remote. */
+            if (!re->second.pending) {
+                /* We already connected to this remote. */
                 continue;
             }
 
@@ -561,8 +563,8 @@ connect_to_remotes(void *opaque)
                 continue;
             }
 
-            re->second.rfd = rina_flow_alloc_wait(wfd);
-            if (re->second.rfd < 0) {
+            rfd = rina_flow_alloc_wait(wfd);
+            if (rfd < 0) {
                 perror("rina_flow_alloc_wait()");
                 cout << "Failed to connect to remote " << re->second.app_name <<
                         " through DIF " << re->second.dif_name << endl;
@@ -574,7 +576,7 @@ connect_to_remotes(void *opaque)
                         " through DIF " << re->second.dif_name << endl;
             }
 
-            CDAPConn conn(re->second.rfd, 1);
+            CDAPConn conn(rfd, 1);
             CDAPMessage m, *rm = NULL;
             Hello hello;
 
@@ -620,7 +622,8 @@ abor:
             if (rm) {
                 delete rm;
             }
-            close(re->second.rfd);
+            re->second.pending = false;
+            close(rfd);
         }
 
         sleep(5);
@@ -684,7 +687,6 @@ int main(int argc, char **argv)
 
     /* Wait for incoming control connections. */
     for (;;) {
-        Remote r;
         int cfd;
         int ret;
 
@@ -711,18 +713,13 @@ int main(int argc, char **argv)
 
         cout << "Flow accepted!" << endl;
 
-        r.rfd = cfd;
-        if (r.tun_alloc()) {
-            close(r.rfd);
-            continue;
-        }
-
-        CDAPConn conn(r.rfd, 1);
+        CDAPConn conn(cfd, 1);
         CDAPMessage *rm;
         CDAPMessage m;
         const char *objbuf;
         size_t objlen;
         Hello hello;
+        string remote_name;
 
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_CONNECT) {
@@ -730,9 +727,7 @@ int main(int argc, char **argv)
             goto abor;
         }
 
-        r.app_name = rm->src_appl;
-        r.dif_name = string();
-        g->remotes[r.app_name] = r;
+        remote_name = rm->src_appl;
 
         m.m_connect_r(rm, 0, string());
         if (conn.msg_send(&m, rm->invoke_id)) {
@@ -775,8 +770,21 @@ int main(int argc, char **argv)
             delete rm; rm = NULL;
             cout << "Received route " << robj.route << endl;
         }
+
+        if (g->remotes.count(remote_name) == 0) {
+            g->remotes[remote_name] = Remote();
+
+            Remote& r = g->remotes[remote_name];
+
+            r.app_name = remote_name;
+            r.dif_name = string();
+            if (r.tun_alloc()) {
+                close(cfd);
+                continue;
+            }
+        }
 abor:
-        close(r.rfd);
+        close(cfd);
     }
 
     pthread_exit(NULL);
