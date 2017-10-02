@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 2.8)
 
 project(rlite)
 
@@ -7,14 +7,19 @@ message(STATUS "C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")
 
 if(CMAKE_C_COMPILER STREQUAL "CMAKE_C_COMPILER-NOTFOUND")
-	message(FATAL_ERROR "Cannot find C compiler")
+    message(FATAL_ERROR "Cannot find C compiler")
 endif()
 
 if(CMAKE_CXX_COMPILER STREQUAL "CMAKE_CXX_COMPILER-NOTFOUND")
-	message(FATAL_ERROR "Cannot find C++ compiler")
+    message(FATAL_ERROR "Cannot find C++ compiler")
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+# Prepare compiler flags for C++11
+if (CMAKE_VERSION VERSION_LESS "3.1")
+    set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+else()
+    set(CMAKE_CXX_STANDARD 11)
+endif()
 
 # Some globbing and headers include
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
