@@ -655,18 +655,17 @@ RoutingEngine::compute_fwd_table()
             /* Delete the old one. */
             dst_addr = f->first;
             dst_node = f->second.first;
-            if (!dst_node.size()) {
-                dst_node = "any";
-            }
             port_id = f->second.second;
             ret = uipcp_pduft_del(uipcp, uipcp->id, dst_addr, port_id);
             if (ret) {
                 UPE(uipcp, "Failed to delete PDUFT entry for %s(%lu) "
-                           "(port=%u) [%s]\n", dst_node.c_str(),
+                           "(port=%u) [%s]\n",
+                           node_id_pretty(dst_node).c_str(),
                            (long unsigned)dst_addr, port_id, strerror(errno));
             } else {
                 UPD(uipcp, "Delete PDUFT entry for %s(%lu) (port=%u)\n",
-                           dst_node.c_str(), (long unsigned)dst_addr, port_id);
+                           node_id_pretty(dst_node).c_str(),
+                           (long unsigned)dst_addr, port_id);
             }
     }
 
@@ -677,7 +676,6 @@ RoutingEngine::compute_fwd_table()
             rlm_addr_t dst_addr;
             rl_port_t port_id;
             NodeId dst_node;
-            NodeId nhop;
             int ret;
 
             of = next_ports.find(f->first);
@@ -690,23 +688,19 @@ RoutingEngine::compute_fwd_table()
             /* Add the new one. */
             dst_addr = f->first;
             dst_node = f->second.first;
-            nhop = next_hops[dst_node].front();
-            if (!dst_node.size()) {  /* rename for pretty printing */
-                dst_node = "any";
-            }
             port_id = f->second.second;
             ret = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
             if (ret) {
                 UPE(uipcp, "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
                            "entry [%s]\n",
-                           dst_node.c_str(), (long unsigned)dst_addr,
-                           nhop.c_str(), port_id, strerror(errno));
+                           node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                           next_hops[dst_node].front().c_str(), port_id, strerror(errno));
                 /* Trigger re insertion next time. */
                 f->second = make_pair(NodeId(), 0);
             } else {
                 UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
-                           dst_node.c_str(), (long unsigned)dst_addr,
-                           nhop.c_str(), port_id);
+                           node_id_pretty(dst_node).c_str(), (long unsigned)dst_addr,
+                           next_hops[dst_node].front().c_str(), port_id);
             }
     }
 
@@ -745,10 +739,7 @@ RoutingEngine::dump(std::stringstream& ss) const
             continue;
         }
 
-        if (!dst_node.size()) {
-            dst_node = "any";
-        }
-        ss << "    Remote: " << dst_node << ", Next hops: ";
+        ss << "    Remote: " << node_id_pretty(dst_node) << ", Next hops: ";
         for (list<NodeId>::const_iterator lfa = h->second.begin();
                                 lfa != h->second.end(); lfa ++) {
             ss << *lfa;

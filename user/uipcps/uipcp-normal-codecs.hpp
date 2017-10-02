@@ -50,6 +50,14 @@
 
 typedef std::string NodeId;
 
+/* Helper for pretty printing of default route. */
+static inline std::string node_id_pretty(const NodeId& node) {
+    if (node == std::string()) {
+        return std::string("any");
+    }
+    return node;
+}
+
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
     virtual ~UipcpObject() { }
