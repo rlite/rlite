@@ -734,43 +734,56 @@ execute_command(const string& cmds)
 int
 Remote::ip_configure() const
 {
-    stringstream cmdss;
+    {
+        /* Flush previous IP addresses, if any. */
+        stringstream cmdss;
 
-    /* Flush previous IP addresses, if any. */
-    cmdss = stringstream();
-    cmdss << "ip addr flush dev " << tun_name;
-    if (execute_command(cmdss)) {
-        cerr << "Failed to flush address for interface " << tun_name << endl;
-        return -1;
+        cmdss << "ip addr flush dev " << tun_name;
+        if (execute_command(cmdss)) {
+            cerr << "Failed to flush address for interface "
+                    << tun_name << endl;
+            return -1;
+        }
     }
 
-    /* Disable TSO and GSO. */
-    cmdss = stringstream();
-    cmdss << "ethtool -K " << tun_name << " tso off gso off";
-    if (execute_command(cmdss)) {
-        cerr << "Failed to disable TSO and GSO for " << tun_name << endl;
-        return -1;
+    {
+        /* Disable TSO and GSO. */
+        stringstream cmdss;
+
+        cmdss << "ethtool -K " << tun_name << " tso off gso off";
+        if (execute_command(cmdss)) {
+            cerr << "Failed to disable TSO and GSO for " << tun_name << endl;
+            return -1;
+        }
     }
 
-    /* Bring the tunnel device up. */
-    cmdss = stringstream();
-    cmdss << "ip link set dev " << tun_name << " up";
-    if (execute_command(cmdss)) {
-        cerr << "Failed to bring device " << tun_name << " up" << endl;
-        return -1;
+    {
+        /* Bring the tunnel device up. */
+        stringstream cmdss;
+
+        cmdss << "ip link set dev " << tun_name << " up";
+        if (execute_command(cmdss)) {
+            cerr << "Failed to bring device " << tun_name << " up" << endl;
+            return -1;
+        }
     }
 
-    /* Assign the designated IP address to the tunnel device. */
-    cmdss = stringstream();
-    cmdss << "ip addr add " << tun_local_addr.repr << " dev " << tun_name;
-    if (execute_command(cmdss)) {
-        cerr << "Failed to assign IP address to interface " << tun_name << endl;
-        return -1;
+    {
+        /* Assign the designated IP address to the tunnel device. */
+        stringstream cmdss;
+
+        cmdss << "ip addr add " << tun_local_addr.repr << " dev " << tun_name;
+        if (execute_command(cmdss)) {
+            cerr << "Failed to assign IP address to interface "
+                    << tun_name << endl;
+            return -1;
+        }
     }
 
     /* Setup the routes advertised by the remote peer. */
     for (set<Route>::iterator ri = routes.begin(); ri != routes.end(); ri ++) {
-        cmdss = stringstream();
+        stringstream cmdss;
+
         cmdss << "ip route add " << static_cast<string>(ri->subnet) << " via " <<
                     tun_remote_addr.noprefix() << " dev " << tun_name;
         if (execute_command(cmdss)) {
