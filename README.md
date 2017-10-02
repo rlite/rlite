@@ -221,12 +221,14 @@ Other programs are available for testing and deployment:
 
 * **rinaperf**, a multi-threaded client/server application for network
                 throughput and latency performance measurement. Use
-                `rinaperf -h` to see the available commmands.
+                `rinaperf -h` to see the available commmands. This program
+                is described in section 7.3.
 * **rina-echo-async**, a single-threaded client/server application
                        implementing a echo service using only
                        non-blocking I/O. This application is able to allocate
                        and manage multiple flows in parallel, without using
-                       blocking allocation or blocking I/O.
+                       blocking allocation or blocking I/O. This program is
+                       described in section 7.4.
 * **rina-gw**, a deamon program implementing a gateway between a TCP/IP
                network and a RINA network.
 * **iporinad**, a daemon program which is able to tunnel IP traffic over
