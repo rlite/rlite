@@ -939,6 +939,24 @@ with 64 GB of RAM it is possible to deploy a ring of 350 nodes, when
 giving each node the default amount of memory.
 
 
+## 9. RINA API documentation
+A convenient way to introduce the RINA API is to show how a simple application
+would use the client-side and server-side API calls. This also eases the
+comparison with sockets, where a similar walkthrough is often presented. Note
+that in this context the term client simply refers to the initiator of the
+flow allocation procedure (or TCP connection), while the term server refers to
+the other peer. The discussion here, in other words, does not imply that the
+client/server paradigm must be applied; the walkthrough is more general, being
+valid also for other distributed application paradigms (e.g. peer-to-peer).
+The workflow presented in this subsection refers to the
+case of blocking operation, that is the API calls may block waiting for
+asynchronous events; moreover, for the sake
+of exposition, we assume that the operations do not fail. Non-blocking
+operations and errors are however covered by the API specification (section
+9.2) and the examples (section 9.4).
+
+
+
 ## Credits
 
 *rlite* is a community-driven project partially supported by the EU FP7
