@@ -23,6 +23,7 @@
 #include <rina/api.h>
 
 #include <rina/cdap.hpp>
+#include "fdfwd.hpp"
 #include "iporina.pb.h"
 
 using namespace std;
@@ -122,6 +123,8 @@ struct Remote {
     int ip_configure() const;
 };
 
+#define NUM_WORKERS     1
+
 struct IPoRINA {
     /* Enable verbose mode */
     int verbose;
@@ -129,11 +132,16 @@ struct IPoRINA {
     /* Control device to listen for incoming connections. */
     int rfd;
 
+    /* Daemon configuration. */
     Local                   local;
     map<string, Remote>     remotes;
     list<Route>             local_routes;
 
-    IPoRINA() : verbose(0), rfd(-1) { }
+    /* Worker threads that forward traffic. */
+    vector<FwdWorker*> workers;
+
+    IPoRINA();
+    ~IPoRINA();
 };
 
 /*
@@ -303,6 +311,20 @@ string2int(const string& s, int& ret)
     }
 
     return 0;
+}
+
+IPoRINA::IPoRINA() : verbose(0), rfd(-1)
+{
+    for (int i = 0; i < NUM_WORKERS; i ++) {
+        workers.push_back(new FwdWorker(i, verbose));
+    }
+}
+
+IPoRINA::~IPoRINA()
+{
+    for (unsigned int i=0; i<workers.size(); i++) {
+        delete workers[i];
+    }
 }
 
 IPAddr::IPAddr(const string &_p) : repr(_p)

@@ -179,7 +179,7 @@ Gateway::Gateway()
     appl_name = "rina-gw/1";
 
     /* Start workers. */
-    for (int i=0; i<NUM_WORKERS; i++) {
+    for (int i = 0; i < NUM_WORKERS; i ++) {
         workers.push_back(new FwdWorker(i, verbose));
     }
 }
