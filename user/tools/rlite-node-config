@@ -7,6 +7,19 @@ import re
 import os
 
 
+# Clean up a string or bytearray that comes from process output
+def strclean(s):
+    s = str(s)
+    s = s.replace("\\n", "\n")
+    if s.startswith("b\'") or s.startswith("b\""):
+        s = s[2:]
+        if s[-1] in ["\'", "\""]:
+            s = s[:-1]
+    if len(s) > 0 and s[-1] == '\n':
+        s = s[:-1]
+    return s
+
+
 description = "Simple configuration tool for rlite"
 epilog = "2017 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -54,13 +67,13 @@ fin.close()
 for cmd in cmds:
     cmdargs = ['rlite-ctl'] + cmd[1]
     try:
-        subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+        o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
     except Exception as e:
-        o = str(e.output)
-        o = o.strip()
+        o = strclean(e.output)
         print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
         quit()
     print('executed %s' % ' '.join(cmdargs))
+    o = strclean(o)
 
 i = 1
 n = len(enrolls)
@@ -68,14 +81,14 @@ for cmd in enrolls:
     cmdargs = ['rlite-ctl'] + cmd[1]
     while 1:
         try:
-            subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+            o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
             break
         except Exception as e:
-            o = str(e.output)
-            o = o.strip()
+            o = strclean(e.output)
             print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
             time.sleep(3)
     print('executed %s' % ' '.join(cmdargs))
+    o = strclean(o)
 
     print('Enrollment %d/%d successfully completed' % (i, n))
     i += 1
