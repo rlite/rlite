@@ -43,10 +43,10 @@
 #include "kerconfig.h"
 
 /* Include for signal_pending() */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0)
-#include <linux/sched.h>
-#else
+#ifdef RL_SIGNAL_PENDING_IN_SCHED_SIGNAL
 #include <linux/sched/signal.h>
+#else
+#include <linux/sched.h>
 #endif
 
 /*
