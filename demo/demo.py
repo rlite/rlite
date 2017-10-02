@@ -836,6 +836,13 @@ for vmname in sorted(vms):
                         % vars_dict
             del vars_dict
 
+        if dif not in vm['enrolling']:
+            vars_dict = {'dif': dif, 'id': vm['id']}
+            outs += '$SUDO rlite-ctl ipcp-enroller-enable %(dif)s.%(id)s.IPCP:%(id)s\n'\
+                        % vars_dict
+            print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
+            del vars_dict
+
         vars_dict = {'echoname': 'rina-echo-async:%s' % vm['name'],
                        'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
         if args.register:
@@ -864,9 +871,6 @@ for vmname in sorted(vms):
             cmd += '\n'
             del vars_dict
             enroll_cmds.append(cmd)
-
-        if dif not in vm['enrolling']:
-            print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
 
     # Generate /etc/rina/initscript
     outs += 'cat > .initscript << EOF\n'
