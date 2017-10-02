@@ -1,33 +1,29 @@
-#############################################################################
-## Table of contents                                                        #
-#############################################################################
-
-* 0. Introduction
-* 1. Software requirements
-* 2. Build instructions
-* 3. Overview of the software components
-    * 3.1. Kernel modules
-    * 3.2. Userspace IPCPs daemon
-    * 3.3. Libraries
-    * 3.4. Control tool
-    * 3.5. Other tools
-    * 3.6. Python bindings
-* 4. Tutorials
-    * 4.1 Using the demonstrator
-    * 4.2 Hands-on tutorial #1: normal-over-shim-eth
-    * 4.3 Hands-on tutorial #2: normal-over-shim-udp
-* 5. Configuration of IPC Processes
-    * 5.1. shim-eth IPC Process
-    * 5.2. shim-udp4 IPC Process
-    * 5.3. shim-tcp4 IPC Process
-    * 5.4. shim-loopback IPC Process
-    * 5.5. Normal IPC Process
-        * 5.5.1 IPCP flavours to support different data transfer constants
+## Table of contents
+1. Introduction
+2. Software requirements
+3. Build instructions
+4. Overview of the software components
+    41. Kernel modules
+    42. Userspace IPCPs daemon
+    43. Libraries
+    44. Control tool
+    45. Other tools
+    46. Python bindings
+5. Tutorials
+	51. Using the demonstrator
+    52. Hands-on tutorial #1: normal-over-shim-eth
+	53. Hands-on tutorial #2: normal-over-shim-udp
+6. Configuration of IPC Processes
+	61. shim-eth IPC Process
+	62. shim-udp4 IPC Process
+	63. shim-tcp4 IPC Process
+	64. shim-loopback IPC Process
+	65. Normal IPC Process
+		6.5.1 IPCP flavours to support different data transfer constants
 
 
-#############################################################################
-## 0. Introduction                                                          #
-#############################################################################
+
+## 1. Introduction
 
 The *rlite* project provides a lightweight Free and Open Source implementation
 of the Recursive InterNetwork Architecture (RINA) for GNU/Linux operating
@@ -46,9 +42,8 @@ additionally offering the QoS awareness built into RINA.
 The application API can be found in the include/rina/api.h header file.
 
 
-#############################################################################
-## 1. Software requirements                                                 #
-#############################################################################
+
+## 2. Software requirements
 
 This section lists the software packages required to build and run *rlite* on
 Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are explicitly
@@ -56,7 +51,6 @@ indicated here, but using other distributions should be equally
 straightforward.
 
 ### Ubuntu 14.04 and Debian 8
-#############################################################################
 
 * gcc
 * g++
@@ -67,7 +61,6 @@ straightforward.
 * python, swig [optional, for python bindings]
 
 ### Archlinux
-#############################################################################
 
 * gcc
 * cmake
@@ -81,9 +74,8 @@ using yaourt:
     $ yaourt --noconfirm -S rlite-git
 
 
-#############################################################################
-## 2. Build instructions                                                       #
-#############################################################################
+
+## 3. Build instructions
 
 Download the repo and enter the root directory
 
@@ -104,14 +96,12 @@ Install *rlite* on the system
 
 
 
-#############################################################################
-## 3. Overview of the software components                                   #
-#############################################################################
+
+## 4. Overview of the software components
 
 This section briefly describes the software components of *rlite*.
 
-### 3.1. Kernel modules
-#############################################################################
+### 4.1. Kernel modules
 
 A main kernel module **rlite** which implements core functionalities:
 
@@ -134,8 +124,7 @@ A separate module for each type of IPCP:
 * **rlite-shim-loopback**, implementing a loopback shim IPCP.
 
 
-### 3.2. Userspace IPCPs daemon
-#############################################################################
+### 4.2. Userspace IPCPs daemon
 
 A daemon program, **rlite-uipcps**, which implements the user-space part of
 the normal IPCP, the shim-udp4, and shim-tcp4. A main thread listens on a UNIX
@@ -161,8 +150,7 @@ Run
 to see the available options.
 
 
-### 3.3. Libraries
-#############################################################################
+### 4.3. Libraries
 
 The following libraries are available:
 
@@ -176,8 +164,7 @@ The following libraries are available:
 * **cdap**, a C++ implementation of the CDAP protocol.
 
 
-### 3.4. Control tool
-#############################################################################
+### 4.4. Control tool
 
 The **rlite-ctl** command line tool is used for the administration of the
 *rlite* stack, in the same way as the *iproute2* tool is used to administer
@@ -203,8 +190,7 @@ To show all the available command and the corresponding usage, use
     $ rlite-ctl -h
 
 
-### 3.5. Other tools
-#############################################################################
+### 4.5. Other tools
 
 Other programs are available for testing and deployment:
 
@@ -240,8 +226,7 @@ flow, using 1200 bytes sized SDUs:
     $ rinaperf -t perf -d -n.DIF -s 1200
 
 
-### 3.6. Python bindings
-#############################################################################
+### 4.6. Python bindings
 
 If your system supports Python, you can write applications using the *rlite*
 Python bindings, which are a wrapper for the POSIX-like API exported by
@@ -255,12 +240,9 @@ The **rina-toy** script is a trivial example written using these bindings.
 
 
 
-#############################################################################
-## 4. Tutorials                                                             #
-#############################################################################
+## 5. Tutorials
 
-### 4.1 Using the demonstrator
-#############################################################################
+### 5.1 Using the demonstrator
 
 The demonstrator is a tool written in Python which allows you to deploy
 arbitrarily complex RINA networks, within your PC, using light Virtual
@@ -287,7 +269,7 @@ following differences:
 2. The name of **eth** instances does not need to be a valid VLAN id
 
 
-#### 4.1.1 Mini-tutorial
+#### 5.1.1 Mini-tutorial
 
 Enter the demo directory and run
 
@@ -335,7 +317,7 @@ Exit the node shell and teardown the scenario:
     $ ./down.sh
 
 
-### 4.2 Hands-on tutorial #1: normal-over-shim-eth
+### 5.2 Hands-on tutorial #1: normal-over-shim-eth
 #############################################################################
 
 This tutorial shows how to manually reproduce the configuration described
@@ -451,7 +433,7 @@ On node C:
     $ rinaperf -d n.DIF -t perf -s 1400 -c 100000
 
 
-### 4.3 Hands-on tutorial #2: normal-over-shim-udp
+### 5.3 Hands-on tutorial #2: normal-over-shim-udp
 #############################################################################
 
 This tutorial illustrates a simple example of deploying the shim-udp to
@@ -474,7 +456,7 @@ configuration) here we will assume that each network is composed by only one
 node; let X be the node of the first network and Y the node of the second
 network. In a real deployment, of course, X and Y would be just the edge
 nodes of a bigger RINA nework (e.g. with nodes physically connected through
-shim-eth DIFs like shown in section 4.2), and act as a *gateway* towards
+shim-eth DIFs like shown in section 5.2), and act as a *gateway* towards
 the IP network.
 
 We will assume that IP connectivity has been setup properly between X and Y.
@@ -530,17 +512,14 @@ Access Y and run the rinaperf client (in ping mode):
     $ rinaperf
 
 
-#############################################################################
-## 5. Configuration of IPC Processes                                        #
-#############################################################################
+## 6. Configuration of IPC Processes
 
 Each type of IPC Process has different configuration needs. shim IPC
 Processes, in particular, wrap a legacy transport technology; their
 configuration is closely related to the corresponding technology.
 
 
-### 5.1. shim-eth IPC Process
-#############################################################################
+### 6.1. shim-eth IPC Process
 
 The shim DIF over Ethernet wraps an L2 Ethernet network. A shim-eth IPCP
 must be configured with the O.S. name of the Ethernet Network Interface Card
@@ -553,8 +532,7 @@ In the following example
 a shim IPCP called ether3:181 is assigned a network interface called eth2.
 
 
-### 5.2. shim-udp4 IPC Process
-#############################################################################
+### 6.2. shim-udp4 IPC Process
 
 The shim DIF over UDP/IPv4 wraps an arbitrary IPv4 network that supports UDP
 as a transport protocol. As a lower level mechanisms, regular UDP sockets are
@@ -603,8 +581,7 @@ enough for any need. In other words, creating more shim IPCPs on the same node
 is pointless.
 
 
-### 5.3. shim-tcp4 IPC Process
-#############################################################################
+### 6.3. shim-tcp4 IPC Process
 
 In spite of the name being similar, the shim DIF over TCP/IPv4 is fundamentally
 different from its UDP counterpart. While the name of an application running
@@ -645,8 +622,7 @@ are not expected to focus on it. It is strongly recommended to always use the
 UDP shim when interfacing *rlite* with IP networks.
 
 
-### 5.4. shim-loopback IPC Process
-#############################################################################
+### 6.4. shim-loopback IPC Process
 
 The shim-loopback conceptually wraps a loopback network device. SDUs sent on
 a flow supported by this shim are forwarded to another flow supported by the
@@ -664,8 +640,7 @@ It supports two configuration parameter:
                     **drop_fract** SDUs.
 
 
-### 5.5. Normal IPC Process
-#############################################################################
+### 6.5. Normal IPC Process
 
 A normal IPC Process can be manually configured with an address unique in its
 DIF.
@@ -681,7 +656,7 @@ where a normal IPCP called normal1:xyz is given the address 7382 to be used
 in its DIF.
 
 
-### 5.5.1 IPCP flavours to support different data transfer constants
+### 6.5.1 IPCP flavours to support different data transfer constants
 
 The data transfer constants of the normal IPCP (e.g. size of EFCP sequence
 numbers, addresses, CEP-ids, ...) are hardcoded in the **normal.ko** kernel
@@ -713,9 +688,7 @@ You are free to add/modify flavours depending on your needs, and use
 the different flavours together.
 
 
-#############################################################################
 ## Credits
-#############################################################################
 
 *rlite* is a community-driven project partially supported by the EU FP7
 projects PRISTINE and ARCFIRE.
