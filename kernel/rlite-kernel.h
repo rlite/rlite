@@ -333,7 +333,7 @@ rb_list_empty(struct rb_list *list)
 static inline void
 rb_list_enq(struct rl_buf *elem, struct rb_list *list)
 {
-    /* TODO make safe */
+    BUG_ON(elem->prev != NULL || elem->next != NULL);
     list->prev->next = elem;
     elem->next = (struct rl_buf *)list;
     elem->prev = list->prev;
