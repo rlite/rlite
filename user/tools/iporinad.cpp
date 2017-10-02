@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
-
+#include <poll.h>
 #include <rina/api.h>
 
 using namespace std;
@@ -43,8 +43,11 @@ struct Remote {
     string tun_name;
     int tun_fd;
 
+    /* Flow for control connection. */
+    int rfd;
+
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
-                        dif_name(d), tun_subnet(i), tun_fd(-1) { }
+                        dif_name(d), tun_subnet(i), tun_fd(-1), rfd(-1) { }
 };
 
 struct Route {
@@ -380,6 +383,64 @@ int main(int argc, char **argv)
 
     if (setup()) {
         return -1;
+    }
+
+    for (;;) {
+        for (list<Remote>::iterator l = g->remotes.begin();
+                            l != g->remotes.end(); l ++) {
+            struct rina_flow_spec spec;
+            struct pollfd pfd;
+            int ret;
+            int wfd;
+
+            if (l->rfd >= 0) {
+                /* We are already connected to this remote. */
+                continue;
+            }
+
+            /* Tyr to allocate a reliable flow. */
+            rina_flow_spec_default(&spec);
+            spec.max_sdu_gap = 0;
+            spec.in_order_delivery = 1;
+            spec.msg_boundaries = 0;
+            spec.spare3 = 1;
+            wfd = rina_flow_alloc(l->dif_name.c_str(), "iporinad",
+                                  l->app_name.c_str(), &spec, RINA_F_NOWAIT);
+            if (wfd < 0) {
+                perror("rina_flow_alloc()");
+                cout << "Failed to connect to remote " << l->app_name <<
+                        " through DIF " << l->dif_name << endl;
+                continue;
+            }
+            pfd.fd = wfd;
+            pfd.events = POLLIN;
+            ret = poll(&pfd, 1, 3000);
+            if (ret <= 0) {
+                if (ret < 0) {
+                    perror("poll(cfd)");
+                } else if (g->verbose) {
+                    cout << "Failed to connect to remote " << l->app_name <<
+                            " through DIF " << l->dif_name << endl;
+                }
+                close(wfd);
+                continue;
+            }
+
+            l->rfd = rina_flow_alloc_wait(wfd);
+            if (l->rfd < 0) {
+                perror("rina_flow_alloc_wait()");
+                cout << "Failed to connect to remote " << l->app_name <<
+                        " through DIF " << l->dif_name << endl;
+                continue;
+            }
+
+            if (g->verbose) {
+                cout << "Connected to remote " << l->app_name <<
+                        " through DIF " << l->dif_name << endl;
+            }
+        }
+
+        sleep(5);
     }
 
     return 0;
