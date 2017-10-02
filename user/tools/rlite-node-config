@@ -57,7 +57,8 @@ for cmd in enrolls:
     cmdargs = ['rlite-ctl'] + cmd[1]
     while 1:
         try:
-            subprocess.check_call(cmdargs)
+            subprocess.check_output(cmdargs)
         except Exception as e:
-            print("Enrollment at line %s failed --> %s" % (cmd[0], e))
+            e.output = e.output.strip()
+            print("Enrollment at line %s failed --> %s" % (cmd[0], e.output))
             time.sleep(3)
