@@ -1461,7 +1461,7 @@ Neighbor::flow_alloc(const char *supp_dif)
                                                      &relspec) == 0);
     UPD(rib->uipcp, "N-1 DIF %s has%s reliable flows\n", supp_dif,
                                         (use_reliable_flow ? "" : " not"));
-    if (!rib->uipcp->uipcps->reliable_flows) {
+    if (!rib->reliable_flows) {
         /* Force unreliable flows even if we have reliable ones. */
         use_reliable_flow = false;
     }
@@ -1717,7 +1717,7 @@ uipcp_rib::allocate_n_flows()
 {
     list<string> n_flow_allocations;
 
-    if (!uipcp->uipcps->reliable_n_flows) {
+    if (!reliable_n_flows) {
         /* Reliable N-flows feature disabled. */
         return;
     }

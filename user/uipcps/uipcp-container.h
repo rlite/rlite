@@ -47,12 +47,6 @@ struct uipcps {
     pthread_mutex_t lock;
     int n_uipcps;
 
-    /* Use reliable N-flows if reliable N-1-flows are not available. */
-    int reliable_n_flows;
-
-    /* Use reliable N-1-flows rather than unreliable ones. */
-    int reliable_flows;
-
     /* List of IPCP "nodes", used for topological sorting and computation
      * of IPCP hdroom and maximum SDU size. */
     struct list_head ipcp_nodes;
