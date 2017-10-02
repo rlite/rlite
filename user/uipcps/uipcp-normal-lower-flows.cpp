@@ -291,11 +291,10 @@ lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 int
-lfdb_default::neighs_refresh()
+lfdb_default::neighs_refresh(size_t limit)
 {
     map< rlm_addr_t, map< rlm_addr_t, LowerFlow > >::iterator it;
     map< rlm_addr_t, LowerFlow >::iterator jt;
-    unsigned int limit = 10;
     int ret = 0;
 
     if (db.size() == 0) {

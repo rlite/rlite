@@ -302,3 +302,30 @@ dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 
     return ret;
 }
+
+/* Propagate local entries (i.e. the ones corresponding to locally
+ * registered applications) to all our neighbors. */
+int
+dft_default::neighs_refresh(size_t limit)
+{
+    int ret = 0;
+
+    for (multimap< string, DFTEntry >::const_iterator e = dft_table.begin();
+            e != dft_table.end();) {
+        DFTSlice dft_slice;
+
+        while (dft_slice.entries.size() < limit && e != dft_table.end()) {
+            if (e->second.local) {
+                dft_slice.entries.push_back(e->second);
+            }
+            e ++;
+        }
+
+        if (dft_slice.entries.size()) {
+            ret |= rib->neighs_sync_obj_all(true, obj_class::dft,
+                                            obj_name::dft, &dft_slice);
+        }
+    }
+
+    return ret;
+}
