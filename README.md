@@ -1020,7 +1020,7 @@ call this function as a first step to implement server-side functionalities.
 
     int rina_register(int fd, const char *dif, const char *appl, int flags)
     
-    This function registers the application name appl to a DIF in the system. After a successful
+This function registers the application name appl to a DIF in the system. After a successful
 registration, flow allocation requests can be received on fd by means of rina flow accept().
 If dif is not NULL, the system may register the application to dif. However, the dif argument
 is only advisory and the implementation is free to ignore it. If DIF is NULL, the system au-
@@ -1073,6 +1073,82 @@ is functionally equivalent to
     cfd = rina_flow_respond(sfd, h, 0 /* positive response */);
     
 On error -1 is returned, with the errno code properly set.
+
+    int rina_flow_respond(int fd, int handle, int response)
+
+This function is called to emit a verdict on the flow allocation request identified by handle,
+that was previously received on fd by calling rina flow accept() with the RINA F NORESP
+flag set. A zero response indicates a positive response, which completes the flow allocation procedure.
+A non-zero response indicates that the flow allocation request is denied. In both cases
+response is sent to the requesting application to inform it about the verdict. When the response
+is positive, on success this function returns a file descriptor that can be subsequently used with
+standard I/O system calls to exchange SDUs on the flow and synchronize. When the response is
+negative, 0 is returned on success. In any case, -1 is returned on error, with the errno code properly
+set.
+
+    int rina_flow_alloc(const char *dif, const char *local_appl,
+                        const char *remote_appl,
+                        const struct rina_flow_spec *flowspec,
+                        unsigned int flags);
+                        
+This function is called to issue a flow allocation request towards the destination application
+called remote appl, using local appl as a source application name. If flowspec is not
+NULL, it specifies the QoS parameters to be used for the flow, should the flow allocation request
+be successful. If it is NULL, an implementation-specific default QoS will be assumed instead
+(which typically corresponds to a best-effort QoS). If dif is not NULL the system may look for
+remote appl in a DIF called dif. However, the dif argument is only advisory and the system
+is free to ignore it and take an autonomous decision.
+If flags specifies RINA F NOWAIT, a call to this function does not wait until the completion
+of the flow allocation procedure; on success, it just returns a control file descriptor that can be
+subsequently fed to rina flow alloc wait() to wait for completion and obtain the flow I/O
+file descriptor. Moreover, the control file descriptor can be used with poll(), select() and
+similar.
+If flags does not specify RINA F NOWAIT, a call to this function waits until the flow allocation
+procedure is complete. On success, it returns a file descriptor that can be subsequently used
+with standard I/O system calls to exchange SDUs on the flow and synchronize.
+In any case, -1 is returned on error, with the errno code properly set.
+
+    int rina_flow_alloc_wait(int wfd)
+    
+This function waits for the completion of a flow allocation procedure previosuly initiated with
+a call to rina flow alloc() with the RINA F NOWAIT flag set. The wfd file descriptor
+must match the one returned by rina flow alloc(). On success, it returns a file descriptor
+that can be subsequently used with standard I/O system calls to exchange SDUs on the flow and
+synchronize. On error -1 is returned, with the errno code properly set.
+
+    struct rina_flow_spec {
+        uint64_t max_sdu_gap; /* in SDUs */
+        uint64_t avg_bandwidth; /* in bits per second */
+        uint32_t max_delay; /* in microseconds */
+        uint16_t max_loss; /* percentage */
+        uint32_t max_jitter; /* in microseconds */
+        uint8_t in_order_delivery; /* boolean */
+        uint8_t msg_boundaries; /* boolean */
+    };
+    void rina_flow_spec_default(struct rina_flow_spec *spec)
+        
+This function fills in the provided spec with an implementation-specific default QoS, which
+should correspond to a best-effort QoS. The fields of the rina flow spec data structure specify
+the QoS of a RINA flow as follows:
+ * max sdu gap specifies the maximum number of consecutive SDUs that can be lost without
+violating the QoS. Specifying -1 means that there is no maximum, and so the flow is
+unreliable; 0 means that no SDU can be lost and so the flow is reliable.
+ * avg bandwidth specifies the maximum bandwidth that should be guaranteed on this flow,
+in bits per second.
+ * max delay specifies the maximum one-way latency that can be experienced by SDUs of
+this flow without violating the QoS, expressed in microseconds.
+ * max loss specifies the maximum percentage of SDUs that can be lost on this flow without
+violating the QoS.
+ * max jitter specifies the maximum jitter that can be experienced by SDUs on this flow
+without violating the QoS.
+ * in order delivery, if true requires that the SDUs are delivered in order on this flow
+(no SDU reordering is allowed).
+ * msg boundaries: if true, the flow is stream-oriented, like TCP; a stream-oriented flow
+does not preserve message boundaries, and therefore write() and read() system calls
+are used to exchange a stream of bytes, and the granularity of the exchange is the byte.
+If false, the flow is datagram-oriented, like UDP, and does preserve message boundaries.
+The I/O system calls are used to exchanges messages (SDUs), and the granularity of the
+exchange is the message.    
 
 
 
