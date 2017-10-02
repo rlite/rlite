@@ -349,18 +349,19 @@ worker_fn(void *opaque)
                 req->msg_type);
     }
 out:
-    if (req) {
-        rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
-    }
     if (ret) {
         struct rl_msg_base_resp resp;
 
         PE("Invalid message received [type=%d]\n",
-                req->msg_type);
+           req ? req->msg_type : RLITE_U_MSG_MAX);
         resp.msg_type = RLITE_U_BASE_RESP;
-        resp.event_id = req->event_id;
+        resp.event_id = req ? req->event_id : 0;
         resp.result = RLITE_ERR;
         rl_msg_write_fd(wi->cfd, RLITE_MB(&resp));
+    }
+
+    if (req) {
+        rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
     }
 
     /* Close the connection. */
