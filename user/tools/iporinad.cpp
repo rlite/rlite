@@ -910,12 +910,13 @@ usage(void)
 {
     cout << "iporinad [OPTIONS]" << endl <<
         "   -h : show this help" << endl <<
-        "   -c CONF_FILE: path to configuration file" << endl;
+        "   -c CONF_FILE: path to config file "
+                "(default /etc/rina/iporinad.conf)" << endl;
 }
 
 int main(int argc, char **argv)
 {
-    const char *confpath = "/etc/iporinad.conf";
+    const char *confpath = "/etc/rina/iporinad.conf";
     struct pollfd pfd[1];
     pthread_t fa_th;
     int opt;
