@@ -170,9 +170,8 @@ EnrollmentInfo::serialize(char *buf, unsigned int size) const
     gm.set_address(address);
     gm.set_startearly(start_early);
 
-    for (list<string>::const_iterator dif = lower_difs.begin();
-                            dif != lower_difs.end(); dif++) {
-        gm.add_supportingdifs(*dif);
+    for (const string& dif : lower_difs) {
+        gm.add_supportingdifs(dif);
     }
 
     return ser_common(gm, buf, size);
@@ -243,13 +242,12 @@ DFTSlice::serialize(char *buf, unsigned int size) const
 {
     gpb::directoryForwardingTableEntrySet_t gm;
 
-    for (list<DFTEntry>::const_iterator e = entries.begin();
-                    e != entries.end(); e++) {
+    for (const DFTEntry& e : entries) {
         gpb::directoryForwardingTableEntry_t *gentry;
         int ret;
 
         gentry = gm.add_directoryforwardingtableentry();
-        ret = DFTEntry2gpb(*e, *gentry);
+        ret = DFTEntry2gpb(e, *gentry);
         if (ret) {
             return ret;
         }
@@ -277,9 +275,8 @@ NeighborCandidate2gpb(const NeighborCandidate &cand, gpb::neighbor_t &gm)
     gm.set_applicationprocessinstance(cand.api);
     gm.set_address(cand.address);
 
-    for (list<string>::const_iterator dif = cand.lower_difs.begin();
-                            dif != cand.lower_difs.end(); dif++) {
-        gm.add_supportingdifs(*dif);
+    for (const string& dif : cand.lower_difs) {
+        gm.add_supportingdifs(dif);
     }
 
     return 0;
@@ -314,13 +311,11 @@ NeighborCandidate::operator==(const NeighborCandidate &o) const
 
     set<string> s1, s2;
 
-    for (list<string>::const_iterator lit = lower_difs.begin();
-                                    lit != lower_difs.end(); lit++) {
-        s1.insert(*lit);
+    for (const string& lower : lower_difs) {
+        s1.insert(lower);
     }
-    for (list<string>::const_iterator lit = o.lower_difs.begin();
-                                    lit != o.lower_difs.end(); lit++) {
-        s2.insert(*lit);
+    for (const string& lower : o.lower_difs) {
+        s2.insert(lower);
     }
 
     return s1 == s2;
@@ -343,13 +338,12 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 {
     gpb::neighbors_t gm;
 
-    for (list<NeighborCandidate>::const_iterator c = candidates.begin();
-                    c != candidates.end(); c++) {
+    for (const NeighborCandidate& cand : candidates) {
         gpb::neighbor_t *neigh;
         int ret;
 
         neigh = gm.add_neighbor();
-        ret = NeighborCandidate2gpb(*c, *neigh);
+        ret = NeighborCandidate2gpb(cand, *neigh);
         if (ret) {
             return ret;
         }
@@ -427,13 +421,12 @@ LowerFlowList::serialize(char *buf, unsigned int size) const
 {
     gpb::flowStateObjectGroup_t gm;
 
-    for (list<LowerFlow>::const_iterator f = flows.begin();
-                    f != flows.end(); f++) {
+    for (const LowerFlow& f : flows) {
         gpb::flowStateObject_t *flow;
         int ret;
 
         flow = gm.add_flow_state_objects();
-        ret = LowerFlow2gpb(*f, *flow);
+        ret = LowerFlow2gpb(f, *flow);
         if (ret) {
             return ret;
         }
@@ -554,12 +547,11 @@ PolicyDescr2gpb(const PolicyDescr& p, gpb::policyDescriptor_t &gm)
     gm.set_policyimplname(p.impl_name);
     gm.set_version(p.version);
 
-    for (list<Property>::const_iterator pr = p.parameters.begin();
-                            pr != p.parameters.end(); pr++) {
+    for (const Property& pr : p.parameters) {
         gpb::property_t *param;
 
         param = gm.add_policyparameters();
-        Property2gpb(*pr, *param);
+        Property2gpb(pr, *param);
     }
 
     return 0;
@@ -1049,11 +1041,10 @@ FlowRequest2gpb(const FlowRequest& fr,
     gm.set_destinationportid(fr.dst_port);
     gm.set_sourceaddress(fr.src_addr);
     gm.set_destinationaddress(fr.dst_addr);
-    for (list<ConnId>::const_iterator lit = fr.connections.begin();
-                        lit != fr.connections.end(); lit++) {
+    for (const ConnId& conn : fr.connections) {
         gpb::connectionId_t *c = gm.add_connectionids();
 
-        ConnId2gpb(*lit, *c);
+        ConnId2gpb(conn, *c);
     }
     gm.set_currentconnectionidindex(fr.cur_conn_idx);
     gm.set_state(fr.state);
@@ -1187,13 +1178,12 @@ AddrAllocEntries::serialize(char *buf, unsigned int size) const
 {
     gpb::AddrAllocEntries gm;
 
-    for (list<AddrAllocRequest>::const_iterator r = entries.begin();
-                    r != entries.end(); r++) {
+    for (const AddrAllocRequest& r : entries) {
         gpb::AddrAllocRequest *gr;
         int ret;
 
         gr = gm.add_entries();
-        ret = AddrAllocRequest2gpb(*r, *gr);
+        ret = AddrAllocRequest2gpb(r, *gr);
         if (ret) {
             return ret;
         }
