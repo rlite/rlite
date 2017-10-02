@@ -200,6 +200,12 @@ int rina_flow_alloc_wait(int wfd);
  */
 void rina_flow_spec_default(struct rina_flow_spec *spec);
 
+/*
+ * Retrieve the MSS (Maximum Segment Size) that can be written to the flow
+ * with a single write.
+ */
+unsigned int rina_flow_mss_get(int fd);
+
 #ifdef __cplusplus
 }
 #endif

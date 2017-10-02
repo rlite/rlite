@@ -628,3 +628,15 @@ out0:
 
     return ffd;
 }
+
+unsigned int
+rina_flow_mss_get(int fd)
+{
+    uint32_t mss;
+
+    if (ioctl(fd, RLITE_IOCTL_MSS_GET, &mss)) {
+        mss = 0;
+    }
+
+    return mss;
+}
