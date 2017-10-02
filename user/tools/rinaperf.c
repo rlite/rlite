@@ -269,7 +269,7 @@ repoll:
     w->result.pps *= i;
     w->result.pps /= ns;
     w->result.bps = w->result.pps * 8 * size;
-    w->result.latency = (ns/i) - interval * 1000;
+    w->result.latency = i ? ((ns/i) - interval * 1000) : 0;
 
     return 0;
 }
