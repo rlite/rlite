@@ -376,7 +376,7 @@ connect_to_remotes(void *opaque)
             ret = poll(&pfd, 1, 3000);
             if (ret <= 0) {
                 if (ret < 0) {
-                    perror("poll(cfd)");
+                    perror("poll(wfd)");
                 } else if (g->verbose) {
                     cout << "Failed to connect to remote " << l->app_name <<
                             " through DIF " << l->dif_name << endl;
@@ -416,6 +416,7 @@ usage(void)
 int main(int argc, char **argv)
 {
     const char *confpath = "/etc/iporinad.conf";
+    struct pollfd pfd[1];
     pthread_t fa_th;
     int opt;
 
@@ -455,6 +456,36 @@ int main(int argc, char **argv)
     if (pthread_create(&fa_th, NULL, connect_to_remotes, NULL)) {
         perror("pthread_create()");
         return -1;
+    }
+
+    /* Wait for incoming control connections. */
+    for (;;) {
+        int cfd;
+        int ret;
+
+        pfd[0].fd = g->rfd;
+        pfd[0].events = POLLIN;
+        ret = poll(pfd, 1, -1);
+        if (ret < 0) {
+            perror("poll(lfd)");
+            return -1;
+        }
+
+        if (!pfd[0].revents & POLLIN) {
+		continue;
+	}
+
+        cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
+        if (cfd < 0) {
+            if (errno == ENOSPC) {
+                continue;
+            }
+            perror("rina_flow_accept(lfd)");
+            return -1;
+        }
+
+        cout << "Flow accepted!" << endl;
+        close(cfd);
     }
 
     pthread_exit(NULL);
