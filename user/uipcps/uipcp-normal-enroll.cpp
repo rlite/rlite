@@ -146,7 +146,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 void
 NeighFlow::enrollment_abort()
 {
-    UPE(neigh->rib->uipcp, "Aborting enrollment\n");
+    UPW(neigh->rib->uipcp, "Aborting enrollment\n");
 
     if (enroll_state == NEIGH_NONE) {
         return;
@@ -358,7 +358,7 @@ NeighFlow::next_enroll_msg()
                 UPE(neigh->rib->uipcp, "pthread_cond_timedwait(): %s\n",
                     strerror(ret));
             } else {
-                UPE(neigh->rib->uipcp, "Timed out\n");
+                UPW(neigh->rib->uipcp, "Timed out\n");
             }
             return NULL;
         }
