@@ -149,7 +149,7 @@ struct rl_buf {
 
 struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp);
 
-struct rl_buf * rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
+struct rl_buf *rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
 void __rl_buf_free(struct rl_buf *rb);
 
