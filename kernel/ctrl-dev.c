@@ -532,6 +532,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->addr = 0;
         entry->refcnt = 1;
         entry->hdroom = 0;
+        entry->tailroom = 0;
         entry->max_sdu_size = (1 << 16) - 1;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
@@ -1535,6 +1536,7 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->ipcp_id = ipcp->id;
     upd->ipcp_addr = ipcp->addr;
     upd->hdroom = ipcp->hdroom;
+    upd->tailroom = ipcp->tailroom;
     upd->max_sdu_size = ipcp->max_sdu_size;
     memcpy(&upd->pcisizes, &ipcp->pcisizes, sizeof(upd->pcisizes));
     if (ipcp->name) {

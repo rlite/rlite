@@ -798,6 +798,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->id = upd->ipcp_id;
     uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
     uipcp->hdroom = upd->hdroom;
+    uipcp->tailroom = upd->tailroom;
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
     uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
@@ -1007,9 +1008,10 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " hdroom = %u, mss = %u\n",
+                " hdroom = %u, troom = %u, mss = %u\n",
                 uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name, uipcp->hdroom, uipcp->max_sdu_size);
+                uipcp->dif_name, uipcp->hdroom, uipcp->tailroom,
+                uipcp->max_sdu_size);
     }
     pthread_mutex_unlock(&uipcps->lock);
 

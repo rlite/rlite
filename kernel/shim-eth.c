@@ -112,6 +112,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.data = (unsigned long)priv;
     priv->arp_tmr_shutdown = false;
     ipcp->hdroom = 0;
+    ipcp->tailroom = 0;
 
     mutex_lock(&shims_lock);
     list_add_tail(&priv->node, &shims);
@@ -991,6 +992,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
          * in the ipcp_entry and notify userspace. */
         *notify = (ipcp->max_sdu_size != priv->netdev->mtu);
         ipcp->max_sdu_size = priv->netdev->mtu;
+        ipcp->tailroom = priv->netdev->needed_tailroom;
 
         PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
            netdev->mtu);
