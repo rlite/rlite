@@ -78,7 +78,7 @@ lfdb_default::add(const LowerFlow &lf)
     local_entry = (lfz.local_node == rib->myname);
     if ((!local_entry && lfz.seqnum > it->second[lfz.remote_node].seqnum)
                 || (local_entry && lfz != it->second[lfz.remote_node])) {
-        it->second[lfz.remote_node] = lfz; /* Update the entry */
+        it->second[lfz.remote_node] = std::move(lfz); /* Update the entry */
         UPV(rib->uipcp, "Lower flow %s updated\n", repr.c_str());
         return true;
     }
@@ -129,7 +129,7 @@ lfdb_default::update_local(const string& node_name)
     lf.seqnum = 1; /* not meaningful */
     lf.state = true;
     lf.age = 0;
-    lfl.flows.push_back(lf);
+    lfl.flows.push_back(std::move(lf));
 
     sm = rl_new(CDAPMessage(), RL_MT_CDAP);
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
