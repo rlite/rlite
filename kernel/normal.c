@@ -81,7 +81,7 @@ rl_buf_pci_pop(struct rl_buf *rb)
         return -1;
     }
 
-    rb->pci++;
+    RL_BUF_PCI_POP(rb);
     rb->len -= sizeof(struct rina_pci);
 
     return 0;
@@ -90,12 +90,12 @@ rl_buf_pci_pop(struct rl_buf *rb)
 static inline int
 rl_buf_pci_push(struct rl_buf *rb)
 {
-    if (unlikely((uint8_t *)(rb->pci-1) < &rb->raw->buf[0])) {
+    if (unlikely((uint8_t *)(RL_BUF_PCI(rb)-1) < &rb->raw->buf[0])) {
         RPD(2, "No space to push another PCI\n");
         return -1;
     }
 
-    rb->pci--;
+    RL_BUF_PCI_PUSH(rb);
     rb->len += sizeof(struct rina_pci);
 
     return 0;

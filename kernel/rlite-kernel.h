@@ -198,6 +198,8 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 #define RL_BUF_DATA(rb) ((uint8_t *)rb->pci)
 #define RL_BUF_PCI(rb) rb->pci
 #define RL_BUF_PCI_CTRL(rb) ((struct rina_pci_ctrl *)rb->pci)
+#define RL_BUF_PCI_POP(rb) rb->pci++
+#define RL_BUF_PCI_PUSH(rb) rb->pci--
 
 /*
  * Kernel data-structures.
