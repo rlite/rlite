@@ -611,7 +611,6 @@ for dif in dif_ordering:
 for dif in sorted(difs):
     neighsets = dict()
     dif_graphs[dif] = dict()
-    first = None
 
     # For each N-1-DIF supporting this DIF, compute the set of nodes that
     # share such N-1-DIF. This set will be called the 'neighset' of
@@ -619,9 +618,6 @@ for dif in sorted(difs):
 
     for vmname in sorted(difs[dif]):
         dif_graphs[dif][vmname] = [] # init for later use
-        if first == None: # pick any node for later use
-            first = vmname
-        first = vmname
         for lower_dif in sorted(difs[dif][vmname]):
             if lower_dif not in neighsets:
                 neighsets[lower_dif] = []
@@ -634,12 +630,28 @@ for dif in sorted(difs):
             for vm2 in neighsets[lower_dif]:
                 if vm1 != vm2:
                     dif_graphs[dif][vm1].append((vm2, lower_dif))
+    #print(neighsets)
+    #print(dif_graphs[dif])
 
+##### Compute the center of each DIF, to speed up parallel enrollment #####
+dif_center = dict()
+for dif in sorted(difs):
+    master = None
+    master_level = len(vms) + 1
+    for vmname in dif_graphs[dif]:
+        level = graph_node_depth(dif_graphs[dif], vmname, master_level)
+        if level < master_level:
+            master = vmname
+            master_level = level
+    dif_center[dif] = master
+
+####################### Compute enrollments #######################
+for dif in sorted(difs):
     enrollments[dif] = []
     # To generate the list of enrollments, we simulate one,
     # using breadth-first trasversal.
-    enrolled = set([first])
-    frontier = FrontierSet([first])
+    enrolled = set([dif_center[dif]])
+    frontier = FrontierSet([dif_center[dif]])
     edges_covered = set()
     while not frontier.empty():
         cur = frontier.pop()
@@ -664,21 +676,6 @@ for dif in sorted(difs):
                                                      'enroller': edge[0],
                                                      'lower_dif': edge[1]})
                         edges_covered.add((cur, edge[0]))
-
-    #print(neighsets)
-    #print(dif_graphs[dif])
-
-# Compute the center of each DIF, to speed up parallel enrollment
-dif_center = dict()
-for dif in sorted(difs):
-    master = None
-    master_level = len(vms) + 1
-    for vmname in dif_graphs[dif]:
-        level = graph_node_depth(dif_graphs[dif], vmname, master_level)
-        if level < master_level:
-            master = vmname
-            master_level = level
-    dif_center[dif] = master
 
 shim_id = 1
 for shim in shims:
