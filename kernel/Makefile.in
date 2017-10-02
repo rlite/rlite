@@ -16,6 +16,8 @@ rlite-shim-udp4-y := shim-udp4.o
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include
 
+EXTRA_CFLAGS += -g
+
 ifeq ($(HAVE_VMPI),y)
 obj-m += rlite-shim-hv.o
 rlite-shim-hv-y := shim-hv.o shim-hv-numtables.o
