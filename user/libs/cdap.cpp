@@ -270,7 +270,7 @@ CDAPConn::connect(const std::string& src, const std::string& dst,
     CDAPMessage m;
 
     m.m_connect(auth_mech, auth_value, src, dst);
-    if (msg_send(&m, 0)) {
+    if (msg_send(&m, 0) < 0) {
         return -1;
     }
 
@@ -295,7 +295,7 @@ CDAPConn::accept()
     }
 
     m.m_connect_r(rm, 0, string());
-    if (msg_send(&m, rm->invoke_id)) {
+    if (msg_send(&m, rm->invoke_id) < 0) {
         delete rm;
         return NULL;
     }
@@ -1129,7 +1129,7 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
 
     delete serbuf;
 
-    return 0;
+    return n;
 }
 
 struct CDAPMessage *

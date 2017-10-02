@@ -49,6 +49,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   pending_keepalive_reqs(0)
 {
     last_activity = time(NULL);
+    stats.bytes_sent = stats.bytes_recvd = 0;
     assert(neigh);
 }
 
@@ -145,11 +146,11 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
         }
     }
 
-    if (ret == 0) {
+    if (ret > 0) {
         last_activity = time(NULL);
     }
 
-    return ret;
+    return ret >= 0 ? 0 : ret;
 }
 
 void

@@ -146,6 +146,13 @@ struct NeighFlow {
     int keepalive_tmrid;
     int pending_keepalive_reqs;
 
+    /* Statistics about management traffic. */
+    struct {
+        unsigned int bytes_sent;
+        unsigned int bytes_recvd;
+        time_t t_start;
+    } stats;
+
     NeighFlow(Neighbor *n, const std::string& supp_dif, rl_port_t pid,
               int ffd, rl_ipcp_id_t lid);
     ~NeighFlow();
