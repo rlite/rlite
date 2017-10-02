@@ -982,8 +982,9 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (propagate) {
-            rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
-                                      rm->obj_name, &aar);
+            /* nf can be NULL for M_DELETE messages */
+            rib->neighs_sync_obj_excluding(nf ? nf->neigh : NULL, create,
+                                           rm->obj_class, rm->obj_name, &aar);
         }
 
     } else if (rm->obj_class == obj_class::addr_alloc_table) {
@@ -1020,6 +1021,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (prop_aal.entries.size() > 0) {
+            assert(nf);
             rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
                                       rm->obj_name, &prop_aal);
         }
