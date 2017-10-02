@@ -375,7 +375,7 @@ RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
             break;
         }
 
-        assert(min_addr != string());
+        assert(min_addr.size() > 0);
 
         PV_S("Selecting node %s\n", min_addr.c_str());
 
@@ -487,10 +487,8 @@ RoutingEngine::compute_next_hops(const NodeId& local_node)
                                     info[kvv.first].dist) {
                     bool dupl = false;
 
-                    for (list<NodeId>::iterator
-                            lfa = next_hops[kvv.first].begin();
-                                lfa != next_hops[kvv.first].end(); lfa++) {
-                        if (*lfa == kvu.first) {
+                    for (const NodeId& lfa : next_hops[kvv.first]) {
+                        if (lfa == kvu.first) {
                             dupl = true;
                             break;
                         }
