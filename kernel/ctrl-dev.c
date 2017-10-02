@@ -531,8 +531,9 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         entry->dif = dif;
         entry->addr = 0;
         entry->refcnt = 1;
-        entry->hdroom = 64; /* default, ok for normal IPCPs */
-        entry->max_sdu_size = (1 << 16); /* default, ok for normal IPCPs */
+        entry->hdroom = 64;
+        /* Default MSS is ok for normal IPCPs. */
+        entry->max_sdu_size = (1 << 16) - 1 - entry->hdroom;
         INIT_LIST_HEAD(&entry->registered_appls);
         spin_lock_init(&entry->regapp_lock);
         init_waitqueue_head(&entry->uipcp_wqh);
