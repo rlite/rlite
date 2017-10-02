@@ -254,7 +254,10 @@ static ssize_t
 rl_io_write_iter(struct kiocb *iocb,
 #ifdef RL_HAVE_CHRDEV_RW_ITER
                  struct iov_iter *from
-#endif
+#else  /* AIO_RW */
+                 const struct iovec *from,
+                 unsigned long iov_cnt, loff_t pos
+#endif /* AIO_RW */
 )
 {
     struct file *f = iocb->ki_filp;
@@ -265,7 +268,9 @@ rl_io_write_iter(struct kiocb *iocb,
     struct rl_mgmt_hdr mhdr;
 #ifdef RL_HAVE_CHRDEV_RW_ITER
     size_t left = iov_iter_count(from);
-#endif
+#else  /* AIO_RW */
+    size_t left = iov_length(from, iov_cnt);
+#endif /* AIO_RW */
     size_t tot = 0;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     bool mgmt_sdu;
@@ -289,6 +294,11 @@ rl_io_write_iter(struct kiocb *iocb,
         if (copy_from_iter(&mhdr, sizeof(mhdr), from) != sizeof(mhdr)) {
             PE("copy_from_iter(mgmthdr)\n");
             return -EINVAL;
+        }
+#else
+        if (memcpy_fromiovecend((void *)&mhdr, from, 0, sizeof(mhdr))) {
+            PE("memcpy_fromiovecend(mgmthdr)\n");
+            return -EFAULT;
         }
 #endif
         left -= sizeof(mhdr);
@@ -319,7 +329,14 @@ rl_io_write_iter(struct kiocb *iocb,
             ret = -EINVAL;
             break;
         }
-#endif
+#else  /* AIO_RW */
+        if (unlikely(memcpy_fromiovecend(RL_BUF_DATA(rb), from, tot, copylen))) {
+            PE("memcpy_fromiovecend(data)\n");
+            rl_buf_free(rb);
+            ret = -EINVAL;
+            break;
+        }
+#endif /* AIO_RW */
         rl_buf_append(rb, copylen);
 
         if (unlikely(mgmt_sdu)) {
@@ -405,7 +422,10 @@ static ssize_t
 rl_io_read_iter(struct kiocb *iocb,
 #ifdef RL_HAVE_CHRDEV_RW_ITER
                 struct iov_iter *to
-#endif
+#else  /* AIO_RW */
+                const struct iovec *to,
+                unsigned long iov_cnt, loff_t pos
+#endif /* AIO_RW */
 )
 {
     struct file *f = iocb->ki_filp;
@@ -416,7 +436,9 @@ rl_io_read_iter(struct kiocb *iocb,
     DECLARE_WAITQUEUE(wait, current);
 #ifdef RL_HAVE_CHRDEV_RW_ITER
     size_t ulen = iov_iter_count(to);
-#endif
+#else  /* AIO_RW */
+    size_t ulen = iov_length(to, iov_cnt);
+#endif /* AIO_RW */
     ssize_t ret = 0;
 
     if (unlikely(!txrx)) {
@@ -779,7 +801,10 @@ static const struct file_operations rl_io_fops = {
 #ifdef RL_HAVE_CHRDEV_RW_ITER
     .write_iter     = rl_io_write_iter,
     .read_iter      = rl_io_read_iter,
-#endif
+#else  /* AIO_RW */
+    .aio_write      = rl_io_write_iter,
+    .aio_read       = rl_io_read_iter,
+#endif /* AIO_RW */
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,
 #ifdef CONFIG_COMPAT
