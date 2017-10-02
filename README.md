@@ -552,7 +552,7 @@ trying to ping X from Y
     $ ping 10.10.10.4
 
 As a first step, access both machine X and Y and append the following lines
-to /etc/hosts (making sure that they not clash with other entries):
+to /etc/hosts (making sure that they do not clash with other entries):
 
     10.10.10.4      xnorm.IPCP
     10.10.10.52     ynorm.IPCP
@@ -579,7 +579,7 @@ Carry out similar operations on node Y:
     $ sudo rlite-ctl ipcp-register ynorm.IPCP udptunnel.DIF
 
 Finally, enable Y to be the first enroller for the normal DIF (you may ignore
-errors related to failure to register DAF names)
+failures related to registration of DAF names)
 
     $ sudo rlite-ctl ipcp-enroller-enable ynorm.IPCP
 
@@ -637,17 +637,17 @@ An example of /etc/hosts configuration is the following:
 
     127.0.0.1       localhost.localdomain   localhost
     ::1             localhost.localdomain   localhost
-    8.12.97.231     xyz-abc--
-    8.12.97.230     asd-63--
+    8.12.97.231     xyz.abc
+    8.12.97.230     asd63
 
 In this example, the IP 8.12.97.231 is mapped to an application called
-xyz|abc, while the IP 8.12.97.230 is mapped to another application
-called asd|63. This means that this shim UDP implements a tunnel
+xyz.abc, while the IP 8.12.97.230 is mapped to another application
+called asd63. This means that this shim UDP implements a tunnel
 between two nodes. The first endpoint node has a network interface configured
 with the address 8.12.97.231 (with some netmask), and a RINA application
-called xyz|abc can register to the local shim UDP IPCP. The other endpoint
+called xyz.abc can register to the local shim UDP IPCP. The other endpoint
 node has a network interface configured with the address 8.12.97.232, and a
-RINA application called asd|63 can register to the local shim UDP IPCP.
+RINA application called asd63 can register to the local shim UDP IPCP.
 
 Note that while an IP address corresponds to one and only one application
 name, an application name may correspond to multiple IP addresses. This
