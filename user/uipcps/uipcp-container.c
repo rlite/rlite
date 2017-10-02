@@ -1047,32 +1047,26 @@ topo_visit(struct uipcps *uipcps)
     list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
+        /* Start from safe values. */
         ipn->marked = 0;
         ipn->hdroom = 0;
         ipn->max_sdu_size = 65536;
-        if (uipcp) {
-            ipn->hdrsize = ipcp_hdrlen(uipcp);
-            if (type_is_normal_ipcp(uipcp->dif_type)) {
-                /* Any normal IPCP needs at least some hdroom for
-                 * its own header. If this IPCP has no lowers, this
-                 * hdroom will be used (and not zero). If there is
-                 * at least a lower, then the hdroom will be for
-                 * sure greater or equal than ipn->hdrsize, depending
-                 * on the lowers (see algorithm below).
-                 */
-                ipn->hdroom = ipn->hdrsize;
-            }
 
-            if (list_empty(&ipn->lowers)) {
-                /* No lowers, it can be a shim or a normal without
-                 * lowers. We need to start from the kernel-provided
-                 * MSS. */
-                ipn->max_sdu_size = uipcp->max_sdu_size;
-            } else {
-                /* There are some lowers, so we start from the maximum
-                 * value, which will be overridden during the minimization
-                 * process. */
-            }
+        if (!uipcp) {
+            continue; /* This should not ever happen. */
+        }
+
+        ipn->hdrsize = ipcp_hdrlen(uipcp);
+        if (list_empty(&ipn->lowers)) {
+            /* No lowers, it can be a shim or a normal without
+             * lowers. We need to start from the kernel-provided
+             * MSS and hdroom. */
+            ipn->max_sdu_size = uipcp->max_sdu_size;
+            ipn->hdroom = uipcp->hdroom;
+        } else {
+            /* There are some lowers, so we start from the maximum
+             * value, which will be overridden during the minimization
+             * process. */
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
