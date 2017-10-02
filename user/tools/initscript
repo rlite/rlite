@@ -1,0 +1,3 @@
+ipcp-create n1.IPCP normal n.DIF
+ipcp-create l.IPCP shim-loopback l.DIF
+ipcp-register n1.IPCP l.DIF
