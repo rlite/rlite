@@ -22,6 +22,7 @@ except:
     quit()
 
 cmds = []
+enrolls = []
 
 linecnt = 0
 while 1:
@@ -36,24 +37,24 @@ while 1:
 
     splitted = line.split()
     if splitted[0] == 'ipcp-enroll':
-        enrolls.append((linecnt, line))
+        enrolls.append((linecnt, splitted))
     else:
-        cmds.append((linecnt, line))
+        cmds.append((linecnt, splitted))
 
 fin.close()
 
 for cmd in cmds:
-    cmdline = 'rlite-ctl %s' % cmd[1]
+    cmdargs = ['rlite-ctl'] + cmd[1]
     try:
-        subprocess.check_call(cmdline)
+        subprocess.check_call(cmdargs)
     except Exception as e:
         print("Failure at line %s --> %s" % (cmd[0], e))
         quit()
 
 for cmd in enrolls:
-    cmdline = 'rlite-ctl %s' % cmd[1]
+    cmdargs = ['rlite-ctl'] + cmd[1]
     try:
-        subprocess.check_call(cmdline)
+        subprocess.check_call(cmdargs)
     except Exception as e:
         print("Failure at line %s --> %s" % (cmd[0], e))
         quit()
