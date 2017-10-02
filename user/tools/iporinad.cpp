@@ -16,8 +16,10 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <poll.h>
-#include <rina/api.h>
 #include <pthread.h>
+#include <errno.h>
+#include <stdint.h>
+#include <rina/api.h>
 
 #include <rina/cdap.hpp>
 #include "iporina.pb.h"
@@ -245,7 +247,6 @@ string2int(const string& s, int& ret)
 
 IPSubnet::IPSubnet(const string &_p) : repr(_p)
 {
-    stringstream ss;
     string p = _p;
     string digit;
     size_t slash;
@@ -254,41 +255,40 @@ IPSubnet::IPSubnet(const string &_p) : repr(_p)
     slash = p.find("/");
 
     if (slash == string::npos) {
-        goto ex;
+        throw "Invalid IP prefix";
     }
 
     /* Extract the mask m in "a.b.c.d/m" */
     if (string2int(p.substr(slash + 1), m)) {
-        goto ex;
+        throw "Invalid IP prefix";
     }
     if (m < 1 || m > 30) {
-        goto ex;
+        throw "Invalid IP prefix";
     }
     netbits = m;
     p = p.substr(0, slash);
 
     /* Extract a, b, c and d. */
     std::replace(p.begin(), p.end(), '.', ' ');
-    ss = stringstream(p);
+
+    stringstream ss(p);
 
     netaddr = 0;
     while (ss >> digit) {
         int d;
 
         if (string2int(digit, d)) {
-            goto ex;
+            throw "Invalid IP prefix";
         }
 
         if (d < 0 || d > 255) {
-            goto ex;
+            throw "Invalid IP prefix";
         }
         netaddr <<= 8;
         netaddr |= (unsigned)d;
     }
 
     return;
-ex:
-    throw "Invalid IP prefix";
 }
 
 /* Arguments taken by the function:
