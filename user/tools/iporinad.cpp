@@ -17,6 +17,7 @@
 #include <linux/if_tun.h>
 #include <poll.h>
 #include <rina/api.h>
+#include <pthread.h>
 
 using namespace std;
 
@@ -339,52 +340,10 @@ setup(void)
     return 0;
 }
 
-static void
-usage(void)
+/* Try to connect to all the user-specified remotes. */
+static void *
+connect_to_remotes(void *opaque)
 {
-    cout << "iporinad [OPTIONS]" << endl <<
-        "   -h : show this help" << endl <<
-        "   -c CONF_FILE: path to configuration file" << endl;
-}
-
-int main(int argc, char **argv)
-{
-    const char *confpath = "/etc/iporinad.conf";
-    int opt;
-
-    while ((opt = getopt(argc, argv, "hc:v")) != -1) {
-        switch (opt) {
-            case 'h':
-                usage();
-                return 0;
-
-            case 'c':
-		confpath = optarg;
-                break;
-
-            case 'v':
-                g->verbose ++;
-                break;
-
-            default:
-                printf("    Unrecognized option %c\n", opt);
-                usage();
-                return -1;
-        }
-    }
-
-    if (parse_conf(confpath)) {
-        return -1;
-    }
-
-    if (g->verbose) {
-        dump_conf();
-    }
-
-    if (setup()) {
-        return -1;
-    }
-
     for (;;) {
         for (list<Remote>::iterator l = g->remotes.begin();
                             l != g->remotes.end(); l ++) {
@@ -442,6 +401,63 @@ int main(int argc, char **argv)
 
         sleep(5);
     }
+
+    pthread_exit(NULL);
+}
+
+static void
+usage(void)
+{
+    cout << "iporinad [OPTIONS]" << endl <<
+        "   -h : show this help" << endl <<
+        "   -c CONF_FILE: path to configuration file" << endl;
+}
+
+int main(int argc, char **argv)
+{
+    const char *confpath = "/etc/iporinad.conf";
+    pthread_t fa_th;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hc:v")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+
+            case 'c':
+		confpath = optarg;
+                break;
+
+            case 'v':
+                g->verbose ++;
+                break;
+
+            default:
+                printf("    Unrecognized option %c\n", opt);
+                usage();
+                return -1;
+        }
+    }
+
+    if (parse_conf(confpath)) {
+        return -1;
+    }
+
+    if (g->verbose) {
+        dump_conf();
+    }
+
+    if (setup()) {
+        return -1;
+    }
+
+    if (pthread_create(&fa_th, NULL, connect_to_remotes, NULL)) {
+        perror("pthread_create()");
+        return -1;
+    }
+
+    pthread_exit(NULL);
 
     return 0;
 }
