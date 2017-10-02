@@ -30,23 +30,35 @@ using namespace std;
  * Internal data structures.
  */
 
-struct IPSubnet {
+struct IPAddr {
     string      repr;
-    uint32_t    netaddr;
+    uint32_t    addr;
     unsigned    netbits;
 
-    IPSubnet() : netaddr(0), netbits(0) { }
-    IPSubnet(const string &p);
-    bool operator<(const IPSubnet& o) const {
-        return netaddr < o.netaddr ||
-                (netaddr == o.netaddr && netbits < o.netbits);
+    IPAddr() : addr(0), netbits(0) { }
+    IPAddr(const string &p);
+    IPAddr(uint32_t naddr, unsigned nbits);
+    bool operator<(const IPAddr& o) const {
+        return addr < o.addr ||
+                (addr == o.addr && netbits < o.netbits);
+    }
+
+    /* Pick an host address in belonging to the same subnet. */
+    IPAddr hostaddr(uint32_t host) const {
+        uint32_t hostmask = ~((1 << (32 - netbits)) - 1);
+
+        if (host & hostmask) {
+            throw "Host number out of range";
+        }
+
+        return IPAddr(addr & hostmask, netbits);
     }
 };
 
 struct Route {
-    IPSubnet subnet;
+    IPAddr subnet;
 
-    Route(const IPSubnet &i) : subnet(i) { }
+    Route(const IPAddr &i) : subnet(i) { }
     bool operator<(const Route& o) const { return subnet < o.subnet; }
 };
 
@@ -61,7 +73,7 @@ struct Local {
 struct Remote {
     string app_name;
     string dif_name;
-    IPSubnet tun_subnet;
+    IPAddr tun_subnet;
     string tun_name;
     int tun_fd;
 
@@ -72,7 +84,7 @@ struct Remote {
     set<Route> routes;
 
     Remote() : tun_fd(-1), pending(true) { }
-    Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
+    Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
                         dif_name(d), tun_subnet(i), tun_fd(-1),
                         pending(true) { }
     int tun_alloc();
@@ -255,7 +267,7 @@ string2int(const string& s, int& ret)
     return 0;
 }
 
-IPSubnet::IPSubnet(const string &_p) : repr(_p)
+IPAddr::IPAddr(const string &_p) : repr(_p)
 {
     string p = _p;
     string digit;
@@ -283,7 +295,7 @@ IPSubnet::IPSubnet(const string &_p) : repr(_p)
 
     stringstream ss(p);
 
-    netaddr = 0;
+    addr = 0;
     while (ss >> digit) {
         int d;
 
@@ -294,11 +306,35 @@ IPSubnet::IPSubnet(const string &_p) : repr(_p)
         if (d < 0 || d > 255) {
             throw "Invalid IP prefix";
         }
-        netaddr <<= 8;
-        netaddr |= (unsigned)d;
+        addr <<= 8;
+        addr |= (unsigned)d;
     }
 
     return;
+}
+
+IPAddr::IPAddr(uint32_t naddr, unsigned nbits)
+{
+    unsigned a, b, c, d;
+    stringstream ss;
+
+    if (!nbits || nbits > 30) {
+        throw "Invalid IP prefix";
+    }
+
+    addr = naddr;
+    netbits = nbits;
+
+    d = naddr & 0xff;
+    naddr >>= 8;
+    c = naddr & 0xff;
+    naddr >>= 8;
+    b = naddr & 0xff;
+    naddr >>= 8;
+    a = naddr & 0xff;
+
+    ss << a << "." << b << "." << c << "." << d << "/" << nbits;
+    repr = ss.str();
 }
 
 /* Arguments taken by the function:
@@ -394,7 +430,7 @@ parse_conf(const char *path)
             }
 
         } else if (tokens[0] == "remote") {
-            IPSubnet subnet;
+            IPAddr subnet;
 
             if (tokens.size() != 4) {
                 cerr << "Invalid 'remote' directive at line " <<
@@ -403,7 +439,7 @@ parse_conf(const char *path)
             }
 
             try {
-                subnet = IPSubnet(tokens[3]);
+                subnet = IPAddr(tokens[3]);
             } catch (...) {
                 cerr << "Invalid IP prefix at line " << lines_cnt << endl;
                 return -1;
@@ -417,7 +453,7 @@ parse_conf(const char *path)
             g->remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
 
         } else if (tokens[0] == "route") {
-            IPSubnet subnet;
+            IPAddr subnet;
 
             if (tokens.size() != 2) {
                 cerr << "Invalid 'route' directive at line " <<
@@ -426,7 +462,7 @@ parse_conf(const char *path)
             }
 
             try {
-                subnet = IPSubnet(tokens[1]);
+                subnet = IPAddr(tokens[1]);
             } catch (...) {
                 cerr << "Invalid IP prefix at line " << lines_cnt << endl;
                 return -1;
