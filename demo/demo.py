@@ -272,8 +272,10 @@ argparser.add_argument('--broadcast-enrollment', action='store_true',
                               "is specified for the ipcp-enroll command, so "\
                               "that N-1 flow allocation is issued using the "\
                               "N-DIF name as destination application")
-argparser.add_argument('--parallelize', action='store_true',
-                       help = "Allow enrollments to run in parallel")
+argparser.add_argument('--enrollment-order',
+                       help = "Sequential vs parallel enrollment",
+                       type = str, choices = ['sequential', 'parallel'],
+                       default = None)
 args = argparser.parse_args()
 
 
@@ -545,8 +547,12 @@ if len(vms) > boot_batch_size:
     print("You want to run a lot of nodes, so it's better if I give "
           "each node some time to boot (since the boot is CPU-intensive)")
 
+VMTHRESH = 10
 if not args.backend:
-    args.backend = 'tap' if len(vms) <= 10 else 'udp'
+    args.backend = 'tap' if len(vms) <= VMTHRESH else 'udp'
+
+if not args.enrollment_order:
+    args.enrollment_order = 'sequential' if len(vms) <= VMTHRESH else 'parallel'
 
 
 ############ Compute registration/enrollment order for DIFs ###############
@@ -926,7 +932,7 @@ for vmname in sorted(vms):
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
             elif args.addr_alloc_policy == "distributed":
-                nack_wait_secs = 5 if args.parallelize and len(vms) > 30 else 1
+                nack_wait_secs = 5 if args.enrollment_order == 'parallel' and len(vms) > 30 else 1
                 outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
                                                     % {'dif': dif, 'nws': nack_wait_secs}
 
@@ -1002,7 +1008,7 @@ for vmname in sorted(vms):
     outs += 'EOF\n'\
             '$SUDO cp .initscript /etc/rina/initscript\n'\
             'rm .initscript\n'
-    if args.parallelize:
+    if args.enrollment_order == 'parallel':
         outs += 'nohup rlite-node-config -v --no-reset &> rlite-node-config.log &\n'
 
     # Run rlite-rand clients
@@ -1034,7 +1040,7 @@ if vm_conf_count > 0:
 if len(dns_mappings) > 0:
     print("DNS mappings: %s" % (dns_mappings))
 
-if not args.parallelize:
+if args.enrollment_order == 'sequential':
     # Run the enrollment operations in an order which respect the dependencies
     for dif in dif_ordering:
         enrollments_list = enrollments[dif] + lowerflowallocs[dif]
