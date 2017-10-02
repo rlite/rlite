@@ -16,6 +16,8 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+#include <rina/api.h>
+
 using namespace std;
 
 struct IPSubnet {
@@ -52,13 +54,17 @@ struct Route {
 };
 
 struct IPoRINA {
+    /* Enable verbose mode */
     int verbose;
+
+    /* Control device to listen for incoming connections. */
+    int rfd;
 
     list<Local>     locals;
     list<Remote>    remotes;
     list<Route>     routes;
 
-    IPoRINA() : verbose(0) { }
+    IPoRINA() : verbose(0), rfd(-1) { }
 };
 
 static IPoRINA _g;
@@ -289,6 +295,28 @@ dump_conf(void)
 static int
 setup(void)
 {
+    g->rfd = rina_open();
+    if (g->rfd < 0) {
+        perror("rina_open()");
+        return -1;
+    }
+
+    /* Register us to one or more local DIFs. */
+    for (list<Local>::iterator l = g->locals.begin();
+                            l != g->locals.end(); l ++) {
+        int ret;
+
+        ret = rina_register(g->rfd, l->dif_name.c_str(),
+                        l->app_name.c_str(), 0);
+        if (ret) {
+            perror("rina_register()");
+            cerr << "Failed to register " << l->app_name << " in DIF "
+                    << l->dif_name << endl;
+            return -1;
+        }
+    }
+
+    /* Create a TUN device for each remote. */
     for (list<Remote>::iterator l = g->remotes.begin();
                             l != g->remotes.end(); l ++) {
         char tun_name[IFNAMSIZ];
