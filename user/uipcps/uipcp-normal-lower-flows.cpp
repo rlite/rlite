@@ -219,10 +219,17 @@ lfdb_default::update_address(rlm_addr_t new_addr)
     }
 
     if (lfl.flows.size()) {
+        rib->neighs_sync_obj_all(true, obj_class::lfdb, obj_name::lfdb, &lfl);
+    }
+
+    /* Move entries. */
+    db[new_addr] = db[rib->myaddr];
+    db.erase(rib->myaddr);
+
+    if (lfl.flows.size()) {
         /* Update the routing table. */
         re.update_kernel_routing(new_addr);
     }
-
 }
 
 int
