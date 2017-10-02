@@ -41,13 +41,15 @@ struct CDAPAuthValue {
                          other == std::string(); }
 };
 
-#define CDAP_DISCARD_SECS_DFLT  5
+#define CDAP_DISCARD_SECS_DFLT  15
 
 class InvokeIdMgr {
     struct Id {
         int     iid;
         time_t  created;
+
         Id(int i, time_t t) : iid(i), created(t) { }
+        Id(const Id& o) : iid(o.iid), created(o.created) { }
         bool operator==(const Id &o) const { return iid == o.iid; }
         bool operator!=(const Id &o) const { return iid != o.iid; }
         bool operator<(const Id &o) const { return iid < o.iid; }
