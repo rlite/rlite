@@ -439,6 +439,7 @@ struct uipcp_rib {
     int del_neighbor(const std::string& neigh_name);
     int neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
     int neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
+    void allocate_n_flows();
 
     int update_lower_difs(int reg, std::string lower_dif);
     int register_to_lower(const char *dif_name, bool reg);
@@ -450,13 +451,16 @@ struct uipcp_rib {
     void update_address(rlm_addr_t new_addr);
     rlm_addr_t lookup_node_address(const std::string& node_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);
+    void check_for_address_conflicts();
+
+    NeighborCandidate neighbor_cand_get() const;
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
-
     void neigh_flow_prune(NeighFlow *nf);
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
-    NeighborCandidate neighbor_cand_get() const;
+    void trigger_re_enrollments();
+    void clean_enrollment_resources();
 
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);

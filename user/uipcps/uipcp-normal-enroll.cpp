@@ -1650,10 +1650,9 @@ uipcp_rib::enroller_enable(bool enable)
     return 0;
 }
 
-static void
-normal_trigger_re_enrollments(struct uipcp *uipcp)
+void
+uipcp_rib::trigger_re_enrollments()
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
     list< pair<string, string> > re_enrollments;
 
     if (uipcp->uipcps->keepalive == 0) {
@@ -1661,32 +1660,32 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
         return;
     }
 
-    pthread_mutex_lock(&rib->lock);
+    pthread_mutex_lock(&lock);
 
     /* Scan all the neighbor candidates. */
     for (set<string>::const_iterator
-            cand = rib->neighbors_cand.begin();
-                cand != rib->neighbors_cand.end(); cand++) {
+            cand = neighbors_cand.begin();
+                cand != neighbors_cand.end(); cand++) {
         map<string, NeighborCandidate>::const_iterator mit =
-                rib->neighbors_seen.find(*cand);
+                neighbors_seen.find(*cand);
         map<string, Neighbor *>::iterator neigh;
         string common_dif;
         NeighFlow *nf = NULL;
 
-        assert(mit != rib->neighbors_seen.end());
-        if (rib->neighbors_deleted.count(*cand) == 0) {
+        assert(mit != neighbors_seen.end());
+        if (neighbors_deleted.count(*cand) == 0) {
             /* This neighbor was not deleted, so we avoid enrolling to it,
              * as this was not explicitely asked. */
             continue;
         }
 
-        neigh = rib->neighbors.find(*cand);
+        neigh = neighbors.find(*cand);
 
-        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
+        if (neigh != neighbors.end() && neigh->second->has_flows()) {
             nf = neigh->second->mgmt_conn(); /* cache variable */
         }
 
-        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
+        if (neigh != neighbors.end() && neigh->second->has_flows()) {
             time_t inact;
 
             /* There is a management flow towards this neighbor, but we need
@@ -1697,9 +1696,9 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
 
             if (nf->enroll_state == NEIGH_NONE && inact > 10) {
                 /* Prune the flow now, we'll try to enroll later. */
-                UPD(rib->uipcp, "Pruning flow towards %s since inactive "
+                UPD(uipcp, "Pruning flow towards %s since inactive "
                                 "for %d seconds\n", cand->c_str(), (int)inact);
-                rib->neigh_flow_prune(nf);
+                neigh_flow_prune(nf);
             }
 
             /* Enrollment not needed. */
@@ -1707,31 +1706,30 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
         }
 
         common_dif = common_lower_dif(mit->second.lower_difs,
-                                      rib->lower_difs);
+                                      lower_difs);
         if (common_dif == string()) {
             /* Weird, but it could happen. */
             continue;
         }
 
         /* Start the enrollment. */
-        UPD(rib->uipcp, "Triggering re-enrollment with neighbor %s through "
+        UPD(uipcp, "Triggering re-enrollment with neighbor %s through "
                         "lower DIF %s\n", cand->c_str(), common_dif.c_str());
         re_enrollments.push_back(make_pair(*cand, common_dif));
     }
 
-    pthread_mutex_unlock(&rib->lock);
+    pthread_mutex_unlock(&lock);
 
     /* Start asynchronous re-enrollments outside of the lock. */
     for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
                                         lit != re_enrollments.end(); lit ++) {
-        rib->enroll(lit->first.c_str(), lit->second.c_str(), 0);
+        enroll(lit->first.c_str(), lit->second.c_str(), 0);
     }
 }
 
-static void
-normal_allocate_n_flows(struct uipcp *uipcp)
+void
+uipcp_rib::allocate_n_flows()
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
     list<string> n_flow_allocations;
 
     if (!uipcp->uipcps->reliable_n_flows) {
@@ -1739,15 +1737,15 @@ normal_allocate_n_flows(struct uipcp *uipcp)
         return;
     }
 
-    pthread_mutex_lock(&rib->lock);
+    pthread_mutex_lock(&lock);
     /* Scan all the enrolled neighbors. */
     for (set<string>::const_iterator
-            cand = rib->neighbors_cand.begin();
-                cand != rib->neighbors_cand.end(); cand++) {
+            cand = neighbors_cand.begin();
+                cand != neighbors_cand.end(); cand++) {
         map<string, Neighbor *>::iterator neigh;
 
-        neigh = rib->neighbors.find(*cand);
-        if (neigh == rib->neighbors.end() ||
+        neigh = neighbors.find(*cand);
+        if (neigh == neighbors.end() ||
                 !neigh->second->enrollment_complete() ||
                         !neigh->second->initiator) {
             continue;
@@ -1765,7 +1763,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
         UPD(uipcp, "Trying to allocate an N-flow towards neighbor %s,"
             " because N-1-flow is unreliable\n", cand->c_str());
     }
-    pthread_mutex_unlock(&rib->lock);
+    pthread_mutex_unlock(&lock);
 
     /* Carry out allocations of N-flows. */
     struct rina_flow_spec relspec;
@@ -1808,9 +1806,9 @@ normal_allocate_n_flows(struct uipcp *uipcp)
 
         map<string, Neighbor *>::iterator neigh;
 
-        pthread_mutex_lock(&rib->lock);
-        neigh = rib->neighbors.find(*lit);
-        if (neigh != rib->neighbors.end()) {
+        pthread_mutex_lock(&lock);
+        neigh = neighbors.find(*lit);
+        if (neigh != neighbors.end()) {
             NeighFlow *nf;
 
             nf = rl_new(NeighFlow(neigh->second, string(uipcp->dif_name),
@@ -1822,21 +1820,20 @@ normal_allocate_n_flows(struct uipcp *uipcp)
             UPE(uipcp, "Neighbor disappeared, closing N-flow %d\n", pfd.fd);
             close(pfd.fd);
         }
-        pthread_mutex_unlock(&rib->lock);
+        pthread_mutex_unlock(&lock);
     }
 }
 
 /* Clean up used enrollment resources. */
-static void
-normal_clean_enrollment_resources(struct uipcp *uipcp)
+void
+uipcp_rib::clean_enrollment_resources()
 {
     list<EnrollmentResources *> snapshot;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
 
-    pthread_mutex_lock(&rib->lock);
-    snapshot = rib->used_enrollment_resources;
-    rib->used_enrollment_resources.clear();
-    pthread_mutex_unlock(&rib->lock);
+    pthread_mutex_lock(&lock);
+    snapshot = used_enrollment_resources;
+    used_enrollment_resources.clear();
+    pthread_mutex_unlock(&lock);
 
     for (list<EnrollmentResources *>::iterator
             lit = snapshot.begin();
@@ -1845,43 +1842,41 @@ normal_clean_enrollment_resources(struct uipcp *uipcp)
     }
 }
 
-static void
-normal_check_for_address_conflicts(struct uipcp *uipcp)
+void
+uipcp_rib::check_for_address_conflicts()
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->lock);
-    NeighborCandidate cand = rib->neighbor_cand_get();
-    string my_name = rib->myname;
+    ScopeLock lock_(lock);
+    NeighborCandidate cand = neighbor_cand_get();
     bool need_to_change = false;
     map<rlm_addr_t, string> m;
 
     /* Temporarily insert a neighbor representing myself. */
-    rib->neighbors_seen[my_name] = cand;
+    neighbors_seen[myname] = cand;
 
     for (map<string, NeighborCandidate>::iterator cit =
-            rib->neighbors_seen.begin();
-                cit != rib->neighbors_seen.end(); cit ++) {
+            neighbors_seen.begin();
+                cit != neighbors_seen.end(); cit ++) {
         rlm_addr_t addr = cit->second.address;
 
         if (m.count(addr)) {
             UPW(uipcp, "Nodes %s and %s conflicts on the same address %lu\n",
                        m[addr].c_str(), cit->first.c_str(), addr);
-            need_to_change = ((my_name == m[addr] && my_name < cit->first) ||
-                                (my_name == cit->first && my_name < m[addr]));
+            need_to_change = ((myname == m[addr] && myname < cit->first) ||
+                                (myname == cit->first && myname < m[addr]));
         } else {
             m[addr] = cit->first;
         }
     }
 
-    rib->neighbors_seen.erase(my_name); /* Remove temporary. */
+    neighbors_seen.erase(myname); /* Remove temporary. */
 
     if (need_to_change) {
         /* My address conflicts with someone else, and I am the
          * designated one to change it. */
-        rlm_addr_t newaddr = rib->addra->allocate();
+        rlm_addr_t newaddr = addra->allocate();
 
         if (newaddr) {
-            rib->set_address(newaddr);
+            set_address(newaddr);
         }
     }
 }
@@ -1889,8 +1884,10 @@ normal_check_for_address_conflicts(struct uipcp *uipcp)
 void
 normal_trigger_tasks(struct uipcp *uipcp)
 {
-    normal_trigger_re_enrollments(uipcp);
-    normal_allocate_n_flows(uipcp);
-    normal_clean_enrollment_resources(uipcp);
-    normal_check_for_address_conflicts(uipcp);
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    rib->trigger_re_enrollments();
+    rib->allocate_n_flows();
+    rib->clean_enrollment_resources();
+    rib->check_for_address_conflicts();
 }
