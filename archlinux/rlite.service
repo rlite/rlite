@@ -2,7 +2,7 @@
 Description=rlite daemon running uipcps
 #ConditionPathExists=/etc/rina/uipcp-qoscubes.qos
 #ConditionPathExists=/etc/rina/shim-tcp4-dir
-Wants=systemd-modules-load.service
+Requires=systemd-modules-load.service
 After=systemd-modules-load.service
 #After=network.target
 

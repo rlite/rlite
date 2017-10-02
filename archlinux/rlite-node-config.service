@@ -1,14 +1,14 @@
 [Unit]
 Description=create and configures IPCPs
 ConditionPathExists=/etc/rina/initscript
-Wants=systemd-modules-load.service rlite.service
-After=systemd-modules-load.service rlite.service
+Requires=rlite.service
+After=rlite.service
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart=/usr/bin/rlite-node-config -v
+RemainAfterExit=yes
 #WorkingDirectory=
-#Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
