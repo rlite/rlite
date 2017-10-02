@@ -894,12 +894,11 @@ for vmname in sorted(vms):
                     '$SUDO chmod -R a+rw /run/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
-                    '$SUDO nohup %(valgrind)s rlite-uipcps -v %(verb)s -k %(keepalive)s '\
+                    '$SUDO nohup %(valgrind)s rlite-uipcps -v %(verb)s '\
                                         '%(relnflows)s %(relflows)s '\
                                         '&> uipcp.log &\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
-                           'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
                            'relflows': '-R' if args.reliable_flows else '',
                            'flsuf': flavour_suffix,
@@ -935,6 +934,8 @@ for vmname in sorted(vms):
                 nack_wait_secs = 5 if args.enrollment_order == 'parallel' and len(vms) > 30 else 1
                 outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
                                                     % {'dif': dif, 'nws': nack_wait_secs}
+            outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'\
+                        % {'dif': dif, 'id': vm['id'], 'keepalive': args.keepalive}
 
             for p in dif_policies[dif]:
                 if len(p['nodes']) == 0 or vmname in p.nodes:

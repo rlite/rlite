@@ -47,9 +47,6 @@ struct uipcps {
     pthread_mutex_t lock;
     int n_uipcps;
 
-    /* Keepalive timeout in seconds. */
-    unsigned int keepalive;
-
     /* Use reliable N-flows if reliable N-1-flows are not available. */
     int reliable_n_flows;
 

@@ -653,9 +653,6 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
-/* default value for keepalive parameter */
-#define NEIGH_KEEPALIVE_TO      10
-
 static void
 usage(void)
 {
@@ -663,14 +660,11 @@ usage(void)
         "   -h : show this help\n"
         "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
                            "DBG (default), VERY\n"
-        "   -k NUM : keepalive interval in seconds (default "
-                                "%d seconds, 0 to disable)\n"
         "   -N : use reliable N-flows if reliable N-1-flows are "
                                                     "not available\n"
         "   -R : if possible, use dedicated reliable N-1-flows "
                               "for management traffic rather than reusing "
-                              "kernel-bound unreliable N-1 flows\n",
-          NEIGH_KEEPALIVE_TO);
+                              "kernel-bound unreliable N-1 flows\n");
 }
 
 int main(int argc, char **argv)
@@ -682,11 +676,10 @@ int main(int argc, char **argv)
     int ret, opt;
     int iarg;
 
-    uipcps->keepalive = NEIGH_KEEPALIVE_TO;
     uipcps->reliable_n_flows = 0;
     uipcps->reliable_flows = 0;
 
-    while ((opt = getopt(argc, argv, "hv:k:NRA:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:NRA:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -694,16 +687,6 @@ int main(int argc, char **argv)
 
             case 'v':
                 verbosity = optarg;
-                break;
-
-            case 'k':
-                iarg = atoi(optarg);
-                if (iarg < 0) {
-                    PE("Invalid -k argument '%u'\n", iarg);
-                    usage();
-                    return -1;
-                }
-                uipcps->keepalive = iarg;
                 break;
 
             case 'N':
