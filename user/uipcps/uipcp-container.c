@@ -811,8 +811,12 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
 
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
-        PE("uipcp %u already created\n", upd->ipcp_id);
-        goto err1;
+        /* This is harmless, and may happen if an IPCP is created between
+         * rina_open() and the ioctl() on to enable IPCP updates on that
+         * control device. */
+        PD("uipcp %u already created\n", upd->ipcp_id);
+        ret = 0;
+        goto out1;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
     uipcps->n_uipcps ++;
@@ -885,7 +889,7 @@ err2:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
     uipcps->n_uipcps --;
-err1:
+out1:
     pthread_mutex_unlock(&uipcps->lock);
     rl_free(uipcp, RL_MT_UIPCP);
 
