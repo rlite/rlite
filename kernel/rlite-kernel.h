@@ -155,7 +155,9 @@ union rl_buf_ctx {
 };
 
 #ifndef RL_SKB
-/* Custom implementation of packet data and metadata. */
+/* Custom implementation of packet data and metadata.
+ * The struct rl_rawbuf takes the role of struct skb_shared_info,
+ * while struct rl_buf takes the role of struct sk_buff. */
 struct rl_rawbuf {
     size_t size;
     atomic_t refcnt;
@@ -210,6 +212,13 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
     rb->len += len;
 
     return 0;
+}
+
+static inline void
+rl_buf_append(struct rl_buf *rb, size_t len)
+{
+    rb->len += len;
+    BUG_ON((uint8_t *)(rb->pci) + rb->len > rb->raw->buf + rb->raw->size);
 }
 
 #define rl_buf_free(_rb) \
@@ -274,6 +283,8 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
     return 0;
 }
+
+#define rl_buf_append(_rb, _len)        skb_put(_rb, _len)
 
 #define rl_buf_free(_rb) \
     do { \

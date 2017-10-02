@@ -178,7 +178,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
                     PE("Out of memory\n");
                     break;
                 }
-                priv->cur_rx_rb->len = priv->cur_rx_rblen;
+                rl_buf_append(priv->cur_rx_rb, priv->cur_rx_rblen);
             }
 
             priv->cur_rx_buflen = 0;
