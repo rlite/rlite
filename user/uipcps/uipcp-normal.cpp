@@ -1243,6 +1243,8 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
     uint8_t response = RLITE_ERR;
     ScopeLock lock_(rib->lock);
     Neighbor *neigh;
+    NeighFlow *nf;
+    int mgmt_fd;
     int ret;
 
     /* Check that the N-flow allocation request makes sense. */
@@ -1251,7 +1253,7 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
         UPE(rib->uipcp, "Rejected N-flow request from non-neighbor %s\n",
                         req->remote_appl);
 
-    } else if (neigh->mgmt_conn()->upper_flow_fd >= 0) {
+    } else if (neigh->n_flow) {
         UPE(rib->uipcp, "Rejected N-flow request from %s, an N-flow "
                         "already exists\n", req->remote_appl);
 
@@ -1272,13 +1274,17 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
         return 0;
     }
 
-    neigh->mgmt_conn()->upper_flow_fd = rl_open_appl_port(req->port_id);
-    if (neigh->mgmt_conn()->upper_flow_fd < 0) {
+    mgmt_fd = rl_open_appl_port(req->port_id);
+    if (mgmt_fd < 0) {
         UPE(rib->uipcp, "Failed to open I/O port for N-flow towards %s\n",
                         req->remote_appl);
         return 0;
     }
 
+    nf = rl_new(NeighFlow(neigh, string(req->dif_name), RL_PORT_ID_NONE,
+                          mgmt_fd, RL_IPCP_ID_NONE), RL_MT_NEIGHFLOW);
+    nf->reliable = true;
+    neigh->n_flow_set(nf);
     UPD(rib->uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
                     req->remote_appl, req->dif_name, req->port_id);
 

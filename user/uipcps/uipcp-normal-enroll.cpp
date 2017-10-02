@@ -42,8 +42,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   neigh(n), supp_dif(supdif),
                                   port_id(pid), lower_ipcp_id(lid),
                                   flow_fd(ffd), reliable(false),
-                                  upper_flow_fd(-1), conn(NULL),
-                                  enroll_state(NEIGH_NONE),
+                                  conn(NULL), enroll_state(NEIGH_NONE),
                                   enrollment_rsrc(NULL),
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
@@ -55,6 +54,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
 
 NeighFlow::~NeighFlow()
 {
+    struct uipcp *uipcp = neigh->rib->uipcp;
     int ret;
 
     if (!neigh) {
@@ -71,26 +71,14 @@ NeighFlow::~NeighFlow()
 
     ret = close(flow_fd);
     if (ret) {
-        UPE(neigh->rib->uipcp, "Error deallocating N-1-flow [fd=%d]\n",
-                               flow_fd);
+        UPE(uipcp, "Error deallocating N-1-flow [fd=%d]\n", flow_fd);
     } else {
-        UPD(neigh->rib->uipcp, "N-1-flow deallocated [fd=%d]\n",
-                               flow_fd);
+        UPD(uipcp, "N-1-flow deallocated [fd=%d]\n", flow_fd);
     }
 
-    if (upper_flow_fd >= 0) {
-        ret = close(upper_flow_fd);
-        if (ret) {
-            UPE(neigh->rib->uipcp, "Error deallocating N-flow [fd=%d]\n",
-                                   upper_flow_fd);
-        } else {
-            UPD(neigh->rib->uipcp, "N-flow deallocated [fd=%d]\n",
-                                   upper_flow_fd);
-        }
+    if (!reliable) {
+        topo_lower_flow_removed(uipcp->uipcps, uipcp->id, lower_ipcp_id);
     }
-
-    topo_lower_flow_removed(neigh->rib->uipcp->uipcps, neigh->rib->uipcp->id,
-                            lower_ipcp_id);
 }
 
 /* Does not take ownership of m. */
@@ -114,6 +102,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
         m->set_obj_value(objbuf, objlen);
     }
 
+    assert(conn);
     if (reliable) {
         /* Management-only flow, we don't need to use management PDUs. */
         ret = conn->msg_send(m, invoke_id);
@@ -277,7 +266,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string& name)
 {
     rib = rib_;
     initiator = false;
-    mgmt_only = NULL;
+    mgmt_only = n_flow = NULL;
     ipcp_name = name;
     unheard_since = time(NULL);
 }
@@ -290,6 +279,10 @@ Neighbor::~Neighbor()
     }
 
     mgmt_only_set(NULL);
+    if (n_flow) {
+        uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
+        rl_delete(n_flow, RL_MT_NEIGHFLOW);
+    }
 }
 
 void
@@ -300,7 +293,7 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
         rl_delete(mgmt_only, RL_MT_NEIGHFLOW);
     }
 
-    UPD(rib->uipcp, "Switch management-only flow (oldfd=%d --> newfd=%d)\n",
+    UPD(rib->uipcp, "Set management-only N-1-flow (oldfd=%d --> newfd=%d)\n",
                     mgmt_only ? mgmt_only->flow_fd : -1,
                     nf ? nf->flow_fd : -1);
     mgmt_only = nf;
@@ -308,6 +301,30 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
         uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd,
                            normal_mgmt_only_flow_ready, nf);
     }
+}
+
+void
+Neighbor::n_flow_set(NeighFlow *nf)
+{
+    NeighFlow *kbnf;
+
+    assert(n_flow == NULL);
+    assert(nf != NULL);
+    assert(has_flows());
+
+    /* Inherit CDAP connection and enrollment state, and switch
+     * keepalive timer. */
+    kbnf = flows.begin()->second;
+    nf->enroll_state = kbnf->enroll_state;
+    nf->conn = kbnf->conn;
+    kbnf->conn = NULL;
+    kbnf->keepalive_tmr_stop();
+    nf->keepalive_tmr_start();
+
+    UPD(rib->uipcp, "Set management-only N-flow (fd=%d)\n", nf->flow_fd);
+    n_flow = nf;
+    uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd,
+                       normal_mgmt_only_flow_ready, nf);
 }
 
 const char *
@@ -335,6 +352,10 @@ Neighbor::_mgmt_conn() const
 {
     if (mgmt_only) {
         return mgmt_only;
+    }
+
+    if (n_flow) {
+        return n_flow;
     }
 
     assert(!flows.empty());
@@ -701,6 +722,10 @@ finish:
     pthread_mutex_unlock(&rib->lock);
     rib->enroller_enable(true);
 
+    /* Trigger periodic tasks to possibly allocate
+     * N-flows and free enrollment resources. */
+    uipcps_loop_signal(rib->uipcp->uipcps);
+
     return NULL;
 
 err:
@@ -945,6 +970,7 @@ finish:
     nf->enrollment_rsrc_put();
     pthread_mutex_unlock(&rib->lock);
     rib->enroller_enable(true);
+    uipcps_loop_signal(rib->uipcp->uipcps);
 
     return NULL;
 
@@ -1708,7 +1734,6 @@ normal_allocate_n_flows(struct uipcp *uipcp)
             cand = rib->neighbors_cand.begin();
                 cand != rib->neighbors_cand.end(); cand++) {
         map<string, Neighbor *>::iterator neigh;
-        NeighFlow *nf = NULL;
 
         neigh = rib->neighbors.find(*cand);
         if (neigh == rib->neighbors.end() ||
@@ -1717,8 +1742,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
             continue;
         }
 
-        nf = neigh->second->mgmt_conn();
-        if (nf->reliable || nf->upper_flow_fd >= 0) {
+        if (neigh->second->mgmt_conn()->reliable) {
             /* N-flow unnecessary or already allocated. */
             continue;
         }
@@ -1727,7 +1751,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
          * We then try to allocate an N-flow, to be used in place of
          * the N-1-flow for layer management. */
         n_flow_allocations.push_back(*cand);
-        UPD(rib->uipcp, "Trying to allocate an N-flow towards neighbor %s,"
+        UPD(uipcp, "Trying to allocate an N-flow towards neighbor %s,"
             " because N-1-flow is unreliable\n", cand->c_str());
     }
     pthread_mutex_unlock(&rib->lock);
@@ -1742,11 +1766,11 @@ normal_allocate_n_flows(struct uipcp *uipcp)
         struct pollfd pfd;
         int ret;
 
-        pfd.fd = rina_flow_alloc(rib->uipcp->dif_name, rib->uipcp->name,
+        pfd.fd = rina_flow_alloc(uipcp->dif_name, uipcp->name,
                                  lit->c_str(), &relspec, RINA_F_NOWAIT);
         if (pfd.fd < 0) {
-            UPI(rib->uipcp, "Failed to issue N-flow allocation towards"
-                            " %s [%s]\n", lit->c_str(), strerror(errno));
+            UPI(uipcp, "Failed to issue N-flow allocation towards"
+                       " %s [%s]\n", lit->c_str(), strerror(errno));
             continue;
         }
         pfd.events = POLLIN;
@@ -1755,7 +1779,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
             if (ret < 0) {
                 perror("poll()");
             } else {
-                UPI(rib->uipcp, "Timeout while allocating N-flow towards %s\n",
+                UPI(uipcp, "Timeout while allocating N-flow towards %s\n",
                                 lit->c_str());
             }
             close(pfd.fd);
@@ -1764,22 +1788,26 @@ normal_allocate_n_flows(struct uipcp *uipcp)
 
         pfd.fd = rina_flow_alloc_wait(pfd.fd);
         if (pfd.fd < 0) {
-            UPI(rib->uipcp, "Failed to allocate N-flow towards %s [%s]\n",
-                            lit->c_str(), strerror(errno));
+            UPI(uipcp, "Failed to allocate N-flow towards %s [%s]\n",
+                       lit->c_str(), strerror(errno));
             continue;
         }
 
-        UPI(rib->uipcp, "N-flow allocated [fd=%d]\n", pfd.fd);
+        UPI(uipcp, "N-flow allocated [fd=%d]\n", pfd.fd);
 
         map<string, Neighbor *>::iterator neigh;
 
         pthread_mutex_lock(&rib->lock);
         neigh = rib->neighbors.find(*lit);
-        if (neigh != rib->neighbors.end() && neigh->second->has_flows()) {
-            neigh->second->mgmt_conn()->upper_flow_fd = pfd.fd;
+        if (neigh != rib->neighbors.end()) {
+            NeighFlow *nf;
+            nf = rl_new(NeighFlow(neigh->second, string(uipcp->dif_name),
+                                  RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE),
+                        RL_MT_NEIGHFLOW);
+            nf->reliable = true;
+            neigh->second->n_flow_set(nf);
         } else {
-            UPE(rib->uipcp, "Neighbor disappeared, closing "
-                            "N-flow %d\n", pfd.fd);
+            UPE(uipcp, "Neighbor disappeared, closing N-flow %d\n", pfd.fd);
             close(pfd.fd);
         }
         pthread_mutex_unlock(&rib->lock);
