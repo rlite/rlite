@@ -30,6 +30,7 @@
 #include <ctime>
 #include <sstream>
 #include <pthread.h>
+#include <utility>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -621,8 +622,9 @@ private:
     /* The routing table computed by compute_next_hops(). */
     std::map<NodeId, std::list<NodeId> > next_hops;
 
-    /* The forwarding table computed by compute_fwd_table(). */
-    std::map<NodeId, rl_port_t> next_ports;
+    /* The forwarding table computed by compute_fwd_table().
+     * It maps a NodeId --> (dst_addr, local_port). */
+    std::map<NodeId, std::pair<rlm_addr_t, rl_port_t> > next_ports;
 
     /* Set of ports that are currently down. */
     std::set<rl_port_t> ports_down;
