@@ -2,8 +2,9 @@
 
 import subprocess
 import argparse
-import re
 import time
+import re
+import os
 
 
 description = "Simple configuration tool for rlite"
@@ -17,13 +18,18 @@ argparser.add_argument('-s', '--script',
 
 args = argparser.parse_args()
 
+usock = '/var/run/rlite/uipcp-server'
+if not os.path.exists(usock):
+    print("Cannot stat %s: please check that rlite-uipcps is running" % (usock,))
+    quit()
+
 try:
     fin = open(args.script, "r")
 except:
     print("Failed to open script file %s" % args.script)
     quit()
 
-cmds = []
+cmds = [(0, ['reset'])] # always start from a reset to remove all the IPCPs
 enrolls = []
 
 linecnt = 0
