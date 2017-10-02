@@ -50,9 +50,13 @@ struct Route {
 };
 
 struct IPoRINA {
+    int verbose;
+
     list<Local>     locals;
     list<Remote>    remotes;
     list<Route>     routes;
+
+    IPoRINA() : verbose(0) { }
 };
 
 static IPoRINA _g;
@@ -304,7 +308,7 @@ int main(int argc, char **argv)
     const char *confpath = "/etc/iporinad.conf";
     int opt;
 
-    while ((opt = getopt(argc, argv, "hc:")) != -1) {
+    while ((opt = getopt(argc, argv, "hc:v")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -312,6 +316,10 @@ int main(int argc, char **argv)
 
             case 'c':
 		confpath = optarg;
+                break;
+
+            case 'v':
+                g->verbose ++;
                 break;
 
             default:
@@ -325,7 +333,9 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    dump_conf();
+    if (g->verbose) {
+        dump_conf();
+    }
 
     return 0;
 }
