@@ -673,6 +673,14 @@ out:
     return ret;
 }
 
+static int
+execute_command(const string& cmds)
+{
+    stringstream cmdss(cmds);
+
+    return execute_command(cmdss);
+}
+
 int
 Remote::ip_configure() const
 {
@@ -959,6 +967,16 @@ int main(int argc, char **argv)
                 usage();
                 return -1;
         }
+    }
+
+    /* Check that 'ip' and 'ethtool' are available. */
+    if (execute_command("which ip")) {
+        cerr << "'ip' command not available, please install iproute2" << endl;
+        return -1;
+    }
+    if (execute_command("which ethtool")) {
+        cerr << "'ethtool' command not available, please install it" << endl;
+        return -1;
     }
 
     /* Parse configuration file. */
