@@ -298,10 +298,12 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
         rl_delete(mgmt_only, RL_MT_NEIGHFLOW);
     }
 
-    UPD(rib->uipcp, "Set management-only N-1-flow for neigh %s "
-                    "(oldfd=%d --> newfd=%d)\n", ipcp_name.c_str(),
-                    mgmt_only ? mgmt_only->flow_fd : -1,
-                    nf ? nf->flow_fd : -1);
+    if (mgmt_only || nf) {
+        UPD(rib->uipcp, "Set management-only N-1-flow for neigh %s "
+                        "(oldfd=%d --> newfd=%d)\n", ipcp_name.c_str(),
+                        mgmt_only ? mgmt_only->flow_fd : -1,
+                        nf ? nf->flow_fd : -1);
+    }
     mgmt_only = nf;
     if (nf) {
         uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd,
