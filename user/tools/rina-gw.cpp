@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Nextworks
+ * Copyright (C) 2015-2017 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
  *
  * This file is part of rlite.
@@ -47,6 +47,7 @@
 #include <fcntl.h>
 
 #include <rina/api.h>
+#include "fdfwd.hpp"
 
 using namespace std;
 
@@ -144,42 +145,6 @@ RinaName::operator=(const RinaName& other)
 }
 
 #define NUM_WORKERS     1
-#define MAX_SESSIONS    16
-#define MAX_BUF_SIZE    1460
-
-struct Fd {
-    int fd;
-    int len;
-    int ofs;
-    char close;
-    char data[MAX_BUF_SIZE];
-
-    Fd(int _fd): fd(_fd), len(0), ofs(0), close(0) { }
-    Fd(): fd(0), len(0), ofs(0), close(0) { }
-};
-
-struct Worker {
-    pthread_t th;
-    pthread_mutex_t lock;
-    int syncfd;
-    int idx;
-
-    /* Holds the active mappings between rina file descriptors and
-     * socket file descriptors. */
-    map<int, int> fdmap;
-
-    struct Fd fds[MAX_SESSIONS * 2];
-    int nfds;
-
-    Worker(int idx_);
-    ~Worker();
-
-    int repoll();
-    int drain_syncfd();
-    void submit(int cfd, int rfd);
-    void terminate(unsigned int i, int ret, int errcode);
-    void run();
-};
 
 struct Gateway {
     string appl_name;
@@ -204,292 +169,11 @@ struct Gateway {
      * client_fd --> flow_fd */
     map<int, int> pending_conns;
 
-    vector<Worker*> workers;
+    vector<FwdWorker*> workers;
 
     Gateway();
     ~Gateway();
 };
-
-static void *
-worker_function(void *opaque)
-{
-    Worker *w = (Worker *)opaque;
-
-    w->run();
-
-    return NULL;
-}
-
-
-Worker::Worker(int idx_) : idx(idx_), nfds(0)
-{
-    syncfd = eventfd(0, 0);
-    if (syncfd < 0) {
-        perror("eventfd()");
-        exit(EXIT_FAILURE);
-    }
-    pthread_create(&th, NULL, worker_function, this);
-    pthread_mutex_init(&lock, NULL);
-}
-
-Worker::~Worker()
-{
-    if (pthread_join(th, NULL)) {
-        perror("pthread_join");
-    }
-    close(syncfd);
-}
-
-int
-Worker::repoll()
-{
-    uint64_t x = 1;
-    int n;
-
-    n = write(syncfd, &x, sizeof(x));
-    if (n != sizeof(x)) {
-        perror("write(syncfd)");
-        if (n < 0) {
-            return n;
-        }
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-Worker::drain_syncfd()
-{
-    uint64_t x;
-    int n;
-
-    n = read(syncfd, &x, sizeof(x));
-    if (n != sizeof(x)) {
-        perror("read(syncfd)");
-        if (n < 0) {
-            return n;
-        }
-        return -1;
-    }
-
-    return 0;
-}
-
-void
-Worker::submit(int cfd, int rfd)
-{
-    pthread_mutex_lock(&lock);
-
-    if (nfds >= 2 * MAX_SESSIONS) {
-        pthread_mutex_unlock(&lock);
-        printf("too many sessions, shutting down %d <--> %d\n", cfd, rfd);
-        close(cfd);
-        close(rfd);
-        return;
-    }
-
-    /* Add the new mapping. The converse would be the same. */
-    fdmap[rfd] = cfd;
-    /* Append two entries in the fds array. */
-    fds[nfds ++] = Fd(rfd);
-    fds[nfds ++] = Fd(cfd);
-    repoll();
-    pthread_mutex_unlock(&lock);
-
-    if (verbose >= 1) {
-        printf("New mapping created %d <--> %d [entries=%d,%d]\n",
-                cfd, rfd, nfds - 2, nfds - 1);
-    }
-}
-
-/* Called under worker lock. */
-void
-Worker::terminate(unsigned int i, int ret, int errcode)
-{
-    unsigned j;
-    string how;
-
-    i &= ~(0x1);
-    j = i + 1;
-
-    close(fds[i].fd);
-    close(fds[j].fd);
-    fds[i].close = fds[j].close = 1;
-
-    assert(fdmap.find(fds[i].fd) != fdmap.end());
-    fdmap.erase(fds[i].fd);
-
-    if (verbose >= 1) {
-        if (ret == 0 || errcode == EPIPE) {
-            how = "normally";
-        } else {
-            how = "with errors";
-        }
-
-        cout << "w" << idx << ": Session " << fds[i].fd << " <--> "
-                << fds[j].fd << " closed " << how << " [entries=" << i
-                << "," << j << "]" <<endl;
-    }
-
-    /* fds entries are recovered at the beginning of the run() main loop */
-}
-
-void
-Worker::run()
-{
-    struct pollfd pollfds[1 + MAX_SESSIONS * 2];
-    struct pollfd *pfds = pollfds + 1;
-
-    if (verbose >= 1) {
-        printf("w%d starts\n", idx);
-    }
-
-    for (;;) {
-        int nrdy;
-
-        pfds[-1].fd = syncfd;
-        pfds[-1].events = POLLIN;
-
-        /* Load the poll array with the active fd mappings, also recycling
-         * the entries of closed sessions. */
-        pthread_mutex_lock(&lock);
-        for (int i = 0; i < nfds; ) {
-            int j = i + 1; /* index of the mapped entry */
-
-            if (fds[i].close) {
-                nfds -= 2;
-                if (i < nfds) {
-                    fds[i] = fds[nfds-1];
-                    fds[j] = fds[nfds];
-                    if (verbose >= 1) {
-                        printf("Recycled entries %d,%d\n", i, j);
-                    }
-                }
-                continue;
-            }
-
-            pfds[i].fd = fds[i].fd;
-            pfds[j].fd = fds[j].fd;
-            pfds[i].events = pfds[j].events = 0;
-
-            /* If there is pending data in the output buffer for entry i,
-             * request POLLOUT to flush that data. Otherwise request POLLIN
-             * on the mapped entry, but only if the mapped entry does not
-             * need to flush its own output buffer. */
-            if (fds[i].len) {
-                pfds[i].events = POLLOUT;
-            } else if (!fds[j].len) {
-                pfds[j].events = POLLIN;
-            }
-
-            /* Same logic for the mapped entry. */
-            if (fds[j].len) {
-                pfds[j].events = POLLOUT;
-            } else if (!fds[i].len) {
-                pfds[i].events = POLLIN;
-            }
-
-            i += 2;
-        }
-        pthread_mutex_unlock(&lock);
-
-        if (verbose >= 2) {
-            printf("w%d polls %d file descriptors\n", idx, nfds + 1);
-        }
-        nrdy = poll(pollfds, nfds + 1, -1);
-        if (nrdy < 0) {
-            perror("poll()");
-            break;
-
-        } else if (nrdy == 0) {
-            printf("w%d: poll() timeout\n", idx);
-            continue;
-        }
-
-        if (pfds[-1].revents) {
-            /* We've been requested to repoll the queue. */
-            nrdy--;
-            if (pfds[-1].revents & POLLIN) {
-                if (verbose >= 2) {
-                    printf("w%d: Mappings changed, rebuilding poll array\n", idx);
-                }
-                pthread_mutex_lock(&lock);
-                drain_syncfd();
-                pthread_mutex_unlock(&lock);
-
-            } else {
-                printf("w%d: Error event %d on syncfd\n", idx,
-                   pfds[-1].revents);
-            }
-
-            continue;
-        }
-
-        pthread_mutex_lock(&lock);
-
-        for (int i = 0, n = 0; n < nrdy; i ++) {
-            int j;
-
-            if (!pfds[i].revents || fds[i].close) {
-                /* No events on this fd, or the session has
-                 * been terminated by the mapped fd (in a previous
-                 * iteration of this loop). Let's skip it. */
-                continue;
-            }
-
-            if (verbose >= 2) {
-                printf("w%d: fd %d ready, events %d\n", idx,
-                        pfds[i].fd, pfds[i].revents);
-            }
-
-            /* Consume the events on this fd. */
-            n++;
-
-            j = i ^ 0x1; /* index to the mapped fds entry */
-
-            if (pfds[i].revents & POLLIN) {
-                int m;
-
-                assert(fds[j].len == 0);
-                /* The output buffer for entry j is empty and, there
-                 * is data to read from the mapped entry i. Load the
-                 * output buffer with this data. */
-                m = read(fds[i].fd, fds[j].data, MAX_BUF_SIZE);
-                if (m <= 0) {
-                    terminate(i, m, errno);
-                } else {
-                    fds[j].len = m;
-                    fds[j].ofs = 0;
-                }
-
-            } else if (pfds[i].revents & POLLOUT) {
-                int m;
-
-                assert(fds[i].len > 0);
-                /* There is data in the output buffer of entry i. Try to
-                 * flush it. */
-                m = write(fds[i].fd, fds[i].data + fds[i].ofs, fds[i].len);
-                if (m <= 0) {
-                    terminate(i, m, errno);
-                } else {
-                    fds[i].ofs += m;
-                    fds[i].len -= m;
-                    if (verbose >= 2) {
-                        printf("Forwarded %d bytes %d --> %d\n", m,
-                               fds[j].fd, fds[i].fd);
-                    }
-                }
-            }
-        }
-
-        pthread_mutex_unlock(&lock);
-    }
-
-    if (verbose >= 1) {
-        printf("w%d stops\n", idx);
-    }
-}
 
 Gateway::Gateway()
 {
@@ -497,7 +181,7 @@ Gateway::Gateway()
 
     /* Start workers. */
     for (int i=0; i<NUM_WORKERS; i++) {
-        workers.push_back(new Worker(i));
+        workers.push_back(new FwdWorker(i, verbose));
     }
 }
 

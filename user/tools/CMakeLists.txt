@@ -7,7 +7,7 @@ message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to iporinad targe
 add_executable(rinaperf rinaperf.c)
 add_executable(rina-echo-async rina-echo-async.c)
 add_executable(rlite-ctl rlite-ctl.c)
-add_executable(rina-gw rina-gw.cpp)
+add_executable(rina-gw rina-gw.cpp fdfwd.cpp)
 add_executable(iporinad iporinad.cpp ${IPORINA_GPB_SRC} ${IPORINA_GPB_HDR})
 if (MAC2IFNAME)
 add_executable(mac2ifname mac2ifname.c)

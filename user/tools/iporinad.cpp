@@ -769,7 +769,7 @@ connect_to_remotes(void *opaque)
 
                 rfd = rina_flow_alloc_wait(wfd);
                 if (rfd < 0) {
-                    if (errno != EPERM || g->verbose) {
+                    if (errno != EPERM || g->verbose > 1) {
                         if (errno != EPERM) {
                             perror("rina_flow_alloc_wait()");
                         }
@@ -780,7 +780,7 @@ connect_to_remotes(void *opaque)
                     continue;
                 }
 
-                if (g->verbose) {
+                if (g->verbose > 1) {
                     cout << "Flow allocated to remote " <<
                         re->second.app_name << " through DIF "
                             << re->second.dif_name << endl;
@@ -953,8 +953,8 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        if (g->verbose) {
-            cout << "Accepted new connection from remote" << endl;
+        if (g->verbose > 1) {
+            cout << "Accepted new connection from remote peer" << endl;
         }
 
         CDAPConn conn(cfd, 1);
