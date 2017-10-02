@@ -464,8 +464,9 @@ os_tun_alloc(char *dev, int flags)
     return fd;
 }
 
-/* Binary search for the MSS size for a RINA flow :) */
-static unsigned int
+/* Binary search for the MSS size for a RINA flow :)
+ * (currently unused) */
+unsigned int
 probe_mss(int fd)
 {
     unsigned int ub = 1;
@@ -787,7 +788,7 @@ Remote::mss_configure() const
 {
     stringstream cmdss;
 
-    cmdss << "ip link set mtu " << probe_mss(rfd)
+    cmdss << "ip link set mtu " << 1400
             << " dev " << tun_name;
 
     return execute_command(cmdss);
