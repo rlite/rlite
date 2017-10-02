@@ -38,6 +38,9 @@ struct IPAddr {
     IPAddr() : addr(0), netbits(0) { }
     IPAddr(const string &p);
     IPAddr(uint32_t naddr, unsigned nbits);
+
+    bool empty() const { return netbits == 0 && addr == 0; }
+
     bool operator<(const IPAddr& o) const {
         return addr < o.addr ||
                 (addr == o.addr && netbits < o.netbits);
@@ -51,8 +54,10 @@ struct IPAddr {
             throw "Host number out of range";
         }
 
-        return IPAddr(addr & hostmask, netbits);
+        return IPAddr((addr & hostmask) + host, netbits);
     }
+
+    operator string() const { return repr; }
 };
 
 struct Route {
@@ -82,6 +87,10 @@ struct Remote {
 
     /* Routes reachable through this remote. */
     set<Route> routes;
+
+    /* IP address of the local and remote tunnel endpoint. */
+    IPAddr tun_local_addr;
+    IPAddr tun_remote_addr;
 
     Remote() : tun_fd(-1), pending(true) { }
     Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
@@ -130,6 +139,8 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
 
 struct Hello : public Obj {
     string tun_subnet;  /* Subnet to be used for the tunnel */
+    string tun_src_addr;  /* IP address of the source */
+    string tun_dst_addr;  /* IP address of the destination */
     uint32_t num_routes; /* How many route to exchange */
 
     Hello() : num_routes(0) { }
@@ -141,6 +152,8 @@ static void
 gpb2Hello(Hello &m, const gpb::hello_msg_t &gm)
 {
     m.tun_subnet = gm.tun_subnet();
+    m.tun_src_addr = gm.tun_src_addr();
+    m.tun_dst_addr = gm.tun_dst_addr();
     m.num_routes = gm.num_routes();
 }
 
@@ -148,6 +161,8 @@ static int
 Hello2gpb(const Hello &m, gpb::hello_msg_t &gm)
 {
     gm.set_tun_subnet(m.tun_subnet);
+    gm.set_tun_src_addr(m.tun_src_addr);
+    gm.set_tun_dst_addr(m.tun_dst_addr);
     gm.set_num_routes(m.num_routes);
 
     return 0;
@@ -643,11 +658,20 @@ connect_to_remotes(void *opaque)
             }
             delete rm; rm = NULL;
 
+            /* Assign tunnel IP addresses if needed. */
+            if (re->second.tun_local_addr.empty() ||
+                        re->second.tun_remote_addr.empty()) {
+                re->second.tun_local_addr = re->second.tun_subnet.hostaddr(1);
+                re->second.tun_remote_addr = re->second.tun_subnet.hostaddr(2);
+            }
+
             /* Exchange routes. */
             m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
                       0, 0, string());
             hello.num_routes = g->local_routes.size();
-            hello.tun_subnet = re->second.tun_subnet.repr;
+            hello.tun_subnet = re->second.tun_subnet;
+            hello.tun_src_addr = re->second.tun_local_addr;
+            hello.tun_dst_addr = re->second.tun_remote_addr;
             if (cdap_obj_send(&conn, &m, 0, &hello)) {
                 cerr << "Failed to send M_START" << endl;
                 goto abor;
@@ -655,7 +679,7 @@ connect_to_remotes(void *opaque)
 
             for (list<Route>::iterator ro = g->local_routes.begin();
                     ro != g->local_routes.end(); ro ++) {
-                RouteObj robj(ro->subnet.repr);
+                RouteObj robj(ro->subnet);
 
                 m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
                             0, 0, string());
@@ -785,7 +809,7 @@ int main(int argc, char **argv)
         }
         delete rm; rm = NULL;
 
-        /* Receive routes from peer. */
+        /* Receive Hello message. */
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_START) {
             cerr << "M_START expected" << endl;
@@ -800,9 +824,6 @@ int main(int argc, char **argv)
         hello = Hello(objbuf, objlen);
         delete rm; rm = NULL;
 
-        cout << "Hello received: " << hello.num_routes << " routes, tun_subnet "
-                << hello.tun_subnet << endl;
-
         if (g->remotes.count(remote_name) == 0) {
             g->remotes[remote_name] = Remote();
 
@@ -816,6 +837,17 @@ int main(int argc, char **argv)
             }
         }
 
+        g->remotes[remote_name].tun_local_addr = IPAddr(hello.tun_dst_addr);
+        g->remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
+
+        cout << "Hello received: " << hello.num_routes << " routes, tun_subnet "
+                << hello.tun_subnet << ", local IP "
+                << static_cast<string>(g->remotes[remote_name].tun_local_addr)
+                << ", remote IP "
+                << static_cast<string>(g->remotes[remote_name].tun_remote_addr)
+                << endl;
+
+        /* Receive routes from peer. */
         for (unsigned int i = 0; i < hello.num_routes; i ++) {
             RouteObj robj;
             size_t prevlen;
