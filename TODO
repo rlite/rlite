@@ -1,21 +1,37 @@
-- support generic RIB M_READ (and M_WRITE)
+Open tasks, in decreasing order of priority:
 
-- implement utility to graphically show ipcp-rib-show, using graphviz
-  (DIF map with active links)
+* use separate N-1 flows for management and data
+   * right now the IPCP multiplexes its owm management SDUs and
+     data SDUs (coming from N-flows) on the same N-1 flow
+   * this would allow to use reliable flows for management SDUs and
+     unreliable ones for user traffic
 
-- install: don't overwrite config files
+* generic RIB synchronization where needed (e.g. DFT, LFDB, neighbors)
+   * a smart implementation would use some kind of hash on the RIB
+     subtrees to understand when the neighbor has different (and newer)
+     version of a fully-replicated subtree (e.g. DFT or Lower Flow
+     database (LFDB))
+   * avoid exchanging the same data again and again when not needed,
+     just periodically exchange hashes (and do the full update only when
+     needed)
 
-- DTCP: RTT estimate should happen using ktime_t variables
+* implement support for tailroom (needed by shim-eth)
 
-- allocate and use N-flows rather than N-1-flows over shim DIFs
-    - logic for self-registration and N-flow allocation already in place
-    - the only missing thing is to actually use the N-flow and not the N-1
+* let IPCP allocate and use N-flows ("self-flows") rather than N-1-flows
+  over shim DIFs: this is useful to let normal IPCPs that work over
+  unreliable shim to actually use a reliable flow for management SDUs
+    * logic for self-registration and N-flow allocation already in place
+    * the only missing thing is to actually use the N-flow and not the
+      N-1, when management SDUs are to be sent or received
 
-- generic RIB synchronization where needed (e.g. DFT)
-
-- use separate N-1 flows for management and data
-
-- routing: use IPCP names to identify graph nodes, rather than using
+* routing: use IPCP names to identify graph nodes, rather than using
   addresses. This is a first step towards supporting live renumbering
 
-- implement support for tailroom (needed by shim-eth)
+* DTCP: RTT estimate should happen using ktime_t variables
+
+* install: don't overwrite config files
+
+* implement utility to graphically show dif-rib-show, using graphviz
+  (DIF map with active links)
+
+* support generic RIB M_READ (and M_WRITE)
