@@ -45,6 +45,8 @@ struct Remote {
 
 struct Route {
     IPSubnet subnet;
+
+    Route(const IPSubnet &i) : subnet(i) { }
 };
 
 struct IPoRINA {
@@ -52,6 +54,9 @@ struct IPoRINA {
     list<Remote>    remotes;
     list<Route>     routes;
 };
+
+static IPoRINA _g;
+static IPoRINA *g = &_g;
 
 #if 0
 static string
@@ -209,6 +214,52 @@ parse_conf(const char *path)
         if (tokens.size() <= 0 || tokens[0][0] == '#') {
             /* Ignore comments and white spaces. */
             continue;
+        }
+
+        if (tokens[0] == "local") {
+            if (tokens.size() != 3) {
+                cerr << "Invalid 'local' directive at line " <<
+                        lines_cnt << endl;
+                return -1;
+            }
+
+            g->locals.push_back(Local(tokens[1], tokens[2]));
+
+        } else if (tokens[0] == "remote") {
+            IPSubnet subnet;
+
+            if (tokens.size() != 4) {
+                cerr << "Invalid 'remote' directive at line " <<
+                        lines_cnt << endl;
+                return -1;
+            }
+
+            try {
+                subnet = IPSubnet(tokens[3]);
+            } catch (...) {
+                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
+                return -1;
+            }
+
+            g->remotes.push_back(Remote(tokens[1], tokens[2], subnet));
+
+        } else if (tokens[0] == "route") {
+            IPSubnet subnet;
+
+            if (tokens.size() != 2) {
+                cerr << "Invalid 'route' directive at line " <<
+                        lines_cnt << endl;
+                return -1;
+            }
+
+            try {
+                subnet = IPSubnet(tokens[1]);
+            } catch (...) {
+                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
+                return -1;
+            }
+
+            g->routes.push_back(Route(subnet));
         }
     }
 
