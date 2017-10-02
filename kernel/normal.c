@@ -67,12 +67,6 @@ struct rina_pci_ctrl {
     rl_seq_t my_rwe;  /* sent but unused */
 } __attribute__ ((__packed__));
 
-static struct rl_buf *
-rl_buf_alloc_ctrl(size_t hdroom, gfp_t gfp)
-{
-    return rl_buf_alloc(sizeof(struct rina_pci_ctrl), hdroom, gfp);
-}
-
 static inline int
 rl_buf_pci_pop(struct rl_buf *rb)
 {
@@ -984,10 +978,12 @@ static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
 {
-    struct rl_buf *rb = rl_buf_alloc_ctrl(ipcp->hdroom, GFP_ATOMIC);
+    struct rl_buf *rb = rl_buf_alloc(sizeof(struct rina_pci_ctrl),
+                                     ipcp->hdroom, GFP_ATOMIC);
     struct rina_pci_ctrl *pcic;
 
-    if (rb) {
+    if (likely(rb)) {
+        rb->len = sizeof(struct rina_pci_ctrl);
         pcic = (struct rina_pci_ctrl *)RL_BUF_DATA(rb);
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;

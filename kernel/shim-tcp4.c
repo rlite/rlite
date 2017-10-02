@@ -170,13 +170,14 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
             } else {
                 priv->cur_rx_hdr = false;
                 priv->cur_rx_rb = rl_buf_alloc(priv->cur_rx_rblen,
-                                                  priv->flow->txrx.ipcp->hdroom,
-                                                  GFP_ATOMIC);
+                                               priv->flow->txrx.ipcp->hdroom,
+                                               GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     flow->stats.rx_err++;
                     PE("Out of memory\n");
                     break;
                 }
+                priv->cur_rx_rb->len = priv->cur_rx_rblen;
             }
 
             priv->cur_rx_buflen = 0;
