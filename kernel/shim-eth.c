@@ -855,7 +855,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 {
     struct rl_shim_eth *priv = ipcp->priv;
     struct net_device *netdev = priv->netdev;
-    int hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length */
+    int hhlen;
     struct sk_buff *skb = NULL;
     struct arpt_entry *entry = flow->priv;
     int ret;
@@ -889,6 +889,8 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
 
     spin_unlock_bh(&priv->tx_lock);
 
+#ifndef RL_SKB
+    hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length. */
     skb = alloc_skb(hhlen + rb->len + netdev->needed_tailroom,
                     GFP_KERNEL);
     if (!skb) {
@@ -896,11 +898,17 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         return -ENOMEM;
     }
 
-    skb_reserve(skb, hhlen);
+    skb_reserve(skb, hhlen); /* needed by dev_hard_header */
+#else  /* RL_SKB */
+    (void)hhlen;
+    skb = rb;
+#endif /* RL_SKB */
     skb_reset_network_header(skb);
     skb->dev = netdev;
     skb->protocol = htons(ETH_P_RLITE);
 
+    /* dev_hard_header() will call eth_header(), which skb_push() and
+     * initialize the Ethernet header. */
     ret = dev_hard_header(skb, skb->dev, ETH_P_RLITE, entry->tha,
                           netdev->dev_addr, skb->len);
     if (unlikely(ret < 0)) {
@@ -912,8 +920,10 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     skb->destructor = &shim_eth_skb_destructor;
     skb_shinfo(skb)->destructor_arg = (void *)flow;
 
+#ifndef RL_SKB
     /* Copy data into the skb. */
     memcpy(skb_put(skb, rb->len), RL_BUF_DATA(rb), rb->len);
+#endif /* !RL_SKB */
 
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);
@@ -927,7 +937,9 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
         spin_unlock_bh(&priv->tx_lock);
     }
 
+#ifndef RL_SKB
     rl_buf_free(rb);
+#endif /* !RL_SKB */
 
     return 0;
 }
@@ -991,13 +1003,20 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
          * changed; we should intercept those changes, reflect the change
          * in the ipcp_entry and notify userspace. */
-        *notify = (ipcp->max_sdu_size != priv->netdev->mtu) ||
-                    (ipcp->tailroom != priv->netdev->needed_tailroom);
-        ipcp->max_sdu_size = priv->netdev->mtu;
-        ipcp->tailroom = priv->netdev->needed_tailroom;
+        *notify = (ipcp->max_sdu_size != netdev->mtu) ||
+                    (ipcp->tailroom != netdev->needed_tailroom);
+        ipcp->max_sdu_size = netdev->mtu;
+        ipcp->tailroom = netdev->needed_tailroom;
+#ifdef RL_SKB
+        /* Report the headroom needed for Ethernet header. */
+        if (ipcp->hdroom != LL_RESERVED_SPACE(netdev)) {
+            *notify = 1;
+        }
+        ipcp->hdroom = LL_RESERVED_SPACE(netdev);
+#endif /* RL_SKB */
 
-        PD("netdev set to %p [max_sdu_size=%u]\n", priv->netdev,
-           netdev->mtu);
+        PD("netdev set to %p [max_sdu_size=%u, hdroom=%u, troom=%u]\n",
+           netdev, ipcp->max_sdu_size, ipcp->hdroom, ipcp->tailroom);
 
     } else if (strcmp(param_name, "mss") == 0) {
         /* Deny changes to max_sdu_size (and update). */
