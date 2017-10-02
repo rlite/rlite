@@ -631,15 +631,26 @@ execute_command(stringstream& cmdss)
     for (unsigned i = 0; i < tokens.size(); i ++) {
         argv[i] = strdup(tokens[i].c_str());
         if (!argv[i]) {
-            cerr << "Out of memory while allocating arguments" << endl;
+            cerr << "execute_command: out of memory while allocating "
+                        "arguments" << endl;
             goto out;
         }
     }
 
     child_pid = fork();
     if (child_pid == 0) {
-        /* Child process --> run the command. */
+        /* Child process: Redirect standard input, output and
+         * error to /dev/null and execute the target command. */
 
+        close(0);
+        close(1);
+        close(2);
+        if (open("/dev/null", O_RDONLY) < 0 ||
+                open("/dev/null", O_WRONLY) < 0 ||
+                    open("/dev/null", O_WRONLY) < 0) {
+            /* Redirection failed. */
+            return -1;
+        }
         execvp(argv[0], argv);
         perror("execvp()");
         exit(0);
