@@ -205,7 +205,7 @@ open_bound_socket(struct shim_tcp4 *shim, int *fd, struct sockaddr_in *addr)
     return 0;
 }
 
-static void accept_conn(struct uipcp *uipcp, int lfd);
+static void accept_conn(struct uipcp *uipcp, int lfd, void *opaque);
 
 static int
 shim_tcp4_appl_unregister(struct uipcp *uipcp,
@@ -285,7 +285,7 @@ shim_tcp4_appl_register(struct uipcp *uipcp,
 
     /* The accept_conn() callback will be invoked on new incoming
      * connections. */
-    uipcp_loop_fdh_add(uipcp, bp->fd, accept_conn);
+    uipcp_loop_fdh_add(uipcp, bp->fd, accept_conn, NULL);
 
     list_add_tail(&bp->node, &shim->bindpoints);
 
@@ -381,7 +381,7 @@ lfd_to_appl_name(struct shim_tcp4 *shim, int lfd, char **name)
 }
 
 static void
-accept_conn(struct uipcp *uipcp, int lfd)
+accept_conn(struct uipcp *uipcp, int lfd, void *opaque)
 {
     struct shim_tcp4 *shim = SHIM(uipcp);
     struct sockaddr_in remote_addr;

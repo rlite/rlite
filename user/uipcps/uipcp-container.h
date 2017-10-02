@@ -287,9 +287,10 @@ typedef int (*uipcp_msg_handler_t)(struct uipcp *uipcp,
 typedef void (*uipcp_tmr_cb_t)(struct uipcp *uipcp, void *arg);
 
 /* The signature of file descriptor callback. */
-typedef void (*uipcp_loop_fdh_t)(struct uipcp *uipcp, int fd);
+typedef void (*uipcp_loop_fdh_t)(struct uipcp *uipcp, int fd, void *opaque);
 
-int uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb);
+int uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
+                       void *opaque);
 
 int uipcp_loop_fdh_del(struct uipcp *uipcp, int fd);
 

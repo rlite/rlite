@@ -330,6 +330,7 @@ struct uipcp_loop_tmr {
 struct uipcp_loop_fdh {
     int fd;
     uipcp_loop_fdh_t cb;
+    void *opaque;
 
     struct list_head node;
     struct list_head tmpnode; /* private for the uipcp_loop */
@@ -472,7 +473,7 @@ uipcp_loop(void *opaque)
              * add/remove fdh entries. */
             list_for_each_entry_safe(fdh, tmp, &ready, tmpnode) {
                 list_del_init(&fdh->tmpnode);
-                fdh->cb(uipcp, fdh->fd);
+                fdh->cb(uipcp, fdh->fd, fdh->opaque);
             }
         }
 
@@ -626,7 +627,8 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
 }
 
 int
-uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
+uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
+                   void *opaque)
 {
     struct uipcp_loop_fdh *fdh;
 
@@ -644,6 +646,7 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb)
     memset(fdh, 0, sizeof(*fdh));
     fdh->fd = fd;
     fdh->cb = cb;
+    fdh->opaque = opaque;
 
     pthread_mutex_lock(&uipcp->lock);
     list_add_tail(&fdh->node, &uipcp->fdhs);
