@@ -881,7 +881,7 @@ for dif in dif_ordering:
         else:
             outs += '\n'
         if args.register:
-            outs += 'rlite-rand-clients > rlite-rand-clients.log &\n'
+            outs += 'nohup rlite-rand-clients -v 2&>1 > rlite-rand-clients.log &\n'
         outs += 'sleep 1\n'\
                 'true\n'\
                 'ENDSSH\n'\
