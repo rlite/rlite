@@ -1514,13 +1514,13 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     nf = neigh->mgmt_conn();
 
-    if (nf->enroll_state != NEIGH_ENROLLED) {
-        rsrc = nf->enrollment_rsrc_get(true);
-    }
-
     if (nf->enroll_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
+    }
+
+    if (nf->enroll_state != NEIGH_ENROLLED) {
+        rsrc = nf->enrollment_rsrc_get(true);
     }
 
     if (wait_for_completion) {
