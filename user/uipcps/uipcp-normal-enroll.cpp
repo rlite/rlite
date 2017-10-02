@@ -1354,7 +1354,7 @@ uipcp_flow_alloc(struct uipcp *uipcp, const char *dif_name,
     ret = poll(&pfd, 1, 2000);
     if (ret <= 0) {
         if (ret == 0) {
-            UPE(uipcp, "poll() timed out\n");
+            UPD(uipcp, "poll() timed out\n");
             ret = -1;
         } else {
             UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
@@ -1424,7 +1424,7 @@ Neighbor::alloc_flow(const char *supp_dif)
                            use_reliable_flow ? &relspec : NULL,
                            rib->uipcp->id, &port_id_);
     if (ret) {
-        UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
+        UPW(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
         return -1;
     }
 
