@@ -111,6 +111,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.function = arp_resolver_cb;
     priv->arp_resolver_tmr.data = (unsigned long)priv;
     priv->arp_tmr_shutdown = false;
+    ipcp->hdroom = 0;
 
     mutex_lock(&shims_lock);
     list_add_tail(&priv->node, &shims);
