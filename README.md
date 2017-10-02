@@ -191,10 +191,12 @@ Available commands:
 * ipcp-unregister: Unregister an IPCP from a DIF
 * ipcp-enroll: Enroll an IPCP into a DIF
 * ipcps-show: Show the list of IPCPs that are currently running in the system
-* ipcp-rib-show: Show the RIB of an IPCP running in the system
+* dif-rib-show: Show the RIB of a DIF in the system
 * flows-show: Show the allocated flows that have a local IPCP as one of the
               endpoints
 * flows-dump: Show the detailed DTP/DTCP state of a given flow
+* regs-show: Show all the names registered to any of the local IPCPs
+* dif-policy-mod: Modify a policy for a DIF running in the system
 
 To show all the available command and the corresponding usage, use
 
