@@ -955,6 +955,46 @@ of exposition, we assume that the operations do not fail. Non-blocking
 operations and errors are however covered by the API specification (section
 9.2) and the examples (section 9.4).
 
+### 9.1 Server-side operations
+The first operation needed by the server, (1) in figure 3, is rina open, which
+takes no arguments and returns a listening file descriptor (an integer, as
+usual) to be used for subsequent server-side calls. This file descriptor is the
+handler for an instance of a RINA control device which acts as a receiver for
+incoming flow allocation requests. At (2), the server calls rina register to
+register a name with the RINA control device, specifying the associated
+listening file descriptor (lfd), the name of the DIF to register to (dif)
+and the name to be registered (appl). The DIF argument is optional and
+advisory: the API implementation may choose to ignore it, and use some
+namespace management strategy to decide into which DIF the name should be
+registered. After a successful registration, the server can receive flow
+allocation requests, by calling rina flow accept on the listening file
+descriptor (3). Since the listening file descriptor was not put in
+non-blocking mode, this call will block until a flow request arrives. When this
+happens, the function returns a new file descriptor (cfd), the name of the
+remote application (src) and the QoS granted to the flow. The returned file
+descriptor is an handler for an instance of a RINA I/O device, to be used for
+data I/O.
+At this point (4), the flow allocation is complete, and the server can exchange
+SDUs with the client, using the write and read blocking calls or working in
+non-blocking mode (possibly mutliplexing with other I/O devices, sockets, etc.)
+by means of poll or select. This I/O phase is completely analogous to the
+I/O exchange that happens with TCP or UDP sockets, only the QoS may be
+different. Once the I/O session ends, the server can close the flow, triggering
+flow deallocation, using the close system call (5). The server can then decide
+whether to terminate or accept another flow allocation request (3).
+
+### 9.2 Client-side operations
+Client operation is straightforward; the client calls rina flow alloc (1) to
+issue a flow allocation request, passing as arguments the name of the DIF that
+is asked to support the flow (dif), the name of the client (src, i.e. the
+source application name), the name of the destination application (dst, i.e.
+the server name) and the required QoS for the flow (qos). The call will block
+until the flow allocation completes successfully, returning an file descriptor
+(fd) to be used for data I/O. At this point the client can exchange SDUs with
+the server (2), using the I/O file descriptor either in blocking or not
+blocking mode, similarly to what is possible to do with sockets. When the I/O
+session terminates, the client can deallocate the flow with the close system
+call.
 
 
 ## Credits
