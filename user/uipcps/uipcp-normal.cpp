@@ -355,6 +355,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 #endif /* RL_USE_QOS_CUBES */
 
     keepalive = NEIGH_KEEPALIVE_TO;
+    reliable_flows = 0;
+    reliable_n_flows = 0;
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
@@ -606,7 +608,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         lower_difs.erase(lit);
     }
 
-    if (uipcp->uipcps->reliable_n_flows) {
+    if (reliable_n_flows) {
         /* Check whether we need to do or undo self-registration. */
         struct rina_flow_spec relspec;
 
@@ -1242,6 +1244,33 @@ uipcp_rib::policy_param_mod(const std::string& component,
         } else {
             UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
         }
+    } else if (component == "resource-allocator") {
+        if (param_name == "reliable_flows") {
+            if (param_value == "true") {
+                reliable_flows = 1;
+                ret = 0;
+            } else if (param_value == "false") {
+                reliable_flows = 0;
+                ret = 0;
+            } else {
+                UPE(uipcp, "Invalid parameter value (not 'true' or 'false').\n");
+            }
+        } else if (param_name == "reliable_n_flows") {
+            if (param_value == "true") {
+                if (!reliable_flows) {
+                    UPE(uipcp, "Reliable flows not used,"
+                               " reliable N-flows do not make sense.\n");
+                } else {
+                    reliable_n_flows = 1;
+                    ret = 0;
+                }
+            } else if (param_value == "false") {
+                reliable_n_flows = 0;
+                ret = 0;
+            } else {
+                UPE(uipcp, "Invalid parameter value (not 'true' or 'false').\n");
+            }
+        }
     }
 
     if (!ret) {
@@ -1544,7 +1573,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
         return ret;
     }
 
-    if (!uipcp->uipcps->reliable_n_flows) {
+    if (!reliable_n_flows) {
         pthread_mutex_unlock(&lock);
     } else {
         bool self_reg_pending;
@@ -1655,6 +1684,7 @@ normal_lib_init(void)
     available_policies["address-allocator"].insert("manual");
     available_policies["address-allocator"].insert("distributed");
     available_policies["enrollment"].insert("default");
+    available_policies["resource-allocator"].insert("default");
 }
 
 struct uipcp_ops normal_ops = {

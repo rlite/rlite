@@ -675,10 +675,7 @@ int main(int argc, char **argv)
     const char *verbosity = "DBG";
     int ret, opt;
 
-    uipcps->reliable_n_flows = 0;
-    uipcps->reliable_flows = 0;
-
-    while ((opt = getopt(argc, argv, "hv:NRA:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -688,25 +685,11 @@ int main(int argc, char **argv)
                 verbosity = optarg;
                 break;
 
-            case 'N':
-                uipcps->reliable_n_flows = 1;
-                break;
-
-            case 'R':
-                uipcps->reliable_flows = 1;
-                break;
-
             default:
                 printf("    Unrecognized option %c\n", opt);
                 usage();
                 return -1;
         }
-    }
-
-    if (!uipcps->reliable_flows) {
-        /* If reliable flows are not used by the IPCPs, then it
-         * does not make sense to use (reliable) N-flows. */
-        uipcps->reliable_n_flows = 0;
     }
 
     /* Set verbosity level. */
