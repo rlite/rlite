@@ -132,9 +132,6 @@ struct NeighFlow {
      * reliable. */
     bool reliable;
 
-    /* File descriptor of an associated N-flow, currently unused. */
-    int upper_flow_fd;
-
     /* CDAP connection associated to this flow, if any. */
     CDAPConn *conn;
 
@@ -193,6 +190,11 @@ struct Neighbor {
      * management purposes. */
     NeighFlow *mgmt_only;
 
+    /* If not NULL, a regular (non-kernel-bound) N flow used for
+     * management purposes. This may be used only if the N-1 DIFs
+     * towards the neighbor do not support reliable flows. */
+    NeighFlow *n_flow;
+
     /* Last time we received a keepalive response from this neighbor.
      * We don't consider requests, as timeout on responses. */
     time_t unheard_since;
@@ -207,6 +209,7 @@ struct Neighbor {
     static const char *enroll_state_repr(enroll_state_t s);
 
     void mgmt_only_set(NeighFlow *nf);
+    void n_flow_set(NeighFlow *nf);
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_flows() const { return !flows.empty(); }
