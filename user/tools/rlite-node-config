@@ -56,10 +56,11 @@ for cmd in cmds:
     try:
         subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
     except Exception as e:
-        e.output = e.output.strip()
-        print("Failure at %s:%s --> %s" % (args.script, cmd[0], e.output))
+        o = str(e.output)
+        o = o.strip()
+        print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
         quit()
-    print('executing %s' % ' '.join(cmdargs))
+    print('executed %s' % ' '.join(cmdargs))
 
 i = 1
 n = len(enrolls)
@@ -68,11 +69,13 @@ for cmd in enrolls:
     while 1:
         try:
             subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+            break
         except Exception as e:
-            e.output = e.output.strip()
-            print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, e.output))
+            o = str(e.output)
+            o = o.strip()
+            print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
             time.sleep(3)
-    print('executing %s' % ' '.join(cmdargs))
+    print('executed %s' % ' '.join(cmdargs))
 
     print('Enrollment %d/%d successfully completed' % (i, n))
     i += 1
