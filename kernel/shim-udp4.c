@@ -212,7 +212,11 @@ udp4_rx_worker(struct work_struct *w)
 }
 
 static void
-udp4_data_ready(struct sock *sk)
+udp4_data_ready(struct sock *sk
+#ifdef RL_SK_DATA_READY_SECOND_ARG
+                , int unused
+#endif  /* RL_SK_DATA_READY_SECOND_ARG */
+)
 {
     struct shim_udp4_flow *priv = sk->sk_user_data;
 
