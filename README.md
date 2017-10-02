@@ -1,6 +1,7 @@
 # Documentation
 
 ## Table of contents
+````
 1. Introduction
 2. Software requirements
 3. Build instructions
@@ -36,7 +37,7 @@
     94. Mapping sockets API to RINA API
         941. Server-side mapping
         942. Client-side mapping
-
+````
 
 ## 1. Introduction
 
