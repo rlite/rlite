@@ -1,11 +1,5 @@
 Open tasks, in decreasing order of priority:
 
-* use separate N-1 flows for management and data
-   * right now the IPCP multiplexes its owm management SDUs and
-     data SDUs (coming from N-flows) on the same N-1 flow
-   * this would allow to use reliable flows for management SDUs and
-     unreliable ones for user traffic
-
 * generic RIB synchronization where needed (e.g. DFT, LFDB, neighbors)
    * a smart implementation would use some kind of hash on the RIB
      subtrees to understand when the neighbor has different (and newer)

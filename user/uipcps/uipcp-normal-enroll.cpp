@@ -1479,7 +1479,7 @@ Neighbor::flow_alloc(const char *supp_dif)
             nf = rl_new(NeighFlow(this, string(supp_dif), RL_PORT_ID_NONE,
                                   mgmt_fd, RL_IPCP_ID_NONE), RL_MT_NEIGHFLOW);
             nf->reliable = true;
-            UPD(rib->uipcp, "Management-only N-1 flow allocated\n");
+            UPD(rib->uipcp, "Management-only reliable N-1 flow allocated\n");
             mgmt_only_set(nf);
         }
     }
