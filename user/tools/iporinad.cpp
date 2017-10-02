@@ -142,6 +142,8 @@ struct IPoRINA {
 
     IPoRINA();
     ~IPoRINA();
+
+    void start_workers();
 };
 
 /*
@@ -314,6 +316,11 @@ string2int(const string& s, int& ret)
 }
 
 IPoRINA::IPoRINA() : verbose(0), rfd(-1)
+{
+}
+
+void
+IPoRINA::start_workers()
 {
     for (int i = 0; i < NUM_WORKERS; i ++) {
         workers.push_back(new FwdWorker(i, verbose));
@@ -932,6 +939,7 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Parse configuration file. */
     if (parse_conf(confpath)) {
         return -1;
     }
@@ -940,16 +948,22 @@ int main(int argc, char **argv)
         dump_conf();
     }
 
+    /* Name registration and creation of TUN devices. */
     if (setup()) {
         return -1;
     }
 
+    /* Start the threads that will carry out the forwarding work. */
+    g->start_workers();
+
+    /* Start a thread that periodically tries to connect to
+     * the remote peers specified by the configuration. */
     if (pthread_create(&fa_th, NULL, connect_to_remotes, NULL)) {
         perror("pthread_create()");
         return -1;
     }
 
-    /* Wait for incoming control connections. */
+    /* Wait for incoming control/data connections from remote peers. */
     for (;;) {
         int cfd;
         int ret;
