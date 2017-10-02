@@ -61,7 +61,7 @@ NeighFlow::~NeighFlow()
         return;
     }
 
-    enrollment_cleanup();
+    assert(enrollment_rsrc == NULL);
     keepalive_tmr_stop();
 
     if (conn) {
@@ -656,6 +656,7 @@ finish:
         rl_delete(rm, RL_MT_CDAP);
     }
     nf->enrollment_commit();
+    nf->enrollment_rsrc_put();
     pthread_mutex_unlock(&rib->lock);
     rib->enroller_enable(true);
 
@@ -666,6 +667,7 @@ err:
         rl_delete(rm, RL_MT_CDAP);
     }
     nf->enrollment_abort();
+    nf->enrollment_rsrc_put();
     pthread_mutex_unlock(&rib->lock);
     return NULL;
 }
@@ -899,6 +901,7 @@ finish:
         rl_delete(rm, RL_MT_CDAP);
     }
     nf->enrollment_commit();
+    nf->enrollment_rsrc_put();
     pthread_mutex_unlock(&rib->lock);
     rib->enroller_enable(true);
 
@@ -909,28 +912,31 @@ err:
         rl_delete(rm, RL_MT_CDAP);
     }
     nf->enrollment_abort();
+    nf->enrollment_rsrc_put();
     pthread_mutex_unlock(&rib->lock);
     return NULL;
 }
 
-void
-NeighFlow::enrollment_start(bool initiator)
+struct EnrollmentResources *
+NeighFlow::enrollment_rsrc_get(bool initiator)
 {
-    if (enrollment_rsrc) {
-        return;
+    if (enrollment_rsrc != NULL) {
+        enrollment_rsrc->refcnt ++;
+        return enrollment_rsrc;
     }
     UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
                             neigh->ipcp_name.c_str());
     enroll_state_set(NEIGH_ENROLLING);
     enrollment_rsrc = rl_new(EnrollmentResources(this, initiator),
                              MT_NEIGHFLOW);
+    return enrollment_rsrc;
 }
 
-/* Clean-up enrollment resources if needed. */
 void
-NeighFlow::enrollment_cleanup()
+NeighFlow::enrollment_rsrc_put()
 {
-    if (!enrollment_rsrc) {
+    assert(enrollment_rsrc != NULL);
+    if (--enrollment_rsrc->refcnt > 0) {
         return;
     }
     UPD(neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
@@ -941,13 +947,14 @@ NeighFlow::enrollment_cleanup()
 }
 
 EnrollmentResources::EnrollmentResources(struct NeighFlow *f,
-                                         bool initiator) : nf(f)
+                                         bool initiator) : nf(f), refcnt(1)
 {
     pthread_cond_init(&msgs_avail, NULL);
     pthread_cond_init(&stopped, NULL);
     pthread_create(&th, NULL,
             initiator ? enrollee_thread : enroller_thread,
             nf);
+    refcnt ++;
 }
 
 EnrollmentResources::~EnrollmentResources()
@@ -1461,6 +1468,7 @@ static int
 normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
                  const char *supp_dif_name, int wait_for_completion)
 {
+    struct EnrollmentResources *rsrc = NULL;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
     NeighFlow *nf;
@@ -1506,13 +1514,13 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
     nf = neigh->mgmt_conn();
 
+    if (nf->enroll_state != NEIGH_ENROLLED) {
+        rsrc = nf->enrollment_rsrc_get(true);
+    }
+
     if (nf->enroll_state != NEIGH_NONE) {
         UPI(rib->uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
-
-    } else {
-        /* Start the enrollment procedure as initiator (enrollee). */
-        nf->enrollment_start(true);
     }
 
     if (wait_for_completion) {
@@ -1521,16 +1529,17 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
          * (NEIGH_NONE).
          */
         while (nf->enroll_state == NEIGH_ENROLLING) {
-            pthread_cond_wait(&nf->enrollment_rsrc->stopped, &rib->lock);
+            pthread_cond_wait(&rsrc->stopped, &rib->lock);
         }
 
         ret = nf->enroll_state == NEIGH_ENROLLED ? 0 : -1;
-        nf->enrollment_cleanup();
-
     } else {
         ret = 0;
     }
 
+    if (rsrc) {
+        nf->enrollment_rsrc_put();
+    }
     pthread_mutex_unlock(&rib->lock);
 
     return ret;

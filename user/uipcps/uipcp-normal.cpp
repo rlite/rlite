@@ -226,11 +226,6 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
 
         nf->last_activity = time(NULL);
 
-        /* Start the enrollment as a slave (enroller), if needed. */
-        if (nf->enroll_state == NEIGH_NONE) {
-            nf->enrollment_start(false);
-        }
-
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
                 !neigh->initiator && m->op_code == gpb::M_START &&
                     m->obj_name == obj_name::enrollment &&
@@ -246,15 +241,17 @@ rib_recv_msg(struct uipcp_rib *rib, struct rl_mgmt_hdr *mhdr,
             neigh->mgmt_port_id = nf->port_id;
         }
 
-        if (nf->enroll_state == NEIGH_ENROLLING) {
+        if (nf->enroll_state != NEIGH_ENROLLED) {
+            /* Start the enrollment as a slave (enroller), if needed. */
+            nf->enrollment_rsrc_get(false);
+
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            assert(nf->enrollment_rsrc);
             nf->enrollment_rsrc->msgs.push_back(m);
             m = NULL;
             pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
+            nf->enrollment_rsrc_put();
         } else {
-            nf->enrollment_cleanup();
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
             ret = rib->cdap_dispatch(m, nf);
