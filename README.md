@@ -19,8 +19,10 @@
 	63. shim-tcp4 IPC Process
 	64. shim-loopback IPC Process
 	65. Normal IPC Process
-		6.5.1 IPCP flavours to support different data transfer constants
-
+		651. IPCP flavours to support different data transfer constants
+7. Tools
+    71. rina-gw
+    72. iporinad
 
 
 ## 1. Introduction
@@ -41,6 +43,11 @@ that can be easily assimilated by programmers used to the socket API, while
 additionally offering the QoS awareness built into RINA.
 The application API can be found in the include/rina/api.h header file.
 
+While the *rlite* software can be used to build RINA-only, IP-free networks,
+it also provides tools to interoperate RINA networks with existing IP networks
+in many different ways. The **shim-udp4** (section 6.2) enables RINA over IP;
+**iporinad** (section 7.2) allows IP over RINA with an MPLS-like architecture;
+finally, **rina-gw** (section 7.1) allows to deploy RINA next to IP.
 
 
 ## 2. Software requirements
@@ -204,6 +211,8 @@ Other programs are available for testing and deployment:
                        blocking allocation or blocking I/O.
 * **rina-gw**, a deamon program implementing a gateway between a TCP/IP
                network and a RINA network.
+* **iporinad**, a daemon program which is able to tunnel IP traffic over
+                a RINA network
 * **rina-toy**, a simple echo program written using the Python bindings.
 
 #### Examples of rinaperf usage
@@ -656,7 +665,7 @@ where a normal IPCP called normal1:xyz is given the address 7382 to be used
 in its DIF.
 
 
-### 6.5.1 IPCP flavours to support different data transfer constants
+### 6.5.1. IPCP flavours to support different data transfer constants
 
 The data transfer constants of the normal IPCP (e.g. size of EFCP sequence
 numbers, addresses, CEP-ids, ...) are hardcoded in the **normal.ko** kernel
@@ -687,6 +696,85 @@ of some macros.
 You are free to add/modify flavours depending on your needs, and use
 the different flavours together.
 
+
+## 7. Tools
+This section documents useful programs that are part of the *rlite*
+software, but they are not part of the stack implementation.
+
+### 7.1. rina-gw
+The **rina-gw** program is a C++ daemon that acts as a proxy/gateway
+between a TCP/IP network and a RINA network, as depicted in XXX.
+On the one side, the gateway accepts TCP connections coming from
+a TCP/IP network and proxies them by allocating RINA flows towards the
+proper server applications in the RINA network. On the other side,
+the gateway accepts flow allocation requests coming from the RINA network
+and proxies them to a TCP server by means of new TCP connections.
+
+The proxy needs therefore to be configured with a mapping between TCP/IP
+names (IP and ports) and RINA names (DIF and application names).
+In the current prototype, the mapping can be specified only with a
+configuration file that rina-gw reads at startup; future versions may
+implement a mechanism to allow for dynamic reconfiguration. Each line in
+the configuration file specifies a single mapping. Two types of mappings
+are possible, one for each direction: an I2R directive maps TCP
+clients to RINA servers, whereas an R2I directive maps RINA
+clients to TCP servers.
+
+In the following configuration file example
+
+    I2R serv.DIF rinaservice2 0.0.0.0 9063
+    R2I vpn3.DIF tcpservice1 32.1.42.190 8729
+
+the first directive cofigures rina-gw to proxy incoming connections on
+destination port 9063 (on any host interface) towards the rinaservice2
+application running in serv.DIF; the second directive asks rina-gw to proxy
+incoming flow allocation requests for the destination application
+tcpservice1 (on DIF vpn3.DIF) towards a TCP server on host 32.1.42.190
+on port 8279.
+
+The rina-gw program has been designed as a multi-threaded event-loop based
+application. The RINA API is used in non-blocking mode together
+with the socket API.
+The main thread event-loop is responsible for the TCP connection setup and RINA
+flow allocation, while the data forwarding -- i.e. reading data from a TCP
+socket and writing it on a RINA flow and the other way around -- happens within
+dedicated worker threads. It is worth observing that the only data structure
+that worker threads use is a map that maps each file descriptor into another
+file descriptor (e.g. std::map<int, int>). As a consequence, the
+worker thread is generic code that is not aware of what kind of network I/O is
+using -- TCP sockets, RINA flows, or others. This transparency property is
+possible because of the file descriptor abstraction provided by the new
+RINA API.
+In the current prototype, only a single worker
+thread is used to handle all the active sessions; future versions are expected
+to use multiple worker threads to scale up with the number of sessions.
+
+At startup, the main thread reads the configuration file and issues all the
+bind()/listen() and rina\_register() calls that are necessary
+to listen for incoming TCP connection (I2R) or RINA incoming flow requests
+(R2I). The main poll-based event-loop waits for any of the four
+event types that can happen:
+ * A flow allocation request comes from the RINA network, matching one
+   of the R2I directives. A TCP connection is initiated towards the
+   mapped IP and port, calling connect() in non-blocking mode.
+ * A TCP connection comes from the TCP/IP network, matching one of
+   the I2R directives. A RINA flow allocation is initiated towards the
+   mapped DIF and application name, using rina\_flow\_alloc()
+   with the {RINA\_F\_NOWAIT} set.
+ * A flow allocation response comes, matching one of the proxied TCP
+   connections associated to an I2R directive. The
+   rina\_flow\_alloc\_wait() function is called to complete
+   the flow allocation and the new session is dispatched to a worker
+   thread.
+ * A TCP connection handshake completes for one of the proxied flow
+   allocations associated to an R2I directive. The new session is
+   is dispatched to a worker thread.
+
+The main event-loop uses some data structures to keep track of the ongoing connection
+setups.
+
+### 7.2 iporinad
+xxx
 
 ## Credits
 
