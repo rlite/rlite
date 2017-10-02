@@ -79,6 +79,7 @@ generate_flavours() {
 HAVE_VMPI="n"
 HAVE_SHIM_TCP4="y"
 HAVE_SHIM_UDP4="y"
+WITH_SKBUFFS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
 
@@ -121,6 +122,14 @@ do
 
         "--without-shim-tcp4")
         HAVE_SHIM_TCP4="n"
+        ;;
+
+        "--with-skbuffs")
+        WITH_SKBUFFS="y"
+        ;;
+
+        "--with-skbuffs")
+        WITH_SKBUFFS="n"
         ;;
 
         "--with-vmpi")
@@ -199,6 +208,19 @@ fi
 # Generate kernel makefile
 cp kernel/Makefile.in kernel/Makefile
 generate_flavours
+
+# Generate kerconfig.h file
+KCF=kernel/kerconfig.h
+cat > $KCF <<EOF
+#ifndef __RLITE_KERCONFIG_H__
+#define __RLITE_KERCONFIG_H__
+EOF
+
+if [ $WITH_SKBUFFS == "y" ]; then
+    echo '#define RL_SKB' >> $KCF
+fi
+
+echo '#endif' >> $KCF
 
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
 sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh

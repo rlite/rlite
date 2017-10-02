@@ -35,3 +35,6 @@ Open tasks, in decreasing order of priority:
   (DIF map with active links)
 
 * support generic RIB M_READ (and M_WRITE)
+
+* io-dev: support read_iter() and write_iter() to avoid copies on
+  writev() and readv()

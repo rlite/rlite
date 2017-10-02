@@ -40,6 +40,8 @@
 #include <linux/version.h>
 #include <linux/uaccess.h>
 
+#include "kerconfig.h"
+
 /* Include for signal_pending() */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0)
 #include <linux/sched.h>
@@ -115,11 +117,11 @@ extern int verbosity;
 struct rina_pci;
 
 /*
- * Use struct sk_buff for packet data and metadata, rather than using a custom
- * implementation. The custom implementation is smaller and simpler, but it
+ * If RL_SKB is defined, we use struct sk_buff for packet data and metadata,
+ * rather than using a custom implementation.
+ * The custom implementation is smaller and simpler, but it
  * requires copies and allocations at the shim-eth layer.
  */
-//#define RL_SKB
 
 #ifndef RL_SKB
 struct rl_buf;
