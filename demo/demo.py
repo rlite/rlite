@@ -737,9 +737,16 @@ for vmname in sorted(vms):
 
 
 # Generate per-VM setup script
+vm_conf_batch = 20
+vm_conf_count = 0
 outs += 'SUBSHELLS=""\n'
 for vmname in sorted(vms):
     vm = vms[vmname]
+
+    if vm_conf_count == vm_conf_batch:
+            outs += 'wait $SUBSHELLS\n\n'
+            vm_conf_count = 0
+            outs += 'SUBSHELLS=""\n'
 
     outs += '(\n'\
             'DONE=255\n'\
@@ -898,8 +905,11 @@ for vmname in sorted(vms):
             'done\n'\
             ') &\n'
     outs += 'SUBSHELLS="$SUBSHELLS $!"\n\n'
+    vm_conf_count += 1
 
-outs += 'wait $SUBSHELLS\n\n'
+if vm_conf_count > 0:
+    outs += 'wait $SUBSHELLS\n\n'
+
 
 if len(dns_mappings) > 0:
     print("DNS mappings: %s" % (dns_mappings))
