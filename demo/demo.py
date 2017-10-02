@@ -893,11 +893,11 @@ for vmname in sorted(vms):
             del vars_dict
 
         vars_dict = {'echoname': 'rina-echo-async.%s' % vm['name'],
-                       'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
+                       'dif': dif, 'perfname': 'rinaperf.%s' % vm['name']}
         if args.register:
             outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' % vars_dict
         if args.simulate:
-            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' % vars_dict
+            outs += 'nohup rinaperf -z "%(perfname)s" -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' % vars_dict
         del vars_dict
 
         enrollments_list = enrollments[dif] + lowerflowallocs[dif]
