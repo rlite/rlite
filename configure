@@ -123,11 +123,21 @@ EOF
             (void)fops->read_iter;
         }
 EOF
+
     add_test 'SIGNAL_PENDING_IN_SCHED_SIGNAL' <<EOF
         #include <linux/sched/signal.h>
 
         int dummy(void) {
             return signal_pending(NULL);
+        }
+EOF
+
+    add_test 'SK_DATA_READY_SECOND_ARG' <<EOF
+        #include <net/sock.h>
+
+        void dummy(void) {
+            struct sock *sk = NULL;
+            sk->sk_data_ready(sk, 0);
         }
 EOF
 
