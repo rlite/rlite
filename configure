@@ -75,6 +75,21 @@ generate_flavours() {
     echo "... flavours generated"
 }
 
+usage() {
+    cat <<EOF
+configure options:
+
+    --help                      Show this help and exit
+    --prefix                    [/] Prefix path for installation of kernel and user components
+    --libmodprefix
+    --with-shim-udp4            Enable shim-udp4
+    --without-shim-udp4         Disable shim-udp4
+    --with-shim-tcp4            Enable shim-tcp4
+    --without-shim-tcp4         Disable shim-tcp4
+    --with-skbuffs              Use Linux native skbuffs for PDU data/metadata (better performance)
+    --without-skbuffs           Use custom packet representation for PDU data/metadata
+EOF
+}
 
 WITH_VMPI="n"
 WITH_SHIM_TCP4="y"
@@ -88,6 +103,16 @@ while [[ $# > 0 ]]
 do
     key="$1"
     case $key in
+        "-h")
+            usage
+            exit 0
+        ;;
+
+        "--help")
+            usage
+            exit 0
+        ;;
+
         "--prefix")
         if [ -n "$2" ]; then
             INSTALL_PREFIX=$2
@@ -128,7 +153,7 @@ do
         WITH_SKBUFFS="y"
         ;;
 
-        "--with-skbuffs")
+        "--without-skbuffs")
         WITH_SKBUFFS="n"
         ;;
 
@@ -142,6 +167,7 @@ do
 
         *)
         echo "Unknown option '$key'"
+        echo "Try ./configure --help"
         exit 255
         ;;
     esac
