@@ -7,11 +7,15 @@ rlite-shim-loopback-y := shim-loopback.o
 obj-m += rlite-shim-eth.o
 rlite-shim-eth-y := shim-eth.o
 
+ifeq ($(HAVE_SHIM_TCP4),y)
 obj-m += rlite-shim-tcp4.o
 rlite-shim-tcp4-y := shim-tcp4.o
+endif
 
+ifeq ($(HAVE_SHIM_UDP4),y)
 obj-m += rlite-shim-udp4.o
 rlite-shim-udp4-y := shim-udp4.o
+endif
 
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include

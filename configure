@@ -77,6 +77,8 @@ generate_flavours() {
 
 
 HAVE_VMPI="n"
+HAVE_SHIM_TCP4="y"
+HAVE_SHIM_UDP4="y"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
 
@@ -85,10 +87,6 @@ while [[ $# > 0 ]]
 do
     key="$1"
     case $key in
-        "--with-vmpi")
-        HAVE_VMPI="y"
-        ;;
-
         "--prefix")
         if [ -n "$2" ]; then
             INSTALL_PREFIX=$2
@@ -107,6 +105,30 @@ do
             echo "--libmodprefix requires a path argument"
             exit 255
         fi
+        ;;
+
+        "--with-shim-udp4")
+        HAVE_SHIM_UDP4="y"
+        ;;
+
+        "--without-shim-udp4")
+        HAVE_SHIM_UDP4="n"
+        ;;
+
+        "--with-shim-tcp4")
+        HAVE_SHIM_TCP4="y"
+        ;;
+
+        "--without-shim-tcp4")
+        HAVE_SHIM_TCP4="n"
+        ;;
+
+        "--with-vmpi")
+        HAVE_VMPI="y"
+        ;;
+
+        "--without-vmpi")
+        HAVE_VMPI="n"
         ;;
 
         *)
@@ -151,10 +173,12 @@ cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
 
 # Generate the main Makefile
 cp Makefile.in Makefile
-sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}${LIBMODPREFIX}|g" Makefile
 sed -i "s|@ROOTDIR@|$PWD|g" Makefile
 sed -i "s|@LIBMODPREFIX@|${LIBMODPREFIX}|g" Makefile
+sed -i "s|@HAVE_SHIM_UDP4@|${HAVE_SHIM_UDP4}|g" Makefile
+sed -i "s|@HAVE_SHIM_TCP4@|${HAVE_SHIM_TCP4}|g" Makefile
+sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
 
 # Prepare VMPI
 if [ $HAVE_VMPI == "y" ]; then
