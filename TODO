@@ -11,9 +11,6 @@ Open tasks, in decreasing order of priority:
 
 * implement support for tailroom (needed by shim-eth)
 
-* routing: use IPCP names to identify graph nodes, rather than using
-  addresses. This is a first step towards supporting live renumbering
-
 * DTCP: RTT estimate should happen using ktime_t variables
 
 * install: don't overwrite config files
