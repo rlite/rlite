@@ -306,7 +306,7 @@ rl_upqueue_append(struct rl_ctrl *rc, const struct rl_msg_base *rmsg,
             /* No free space in the queue. */
             spin_unlock(&rc->upqueue_lock);
             if (!maysleep || !time_before(jiffies, exp)) {
-                RPD(2, "upqueue overrun, dropping\n");
+                RPD(2, "upqueue overrun, dropping [cansleep=%d]\n", maysleep);
                 rl_free(serbuf, RL_MT_UPQ);
                 rl_free(entry, RL_MT_UPQ);
                 ret = -ENOSPC;
