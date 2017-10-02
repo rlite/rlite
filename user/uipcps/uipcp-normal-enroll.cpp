@@ -1197,7 +1197,7 @@ uipcp_rib::lookup_node_address(const std::string& node_name) const
         return mit->second.address;
     }
 
-    return 0; /* Zero means no address was found. */
+    return RL_ADDR_NULL; /* Zero means no address was found. */
 }
 
 std::string

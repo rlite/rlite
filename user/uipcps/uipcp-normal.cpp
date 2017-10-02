@@ -329,7 +329,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
                                          enroller_enabled(false),
                                          self_registered(false),
                                          self_registration_needed(false),
-                                         myaddr(0)
+                                         myaddr(RL_ADDR_NULL)
 {
     int ret;
 
@@ -864,7 +864,7 @@ addr_allocator_distributed::allocate()
 {
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
-    rlm_addr_t addr = 0;
+    rlm_addr_t addr = RL_ADDR_NULL;
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);

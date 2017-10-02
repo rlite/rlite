@@ -60,7 +60,7 @@ struct EnrollmentInfo : public UipcpObject {
     std::list< std::string > lower_difs;
     bool start_early;
 
-    EnrollmentInfo() : address(0), start_early(false) { }
+    EnrollmentInfo() : address(RL_ADDR_NULL), start_early(false) { }
     EnrollmentInfo(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -94,7 +94,7 @@ struct DFTEntry : public UipcpObject {
      * locally. */
     bool local;
 
-    DFTEntry() : address(0), timestamp(0), local(false) { }
+    DFTEntry() : address(RL_ADDR_NULL), timestamp(0), local(false) { }
     DFTEntry(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -346,7 +346,8 @@ struct AddrAllocRequest : public UipcpObject {
     rlm_addr_t address;
     bool pending; /* not serialized */
 
-    AddrAllocRequest() : requestor (0), address(0), pending(true) { }
+    AddrAllocRequest() : requestor (0), address(RL_ADDR_NULL),
+                         pending(true) { }
     AddrAllocRequest(rlm_addr_t a, rlm_addr_t r) : requestor(r), address(a),
                                                  pending(true) { }
     AddrAllocRequest(const char *buf, unsigned int size);

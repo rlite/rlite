@@ -476,7 +476,7 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
     PI_S("IPC Processes table:\n");
 
     list_for_each_entry(attrs, &ipcps, node) {
-        if (attrs->addr == 0) {
+        if (attrs->addr == RL_ADDR_NULL) {
             strncpy(addrbuf, "*", sizeof(addrbuf));
         } else {
             snprintf(addrbuf, sizeof(addrbuf), "%llu",
