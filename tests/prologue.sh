@@ -4,7 +4,7 @@ fi
 
 if [ "$batch" != "0" ]; then
     rlite-uipcps &
-    while [ ! -e "/var/rina/uipcp-server" ] ; do
+    while [ ! -e "/var/rina/uipcps-server" ] ; do
         true
     done
 fi

@@ -49,7 +49,7 @@ enum {
     RLITE_U_MSG_MAX,
 };
 
-/* Numtables for rlite-ctl <==> uipcp-server messages exchange. */
+/* Numtables for rlite-ctl <==> uipcps-server messages exchange. */
 
 extern struct rl_msg_layout rl_uipcps_numtables[RLITE_U_MSG_MAX + 1];
 
