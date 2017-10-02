@@ -42,7 +42,7 @@ const LowerFlow *
 lfdb_default::_find(const NodeId& local_node, const NodeId& remote_node) const
 {
     const auto it = db.find(local_node);
-    map<NodeId, LowerFlow>::const_iterator jt;
+    unordered_map<NodeId, LowerFlow>::const_iterator jt;
 
     if (it == db.end()) {
         return NULL;
@@ -91,7 +91,7 @@ bool
 lfdb_default::del(const NodeId& local_node, const NodeId& remote_node)
 {
     auto it = db.find(local_node);
-    map<NodeId, LowerFlow>::iterator jt;
+    unordered_map<NodeId, LowerFlow>::iterator jt;
     string repr;
 
     if (it == db.end()) {
@@ -268,7 +268,7 @@ lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 int
 lfdb_default::neighs_refresh(size_t limit)
 {
-    map< NodeId, LowerFlow >::iterator jt;
+    unordered_map< NodeId, LowerFlow >::iterator jt;
     int ret = 0;
 
     if (db.size() == 0) {
@@ -307,7 +307,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
     assert(lfdb);
 
     for (auto& kvi : lfdb->db) {
-        list<map<NodeId, LowerFlow >::iterator> discard_list;
+        list<unordered_map<NodeId, LowerFlow >::iterator> discard_list;
 
         if (kvi.first == rib->myname) {
             /* Don't age local entries, we pretend they
@@ -345,8 +345,8 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
 void
 RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
-                        const std::map<NodeId, std::list<Edge> >& graph,
-                        std::map<NodeId, Info>& info)
+            const std::unordered_map<NodeId, std::list<Edge> >& graph,
+            std::unordered_map<NodeId, Info>& info)
 {
     /* Initialize the per-node info map. */
     for (const auto& kvg : graph) {
@@ -409,9 +409,9 @@ RoutingEngine::compute_shortest_paths(const NodeId& source_addr,
 int
 RoutingEngine::compute_next_hops(const NodeId& local_node)
 {
-    std::map<NodeId, std::map<NodeId, Info> > neigh_infos;
-    std::map<NodeId, std::list<Edge> > graph;
-    std::map<NodeId, Info> info;
+    std::unordered_map<NodeId, std::unordered_map<NodeId, Info> > neigh_infos;
+    std::unordered_map<NodeId, std::list<Edge> > graph;
+    std::unordered_map<NodeId, Info> info;
 
     /* Clean up state left from the previous run. */
     next_hops.clear();
@@ -534,9 +534,10 @@ RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
 int
 RoutingEngine::compute_fwd_table()
 {
-    map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new_, next_ports_new;
+    unordered_map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new_,
+                                                        next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
-    map<rl_port_t, int> port_hits;
+    unordered_map<rl_port_t, int> port_hits;
     rl_port_t dflt_port;
     int dflt_hits = 0;
 
@@ -544,11 +545,10 @@ RoutingEngine::compute_fwd_table()
      * into a port-id towards the next-hop. */
     for (const auto& kvr : next_hops) {
         for (const NodeId& lfa : kvr.second) {
-            map<string, Neighbor*>::iterator neigh;
+            auto neigh = rib->neighbors.find(lfa);
             rlm_addr_t dst_addr;
             rl_port_t port_id;
 
-            neigh = rib->neighbors.find(lfa);
             if (neigh == rib->neighbors.end()) {
                 UPE(uipcp, "Could not find neighbor with name %s\n",
                            lfa.c_str());

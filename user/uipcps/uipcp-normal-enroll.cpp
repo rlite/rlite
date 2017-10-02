@@ -1172,8 +1172,7 @@ uipcp_rib::get_neighbor(const string& neigh_name, bool create)
 int
 uipcp_rib::del_neighbor(const std::string& neigh_name)
 {
-    map<string, Neighbor*>::iterator mit =
-                    neighbors.find(neigh_name);
+    auto mit = neighbors.find(neigh_name);
 
     assert(mit != neighbors.end());
 
@@ -1188,8 +1187,7 @@ uipcp_rib::del_neighbor(const std::string& neigh_name)
 rlm_addr_t
 uipcp_rib::lookup_node_address(const std::string& node_name) const
 {
-    map< string, NeighborCandidate >::const_iterator
-            mit = neighbors_seen.find(node_name);
+    auto mit = neighbors_seen.find(node_name);
 
     if (mit != neighbors_seen.end()) {
         return mit->second.address;
@@ -1657,7 +1655,6 @@ uipcp_rib::trigger_re_enrollments()
     /* Scan all the neighbor candidates. */
     for (const string& nc : neighbors_cand) {
         auto mit = neighbors_seen.find(nc);
-        map<string, Neighbor *>::iterator neigh;
         string common_dif;
         NeighFlow *nf = NULL;
 
@@ -1668,7 +1665,7 @@ uipcp_rib::trigger_re_enrollments()
             continue;
         }
 
-        neigh = neighbors.find(nc);
+        auto neigh = neighbors.find(nc);
 
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
             nf = neigh->second->mgmt_conn(); /* cache variable */
@@ -1728,9 +1725,8 @@ uipcp_rib::allocate_n_flows()
     pthread_mutex_lock(&lock);
     /* Scan all the enrolled neighbors. */
     for (const string& nc : neighbors_cand) {
-        map<string, Neighbor *>::iterator neigh;
+        auto neigh = neighbors.find(nc);
 
-        neigh = neighbors.find(nc);
         if (neigh == neighbors.end() ||
                 !neigh->second->enrollment_complete() ||
                         !neigh->second->initiator) {
@@ -1789,10 +1785,8 @@ uipcp_rib::allocate_n_flows()
 
         UPI(uipcp, "N-flow allocated [fd=%d]\n", pfd.fd);
 
-        map<string, Neighbor *>::iterator neigh;
-
         pthread_mutex_lock(&lock);
-        neigh = neighbors.find(re);
+        auto neigh = neighbors.find(re);
         if (neigh != neighbors.end()) {
             NeighFlow *nf;
 

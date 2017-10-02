@@ -484,8 +484,6 @@ uipcp_rib::dump() const
         const NeighborCandidate& cand = kvn.second;
         string neigh_name = rina_string_from_components(cand.apn, cand.api,
                                                         string(), string());
-        map<string, Neighbor*>::const_iterator neigh;
-
         ss << "    Name: "
                 << rina_string_from_components(cand.apn, cand.api,
                                                cand.aen, cand.aei)
@@ -505,7 +503,7 @@ uipcp_rib::dump() const
             ss << "} ";
         }
 
-        neigh = neighbors.find(neigh_name);
+        auto neigh = neighbors.find(neigh_name);
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
             NeighFlow *nf = neigh->second->mgmt_conn();
 
@@ -1633,7 +1631,8 @@ normal_enroller_enable(struct uipcp *uipcp,
     return rib->enroller_enable(!!req->enable);
 }
 
-std::map< std::string, std::set<std::string> > available_policies;
+std::unordered_map< std::string,
+    std::unordered_set<std::string> > available_policies;
 
 extern "C" void
 normal_lib_init(void)

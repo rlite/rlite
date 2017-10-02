@@ -804,7 +804,7 @@ flow allocation, while the data forwarding -- i.e. reading data from a TCP
 socket and writing it on a RINA flow and the other way around -- happens within
 dedicated worker threads. It is worth observing that the only data structure
 that worker threads use is a map that maps each file descriptor into another
-file descriptor (e.g. std::map<int, int>). As a consequence, the
+file descriptor. As a consequence, the
 worker thread is generic code that is not aware of what kind of network I/O is
 using -- TCP sockets, RINA flows, or others. This transparency property is
 possible because of the file descriptor abstraction provided by the new
