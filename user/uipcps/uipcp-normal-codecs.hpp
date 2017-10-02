@@ -342,7 +342,7 @@ struct FlowRequest : public UipcpObject {
     uint32_t state;
     QosSpec qos;
     ConnPolicies policies;
-    void *access_ctrl = NULL;
+    void *access_ctrl = nullptr;
     uint32_t max_create_flow_retries;
     uint32_t create_flow_retries;
     uint32_t hop_cnt;
@@ -364,7 +364,7 @@ struct FlowRequest : public UipcpObject {
 struct AData : public UipcpObject {
     rlm_addr_t src_addr;
     rlm_addr_t dst_addr;
-    CDAPMessage *cdap = NULL;
+    CDAPMessage *cdap = nullptr;
 
     AData() = default;
     AData(const char *buf, unsigned int size);
