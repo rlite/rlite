@@ -433,7 +433,7 @@ while 1:
                                             % (linecnt, shim))
             continue
 
-        shims[shim] = {'name': shim, 'type': 'udp4'}
+        shims[shim] = {'name': shim, 'type': 'udp4', 'vms': []}
 
         dns_mappings[shim] = dict()
 
@@ -445,6 +445,7 @@ while 1:
                                                 % (linecnt, ip))
                 continue
 
+            shims[shim]['vms'].append(vm)
             if vm not in vms:
                 vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
             links.append((shim, vm))
