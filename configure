@@ -81,7 +81,7 @@ configure options:
 
     --help                      Show this help and exit
     --prefix                    [/] Prefix path for installation of kernel and user components
-    --libmodprefix
+    --kernbuilddir              Path to the kernel directory to use for out-of-tree module compilation
     --with-shim-udp4            Enable shim-udp4
     --without-shim-udp4         Disable shim-udp4
     --with-shim-tcp4            Enable shim-tcp4
@@ -102,6 +102,7 @@ WITH_SKBUFFS="n"
 VERB_KERN_LOGS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
+KERNBUILDDIR="/lib/modules/`uname -r`/build"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -124,6 +125,16 @@ do
             shift
         else
             echo "--prefix requires a path argument"
+            exit 255
+        fi
+        ;;
+
+        "--kernbuilddir")
+        if [ -n "$2" ]; then
+            KERNBUILDDIR=$2
+            shift
+        else
+            echo "--kernbuilddir requires a path argument"
             exit 255
         fi
         ;;
@@ -219,7 +230,7 @@ cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
 cp Makefile.in Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}${LIBMODPREFIX}|g" Makefile
 sed -i "s|@ROOTDIR@|$PWD|g" Makefile
-sed -i "s|@LIBMODPREFIX@|${LIBMODPREFIX}|g" Makefile
+sed -i "s|@KERNBUILDDIR@|$KERNBUILDDIR|g" Makefile
 sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
 sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
 sed -i "s|@WITH_VMPI@|${WITH_VMPI}|g" Makefile
