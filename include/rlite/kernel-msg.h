@@ -362,6 +362,7 @@ struct rl_kmsg_flow_deallocated {
     rl_port_t local_port_id;
     rl_port_t remote_port_id;
     rlm_addr_t remote_addr;
+    uint8_t initiator;
 } __attribute__((packed));
 
 /* uipcp (application) --> kernel message to ask

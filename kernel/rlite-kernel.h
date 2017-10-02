@@ -581,6 +581,7 @@ struct flow_entry {
 #define RL_FLOW_ALLOCATED       (1 << 2) /* flow has been allocated */
 #define RL_FLOW_DEALLOCATED     (1 << 3) /* flow has been deallocated */
 #define RL_FLOW_DEL_POSTPONED   (1 << 4) /* flow removal has been postponed */
+#define RL_FLOW_INITIATOR       (1 << 5) /* local node initiated this flow */
     uint8_t             flags;
     struct hlist_node   node;
     struct hlist_node   node_cep;

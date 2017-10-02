@@ -1162,6 +1162,7 @@ flow_del(struct flow_entry *entry)
         ntfy.local_port_id = entry->local_port;
         ntfy.remote_port_id = entry->remote_port;
         ntfy.remote_addr = entry->remote_addr;
+        ntfy.initiator = !!(entry->flags & RL_FLOW_INITIATOR);
     }
     if (entry->upper.rc) {
         struct rl_ctrl *rc = entry->upper.rc;
@@ -2504,6 +2505,9 @@ rl_fa_req(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ret) {
         goto out;
     }
+
+    /* We are the initiator for this flow. */
+    flow_entry->flags |= RL_FLOW_INITIATOR;
 
     local_port = flow_entry->local_port;
 
