@@ -503,12 +503,12 @@ usage(void)
     cout << "rina-gw\n"
             << "    -h <show this help>\n"
             << "    -v <increase verbosity>\n"
-            << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rlite/rina-gw.conf')\n";
+            << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rina/rina-gw.conf')\n";
 }
 
 int main(int argc, char **argv)
 {
-    const char *confname = "/etc/rlite/rina-gw.conf";
+    const char *confname = "/etc/rina/rina-gw.conf";
     struct pollfd pfd[128];
     int ret;
     int opt;
