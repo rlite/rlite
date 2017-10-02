@@ -97,13 +97,12 @@ int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
                           const UipcpObject *obj)
 {
-    char objbuf[4096];
-    int objlen;
-    char *serbuf = NULL;
-    size_t serlen = 0;
-    int ret;
+    char objbuf[4096]; /* Don't change the scope of this buffer. */
+    int ret = 0;
 
     if (obj) {
+        int objlen;
+
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             errno = EINVAL;
@@ -114,26 +113,36 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
         m->set_obj_value(objbuf, objlen);
     }
 
-    try {
-        ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
-    } catch (std::bad_alloc) {
-        ret = -1;
-    }
+    if (reliable) {
+        /* Management-only flow, we don't need to use management PDUs. */
+        ret = conn->msg_send(m, invoke_id);
+    } else {
+        /* Kernel-bound flow, we need to encapsulate the message in a
+         * management PDU. */
+        char *serbuf = NULL;
+        size_t serlen = 0;
 
-    if (ret) {
-        errno = EINVAL;
-        UPE(neigh->rib->uipcp, "message serialization failed\n");
+        try {
+            ret = conn->msg_ser(m, invoke_id, &serbuf, &serlen);
+        } catch (std::bad_alloc) {
+            ret = -1;
+        }
+
+        if (ret) {
+            errno = EINVAL;
+            UPE(neigh->rib->uipcp, "message serialization failed\n");
+            if (serbuf) {
+                delete [] serbuf;
+            }
+            return -1;
+        }
+
+        ret = mgmt_write_to_local_port(neigh->rib->uipcp, port_id,
+                                       serbuf, serlen);
+
         if (serbuf) {
             delete [] serbuf;
         }
-        return -1;
-    }
-
-    ret = mgmt_write_to_local_port(neigh->rib->uipcp, port_id,
-                                   serbuf, serlen);
-
-    if (serbuf) {
-        delete [] serbuf;
     }
 
     if (ret == 0) {
@@ -1376,12 +1385,13 @@ uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
         if (ret == 0) {
             UPD(uipcp, "poll() timed out\n");
             ret = -1;
+            errno = ETIMEDOUT;
         } else {
             UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
         }
         close(wfd);
 
-        return -1;
+        return ret;
     }
 
     return __rina_flow_alloc_wait(wfd, port_id);
@@ -1436,8 +1446,7 @@ Neighbor::flow_alloc(const char *supp_dif)
                                        RL_MT_NEIGHFLOW);
     flows[port_id_]->reliable = false;
 
-    UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
-                    use_reliable_flow ? "" : "un",
+    UPD(rib->uipcp, "Unreliable N-1 flow allocated [fd=%d, port_id=%u]\n",
                     flows[port_id_]->flow_fd, flows[port_id_]->port_id);
 
     topo_lower_flow_added(rib->uipcp->uipcps, rib->uipcp->id,

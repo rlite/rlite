@@ -688,15 +688,16 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 {
     AData adata;
     CDAPMessage am;
-    char objbuf[4096];
+    char objbuf[4096];  /* Don't change the scope of this buffer. */
     char aobjbuf[4096];
     char *serbuf = NULL;
-    int objlen;
     int aobjlen;
     size_t serlen;
     int ret;
 
     if (obj) {
+        int objlen;
+
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
@@ -1326,9 +1327,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
      * we don't bound the kernel datapath. If we bound it, EFCP would be
      * bypassed, and then the management PDUs wouldn't be transferred
      * reliably. */
-    if (nf->reliable) {
-        neigh->mgmt_only_set(nf);
-    } else {
+    if (!nf->reliable) {
         neigh->flows[neigh_port_id] = nf;
     }
 
@@ -1350,8 +1349,12 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     }
 
     nf->flow_fd = flow_fd;
-    UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
-                    nf->reliable ? "" : "un", nf->flow_fd, nf->port_id);
+    UPD(rib->uipcp, "%seliable N-1 flow allocated [fd=%d, port_id=%u]\n",
+                    nf->reliable ? "R" : "Unr", nf->flow_fd, nf->port_id);
+
+    if (nf->reliable) {
+        neigh->mgmt_only_set(nf);
+    }
 
     /* Add the flow to the datapath topology if it's not management-only. */
     if (!nf->reliable) {
