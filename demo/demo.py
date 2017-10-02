@@ -174,6 +174,10 @@ argparser.add_argument('-g', '--graphviz', action='store_true',
 argparser.add_argument('-m', '--memory',
                        help = "Amount of memory in megabytes", type = int,
                        default = 164) # 128 without KASAN
+argparser.add_argument('--wait-for-boot',
+                       help = "Number of seconds to wait between the boot "\
+                              "of a batch of nodes and the next one",
+                       type = int, default = 10) # 128 without KASAN
 argparser.add_argument('--num-cpus',
                        help = "Number of vCPUs to give to each node", type = int,
                        default = 1)
@@ -452,7 +456,6 @@ for vmname in hostfwds:
 
 
 boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
-wait_for_boot = 12  # in seconds
 if len(vms) > 8:
     print("You want to run a lot of nodes, so it's better if I give "
           "each node some time to boot (since the boot is CPU-intensive)")
@@ -702,7 +705,7 @@ for vmname in sorted(vms):
 
     budget -= 1
     if budget <= 0:
-        outs += 'sleep %s\n' % wait_for_boot
+        outs += 'sleep %s\n' % args.wait_for_boot
         budget = boot_batch_size
 
     vmid += 1
