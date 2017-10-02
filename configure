@@ -65,7 +65,7 @@ generate_flavours() {
             fi
         done
 
-        # Generate the makefile chunk
+        # Generate the Makefile chunk
         echo "" >> kernel/Makefile
         echo "obj-m += rlite-normal-${FLAVOUR}.o" >> kernel/Makefile
         echo "rlite-normal-${FLAVOUR}-y := normal-${FLAVOUR}.o" >> kernel/Makefile
@@ -79,7 +79,7 @@ generate_flavours() {
     printmsg "... flavours generated"
 }
 
-KTESTDIR="kernel-test-dir"
+KTESTDIR="tmp-kernel-test-dir"
 KTESTOBJS=""
 
 add_test() {
@@ -115,7 +115,7 @@ probe_kernel_features() {
 EOF
 
     # Add tests one by one.
-    add_test 'have_chrdev_rw_iter' <<EOF
+    add_test 'HAVE_CHRDEV_RW_ITER' <<EOF
         #include <linux/fs.h>
         void dummy(void) {
             struct file_operations *fops = NULL;
@@ -123,7 +123,7 @@ EOF
             (void)fops->read_iter;
         }
 EOF
-    add_test 'signal_pending_in_sched_signal' <<EOF
+    add_test 'SIGNAL_PENDING_IN_SCHED_SIGNAL' <<EOF
         #include <linux/sched/signal.h>
 
         int dummy(void) {
@@ -165,6 +165,16 @@ EOF
 # END RUNNING TESTS: $(date)
 ##############################################################################
 EOF
+
+    # Collect test results and define proper macros in the kernel
+    # configuration file ($KCF).
+    for kobj in $KTESTOBJS; do
+        if [ -f $KTESTDIR/$kobj ]; then
+            macro=$(echo $kobj | sed 's|\.o$||g')
+            macro="#define RL_${macro}"
+            echo $macro >> ${KCF}
+        fi
+    done
 }
 
 usage() {
@@ -357,11 +367,9 @@ if [ $WITH_VMPI == "y" ]; then
     cd ../..
 fi
 
-# Generate kernel makefile
+# Generate kernel Makefile
 cp kernel/Makefile.in kernel/Makefile
 generate_flavours
-
-probe_kernel_features
 
 # Generate kerconfig.h file
 KCF=kernel/kerconfig.h
@@ -381,6 +389,8 @@ fi
 if [ $DEBUG == "y" ]; then
     echo '#define RL_MEMTRACK /* Track memory alloc/dealloc */' >> $KCF
 fi
+
+probe_kernel_features
 
 echo '#endif' >> $KCF
 
