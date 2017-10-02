@@ -215,7 +215,7 @@ argparser.add_argument('-R', '--reliable-flows', action='store_true',
                               "for management traffic rather than reusing "
                               "kernel-bound unreliable N-1 flows")
 argparser.add_argument('-A', '--addr-alloc-policy', type=str,
-                        choices = ["auto", "manual"], default = "auto",
+                        choices = ["distributed", "manual"], default = "distributed",
                        help = "Address allocation policy to be used for all DIFs")
 argparser.add_argument('-r', '--register', action='store_true',
                        help = "Register rina-echo-async apps instances on each node")
@@ -851,6 +851,10 @@ for vmname in sorted(vms):
             if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
+            elif args.addr_alloc_policy == "distributed":
+                nack_wait_secs = 5 if args.parallelize and len(vms) > 30 else 1
+                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
+                                                    % {'dif': dif, 'nws': nack_wait_secs}
 
             for p in dif_policies[dif]:
                 if len(p['nodes']) == 0 or vmname in p.nodes:
