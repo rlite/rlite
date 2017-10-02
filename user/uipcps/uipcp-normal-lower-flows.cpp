@@ -115,14 +115,18 @@ lfdb_default::del(const NodeId& local_node, const NodeId& remote_node)
 }
 
 void
-lfdb_default::update_local(const string& neigh_name)
+lfdb_default::update_local(const string& node_name)
 {
     LowerFlowList lfl;
     LowerFlow lf;
     CDAPMessage *sm;
 
+    if (rib->get_neighbor(node_name, false) == NULL) {
+        return; /* Not our neighbor. */
+    }
+
     lf.local_node = rib->myname;
-    lf.remote_node = neigh_name;
+    lf.remote_node = node_name;
     lf.cost = 1;
     lf.seqnum = 1; /* not meaningful */
     lf.state = true;
