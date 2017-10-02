@@ -75,8 +75,12 @@ rl_buf_pci_pop(struct rl_buf *rb)
         return -1;
     }
 
-    RL_BUF_PCI_POP(rb);
+#ifndef RL_SKB
+    rb->pci++;
     rb->len -= sizeof(struct rina_pci);
+#else  /* RL_SKB */
+    skb_pull(rb, sizeof(struct rina_pci));
+#endif /* RL_SKB */
 
     return 0;
 }
@@ -84,13 +88,21 @@ rl_buf_pci_pop(struct rl_buf *rb)
 static inline int
 rl_buf_pci_push(struct rl_buf *rb)
 {
+#ifndef RL_SKB
     if (unlikely((uint8_t *)(RL_BUF_PCI(rb)-1) < &rb->raw->buf[0])) {
         RPD(2, "No space to push another PCI\n");
         return -1;
     }
 
-    RL_BUF_PCI_PUSH(rb);
+    rb->pci--;
     rb->len += sizeof(struct rina_pci);
+#else  /* RL_SKB */
+    if (unlikely(skb_headroom(rb) < sizeof(struct rina_pci))) {
+        RPD(2, "No space to push another PCI\n");
+        return -1;
+    }
+    skb_push(rb, sizeof(struct rina_pci));
+#endif /* RL_SKB */
 
     return 0;
 }
@@ -1078,9 +1090,9 @@ no_ack:
 static void
 seqq_push(struct dtp *dtp, struct rl_buf *rb)
 {
-    struct rl_buf *cur;
     rl_seq_t seqnum = RL_BUF_PCI(rb)->seqnum;
-    struct list_head *pos = &dtp->seqq;
+    struct rb_list *pos = &dtp->seqq;
+    struct rl_buf *cur;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
         RPD(2, "seqq overrun: dropping PDU [%lu]\n",
@@ -1093,13 +1105,13 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
         struct rina_pci *pci = RL_BUF_PCI(cur);
 
         if (seqnum < pci->seqnum) {
-            pos = &cur->node;
+            pos = rl_buf_listnode(cur);
             break;
         } else if (seqnum == pci->seqnum) {
             /* This is a duplicate amongst the gaps, we can
              * drop it. */
             rl_buf_free(rb);
-            RPD(2, "Duplicate amongs the gaps [%lu] dropped\n",
+            RPD(2, "Duplicate amongst the gaps [%lu] dropped\n",
                 (long unsigned)seqnum);
 
             return;
@@ -1224,7 +1236,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
                         NPD("Remove [%lu] from rtxq\n",
                                 (long unsigned)pci->seqnum);
-                        list_del_init(&cur->node);
+                        rb_list_del(cur);
                         dtp->rtxq_len--;
 
                         if (RL_BUF_RTX(cur).jiffies) {
@@ -1546,7 +1558,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
     deliver = !drop && (gap <= flow->cfg.max_sdu_gap);
 
     if (deliver) {
-        struct list_head qrbs;
+        struct rb_list qrbs;
         struct rl_buf *qrb, *tmp;
 
         /* Update rcv_lwe_priv only if this PDU is going to be

@@ -90,7 +90,7 @@ extern int verbosity;
 
 
 /*
- * Packet buffers for the rlite stack.
+ * Bit definitions for the PCI header.
  */
 
 /* PDU flags */
@@ -109,18 +109,23 @@ extern int verbosity;
 #define PDU_T_SACK          2   /* Selective ACK */
 #define PDU_T_SNACK         3   /* Selective NACK */
 
-/* PCI header is opaque here, only the normal IPCP can use
+/* PCI header is opaque here, only the normal IPCP can see and use
  * its layout. */
 struct rina_pci;
 
+/*
+ * Use struct sk_buff for packet data and metadata, rather than using a custom
+ * implementation. The custom implementation is smaller and simpler, but it
+ * requires copies and allocations at the shim-eth layer.
+ */
 //#define RL_SKB
 
 #ifndef RL_SKB
 struct rl_buf;
-#else
+#else  /* RL_SKB */
 #include <linux/skbuff.h>
-#define rl_buf  sk_buff
-#endif
+#define rl_buf  sk_buff  /* just map on sk_buff */
+#endif /* RL_SKB */
 
 struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom,
                             size_t tailroom, gfp_t gfp);
@@ -150,6 +155,7 @@ union rl_buf_ctx {
 };
 
 #ifndef RL_SKB
+/* Custom implementation of packet data and metadata. */
 struct rl_rawbuf {
     size_t size;
     atomic_t refcnt;
@@ -167,8 +173,6 @@ struct rl_buf {
 #define RL_BUF_DATA(rb)         ((uint8_t *)rb->pci)
 #define RL_BUF_PCI(rb)          rb->pci
 #define RL_BUF_PCI_CTRL(rb)     ((struct rina_pci_ctrl *)rb->pci)
-#define RL_BUF_PCI_POP(rb)      rb->pci++
-#define RL_BUF_PCI_PUSH(rb)     rb->pci--
 #define RL_BUF_RTX(rb)          (rb)->u.rtx
 #define RL_BUF_RX(rb)           (rb)->u.rx
 #define RL_BUF_RMT(rb)          (rb)->u.rmt
@@ -226,8 +230,11 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
             list_for_each_entry(rb, l, node)
 #define rb_list_foreach_safe(rb, tmp, l) \
             list_for_each_entry_safe(rb, tmp, l, node)
+#define rl_buf_listnode(_rb)    (&(_rb)->node)
 
 #else  /* RL_SKB */
+
+/* Reuse Linux sk_buff. */
 
 #define RL_BUF_DATA(rb)         ((uint8_t *)(rb)->data)
 #define RL_BUF_PCI(rb)          ((struct rina_pci *)(rb)->data)
@@ -275,7 +282,8 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
         __rl_buf_free(_rb); \
     } while (0)
 
-/* Support for list of buffers. */
+/* Support for lists of buffers. We assume that the beginning of
+ * struct sk_buff matches the layout of struct rb_list. */
 struct rb_list {
     struct rl_buf *next;
     struct rl_buf *prev;
@@ -321,10 +329,14 @@ struct rl_buf *rb_list_front(struct rb_list *list)
 #define rb_list_foreach(_cur, _l)   \
         for (_cur = (_l)->next; _cur != ((struct rl_buf *)(_l)); \
                 _cur = _cur->next)
+
 #define rb_list_foreach_safe(_cur, _tmp, _l) \
         for (_cur = (_l)->next, _tmp = _cur->next;  \
                 _cur != ((struct rl_buf *)(_l)); \
                 _cur = _tmp, _tmp = _tmp->next)
+
+#define rl_buf_listnode(_rb)    ((struct rb_list *)(_rb))
+
 #endif /* RL_SKB */
 
 /*
