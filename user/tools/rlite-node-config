@@ -59,6 +59,7 @@ for cmd in cmds:
         e.output = e.output.strip()
         print("Failure at %s:%s --> %s" % (args.script, cmd[0], e.output))
         quit()
+    print('executing %s' % ' '.join(cmdargs))
 
 i = 1
 n = len(enrolls)
@@ -71,6 +72,7 @@ for cmd in enrolls:
             e.output = e.output.strip()
             print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, e.output))
             time.sleep(3)
+    print('executing %s' % ' '.join(cmdargs))
 
     print('Enrollment %d/%d successfully completed' % (i, n))
     i += 1
