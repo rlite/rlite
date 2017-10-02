@@ -613,6 +613,10 @@ sigint_handler(int signum)
     struct uipcps *uipcps = &guipcps;
     struct uipcp *uipcp, *tmp;
 
+    if (signum == SIGPIPE) {
+        PI("SIGPIPE received, ignoring...\n");
+    }
+
     print_backtrace();
 
     PI("Signal %d received, terminating...\n", signum);
