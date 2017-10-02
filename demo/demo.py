@@ -937,9 +937,9 @@ outs =  '#!/bin/bash\n'             \
 
 for vmname in sorted(vms):
     vm = vms[vmname]
-    outs += 'kill_qemu rina-%(id)s.pid\n' % {'id': vm['id']}
+    outs += '( kill_qemu rina-%(id)s.pid ) &\n' % {'id': vm['id']}
 
-outs += '\n'
+outs += 'wait\n'
 
 for vmname in sorted(vms):
     vm = vms[vmname]
