@@ -1238,7 +1238,7 @@ exchange is the message.
 
 
 ### 9.4 Mapping sockets API to RINA API
-The walkthough presented in section 9.2 and 9.3 highlights the strong relationship between
+The walkthough presented in sections 9.1 and 9.2 highlights the strong relationship between
 the RINA POSIX API and the socket API. In this section we will explore this relationship in depth,
 in order to
  * Define a clear mapping from socket calls to RINA calls, that can be used as a reference
