@@ -36,6 +36,7 @@
 #include <linux/bitmap.h>
 #include <linux/hashtable.h>
 #include <linux/spinlock.h>
+#include <linux/uio.h>
 #include <asm/compat.h>
 
 
@@ -249,43 +250,22 @@ rl_io_open(struct inode *inode, struct file *f)
     return 0;
 }
 
-static ssize_t rl_io_write(struct file *f, const char __user *ubuf,
-                           size_t ulen, loff_t *ppos);
 static ssize_t
-splitted_sdu_write(struct file *f, const char __user *ubuf, size_t ulen,
-                     loff_t *ppos, size_t max_sdu_size)
+rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-        ssize_t tot = 0;
-
-        while (ulen) {
-            size_t fraglen = min(max_sdu_size, ulen);
-            ssize_t ret;
-
-            ret = rl_io_write(f, ubuf, fraglen, ppos);
-            if (ret < 0) {
-                break;
-            }
-
-            ubuf += fraglen;
-            ulen -= fraglen;
-            tot += ret;
-        }
-
-        return tot;
-}
-
-static ssize_t
-rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
-{
+    struct file *f = iocb->ki_filp;
     struct rl_io *rio = (struct rl_io *)f->private_data;
     struct flow_entry *flow;
     struct ipcp_entry *ipcp;
     struct rl_buf *rb;
     struct rl_mgmt_hdr mhdr;
-    size_t orig_len = ulen;
+    size_t left = iov_iter_count(from);
+    size_t tot = 0;
     bool blocking = !(f->f_flags & O_NONBLOCK);
+    bool mgmt_sdu;
+    bool something_sent = false;
     DECLARE_WAITQUEUE(wait, current);
-    ssize_t ret;
+    ssize_t ret = 0;
 
     if (unlikely(!rio->txrx)) {
         PE("Error: Not bound to a flow nor IPCP\n");
@@ -295,111 +275,120 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
     /* If this is a management SDU write, rio->flow is NULL. */
     ipcp = rio->txrx->ipcp;
     flow = rio->flow;
+    mgmt_sdu = (rio->mode == RLITE_IO_MODE_IPCP_MGMT);
 
-    if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
+    if (unlikely(mgmt_sdu)) {
         /* Copy in the management header. */
-        if (copy_from_user(&mhdr, ubuf, sizeof(mhdr))) {
-            PE("copy_from_user(mgmthdr)\n");
-            return -EFAULT;
+        if (copy_from_iter(&mhdr, sizeof(mhdr), from) != sizeof(mhdr)) {
+            PE("copy_from_iter(mgmthdr)\n");
+            return -EINVAL;
         }
-        ubuf += sizeof(mhdr);
-        ulen -= sizeof(mhdr);
+        left -= sizeof(mhdr);
+        tot += sizeof(mhdr);
+    }
 
-    } else if (unlikely(ulen > ipcp->max_sdu_size)) {
-        if (flow->cfg.msg_boundaries) {
-            /* We cannot split the write(): message boundaries needs to be
-             * managed by EFCP fragmentation and reassembly. */
-            return -EMSGSIZE;
+    if (unlikely((mgmt_sdu || flow->cfg.msg_boundaries)
+                    && left > ipcp->max_sdu_size)) {
+        /* We cannot split the write(): message boundaries need to be handled
+         * by EFCP fragmentation and reassembly. */
+        return -EMSGSIZE;
+    }
+
+    while (left) {
+        size_t copylen = min(left, ipcp->max_sdu_size);
+
+        rb = rl_buf_alloc(copylen, ipcp->hdroom, ipcp->tailroom, GFP_KERNEL);
+        if (unlikely(!rb)) {
+            ret = -ENOMEM;
+            break;
         }
 
-        /* QoS does not require message boundaries, we can split. */
-        return splitted_sdu_write(f, ubuf, ulen, ppos, ipcp->max_sdu_size);
-    }
-
-    rb = rl_buf_alloc(ulen, ipcp->hdroom, ipcp->tailroom, GFP_KERNEL);
-    if (!rb) {
-        return -ENOMEM;
-    }
-
-    /* Copy in the userspace SDU. */
-    if (copy_from_user(RL_BUF_DATA(rb), ubuf, ulen)) {
-        PE("copy_from_user(data)\n");
-        rl_buf_free(rb);
-        return -EFAULT;
-    }
-    rl_buf_append(rb, ulen);
-
-    if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
-        struct ipcp_entry *lower_ipcp;
-        struct flow_entry *lower_flow;
-
-        if (!ipcp->ops.mgmt_sdu_build) {
-            RPD(2, "Missing mgmt_sdu_write() operation\n");
+        /* Copy in the userspace SDU. */
+        if (unlikely(copy_from_iter(RL_BUF_DATA(rb), copylen, from) != copylen)) {
+            PE("copy_from_iter(data)\n");
             rl_buf_free(rb);
-            return -ENXIO;
+            ret = -EINVAL;
+            break;
         }
+        rl_buf_append(rb, copylen);
 
-        /* Management write. Prepare the buffer and get the lower
-         * flow and lower IPCP. */
-        ret = ipcp->ops.mgmt_sdu_build(ipcp, &mhdr, rb, &lower_ipcp,
-                                       &lower_flow);
-        if (ret) {
-            rl_buf_free(rb);
-            return ret;
-        }
+        if (unlikely(mgmt_sdu)) {
+            struct ipcp_entry *lower_ipcp;
+            struct flow_entry *lower_flow;
 
-        /* Prepare to write to an N-1 flow. */
-        ipcp = lower_ipcp;
-        flow = lower_flow;
-    }
-
-    /* Write to the flow, sleeping if needed. This can be a management write
-     * (to an N-1 flow) or an application write (to an N-flow). */
-    if (blocking) {
-        add_wait_queue(flow->txrx.tx_wqh, &wait);
-    }
-
-    for (;;) {
-        current->state = TASK_INTERRUPTIBLE;
-
-        ret = ipcp->ops.sdu_write(ipcp, flow, rb, blocking);
-
-        if (ret == -EAGAIN) {
-            if (signal_pending(current)) {
+            if (!ipcp->ops.mgmt_sdu_build) {
+                RPD(2, "Missing mgmt_sdu_write() operation\n");
                 rl_buf_free(rb);
-                rb = NULL;
-		/* We avoid restarting the system call, because the other
-		 * end could have shutdown the flow, ops.sdu_write()
-		 * could keep returning -EAGAIN forever, and appication could
-		 * get stuck in the write() syscall forever. */
-                ret = -EINTR;
+                ret = -ENXIO;
                 break;
             }
 
-            if (!blocking) {
+            /* Management write. Prepare the buffer and get the lower
+             * flow and lower IPCP. */
+            ret = ipcp->ops.mgmt_sdu_build(ipcp, &mhdr, rb, &lower_ipcp,
+                                           &lower_flow);
+            if (ret) {
                 rl_buf_free(rb);
-                rb = NULL;
                 break;
             }
 
-            /* No room to write, let's sleep. */
-            schedule();
-            continue;
+            /* Prepare to write to an N-1 flow. */
+            ipcp = lower_ipcp;
+            flow = lower_flow;
         }
 
-        break;
+        /* Write to the flow, sleeping if needed. This can be a management write
+         * (to an N-1 flow) or an application write (to an N-flow). */
+        if (blocking) {
+            add_wait_queue(flow->txrx.tx_wqh, &wait);
+        }
+
+        for (;;) {
+            current->state = TASK_INTERRUPTIBLE;
+
+            ret = ipcp->ops.sdu_write(ipcp, flow, rb, blocking);
+
+            if (ret == -EAGAIN) {
+                if (signal_pending(current)) {
+                    rl_buf_free(rb);
+                    rb = NULL;
+                    /* We avoid restarting the system call, because the other
+                     * end could have shutdown the flow, ops.sdu_write()
+                     * could keep returning -EAGAIN forever, and appication could
+                     * get stuck in the write() syscall forever. */
+                    ret = -EINTR;
+                    break;
+                }
+
+                if (!blocking) {
+                    rl_buf_free(rb);
+                    rb = NULL;
+                    break;
+                }
+
+                /* No room to write, let's sleep. */
+                schedule();
+                continue;
+
+            }
+            break;
+        }
+
+        current->state = TASK_RUNNING;
+        if (blocking) {
+            remove_wait_queue(flow->txrx.tx_wqh, &wait);
+        }
+
+        if (unlikely(ret < 0)) {
+            break;
+        }
+
+        something_sent = true;
+        left -= copylen;
+        tot += copylen;
     }
 
-    current->state = TASK_RUNNING;
-    if (blocking) {
-        remove_wait_queue(flow->txrx.tx_wqh, &wait);
-    }
-
-    if (unlikely(ret < 0)) {
-        return ret;
-    }
-
-    return orig_len;
+    return something_sent ? tot : ret;
 }
 
 static ssize_t
@@ -776,7 +765,7 @@ static const struct file_operations rl_io_fops = {
     .owner          = THIS_MODULE,
     .release        = rl_io_release,
     .open           = rl_io_open,
-    .write          = rl_io_write,
+    .write_iter     = rl_io_write_iter,
     .read           = rl_io_read,
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,

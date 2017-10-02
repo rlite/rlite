@@ -1023,7 +1023,7 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
 #endif /* RL_SKB */
 
         PD("netdev set to %p [max_sdu_size=%u, hdroom=%u, troom=%u]\n",
-           netdev, ipcp->max_sdu_size, ipcp->hdroom, ipcp->tailroom);
+           netdev, (unsigned)ipcp->max_sdu_size, ipcp->hdroom, ipcp->tailroom);
 
     } else if (strcmp(param_name, "mss") == 0) {
         /* Deny changes to max_sdu_size (and update). */

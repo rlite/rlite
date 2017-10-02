@@ -464,7 +464,7 @@ struct ipcp_entry {
     void                *priv;
     uint16_t            tailroom; /* tailroom (e.g. used by shim-eth) */
     uint16_t            hdroom; /* DIF stacking hdroom */
-    uint32_t            max_sdu_size;
+    size_t              max_sdu_size;
     struct list_head    registered_appls;
     spinlock_t          regapp_lock;
     struct rl_ctrl      *uipcp;
