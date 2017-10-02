@@ -1086,13 +1086,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
     UPD(rib->uipcp, "Starting RIB sync with neighbor '%s'\n",
         static_cast<string>(ipcp_name).c_str());
 
-    /* Synchronize lower flow database. */
-    ret |= rib->lfdb->sync_neigh(nf, limit);
-
-    /* Synchronize Directory Forwarding Table. */
-    ret |= rib->dft->sync_neigh(nf, limit);
-
-    /* Synchronize neighbors. */
+    /* Synchronize neighbors first. */
     {
         NeighborCandidate cand = rib->neighbor_cand_get();
         string my_name = rib->myname;
@@ -1120,6 +1114,12 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
         /* Remove myself. */
         rib->neighbors_seen.erase(my_name);
     }
+
+    /* Synchronize lower flow database. */
+    ret |= rib->lfdb->sync_neigh(nf, limit);
+
+    /* Synchronize Directory Forwarding Table. */
+    ret |= rib->dft->sync_neigh(nf, limit);
 
     /* Synchronize address allocation table. */
     ret |= rib->addra->sync_neigh(nf, limit);
