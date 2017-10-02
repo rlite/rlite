@@ -408,10 +408,10 @@ struct uipcp_rib {
     int keepalive;
 
     /* Use reliable N-flows if reliable N-1-flows are not available. */
-    int reliable_n_flows;
+    bool reliable_n_flows;
 
     /* Use reliable N-1-flows rather than unreliable ones. */
-    int reliable_flows;
+    bool reliable_flows;
 
     /* Neighbors. We keep track of all the NeighborCandidate objects seen,
      * even for candidates that have no lower DIF in common with us. This

@@ -659,12 +659,7 @@ usage(void)
     printf("rlite-uipcps [OPTIONS]\n"
         "   -h : show this help\n"
         "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
-                           "DBG (default), VERY\n"
-        "   -N : use reliable N-flows if reliable N-1-flows are "
-                                                    "not available\n"
-        "   -R : if possible, use dedicated reliable N-1-flows "
-                              "for management traffic rather than reusing "
-                              "kernel-bound unreliable N-1 flows\n");
+                           "DBG (default), VERY\n");
 }
 
 int main(int argc, char **argv)

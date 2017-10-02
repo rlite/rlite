@@ -355,8 +355,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 #endif /* RL_USE_QOS_CUBES */
 
     keepalive = NEIGH_KEEPALIVE_TO;
-    reliable_flows = 0;
-    reliable_n_flows = 0;
+    reliable_flows = false;
+    reliable_n_flows = false;
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
@@ -1225,7 +1225,7 @@ uipcp_rib::policy_param_mod(const std::string& component,
                             const std::string& param_name,
                             const std::string& param_value)
 {
-    int ret = -1;
+    int ret = 0;
 
     if (!available_policies.count(component)) {
         UPE(uipcp, "Unknown component %s\n", component.c_str());
@@ -1234,6 +1234,7 @@ uipcp_rib::policy_param_mod(const std::string& component,
 
     if (component == "address-allocator") {
         ret = addra->param_mod(param_name, param_value);
+
     } else if (component == "enrollment") {
         if (param_name == "keepalive") {
             int keepalive_old = keepalive;
@@ -1243,33 +1244,32 @@ uipcp_rib::policy_param_mod(const std::string& component,
             }
         } else {
             UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
+            return -1;
         }
+
     } else if (component == "resource-allocator") {
+        bool enable = (param_value == "true");
+
         if (param_name == "reliable_flows") {
-            if (param_value == "true") {
-                reliable_flows = 1;
-                ret = 0;
-            } else if (param_value == "false") {
-                reliable_flows = 0;
-                ret = 0;
-            } else {
-                UPE(uipcp, "Invalid parameter value (not 'true' or 'false').\n");
+            if (!enable && param_value != "false") {
+                UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
+                return -1;
             }
+            reliable_flows = enable;
         } else if (param_name == "reliable_n_flows") {
-            if (param_value == "true") {
-                if (!reliable_flows) {
-                    UPE(uipcp, "Reliable flows not used,"
-                               " reliable N-flows do not make sense.\n");
-                } else {
-                    reliable_n_flows = 1;
-                    ret = 0;
-                }
-            } else if (param_value == "false") {
-                reliable_n_flows = 0;
-                ret = 0;
-            } else {
-                UPE(uipcp, "Invalid parameter value (not 'true' or 'false').\n");
+            if (!enable && param_value != "false") {
+                UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
+                return -1;
             }
+            if (enable && !reliable_flows) {
+                UPE(uipcp, " Cannot enable reliable N-flows as reliable "
+                           "flows are disabled.\n");
+                return -1;
+            }
+            reliable_n_flows = enable;
+        } else {
+            UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
+            return -1;
         }
     }
 
