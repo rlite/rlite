@@ -430,63 +430,63 @@ On node A, set-up the interface towards B and create a shim IPCP
 over Ethernet:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethAB.IPCP:1 shim-eth ethAB.DIF
+    $ sudo rlite-ctl ipcp-create ethAB.IPCP shim-eth ethAB.DIF
 
 Bind the shim IPCP to eth0, so that the network interface will be used
 to send and receive packets:
 
-    $ sudo rlite-ctl ipcp-config ethAB.IPCP:1 netdev eth0
+    $ sudo rlite-ctl ipcp-config ethAB.IPCP netdev eth0
 
 Create a normal IPCP in the normal DIF:
 
-    $ sudo rlite-ctl ipcp-create a.IPCP:1 normal n.DIF
+    $ sudo rlite-ctl ipcp-create a.IPCP normal n.DIF
 
 Let the normal IPCP register to the shim DIF:
 
-    $ sudo rlite-ctl ipcp-register a.IPCP:1 ethAB.DIF
+    $ sudo rlite-ctl ipcp-register a.IPCP ethAB.DIF
 
 
 On node B, similar operations are carried out for both the interfaces:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethAB.IPCP:1 shim-eth ethAB.DIF
-    $ sudo rlite-ctl ipcp-config ethAB.IPCP:1 netdev eth0
+    $ sudo rlite-ctl ipcp-create ethAB.IPCP shim-eth ethAB.DIF
+    $ sudo rlite-ctl ipcp-config ethAB.IPCP netdev eth0
     $
     $ sudo ip link set eth1 up
-    $ sudo rlite-ctl ipcp-create ethBC.IPCP:1 shim-eth ethBC.DIF
-    $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth1
+    $ sudo rlite-ctl ipcp-create ethBC.IPCP shim-eth ethBC.DIF
+    $ sudo rlite-ctl ipcp-config ethBC.IPCP netdev eth1
     $
-    $ sudo rlite-ctl ipcp-create b.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-register b.IPCP:1 ethAB.DIF
-    $ sudo rlite-ctl ipcp-register b.IPCP:1 ethBC.DIF
+    $ sudo rlite-ctl ipcp-create b.IPCP normal n.DIF
+    $ sudo rlite-ctl ipcp-register b.IPCP ethAB.DIF
+    $ sudo rlite-ctl ipcp-register b.IPCP ethBC.DIF
 
 On node C:
 
     $ sudo ip link set eth0 up
-    $ sudo rlite-ctl ipcp-create ethBC.IPCP:1 shim-eth ethBC.DIF
-    $ sudo rlite-ctl ipcp-config ethBC.IPCP:1 netdev eth0
+    $ sudo rlite-ctl ipcp-create ethBC.IPCP shim-eth ethBC.DIF
+    $ sudo rlite-ctl ipcp-config ethBC.IPCP netdev eth0
     $
-    $ sudo rlite-ctl ipcp-create c.IPCP:1 normal n.DIF
-    $ sudo rlite-ctl ipcp-register c.IPCP:1 ethBC.DIF
+    $ sudo rlite-ctl ipcp-create c.IPCP normal n.DIF
+    $ sudo rlite-ctl ipcp-register c.IPCP ethBC.DIF
 
 Once the IPCPs are set up, we have to carry out the enrollments in
 the normal DIF. Among the possible strategies, we can enroll A and
 C against B, so that B will be the initial node in the DIF.
 
-On node B, enable b.IPCP:1 to act as an enroller even if it is not
+On node B, enable b.IPCP to act as an enroller even if it is not
 enrolled to any other node (as it is the first node):
 
-    $ sudo rlite-ctl ipcp-enroller-enable b.IPCP:1
+    $ sudo rlite-ctl ipcp-enroller-enable b.IPCP
 
-On node A, enroll a.IPCP:1 into n.DIF using ethAB.DIF as a supporting
-DIF and b.IPCP:1 as a neighbor:
+On node A, enroll a.IPCP into n.DIF using ethAB.DIF as a supporting
+DIF and b.IPCP as a neighbor:
 
-    $ sudo rlite-ctl ipcp-enroll a.IPCP:1 n.DIF ethAB.DIF b.IPCP:1
+    $ sudo rlite-ctl ipcp-enroll a.IPCP n.DIF ethAB.DIF b.IPCP
 
-On node C, enroll c.IPCP:1 into n.DIF using ethBC.DIF as a supporting
-DIF and b.IPCP:1 as a neighbor:
+On node C, enroll c.IPCP into n.DIF using ethBC.DIF as a supporting
+DIF and b.IPCP as a neighbor:
 
-    $ sudo rlite-ctl ipcp-enroll c.IPCP:1 n.DIF ethBC.DIF b.IPCP:1
+    $ sudo rlite-ctl ipcp-enroll c.IPCP n.DIF ethBC.DIF b.IPCP
 
 On any node, you can check the standard output of the userspace daemon,
 to check that the previous operations are completed with success.
@@ -614,9 +614,9 @@ must be configured with the O.S. name of the Ethernet Network Interface Card
 
 In the following example
 
-    $ sudo rlite-ctl ipcp-config ether3:181 netdev eth2
+    $ sudo rlite-ctl ipcp-config ether3 netdev eth2
 
-a shim IPCP called ether3:181 is assigned a network interface called eth2.
+a shim IPCP called ether3 is assigned a network interface called eth2.
 
 
 ### 6.2. shim-udp4 IPC Process
@@ -685,11 +685,11 @@ file is stored at /etc/rina/shim-tcp4-dir.
 
 An example configuration is the following:
 
-    rinaperf-data:client 10.0.0.1 6789 i.DIF
-    rinaperf-data:server 10.0.0.2 6788 i.DIF
+    rinaperf-data|client 10.0.0.1 6789 i.DIF
+    rinaperf-data|server 10.0.0.2 6788 i.DIF
 
-where the application named rinaperf-data:client is mapped (bound) to the
-TCP socket with address 10.0.0.1:6789 and rinaperf-data:server is mapped
+where the application named rinaperf-data|client is mapped (bound) to the
+TCP socket with address 10.0.0.1:6789 and rinaperf-data|server is mapped
 to the TCP socket 10.0.0.1:6788. These mappings are valid for a shim DIF
 called i.DIF.
 
@@ -738,9 +738,9 @@ policy for the **address-allocator** component using **rlite-ctl** program,
 and configure addresses manually like in the following example:
 
     $ sudo rlite-ctl dif-policy-mod n.DIF adddress-allocator manual
-    $ sudo rlite-ctl ipcp-config normal1:xyz address 7382
+    $ sudo rlite-ctl ipcp-config normal1.IPCP address 7382
 
-where a normal IPCP called normal1:xyz is given the address 7382 to be used
+where a normal IPCP called normal1.IPCP is given the address 7382 to be used
 in its DIF.
 
 
