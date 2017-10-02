@@ -129,9 +129,8 @@ FwdWorker::submit(int cfd, int rfd)
         return;
     }
 
-    /* Add the new mapping. The converse would be the same. */
-    fdmap[rfd] = cfd;
-    /* Append two entries in the fds array. */
+    /* Append two entries in the fds array. Mapping is implicit
+     * between two consecutive entries. */
     fds[nfds ++] = Fd(rfd);
     fds[nfds ++] = Fd(cfd);
     repoll();
@@ -151,14 +150,11 @@ FwdWorker::terminate(unsigned int i, int ret, int errcode)
     string how;
 
     i &= ~(0x1);
-    j = i + 1;
+    j = i | 0x1;
 
     close(fds[i].fd);
     close(fds[j].fd);
     fds[i].close = fds[j].close = 1;
-
-    assert(fdmap.find(fds[i].fd) != fdmap.end());
-    fdmap.erase(fds[i].fd);
 
     if (verbose >= 1) {
         if (ret == 0 || errcode == EPIPE) {
