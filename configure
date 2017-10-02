@@ -89,6 +89,7 @@ configure options:
     --with-skbuffs              Use Linux native skbuffs for PDU data/metadata (better performance)
     --without-skbuffs           Use custom packet representation for PDU data/metadata
     --verbose-kernel            Compile (conditional) verbose kernel logs (may slow down a bit)
+    --debug                     Compile in debug mode
 EOF
 }
 
@@ -103,6 +104,7 @@ VERB_KERN_LOGS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
 KERNBUILDDIR="/lib/modules/`uname -r`/build"
+DEBUG="n"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -185,6 +187,10 @@ do
         WITH_VMPI="n"
         ;;
 
+        "--debug")
+        DEBUG="y"
+        ;;
+
         *)
         echo "Unknown option '$key'"
         echo "Try ./configure --help"
@@ -223,7 +229,7 @@ mkdir build || exit 255
 
 (
 cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG}
 )
 
 # Generate the main Makefile
@@ -268,6 +274,10 @@ fi
 
 if [ $VERB_KERN_LOGS == "y" ]; then
     echo '#define RL_PV_ENABLE /* Compile PV() conditional logs */' >> $KCF
+fi
+
+if [ $DEBUG == "y" ]; then
+    echo '#define RL_MEMTRACK /* Track memory alloc/dealloc */' >> $KCF
 fi
 
 echo '#endif' >> $KCF
