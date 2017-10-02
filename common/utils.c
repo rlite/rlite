@@ -96,7 +96,7 @@ rina_name_serlen(const struct rina_name *name)
 }
 
 /* Serialize a C string. */
-void
+static void
 serialize_string(void **pptr, const char *s)
 {
     uint16_t slen;
@@ -109,7 +109,7 @@ serialize_string(void **pptr, const char *s)
 }
 
 /* Deserialize a C string. */
-int
+static int
 deserialize_string(const void **pptr, char **s, int *sleft)
 {
     uint16_t slen;
@@ -461,7 +461,6 @@ rina_name_free(struct rina_name *name)
         name->aei = NULL;
     }
 }
-COMMON_EXPORT(rina_name_free);
 
 void
 rina_name_move(struct rina_name *dst, struct rina_name *src)
@@ -482,7 +481,6 @@ rina_name_move(struct rina_name *dst, struct rina_name *src)
     dst->aei = src->aei;
     src->aei = NULL;
 }
-COMMON_EXPORT(rina_name_move);
 
 int
 rina_name_copy(struct rina_name *dst, const struct rina_name *src)
@@ -502,7 +500,6 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
 
     return 0;
 }
-COMMON_EXPORT(rina_name_copy);
 
 COMMON_STATIC int
 __rina_name_fill(struct rina_name *name, const char *apn,
@@ -530,7 +527,6 @@ __rina_name_fill(struct rina_name *name, const char *apn,
     return 0;
 
 }
-COMMON_EXPORT(__rina_name_fill);
 
 int
 rina_name_fill(struct rina_name *name, const char *apn,
@@ -538,7 +534,6 @@ rina_name_fill(struct rina_name *name, const char *apn,
 {
     return __rina_name_fill(name, apn, api, aen, aei, 1);
 }
-COMMON_EXPORT(rina_name_fill);
 
 COMMON_STATIC char *
 __rina_name_to_string(const struct rina_name *name, int maysleep)
@@ -590,14 +585,12 @@ __rina_name_to_string(const struct rina_name *name, int maysleep)
 
     return str;
 }
-COMMON_EXPORT(__rina_name_to_string);
 
 char *
 rina_name_to_string(const struct rina_name *name)
 {
     return __rina_name_to_string(name, 1);
 }
-COMMON_EXPORT(rina_name_to_string);
 
 int
 rina_sername_valid(const char *str)
@@ -620,7 +613,6 @@ rina_sername_valid(const char *str)
 
     return (*orig_str == ':') ? 0 : 1;
 }
-COMMON_EXPORT(rina_sername_valid);
 
 COMMON_STATIC int
 __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
@@ -653,14 +645,12 @@ __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
 
     return 0;
 }
-COMMON_EXPORT(__rina_name_from_string);
 
 int
 rina_name_from_string(const char *str, struct rina_name *name)
 {
     return __rina_name_from_string(str, name, 1);
 }
-COMMON_EXPORT(rina_name_from_string);
 
 int
 rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
@@ -699,7 +689,6 @@ rina_name_cmp(const struct rina_name *one, const struct rina_name *two)
 
     return 0;
 }
-COMMON_EXPORT(rina_name_cmp);
 
 int
 rina_name_valid(const struct rina_name *name)
@@ -710,7 +699,6 @@ rina_name_valid(const struct rina_name *name)
 
     return 1;
 }
-COMMON_EXPORT(rina_name_valid);
 
 void
 flow_config_dump(const struct rl_flow_config *c)
