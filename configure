@@ -114,7 +114,14 @@ probe_kernel_features() {
 ##############################################################################
 EOF
 
-    # Add tests one by one.
+    # Add tests one by one, starting with a dummy test to make sure we are
+    # able to compile kernel modules.
+    add_test 'KERNEL_MODULES_OK' <<EOF
+        int dummy(int x) {
+            return x;
+        }
+EOF
+
     add_test 'HAVE_CHRDEV_RW_ITER' <<EOF
         #include <linux/fs.h>
         void dummy(void) {
@@ -176,13 +183,17 @@ EOF
 ##############################################################################
 EOF
 
-    # Collect test results and define proper macros in the kernel
-    # configuration file ($KCF).
+    # Check if we were able to compile kernel modules, collect test results
+    # and define proper macros in the kernel configuration file ($KCF).
     for kobj in $KTESTOBJS; do
         if [ -f $KTESTDIR/$kobj ]; then
             macro=$(echo $kobj | sed 's|\.o$||g')
             macro="#define RL_${macro}"
             echo $macro >> ${KCF}
+        elif [ $kobj == "KERNEL_MODULES_OK.o" ]; then
+            printmsg "Error: failed to build kernel modules in $KERNBUILDDIR"
+            printmsg "Check config.log for details"
+            exit 255
         fi
     done
 }
@@ -313,8 +324,8 @@ do
 done
 
 # Check if kernel headers are there for out-of-tree build
-if [ ! -d /lib/modules/`uname -r`/build ]; then
-    printmsg "Cannot find '/lib/modules/$(uname -r)/build' directory"
+if [ ! -d $KERNBUILDDIR ]; then
+    printmsg "Cannot find '$KERNBUILDDIR' kernel build directory"
     printmsg "Make sure headers for the running kernel are installed"
     exit 255
 fi
