@@ -8,7 +8,7 @@
     41. Kernel modules
     42. Userspace IPCPs daemon
     43. Libraries
-    44. Control tool
+    44. Administration tools
     45. Other tools
     46. Python bindings
 5. Tutorials
@@ -186,7 +186,7 @@ The following libraries are available:
 * **cdap**, a C++ implementation of the CDAP protocol.
 
 
-### 4.4. Control tool
+### 4.4. Administration tools
 
 The **rlite-ctl** command line tool is used for the administration of the
 *rlite* stack, in the same way as the *iproute2* tool is used to administer
@@ -212,6 +212,29 @@ Available commands:
 To show all the available command and the corresponding usage, use
 
     $ rlite-ctl -h
+
+The **rlite-node-config** tool can be used to run a sequence of **rlite-ctl**
+commands specified by a configuration file (the _initscript_).
+This is particularly useful to setup the IPCPs once a machine boots.
+The _initscript_ is a list of commands that are executed sequentially,
+e.g.:
+
+    ipcp-create e1.IPCP shim-eth e.DIF
+    ipcp-create n1.IPCP normal n.DIF
+    ipcp-create m1.IPCP normal m.DIF
+    ipcp-register n1.IPCP e.DIF
+    ipcp-register m1.IPCP n.DIF
+    ipcp-config e1.IPCP netdev ens4
+    ipcp-enroll n1.IPCP n.DIF e.DIF n2.IPCP
+    ipcp-enroll m1.IPCP m.DIF n.DIF m2.IPCP
+
+The node configurator aborts immediately if a non-enrollment command fails,
+as such a failure happens on misconfiguration or lack of system resources.
+If an enrollment command fails, conversely, it is likely that the remote
+enroller node is not up yet, or network is temporarily down; for this reason,
+on failure the program waits for a few seconds and tries again, as many times
+as it is necessary. When the current enrollment succeeds, it proceeds to
+the next one, until all the enrollments are completed.
 
 
 ### 4.5. Other tools
