@@ -1,4 +1,5 @@
-reset
+ipcp-create e1.IPCP shim-eth e.DIF
 ipcp-create n1.IPCP normal n.DIF
-ipcp-create l.IPCP shim-loopback l.DIF
-ipcp-register n1.IPCP l.DIF
+ipcp-register n1.IPCP e.DIF
+ipcp-config e1.IPCP netdev ens4
+ipcp-enroll n1.IPCP n1.DIF e.DIF n2.IPCP
