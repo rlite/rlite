@@ -51,6 +51,8 @@ argparser.add_argument('-D', type = int, default = 2,
                        help = "Average duration of a client")
 argparser.add_argument('-M', type = int, default = 40,
                        help = "Max number of active clients at any time")
+argparser.add_argument('-I', type = int, default = 1000,
+                       help = "Minimum inter-packet interval (in microseconds)")
 argparser.add_argument('--filter-name', type = str, default = 'rinaperf',
                        help = "String to use for filtering registered names")
 argparser.add_argument('-v', '--verbose', action = 'store_true',
@@ -63,6 +65,10 @@ if args.T < 1 or args.T > 100:
 
 if args.D < 1 or args.D > 100:
     print("Invalid parameter D: it must be 1 <= D <= 100")
+    quit()
+
+if args.I < 100 or args.I > 1000000:
+    print("Invalid parameter I: it must be 100 <= D <= 1000000")
     quit()
 
 # Generate clients
@@ -98,7 +104,7 @@ try:
         # Generate a new client
         dur = random.randint(1, 2*args.D-1)
         sel = random.randint(0, len(destinations)-1)
-        interval = random.randint(300, 2000) # us
+        interval = random.randint(args.I, args.I * 20) # us
         pktlen = random.randint(2, 1000)
         sizespec = '' if pktlen > 800 else "-s %d" % pktlen
         dif, appl = destinations[sel]

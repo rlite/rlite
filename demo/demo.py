@@ -215,11 +215,13 @@ argparser.add_argument('-r', '--register', action='store_true',
 argparser.add_argument('-s', '--simulate', action='store_true',
                        help = "Simulate network load using the rlite-rand-clients on each node")
 argparser.add_argument('-T', '--rand-period', default = 1, type = int,
-                       help = "Average time between to rinaperf spawn")
+                       help = "Average time between to rinaperf spawns")
 argparser.add_argument('-D', '--rand-duration', default = 8, type = int,
                        help = "Average duration of a rinaperf client")
 argparser.add_argument('-M', '--rand-max', default = 40, type = int,
                        help = "Max number of spawned of rinaperf client")
+argparser.add_argument('-I', '--rand-interval', default = 1000, type = int,
+                       help = "Min inter-packet interval for rinaperf clients")
 argparser.add_argument('-i', '--image',
                        help = "qcow2 image for legacy mode", type = str,
                        default = '')
@@ -836,11 +838,12 @@ for vmname in sorted(vms):
 
     # Run rlite-rand clients
     if args.simulate:
-        outs += 'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s '\
-                    '-v > rlite-rand-clients.log &\n' % \
+        outs += 'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s -I %(randintv)s '\
+                    ' &> rlite-rand-clients.log &\n' % \
                     {'randperiod': args.rand_period,
                      'randdur': args.rand_duration,
-                     'randmax': args.rand_max }
+                     'randmax': args.rand_max,
+                     'randintv': args.rand_interval }
 
     outs +=         '\n'\
                     'sleep 1\n'\
