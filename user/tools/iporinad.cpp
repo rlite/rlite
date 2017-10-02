@@ -675,6 +675,14 @@ Remote::ip_configure() const
         return -1;
     }
 
+    /* Disable TSO and GSO. */
+    cmdss = stringstream();
+    cmdss << "ethtool -K " << tun_name << " tso off gso off";
+    if (execute_command(cmdss)) {
+        cerr << "Failed to disable TSO and GSO for " << tun_name << endl;
+        return -1;
+    }
+
     /* Bring the tunnel device up. */
     cmdss = stringstream();
     cmdss << "ip link set dev " << tun_name << " up";
