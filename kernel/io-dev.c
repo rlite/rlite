@@ -694,38 +694,55 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
     struct rl_io *rio = (struct rl_io *)f->private_data;
     void __user *argp = (void __user *)arg;
-    struct rl_ioctl_info info;
-    long ret = -EINVAL;
+    long ret = 0;
 
-    /* We have only one command for now. */
-    if (cmd != RLITE_IOCTL_FLOW_BIND
-            && cmd != 1 /* splitted-sdu hack, temporary*/) {
-        return -EINVAL;
-    }
+    switch (cmd) {
+    case RLITE_IOCTL_FLOW_BIND:
+        {
+            struct rl_ioctl_info info;
 
-    if (copy_from_user(&info, argp, sizeof(info))) {
-        return -EFAULT;
-    }
+            if (copy_from_user(&info, argp, sizeof(info))) {
+                return -EFAULT;
+            }
 
-    rl_io_release_internal(rio);
+            rl_io_release_internal(rio);
 
-    switch (info.mode) {
-        case RLITE_IO_MODE_APPL_BIND:
-            ret = rl_io_ioctl_bind(rio, &info);
+            switch (info.mode) {
+                case RLITE_IO_MODE_APPL_BIND:
+                    ret = rl_io_ioctl_bind(rio, &info);
+                    break;
+
+                case RLITE_IO_MODE_IPCP_MGMT:
+                    ret = rl_io_ioctl_mgmt(rio, &info);
+                    break;
+
+            }
+
+            if (ret == 0) {
+                /* Set the mode only if the ioctl operation was successful.
+                 * This is very important because rl_io_release_internal()
+                 * looks at the mode to perform its action, assuming some
+                 * pointers to be not NULL depending on the mode. */
+                rio->mode = info.mode;
+            }
             break;
+        }
 
-        case RLITE_IO_MODE_IPCP_MGMT:
-            ret = rl_io_ioctl_mgmt(rio, &info);
+    case RLITE_IOCTL_MSS_GET:
+        {
+            uint32_t __user *mss = (uint32_t __user *)argp;
+
+            BUG_ON(!rio->txrx);
+            BUG_ON(!rio->txrx->ipcp);
+            if (put_user(rio->txrx->ipcp->max_sdu_size, mss)) {
+                return -EFAULT;
+            }
             break;
+        }
 
-    }
-
-    if (ret == 0) {
-        /* Set the mode only if the ioctl operation was successful.
-         * This is very important because rl_io_release_internal()
-         * looks at the mode to perform its action, assuming some pointers
-         * to be not NULL depending on the mode. */
-        rio->mode = info.mode;
+    default:
+        ret = -EINVAL;
+        break;
     }
 
     return ret;
