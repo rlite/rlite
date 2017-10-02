@@ -54,8 +54,6 @@
  */
 extern int verbosity;
 
-//#define RL_PV_ENABLE /* compile PV() conditional logs */
-
 #define DOPRINT(KLEV, LEV, FMT, ...)            \
                 printk(KLEV "[" LEV "]%s: " FMT, __func__, ##__VA_ARGS__)
 
