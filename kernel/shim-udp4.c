@@ -163,7 +163,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             msg.msg_name = &remote_addr;
             msg.msg_namelen = sizeof(remote_addr);
         }
-        iov.iov_base = RLITE_BUF_DATA(rb);
+        iov.iov_base = RL_BUF_DATA(rb);
         iov.iov_len = rb->len;
 
         ret = kernel_recvmsg(sock, &msg, (struct kvec *)&iov, 1,
@@ -325,7 +325,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
     struct iovec iov;
     int ret;
 
-    iov.iov_base = RLITE_BUF_DATA(rb);
+    iov.iov_base = RL_BUF_DATA(rb);
     iov.iov_len = rb->len;
 
     msg.msg_name = (struct sockaddr *)&flow_priv->remote_addr;

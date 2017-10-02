@@ -322,7 +322,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
     }
 
     /* Copy in the userspace SDU. */
-    if (copy_from_user(RLITE_BUF_DATA(rb), ubuf, ulen)) {
+    if (copy_from_user(RL_BUF_DATA(rb), ubuf, ulen)) {
         PE("copy_from_user(data)\n");
         rl_buf_free(rb);
         return -EFAULT;
@@ -454,7 +454,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 	if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
             ret = ulen;
-            if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), ret))) {
+            if (unlikely(copy_to_user(ubuf, RL_BUF_DATA(rb), ret))) {
                 ret = -EFAULT;
             }
 
@@ -469,7 +469,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             spin_unlock_bh(&txrx->rx_lock);
 
             ret = rb->len;
-            if (unlikely(copy_to_user(ubuf, RLITE_BUF_DATA(rb), ret))) {
+            if (unlikely(copy_to_user(ubuf, RL_BUF_DATA(rb), ret))) {
                 ret = -EFAULT;
             }
 
