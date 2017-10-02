@@ -24,6 +24,10 @@ message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
 message(STATUS "RLITE HEADERS: ${RLITE_HEADERS}")
 
 add_definitions("-Wall -g")
+if(DEBUG STREQUAL "y")
+    add_definitions("-DRL_DEBUG")
+    message(STATUS "Configuring for debug mode")
+endif()
 
 include_directories(${INCLUDE_DIR})
 

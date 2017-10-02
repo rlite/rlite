@@ -304,9 +304,10 @@ struct rl_flow_dtp
 #define RL_VERB_DBG     4
 #define RL_VERB_VERY    5
 
-/* Memtrack machinery, disabled by default. */
+/* Memtrack machinery, enabled in debug mode. */
+#ifdef RL_DEBUG
 #define RL_MEMTRACK
-#undef RL_MEMTRACK
+#endif
 
 #ifdef __cplusplus
 }
