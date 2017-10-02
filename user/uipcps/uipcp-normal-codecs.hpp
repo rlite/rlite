@@ -84,11 +84,11 @@ struct UipcpObject {
 };
 
 struct EnrollmentInfo : public UipcpObject {
-    rlm_addr_t address;
+    rlm_addr_t address = RL_ADDR_NULL;
     std::list< std::string > lower_difs;
-    bool start_early;
+    bool start_early = false;
 
-    EnrollmentInfo() : address(RL_ADDR_NULL), start_early(false) { }
+    EnrollmentInfo() = default;
     EnrollmentInfo(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
@@ -115,14 +115,14 @@ struct RinaName {
 
 struct DFTEntry : public UipcpObject {
     RinaName appl_name;
-    rlm_addr_t address;
-    uint64_t timestamp;
+    rlm_addr_t address = RL_ADDR_NULL;
+    uint64_t timestamp = 0;
     /* Not externally visible (not serialized), true
      * if this entry refers to an application registered
      * locally. */
-    bool local;
+    bool local = false;
 
-    DFTEntry() : address(RL_ADDR_NULL), timestamp(0), local(false) { }
+    DFTEntry() = default;
     DFTEntry(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
@@ -140,7 +140,7 @@ struct NeighborCandidate : public UipcpObject {
     std::string api;
     std::string aen; /* not serialized */
     std::string aei; /* not serialized */
-    rlm_addr_t address;
+    rlm_addr_t address = RL_ADDR_NULL;
     std::list<std::string> lower_difs;
 
     NeighborCandidate() = default;
@@ -164,12 +164,13 @@ struct NeighborCandidateList : public UipcpObject {
 struct LowerFlow : public UipcpObject {
     NodeId local_node;
     NodeId remote_node;
-    unsigned int cost;
-    unsigned int seqnum;
-    bool state;
-    unsigned int age;
+    unsigned int cost = 0;
+    unsigned int seqnum = 0;
+    bool state = false;
+    unsigned int age = 0;
 
-    LowerFlow() : cost(0), seqnum(0), state(false), age(0) { }
+    LowerFlow() = default;
+    RL_COPIABLE_MOVABLE(LowerFlow);
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
     bool operator==(const LowerFlow& o) {
@@ -320,11 +321,11 @@ struct ConnPolicies : public UipcpObject {
 };
 
 struct ConnId : public UipcpObject {
-    uint32_t qos_id;
-    uint32_t src_cep;
-    uint32_t dst_cep;
+    uint32_t qos_id = 0;
+    uint32_t src_cep = 0;
+    uint32_t dst_cep = 0;
 
-    ConnId() : qos_id(0), src_cep(0), dst_cep(0) { }
+    ConnId() = default;
     ConnId(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
@@ -341,7 +342,7 @@ struct FlowRequest : public UipcpObject {
     uint32_t state;
     QosSpec qos;
     ConnPolicies policies;
-    void *access_ctrl;
+    void *access_ctrl = NULL;
     uint32_t max_create_flow_retries;
     uint32_t create_flow_retries;
     uint32_t hop_cnt;
@@ -352,10 +353,10 @@ struct FlowRequest : public UipcpObject {
     struct rl_flow_config flowcfg;
 #define RL_FLOWREQ_INITIATOR    0x1 /* Was I the initiator? */
 #define RL_FLOWREQ_SEND_DEL     0x2 /* Should I send a delete message ? */
-    uint8_t flags;
+    uint8_t flags = 0;
     /* End of local storage. */
 
-    FlowRequest() : access_ctrl(NULL), flags(0) { }
+    FlowRequest() = default;
     FlowRequest(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
@@ -363,21 +364,20 @@ struct FlowRequest : public UipcpObject {
 struct AData : public UipcpObject {
     rlm_addr_t src_addr;
     rlm_addr_t dst_addr;
-    CDAPMessage *cdap;
+    CDAPMessage *cdap = NULL;
 
-    AData() : cdap(NULL) { }
+    AData() = default;
     AData(const char *buf, unsigned int size);
     ~AData() { if (cdap) rl_delete(cdap, RL_MT_CDAP); }
     int serialize(char *buf, unsigned int size) const override;
 };
 
 struct AddrAllocRequest : public UipcpObject {
-    rlm_addr_t requestor;
-    rlm_addr_t address;
-    bool pending; /* not serialized */
+    rlm_addr_t requestor = RL_ADDR_NULL;
+    rlm_addr_t address = RL_ADDR_NULL;
+    bool pending = true; /* not serialized */
 
-    AddrAllocRequest() : requestor (0), address(RL_ADDR_NULL),
-                         pending(true) { }
+    AddrAllocRequest() = default;
     AddrAllocRequest(rlm_addr_t a, rlm_addr_t r) : requestor(r), address(a),
                                                  pending(true) { }
     AddrAllocRequest(const char *buf, unsigned int size);
