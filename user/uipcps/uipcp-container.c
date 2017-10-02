@@ -1049,8 +1049,8 @@ topo_visit(struct uipcps *uipcps)
 
         ipn->marked = 0;
         ipn->hdroom = 0;
+        ipn->max_sdu_size = 65536;
         if (uipcp) {
-            ipn->max_sdu_size = uipcp->max_sdu_size;
             ipn->hdrsize = ipcp_hdrlen(uipcp);
             if (type_is_normal_ipcp(uipcp->dif_type)) {
                 /* Any normal IPCP needs at least some hdroom for
@@ -1061,6 +1061,17 @@ topo_visit(struct uipcps *uipcps)
                  * on the lowers (see algorithm below).
                  */
                 ipn->hdroom = ipn->hdrsize;
+            }
+
+            if (list_empty(&ipn->lowers)) {
+                /* No lowers, it can be a shim or a normal without
+                 * lowers. We need to start from the kernel-provided
+                 * MSS. */
+                ipn->max_sdu_size = uipcp->max_sdu_size;
+            } else {
+                /* There are some lowers, so we start from the maximum
+                 * value, which will be overridden during the minimization
+                 * process. */
             }
         }
     }
