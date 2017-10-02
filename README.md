@@ -1,3 +1,5 @@
+# Documentation
+
 ## Table of contents
 1. Introduction
 2. Software requirements
