@@ -641,13 +641,13 @@ An example of /etc/hosts configuration is the following:
     8.12.97.230     asd-63--
 
 In this example, the IP 8.12.97.231 is mapped to an application called
-xyz:abc, while the IP 8.12.97.230 is mapped to another application
-called asd:63. This means that this shim UDP implements a tunnel
+xyz|abc, while the IP 8.12.97.230 is mapped to another application
+called asd|63. This means that this shim UDP implements a tunnel
 between two nodes. The first endpoint node has a network interface configured
 with the address 8.12.97.231 (with some netmask), and a RINA application
-called xyz:abc can register to the local shim UDP IPCP. The other endpoint
+called xyz|abc can register to the local shim UDP IPCP. The other endpoint
 node has a network interface configured with the address 8.12.97.232, and a
-RINA application called asd:63 can register to the local shim UDP IPCP.
+RINA application called asd|63 can register to the local shim UDP IPCP.
 
 Note that while an IP address corresponds to one and only one application
 name, an application name may correspond to multiple IP addresses. This
