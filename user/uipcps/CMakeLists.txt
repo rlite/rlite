@@ -21,9 +21,9 @@ target_link_libraries(rlite-uipcps rina-api rlite-conf uipcp-normal)
 
 # Installation directives
 install(TARGETS rlite-uipcps DESTINATION usr/bin)
-install(FILES shim-tcp4-dir DESTINATION etc/rlite)
+install(FILES shim-tcp4-dir DESTINATION etc/rina)
 
 if (USE_QOS_CUBES)
-    install(FILES uipcp-qoscubes.qos DESTINATION etc/rlite)
+    install(FILES uipcp-qoscubes.qos DESTINATION etc/rina)
 endif()
 

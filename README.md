@@ -603,7 +603,7 @@ and the use cases are similar.
 
 As a consequence, the configuration for the shim TCP is not specified using
 a standard configuration file (e.g. /etc/hosts). An ad-hoc configuration
-file is stored at /etc/rlite/shim-tcp4-dir.
+file is stored at /etc/rina/shim-tcp4-dir.
 
 An example configuration is the following:
 
