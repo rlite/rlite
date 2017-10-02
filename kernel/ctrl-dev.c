@@ -3203,6 +3203,12 @@ rlite_init(void)
         return ret;
     }
 
+#ifndef RL_SKB
+    PD("using custom packet buffers\n");
+#else
+    PD("using native packet buffers\n");
+#endif
+
     return 0;
 }
 
