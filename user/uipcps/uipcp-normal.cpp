@@ -324,7 +324,8 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 }
 
 
-uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
+uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
+                                         enrolled(0),
                                          enroller_enabled(false),
                                          self_registered(false),
                                          self_registration_needed(false),

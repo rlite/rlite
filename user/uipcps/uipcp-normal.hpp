@@ -353,6 +353,9 @@ struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;
 
+    /* std::string cache for uipcp->name. */
+    std::string myname;
+
     /* File descriptor used to receive and send mgmt PDUs. */
     int mgmtfd;
 
