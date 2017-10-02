@@ -51,8 +51,6 @@ struct FwdWorker {
 
     /* Holds the active mappings between RINA file descriptors and
      * socket file descriptors. */
-    std::map<int, int> fdmap;
-
     struct Fd fds[MAX_SESSIONS * 2];
     int nfds;
 
