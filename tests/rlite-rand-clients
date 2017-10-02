@@ -110,7 +110,7 @@ try:
         reliable = random.choice([True, False])
         qos = "-fg0" if reliable else ""
         dif, appl = destinations[sel]
-        cmd = 'rinaperf -t perf %s %s -i %d -d %s -z "%s" -D %d' \
+        cmd = 'rinaperf -t perf %s %s -i %d -d %s -z %s -D %d' \
                     % (sizespec, qos, interval, dif, appl, dur)
         try:
             p = subprocess.Popen(cmd.split(), stdout=subprocess.DEVNULL,
