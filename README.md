@@ -12,7 +12,7 @@
 5. Tutorials
 	51. Using the demonstrator
     52. Hands-on tutorial #1: normal-over-shim-eth
-	53. Hands-on tutorial #2: normal-over-shim-udp
+	53. Hands-on tutorial #2: normal-over-shim-udp4
 6. Configuration of IPC Processes
 	61. shim-eth IPC Process
 	62. shim-udp4 IPC Process
@@ -442,12 +442,11 @@ On node C:
     $ rinaperf -d n.DIF -t perf -s 1400 -c 100000
 
 
-### 5.3 Hands-on tutorial #2: normal-over-shim-udp
-#############################################################################
+### 5.3 Hands-on tutorial #2: normal-over-shim-udp4
 
-This tutorial illustrates a simple example of deploying the shim-udp to
+This tutorial illustrates a simple example of deploying the shim-udp4 to
 allow two RINA networks to communicate over an IP network like the
-Internet or a LAN. Using the shim-udp, the RINA traffic between the two
+Internet or a LAN. Using the shim-udp4, the RINA traffic between the two
 RINA networks is transported through an UDP tunnel.
 
     NETWORK_X <---udp-tunnel---> NETWORK_Y
@@ -774,11 +773,76 @@ event types that can happen:
    allocations associated to an R2I directive. The new session is
    is dispatched to a worker thread.
 
-The main event-loop uses some data structures to keep track of the ongoing connection
-setups.
+The main event-loop uses some data structures to keep track of the ongoing
+connection setups.
 
 ### 7.2 iporinad
-xxx
+The **iporinad** program is a C++ daemon that tunnels IP traffic over a RINA
+network. Such a RINA network has a role similar to MPLS within traditional
+IP/MPLS deployments. The daemon runs in the *edge* nodes at the boundary
+between the IP network and the RINA network, encapsulating or
+decapsulating IP packets into/from RINA flows.
+
+Each RINA flow operates as an IP tunnel between two iporinad instances running
+on two different edge nodes. On the IP side, each tunnel endpoint is
+implemented using a **tun** device. The iporinad programs implements the
+encapsulation and decapsulation by forwarding the IP traffic from the tun
+device towards the associated RINA flow endpoint, and the other way around.
+
+The iporinad daemon creates tunnel towards its peers and advertise IP routes
+according to its configuration file.
+In the following example, two iporinad daemons run on different edge nodes
+that belong to the same DIF n.DIF. In this case, n.DIF is the RINA network
+that supports the IP tunnels. Each daemon is configured to register within
+RINA, connect to the other peer, and advertise to the other some routes that
+are reachable on its side.
+
+    # Configuration file for the first iporina daemon
+    #
+    # Application name and DIF names for this daemon, used
+    # for name registrations
+    local       iporina1        n.DIF
+
+    # Information about remote tunnel endpoints, with application name
+    # (and DIF name) for flow allocation, and IP subnet to be used
+    # for the point-to-point IP tunnel.
+    remote      iporina2        n.DIF       192.168.134.0/30
+
+    # Routes that are locally reachable, which are going to be advertised
+    # to the remote endpoints
+    route       10.9.0.0/24
+    route       10.9.1.0/24
+
+The `local` directive (which must be unique) specifies the daemon name
+and the DIFs to register to.
+Each `remote` directive specifies application and DIF name of a remote
+iporina daemon to connect to, together with an IP subnet to use for
+the IP tunnel (a /30 is preferable, as only two IP addresses are needed).
+More `remote` directive are possible, one for each peer. A different tun
+device will be created for each remote peer.
+The `route` directive specifies a locally reachable route that the daemon
+will advertise to all its peers.
+When an iporina daemon receives a route from a peer, it adds an entry
+in the local IP routing table to forward IP traffic for that destination
+towards the tun device associated to the peer.
+
+    # Configuration file for the second iporina daemon
+    #
+    # Application name and DIF names for this daemon, used
+    # for name registrations
+    local       iporina2        n.DIF
+
+    # Information about remote tunnel endpoints, with application name
+    # (and DIF name) for flow allocation, and IP subnet to be used
+    # for the point-to-point IP tunnel.
+    remote      iporina1        n.DIF       192.168.134.0/30
+
+    # Routes that are locally reachable, which are going to be advertised
+    # to the remote endpoints
+    route       10.9.2.0/24
+    route       10.9.3.0/24
+
+
 
 ## Credits
 
