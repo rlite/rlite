@@ -75,9 +75,9 @@ struct IPoRINA {
     /* Control device to listen for incoming connections. */
     int rfd;
 
-    Local           local;
-    list<Remote>    remotes;
-    list<Route>     routes;
+    Local                   local;
+    map<string, Remote>     remotes;
+    list<Route>             routes;
 
     IPoRINA() : verbose(0), rfd(-1) { }
 };
@@ -399,7 +399,12 @@ parse_conf(const char *path)
                 return -1;
             }
 
-            g->remotes.push_back(Remote(tokens[1], tokens[2], subnet));
+            if (g->remotes.count(tokens[1])) {
+                cerr << "Duplicated 'remote' directive at line " <<
+                        lines_cnt << endl;
+                return -1;
+            }
+            g->remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
 
         } else if (tokens[0] == "route") {
             IPSubnet subnet;
@@ -437,10 +442,10 @@ dump_conf(void)
     cout << endl;
 
     cout << "Remotes:" << endl;
-    for (list<Remote>::iterator l = g->remotes.begin();
-                            l != g->remotes.end(); l ++) {
-        cout << "   " << l->app_name << " in DIF " << l->dif_name
-            << ", tunnel prefix " << l->tun_subnet.repr << endl;
+    for (map<string, Remote>::iterator r = g->remotes.begin();
+                            r != g->remotes.end(); r ++) {
+        cout << "   " << r->second.app_name << " in DIF " << r->second.dif_name
+            << ", tunnel prefix " << r->second.tun_subnet.repr << endl;
     }
 
     cout << "Advertised routes:" << endl;
@@ -493,9 +498,9 @@ setup(void)
     }
 
     /* Create a TUN device for each remote. */
-    for (list<Remote>::iterator l = g->remotes.begin();
-                            l != g->remotes.end(); l ++) {
-        if (remote_tun_alloc(*l)) {
+    for (map<string, Remote>::iterator r = g->remotes.begin();
+                            r != g->remotes.end(); r ++) {
+        if (remote_tun_alloc(r->second)) {
             return -1;
         }
     }
@@ -510,14 +515,14 @@ connect_to_remotes(void *opaque)
     string myname = g->local.app_name;
 
     for (;;) {
-        for (list<Remote>::iterator re = g->remotes.begin();
+        for (map<string, Remote>::iterator re = g->remotes.begin();
                             re != g->remotes.end(); re ++) {
             struct rina_flow_spec spec;
             struct pollfd pfd;
             int ret;
             int wfd;
 
-            if (re->rfd >= 0) {
+            if (re->second.rfd >= 0) {
                 /* We are already connected to this remote. */
                 continue;
             }
@@ -528,12 +533,12 @@ connect_to_remotes(void *opaque)
             spec.in_order_delivery = 1;
             spec.msg_boundaries = 1;
             spec.spare3 = 1;
-            wfd = rina_flow_alloc(re->dif_name.c_str(), myname.c_str(),
-                                  re->app_name.c_str(), &spec, RINA_F_NOWAIT);
+            wfd = rina_flow_alloc(re->second.dif_name.c_str(), myname.c_str(),
+                                  re->second.app_name.c_str(), &spec, RINA_F_NOWAIT);
             if (wfd < 0) {
                 perror("rina_flow_alloc()");
-                cout << "Failed to connect to remote " << re->app_name <<
-                        " through DIF " << re->dif_name << endl;
+                cout << "Failed to connect to remote " << re->second.app_name <<
+                        " through DIF " << re->second.dif_name << endl;
                 continue;
             }
             pfd.fd = wfd;
@@ -543,33 +548,33 @@ connect_to_remotes(void *opaque)
                 if (ret < 0) {
                     perror("poll(wfd)");
                 } else if (g->verbose) {
-                    cout << "Failed to connect to remote " << re->app_name <<
-                            " through DIF " << re->dif_name << endl;
+                    cout << "Failed to connect to remote " << re->second.app_name <<
+                            " through DIF " << re->second.dif_name << endl;
                 }
                 close(wfd);
                 continue;
             }
 
-            re->rfd = rina_flow_alloc_wait(wfd);
-            if (re->rfd < 0) {
+            re->second.rfd = rina_flow_alloc_wait(wfd);
+            if (re->second.rfd < 0) {
                 perror("rina_flow_alloc_wait()");
-                cout << "Failed to connect to remote " << re->app_name <<
-                        " through DIF " << re->dif_name << endl;
+                cout << "Failed to connect to remote " << re->second.app_name <<
+                        " through DIF " << re->second.dif_name << endl;
                 continue;
             }
 
             if (g->verbose) {
-                cout << "Connected to remote " << re->app_name <<
-                        " through DIF " << re->dif_name << endl;
+                cout << "Connected to remote " << re->second.app_name <<
+                        " through DIF " << re->second.dif_name << endl;
             }
 
-            CDAPConn conn(re->rfd, 1);
+            CDAPConn conn(re->second.rfd, 1);
             CDAPMessage m, *rm = NULL;
             Hello hello;
 
             /* CDAP connection setup. */
             m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
-                                              /* dst */ re->app_name);
+                                              /* dst */ re->second.app_name);
             if (conn.msg_send(&m, 0)) {
                 cerr << "Failed to send M_CONNECT" << endl;
                 goto abor;
@@ -588,7 +593,7 @@ connect_to_remotes(void *opaque)
             m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
                       0, 0, string());
             hello.num_routes = g->routes.size();
-            hello.tun_subnet = re->tun_subnet.repr;
+            hello.tun_subnet = re->second.tun_subnet.repr;
             if (cdap_obj_send(&conn, &m, 0, &hello)) {
                 cerr << "Failed to send M_START" << endl;
                 goto abor;
@@ -609,7 +614,7 @@ abor:
             if (rm) {
                 delete rm;
             }
-            close(re->rfd);
+            close(re->second.rfd);
         }
 
         sleep(5);
@@ -705,7 +710,6 @@ int main(int argc, char **argv)
             close(r.rfd);
             continue;
         }
-        g->remotes.push_back(r);
 
         CDAPConn conn(r.rfd, 1);
         CDAPMessage *rm;
@@ -722,6 +726,7 @@ int main(int argc, char **argv)
 
         r.app_name = rm->src_appl;
         r.dif_name = string();
+        g->remotes[r.app_name] = r;
 
         m.m_connect_r(rm, 0, string());
         if (conn.msg_send(&m, rm->invoke_id)) {
