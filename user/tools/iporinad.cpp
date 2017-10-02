@@ -60,6 +60,7 @@ struct Remote {
     Remote() : tun_fd(-1) { }
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
                         dif_name(d), tun_subnet(i), tun_fd(-1), rfd(-1) { }
+    int tun_alloc();
 };
 
 struct Route {
@@ -298,7 +299,7 @@ IPSubnet::IPSubnet(const string &_p) : repr(_p)
  * int flags: interface flags (eg, IFF_TUN, IFF_NO_PI, IFF_TAP etc.)
  */
 static int
-tun_alloc(char *dev, int flags)
+os_tun_alloc(char *dev, int flags)
 {
     struct ifreq ifr;
     int fd, err;
@@ -455,20 +456,25 @@ dump_conf(void)
     }
 }
 
-static int
-remote_tun_alloc(Remote &r)
+int
+Remote::tun_alloc()
 {
-    char tun_name[IFNAMSIZ];
+    char tname[IFNAMSIZ];
 
-    tun_name[0] = '\0';
-    r.tun_fd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
-    if (r.tun_fd < 0) {
+    if (tun_name != string()) {
+        /* Nothing to do. */
+        return 0;
+    }
+
+    tname[0] = '\0';
+    tun_fd = os_tun_alloc(tname, IFF_TUN | IFF_NO_PI);
+    if (tun_fd < 0) {
         cerr << "Failed to create tunnel" << endl;
         return -1;
     }
-    r.tun_name = tun_name;
+    tun_name = tname;
     if (g->verbose) {
-        cout << "Created tunnel device " << r.tun_name << endl;
+        cout << "Created tunnel device " << tun_name << endl;
     }
 
     return 0;
@@ -500,7 +506,7 @@ setup(void)
     /* Create a TUN device for each remote. */
     for (map<string, Remote>::iterator r = g->remotes.begin();
                             r != g->remotes.end(); r ++) {
-        if (remote_tun_alloc(r->second)) {
+        if (r->second.tun_alloc()) {
             return -1;
         }
     }
@@ -706,7 +712,7 @@ int main(int argc, char **argv)
         cout << "Flow accepted!" << endl;
 
         r.rfd = cfd;
-        if (remote_tun_alloc(r)) {
+        if (r.tun_alloc()) {
             close(r.rfd);
             continue;
         }
