@@ -54,9 +54,10 @@ fin.close()
 for cmd in cmds:
     cmdargs = ['rlite-ctl'] + cmd[1]
     try:
-        subprocess.check_call(cmdargs)
+        subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
     except Exception as e:
-        print("Failure at line %s --> %s" % (cmd[0], e))
+        e.output = e.output.strip()
+        print("Failure at %s:%s --> %s" % (args.script, cmd[0], e.output))
         quit()
 
 i = 1
@@ -65,10 +66,10 @@ for cmd in enrolls:
     cmdargs = ['rlite-ctl'] + cmd[1]
     while 1:
         try:
-            subprocess.check_output(cmdargs)
+            subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
         except Exception as e:
             e.output = e.output.strip()
-            print("Enrollment at line %s failed (%d/%d) --> %s" % (cmd[0], i, n, e.output))
+            print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, e.output))
             time.sleep(3)
 
     print('Enrollment %d/%d successfully completed' % (i, n))
