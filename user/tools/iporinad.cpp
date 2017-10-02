@@ -77,6 +77,12 @@ struct Local {
     Local(const string &a) : app_name(a) { }
 };
 
+enum {
+    IPOR_CTRL = 0,
+    IPOR_DATA,
+    IPOR_MAX,
+};
+
 struct Remote {
     /* Application name and DIF of the remote */
     string app_name;
@@ -91,8 +97,8 @@ struct Remote {
     IPAddr tun_remote_addr;
     IPAddr tun_subnet;
 
-    /* True if we need to advertise local routes to this remote. */
-    bool pending;
+    /* True if we need to allocate a control/data flow for this remote. */
+    bool flow_alloc_needed[IPOR_MAX];
 
     /* Routes reachable through this remote. */
     set<Route> routes;
@@ -100,10 +106,14 @@ struct Remote {
     /* Data file descriptor for the flow that supports the tunnel. */
     int rfd;
 
-    Remote() : tun_fd(-1), pending(true), rfd(-1) { }
+    Remote() : tun_fd(-1), rfd(-1) {
+        flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
+    }
+
     Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
-                        dif_name(d), tun_fd(-1), tun_subnet(i), pending(true),
-                        rfd(-1) { }
+                        dif_name(d), tun_fd(-1), tun_subnet(i), rfd(-1) {
+        flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
+    }
 
     /* Allocate a tunnel device for this remote. */
     int tun_alloc();
@@ -710,122 +720,155 @@ connect_to_remotes(void *opaque)
     for (;;) {
         for (map<string, Remote>::iterator re = g->remotes.begin();
                             re != g->remotes.end(); re ++) {
-            struct rina_flow_spec spec;
-            struct pollfd pfd;
-            int rfd;
-            int ret;
-            int wfd;
+            for (unsigned i = 0; i < IPOR_MAX; i ++) {
+                struct rina_flow_spec spec;
+                struct pollfd pfd;
+                int rfd;
+                int ret;
+                int wfd;
 
-            if (!re->second.pending) {
-                /* We already connected to this remote. */
-                continue;
-            }
-
-            /* Tyr to allocate a reliable flow. */
-            rina_flow_spec_default(&spec);
-            spec.max_sdu_gap = 0;
-            spec.in_order_delivery = 1;
-            spec.msg_boundaries = 1;
-            spec.spare3 = 1;
-            wfd = rina_flow_alloc(re->second.dif_name.c_str(), myname.c_str(),
-                                  re->second.app_name.c_str(), &spec, RINA_F_NOWAIT);
-            if (wfd < 0) {
-                perror("rina_flow_alloc()");
-                cout << "Failed to connect to remote " << re->second.app_name <<
-                        " through DIF " << re->second.dif_name << endl;
-                continue;
-            }
-            pfd.fd = wfd;
-            pfd.events = POLLIN;
-            ret = poll(&pfd, 1, 3000);
-            if (ret <= 0) {
-                if (ret < 0) {
-                    perror("poll(wfd)");
-                } else if (g->verbose) {
-                    cout << "Failed to connect to remote " << re->second.app_name <<
-                            " through DIF " << re->second.dif_name << endl;
+                if (!re->second.flow_alloc_needed[i]) {
+                    /* We already connected to this remote. */
+                    continue;
                 }
-                close(wfd);
-                continue;
-            }
 
-            rfd = rina_flow_alloc_wait(wfd);
-            if (rfd < 0) {
-                if (errno != EPERM || g->verbose) {
-                    if (errno != EPERM) {
-                        perror("rina_flow_alloc_wait()");
+                /* Try to allocate a reliable flow for the control connection
+                 * and an unreliable flow for the data connection. */
+                rina_flow_spec_default(&spec);
+                if (i == IPOR_CTRL) {
+                    spec.max_sdu_gap = 0;
+                    spec.in_order_delivery = 1;
+                    spec.msg_boundaries = 1;
+                    spec.spare3 = 1;
+                }
+                wfd = rina_flow_alloc(re->second.dif_name.c_str(),
+                                      myname.c_str(),
+                                      re->second.app_name.c_str(), &spec,
+                                      RINA_F_NOWAIT);
+                if (wfd < 0) {
+                    perror("rina_flow_alloc()");
+                    cout << "Failed to connect to remote " <<
+                            re->second.app_name << " through DIF "
+                                << re->second.dif_name << endl;
+                    continue;
+                }
+                pfd.fd = wfd;
+                pfd.events = POLLIN;
+                ret = poll(&pfd, 1, 3000);
+                if (ret <= 0) {
+                    if (ret < 0) {
+                        perror("poll(wfd)");
+                    } else if (g->verbose) {
+                        cout << "Failed to connect to remote " <<
+                                re->second.app_name << " through DIF "
+                                    << re->second.dif_name << endl;
                     }
-                    cout << "Failed to connect to remote " << re->second.app_name <<
-                        " through DIF " << re->second.dif_name << endl;
+                    close(wfd);
+                    continue;
                 }
-                continue;
-            }
 
-            if (g->verbose) {
-                cout << "Flow allocated to remote " << re->second.app_name <<
-                        " through DIF " << re->second.dif_name << endl;
-            }
+                rfd = rina_flow_alloc_wait(wfd);
+                if (rfd < 0) {
+                    if (errno != EPERM || g->verbose) {
+                        if (errno != EPERM) {
+                            perror("rina_flow_alloc_wait()");
+                        }
+                        cout << "Failed to connect to remote " <<
+                            re->second.app_name << " through DIF "
+                                << re->second.dif_name << endl;
+                    }
+                    continue;
+                }
 
-            CDAPConn conn(rfd, 1);
-            CDAPMessage m, *rm = NULL;
-            Hello hello;
+                if (g->verbose) {
+                    cout << "Flow allocated to remote " <<
+                        re->second.app_name << " through DIF "
+                            << re->second.dif_name << endl;
+                }
 
-            /* CDAP connection setup. */
-            m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
-                                              /* dst */ re->second.app_name);
-            if (conn.msg_send(&m, 0)) {
-                cerr << "Failed to send M_CONNECT" << endl;
-                goto abor;
-            }
+                CDAPConn conn(rfd, 1);
+                CDAPMessage m, *rm = NULL;
+                Hello hello;
 
-            rm = conn.msg_recv();
-            if (rm->op_code != gpb::M_CONNECT_R) {
-                cerr << "M_CONNECT_R expected" << endl;
-                goto abor;
-            }
-            delete rm; rm = NULL;
-
-            /* Assign tunnel IP addresses if needed. */
-            if (re->second.tun_local_addr.empty() ||
-                        re->second.tun_remote_addr.empty()) {
-                re->second.tun_local_addr = re->second.tun_subnet.hostaddr(1);
-                re->second.tun_remote_addr = re->second.tun_subnet.hostaddr(2);
-            }
-
-            /* Exchange routes. */
-            m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
-                      0, 0, string());
-            hello.num_routes = g->local_routes.size();
-            hello.tun_subnet = re->second.tun_subnet;
-            hello.tun_src_addr = re->second.tun_local_addr;
-            hello.tun_dst_addr = re->second.tun_remote_addr;
-            if (cdap_obj_send(&conn, &m, 0, &hello)) {
-                cerr << "Failed to send M_START" << endl;
-                goto abor;
-            }
-
-            for (list<Route>::iterator ro = g->local_routes.begin();
-                    ro != g->local_routes.end(); ro ++) {
-                RouteObj robj(ro->subnet);
-
-                m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
-                            0, 0, string());
-                if (cdap_obj_send(&conn, &m, 0, &robj)) {
-                    cerr << "Failed to send M_WRITE" << endl;
+                /* CDAP connection setup. */
+                m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
+                                    /* dst */ re->second.app_name);
+                if (conn.msg_send(&m, 0)) {
+                    cerr << "Failed to send M_CONNECT" << endl;
                     goto abor;
                 }
-            }
-abor:
-            if (rm) {
-                delete rm;
-            }
-            re->second.pending = false;
-            close(rfd);
 
-            re->second.ip_configure();
+                rm = conn.msg_recv();
+                if (rm->op_code != gpb::M_CONNECT_R) {
+                    cerr << "M_CONNECT_R expected" << endl;
+                    goto abor;
+                }
+                delete rm; rm = NULL;
+
+                if (i == IPOR_DATA) {
+                    /* This is a data connection, send an empty CDAP start
+                     * message to inform the remote peer. */
+                    m.m_start(gpb::F_NO_FLAGS, "data", "/data",
+                                0, 0, string());
+                    if (cdap_obj_send(&conn, &m, 0, NULL)) {
+                        cerr << "Failed to send M_START(data)" << endl;
+                        goto abor;
+                    }
+                    re->second.rfd = rfd;
+
+                } else {
+                    /* This is a control connection. */
+
+                    /* Assign tunnel IP addresses if needed. */
+                    if (re->second.tun_local_addr.empty() ||
+                                re->second.tun_remote_addr.empty()) {
+                        re->second.tun_local_addr =
+                                    re->second.tun_subnet.hostaddr(1);
+                        re->second.tun_remote_addr =
+                                    re->second.tun_subnet.hostaddr(2);
+                    }
+
+                    /* Exchange routes. */
+                    m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
+                              0, 0, string());
+                    hello.num_routes = g->local_routes.size();
+                    hello.tun_subnet = re->second.tun_subnet;
+                    hello.tun_src_addr = re->second.tun_local_addr;
+                    hello.tun_dst_addr = re->second.tun_remote_addr;
+                    if (cdap_obj_send(&conn, &m, 0, &hello)) {
+                        cerr << "Failed to send M_START(hello)" << endl;
+                        goto abor;
+                    }
+
+                    for (list<Route>::iterator ro = g->local_routes.begin();
+                            ro != g->local_routes.end(); ro ++) {
+                        RouteObj robj(ro->subnet);
+
+                        m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
+                                    0, 0, string());
+                        if (cdap_obj_send(&conn, &m, 0, &robj)) {
+                            cerr << "Failed to send M_WRITE" << endl;
+                            goto abor;
+                        }
+                    }
+                    re->second.ip_configure();
+                }
+
+                re->second.flow_alloc_needed[i] = false;
+    abor:
+                if (rm) {
+                    delete rm;
+                }
+
+                /* Don't close a data file descriptor which is going
+                 * to be used. */
+                if (re->second.rfd != rfd) {
+                    close(rfd);
+                }
+            }
         }
 
-        sleep(5);
+        sleep(3);
     }
 
     pthread_exit(NULL);
@@ -938,16 +981,33 @@ int main(int argc, char **argv)
         }
         delete rm; rm = NULL;
 
-        /* Receive Hello message. */
+        /* Receive Hello or Data message. */
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_START) {
             cerr << "M_START expected" << endl;
             goto abor;
         }
 
+        if (rm->obj_class == "data") {
+            /* This is a data flow. */
+            delete rm; rm = NULL;
+            if (g->remotes.count(remote_name) == 0) {
+                cerr << "M_START(data) for unknown remote" << endl;
+                goto abor;
+            }
+            if (g->verbose) {
+                cout << "M_START(data) received from " <<
+                            remote_name << endl;
+            }
+            g->remotes[remote_name].rfd = cfd;
+            g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
+            continue;
+        }
+
+        /* This is a control connection, process the Hello message. */
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
-            cerr << "M_START does not contain a nested message" << endl;
+            cerr << "M_START(hello) does not contain a nested message" << endl;
             goto abor;
         }
         hello = Hello(objbuf, objlen);
@@ -969,8 +1029,9 @@ int main(int argc, char **argv)
         g->remotes[remote_name].tun_local_addr = IPAddr(hello.tun_dst_addr);
         g->remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
 
-        cout << "Hello received: " << hello.num_routes << " routes, tun_subnet "
-                << hello.tun_subnet << ", local IP "
+        cout << "Hello received from " << remote_name << ": "
+                << hello.num_routes
+                << " routes, tun_subnet " << hello.tun_subnet << ", local IP "
                 << static_cast<string>(g->remotes[remote_name].tun_local_addr)
                 << ", remote IP "
                 << static_cast<string>(g->remotes[remote_name].tun_remote_addr)
