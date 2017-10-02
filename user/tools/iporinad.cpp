@@ -83,9 +83,9 @@ struct IPoRINA {
  * CDAP objects with their serialization and deserialization routines
  */
 
-struct Msg {
+struct Obj {
     virtual int serialize(char *buf, unsigned int size) const = 0;
-    virtual ~Msg() { }
+    virtual ~Obj() { }
 };
 
 static int
@@ -103,24 +103,24 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
     return gm.ByteSize();
 }
 
-struct HelloMsg : public Msg {
+struct Hello : public Obj {
     string tun_subnet;  /* Subnet to be used for the tunnel */
     uint32_t num_routes; /* How many route to exchange */
 
-    HelloMsg() : num_routes(0) { }
-    HelloMsg(const char *buf, unsigned int size);
+    Hello() : num_routes(0) { }
+    Hello(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
 
 static void
-gpb2HelloMsg(HelloMsg &m, const gpb::hello_msg_t &gm)
+gpb2Hello(Hello &m, const gpb::hello_msg_t &gm)
 {
     m.tun_subnet = gm.tun_subnet();
     m.num_routes = gm.num_routes();
 }
 
 static int
-HelloMsg2gpb(const HelloMsg &m, gpb::hello_msg_t &gm)
+Hello2gpb(const Hello &m, gpb::hello_msg_t &gm)
 {
     gm.set_tun_subnet(m.tun_subnet);
     gm.set_num_routes(m.num_routes);
@@ -128,68 +128,70 @@ HelloMsg2gpb(const HelloMsg &m, gpb::hello_msg_t &gm)
     return 0;
 }
 
-HelloMsg::HelloMsg(const char *buf, unsigned int size) : num_routes(0)
+Hello::Hello(const char *buf, unsigned int size) : num_routes(0)
 {
     gpb::hello_msg_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    gpb2HelloMsg(*this, gm);
+    gpb2Hello(*this, gm);
 }
 
 int
-HelloMsg::serialize(char *buf, unsigned int size) const
+Hello::serialize(char *buf, unsigned int size) const
 {
     gpb::hello_msg_t gm;
 
-    HelloMsg2gpb(*this, gm);
+    Hello2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
 
-struct RouteMsg : public Msg {
+struct RouteObj : public Obj {
     string route;   /* Route represented as a string. */
 
-    RouteMsg() { }
-    RouteMsg(const char *buf, unsigned int size);
+    RouteObj() { }
+    RouteObj(const string& s) : route(s) { }
+    RouteObj(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
 
 static void
-gpb2RouteMsg(RouteMsg &m, const gpb::route_msg_t &gm)
+gpb2RouteObj(RouteObj &m, const gpb::route_msg_t &gm)
 {
     m.route = gm.route();
 }
 
 static int
-RouteMsg2gpb(const RouteMsg &m, gpb::route_msg_t &gm)
+RouteObj2gpb(const RouteObj &m, gpb::route_msg_t &gm)
 {
     gm.set_route(m.route);
 
     return 0;
 }
 
-RouteMsg::RouteMsg(const char *buf, unsigned int size)
+RouteObj::RouteObj(const char *buf, unsigned int size)
 {
     gpb::route_msg_t gm;
 
     gm.ParseFromArray(buf, size);
 
-    gpb2RouteMsg(*this, gm);
+    gpb2RouteObj(*this, gm);
 }
 
 int
-RouteMsg::serialize(char *buf, unsigned int size) const
+RouteObj::serialize(char *buf, unsigned int size) const
 {
     gpb::route_msg_t gm;
 
-    RouteMsg2gpb(*this, gm);
+    RouteObj2gpb(*this, gm);
 
     return ser_common(gm, buf, size);
 }
 
+/* Send a CDAP message after attaching a serialized object. */
 static int
-cdap_obj_send(CDAPConn *conn, CDAPMessage *m, int invoke_id, const Msg *obj)
+cdap_obj_send(CDAPConn *conn, CDAPMessage *m, int invoke_id, const Obj *obj)
 {
     char objbuf[4096];
     int objlen;
@@ -323,7 +325,7 @@ tun_alloc(char *dev, int flags)
         return err;
     }
 
-    /* Ff the operation was successful, write back the name of the
+    /* If the operation was successful, write back the name of the
      * interface to the variable "dev", so the caller can know
      * it. Note that the caller MUST reserve space in *dev (see calling
      * code below) */
@@ -498,14 +500,14 @@ connect_to_remotes(void *opaque)
     string myname = g->locals.front().app_name;
 
     for (;;) {
-        for (list<Remote>::iterator l = g->remotes.begin();
-                            l != g->remotes.end(); l ++) {
+        for (list<Remote>::iterator re = g->remotes.begin();
+                            re != g->remotes.end(); re ++) {
             struct rina_flow_spec spec;
             struct pollfd pfd;
             int ret;
             int wfd;
 
-            if (l->rfd >= 0) {
+            if (re->rfd >= 0) {
                 /* We are already connected to this remote. */
                 continue;
             }
@@ -516,12 +518,12 @@ connect_to_remotes(void *opaque)
             spec.in_order_delivery = 1;
             spec.msg_boundaries = 1;
             spec.spare3 = 1;
-            wfd = rina_flow_alloc(l->dif_name.c_str(), myname.c_str(),
-                                  l->app_name.c_str(), &spec, RINA_F_NOWAIT);
+            wfd = rina_flow_alloc(re->dif_name.c_str(), myname.c_str(),
+                                  re->app_name.c_str(), &spec, RINA_F_NOWAIT);
             if (wfd < 0) {
                 perror("rina_flow_alloc()");
-                cout << "Failed to connect to remote " << l->app_name <<
-                        " through DIF " << l->dif_name << endl;
+                cout << "Failed to connect to remote " << re->app_name <<
+                        " through DIF " << re->dif_name << endl;
                 continue;
             }
             pfd.fd = wfd;
@@ -531,33 +533,33 @@ connect_to_remotes(void *opaque)
                 if (ret < 0) {
                     perror("poll(wfd)");
                 } else if (g->verbose) {
-                    cout << "Failed to connect to remote " << l->app_name <<
-                            " through DIF " << l->dif_name << endl;
+                    cout << "Failed to connect to remote " << re->app_name <<
+                            " through DIF " << re->dif_name << endl;
                 }
                 close(wfd);
                 continue;
             }
 
-            l->rfd = rina_flow_alloc_wait(wfd);
-            if (l->rfd < 0) {
+            re->rfd = rina_flow_alloc_wait(wfd);
+            if (re->rfd < 0) {
                 perror("rina_flow_alloc_wait()");
-                cout << "Failed to connect to remote " << l->app_name <<
-                        " through DIF " << l->dif_name << endl;
+                cout << "Failed to connect to remote " << re->app_name <<
+                        " through DIF " << re->dif_name << endl;
                 continue;
             }
 
             if (g->verbose) {
-                cout << "Connected to remote " << l->app_name <<
-                        " through DIF " << l->dif_name << endl;
+                cout << "Connected to remote " << re->app_name <<
+                        " through DIF " << re->dif_name << endl;
             }
 
-            CDAPConn conn(l->rfd, 1);
+            CDAPConn conn(re->rfd, 1);
             CDAPMessage m, *rm = NULL;
-            HelloMsg hello;
+            Hello hello;
 
             /* CDAP connection setup. */
             m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
-                                              /* dst */ l->app_name);
+                                              /* dst */ re->app_name);
             if (conn.msg_send(&m, 0)) {
                 cerr << "Failed to send M_CONNECT" << endl;
                 goto abor;
@@ -568,24 +570,36 @@ connect_to_remotes(void *opaque)
                 cerr << "M_CONNECT_R expected" << endl;
                 goto abor;
             }
+            delete rm; rm = NULL;
 
             cout << "Connected to remote peer" << endl;
 
             /* Exchange routes. */
-            m.m_start(gpb::F_NO_FLAGS, "enrollment", "enrollment",
+            m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
                       0, 0, string());
             hello.num_routes = g->routes.size();
-            hello.tun_subnet = l->tun_subnet.repr;
+            hello.tun_subnet = re->tun_subnet.repr;
             if (cdap_obj_send(&conn, &m, 0, &hello)) {
                 cerr << "Failed to send M_START" << endl;
                 goto abor;
             }
 
+            for (list<Route>::iterator ro = g->routes.begin();
+                    ro != g->routes.end(); ro ++) {
+                RouteObj robj(ro->subnet.repr);
+
+                m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
+                            0, 0, string());
+                if (cdap_obj_send(&conn, &m, 0, &robj)) {
+                    cerr << "Failed to send M_WRITE" << endl;
+                    goto abor;
+                }
+            }
 abor:
             if (rm) {
                 delete rm;
             }
-            close(l->rfd);
+            close(re->rfd);
         }
 
         sleep(5);
@@ -688,7 +702,7 @@ int main(int argc, char **argv)
         CDAPMessage m;
         const char *objbuf;
         size_t objlen;
-        HelloMsg hello;
+        Hello hello;
 
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_CONNECT) {
@@ -704,6 +718,7 @@ int main(int argc, char **argv)
             cerr << "Failed to send M_CONNECT_R" << endl;
             goto abor;
         }
+        delete rm; rm = NULL;
 
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_START) {
@@ -716,9 +731,29 @@ int main(int argc, char **argv)
             cerr << "M_START does not contain a nested message" << endl;
             goto abor;
         }
-        hello = HelloMsg(objbuf, objlen);
+        hello = Hello(objbuf, objlen);
+        delete rm; rm = NULL;
 
         cout << "Hello received " << hello.num_routes << " " << hello.tun_subnet << endl;
+
+        for (unsigned int i = 0; i < hello.num_routes; i ++) {
+            RouteObj robj;
+
+            rm = conn.msg_recv();
+            if (rm->op_code != gpb::M_WRITE) {
+                cerr << "M_WRITE expected" << endl;
+                goto abor;
+            }
+
+            rm->get_obj_value(objbuf, objlen);
+            if (!objbuf) {
+                cerr << "M_WRITE does not contain a nested message" << endl;
+                goto abor;
+            }
+            robj = RouteObj(objbuf, objlen);
+            delete rm; rm = NULL;
+            cout << "Received route " << robj.route << endl;
+        }
 abor:
         close(r.rfd);
     }
