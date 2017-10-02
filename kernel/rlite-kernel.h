@@ -39,6 +39,7 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/uaccess.h>
+#include <linux/uio.h>
 
 #include "kerconfig.h"
 
@@ -223,9 +224,9 @@ rl_buf_append(struct rl_buf *rb, size_t len)
 }
 
 static inline int
-rl_buf_copy_to_user(struct rl_buf *rb, void __user *ubuf, size_t bytes)
+rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 {
-    return copy_to_user(ubuf, RL_BUF_DATA(rb), bytes);
+    return copy_to_iter(RL_BUF_DATA(rb), bytes, to);
 }
 
 #define rl_buf_free(_rb) \
@@ -294,14 +295,11 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 #define rl_buf_append(_rb, _len)        skb_put(_rb, _len)
 
 static inline int
-rl_buf_copy_to_user(struct rl_buf *rb, void __user *ubuf, size_t bytes)
+rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 {
-    struct iovec iov = { .iov_base = ubuf, .iov_len = bytes };
-    struct iov_iter to;
+    int ret = skb_copy_datagram_iter(rb, 0, to, bytes);
 
-    iov_iter_init(&to, READ, &iov, 1, bytes);
-
-    return skb_copy_datagram_iter(rb, 0, &to, bytes);
+    return ret ? ret : bytes;
 }
 
 #define rl_buf_free(_rb) \

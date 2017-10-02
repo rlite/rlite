@@ -392,13 +392,15 @@ rl_io_write_iter(struct kiocb *iocb, struct iov_iter *from)
 }
 
 static ssize_t
-rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
+rl_io_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
+    struct file *f = iocb->ki_filp;
     struct rl_io *rio = (struct rl_io *)f->private_data;
     struct flow_entry *flow = rio->flow; /* NULL if mgmt */
     bool blocking = !(f->f_flags & O_NONBLOCK);
     struct txrx *txrx = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
+    size_t ulen = iov_iter_count(to);
     ssize_t ret = 0;
 
     if (unlikely(!txrx)) {
@@ -443,13 +445,10 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
 	if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
-            ret = ulen;
-            if (unlikely(rl_buf_copy_to_user(rb, ubuf, ret))) {
-                ret = -EFAULT;
+            ret = rl_buf_copy_to_user(rb, to, ulen);
+            if (likely(ret >= 0)) {
+                rl_buf_custom_pop(rb, ret);
             }
-
-            rl_buf_custom_pop(rb, ulen);
-
             spin_unlock_bh(&txrx->rx_lock);
 
         } else {
@@ -458,12 +457,8 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             txrx->rx_qsize -= rl_buf_truesize(rb);
             spin_unlock_bh(&txrx->rx_lock);
 
-            ret = rb->len;
-            if (unlikely(rl_buf_copy_to_user(rb, ubuf, ret))) {
-                ret = -EFAULT;
-            }
-
-            if (flow && flow->sdu_rx_consumed) {
+            ret = rl_buf_copy_to_user(rb, to, rb->len);
+            if (flow && flow->sdu_rx_consumed && ret >= 0) {
                 flow->sdu_rx_consumed(flow, RL_BUF_RX(rb).cons_seqnum);
             }
 
@@ -766,7 +761,7 @@ static const struct file_operations rl_io_fops = {
     .release        = rl_io_release,
     .open           = rl_io_open,
     .write_iter     = rl_io_write_iter,
-    .read           = rl_io_read,
+    .read_iter      = rl_io_read_iter,
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,
 #ifdef CONFIG_COMPAT
