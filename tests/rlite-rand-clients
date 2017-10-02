@@ -14,7 +14,7 @@ def fetch_destinations():
     try:
         o = subprocess.check_output(['rlite-ctl'])
         o = str(o)
-        difs = re.findall(r"dif_name = '([^']+)'", o)
+        difs = re.findall(r"dif_name\s*=\s*'([^']+)'", o)
     except:
         print("Failed to get list of IPCPs")
         quit()
