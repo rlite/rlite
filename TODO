@@ -1,5 +1,16 @@
 Open tasks, in decreasing order of priority:
 
+* add support for shim DIF over WiFi
+
+* io-dev: support read_iter() and write_iter() to avoid copies on
+  writev() and readv()
+
+* implement support for tailroom (needed by shim-eth)
+
+* minimize routing/forwarding table by introducing a "default" route
+
+* implement a policy for distributed bandwidth allocation
+
 * generic RIB synchronization where needed (e.g. DFT, LFDB, neighbors)
    * a smart implementation would use some kind of hash on the RIB
      subtrees to understand when the neighbor has different (and newer)
@@ -9,18 +20,9 @@ Open tasks, in decreasing order of priority:
      just periodically exchange hashes (and do the full update only when
      needed)
 
-* implement support for tailroom (needed by shim-eth)
-
 * DTCP: RTT estimate should happen using ktime_t variables
 
 * install: don't overwrite config files
 
 * implement utility to graphically show dif-rib-show, using graphviz
   (DIF map with active links)
-
-* support generic RIB M_READ (and M_WRITE)
-
-* io-dev: support read_iter() and write_iter() to avoid copies on
-  writev() and readv()
-
-* minimize routing/forwarding table by introducing a "default" route
