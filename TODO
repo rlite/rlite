@@ -7,8 +7,6 @@ Open tasks, in decreasing order of priority:
 
 * implement support for tailroom (needed by shim-eth)
 
-* minimize routing/forwarding table by introducing a "default" route
-
 * implement a policy for distributed bandwidth allocation
 
 * generic RIB synchronization where needed (e.g. DFT, LFDB, neighbors)

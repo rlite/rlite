@@ -560,8 +560,12 @@ RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
 int
 RoutingEngine::compute_fwd_table()
 {
-    map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new;
+    map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new_, next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
+    map<rl_port_t, int> port_hits;
+    rl_port_t dflt_port;
+    int dflt_hits = 0;
+    string dflt_nhop;
 
     /* Compute the forwarding table by translating the next-hop address
      * into a port-id towards the next-hop. */
@@ -595,7 +599,7 @@ RoutingEngine::compute_fwd_table()
 
             /* Also make sure we know the address for this destination. */
             dst_addr = rib->lookup_node_address(r->first);
-            if (dst_addr == 0) {
+            if (dst_addr == RL_ADDR_NULL) {
                 /* We still miss the address of this destination. */
                 UPV(uipcp, "Can't find address for destination %s\n",
                             r->first.c_str());
@@ -604,10 +608,34 @@ RoutingEngine::compute_fwd_table()
 
             /* We have found a suitable port for the destination, we can
              * stop searching. */
-            next_ports_new[dst_addr] = make_pair(r->first, port_id);
+            next_ports_new_[dst_addr] = make_pair(r->first, port_id);
+            if (++ port_hits[port_id] > dflt_hits) {
+                dflt_hits = port_hits[port_id];
+                dflt_port = port_id;
+                dflt_nhop = *lfa;
+            }
             break;
         }
     }
+
+#if 1  /* Use default forwarding entry. */
+    if (dflt_hits) {
+        string any = "any";
+
+        /* Prune out those entries corresponding to the default port, and
+         * replace them with the default entry. */
+        for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =
+                    next_ports_new_.begin(); f != next_ports_new_.end(); f++) {
+            if (f->second.second != dflt_port) {
+                next_ports_new[f->first] = f->second;
+            }
+        }
+        next_ports_new[RL_ADDR_NULL] = make_pair(any, dflt_port);
+        next_hops[any] = list<NodeId>(1, dflt_nhop);
+    }
+#else /* Avoid using the default forwarding entry. */
+    next_ports_new = next_ports_new_;
+#endif
 
     /* Remove old PDUFT entries first. */
     for (map<rlm_addr_t, pair<NodeId, rl_port_t> >::iterator f =

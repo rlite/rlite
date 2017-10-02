@@ -67,6 +67,7 @@ typedef uint16_t rl_msg_t;
 
 #define RL_IPCP_ID_NONE (~((rl_ipcp_id_t)0))
 #define RL_PORT_ID_NONE (~((rl_port_t)0))
+#define RL_ADDR_NULL    (0U)
 
 /* Maximum sizes for data transfer constants, to be used in CDAP
  * messages, user/kernel interfaces and the management layer in general. */
