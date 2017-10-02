@@ -31,10 +31,10 @@
  * The returned buffer has zero length (i.e. it's empty).
  */
 struct rl_buf *
-rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp)
+rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
 {
     struct rl_buf *rb;
-    size_t real_size = size + hdroom;
+    size_t real_size = hdroom + size + tailroom;
     uint8_t *kbuf;
 
     rb = rl_alloc(sizeof(*rb), gfp, RL_MT_BUFHDR);

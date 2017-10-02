@@ -979,7 +979,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
 {
     struct rl_buf *rb = rl_buf_alloc(sizeof(struct rina_pci_ctrl),
-                                     ipcp->hdroom, GFP_ATOMIC);
+                                     ipcp->hdroom, ipcp->tailroom, GFP_ATOMIC);
     struct rina_pci_ctrl *pcic;
 
     if (likely(rb)) {
@@ -1354,7 +1354,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * by rl_buf_pci_pop(), if possible. */
         if (sizeof(*mhdr) > sizeof(struct rina_pci)) {
             struct rl_buf *nrb = rl_buf_alloc(rb->len, sizeof(*mhdr),
-                                              GFP_ATOMIC);
+                                              0, GFP_ATOMIC);
 
             if (!nrb) {
                 PE("Out of memory\n");

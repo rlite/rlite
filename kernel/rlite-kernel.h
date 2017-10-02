@@ -156,7 +156,8 @@ struct rl_buf {
 #define RL_BUF_RX(rb)           (rb)->u.rx
 #define RL_BUF_RMT(rb)          (rb)->u.rmt
 
-struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp);
+struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom,
+                            size_t tailroom, gfp_t gfp);
 
 struct rl_buf *rl_buf_clone(struct rl_buf *rb, gfp_t gfp);
 
