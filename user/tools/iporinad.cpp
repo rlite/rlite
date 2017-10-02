@@ -19,6 +19,8 @@
 #include <rina/api.h>
 #include <pthread.h>
 
+#include <rina/cdap.hpp>
+
 using namespace std;
 
 struct IPSubnet {
