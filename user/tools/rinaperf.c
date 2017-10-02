@@ -1469,6 +1469,7 @@ main(int argc, char **argv)
                 printf("pthread_join(#%d) failed: %s\n", i, strerror(ret));
             }
         }
+        free(workers);
     }
 
     return close(rp->cfd);
