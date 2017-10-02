@@ -6,6 +6,7 @@
 #include <list>
 #include <vector>
 #include <sstream>
+#include <algorithm>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -18,8 +19,12 @@
 using namespace std;
 
 struct IPSubnet {
-    string      prefix;
+    string      repr;
+    unsigned    netaddr;
     unsigned    netbits;
+
+    IPSubnet() : netaddr(0), netbits(0) { }
+    IPSubnet(const string &p);
 };
 
 struct Local {
@@ -47,6 +52,79 @@ struct IPoRINA {
     list<Remote>    remotes;
     list<Route>     routes;
 };
+
+#if 0
+static string
+int2string(int x)
+{
+    stringstream sstr;
+    sstr << x;
+    return sstr.str();
+}
+#endif
+
+static int
+string2int(const string& s, int& ret)
+{
+    char *dummy;
+    const char *cstr = s.c_str();
+
+    ret = strtoul(cstr, &dummy, 10);
+    if (!s.size() || *dummy != '\0') {
+        ret = ~0U;
+        return -1;
+    }
+
+    return 0;
+}
+
+IPSubnet::IPSubnet(const string &_p) : repr(_p)
+{
+    stringstream ss;
+    string p = _p;
+    string digit;
+    size_t slash;
+    int m;
+
+    slash = p.find("/");
+
+    if (slash == string::npos) {
+        goto ex;
+    }
+
+    /* Extract the mask m in "a.b.c.d/m" */
+    if (string2int(p.substr(slash + 1), m)) {
+        goto ex;
+    }
+    if (m < 1 || m > 30) {
+        goto ex;
+    }
+    netbits = m;
+    p = p.substr(0, slash - 1);
+
+    /* Extract a, b, c and d. */
+    std::replace(p.begin(), p.end(), '.', ' ');
+    ss = stringstream(p);
+
+    netaddr = 0;
+    while (ss >> digit) {
+        int d;
+
+        if (string2int(digit, d)) {
+            goto ex;
+        }
+
+        if (d < 0 || d > 255) {
+            goto ex;
+        }
+        netaddr <<= 8;
+        netaddr |= (unsigned)d;
+    }
+
+    return;
+ex:
+    throw "Invalid IP prefix";
+}
 
 /* Arguments taken by the function:
  *
