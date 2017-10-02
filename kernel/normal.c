@@ -1018,8 +1018,8 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     return rb;
 }
 
-/* This must be called under DTP lock and after rcv_lwe has been
- * updated.
+/* This must be called under DTP lock and after rcv_lwe_priv and rcv_lwe
+ * have been updated.
  */
 static struct rl_buf *
 sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
@@ -1055,7 +1055,7 @@ sdu_rx_sv_update(struct ipcp_entry *ipcp, struct flow_entry *flow,
      * way policies are more visible. */
     if (cfg->rtx_control) {
         /* POL: RcvrAck */
-        ack_nack_seq_num = flow->dtp.rcv_lwe - 1;
+        ack_nack_seq_num = flow->dtp.rcv_lwe_priv;
         pdu_type = PDU_T_CTRL | PDU_T_ACK_BIT | PDU_T_ACK;
         if (cfg->flow_control) {
             pdu_type |= PDU_T_CTRL | PDU_T_FC_BIT;
@@ -1234,7 +1234,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 rb_list_foreach_safe(cur, tmp, &dtp->rtxq) {
                     struct rina_pci *pci = RL_BUF_PCI(cur);
 
-                    if (pci->seqnum <= pcic->ack_nack_seq_num) {
+                    if (pci->seqnum < pcic->ack_nack_seq_num) {
                         NPD("Remove [%lu] from rtxq\n",
                                 (long unsigned)pci->seqnum);
                         rb_list_del(cur);
@@ -1449,7 +1449,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         dtp->max_seq_num_rcvd = seqnum;
 
 	if (flow->upper.ipcp) {
-		crb = sdu_rx_sv_update(ipcp, flow, false);
+	    crb = sdu_rx_sv_update(ipcp, flow, false);
 	}
 
         flow->stats.rx_pkt++;
@@ -1492,14 +1492,14 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         rl_buf_free(rb);
         flow->stats.rx_err++;
 
-        if (flow->cfg.dtcp.flow_control &&
-                dtp->rcv_lwe >= dtp->last_snd_data_ack) {
-            /* Send ACK flow control PDU */
+        if (flow->cfg.dtcp.rtx_control &&
+                dtp->rcv_lwe_priv >= dtp->last_snd_data_ack) {
+            /* Send ACK control PDU. */
             crb = ctrl_pdu_alloc(ipcp, flow, PDU_T_CTRL |
                                  PDU_T_ACK_BIT | PDU_T_ACK | PDU_T_FC_BIT,
-                                 dtp->rcv_lwe);
+                                 dtp->rcv_lwe_priv);
             if (crb) {
-                dtp->last_snd_data_ack = dtp->rcv_lwe;
+                dtp->last_snd_data_ack = dtp->rcv_lwe_priv;
             }
         }
 
