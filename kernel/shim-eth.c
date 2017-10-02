@@ -654,8 +654,9 @@ out:
 static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
-    struct rl_buf *rb = rl_buf_alloc(skb->len, priv->ipcp->hdroom,
-                                           GFP_ATOMIC);
+    struct ipcp_entry *ipcp = priv->ipcp;
+    struct rl_buf *rb = rl_buf_alloc(skb->len, ipcp->hdroom,
+                                     ipcp->tailroom, GFP_ATOMIC);
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
     struct flow_entry *flow = NULL;
@@ -675,7 +676,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     rb->len = skb->len;
 
     /* Try to shortcut the packet to the upper IPCP. */
-    if ((rb = rl_sdu_rx_shortcut(priv->ipcp, rb)) == NULL) {
+    if ((rb = rl_sdu_rx_shortcut(ipcp, rb)) == NULL) {
         entry->stats.rx_pkt++;
         entry->stats.rx_byte += rb->len;
         return;
@@ -699,7 +700,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         entry->stats.rx_byte += rb->len;
         spin_unlock_bh(&priv->arpt_lock);
 
-        rl_sdu_rx_flow(priv->ipcp, flow, rb, true);
+        rl_sdu_rx_flow(ipcp, flow, rb, true);
 
         return;
     }
@@ -741,7 +742,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
             goto drop;
         }
 
-        ret = rl_fa_req_arrived(priv->ipcp, 0, 0, 0, 0, priv->upper_names[i],
+        ret = rl_fa_req_arrived(ipcp, 0, 0, 0, 0, priv->upper_names[i],
                                 entry->tpa, NULL, NULL, false);
 
         if (ret) {

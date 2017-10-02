@@ -171,6 +171,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
                 priv->cur_rx_hdr = false;
                 priv->cur_rx_rb = rl_buf_alloc(priv->cur_rx_rblen,
                                                priv->flow->txrx.ipcp->hdroom,
+                                               priv->flow->txrx.ipcp->tailroom,
                                                GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     flow->stats.rx_err++;
