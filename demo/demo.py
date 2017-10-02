@@ -29,9 +29,14 @@ def download_if_needed(locpath, url):
     print('... download complete')
 
 
-def which(program):
+# Wrapper for the 'which' command, to check a program exists on
+# the local machine.
+def which(program, sudo = False):
     FNULL = open(os.devnull, 'w')
-    retcode = subprocess.call(['sudo', 'which', program], stdout = FNULL,
+    cmd = ['which', program]
+    if sudo:
+        cmd = ['sudo'] + cmd
+    retcode = subprocess.call(cmd, stdout = FNULL,
                               stderr = subprocess.STDOUT)
     if retcode != 0:
         print('Fatal error: Cannot find "%s" program' % program)
@@ -280,7 +285,6 @@ args = argparser.parse_args()
 
 
 # Check we have what we need
-which('brctl')
 which('qemu-system-x86_64')
 
 subprocess.call(['chmod', '0400', 'buildroot/buildroot_rsa'])
@@ -550,6 +554,9 @@ if len(vms) > boot_batch_size:
 VMTHRESH = 10
 if not args.backend:
     args.backend = 'tap' if len(vms) <= VMTHRESH else 'udp'
+
+if args.backend == 'tap':
+    which('brctl', sudo=True)
 
 if not args.enrollment_order:
     args.enrollment_order = 'sequential' if len(vms) <= VMTHRESH else 'parallel'
