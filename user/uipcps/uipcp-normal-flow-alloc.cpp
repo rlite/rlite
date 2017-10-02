@@ -460,22 +460,28 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 {
     map<string, FlowRequest>::iterator f;
     rl_port_t local_port;
+    stringstream decode;
+    string objname;
+    unsigned addr, port;
+    char separator;
     int ret;
 
-    f = flow_reqs.find(rm->obj_name + string("L"));
-
+    decode << rm->obj_name.substr(obj_name::flows.size() + 1);
+    decode >> addr >> separator >> port;
+    if (addr == rib->myaddr) {
+        objname = rm->obj_name + string("L");
+    } else {
+        objname = rm->obj_name + string("R");
+    }
+    f = flow_reqs.find(objname);
     if (f == flow_reqs.end()) {
-        f = flow_reqs.find(rm->obj_name + string("R"));
+        UPD(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
+        return 0;
+    }
 
-        if (f == flow_reqs.end()) {
-            UPD(rib->uipcp, "Flow '%s' already deleted locally\n", rm->obj_name.c_str());
-            return 0;
-
-        } else {
-            /* We were the target. */
-            assert(!(f->second.flags & RL_FLOWREQ_INITIATOR));
-        }
-
+    if (addr == rib->myaddr) {
+        /* We were the target. */
+        assert(!(f->second.flags & RL_FLOWREQ_INITIATOR));
     } else {
         /* We were the initiator. */
         assert(f->second.flags & RL_FLOWREQ_INITIATOR);
