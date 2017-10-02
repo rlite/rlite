@@ -38,9 +38,11 @@ struct Remote {
     string app_name;
     string dif_name;
     IPSubnet tun_subnet;
+    string tun_name;
+    int tun_fd;
 
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
-                        dif_name(d), tun_subnet(i) { }
+                        dif_name(d), tun_subnet(i), tun_fd(-1) { }
 };
 
 struct Route {
@@ -181,17 +183,6 @@ tun_alloc(char *dev, int flags)
     return fd;
 }
 
-void
-alloc_tun()
-{
-    char tun_name[IFNAMSIZ];
-    int tunfd;
-
-    strcpy(tun_name, "tun1");
-    tunfd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
-    close(tunfd);
-}
-
 static int
 parse_conf(const char *path)
 {
@@ -295,6 +286,28 @@ dump_conf(void)
     }
 }
 
+static int
+setup(void)
+{
+    for (list<Remote>::iterator l = g->remotes.begin();
+                            l != g->remotes.end(); l ++) {
+        char tun_name[IFNAMSIZ];
+
+        tun_name[0] = '\0';
+        l->tun_fd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
+        if (l->tun_fd < 0) {
+            cerr << "Failed to create tunnel" << endl;
+            return -1;
+        }
+        l->tun_name = tun_name;
+        if (g->verbose) {
+            cout << "Created tunnel device " << l->tun_name << endl;
+        }
+    }
+
+    return 0;
+}
+
 static void
 usage(void)
 {
@@ -335,6 +348,10 @@ int main(int argc, char **argv)
 
     if (g->verbose) {
         dump_conf();
+    }
+
+    if (setup()) {
+        return -1;
     }
 
     return 0;
