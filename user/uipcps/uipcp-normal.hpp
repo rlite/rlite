@@ -233,6 +233,16 @@ private:
     bool verb;
 };
 
+#define RL_LOCK_ASSERT(_lock, _locked) \
+    do { \
+        int ret = pthread_mutex_trylock(_lock); \
+        assert(!(_locked && ret == 0)); \
+        assert(!(!_locked && ret == EBUSY)); \
+        if (!_locked) { \
+            pthread_mutex_unlock(_lock); \
+        } \
+    } while (0)
+
 struct dft {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
