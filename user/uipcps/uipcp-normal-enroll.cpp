@@ -321,7 +321,7 @@ Neighbor::n_flow_set(NeighFlow *nf)
      * keepalive timer. */
     kbnf = flows.begin()->second;
     nf->enroll_state = kbnf->enroll_state;
-    nf->conn = new CDAPConn(nf->flow_fd, 1);
+    nf->conn = new CDAPConn(nf->flow_fd);
     if (kbnf->conn) {
         nf->conn->state_set(kbnf->conn->state_get());
     }
@@ -621,7 +621,7 @@ enrollee_thread(void *opaque)
         if (nf->conn) {
             rl_delete(nf->conn, RL_MT_SHIMDATA);
         }
-        nf->conn = rl_new(CDAPConn(nf->flow_fd, 1), RL_MT_SHIMDATA);
+        nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->uipcp->name,
                           neigh->ipcp_name);

@@ -90,7 +90,7 @@ class CDAPConn {
     CDAPConn(const CDAPConn& o);
 
 public:
-    CDAPConn(int fd, long version,
+    CDAPConn(int fd, long version = 1,
              unsigned int discard_secs = CDAP_DISCARD_SECS_DFLT);
     ~CDAPConn();
 
