@@ -1,5 +1,3 @@
-- rlite-utils: deserialization routines should check lengths
-
 - support generic RIB M_READ (and M_WRITE)
 
 - implement utility to graphically show ipcp-rib-show, using graphviz

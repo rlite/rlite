@@ -110,12 +110,20 @@ serialize_string(void **pptr, const char *s)
 
 /* Deserialize a C string. */
 int
-deserialize_string(const void **pptr, char **s)
+deserialize_string(const void **pptr, char **s, int *sleft)
 {
     uint16_t slen;
 
+    if (*sleft < sizeof(uint16_t)) {
+        return -1;
+    }
     deserialize_obj(*pptr, uint16_t, &slen);
+    *sleft -= sizeof(uint16_t);
+
     if (slen) {
+        if (slen > *sleft) {
+            return -1;
+        }
         *s = COMMON_ALLOC(slen + 1, 1);
         if (!(*s)) {
             return -1;
@@ -124,6 +132,7 @@ deserialize_string(const void **pptr, char **s)
         memcpy(*s, *pptr, slen);
         (*s)[slen] = '\0';
         *pptr += slen;
+        *sleft -= slen;
     } else {
         *s = NULL;
     }
@@ -143,10 +152,18 @@ serialize_buffer(void **pptr, const struct rl_buf_field *bf)
 
 /* Deserialize a buffer. */
 static int
-deserialize_buffer(const void **pptr, struct rl_buf_field *bf)
+deserialize_buffer(const void **pptr, struct rl_buf_field *bf, int *sleft)
 {
+    if (*sleft < sizeof(uint32_t)) {
+        return -1;
+    }
     deserialize_obj(*pptr, uint32_t, &bf->len);
+    *sleft -= sizeof(uint32_t);
+
     if (bf->len) {
+        if (bf->len > *sleft) {
+            return -1;
+        }
         bf->buf = COMMON_ALLOC(bf->len, 1);
         if (!(bf->buf)) {
             return -1;
@@ -154,6 +171,7 @@ deserialize_buffer(const void **pptr, struct rl_buf_field *bf)
 
         memcpy(bf->buf, *pptr, bf->len);
         *pptr += bf->len;
+        *sleft -= bf->len;
     } else {
         bf->buf = NULL;
     }
@@ -173,28 +191,28 @@ serialize_rina_name(void **pptr, const struct rina_name *name)
 
 /* Deserialize a RINA name. */
 int
-deserialize_rina_name(const void **pptr, struct rina_name *name)
+deserialize_rina_name(const void **pptr, struct rina_name *name, int *sleft)
 {
     int ret;
 
     memset(name, 0, sizeof(*name));
 
-    ret = deserialize_string(pptr, &name->apn);
+    ret = deserialize_string(pptr, &name->apn, sleft);
     if (ret) {
         return ret;
     }
 
-    ret = deserialize_string(pptr, &name->api);
+    ret = deserialize_string(pptr, &name->api, sleft);
     if (ret) {
         return ret;
     }
 
-    ret = deserialize_string(pptr, &name->aen);
+    ret = deserialize_string(pptr, &name->aen, sleft);
     if (ret) {
         return ret;
     }
 
-    ret = deserialize_string(pptr, &name->aei);
+    ret = deserialize_string(pptr, &name->aei, sleft);
 
     return ret;
 }
@@ -293,6 +311,8 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     struct rl_buf_field *bf;
     unsigned int copylen;
     const void *desptr;
+    int sleft = serbuf_len;
+    int dleft = msgbuf_len;
     int ret;
     int i;
 
@@ -303,31 +323,60 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     }
 
     copylen = numtables[bmsg->msg_type].copylen;
+    if (copylen > sleft) {
+        PE("Serialized message shorter than copylen [msg_type=%u]\n",
+            bmsg->msg_type);
+        return -1;
+    }
+    if (copylen > dleft) {
+        PE("Message buffer smaller than copylen\n");
+        return -1;
+    }
     memcpy(msgbuf, serbuf, copylen);
+    sleft -= copylen;
+    dleft -= copylen;
 
     desptr = serbuf + copylen;
     name = (struct rina_name *)(msgbuf + copylen);
     for (i = 0; i < numtables[bmsg->msg_type].names; i++, name++) {
-        ret = deserialize_rina_name(&desptr, name);
+        if (dleft < sizeof(struct rina_name)) {
+            PE("Message buffer too short\n");
+            return -1;
+        }
+        ret = deserialize_rina_name(&desptr, name, &sleft);
         if (ret) {
             return ret;
         }
+        dleft -= sizeof(struct rina_name);
     }
 
     str = (string_t *)name;
     for (i = 0; i < numtables[bmsg->msg_type].strings; i++, str++) {
-        ret = deserialize_string(&desptr, str);
+        if (dleft < sizeof(string_t)) {
+            PE("Message buffer too short\n");
+            return -1;
+        }
+        ret = deserialize_string(&desptr, str, &sleft);
         if (ret) {
             return ret;
         }
+        dleft -= sizeof(string_t);
     }
 
     bf = (struct rl_buf_field *)str;
     for (i = 0; i < numtables[bmsg->msg_type].buffers; i++, bf++) {
-        ret = deserialize_buffer(&desptr, bf);
+        if (dleft < sizeof(struct rl_buf_field)) {
+            PE("Message buffer too short\n");
+            return -1;
+        }
+        ret = deserialize_buffer(&desptr, bf, &sleft);
+        if (ret) {
+            return ret;
+        }
+        dleft -= sizeof(struct rl_buf_field);
     }
 
-    if ((desptr - serbuf) != serbuf_len) {
+    if ((desptr - serbuf) != serbuf_len || sleft) {
         return -1;
     }
 
