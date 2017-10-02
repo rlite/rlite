@@ -25,10 +25,6 @@
 #include <linux/slab.h>
 #include "rlite-kernel.h"
 
-#ifdef RL_SKB
-#include <linux/skbuff.h>
-#endif
-
 /*
  * Allocate a buffer to hold PDU header and data.
  * The returned buffer has zero length (i.e. it's empty).
@@ -100,7 +96,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
     rb_list_init(&crb->node);
 #else  /* RL_SKB */
 
-    crb = skb_clone(rb);
+    crb = skb_clone(rb, gfp);
     if (unlikely(!crb)) {
         return NULL;
     }
@@ -123,7 +119,7 @@ __rl_buf_free(struct rl_buf *rb)
 
     rl_free(rb, RL_MT_BUFHDR);
 #else  /* RL_SKB */
-    dev_kfree_skb_any(rb);
+    kfree_skb(rb);
 #endif /* RL_SKB */
 }
 EXPORT_SYMBOL(__rl_buf_free);
