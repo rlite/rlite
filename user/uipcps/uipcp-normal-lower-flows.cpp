@@ -593,7 +593,8 @@ RoutingEngine::compute_fwd_table()
             }
 
             if (rib->lookup_node_address(r->first) == 0) {
-                UPW(uipcp, "Can't find address for destination %s\n",
+                /* We still miss the address of this destination. */
+                UPV(uipcp, "Can't find address for destination %s\n",
                             r->first.c_str());
                 continue;
             }
