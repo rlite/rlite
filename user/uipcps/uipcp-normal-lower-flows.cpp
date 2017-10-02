@@ -123,7 +123,7 @@ lfdb_default::update_local(const string& neigh_name)
     LowerFlow lf;
     CDAPMessage *sm;
 
-    if (remote_addr == 0 || neigh == NULL || !neigh->has_mgmt_flow()) {
+    if (remote_addr == 0 || neigh == NULL || !neigh->has_flows()) {
         /* We still miss the address or the N-1 flow is not there. */
         return;
     }
@@ -613,7 +613,7 @@ RoutingEngine::compute_fwd_table()
                 continue;
             }
 
-            if (!neigh->second->has_mgmt_flow()) {
+            if (!neigh->second->has_flows()) {
                 UPE(uipcp, "N-1 flow towards neigh %s just disappeared\n",
                         neigh_name.c_str());
                 continue;
