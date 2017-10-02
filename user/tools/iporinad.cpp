@@ -462,6 +462,52 @@ os_tun_alloc(char *dev, int flags)
     return fd;
 }
 
+static unsigned int
+probe_mtu(int fd)
+{
+    unsigned int ub = 1;
+    unsigned int lb = 1;
+#define BUFSIZE     65536
+    char buf[BUFSIZE];
+
+    memset(buf, 0, sizeof(buf));
+
+    for (;;) {
+        int n = write(fd, buf, ub);
+
+        if (n < 0) {
+            /* we may check for (errno == EMSGSIZE) */
+            break;
+        }
+
+        if ((ub << 1) > BUFSIZE) {
+            /* Safety check. */
+            break;
+        }
+        ub <<= 1;
+    }
+
+    for (;;) {
+        unsigned int m = (lb + ub) / 2;
+        int n;
+
+        if (m == lb) {
+            break;
+        }
+
+        n = write(fd, buf, m);
+        if (n < 0) {
+            /* we may check for (errno == EMSGSIZE) */
+            ub = m;
+        } else {
+            lb = m;
+        }
+    }
+
+    return lb;
+#undef BUFSIZE
+}
+
 static int
 parse_conf(const char *path)
 {
