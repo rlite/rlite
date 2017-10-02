@@ -80,7 +80,7 @@ namespace obj_name {
 
 /* Time interval (in seconds) between two consecutive periodic
  * RIB synchronizations. */
-#define RL_NEIGH_SYNC_INTVAL           30
+#define RL_NEIGH_REFRESH_INTVAL     30
 
 enum enroll_state_t {
     NEIGH_NONE = 0,
@@ -435,7 +435,7 @@ int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
 void age_incr_cb(struct uipcp *uipcp, void *arg);
-void sync_timeout_cb(struct uipcp *uipcp, void *arg);
+void neighs_refresh_cb(struct uipcp *uipcp, void *arg);
 
 #define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
 
