@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <assert.h>
@@ -31,19 +31,19 @@
 static volatile int mt_count[RL_MT_MAX];
 
 static const char *mt_names[] = {
-    [RL_MT_UTILS]       = "UTILS",
-    [RL_MT_CONF]        = "CONF",
-    [RL_MT_MSG]         = "MSG",
-    [RL_MT_API]         = "API",
-    [RL_MT_EVLOOP]      = "EVLOOP",
-    [RL_MT_UIPCP]       = "UIPCP",
-    [RL_MT_TOPO]        = "TOPO",
-    [RL_MT_MISC]        = "MISC",
-    [RL_MT_SHIM]        = "SHIM",
-    [RL_MT_SHIMDATA]    = "SHIMDATA",
-    [RL_MT_CDAP]        = "CDAP",
-    [RL_MT_NEIGH]       = "NEIGH",
-    [RL_MT_NEIGHFLOW]   = "NEIGHFLOW",
+    [RL_MT_UTILS]     = "UTILS",
+    [RL_MT_CONF]      = "CONF",
+    [RL_MT_MSG]       = "MSG",
+    [RL_MT_API]       = "API",
+    [RL_MT_EVLOOP]    = "EVLOOP",
+    [RL_MT_UIPCP]     = "UIPCP",
+    [RL_MT_TOPO]      = "TOPO",
+    [RL_MT_MISC]      = "MISC",
+    [RL_MT_SHIM]      = "SHIM",
+    [RL_MT_SHIMDATA]  = "SHIMDATA",
+    [RL_MT_CDAP]      = "CDAP",
+    [RL_MT_NEIGH]     = "NEIGH",
+    [RL_MT_NEIGHFLOW] = "NEIGHFLOW",
 };
 
 void

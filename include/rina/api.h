@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RINA_API_H__
@@ -34,13 +34,13 @@ extern "C" {
  * Some spare space is reserved to allow future ABI-compatible extensions.
  */
 struct rina_flow_spec {
-    uint64_t max_sdu_gap;       /* in SDUs */
-    uint64_t avg_bandwidth;     /* in bits per second */
-    uint32_t max_delay;         /* in microseconds */
-    uint16_t max_loss;          /* percentage */
-    uint32_t max_jitter;        /* in microseconds */
-    uint8_t in_order_delivery;  /* boolean */
-    uint8_t msg_boundaries;     /* boolean */
+    uint64_t max_sdu_gap;      /* in SDUs */
+    uint64_t avg_bandwidth;    /* in bits per second */
+    uint32_t max_delay;        /* in microseconds */
+    uint16_t max_loss;         /* percentage */
+    uint32_t max_jitter;       /* in microseconds */
+    uint8_t in_order_delivery; /* boolean */
+    uint8_t msg_boundaries;    /* boolean */
 
     /* for future use */
     uint32_t spare1;
@@ -48,8 +48,8 @@ struct rina_flow_spec {
     uint32_t spare3;
 };
 
-#define RINA_F_NOWAIT       (1 << 0)
-#define RINA_F_NORESP       (1 << 1)
+#define RINA_F_NOWAIT (1 << 0)
+#define RINA_F_NORESP (1 << 1)
 
 /*
  * Open a file descriptor that can be used to register/unregister names,
@@ -200,7 +200,7 @@ int rina_flow_alloc_wait(int wfd);
 void rina_flow_spec_unreliable(struct rina_flow_spec *spec);
 
 /* Deprecated function. */
-#define rina_flow_spec_default  rina_flow_spec_unreliable
+#define rina_flow_spec_default rina_flow_spec_unreliable
 
 /*
  * Retrieve the MSS (Maximum Segment Size) that can be written to the flow
@@ -212,4 +212,4 @@ unsigned int rina_flow_mss_get(int fd);
 }
 #endif
 
-#endif  /* __RINA_API_H__ */
+#endif /* __RINA_API_H__ */

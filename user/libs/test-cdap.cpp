@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <iostream>
@@ -70,9 +71,9 @@ test_cdap_server(int port)
         return -1;
     }
 
-    skaddr.sin_family = AF_INET;
+    skaddr.sin_family      = AF_INET;
     skaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    skaddr.sin_port = htons(port);
+    skaddr.sin_port        = htons(port);
 
     if (bind(ld, (struct sockaddr *)&skaddr, sizeof(skaddr)) < 0) {
         perror("bind()");
@@ -86,12 +87,12 @@ test_cdap_server(int port)
         int pn;
 
         /* Read the payload from the socket (put result in bufin). */
-        n = recvfrom(ld, bufin, sizeof(bufin), 0,
-                (struct sockaddr *)&remote, &addrlen);
+        n = recvfrom(ld, bufin, sizeof(bufin), 0, (struct sockaddr *)&remote,
+                     &addrlen);
 
         /* Print out the address of the sender. */
         PD("Got a datagram from %s port %d, len %d\n",
-                inet_ntoa(remote.sin_addr), ntohs(remote.sin_port), n);
+           inet_ntoa(remote.sin_addr), ntohs(remote.sin_port), n);
 
         if (n < 0) {
             perror("recvfrom()");
@@ -112,7 +113,7 @@ test_cdap_server(int port)
         /* This is a trick to make conn.msg_recv() receive
          * the payload from the pipe. */
         conn.fd = pipefds[0];
-        m = conn.msg_recv();
+        m       = conn.msg_recv();
 
         if (!m) {
             PE("msg_recv()\n");
@@ -126,47 +127,44 @@ test_cdap_server(int port)
         conn.fd = pipefds[1];
 
         switch (m->op_code) {
-            case gpb::M_CONNECT:
-                rm.m_connect_r(m, 0, string());
-                break;
+        case gpb::M_CONNECT:
+            rm.m_connect_r(m, 0, string());
+            break;
 
-            case gpb::M_RELEASE:
-                rm.m_release_r(gpb::F_NO_FLAGS, 0, string());
-                break;
+        case gpb::M_RELEASE:
+            rm.m_release_r(gpb::F_NO_FLAGS, 0, string());
+            break;
 
-            case gpb::M_CREATE:
-                rm.m_create_r(gpb::F_NO_FLAGS, m->obj_class,
-                                m->obj_name, obj_inst_cnt++,
-                                0, string());
-                break;
+        case gpb::M_CREATE:
+            rm.m_create_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name,
+                          obj_inst_cnt++, 0, string());
+            break;
 
-            case gpb::M_DELETE:
-                rm.m_delete_r(gpb::F_NO_FLAGS, m->obj_class,
-                                m->obj_name, m->obj_inst,
-                                0, string());
-                break;
+        case gpb::M_DELETE:
+            rm.m_delete_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name,
+                          m->obj_inst, 0, string());
+            break;
 
-            case gpb::M_READ:
-                rm.m_read_r(gpb::F_NO_FLAGS, m->obj_class,
-                                m->obj_name, m->obj_inst,
-                                0, string());
-                break;
+        case gpb::M_READ:
+            rm.m_read_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name, m->obj_inst,
+                        0, string());
+            break;
 
-            case gpb::M_WRITE:
-                rm.m_write_r(gpb::F_NO_FLAGS, 0, string());
-                break;
+        case gpb::M_WRITE:
+            rm.m_write_r(gpb::F_NO_FLAGS, 0, string());
+            break;
 
-            case gpb::M_START:
-                rm.m_start_r(gpb::F_NO_FLAGS, 0, string());
-                break;
+        case gpb::M_START:
+            rm.m_start_r(gpb::F_NO_FLAGS, 0, string());
+            break;
 
-            case gpb::M_STOP:
-                rm.m_stop_r(gpb::F_NO_FLAGS, 0, string());
-                break;
+        case gpb::M_STOP:
+            rm.m_stop_r(gpb::F_NO_FLAGS, 0, string());
+            break;
 
-            default:
-                PE("Unmanaged op_code %d\n", m->op_code);
-                break;
+        default:
+            PE("Unmanaged op_code %d\n", m->op_code);
+            break;
         }
 
         conn.msg_send(&rm, m->invoke_id);
@@ -202,15 +200,14 @@ client_connect(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    av.name = "George";
+    av.name     = "George";
     av.password = "Washington";
 
-    local_appl = "Dulles/1";
+    local_appl  = "Dulles/1";
     remote_appl = "London/1";
 
-    if (req.m_connect(gpb::AUTH_NONE,
-                      &av, local_appl, remote_appl) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_connect(gpb::AUTH_NONE, &av, local_appl, remote_appl) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -231,9 +228,8 @@ client_create_some(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    if (req.m_create(gpb::F_NO_FLAGS,
-                     "class_A", "x", 0, 0, string()) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_create(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -257,7 +253,7 @@ client_write_some(CDAPConn *conn)
 
     req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
     req.set_obj_value(18);
-    if(conn->msg_send(&req, 0) < 0) {
+    if (conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -295,9 +291,8 @@ client_read_some(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    if (req.m_read(gpb::F_NO_FLAGS,
-                    "class_A", "x", 0, 0, string()) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_read(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -318,9 +313,8 @@ client_startstop_some(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    if (req.m_start(gpb::F_NO_FLAGS,
-                    "class_A", "x", 0, 0, string()) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_start(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -332,9 +326,8 @@ client_startstop_some(CDAPConn *conn)
 
     m->dump();
 
-    if (req.m_stop(gpb::F_NO_FLAGS,
-                   "class_A", "x", 0, 0, string()) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_stop(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -355,9 +348,8 @@ client_delete_some(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    if (req.m_delete(gpb::F_NO_FLAGS,
-                     "class_A", "x", 0, 0, string()) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_delete(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+        conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -378,8 +370,7 @@ client_disconnect(CDAPConn *conn)
     struct CDAPMessage req;
     struct CDAPMessage *m;
 
-    if (req.m_release(gpb::F_NO_FLAGS) ||
-            conn->msg_send(&req, 0) < 0) {
+    if (req.m_release(gpb::F_NO_FLAGS) || conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
@@ -405,12 +396,12 @@ test_cdap_client(int port)
         return -1;
     }
 
-    server.sin_family = AF_INET;
+    server.sin_family      = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    server.sin_port = htons(port);
+    server.sin_port        = htons(port);
 
-    if (connect(sk, (struct sockaddr *)&server,
-                (socklen_t)(sizeof(server))) < 0) {
+    if (connect(sk, (struct sockaddr *)&server, (socklen_t)(sizeof(server))) <
+        0) {
         perror("connect()");
         return -1;
     }
@@ -439,7 +430,8 @@ usage()
     PI("    ./test-cdap [-l]\n");
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     int port = 23872;
     int listen;
@@ -447,26 +439,26 @@ int main(int argc, char **argv)
 
     while ((opt = getopt(argc, argv, "hlp:")) != -1) {
         switch (opt) {
-            case 'h':
-                usage();
-                return 0;
+        case 'h':
+            usage();
+            return 0;
 
-            case 'l':
-                listen = 1;
-                break;
+        case 'l':
+            listen = 1;
+            break;
 
-            case 'p':
-                port = atoi(optarg);
-                if (port <= 0 || port >= 65535) {
-                    PE("    Invalid port number\n");
-                    return -1;
-                }
-                break;
-
-            default:
-                PE("    Unrecognized option %c\n", opt);
-                usage();
+        case 'p':
+            port = atoi(optarg);
+            if (port <= 0 || port >= 65535) {
+                PE("    Invalid port number\n");
                 return -1;
+            }
+            break;
+
+        default:
+            PE("    Unrecognized option %c\n", opt);
+            usage();
+            return -1;
         }
     }
 

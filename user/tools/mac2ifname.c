@@ -10,7 +10,6 @@
 #include <net/if.h>
 #include <string.h>
 
-
 static int
 get_mac_by_ifname(const char *ifname, uint8_t *hwaddr)
 {
@@ -41,7 +40,8 @@ get_mac_by_ifname(const char *ifname, uint8_t *hwaddr)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
     struct ifaddrs *ifaddr, *ifa;
     uint8_t mac_addr_one[6];
@@ -54,13 +54,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    n = sscanf(argv[1], "%02x:%02x:%02x:%02x:%02x:%02x",
-                &tmp[0],
-                &tmp[1],
-                &tmp[2],
-                &tmp[3],
-                &tmp[4],
-                &tmp[5]);
+    n = sscanf(argv[1], "%02x:%02x:%02x:%02x:%02x:%02x", &tmp[0], &tmp[1],
+               &tmp[2], &tmp[3], &tmp[4], &tmp[5]);
     if (n != 6) {
         printf("    invalid MAC address %s\n", argv[1]);
         return -1;
@@ -100,4 +95,3 @@ int main(int argc, char *argv[])
 
     return -1;
 }
-

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_COMMON_H__
@@ -42,11 +42,11 @@
 extern "C" {
 #endif
 
-#define RLITE_CTRLDEV_NAME          "/dev/rlite"
-#define RLITE_IODEV_NAME            "/dev/rlite-io"
-#define RLITE_UIPCPS_VAR            "/run/rlite/"
-#define RLITE_UIPCPS_UNIX_NAME      RLITE_UIPCPS_VAR "uipcps-server"
-#define RLITE_UIPCPS_PIDFILE        RLITE_UIPCPS_VAR "uipcps.pid"
+#define RLITE_CTRLDEV_NAME "/dev/rlite"
+#define RLITE_IODEV_NAME "/dev/rlite-io"
+#define RLITE_UIPCPS_VAR "/run/rlite/"
+#define RLITE_UIPCPS_UNIX_NAME RLITE_UIPCPS_VAR "uipcps-server"
+#define RLITE_UIPCPS_PIDFILE RLITE_UIPCPS_VAR "uipcps.pid"
 
 /* Application naming information:
  *   - Application Process Name
@@ -67,7 +67,7 @@ typedef uint16_t rl_msg_t;
 
 #define RL_IPCP_ID_NONE (~((rl_ipcp_id_t)0))
 #define RL_PORT_ID_NONE (~((rl_port_t)0))
-#define RL_ADDR_NULL    (0U)
+#define RL_ADDR_NULL (0U)
 
 /* Maximum sizes for data transfer constants, to be used in CDAP
  * messages, user/kernel interfaces and the management layer in general. */
@@ -79,11 +79,11 @@ typedef uint32_t rlm_qosid_t;
 
 /* Data transfer constants used by a normal IPCP. */
 struct pci_sizes {
-    rlm_addr_t      addr;
-    rlm_seq_t       seq;
-    rlm_pdulen_t    pdulen;
-    rlm_cepid_t     cepid;
-    rlm_qosid_t     qosid;
+    rlm_addr_t addr;
+    rlm_seq_t seq;
+    rlm_pdulen_t pdulen;
+    rlm_cepid_t cepid;
+    rlm_qosid_t qosid;
 };
 
 /* Actual values for data transfer constants: can be redefined at
@@ -104,8 +104,8 @@ struct pci_sizes {
 #define rl_qosid_t uint16_t
 #endif
 
-#define RLITE_SUCC  0
-#define RLITE_ERR   1
+#define RLITE_SUCC 0
+#define RLITE_ERR 1
 
 /* All the possible messages begin like this. */
 struct rl_msg_base {
@@ -126,29 +126,29 @@ struct rl_msg_base_resp {
 #define RLITE_MB(m) (struct rl_msg_base *)(m)
 #define RLITE_MBR(m) (struct rl_msg_base_resp *)(m)
 
-#define RL_F_IPCPS  (1 << 0)
-#define RL_F_ALL    RL_F_IPCPS
+#define RL_F_IPCPS (1 << 0)
+#define RL_F_ALL RL_F_IPCPS
 
 /* Bind the flow identified by port_id to
  * this rl_io device. */
-#define RLITE_IO_MODE_APPL_BIND     86
+#define RLITE_IO_MODE_APPL_BIND 86
 /* Use this device to write/read management
  * PDUs for the IPCP specified by ipcp_id. */
-#define RLITE_IO_MODE_IPCP_MGMT     88
+#define RLITE_IO_MODE_IPCP_MGMT 88
 
 struct rl_ioctl_info {
-    uint8_t         mode;
-    rl_port_t       port_id;
-    rl_ipcp_id_t    ipcp_id;
+    uint8_t mode;
+    rl_port_t port_id;
+    rl_ipcp_id_t ipcp_id;
 } __attribute__((packed));
 
-#define RLITE_IOCTL_FLOW_BIND   _IOW(0xAF, 0x00, struct rl_ioctl_info)
-#define RLITE_IOCTL_CHFLAGS     _IOW(0xAF, 0x01, uint64_t)
-#define RLITE_IOCTL_MSS_GET     _IOW(0xAF, 0x02, uint32_t *)
+#define RLITE_IOCTL_FLOW_BIND _IOW(0xAF, 0x00, struct rl_ioctl_info)
+#define RLITE_IOCTL_CHFLAGS _IOW(0xAF, 0x01, uint64_t)
+#define RLITE_IOCTL_MSS_GET _IOW(0xAF, 0x02, uint32_t *)
 
-#define RLITE_MGMT_HDR_T_OUT_LOCAL_PORT      1
-#define RLITE_MGMT_HDR_T_OUT_DST_ADDR        2
-#define RLITE_MGMT_HDR_T_IN                  3
+#define RLITE_MGMT_HDR_T_OUT_LOCAL_PORT 1
+#define RLITE_MGMT_HDR_T_OUT_DST_ADDR 2
+#define RLITE_MGMT_HDR_T_IN 3
 
 /* Header used across user/kernel boundary when writing/reading
  * management SDUs from rlite-io devices working in RLITE_IO_MODE_IPCP_MGMT
@@ -168,7 +168,6 @@ struct rl_mgmt_hdr {
     uint8_t type;
 } __attribute__((packed));
 
-
 /* Flow specifications and QoS cubes related definitions. */
 
 struct rate_based_config {
@@ -181,9 +180,9 @@ struct window_based_config {
     rlm_seq_t initial_credit;
 } __attribute__((packed));
 
-#define RLITE_FC_T_NONE      0
-#define RLITE_FC_T_WIN       1
-#define RLITE_FC_T_RATE      2
+#define RLITE_FC_T_NONE 0
+#define RLITE_FC_T_WIN 1
+#define RLITE_FC_T_RATE 2
 
 struct fc_config {
     uint8_t fc_type;
@@ -204,7 +203,7 @@ struct dtcp_config {
     struct fc_config fc;
     uint8_t rtx_control;
     struct rtx_config rtx;
-    uint32_t initial_a;  /* A */
+    uint32_t initial_a; /* A */
     uint32_t bandwidth; /* in bps */
 } __attribute__((packed));
 
@@ -216,16 +215,16 @@ struct rl_flow_config {
     uint8_t dtcp_present;
     struct dtcp_config dtcp;
 
-     /* Currently used by shim-tcp4 and shim-udp4. */
+    /* Currently used by shim-tcp4 and shim-udp4. */
     int32_t fd;
     uint32_t inet_ip;
     uint16_t inet_port;
 } __attribute__((packed));
 
-#define RL_MPL_MSECS_DFLT       1000
-#define RL_RTX_MSECS_DFLT       1000
-#define RL_A_MSECS_DFLT         20
-#define RL_DATA_RXMS_MAX_DFLT   10
+#define RL_MPL_MSECS_DFLT 1000
+#define RL_RTX_MSECS_DFLT 1000
+#define RL_A_MSECS_DFLT 20
+#define RL_DATA_RXMS_MAX_DFLT 10
 
 /* We don't currently have a good way to understand what flow specs
  * should result into DTCP flow control to be enabled or disabled,
@@ -247,10 +246,12 @@ rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
 }
 
 /* Does a flow specification correspond to best effort QoS? */
-static inline int rina_flow_spec_best_effort(struct rina_flow_spec *spec) {
-    return spec->max_sdu_gap == ((rlm_seq_t)-1) && !spec->avg_bandwidth
-            && !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery
-            && !rina_flow_spec_fc_get(spec);
+static inline int
+rina_flow_spec_best_effort(struct rina_flow_spec *spec)
+{
+    return spec->max_sdu_gap == ((rlm_seq_t)-1) && !spec->avg_bandwidth &&
+           !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery &&
+           !rina_flow_spec_fc_get(spec);
 }
 
 struct rl_flow_stats {
@@ -264,14 +265,14 @@ struct rl_flow_stats {
 };
 
 static inline void
-rl_flow_stats_init(struct rl_flow_stats *stats) {
+rl_flow_stats_init(struct rl_flow_stats *stats)
+{
     stats->tx_pkt = stats->tx_byte = stats->tx_err = 0;
     stats->rx_pkt = stats->rx_byte = stats->rx_err = 0;
 }
 
 /* DTP state exported to userspace. */
-struct rl_flow_dtp
-{
+struct rl_flow_dtp {
     /* Sender state. */
     rlm_seq_t snd_lwe;
     rlm_seq_t snd_rwe;
@@ -296,15 +297,15 @@ struct rl_flow_dtp
     unsigned int seqq_len;
 };
 
-#define RL_SHIM_UDP_PORT    0x0d1f
+#define RL_SHIM_UDP_PORT 0x0d1f
 
 #define NPD(FMT, ...)
 
-#define RL_VERB_QUIET   1
-#define RL_VERB_WARN    2
-#define RL_VERB_INFO    3
-#define RL_VERB_DBG     4
-#define RL_VERB_VERY    5
+#define RL_VERB_QUIET 1
+#define RL_VERB_WARN 2
+#define RL_VERB_INFO 3
+#define RL_VERB_DBG 4
+#define RL_VERB_VERY 5
 
 /* Memtrack machinery, enabled in debug mode. */
 #ifdef RL_DEBUG
@@ -315,4 +316,4 @@ struct rl_flow_dtp
 }
 #endif
 
-#endif  /* __RLITE_COMMON_H__ */
+#endif /* __RLITE_COMMON_H__ */

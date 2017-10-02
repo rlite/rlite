@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -50,7 +51,7 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
         return NULL;
     }
 
-    rb->raw = (struct rl_rawbuf *)kbuf;
+    rb->raw       = (struct rl_rawbuf *)kbuf;
     rb->raw->size = real_size;
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + hdroom);

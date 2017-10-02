@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_UIPCP_H__
@@ -96,34 +96,29 @@ struct uipcp_ops {
 
     /* User wants this uipcp to allocate an N-1-flow towards a member
      * of the DIF (no enrollment, just flow allocation). */
-    int (*lower_flow_alloc)(struct uipcp *,
-                            const struct rl_cmsg_ipcp_enroll *,
+    int (*lower_flow_alloc)(struct uipcp *, const struct rl_cmsg_ipcp_enroll *,
                             int wait_for_completion);
 
     /* User asks for a dump of the RIB. */
-    char * (*rib_show)(struct uipcp *);
+    char *(*rib_show)(struct uipcp *);
 
     /* User asks for a dump of the routing information. */
-    char * (*routing_show)(struct uipcp *);
+    char *(*routing_show)(struct uipcp *);
 
     /* An application asked to be registered within the DIF this
      * uipcp is part of. */
-    int (*appl_register)(struct uipcp *uipcp,
-                         const struct rl_msg_base *msg);
+    int (*appl_register)(struct uipcp *uipcp, const struct rl_msg_base *msg);
 
     /* An application issued a flow allocation request using the DIF
      * this uipcp is part of. */
-    int (*fa_req)(struct uipcp *uipcp,
-                  const struct rl_msg_base *msg);
+    int (*fa_req)(struct uipcp *uipcp, const struct rl_msg_base *msg);
 
     /* An application issued a flow allocation response managed by
      * this uipcp. */
-    int (*fa_resp)(struct uipcp *uipcp,
-                   const struct rl_msg_base *msg);
+    int (*fa_resp)(struct uipcp *uipcp, const struct rl_msg_base *msg);
 
     /* An application deallocated a flow managed by this uipcp. */
-    int (*flow_deallocated)(struct uipcp *uipcp,
-                            const struct rl_msg_base *msg);
+    int (*flow_deallocated)(struct uipcp *uipcp, const struct rl_msg_base *msg);
 
     /* Flow allocation request received from a remote uipcp, who
      * wants to establish a neighborhood relationship. This could
@@ -150,14 +145,13 @@ struct uipcp_ops {
     /* User wants to change a policy param of this uipcp. */
     int (*policy_param_mod)(struct uipcp *uipcp,
                             const struct rl_cmsg_ipcp_policy_param_mod *req);
-
 };
 
 struct ipcp_node {
     rl_ipcp_id_t id;
-    unsigned int marked;  /* used to visit the graph */
+    unsigned int marked; /* used to visit the graph */
     unsigned int refcnt;
-    unsigned int update_kern;  /* should we push MSS and hdroom to kernel ? */
+    unsigned int update_kern; /* should we push MSS and hdroom to kernel ? */
     unsigned int hdroom;
     unsigned int max_sdu_size;
     unsigned int hdrsize;
@@ -230,8 +224,7 @@ int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
-struct uipcp *uipcp_get_by_name(struct uipcps *uipcps,
-                                const char *ipcp_name);
+struct uipcp *uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name);
 
 int uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
                            rl_ipcp_id_t *ipcp_id);
@@ -261,15 +254,14 @@ int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_port_t remote_port, uint32_t remote_cep,
-                               rlm_addr_t remote_addr,
-                               const char *local_appl,
+                               rlm_addr_t remote_addr, const char *local_appl,
                                const char *remote_appl,
                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
-                          rl_port_t remote_port, uint32_t remote_cep,
-                          rlm_addr_t remote_addr, uint8_t response,
-                          const struct rl_flow_config *flowcfg);
+                                rl_port_t remote_port, uint32_t remote_cep,
+                                rlm_addr_t remote_addr, uint8_t response,
+                                const struct rl_flow_config *flowcfg);
 
 int uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
                              uint32_t uid);
@@ -297,24 +289,25 @@ int uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
 
 int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
 
-#define UPRINT(_u, LEV, FMT, ...)    \
-    DOPRINT("[%s:" LEV "][%u]%s: " FMT, hms_string(), (_u)->id, __func__, ##__VA_ARGS__)
+#define UPRINT(_u, LEV, FMT, ...)                                              \
+    DOPRINT("[%s:" LEV "][%u]%s: " FMT, hms_string(), (_u)->id, __func__,      \
+            ##__VA_ARGS__)
 
-#define UPD(_u, FMT, ...)   \
-    if (rl_verbosity >= RL_VERB_DBG)    \
-        UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
+#define UPD(_u, FMT, ...)                                                      \
+    if (rl_verbosity >= RL_VERB_DBG)                                           \
+    UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 
-#define UPI(_u, FMT, ...)   \
-    if (rl_verbosity >= RL_VERB_INFO)   \
-        UPRINT(_u, "INF", FMT, ##__VA_ARGS__)
+#define UPI(_u, FMT, ...)                                                      \
+    if (rl_verbosity >= RL_VERB_INFO)                                          \
+    UPRINT(_u, "INF", FMT, ##__VA_ARGS__)
 
-#define UPV(_u, FMT, ...)   \
-    if (rl_verbosity >= RL_VERB_VERY)   \
-        UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
+#define UPV(_u, FMT, ...)                                                      \
+    if (rl_verbosity >= RL_VERB_VERY)                                          \
+    UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 
-#define UPW(_u, FMT, ...)   UPRINT(_u, "WRN", FMT, ##__VA_ARGS__)
+#define UPW(_u, FMT, ...) UPRINT(_u, "WRN", FMT, ##__VA_ARGS__)
 
-#define UPE(_u, FMT, ...)   UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
+#define UPE(_u, FMT, ...) UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
 
 void normal_lib_init(void);
 

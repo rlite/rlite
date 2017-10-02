@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <stdio.h>
@@ -31,14 +31,13 @@
 
 #include "rlite/conf.h"
 
-
 static struct rl_msg_base *
 wait_for_next_msg(int fd, int timeout)
 {
     struct pollfd pfd;
     int ret;
 
-    pfd.fd = fd;
+    pfd.fd     = fd;
     pfd.events = POLLIN;
 
     ret = poll(&pfd, 1, timeout);
@@ -70,14 +69,13 @@ rl_conf_ipcp_create(const char *name, const char *dif_type,
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_CREATE;
     msg.event_id = 1;
-    msg.name = name ? rl_strdup(name, RL_MT_UTILS) : NULL;
+    msg.name     = name ? rl_strdup(name, RL_MT_UTILS) : NULL;
     msg.dif_type = rl_strdup(dif_type, RL_MT_UTILS);
     msg.dif_name = rl_strdup(dif_name, RL_MT_UTILS);
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     if (ret < 0) {
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                       RLITE_MB(&msg));
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
         goto out;
     }
 
@@ -115,7 +113,7 @@ rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id)
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_UIPCP_WAIT;
     msg.event_id = 1;
-    msg.ipcp_id = ipcp_id;
+    msg.ipcp_id  = ipcp_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
@@ -140,7 +138,7 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_DESTROY;
     msg.event_id = 1;
-    msg.ipcp_id = ipcp_id;
+    msg.ipcp_id  = ipcp_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
@@ -156,9 +154,9 @@ rl_ipcp_config_fill(struct rl_kmsg_ipcp_config *req, rl_ipcp_id_t ipcp_id,
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_IPCP_CONFIG;
     req->event_id = 1;
-    req->ipcp_id = ipcp_id;
-    req->name = rl_strdup(param_name, RL_MT_UTILS);
-    req->value = rl_strdup(param_value, RL_MT_UTILS);
+    req->ipcp_id  = ipcp_id;
+    req->name     = rl_strdup(param_name, RL_MT_UTILS);
+    req->value    = rl_strdup(param_value, RL_MT_UTILS);
 
     return 0;
 }
@@ -208,19 +206,19 @@ flow_fetch_append(struct list_head *flows,
         return -1;
     }
 
-    rl_flow->ipcp_id = resp->ipcp_id;
-    rl_flow->local_port = resp->local_port;
+    rl_flow->ipcp_id     = resp->ipcp_id;
+    rl_flow->local_port  = resp->local_port;
     rl_flow->remote_port = resp->remote_port;
-    rl_flow->local_addr = resp->local_addr;
+    rl_flow->local_addr  = resp->local_addr;
     rl_flow->remote_addr = resp->remote_addr;
-    rl_flow->spec = resp->spec;
+    rl_flow->spec        = resp->spec;
 
     /* Insert the flow into the list sorting by IPCP id first
      * and then by local port id. */
-    list_for_each_entry(scan, flows, node) {
+    list_for_each_entry (scan, flows, node) {
         if (rl_flow->ipcp_id < scan->ipcp_id ||
-                (rl_flow->ipcp_id == scan->ipcp_id &&
-                    rl_flow->local_port < scan->local_port)) {
+            (rl_flow->ipcp_id == scan->ipcp_id &&
+             rl_flow->local_port < scan->local_port)) {
             break;
         }
     }
@@ -235,8 +233,8 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
     struct rl_kmsg_flow_fetch_resp *resp;
     struct rl_kmsg_flow_fetch msg;
     uint32_t event_id = 1;
-    int end = 0;
-    int ret = 0;
+    int end           = 0;
+    int ret           = 0;
     int fd;
 
     fd = rina_open();
@@ -246,12 +244,12 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_FLOW_FETCH;
-    msg.ipcp_id = ipcp_id;
+    msg.ipcp_id  = ipcp_id;
 
     /* Fill the flows list. */
 
     while (!end) {
-        msg.event_id = event_id ++;
+        msg.event_id = event_id++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
@@ -269,8 +267,7 @@ rl_conf_flows_fetch(struct list_head *flows, rl_ipcp_id_t ipcp_id)
             flow_fetch_append(flows, resp);
 
             end = resp->end;
-            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                           RLITE_MB(resp));
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
             rl_free(resp, RL_MT_MSG);
         }
     }
@@ -287,7 +284,7 @@ rl_conf_flows_purge(struct list_head *flows)
     struct rl_flow *rl_flow, *tmp;
 
     /* Purge the flows list. */
-    list_for_each_entry_safe(rl_flow, tmp, flows, node) {
+    list_for_each_entry_safe (rl_flow, tmp, flows, node) {
         list_del(&rl_flow->node);
         rl_free(rl_flow, RL_MT_CONF);
     }
@@ -310,7 +307,7 @@ rl_conf_flow_get_info(rl_port_t port_id, struct rl_flow_stats *stats,
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_FLOW_STATS_REQ;
     msg.event_id = 1;
-    msg.port_id = port_id;
+    msg.port_id  = port_id;
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 1);
     if (ret < 0) {
@@ -361,7 +358,7 @@ rl_conf_flows_print(struct list_head *flows)
     char specinfo[16];
 
     PI_S("Flows table:\n");
-    list_for_each_entry(rl_flow, flows, node) {
+    list_for_each_entry (rl_flow, flows, node) {
         struct rl_flow_stats stats;
         int ret;
         int ofs = 0;
@@ -385,17 +382,13 @@ rl_conf_flows_print(struct list_head *flows)
         }
 
         PI_S("  ipcp %u, local addr/port %llu:%u, "
-                "remote addr/port %llu:%u, %s"
-                "tx %lu pkt %lu byte %lu err, "
-                "rx %lu pkt %lu byte %lu err\n",
-                rl_flow->ipcp_id,
-                (long long unsigned int)rl_flow->local_addr,
-                rl_flow->local_port,
-                (long long unsigned int)rl_flow->remote_addr,
-                rl_flow->remote_port, specinfo,
-                stats.tx_pkt, stats.tx_byte, stats.tx_err,
-                stats.rx_pkt, stats.rx_byte, stats.rx_err
-                );
+             "remote addr/port %llu:%u, %s"
+             "tx %lu pkt %lu byte %lu err, "
+             "rx %lu pkt %lu byte %lu err\n",
+             rl_flow->ipcp_id, (long long unsigned int)rl_flow->local_addr,
+             rl_flow->local_port, (long long unsigned int)rl_flow->remote_addr,
+             rl_flow->remote_port, specinfo, stats.tx_pkt, stats.tx_byte,
+             stats.tx_err, stats.rx_pkt, stats.rx_byte, stats.rx_err);
     }
 
     return 0;
@@ -404,8 +397,7 @@ rl_conf_flows_print(struct list_head *flows)
 /* Support for fetching registration information in kernel space. */
 
 static int
-reg_fetch_append(struct list_head *regs,
-                 struct rl_kmsg_reg_fetch_resp *resp)
+reg_fetch_append(struct list_head *regs, struct rl_kmsg_reg_fetch_resp *resp)
 {
     struct rl_reg *rl_reg, *scan;
 
@@ -423,16 +415,17 @@ reg_fetch_append(struct list_head *regs,
         return -1;
     }
 
-    rl_reg->ipcp_id = resp->ipcp_id;
-    rl_reg->pending = resp->pending;
-    rl_reg->appl_name = resp->appl_name; resp->appl_name = NULL;
+    rl_reg->ipcp_id   = resp->ipcp_id;
+    rl_reg->pending   = resp->pending;
+    rl_reg->appl_name = resp->appl_name;
+    resp->appl_name   = NULL;
 
     /* Insert the flow into the list sorting by IPCP id first
      * and then by application name. */
-    list_for_each_entry(scan, regs, node) {
+    list_for_each_entry (scan, regs, node) {
         if (rl_reg->ipcp_id < scan->ipcp_id ||
-                (rl_reg->ipcp_id == scan->ipcp_id &&
-                    strcmp(rl_reg->appl_name, scan->appl_name) < 0)) {
+            (rl_reg->ipcp_id == scan->ipcp_id &&
+             strcmp(rl_reg->appl_name, scan->appl_name) < 0)) {
             break;
         }
     }
@@ -447,8 +440,8 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
     struct rl_kmsg_reg_fetch_resp *resp;
     struct rl_kmsg_reg_fetch msg;
     uint32_t event_id = 1;
-    int end = 0;
-    int ret = 0;
+    int end           = 0;
+    int ret           = 0;
     int fd;
 
     fd = rina_open();
@@ -458,12 +451,12 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
 
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_REG_FETCH;
-    msg.ipcp_id = ipcp_id;
+    msg.ipcp_id  = ipcp_id;
 
     /* Fill the regs list. */
 
     while (!end) {
-        msg.event_id = event_id ++;
+        msg.event_id = event_id++;
 
         ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
         if (ret < 0) {
@@ -481,8 +474,7 @@ rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id)
             reg_fetch_append(regs, resp);
 
             end = resp->end;
-            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                        RLITE_MB(resp));
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
             rl_free(resp, RL_MT_MSG);
         }
     }
@@ -499,7 +491,7 @@ rl_conf_regs_purge(struct list_head *regs)
     struct rl_reg *rl_reg, *tmp;
 
     /* Purge the regs list. */
-    list_for_each_entry_safe(rl_reg, tmp, regs, node) {
+    list_for_each_entry_safe (rl_reg, tmp, regs, node) {
         list_del(&rl_reg->node);
         rl_free(rl_reg->appl_name, RL_MT_UTILS);
         rl_free(rl_reg, RL_MT_CONF);
@@ -512,9 +504,9 @@ rl_conf_regs_print(struct list_head *regs)
     struct rl_reg *rl_reg;
 
     PI_S("Locally registered applications:\n");
-    list_for_each_entry(rl_reg, regs, node) {
-        PI_S("  ipcp %u, name %s%s\n", rl_reg->ipcp_id,
-                rl_reg->appl_name, rl_reg->pending ? " (incomplete)" : "");
+    list_for_each_entry (rl_reg, regs, node) {
+        PI_S("  ipcp %u, name %s%s\n", rl_reg->ipcp_id, rl_reg->appl_name,
+             rl_reg->pending ? " (incomplete)" : "");
     }
 
     return 0;
@@ -536,7 +528,7 @@ rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec)
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_QOS_SUPPORTED;
     msg.event_id = 1;
-    msg.ipcp_id = ipcp_id;
+    msg.ipcp_id  = ipcp_id;
     memcpy(&msg.flowspec, spec, sizeof(*spec));
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 1);

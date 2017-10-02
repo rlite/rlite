@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_CTRL_H__
@@ -39,16 +39,15 @@ int rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet);
 
 struct rl_msg_base *rl_read_next_msg(int rfd, int quiet);
 
-int rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-                   uint32_t event_id, const char *dif_name,
-                   const char *local_appl,
+int rl_fa_req_fill(struct rl_kmsg_fa_req *req, uint32_t event_id,
+                   const char *dif_name, const char *local_appl,
                    const char *remote_appl,
                    const struct rina_flow_spec *flowspec,
                    rl_ipcp_id_t upper_ipcp_id);
 
 void rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
-                    rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-                    rl_port_t port_id, uint8_t response);
+                     rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
+                     rl_port_t port_id, uint8_t response);
 
 /* For userspace IPCPs, not to be used by applications. */
 int rl_open_appl_port(rl_port_t port_id);
@@ -61,4 +60,4 @@ void rl_flow_cfg_default(struct rl_flow_config *cfg);
 }
 #endif
 
-#endif  /* __RLITE_CTRL_H__ */
+#endif /* __RLITE_CTRL_H__ */

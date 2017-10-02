@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <stdio.h>
@@ -37,7 +37,6 @@
 #include "../helpers.h"
 #include "uipcp-container.h"
 
-
 int
 uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
                   const char *local_name, int reg)
@@ -46,11 +45,10 @@ uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
     int ret;
 
     if (reg) {
-        pfd.fd = rina_register(uipcp->cfd, dif_name,
-                               local_name, RINA_F_NOWAIT);
+        pfd.fd = rina_register(uipcp->cfd, dif_name, local_name, RINA_F_NOWAIT);
     } else {
-        pfd.fd = rina_unregister(uipcp->cfd, dif_name,
-                                 local_name, RINA_F_NOWAIT);
+        pfd.fd =
+            rina_unregister(uipcp->cfd, dif_name, local_name, RINA_F_NOWAIT);
     }
 
     if (pfd.fd < 0) {
@@ -59,7 +57,7 @@ uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
     }
 
     pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 2000);
+    ret        = poll(&pfd, 1, 2000);
     if (ret <= 0) {
         if (ret == 0) {
             UPE(uipcp, "poll() timed out\n");
@@ -83,11 +81,11 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 
     /* Create a request message. */
     memset(&resp, 0, sizeof(resp));
-    resp.msg_type = RLITE_KER_APPL_REGISTER_RESP;
-    resp.event_id = req->event_id;  /* This is just 0 for now. */
-    resp.ipcp_id = ipcp_id;
-    resp.reg = 1;
-    resp.response = response;
+    resp.msg_type  = RLITE_KER_APPL_REGISTER_RESP;
+    resp.event_id  = req->event_id; /* This is just 0 for now. */
+    resp.ipcp_id   = ipcp_id;
+    resp.reg       = 1;
+    resp.response  = response;
     resp.appl_name = rl_strdup(req->appl_name, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
@@ -101,19 +99,18 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 }
 
 static int
-uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rlm_addr_t dst_addr, rl_port_t local_port,
-                rl_msg_t msg_type)
+uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
+                rl_port_t local_port, rl_msg_t msg_type)
 {
     struct rl_kmsg_ipcp_pduft_mod req;
     int ret;
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = msg_type;
-    req.event_id = 1;
-    req.ipcp_id = ipcp_id;
-    req.dst_addr = dst_addr;
+    req.msg_type   = msg_type;
+    req.event_id   = 1;
+    req.ipcp_id    = ipcp_id;
+    req.dst_addr   = dst_addr;
     req.local_port = local_port;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
@@ -126,16 +123,16 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 }
 
 int
-uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rlm_addr_t dst_addr, rl_port_t local_port)
+uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
+                rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_SET);
 }
 
 int
-uipcp_pduft_del(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                rlm_addr_t dst_addr, rl_port_t local_port)
+uipcp_pduft_del(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
+                rl_port_t local_port)
 {
     return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_DEL);
@@ -151,7 +148,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
     req.event_id = 1;
-    req.ipcp_id = ipcp_id;
+    req.ipcp_id  = ipcp_id;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -169,10 +166,10 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 {
     memset(spec, 0, sizeof(*spec));
 
-    spec->max_sdu_gap = cfg->max_sdu_gap;
+    spec->max_sdu_gap       = cfg->max_sdu_gap;
     spec->in_order_delivery = cfg->in_order_delivery;
-    spec->msg_boundaries = cfg->msg_boundaries;
-    spec->avg_bandwidth = cfg->dtcp.bandwidth;
+    spec->msg_boundaries    = cfg->msg_boundaries;
+    spec->avg_bandwidth     = cfg->dtcp.bandwidth;
 
     if (cfg->dtcp.flow_control) {
         rina_flow_spec_fc_set(spec, 1);
@@ -182,8 +179,7 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
 int
 uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                            rl_port_t remote_port, uint32_t remote_cep,
-                           rlm_addr_t remote_addr,
-                           const char *local_appl,
+                           rlm_addr_t remote_addr, const char *local_appl,
                            const char *remote_appl,
                            const struct rl_flow_config *flowcfg)
 {
@@ -192,12 +188,12 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
-    req.event_id = 1;
-    req.kevent_id = kevent_id;
-    req.ipcp_id = uipcp->id;
+    req.msg_type    = RLITE_KER_UIPCP_FA_REQ_ARRIVED;
+    req.event_id    = 1;
+    req.kevent_id   = kevent_id;
+    req.ipcp_id     = uipcp->id;
     req.remote_port = remote_port;
-    req.remote_cep = remote_cep;
+    req.remote_cep  = remote_cep;
     req.remote_addr = remote_addr;
     if (flowcfg) {
         memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
@@ -205,7 +201,7 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
         memset(&req.flowcfg, 0, sizeof(*flowcfg));
     }
     flowcfg2flowspec(&req.flowspec, &req.flowcfg);
-    req.local_appl = rl_strdup(local_appl, RL_MT_UTILS);
+    req.local_appl  = rl_strdup(local_appl, RL_MT_UTILS);
     req.remote_appl = rl_strdup(remote_appl, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
@@ -220,22 +216,22 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 int
 uipcp_issue_fa_resp_arrived(struct uipcp *uipcp, rl_port_t local_port,
                             rl_port_t remote_port, uint32_t remote_cep,
-                            rlm_addr_t remote_addr,
-                            uint8_t response, const struct rl_flow_config *flowcfg)
+                            rlm_addr_t remote_addr, uint8_t response,
+                            const struct rl_flow_config *flowcfg)
 {
     struct rl_kmsg_uipcp_fa_resp_arrived req;
     int ret;
 
     /* Create a request message. */
     memset(&req, 0, sizeof(req));
-    req.msg_type = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
-    req.event_id = 1;
-    req.ipcp_id = uipcp->id;
-    req.local_port = local_port;
+    req.msg_type    = RLITE_KER_UIPCP_FA_RESP_ARRIVED;
+    req.event_id    = 1;
+    req.ipcp_id     = uipcp->id;
+    req.local_port  = local_port;
     req.remote_port = remote_port;
-    req.remote_cep = remote_cep;
+    req.remote_cep  = remote_cep;
     req.remote_addr = remote_addr;
-    req.response = response;
+    req.response    = response;
     if (flowcfg) {
         memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
     } else {
@@ -262,9 +258,9 @@ uipcp_issue_flow_dealloc(struct uipcp *uipcp, rl_port_t local_port,
     memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_FLOW_DEALLOC;
     req.event_id = 1;
-    req.ipcp_id = uipcp->id;
-    req.port_id = local_port;
-    req.uid = uid;
+    req.ipcp_id  = uipcp->id;
+    req.port_id  = local_port;
+    req.uid      = uid;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -290,8 +286,8 @@ uipcp_issue_flow_cfg_update(struct uipcp *uipcp, rl_port_t port_id,
     memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_FLOW_CFG_UPDATE;
     req.event_id = 1;
-    req.ipcp_id = uipcp->id;
-    req.port_id = port_id;
+    req.ipcp_id  = uipcp->id;
+    req.port_id  = port_id;
     memcpy(&req.flowcfg, flowcfg, sizeof(*flowcfg));
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
@@ -313,7 +309,7 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_IPCP_UIPCP_SET;
     req.event_id = 1;
-    req.ipcp_id = ipcp_id;
+    req.ipcp_id  = ipcp_id;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
@@ -324,10 +320,10 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     return ret;
 }
 
-#define MAX(a,b) ((a)>(b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define RL_SIGNAL_STOP      1
-#define RL_SIGNAL_REPOLL    2
+#define RL_SIGNAL_STOP 1
+#define RL_SIGNAL_REPOLL 2
 
 #define ONEBILLION 1000000000ULL
 #define ONEMILLION 1000000ULL
@@ -378,7 +374,7 @@ uipcp_loop(void *opaque)
     struct uipcp *uipcp = opaque;
 
     for (;;) {
-        int maxfd = MAX(uipcp->cfd, uipcp->eventfd);
+        int maxfd                   = MAX(uipcp->cfd, uipcp->eventfd);
         uipcp_msg_handler_t handler = NULL;
         struct uipcp_loop_fdh *fdh;
         struct timeval *top = NULL;
@@ -393,7 +389,7 @@ uipcp_loop(void *opaque)
 
         pthread_mutex_lock(&uipcp->lock);
 
-        list_for_each_entry(fdh, &uipcp->fdhs, node) {
+        list_for_each_entry (fdh, &uipcp->fdhs, node) {
             FD_SET(fdh->fd, &rdfs);
             maxfd = MAX(maxfd, fdh->fd);
         }
@@ -411,25 +407,25 @@ uipcp_loop(void *opaque)
 
             if (uipcp->timer_events_cnt) {
                 te = list_first_entry(&uipcp->timer_events,
-                                       struct uipcp_loop_tmr, node);
+                                      struct uipcp_loop_tmr, node);
 
                 clock_gettime(CLOCK_MONOTONIC, &now);
                 if (time_cmp(&now, &te->exp) > 0) {
-                    to.tv_sec = 0;
+                    to.tv_sec  = 0;
                     to.tv_usec = 0;
                 } else {
                     unsigned long delta_ns;
 
                     delta_ns = (te->exp.tv_sec - now.tv_sec) * ONEBILLION +
-                        (te->exp.tv_nsec - now.tv_nsec);
+                               (te->exp.tv_nsec - now.tv_nsec);
 
-                    to.tv_sec = delta_ns / ONEBILLION;
+                    to.tv_sec  = delta_ns / ONEBILLION;
                     to.tv_usec = (delta_ns % ONEBILLION) / 1000;
                 }
 
                 top = &to;
-                NPD("Next timeout due in %lu secs and %lu usecs\n",
-                    top->tv_sec, top->tv_usec);
+                NPD("Next timeout due in %lu secs and %lu usecs\n", top->tv_sec,
+                    top->tv_usec);
             }
         }
         pthread_mutex_unlock(&uipcp->lock);
@@ -439,7 +435,6 @@ uipcp_loop(void *opaque)
             /* Error. */
             perror("select()");
             break;
-
         }
 
         if (FD_ISSET(uipcp->eventfd, &rdfs)) {
@@ -498,7 +493,7 @@ uipcp_loop(void *opaque)
 
             /* Collect fdh entries that are ready. */
             pthread_mutex_lock(&uipcp->lock);
-            list_for_each_entry(fdh, &uipcp->fdhs, node) {
+            list_for_each_entry (fdh, &uipcp->fdhs, node) {
                 if (FD_ISSET(fdh->fd, &rdfs)) {
                     list_add_tail(&fdh->tmpnode, &ready);
                 }
@@ -507,7 +502,7 @@ uipcp_loop(void *opaque)
 
             /* Process ready events out of the lock. Callbacks are allowed to
              * add/remove fdh entries. */
-            list_for_each_entry_safe(fdh, tmp, &ready, tmpnode) {
+            list_for_each_entry_safe (fdh, tmp, &ready, tmpnode) {
                 list_del_init(&fdh->tmpnode);
                 fdh->cb(uipcp, fdh->fd, fdh->opaque);
             }
@@ -572,7 +567,7 @@ uipcp_loop_signal(struct uipcp *uipcp, unsigned int code)
     return eventfd_signal(uipcp->eventfd, code);
 }
 
-#define TIMER_EVENTS_MAX    64
+#define TIMER_EVENTS_MAX 64
 
 int
 uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
@@ -595,19 +590,18 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     pthread_mutex_lock(&uipcp->lock);
 
     if (uipcp->timer_events_cnt >= TIMER_EVENTS_MAX) {
-        PE("Max number of timers reached [%u]\n",
-           uipcp->timer_events_cnt);
+        PE("Max number of timers reached [%u]\n", uipcp->timer_events_cnt);
     }
 
-    e->id = uipcp->timer_next_id;
-    e->cb = cb;
+    e->id  = uipcp->timer_next_id;
+    e->cb  = cb;
     e->arg = arg;
     clock_gettime(CLOCK_MONOTONIC, &e->exp);
     e->exp.tv_nsec += delta_ms * ONEMILLION;
     e->exp.tv_sec += e->exp.tv_nsec / ONEBILLION;
     e->exp.tv_nsec = e->exp.tv_nsec % ONEBILLION;
 
-    list_for_each_entry(cur, &uipcp->timer_events, node) {
+    list_for_each_entry (cur, &uipcp->timer_events, node) {
         if (time_cmp(&e->exp, &cur->exp) < 0) {
             break;
         }
@@ -641,7 +635,7 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
 
     pthread_mutex_lock(&uipcp->lock);
 
-    list_for_each_entry(cur, &uipcp->timer_events, node) {
+    list_for_each_entry (cur, &uipcp->timer_events, node) {
         if (cur->id == id) {
             e = cur;
             break;
@@ -678,10 +672,9 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
         return -1;
     }
 
-
     memset(fdh, 0, sizeof(*fdh));
-    fdh->fd = fd;
-    fdh->cb = cb;
+    fdh->fd     = fd;
+    fdh->cb     = cb;
     fdh->opaque = opaque;
 
     pthread_mutex_lock(&uipcp->lock);
@@ -699,7 +692,7 @@ uipcp_loop_fdh_del(struct uipcp *uipcp, int fd)
     struct uipcp_loop_fdh *fdh;
 
     pthread_mutex_lock(&uipcp->lock);
-    list_for_each_entry(fdh, &uipcp->fdhs, node) {
+    list_for_each_entry (fdh, &uipcp->fdhs, node) {
         if (fdh->fd == fd) {
             list_del(&fdh->node);
             pthread_mutex_unlock(&uipcp->lock);
@@ -749,9 +742,9 @@ uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
     }
 
     pthread_mutex_lock(&uipcps->lock);
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         if (rina_sername_valid(uipcp->name) &&
-                        strcmp(uipcp->name, ipcp_name) == 0) {
+            strcmp(uipcp->name, ipcp_name) == 0) {
             kernelspace = uipcp_is_kernelspace(uipcp);
             if (!uipcp_is_kernelspace(uipcp)) {
                 uipcp->refcnt++;
@@ -777,7 +770,7 @@ uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {
     struct uipcp *uipcp;
 
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         if (uipcp->id == ipcp_id) {
             return uipcp;
         }
@@ -795,10 +788,10 @@ uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
     int ret = -1;
 
     pthread_mutex_lock(&uipcps->lock);
-    list_for_each_entry(cur, &uipcps->uipcps, node) {
+    list_for_each_entry (cur, &uipcps->uipcps, node) {
         if (strcmp(cur->dif_name, dif_name) == 0) {
             *ipcp_id = cur->id;
-            ret = 0;
+            ret      = 0;
             break;
         }
     }
@@ -826,19 +819,22 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     }
     memset(uipcp, 0, sizeof(*uipcp));
 
-    uipcp->id = upd->ipcp_id;
-    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->hdroom = upd->hdroom;
-    uipcp->tailroom = upd->tailroom;
+    uipcp->id           = upd->ipcp_id;
+    uipcp->dif_type     = upd->dif_type;
+    upd->dif_type       = NULL;
+    uipcp->hdroom       = upd->hdroom;
+    uipcp->tailroom     = upd->tailroom;
     uipcp->max_sdu_size = upd->max_sdu_size;
-    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
-    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
+    uipcp->name         = upd->ipcp_name;
+    upd->ipcp_name      = NULL;
+    uipcp->dif_name     = upd->dif_name;
+    upd->dif_name       = NULL;
 
     pthread_mutex_init(&uipcp->lock, NULL);
     list_init(&uipcp->fdhs);
     list_init(&uipcp->timer_events);
     uipcp->timer_events_cnt = 0;
-    uipcp->timer_next_id = 1;
+    uipcp->timer_next_id    = 1;
 
     pthread_mutex_lock(&uipcps->lock);
     if (uipcp_lookup(uipcps, upd->ipcp_id) != NULL) {
@@ -850,11 +846,11 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         goto out1;
     }
     list_add_tail(&uipcp->node, &uipcps->uipcps);
-    uipcps->n_uipcps ++;
+    uipcps->n_uipcps++;
     pthread_mutex_unlock(&uipcps->lock);
 
     uipcp->uipcps = uipcps;
-    uipcp->priv = NULL;
+    uipcp->priv   = NULL;
     uipcp->refcnt = 1; /* Cogito, ergo sum. */
 
     if (!ops) {
@@ -919,7 +915,7 @@ err3:
 err2:
     pthread_mutex_lock(&uipcps->lock);
     list_del(&uipcp->node);
-    uipcps->n_uipcps --;
+    uipcps->n_uipcps--;
 out1:
     pthread_mutex_unlock(&uipcps->lock);
     rl_free(uipcp, RL_MT_UIPCP);
@@ -931,7 +927,7 @@ int
 uipcp_del(struct uipcp *uipcp)
 {
     int kernelspace = 0;
-    int ret = 0;
+    int ret         = 0;
 
     kernelspace = uipcp_is_kernelspace(uipcp);
 
@@ -948,7 +944,7 @@ uipcp_del(struct uipcp *uipcp)
             /* Clean up the timer_events list. */
             struct uipcp_loop_tmr *e, *tmp;
 
-            list_for_each_entry_safe(e, tmp, &uipcp->timer_events, node) {
+            list_for_each_entry_safe (e, tmp, &uipcp->timer_events, node) {
                 list_del(&e->node);
                 rl_free(e, RL_MT_EVLOOP);
             }
@@ -958,7 +954,7 @@ uipcp_del(struct uipcp *uipcp)
             /* Clean up the fdhs list. */
             struct uipcp_loop_fdh *fdh, *tmp;
 
-            list_for_each_entry_safe(fdh, tmp, &uipcp->fdhs, node) {
+            list_for_each_entry_safe (fdh, tmp, &uipcp->fdhs, node) {
                 list_del(&fdh->node);
                 rl_free(fdh, RL_MT_EVLOOP);
             }
@@ -970,9 +966,12 @@ uipcp_del(struct uipcp *uipcp)
         close(uipcp->cfd);
     }
 
-    if (uipcp->dif_type) rl_free(uipcp->dif_type, RL_MT_UTILS /* moved */);
-    if (uipcp->name) rl_free(uipcp->name, RL_MT_UTILS /* moved */);
-    if (uipcp->dif_name) rl_free(uipcp->dif_name, RL_MT_UTILS /* moved */);
+    if (uipcp->dif_type)
+        rl_free(uipcp->dif_type, RL_MT_UTILS /* moved */);
+    if (uipcp->name)
+        rl_free(uipcp->name, RL_MT_UTILS /* moved */);
+    if (uipcp->dif_name)
+        rl_free(uipcp->dif_name, RL_MT_UTILS /* moved */);
 
     if (ret == 0) {
         if (!kernelspace) {
@@ -1003,7 +1002,7 @@ uipcp_put(struct uipcp *uipcp)
 
     if (destroy) {
         list_del(&uipcp->node);
-        uipcp->uipcps->n_uipcps --;
+        uipcp->uipcps->n_uipcps--;
     }
 
     pthread_mutex_unlock(&uipcp->uipcps->lock);
@@ -1027,7 +1026,7 @@ uipcp_put_by_id(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
         PE("Could not find uipcp %u\n", ipcp_id);
         return 0;
     }
-    uipcp->refcnt ++;
+    uipcp->refcnt++;
     pthread_mutex_unlock(&uipcps->lock);
 
     /* Double put to remove it. */
@@ -1045,18 +1044,16 @@ uipcps_print(struct uipcps *uipcps)
     pthread_mutex_lock(&uipcps->lock);
     PD_S("IPC Processes table:\n");
 
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-                " hdroom = %u, troom = %u, mss = %u\n",
-                uipcp->id, uipcp->name, uipcp->dif_type,
-                uipcp->dif_name, uipcp->hdroom, uipcp->tailroom,
-                uipcp->max_sdu_size);
+             " hdroom = %u, troom = %u, mss = %u\n",
+             uipcp->id, uipcp->name, uipcp->dif_type, uipcp->dif_name,
+             uipcp->hdroom, uipcp->tailroom, uipcp->max_sdu_size);
     }
     pthread_mutex_unlock(&uipcps->lock);
 
     return 0;
 }
-
 
 /*
  * Routines for DIF topological ordering, used for two reasons:
@@ -1070,12 +1067,13 @@ uipcps_print(struct uipcps *uipcps)
  */
 
 /* Compute the size of PCI data transfer PDU. */
-static int ipcp_hdrlen(struct uipcp *uipcp)
+static int
+ipcp_hdrlen(struct uipcp *uipcp)
 {
     struct pci_sizes *sz = &uipcp->pcisizes;
 
-    return 2 * sz->addr + 2 * sz->cepid + sz->qosid +
-           1 + 1 + sz->pdulen + sz->seq;
+    return 2 * sz->addr + 2 * sz->cepid + sz->qosid + 1 + 1 + sz->pdulen +
+           sz->seq;
 }
 
 static void
@@ -1085,13 +1083,13 @@ topo_visit(struct uipcps *uipcps)
     struct flow_edge *e;
 
     pthread_mutex_lock(&uipcps->lock);
-    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
         /* Start from safe values. */
-        ipn->marked = 0;
-        ipn->update_kern = 0;
-        ipn->hdroom = 0;
+        ipn->marked       = 0;
+        ipn->update_kern  = 0;
+        ipn->hdroom       = 0;
         ipn->max_sdu_size = 65536;
 
         if (!uipcp) {
@@ -1104,7 +1102,7 @@ topo_visit(struct uipcps *uipcps)
              * lowers. We need to start from the kernel-provided
              * MSS and hdroom. */
             ipn->max_sdu_size = uipcp->max_sdu_size;
-            ipn->hdroom = uipcp->hdroom;
+            ipn->hdroom       = uipcp->hdroom;
         } else {
             /* There are some lowers, so we start from the maximum
              * value, which will be overridden during the minimization
@@ -1120,7 +1118,7 @@ topo_visit(struct uipcps *uipcps)
 
         /* Scan all the nodes that have not been marked (visited) yet,
          * looking for a node that has no unmarked "lowers".  */
-        list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
             int no_prevs = 1;
 
             if (ipn->marked) {
@@ -1130,7 +1128,7 @@ topo_visit(struct uipcps *uipcps)
             prevs = &ipn->lowers;
             nexts = &ipn->uppers;
 
-            list_for_each_entry(e, prevs, node) {
+            list_for_each_entry (e, prevs, node) {
                 if (!e->ipcp->marked) {
                     no_prevs = 0;
                     break;
@@ -1151,7 +1149,7 @@ topo_visit(struct uipcps *uipcps)
          * maximize hdroom and minimize max_sdu_size. */
         ipn->marked = 1;
 
-        list_for_each_entry(e, nexts, node) {
+        list_for_each_entry (e, nexts, node) {
             if (e->ipcp->hdroom < ipn->hdroom + e->ipcp->hdrsize) {
                 e->ipcp->hdroom = ipn->hdroom + e->ipcp->hdrsize;
             }
@@ -1173,9 +1171,9 @@ topo_update_kern(struct uipcps *uipcps)
     char strbuf[10];
     int ret;
 
-    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
         if (!ipn->update_kern) {
-            continue;  /* nothing to do */
+            continue; /* nothing to do */
         }
 
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->hdroom);
@@ -1212,16 +1210,15 @@ topo_compute(struct uipcps *uipcps)
 
     topo_visit(uipcps);
 
-    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
-        PV_S("NODE %u, mss = %u\n", ipn->id,
-             ipn->max_sdu_size);
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+        PV_S("NODE %u, mss = %u\n", ipn->id, ipn->max_sdu_size);
         PV_S("    uppers = [");
-        list_for_each_entry(e, &ipn->uppers, node) {
+        list_for_each_entry (e, &ipn->uppers, node) {
             PV_S("%u, ", e->ipcp->id);
         }
         PV_S("]\n");
         PV_S("    lowers = [");
-        list_for_each_entry(e, &ipn->lowers, node) {
+        list_for_each_entry (e, &ipn->lowers, node) {
             PV_S("%u, ", e->ipcp->id);
         }
         PV_S("]\n");
@@ -1237,7 +1234,7 @@ topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 {
     struct ipcp_node *ipn;
 
-    list_for_each_entry(ipn, &uipcps->ipcp_nodes, node) {
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
         if (ipn->id == ipcp_id) {
             return ipn;
         }
@@ -1254,7 +1251,7 @@ topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
     }
     memset(ipn, 0, sizeof(*ipn));
 
-    ipn->id = ipcp_id;
+    ipn->id     = ipcp_id;
     ipn->refcnt = 0;
     list_init(&ipn->lowers);
     list_init(&ipn->uppers);
@@ -1283,7 +1280,7 @@ topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
 {
     struct flow_edge *e;
 
-    list_for_each_entry(e, edges, node) {
+    list_for_each_entry (e, edges, node) {
         if (e->ipcp == neigh) {
             goto ok;
         }
@@ -1296,7 +1293,7 @@ topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
     }
     memset(e, 0, sizeof(*e));
 
-    e->ipcp = neigh;
+    e->ipcp   = neigh;
     e->refcnt = 0;
     list_add_tail(&e->node, edges);
 ok:
@@ -1312,7 +1309,7 @@ topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
 {
     struct flow_edge *e;
 
-    list_for_each_entry(e, edges, node) {
+    list_for_each_entry (e, edges, node) {
         if (e->ipcp == neigh) {
             e->refcnt--;
             if (e->refcnt == 0) {
@@ -1344,7 +1341,7 @@ topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
     }
 
     if (topo_edge_add(upper, lower, &upper->lowers) ||
-            topo_edge_add(lower, upper, &lower->uppers)) {
+        topo_edge_add(lower, upper, &lower->uppers)) {
         topo_edge_del(upper, lower, &upper->lowers);
 
         return -1;
@@ -1403,20 +1400,26 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         return 0;
     }
 
-    uipcp->refcnt ++;
+    uipcp->refcnt++;
 
-    if (uipcp->dif_type) rl_free(uipcp->dif_type, RL_MT_UTILS);
-    if (uipcp->name) rl_free(uipcp->name, RL_MT_UTILS);
-    if (uipcp->dif_name) rl_free(uipcp->dif_name, RL_MT_UTILS);
+    if (uipcp->dif_type)
+        rl_free(uipcp->dif_type, RL_MT_UTILS);
+    if (uipcp->name)
+        rl_free(uipcp->name, RL_MT_UTILS);
+    if (uipcp->dif_name)
+        rl_free(uipcp->dif_name, RL_MT_UTILS);
 
-    uipcp->id = upd->ipcp_id;
-    uipcp->dif_type = upd->dif_type; upd->dif_type = NULL;
-    uipcp->hdroom = upd->hdroom;
-    mss_changed = (uipcp->max_sdu_size != upd->max_sdu_size);
+    uipcp->id           = upd->ipcp_id;
+    uipcp->dif_type     = upd->dif_type;
+    upd->dif_type       = NULL;
+    uipcp->hdroom       = upd->hdroom;
+    mss_changed         = (uipcp->max_sdu_size != upd->max_sdu_size);
     uipcp->max_sdu_size = upd->max_sdu_size;
-    uipcp->name = upd->ipcp_name; upd->ipcp_name = NULL;
-    uipcp->dif_name = upd->dif_name; upd->dif_name = NULL;
-    uipcp->pcisizes = upd->pcisizes;
+    uipcp->name         = upd->ipcp_name;
+    upd->ipcp_name      = NULL;
+    uipcp->dif_name     = upd->dif_name;
+    upd->dif_name       = NULL;
+    uipcp->pcisizes     = upd->pcisizes;
 
     pthread_mutex_unlock(&uipcps->lock);
 

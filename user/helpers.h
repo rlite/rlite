@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_HELPERS_H__
@@ -31,7 +31,6 @@
 
 #include "rlite/utils.h"
 #include "rlite/uipcps-msg.h"
-
 
 static inline int
 rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
@@ -46,8 +45,7 @@ rl_msg_write_fd(int sfd, struct rl_msg_base *msg)
         return -1;
     }
 
-    serialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-                       serbuf, msg);
+    serialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX, serbuf, msg);
 
     n = write(sfd, serbuf, serlen);
     if (n != serlen) {
@@ -69,9 +67,8 @@ static inline int
 type_has_uipcp(const char *dif_type)
 {
     return type_is_normal_ipcp(dif_type) ||
-            strcmp(dif_type, "shim-tcp4") == 0 ||
-            strcmp(dif_type, "shim-udp4") == 0;
+           strcmp(dif_type, "shim-tcp4") == 0 ||
+           strcmp(dif_type, "shim-udp4") == 0;
 }
 
-
-#endif  /* __RLITE_HELPERS_H__ */
+#endif /* __RLITE_HELPERS_H__ */

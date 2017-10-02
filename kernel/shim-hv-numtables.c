@@ -18,26 +18,28 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include "rlite/utils.h"
 #include "shim-hv-msg.h"
 
-
 struct rl_msg_layout rl_shim_hv_numtables[] = {
-    [RLITE_SHIM_HV_FA_REQ] = {
-        .copylen = sizeof(struct rl_hmsg_fa_req) -
-                   2 * sizeof(char *),
-        .strings = 2,
-    },
-    [RLITE_SHIM_HV_FA_RESP] = {
-        .copylen = sizeof(struct rl_hmsg_fa_resp),
-        .names = 0,
-    },
-    [RLITE_SHIM_HV_MSG_MAX] = {
-        .copylen = 0,
-        .names = 0,
-        .strings = 0,
-    },
+    [RLITE_SHIM_HV_FA_REQ] =
+        {
+            .copylen = sizeof(struct rl_hmsg_fa_req) - 2 * sizeof(char *),
+            .strings = 2,
+        },
+    [RLITE_SHIM_HV_FA_RESP] =
+        {
+            .copylen = sizeof(struct rl_hmsg_fa_resp),
+            .names   = 0,
+        },
+    [RLITE_SHIM_HV_MSG_MAX] =
+        {
+            .copylen = 0,
+            .names   = 0,
+            .strings = 0,
+        },
 };

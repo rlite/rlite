@@ -18,9 +18,8 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
-
 
 #include <ctime>
 #include <iterator>
@@ -30,14 +29,14 @@
 
 using namespace std;
 
-
-static uint64_t time64()
+static uint64_t
+time64()
 {
     struct timespec tv;
 
     if (clock_gettime(CLOCK_MONOTONIC, &tv)) {
         perror("clock_gettime() failed");
-        tv.tv_sec = 0;
+        tv.tv_sec  = 0;
         tv.tv_nsec = 0;
     }
 
@@ -45,7 +44,7 @@ static uint64_t time64()
 }
 
 int
-dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
+dft_default::lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
                           const rlm_addr_t preferred, uint32_t cookie) const
 {
     /* Fetch all entries that hold 'appl_name'. */
@@ -65,7 +64,7 @@ dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
         if (preferred) {
             /* Only accept the preferred address. */
 
-            for (; mit != range.second; mit ++) {
+            for (; mit != range.second; mit++) {
                 if (mit->second.address == preferred) {
                     break;
                 }
@@ -75,8 +74,8 @@ dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
              * the cookie value. */
             cookie %= d;
             while (cookie > 0 && mit != range.second) {
-                mit ++;
-                cookie --;
+                mit++;
+                cookie--;
             }
         }
 
@@ -97,15 +96,15 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
     DFTSlice dft_slice;
     DFTEntry dft_entry;
 
-    dft_entry.address = rib->myaddr;
+    dft_entry.address   = rib->myaddr;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
-    dft_entry.local = true;
+    dft_entry.local     = true;
 
     /* Get all the entries for 'appl_name', and see if there
      * is an entry associated to this uipcp. */
     auto range = dft_table.equal_range(appl_name);
-    for (mit = range.first; mit != range.second; mit ++) {
+    for (mit = range.first; mit != range.second; mit++) {
         if (mit->second.address == rib->myaddr) {
             break;
         }
@@ -114,9 +113,8 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
     if (req->reg) {
         if (mit != range.second) { /* local collision */
             UPE(uipcp, "Application %s already registered on this uipcp\n",
-                        appl_name.c_str());
-            return uipcp_appl_register_resp(uipcp, uipcp->id,
-                                            RLITE_ERR, req);
+                appl_name.c_str());
+            return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_ERR, req);
         }
 
         /* Insert the object into the RIB. */
@@ -134,17 +132,15 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 
     dft_slice.entries.push_back(dft_entry);
 
-    UPD(uipcp, "Application %s %sregistered %s uipcp %d\n",
-            appl_name.c_str(), req->reg ? "" : "un", req->reg ? "to" : "from",
-            uipcp->id);
+    UPD(uipcp, "Application %s %sregistered %s uipcp %d\n", appl_name.c_str(),
+        req->reg ? "" : "un", req->reg ? "to" : "from", uipcp->id);
 
     rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
                              &dft_slice);
 
     if (req->reg) {
         /* Registration requires a response, while unregistrations doesn't. */
-        return uipcp_appl_register_resp(uipcp, uipcp->id,
-                                        RLITE_SUCC, req);
+        return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_SUCC, req);
     }
 
     return 0;
@@ -177,12 +173,12 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     DFTSlice dft_slice(objbuf, objlen);
     DFTSlice prop_dft_add, prop_dft_del;
 
-    for (const DFTEntry& e : dft_slice.entries) {
+    for (const DFTEntry &e : dft_slice.entries) {
         string key = static_cast<string>(e.appl_name);
         auto range = dft_table.equal_range(key);
-        multimap< string, DFTEntry >::iterator mit;
+        multimap<string, DFTEntry>::iterator mit;
 
-        for (mit = range.first; mit != range.second; mit ++) {
+        for (mit = range.first; mit != range.second; mit++) {
             if (mit->second.address == e.address) {
                 break;
             }
@@ -200,7 +196,7 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                 dft_table.insert(make_pair(key, e));
                 prop_dft_add.entries.push_back(e);
                 UPD(uipcp, "DFT entry %s --> %lu %s remotely\n", key.c_str(),
-                            e.address, (collision ? "updated" : "added"));
+                    e.address, (collision ? "updated" : "added"));
             }
 
         } else {
@@ -212,7 +208,6 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                 UPD(uipcp, "DFT entry %s --> %lu removed remotely\n",
                     key.c_str(), e.address);
             }
-
         }
     }
 
@@ -221,13 +216,11 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (prop_dft_add.entries.size()) {
         rib->neighs_sync_obj_excluding(nf->neigh, true, obj_class::dft,
                                        obj_name::dft, &prop_dft_add);
-
     }
 
     if (prop_dft_del.entries.size()) {
         rib->neighs_sync_obj_excluding(nf->neigh, false, obj_class::dft,
                                        obj_name::dft, &prop_dft_del);
-
     }
 
     return 0;
@@ -241,10 +234,10 @@ dft_default::update_address(rlm_addr_t new_addr)
 
     /* Update all the DFT entries corresponding to application that are
      * registered within us. */
-    for (auto& kve : dft_table) {
+    for (auto &kve : dft_table) {
         if (kve.second.local && kve.second.address == rib->myaddr) {
             del_dft.entries.push_back(kve.second);
-            kve.second.address = new_addr;
+            kve.second.address   = new_addr;
             kve.second.timestamp = time64();
             prop_dft.entries.push_back(kve.second);
             UPD(rib->uipcp, "Updated address for DFT entry %s\n",
@@ -254,11 +247,13 @@ dft_default::update_address(rlm_addr_t new_addr)
 
     /* Disseminate the update. */
     if (prop_dft.entries.size()) {
-        rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft, &prop_dft);
+        rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
+                                 &prop_dft);
     }
 
     if (del_dft.entries.size()) {
-        rib->neighs_sync_obj_all(false, obj_class::dft, obj_name::dft, &del_dft);
+        rib->neighs_sync_obj_all(false, obj_class::dft, obj_name::dft,
+                                 &del_dft);
     }
 }
 
@@ -266,12 +261,12 @@ void
 dft_default::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
-    for (const auto& kve : dft_table) {
-        const DFTEntry& entry = kve.second;
+    for (const auto &kve : dft_table) {
+        const DFTEntry &entry = kve.second;
 
         ss << "    Application: " << static_cast<string>(entry.appl_name)
-            << ", Address: " << entry.address << ", Timestamp: "
-                << entry.timestamp << endl;
+           << ", Address: " << entry.address
+           << ", Timestamp: " << entry.timestamp << endl;
     }
 
     ss << endl;
@@ -287,11 +282,11 @@ dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 
         while (dft_slice.entries.size() < limit && eit != dft_table.end()) {
             dft_slice.entries.push_back(eit->second);
-            eit ++;
+            eit++;
         }
 
-        ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::dft, obj_name::dft,
-                &dft_slice);
+        ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::dft,
+                                         obj_name::dft, &dft_slice);
     }
 
     return ret;
@@ -311,12 +306,12 @@ dft_default::neighs_refresh(size_t limit)
             if (eit->second.local) {
                 dft_slice.entries.push_back(eit->second);
             }
-            eit ++;
+            eit++;
         }
 
         if (dft_slice.entries.size()) {
-            ret |= rib->neighs_sync_obj_all(true, obj_class::dft,
-                                            obj_name::dft, &dft_slice);
+            ret |= rib->neighs_sync_obj_all(true, obj_class::dft, obj_name::dft,
+                                            &dft_slice);
         }
     }
 

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_CONF_H__
@@ -27,29 +27,28 @@
 #include "ctrl.h"
 #include "list.h"
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct rl_flow {
     /* Flow attributes. */
-    rl_ipcp_id_t            ipcp_id;
-    rl_port_t               local_port;
-    rl_port_t               remote_port;
-    rlm_addr_t              local_addr;
-    rlm_addr_t              remote_addr;
-    struct rina_flow_spec   spec;
+    rl_ipcp_id_t ipcp_id;
+    rl_port_t local_port;
+    rl_port_t remote_port;
+    rlm_addr_t local_addr;
+    rlm_addr_t remote_addr;
+    struct rina_flow_spec spec;
 
-    struct list_head        node;
+    struct list_head node;
 };
 
 struct rl_reg {
-    rl_ipcp_id_t        ipcp_id;
-    int                 pending;
-    char *              appl_name;
+    rl_ipcp_id_t ipcp_id;
+    int pending;
+    char *appl_name;
 
-    struct list_head    node;
+    struct list_head node;
 };
 
 long int rl_conf_ipcp_create(const char *name, const char *dif_type,
@@ -76,7 +75,8 @@ int rl_conf_regs_fetch(struct list_head *regs, rl_ipcp_id_t ipcp_id);
 
 void rl_conf_regs_purge(struct list_head *regs);
 
-int rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id, struct rina_flow_spec *spec);
+int rl_conf_ipcp_qos_supported(rl_ipcp_id_t ipcp_id,
+                               struct rina_flow_spec *spec);
 
 int rl_conf_flow_get_dtp(rl_port_t port_id, struct rl_flow_dtp *dtp);
 
@@ -90,4 +90,4 @@ int rl_conf_memtrack_dump(void);
 }
 #endif
 
-#endif  /* __RLITE_CONF_H__ */
+#endif /* __RLITE_CONF_H__ */

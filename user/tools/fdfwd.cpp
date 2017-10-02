@@ -8,22 +8,23 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <iostream>
@@ -59,7 +60,6 @@ worker_function(void *opaque)
 
     return NULL;
 }
-
 
 FwdWorker::FwdWorker(int idx_, int verb) : idx(idx_), nfds(0), verbose(verb)
 {
@@ -131,14 +131,14 @@ FwdWorker::submit(int cfd, int rfd)
 
     /* Append two entries in the fds array. Mapping is implicit
      * between two consecutive entries. */
-    fds[nfds ++] = Fd(rfd);
-    fds[nfds ++] = Fd(cfd);
+    fds[nfds++] = Fd(rfd);
+    fds[nfds++] = Fd(cfd);
     repoll();
     pthread_mutex_unlock(&lock);
 
     if (verbose >= 1) {
-        printf("New mapping created %d <--> %d [entries=%d,%d]\n",
-                cfd, rfd, nfds - 2, nfds - 1);
+        printf("New mapping created %d <--> %d [entries=%d,%d]\n", cfd, rfd,
+               nfds - 2, nfds - 1);
     }
 }
 
@@ -163,9 +163,9 @@ FwdWorker::terminate(unsigned int i, int ret, int errcode)
             how = "with errors";
         }
 
-        cout << "w" << idx << ": Session " << fds[i].fd << " <--> "
-                << fds[j].fd << " closed " << how << " [entries=" << i
-                << "," << j << "]" <<endl;
+        cout << "w" << idx << ": Session " << fds[i].fd << " <--> " << fds[j].fd
+             << " closed " << how << " [entries=" << i << "," << j << "]"
+             << endl;
     }
 
     /* fds entries are recovered at the beginning of the run() main loop */
@@ -184,19 +184,19 @@ FwdWorker::run()
     for (;;) {
         int nrdy;
 
-        pfds[-1].fd = syncfd;
+        pfds[-1].fd     = syncfd;
         pfds[-1].events = POLLIN;
 
         /* Load the poll array with the active fd mappings, also recycling
          * the entries of closed sessions. */
         pthread_mutex_lock(&lock);
-        for (int i = 0; i < nfds; ) {
+        for (int i = 0; i < nfds;) {
             int j = i + 1; /* index of the mapped entry */
 
             if (fds[i].close) {
                 nfds -= 2;
                 if (i < nfds) {
-                    fds[i] = fds[nfds-1];
+                    fds[i] = fds[nfds - 1];
                     fds[j] = fds[nfds];
                     if (verbose >= 1) {
                         printf("Recycled entries %d,%d\n", i, j);
@@ -205,8 +205,8 @@ FwdWorker::run()
                 continue;
             }
 
-            pfds[i].fd = fds[i].fd;
-            pfds[j].fd = fds[j].fd;
+            pfds[i].fd     = fds[i].fd;
+            pfds[j].fd     = fds[j].fd;
             pfds[i].events = pfds[j].events = 0;
 
             /* If there is pending data in the output buffer for entry i,
@@ -248,7 +248,8 @@ FwdWorker::run()
             nrdy--;
             if (pfds[-1].revents & POLLIN) {
                 if (verbose >= 2) {
-                    printf("w%d: Mappings changed, rebuilding poll array\n", idx);
+                    printf("w%d: Mappings changed, rebuilding poll array\n",
+                           idx);
                 }
                 pthread_mutex_lock(&lock);
                 drain_syncfd();
@@ -256,7 +257,7 @@ FwdWorker::run()
 
             } else {
                 printf("w%d: Error event %d on syncfd\n", idx,
-                   pfds[-1].revents);
+                       pfds[-1].revents);
             }
 
             continue;
@@ -264,7 +265,7 @@ FwdWorker::run()
 
         pthread_mutex_lock(&lock);
 
-        for (int i = 0, n = 0; n < nrdy && i < nfds; i ++) {
+        for (int i = 0, n = 0; n < nrdy && i < nfds; i++) {
             int j;
 
             if (!pfds[i].revents || fds[i].close) {
@@ -275,8 +276,8 @@ FwdWorker::run()
             }
 
             if (verbose >= 2) {
-                printf("w%d: fd %d ready, events %d\n", idx,
-                        pfds[i].fd, pfds[i].revents);
+                printf("w%d: fd %d ready, events %d\n", idx, pfds[i].fd,
+                       pfds[i].revents);
             }
 
             /* Consume the events on this fd. */
@@ -312,8 +313,8 @@ FwdWorker::run()
                     fds[i].ofs += m;
                     fds[i].len -= m;
                     if (verbose >= 2) {
-                        printf("Forwarded %d bytes %d --> %d\n", m,
-                               fds[j].fd, fds[i].fd);
+                        printf("Forwarded %d bytes %d --> %d\n", m, fds[j].fd,
+                               fds[i].fd);
                     }
                 }
             }
@@ -326,4 +327,3 @@ FwdWorker::run()
         printf("w%d stops\n", idx);
     }
 }
-

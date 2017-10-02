@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_U_MSG_H__
@@ -29,22 +29,21 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 
-
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RLITE_U_IPCP_REGISTER = 1,          /* 1 */
-    RLITE_U_IPCP_ENROLL,                /* 2 */
-    RLITE_U_BASE_RESP,                  /* 3 */
-    RLITE_U_IPCP_RIB_SHOW_REQ,          /* 4 */
-    RLITE_U_IPCP_RIB_SHOW_RESP,         /* 5 */
-    RLITE_U_IPCP_LOWER_FLOW_ALLOC,      /* 6 */
-    RLITE_U_MEMTRACK_DUMP,              /* 7 */
-    RLITE_U_IPCP_POLICY_MOD,            /* 8 */
-    RLITE_U_IPCP_ENROLLER_ENABLE,       /* 9 */
-    RLITE_U_IPCP_ROUTING_SHOW_REQ,      /* 10 */
-    RLITE_U_IPCP_ROUTING_SHOW_RESP,     /* 11 */
-    RLITE_U_IPCP_POLICY_PARAM_MOD,      /* 12 */
+    RLITE_U_IPCP_REGISTER = 1,      /* 1 */
+    RLITE_U_IPCP_ENROLL,            /* 2 */
+    RLITE_U_BASE_RESP,              /* 3 */
+    RLITE_U_IPCP_RIB_SHOW_REQ,      /* 4 */
+    RLITE_U_IPCP_RIB_SHOW_RESP,     /* 5 */
+    RLITE_U_IPCP_LOWER_FLOW_ALLOC,  /* 6 */
+    RLITE_U_MEMTRACK_DUMP,          /* 7 */
+    RLITE_U_IPCP_POLICY_MOD,        /* 8 */
+    RLITE_U_IPCP_ENROLLER_ENABLE,   /* 9 */
+    RLITE_U_IPCP_ROUTING_SHOW_REQ,  /* 10 */
+    RLITE_U_IPCP_ROUTING_SHOW_RESP, /* 11 */
+    RLITE_U_IPCP_POLICY_PARAM_MOD,  /* 12 */
 
     RLITE_U_MSG_MAX,
 };
@@ -129,9 +128,9 @@ struct rl_cmsg_ipcp_enroller_enable {
 } __attribute__((packed));
 
 /* rlite-ctl --> uipcps message to ask for routing table dump */
-#define rl_cmsg_ipcp_routing_show_req   rl_cmsg_ipcp_rib_show_req
+#define rl_cmsg_ipcp_routing_show_req rl_cmsg_ipcp_rib_show_req
 
 /* rlite-ctl <-- uipcps message to report a routing table dump */
-#define rl_cmsg_ipcp_routing_show_resp  rl_cmsg_ipcp_rib_show_resp
+#define rl_cmsg_ipcp_routing_show_resp rl_cmsg_ipcp_rib_show_resp
 
-#endif  /* __RLITE_U_MSG_H__ */
+#endif /* __RLITE_U_MSG_H__ */
