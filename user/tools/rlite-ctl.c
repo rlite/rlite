@@ -792,7 +792,7 @@ ipcps_load()
      * enabled. */
     fd = rina_open();
     if (fd < 0) {
-        perror("rina_open");
+        perror("rina_open()");
         return fd;
     }
     ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
