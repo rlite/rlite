@@ -34,11 +34,11 @@ dtp_init(struct dtp *dtp)
     spin_lock_init(&dtp->lock);
     init_timer(&dtp->snd_inact_tmr);
     init_timer(&dtp->rcv_inact_tmr);
-    INIT_LIST_HEAD(&dtp->cwq);
+    rb_list_init(&dtp->cwq);
     dtp->cwq_len = dtp->max_cwq_len = 0;
-    INIT_LIST_HEAD(&dtp->seqq);
+    rb_list_init(&dtp->seqq);
     dtp->seqq_len = 0;
-    INIT_LIST_HEAD(&dtp->rtxq);
+    rb_list_init(&dtp->rtxq);
     dtp->rtxq_len = dtp->max_rtxq_len = 0;
     init_timer(&dtp->rtx_tmr);
     init_timer(&dtp->a_tmr);
@@ -59,20 +59,20 @@ dtp_fini(struct dtp *dtp)
 
     PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n",
        dtp->cwq_len, dtp->seqq_len, dtp->rtxq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->cwq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
     }
     dtp->cwq_len = 0;
 
-    list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->seqq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
     }
     dtp->seqq_len = 0;
 
-    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->rtxq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
     }
     dtp->rtxq_len = 0;

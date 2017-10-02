@@ -539,7 +539,7 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req,
         init_waitqueue_head(&entry->uipcp_wqh);
         mutex_init(&entry->lock);
         hash_add(rl_dm.ipcp_table, &entry->node, entry->id);
-        INIT_LIST_HEAD(&entry->rmtq);
+        rb_list_init(&entry->rmtq);
         entry->rmtq_size = 0;
         spin_lock_init(&entry->rmtq_lock);
         tasklet_init(&entry->tx_completion, tx_completion_func,
@@ -1049,7 +1049,7 @@ __flow_put(struct flow_entry *entry, bool lock)
                     !(entry->flags & RL_FLOW_NEVER_BOUND)) {
         entry->flags |= RL_FLOW_DEL_POSTPONED;
         spin_lock_bh(&dtp->lock);
-        if (dtp->cwq_len > 0 || !list_empty(&dtp->rtxq)) {
+        if (dtp->cwq_len > 0 || !rb_list_empty(&dtp->rtxq)) {
             PD("Flow removal postponed, cwq contains "
                     "%u PDUs and rtxq contains %u PDUs\n",
                     dtp->cwq_len, dtp->rtxq_len);
@@ -1111,8 +1111,8 @@ flow_del(struct flow_entry *entry)
     }
     dtp_fini(dtp);
 
-    list_for_each_entry_safe(rb, tmp, &entry->txrx.rx_q, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &entry->txrx.rx_q) {
+        rb_list_del(rb);
         rl_buf_free(rb);
     }
     entry->txrx.rx_qsize = 0;
@@ -1442,8 +1442,8 @@ __ipcp_put(struct ipcp_entry *entry)
 
     tasklet_kill(&entry->tx_completion);
 
-    list_for_each_entry_safe(rb, tmp, &entry->rmtq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &entry->rmtq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
     }
 

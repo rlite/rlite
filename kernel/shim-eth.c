@@ -59,7 +59,7 @@ struct arpt_entry {
     struct flow_entry *flow;
 
     /* Used on flow allocator slave side while the flow is in pending state. */
-    struct list_head rx_tmpq;
+    struct rb_list rx_tmpq;
     unsigned int rx_tmpq_len;
     bool fa_req_arrived;
 
@@ -431,7 +431,7 @@ rl_shim_eth_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
     entry->complete = false;  /* Not meaningful. */
     entry->fa_req_arrived = false;
-    INIT_LIST_HEAD(&entry->rx_tmpq);
+    rb_list_init(&entry->rx_tmpq);
     entry->rx_tmpq_len = 0;
     arpt_flow_bind(entry, flow);
     rl_flow_stats_init(&entry->stats);
@@ -501,8 +501,8 @@ rl_shim_eth_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
          * is better to avoid it. */
         PD("Popping %u PDUs from rx_tmpq\n",
                 entry->rx_tmpq_len);
-        list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
-            list_del_init(&rb->node);
+        rb_list_foreach_safe(rb, tmp, &entry->rx_tmpq) {
+            rb_list_del(rb);
             rl_sdu_rx_flow(ipcp, flow, rb, true);
         }
         entry->rx_tmpq_len = 0;
@@ -583,7 +583,7 @@ shim_eth_arp_rx(struct rl_shim_eth *priv, struct arphdr *arp, int len)
                 entry->spa = NULL;  /* Won't be needed. */
                 entry->complete = true;
                 entry->fa_req_arrived = false;
-                INIT_LIST_HEAD(&entry->rx_tmpq);
+                rb_list_init(&entry->rx_tmpq);
                 entry->rx_tmpq_len = 0;
                 entry->flow = NULL;
                 memcpy(entry->tha, sha, sizeof(entry->tha));
@@ -756,7 +756,7 @@ enq:
             goto drop;
         }
         RPD(2, "Push PDU into rx_tmpq\n");
-        list_add_tail_safe(&rb->node, &entry->rx_tmpq);
+        rb_list_enq(rb, &entry->rx_tmpq);
         entry->rx_tmpq_len++;
     }
 
@@ -1026,8 +1026,8 @@ rl_shim_eth_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
             flow->priv = NULL;
             entry->flow = NULL;
             entry->fa_req_arrived = false;
-            list_for_each_entry_safe(rb, tmp, &entry->rx_tmpq, node) {
-                list_del_init(&rb->node);
+            rb_list_foreach_safe(rb, tmp, &entry->rx_tmpq) {
+                rb_list_del(rb);
                 rl_buf_free(rb);
             }
             entry->rx_tmpq_len = 0;

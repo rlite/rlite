@@ -77,8 +77,8 @@ tx_completion_func(unsigned long arg)
             break;
         }
 
-        rb = list_first_entry(&ipcp->rmtq, struct rl_buf, node);
-        list_del_init(&rb->node);
+        rb = rb_list_front(&ipcp->rmtq);
+        rb_list_del(rb);
         ipcp->rmtq_size -= rl_buf_truesize(rb);
         spin_unlock_bh(&ipcp->rmtq_lock);
 
@@ -90,7 +90,7 @@ tx_completion_func(unsigned long arg)
 #if 0
             PD("Pushing back to rmtq\n");
             spin_lock_bh(&ipcp->rmtq_lock);
-            list_add_tail_safe(&rb->node, &ipcp->rmtq);
+            rb_list_enq(rb, &ipcp->rmtq);
             ipcp->rmtq_size += rl_buf_truesize(rb);
             spin_unlock_bh(&ipcp->rmtq_lock);
             break;
@@ -133,7 +133,7 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
                 "overrun\n", (long unsigned)rb->len);
         rl_buf_free(rb);
     } else {
-        list_add_tail_safe(&rb->node, &txrx->rx_q);
+        rb_list_enq(rb, &txrx->rx_q);
         txrx->rx_qsize += rl_buf_truesize(rb);
     }
     spin_unlock_bh(&txrx->rx_lock);
@@ -426,7 +426,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
         current->state = TASK_INTERRUPTIBLE;
 
         spin_lock_bh(&txrx->rx_lock);
-        if (list_empty(&txrx->rx_q)) {
+        if (rb_list_empty(&txrx->rx_q)) {
             if (unlikely(txrx->flags & RL_TXRX_EOF)) {
                 /* Report the EOF condition to userspace reader. */
                 ret = 0;
@@ -450,7 +450,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             continue;
         }
 
-        rb = list_first_entry(&txrx->rx_q, struct rl_buf, node);
+        rb = rb_list_front(&txrx->rx_q);
 
 	if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
@@ -465,7 +465,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 
         } else {
             /* Complete SDU read, consume the rb. */
-            list_del_init(&rb->node);
+            rb_list_del(rb);
             txrx->rx_qsize -= rl_buf_truesize(rb);
             spin_unlock_bh(&txrx->rx_lock);
 
@@ -508,7 +508,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     poll_wait(f, &txrx->rx_wqh, wait);
 
     spin_lock_bh(&txrx->rx_lock);
-    if (!list_empty(&txrx->rx_q) || (txrx->flags & RL_TXRX_EOF)) {
+    if (!rb_list_empty(&txrx->rx_q) || (txrx->flags & RL_TXRX_EOF)) {
         /* Userspace can read when the flow rxq is not empty
          * or when the flow has been deallocated, so that
          * we can report EOF. */
@@ -644,8 +644,8 @@ rl_io_release_internal(struct rl_io *rio)
         /* Drain rx queue. */
         struct rl_buf *rb, *tmp;
 
-        list_for_each_entry_safe(rb, tmp, &rio->txrx->rx_q, node) {
-            list_del_init(&rb->node);
+        rb_list_foreach_safe(rb, tmp, &rio->txrx->rx_q) {
+            rb_list_del(rb);
             rl_buf_free(rb);
         }
         rio->txrx->rx_qsize = 0;

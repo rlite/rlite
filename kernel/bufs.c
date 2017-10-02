@@ -59,7 +59,7 @@ rl_buf_alloc(size_t size, size_t hdroom, size_t tailroom, gfp_t gfp)
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + hdroom);
     rb->len = 0;
-    INIT_LIST_HEAD(&rb->node);
+    rb_list_init(&rb->node);
 
 #else  /* RL_SKB */
     rb = alloc_skb(hdroom + size + tailroom, gfp);
@@ -97,7 +97,7 @@ rl_buf_clone(struct rl_buf *rb, gfp_t gfp)
     memcpy(crb, rb, sizeof(*rb));
 
     /* Reset some fields. */
-    INIT_LIST_HEAD(&crb->node);
+    rb_list_init(&crb->node);
 #else  /* RL_SKB */
 
     crb = skb_clone(rb);
