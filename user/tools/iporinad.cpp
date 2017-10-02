@@ -47,6 +47,7 @@ struct Remote {
     /* Flow for control connection. */
     int rfd;
 
+    Remote() : tun_fd(-1) { }
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
                         dif_name(d), tun_subnet(i), tun_fd(-1), rfd(-1) { }
 };
@@ -297,6 +298,25 @@ dump_conf(void)
 }
 
 static int
+remote_tun_alloc(Remote &r)
+{
+    char tun_name[IFNAMSIZ];
+
+    tun_name[0] = '\0';
+    r.tun_fd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
+    if (r.tun_fd < 0) {
+        cerr << "Failed to create tunnel" << endl;
+        return -1;
+    }
+    r.tun_name = tun_name;
+    if (g->verbose) {
+        cout << "Created tunnel device " << r.tun_name << endl;
+    }
+
+    return 0;
+}
+
+static int
 setup(void)
 {
     g->rfd = rina_open();
@@ -323,17 +343,8 @@ setup(void)
     /* Create a TUN device for each remote. */
     for (list<Remote>::iterator l = g->remotes.begin();
                             l != g->remotes.end(); l ++) {
-        char tun_name[IFNAMSIZ];
-
-        tun_name[0] = '\0';
-        l->tun_fd = tun_alloc(tun_name, IFF_TUN | IFF_NO_PI);
-        if (l->tun_fd < 0) {
-            cerr << "Failed to create tunnel" << endl;
+        if (remote_tun_alloc(*l)) {
             return -1;
-        }
-        l->tun_name = tun_name;
-        if (g->verbose) {
-            cout << "Created tunnel device " << l->tun_name << endl;
         }
     }
 
@@ -460,6 +471,8 @@ int main(int argc, char **argv)
 
     /* Wait for incoming control connections. */
     for (;;) {
+        Remote r;
+        char *srcname;
         int cfd;
         int ret;
 
@@ -475,7 +488,7 @@ int main(int argc, char **argv)
 		continue;
 	}
 
-        cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
+        cfd = rina_flow_accept(g->rfd, &srcname, NULL, 0);
         if (cfd < 0) {
             if (errno == ENOSPC) {
                 continue;
@@ -484,8 +497,16 @@ int main(int argc, char **argv)
             return -1;
         }
 
+        r.app_name = string(srcname); free(srcname);
+        r.dif_name = string();
+        r.rfd = cfd;
+        if (remote_tun_alloc(r)) {
+            close(r.rfd);
+            continue;
+        }
+        g->remotes.push_back(r);
+
         cout << "Flow accepted!" << endl;
-        close(cfd);
     }
 
     pthread_exit(NULL);
