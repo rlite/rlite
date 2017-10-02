@@ -932,10 +932,10 @@ for vmname in sorted(vms):
                 outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
                                                     % {'dif': dif, 'nws': nack_wait_secs}
             if args.reliable_flows:
-                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable_flows true\n'\
+                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-flows true\n'\
                         % {'dif': dif}
             if args.reliable_n_flows:
-                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable_n_flows true\n'\
+                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-n-flows true\n'\
                         % {'dif': dif}
             outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'\
                         % {'dif': dif, 'keepalive': args.keepalive}

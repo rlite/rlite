@@ -776,8 +776,8 @@ of a normal IPCP process:
 | --------------------| ------------------|------------------|-----------------|
 | address-allocator   | distributed       | nack-wait-secs   | Time to wait for a NACK before deciding that the address is good |
 | enrollment          | *                 | keepalive        | Neighbor keepalive timeout in seconds (0 to disable)             |
-| resource-allocator  | *                 | reliable_flows   | Use reliable N-flows if reliable N-1-flows are not available (boolean) |
-| resource-allocator  | *                 | reliable_n_flows | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean) |
+| resource-allocator  | *                 | reliable-flows   | Use reliable N-flows if reliable N-1-flows are not available (boolean) |
+| resource-allocator  | *                 | reliable-n-flows | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean) |
 
 This is an example of how to change the nack-wait-secs parameter of the
 distributed address allocation policy of a normal IPCP process
@@ -786,7 +786,7 @@ distributed address allocation policy of a normal IPCP process
 
 This is an example how to enable reliable flows in the resource allocator
 
-    # rlite-ctl dif-policy-param-mod n.DIF resource-allocator reliable_flows true
+    # rlite-ctl dif-policy-param-mod n.DIF resource-allocator reliable-flows true
 
 ## 7. Tools
 This section documents useful programs that are part of the *rlite*
