@@ -22,6 +22,7 @@
 	64. shim-loopback IPC Process
 	65. Normal IPC Process
 		651. IPCP flavours to support different data transfer constants
+		652. Available policies and parameters
 7. Tools
     71. rina-gw
     72. iporinad
@@ -144,8 +145,6 @@ A separate module for each type of IPCP:
 * **rlite-shim-tcp4**, implementing the kernel-space part of the shim IPCP
                        over TCP and IPv4. This follows an older specification
                        and it is deprecated in favour of the UDP shim IPCP.
-* **rlite-shim-hv**, implementing the shim IPCP over VMPI, to be used with
-                     Virtual Machines.
 * **rlite-shim-loopback**, implementing a loopback shim IPCP.
 
 
@@ -209,6 +208,8 @@ Available commands:
 * flows-dump: Show the detailed DTP/DTCP state of a given flow
 * regs-show: Show all the names registered to any of the local IPCPs
 * dif-policy-mod: Modify a policy for a DIF running in the system
+* dif-policy-param-mod: Modify a policy parameter for a DIF running in the
+  system
 
 To show all the available command and the corresponding usage, use
 
@@ -692,7 +693,7 @@ where a normal IPCP called normal1:xyz is given the address 7382 to be used
 in its DIF.
 
 
-### 6.5.1. IPCP flavours to support different data transfer constants
+#### 6.5.1. IPCP flavours to support different data transfer constants
 
 The data transfer constants of the normal IPCP (e.g. size of EFCP sequence
 numbers, addresses, CEP-ids, ...) are hardcoded in the **normal.ko** kernel
@@ -722,6 +723,36 @@ it is just the same code (normal.c) recompiled with different values
 of some macros.
 You are free to add/modify flavours depending on your needs, and use
 the different flavours together.
+
+#### 6.5.2. Available policies and parameters
+The following table reports policies that are available for the internal
+components of a normal IPCP process:
+
+| Component           | Policy name      | Description                       |
+| ------------------- | -----------------|-----------------------------------|
+| address-allocator   | manual           | Manual address allocation         |
+| address-allocator   | distributed      | Automated address allocation      |
+| routing             | link-state       | Link state routing algorithm      |
+| routing             | link-state-lfa   | Link state enhanced with Loop Free Alternate |
+
+This is an example of how to change the routing policy of the IPCP in a local
+DIF
+
+    # rlite-ctl dif-policy-mod n.DIF routing link-state-lfa
+
+The following table reports parameters that can be changed for the components
+of a normal IPCP process:
+
+| Component           | Policy            | Parameter       | Description     |
+| --------------------| ------------------|-----------------|-----------------|
+| address-allocator   | distributed       | nack-wait-secs  | Time to wait for a NACK before deciding that the address is good |
+
+This is an example of how to change the nack-wait-secs parameter of the
+distributed address allocation policy of a normal IPCP process
+
+    # rlite-ctl dif-policy-param-mod n.DIF address-allocator nack-wait-secs 4
+
+
 
 
 ## 7. Tools
