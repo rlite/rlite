@@ -12,15 +12,15 @@ rina_string_from_components(const std::string& apn, const std::string& api,
     std::string acc;
 
     if (aei.size()) {
-        acc = std::string(":") + aei + acc;
+        acc = std::string("|") + aei + acc;
     }
 
     if (aen.size()) {
-        acc = std::string(":") + aen + acc;
+        acc = std::string("|") + aen + acc;
     }
 
     if (api.size()) {
-        acc = std::string(":") + api + acc;
+        acc = std::string("|") + api + acc;
     }
 
     return apn + acc;

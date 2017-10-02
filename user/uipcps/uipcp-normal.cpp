@@ -489,14 +489,10 @@ uipcp_rib::dump() const
                                                         string(), string());
         map<string, Neighbor*>::const_iterator neigh;
 
-        if (!neighbors_cand.count(neigh_name)) {
-            /* Don't show NeighborCandidate objects corresponding to neighbors
-             * which don't have DIFs in common with us. */
-            continue;
-        }
-
-        ss << "    Name: " << cand.apn << ":" << cand.api
-            << ", Address: " << cand.address << ", Lower DIFs: {";
+        ss << "    Name: "
+                << rina_string_from_components(cand.apn, cand.api,
+                                               cand.aen, cand.aei)
+                << ", Address: " << cand.address << ", Lower DIFs: {";
 
         {
             bool first = true;
@@ -527,6 +523,8 @@ uipcp_rib::dump() const
             } else {
                 ss << "[Enrollment ongoing <" << nf->enroll_state << ">]";
             }
+        } else if (!neighbors_cand.count(neigh_name)) {
+            ss << "[Not a neighbor]";
         } else {
             ss << "[Disconnected]";
         }
