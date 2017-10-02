@@ -236,6 +236,8 @@ argparser.add_argument('--broadcast-enrollment', action='store_true',
                               "is specified for the ipcp-enroll command, so "\
                               "that N-1 flow allocation is issued using the "\
                               "N-DIF name as destination application")
+argparser.add_argument('--parallelize', action='store_true',
+                       help = "[EXPERIMENTAL] Parallelize enrollment")
 args = argparser.parse_args()
 
 
@@ -873,6 +875,8 @@ for vmname in sorted(vms):
     outs += 'EOF\n'\
             '$SUDO cp .initscript /etc/rina/initscript\n'\
             'rm .initscript\n'
+    if args.parallelize:
+        outs += 'nohup rlite-node-config -v --no-reset &> rlite-node-config.log &\n'
 
     # Run rlite-rand clients
     if args.simulate:
@@ -900,45 +904,45 @@ outs += 'wait $SUBSHELLS\n\n'
 if len(dns_mappings) > 0:
     print("DNS mappings: %s" % (dns_mappings))
 
+if not args.parallelize:
+    # Run the enrollment operations in an order which respect the dependencies
+    for dif in dif_ordering:
+        enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+        for enrollment in enrollments_list:
+            vm = vms[enrollment['enrollee']]
 
-# Run the enrollment operations in an order which respect the dependencies
-for dif in dif_ordering:
-    enrollments_list = enrollments[dif] + lowerflowallocs[dif]
-    for enrollment in enrollments_list:
-        vm = vms[enrollment['enrollee']]
+            if enrollment in lowerflowallocs[dif]:
+                oper = 'lower-flow-alloc'
+            else:
+                oper = 'enroll'
 
-        if enrollment in lowerflowallocs[dif]:
-            oper = 'lower-flow-alloc'
-        else:
-            oper = 'enroll'
+            vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
+                         'pvid': vms[enrollment['enroller']]['id'],
+                         'username': args.user,
+                         'vmname': vm['name'],
+                         'dif': dif, 'ldif': enrollment['lower_dif'],
+                         'sshopts': sshopts, 'sudo': sudo,
+                         'oper': oper}
 
-        vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
-                     'pvid': vms[enrollment['enroller']]['id'],
-                     'username': args.user,
-                     'vmname': vm['name'],
-                     'dif': dif, 'ldif': enrollment['lower_dif'],
-                     'sshopts': sshopts, 'sudo': sudo,
-                     'oper': oper}
-
-        outs += 'DONE=255\n'\
-                'while [ $DONE != "0" ]; do\n'\
-                '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
-                'set -x\n'\
-                'SUDO=%(sudo)s\n'\
-                '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
-                        '%(ldif)s.DIF ' % vars_dict
-        if not args.broadcast_enrollment:
-            outs += '%(dif)s.%(pvid)s.IPCP:%(pvid)s\n' % vars_dict
-        else:
-            outs += '\n'
-        outs += 'sleep 1\n'\
-                'true\n'\
-                'ENDSSH\n'\
-                '   DONE=$?\n'\
-                '   if [ $DONE != "0" ]; then\n'\
-                '       sleep 1\n'\
-                '   fi\n'\
-                'done\n\n' % vars_dict
+            outs += 'DONE=255\n'\
+                    'while [ $DONE != "0" ]; do\n'\
+                    '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                    'set -x\n'\
+                    'SUDO=%(sudo)s\n'\
+                    '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
+                            '%(ldif)s.DIF ' % vars_dict
+            if not args.broadcast_enrollment:
+                outs += '%(dif)s.%(pvid)s.IPCP:%(pvid)s\n' % vars_dict
+            else:
+                outs += '\n'
+            outs += 'sleep 1\n'\
+                    'true\n'\
+                    'ENDSSH\n'\
+                    '   DONE=$?\n'\
+                    '   if [ $DONE != "0" ]; then\n'\
+                    '       sleep 1\n'\
+                    '   fi\n'\
+                    'done\n\n' % vars_dict
 
 
 # Apply netem rules. For now this step is done after enrollment in order to
