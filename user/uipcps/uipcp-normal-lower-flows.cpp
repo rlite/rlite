@@ -668,7 +668,7 @@ RoutingEngine::compute_fwd_table()
                            next_hops[dst_node].front().c_str(),
                            port_id, strerror(errno));
                 /* Trigger re insertion next time. */
-                f->second = make_pair(0, 0);
+                f->second = make_pair(NodeId(), 0);
             } else {
                 UPD(uipcp, "Set PDUFT entry %s(%lu) --> %s (port=%u)\n",
                            dst_node.c_str(), (long unsigned)dst_addr,
