@@ -146,7 +146,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
 {
     CDAPMessage *m = NULL;
     Neighbor *neigh;
-    int ret;
+    int ret = 0;
 
     try {
         m = msg_deser_stateless(serbuf, serlen);
@@ -302,12 +302,12 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 void
 normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
-    struct NeighFlow *nf = (struct NeighFlow *)opaque;
+    struct Neighbor *neigh = (struct Neighbor *)opaque;
     char mgmtbuf[MGMTBUF_SIZE_MAX];
-    uipcp_rib *rib = nf->neigh->rib;
+    uipcp_rib *rib = neigh->rib;
     int n;
 
-    n = read(nf->mgmt_flow_fd, mgmtbuf, sizeof(mgmtbuf));
+    n = read(neigh->mgmt_only->flow_fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n",
                 strerror(errno));
@@ -316,7 +316,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     ScopeLock lock_(rib->lock);
 
-    rib_recv_msg(rib, mgmtbuf, n, nf);
+    rib_recv_msg(rib, mgmtbuf, n, neigh->mgmt_only);
 }
 
 
