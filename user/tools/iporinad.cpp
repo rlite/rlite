@@ -501,7 +501,7 @@ parse_conf(const char *path)
 static void
 dump_conf(void)
 {
-    cout << "Local: " << g->local.app_name << "in DIFs";
+    cout << "Local: " << g->local.app_name << " in DIFs";
     for (list<string>::iterator l = g->local.dif_names.begin();
                             l != g->local.dif_names.end(); l ++) {
         cout << " " << *l;
@@ -547,26 +547,34 @@ Remote::tun_alloc()
 }
 
 static int
-execute_command(const char *cargv[])
+execute_command(stringstream& cmdss)
 {
+    vector<string> tokens;
+    string token;
     pid_t child_pid;
     int child_status;
     int ret = -1;
     char **argv;
 
+    if (g->verbose) {
+        cout << "Exec command '" << cmdss.str() << "'" << endl;
+    }
+
+    /* Separate the arguments into a vector. */
+    while (cmdss >> token) {
+        tokens.push_back(token);
+    }
+
     /* Allocate a working copy for the arguments. */
-    argv = (char **)cargv; /* reuse the array */
-    for (int i = 0; ; i++) {
-        if (argv[i] == NULL) {
-            break;
-        }
-        argv[i] = strdup(argv[i]);
+    argv = new char *[tokens.size() + 1];
+    for (unsigned i = 0; i <= tokens.size(); i ++) {
+        argv[i] = NULL;
+    }
+    for (unsigned i = 0; i < tokens.size(); i ++) {
+        argv[i] = strdup(tokens[i].c_str());
         if (!argv[i]) {
             cerr << "Out of memory while allocating arguments" << endl;
-            while (i > 0) {
-                free(argv[--i]);
-            }
-            return -1;
+            goto out;
         }
     }
 
@@ -585,11 +593,12 @@ execute_command(const char *cargv[])
         ret = WEXITSTATUS(child_status);
     }
 
-    for (int i = 0; ; i++) {
-        if (argv[i] == NULL) {
-            break;
+out:
+    for (unsigned i = 0; i < tokens.size(); i++) {
+        if (argv[i]) {
+            free(argv[i]);
+            argv[i] = NULL;
         }
-        free(argv[i]);
     }
 
     return ret;
@@ -598,21 +607,26 @@ execute_command(const char *cargv[])
 int
 Remote::ip_configure() const
 {
-    const char *c0[] = {"ip", "link", "set", "dev", tun_name.c_str(), "up", NULL};
-    const char *c1[] = {"ip", "addr", "flush", "dev", tun_name.c_str(), NULL};
-    const char *c2[] = {"ip", "addr", "add", tun_local_addr.repr.c_str(),
-                        "dev", tun_name.c_str(), NULL};
+    stringstream cmdss;
 
-    if (execute_command(c0)) {
-        cerr << "Failed to bring device " << tun_name << " up" << endl;
-        return -1;
-    }
-    if (execute_command(c1)) {
+    cmdss = stringstream();
+    cmdss << "ip addr flush dev " << tun_name;
+    if (execute_command(cmdss)) {
         cerr << "Failed to flush address for interface " << tun_name << endl;
         return -1;
     }
 
-    if (execute_command(c2)) {
+    cmdss = stringstream();
+    cmdss << "ip link set dev " << tun_name << " up";
+    if (execute_command(cmdss)) {
+        cerr << "Failed to bring device " << tun_name << " up" << endl;
+        return -1;
+    }
+
+    cmdss = stringstream();
+    cmdss << "ip addr add " << tun_local_addr.repr
+                            << " dev " << tun_name;
+    if (execute_command(cmdss)) {
         cerr << "Failed to assign IP address to interface " << tun_name << endl;
         return -1;
     }
