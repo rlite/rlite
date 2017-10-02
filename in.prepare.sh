@@ -9,7 +9,7 @@ sudo insmod kernel/rlite-normal.ko
 sudo insmod kernel/rlite-shim-tcp4.ko
 sudo insmod kernel/rlite-shim-udp4.ko
 
-if [ HAVE_VMPI == "y" ]; then
+if [ WITH_VMPI == "y" ]; then
     # prepare VMPI-KVM
     pushd .
     cd kernel/vmpi
@@ -18,7 +18,7 @@ if [ HAVE_VMPI == "y" ]; then
     popd
 fi
 
-if [ HAVE_VMPI == "y" ]; then
+if [ WITH_VMPI == "y" ]; then
     sudo insmod kernel/rlite-shim-hv.ko
 fi
 

@@ -76,9 +76,9 @@ generate_flavours() {
 }
 
 
-HAVE_VMPI="n"
-HAVE_SHIM_TCP4="y"
-HAVE_SHIM_UDP4="y"
+WITH_VMPI="n"
+WITH_SHIM_TCP4="y"
+WITH_SHIM_UDP4="y"
 WITH_SKBUFFS="n"
 INSTALL_PREFIX="/"
 LIBMODPREFIX=""
@@ -109,19 +109,19 @@ do
         ;;
 
         "--with-shim-udp4")
-        HAVE_SHIM_UDP4="y"
+        WITH_SHIM_UDP4="y"
         ;;
 
         "--without-shim-udp4")
-        HAVE_SHIM_UDP4="n"
+        WITH_SHIM_UDP4="n"
         ;;
 
         "--with-shim-tcp4")
-        HAVE_SHIM_TCP4="y"
+        WITH_SHIM_TCP4="y"
         ;;
 
         "--without-shim-tcp4")
-        HAVE_SHIM_TCP4="n"
+        WITH_SHIM_TCP4="n"
         ;;
 
         "--with-skbuffs")
@@ -133,11 +133,11 @@ do
         ;;
 
         "--with-vmpi")
-        HAVE_VMPI="y"
+        WITH_VMPI="y"
         ;;
 
         "--without-vmpi")
-        HAVE_VMPI="n"
+        WITH_VMPI="n"
         ;;
 
         *)
@@ -185,12 +185,12 @@ cp Makefile.in Makefile
 sed -i "s|@INSTALL_MOD_PATH@|${INSTALL_PREFIX}${LIBMODPREFIX}|g" Makefile
 sed -i "s|@ROOTDIR@|$PWD|g" Makefile
 sed -i "s|@LIBMODPREFIX@|${LIBMODPREFIX}|g" Makefile
-sed -i "s|@HAVE_SHIM_UDP4@|${HAVE_SHIM_UDP4}|g" Makefile
-sed -i "s|@HAVE_SHIM_TCP4@|${HAVE_SHIM_TCP4}|g" Makefile
-sed -i "s|@HAVE_VMPI@|${HAVE_VMPI}|g" Makefile
+sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
+sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
+sed -i "s|@WITH_VMPI@|${WITH_VMPI}|g" Makefile
 
 # Prepare VMPI
-if [ $HAVE_VMPI == "y" ]; then
+if [ $WITH_VMPI == "y" ]; then
     cd kernel/vmpi
     git clean -fdx .
     tar -zxvf vmpi-*.tar.gz
@@ -222,7 +222,7 @@ fi
 
 echo '#endif' >> $KCF
 
-sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.prepare.sh > prepare.sh
-sed "s|HAVE_VMPI|${HAVE_VMPI}|g" in.unprepare.sh > unprepare.sh
+sed "s|WITH_VMPI|${WITH_VMPI}|g" in.prepare.sh > prepare.sh
+sed "s|WITH_VMPI|${WITH_VMPI}|g" in.unprepare.sh > unprepare.sh
 chmod +x prepare.sh
 chmod +x unprepare.sh
