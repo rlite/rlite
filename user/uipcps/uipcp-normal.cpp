@@ -210,7 +210,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
         neigh = nf->neigh;
 
         if (!nf->conn) {
-            nf->conn = rl_new(CDAPConn(nf->flow_fd, 1), RL_MT_SHIMDATA);
+            nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
         }
 
         /* Deserialize the received CDAP message. */

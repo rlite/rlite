@@ -930,7 +930,7 @@ connect_to_remotes(void *opaque)
                             << re->second.dif_name << endl;
                 }
 
-                CDAPConn conn(rfd, 1);
+                CDAPConn conn(rfd);
                 CDAPMessage m, *rm = NULL;
                 Hello hello;
 
@@ -1115,7 +1115,7 @@ int main(int argc, char **argv)
             cout << "Accepted new connection from remote peer" << endl;
         }
 
-        CDAPConn conn(cfd, 1);
+        CDAPConn conn(cfd);
         CDAPMessage *rm;
         CDAPMessage m;
         const char *objbuf;
