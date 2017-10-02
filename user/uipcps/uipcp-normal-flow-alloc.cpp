@@ -415,6 +415,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     string obj_name;
     rlm_addr_t remote_addr;
     CDAPMessage *m;
+    bool send_del;
 
     /* Lookup the corresponding FlowRequest, depending on whether we were
      * the initiator or not. */
@@ -440,12 +441,13 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     /* We were the initiator. */
     assert(!!(f->second.flags & RL_FLOWREQ_INITIATOR) == !!req->initiator);
     remote_addr = req->initiator ? f->second.dst_addr : f->second.src_addr;
+    send_del = (f->second.flags & RL_FLOWREQ_SEND_DEL);
     flow_reqs.erase(f);
 
     UPD(rib->uipcp, "Removed flow request %s [port %u]\n",
                     obj_name_ext.str().c_str(), req->local_port_id);
 
-    if (!(f->second.flags & RL_FLOWREQ_SEND_DEL)) {
+    if (!send_del) {
         return 0;
     }
 
