@@ -123,6 +123,15 @@ struct rl_normal {
     rwlock_t pduft_lock;
 };
 
+/* In general RL_PCI_LEN != sizeof(struct rina_pci) and
+ * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
+ * compiler may need to insert padding. */
+#define RL_PCI_LEN    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
+                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
+                        sizeof(rl_seq_t))
+
+#define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
+
 static void *
 rl_normal_create(struct ipcp_entry *ipcp)
 {
@@ -139,6 +148,10 @@ rl_normal_create(struct ipcp_entry *ipcp)
     ipcp->pcisizes.pdulen   = sizeof(rl_pdulen_t);
     ipcp->pcisizes.cepid    = sizeof(rl_cepid_t);
     ipcp->pcisizes.qosid    = sizeof(rl_qosid_t);
+
+    /* Default hdroom and max sdu size. */
+    ipcp->hdroom = RL_PCI_LEN;
+    ipcp->max_sdu_size = (1 << 16) - 1 - ipcp->hdroom;
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
@@ -1679,15 +1692,6 @@ static struct ipcp_factory normal_factory = {
     .ops.flow_writeable     = rl_normal_flow_writeable,
     .ops.qos_supported      = rl_normal_qos_supported,
 };
-
-/* In general RL_PCI_LEN != sizeof(struct rina_pci) and
- * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
- * compiler may need to insert padding. */
-#define RL_PCI_LEN    (2 * sizeof(rl_addr_t) + 2 * sizeof(rl_cepid_t) + \
-                        sizeof(rl_qosid_t) + 1 + 1 + sizeof(rl_pdulen_t) + \
-                        sizeof(rl_seq_t))
-
-#define RL_PCI_CTRL_LEN (RL_PCI_LEN + 6 * sizeof(rl_seq_t))
 
 static int __init
 rl_normal_init(void)
