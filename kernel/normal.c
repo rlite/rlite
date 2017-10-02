@@ -995,7 +995,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_pci_ctrl *pcic;
 
     if (likely(rb)) {
-        rb->len = sizeof(struct rina_pci_ctrl);
+        rl_buf_append(rb, sizeof(struct rina_pci_ctrl));
         pcic = (struct rina_pci_ctrl *)RL_BUF_DATA(rb);
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;
@@ -1375,7 +1375,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             }
 
             memcpy(RL_BUF_DATA(nrb), RL_BUF_DATA(rb), rb->len);
-            nrb->len = rb->len;
+            rl_buf_append(nrb, rb->len);
             rl_buf_free(rb);
             rb = nrb;
         }

@@ -61,7 +61,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
         PE("Out of memory\n");
         return -ENOMEM;
     }
-    rb->len = serlen;
+    rl_buf_append(rb, serlen);
 
     ret = serialize_rlite_msg(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
                               RL_BUF_DATA(rb), msg);

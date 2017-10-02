@@ -673,7 +673,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
     }
 
     skb_copy_bits(skb, 0, RL_BUF_DATA(rb), skb->len);
-    rb->len = skb->len;
+    rl_buf_append(rb, skb->len);
 
     /* Try to shortcut the packet to the upper IPCP. */
     if ((rb = rl_sdu_rx_shortcut(ipcp, rb)) == NULL) {
