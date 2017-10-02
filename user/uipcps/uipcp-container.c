@@ -1124,6 +1124,7 @@ topo_visit(struct uipcps *uipcps)
     }
 }
 
+/* Update kernelspace hdroom and mss. */
 static int
 topo_update_kern(struct uipcps *uipcps)
 {
