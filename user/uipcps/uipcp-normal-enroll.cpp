@@ -1041,10 +1041,17 @@ neighs_refresh_cb(struct uipcp *uipcp, void *arg)
     ScopeLock(rib->lock);
     size_t limit = 10;
 
-    UPV(rib->uipcp, "Refreshing neighbors\n");
+    UPV(rib->uipcp, "Refreshing neighbors RIB\n");
 
     rib->lfdb->neighs_refresh(limit);
     rib->dft->neighs_refresh(limit);
+    {
+        NeighborCandidateList ncl;
+
+        ncl.candidates.push_back(rib->neighbor_cand_get());
+        rib->neighs_sync_obj_all(true, obj_class::neighbors,
+                                   obj_name::neighbors, &ncl);
+    }
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
 					  RL_NEIGH_REFRESH_INTVAL * 1000,
                                           neighs_refresh_cb, rib);
