@@ -432,8 +432,8 @@ RoutingEngine::compute_next_hops(const NodeId& local_node)
                 continue;
             }
 
-            graph[kvj.second.local_node].push_back(Edge(kvj.second.remote_node,
-                        kvj.second.cost));
+            graph[kvj.second.local_node].emplace_back(kvj.second.remote_node,
+                                                      kvj.second.cost);
             if (!graph.count(kvj.second.remote_node)) {
                 /* Make sure graph contains all the nodes, even if with
                  * empty lists. */

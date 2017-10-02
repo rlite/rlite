@@ -627,6 +627,7 @@ private:
 
         Edge(const NodeId& to_, unsigned int cost_) :
                             to(to_), cost(cost_) { }
+        Edge(Edge&&) = default;
     };
 
     struct Info {

@@ -232,7 +232,7 @@ DFTSlice::DFTSlice(const char *buf, unsigned int size)
     gm.ParseFromArray(buf, size);
 
     for (int i = 0; i < gm.directoryforwardingtableentry_size(); i++) {
-        entries.push_back(DFTEntry());
+        entries.emplace_back();
         gpb2DFTEntry(entries.back(), gm.directoryforwardingtableentry(i));
     }
 }
@@ -328,7 +328,7 @@ NeighborCandidateList::NeighborCandidateList(const char *buf, unsigned int size)
     gm.ParseFromArray(buf, size);
 
     for (int i = 0; i < gm.neighbor_size(); i++) {
-        candidates.push_back(NeighborCandidate());
+        candidates.emplace_back();
         gpb2NeighborCandidate(candidates.back(), gm.neighbor(i));
     }
 }
@@ -411,7 +411,7 @@ LowerFlowList::LowerFlowList(const char *buf, unsigned int size)
     gm.ParseFromArray(buf, size);
 
     for (int i = 0; i < gm.flow_state_objects_size(); i++) {
-        flows.push_back(LowerFlow());
+        flows.emplace_back();
         gpb2LowerFlow(flows.back(), gm.flow_state_objects(i));
     }
 }
@@ -535,7 +535,7 @@ gpb2PolicyDescr(PolicyDescr& p, const gpb::policyDescriptor_t &gm)
     p.version = gm.version();
 
     for (int i = 0; i < gm.policyparameters_size(); i++) {
-        p.parameters.push_back(Property());
+        p.parameters.emplace_back();
         gpb2Property(p.parameters.back(), gm.policyparameters(i));
     }
 }
@@ -1010,7 +1010,7 @@ gpb2FlowRequest(FlowRequest& fr,
     fr.src_addr = gm.sourceaddress();
     fr.dst_addr = gm.destinationaddress();
     for (int i = 0; i < gm.connectionids_size(); i++) {
-        fr.connections.push_back(ConnId());
+        fr.connections.emplace_back();
         gpb2ConnId(fr.connections.back(), gm.connectionids(i));
     }
     fr.cur_conn_idx = gm.currentconnectionidindex();
@@ -1168,7 +1168,7 @@ AddrAllocEntries::AddrAllocEntries(const char *buf, unsigned int size)
     gm.ParseFromArray(buf, size);
 
     for (int i = 0; i < gm.entries_size(); i++) {
-        entries.push_back(AddrAllocRequest());
+        entries.emplace_back();
         gpb2AddrAllocRequest(entries.back(), gm.entries(i));
     }
 }
