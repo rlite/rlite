@@ -572,7 +572,7 @@ connect_to_remotes(void *opaque)
             }
 
             if (g->verbose) {
-                cout << "Connected to remote " << re->second.app_name <<
+                cout << "Flow allocated to remote " << re->second.app_name <<
                         " through DIF " << re->second.dif_name << endl;
             }
 
@@ -594,8 +594,6 @@ connect_to_remotes(void *opaque)
                 goto abor;
             }
             delete rm; rm = NULL;
-
-            cout << "Connected to remote peer" << endl;
 
             /* Exchange routes. */
             m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
@@ -711,7 +709,9 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        cout << "Flow accepted!" << endl;
+        if (g->verbose) {
+            cout << "Accepted new connection from remote" << endl;
+        }
 
         CDAPConn conn(cfd, 1);
         CDAPMessage *rm;
@@ -750,7 +750,8 @@ int main(int argc, char **argv)
         hello = Hello(objbuf, objlen);
         delete rm; rm = NULL;
 
-        cout << "Hello received " << hello.num_routes << " " << hello.tun_subnet << endl;
+        cout << "Hello received: " << hello.num_routes << " routes, tun_subnet "
+                << hello.tun_subnet << endl;
 
         for (unsigned int i = 0; i < hello.num_routes; i ++) {
             RouteObj robj;
