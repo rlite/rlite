@@ -81,12 +81,14 @@ rl_u_response(int sfd, const struct rl_msg_base *req,
 }
 
 static int
-ipcp_register(struct uipcps *uipcps,
-              const struct rl_cmsg_ipcp_register *req)
+rl_u_ipcp_register(struct uipcps *uipcps, int sfd,
+                        const struct rl_msg_base *b_req)
 {
+    struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
+    struct rl_msg_base_resp resp;
     struct uipcp *uipcp;
-    int result = RLITE_ERR;
 
+    resp.result = RLITE_ERR;
     /* Grab the corresponding userspace IPCP. */
     uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (!uipcp) {
@@ -94,41 +96,11 @@ ipcp_register(struct uipcps *uipcps,
     }
 
     if (uipcp->ops.register_to_lower) {
-        result = uipcp->ops.register_to_lower(uipcp, req);
+        resp.result = uipcp->ops.register_to_lower(uipcp, req);
     }
-
     uipcp_put(uipcp);
-
-    return result;
-}
-
-static int
-rl_u_ipcp_register(struct uipcps *uipcps, int sfd,
-                        const struct rl_msg_base *b_req)
-{
-    struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
-    struct rl_msg_base_resp resp;
-
-    resp.result = ipcp_register(uipcps, req);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
-}
-
-static int
-ipcp_enroll(struct uipcps *uipcps, const struct rl_cmsg_ipcp_enroll *req)
-{
-    int ret = RLITE_ERR; /* Report failure by default. */
-    struct uipcp *uipcp;
-
-    /* Find the userspace part of the enrolling IPCP. */
-    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
-    if (uipcp && uipcp->ops.enroll) {
-        ret = uipcp->ops.enroll(uipcp, req, 1);
-    }
-
-    uipcp_put(uipcp);
-
-    return ret;
 }
 
 static int
@@ -137,27 +109,18 @@ rl_u_ipcp_enroll(struct uipcps *uipcps, int sfd,
 {
     struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
     struct rl_msg_base_resp resp;
-
-    resp.result = ipcp_enroll(uipcps, req);
-
-    return rl_u_response(sfd, RLITE_MB(req), &resp);
-}
-
-static int
-ipcp_enroller_enable(struct uipcps *uipcps,
-                     const struct rl_cmsg_ipcp_enroller_enable *req)
-{
-    int ret = RLITE_ERR; /* Report failure by default. */
     struct uipcp *uipcp;
 
+    resp.result = RLITE_ERR;
+    /* Find the userspace part of the enrolling IPCP. */
     uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
-    if (uipcp && uipcp->ops.enroller_enable) {
-        ret = uipcp->ops.enroller_enable(uipcp, req);
+    if (uipcp && uipcp->ops.enroll) {
+        resp.result = uipcp->ops.enroll(uipcp, req, 1);
     }
 
     uipcp_put(uipcp);
 
-    return ret;
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -167,8 +130,15 @@ rl_u_ipcp_enroller_enable(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_enroller_enable *req =
                     (struct rl_cmsg_ipcp_enroller_enable *)b_req;
     struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
 
-    resp.result = ipcp_enroller_enable(uipcps, req);
+    resp.result = RLITE_ERR;
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (uipcp && uipcp->ops.enroller_enable) {
+        resp.result = uipcp->ops.enroller_enable(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
@@ -250,47 +220,15 @@ out:
 }
 
 static int
-ipcp_policy_mod(struct uipcps *uipcps,
-                const struct rl_cmsg_ipcp_policy_mod *req)
-{
-    struct uipcp *uipcp;
-    int result = RLITE_ERR;
-
-    /* Grab the corresponding userspace IPCP. */
-    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
-    if (!uipcp) {
-        return -1;
-    }
-
-    if (uipcp->ops.policy_mod) {
-        result = uipcp->ops.policy_mod(uipcp, req);
-    }
-
-    uipcp_put(uipcp);
-
-    return result;
-}
-
-static int
 rl_u_ipcp_policy_mod(struct uipcps *uipcps, int sfd,
                      const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_policy_mod *req =
                 (struct rl_cmsg_ipcp_policy_mod *)b_req;
     struct rl_msg_base_resp resp;
-
-    resp.result = ipcp_policy_mod(uipcps, req);
-
-    return rl_u_response(sfd, RLITE_MB(req), &resp);
-}
-
-static int
-ipcp_policy_param_mod(struct uipcps *uipcps,
-                      const struct rl_cmsg_ipcp_policy_param_mod *req)
-{
     struct uipcp *uipcp;
-    int result = RLITE_ERR;
 
+    resp.result = RLITE_ERR;
     /* Grab the corresponding userspace IPCP. */
     uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (!uipcp) {
@@ -298,12 +236,12 @@ ipcp_policy_param_mod(struct uipcps *uipcps,
     }
 
     if (uipcp->ops.policy_mod) {
-        result = uipcp->ops.policy_param_mod(uipcp, req);
+        resp.result = uipcp->ops.policy_mod(uipcp, req);
     }
 
     uipcp_put(uipcp);
 
-    return result;
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
 
 static int
@@ -313,8 +251,20 @@ rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
     struct rl_cmsg_ipcp_policy_param_mod *req =
                 (struct rl_cmsg_ipcp_policy_param_mod *)b_req;
     struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
 
-    resp.result = ipcp_policy_param_mod(uipcps, req);
+    resp.result = RLITE_ERR;
+    /* Grab the corresponding userspace IPCP. */
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (!uipcp) {
+        return -1;
+    }
+
+    if (uipcp->ops.policy_mod) {
+        resp.result = uipcp->ops.policy_param_mod(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
