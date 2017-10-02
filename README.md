@@ -1250,7 +1250,7 @@ synchronize. On error -1 is returned, with the errno code properly set.
         uint8_t in_order_delivery; /* boolean */
         uint8_t msg_boundaries; /* boolean */
     };
-    void rina_flow_spec_default(struct rina_flow_spec *spec)
+    void rina_flow_spec_unreliable(struct rina_flow_spec *spec)
         
 This function fills in the provided spec with an implementation-specific default QoS, which
 should correspond to a best-effort QoS. The fields of the rina flow spec data structure specify

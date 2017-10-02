@@ -406,7 +406,7 @@ main(int argc, char **argv)
     rea.p = 1;
 
     /* Start with a default flow configuration (unreliable flow). */
-    rina_flow_spec_default(&rea.flowspec);
+    rina_flow_spec_unreliable(&rea.flowspec);
 
     while ((opt = getopt(argc, argv, "hld:a:z:g:p:")) != -1) {
         switch (opt) {

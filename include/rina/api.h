@@ -195,10 +195,12 @@ int rina_flow_alloc(const char *dif_name, const char *local_appl,
 int rina_flow_alloc_wait(int wfd);
 
 /*
- * Fills in the provided @spec with an implementation-specific default QoS,
- * which typically corresponds to a best-effort QoS.
+ * Fills in the provided @spec with an unrelable best-effort QoS.
  */
-void rina_flow_spec_default(struct rina_flow_spec *spec);
+void rina_flow_spec_unreliable(struct rina_flow_spec *spec);
+
+/* Deprecated function. */
+#define rina_flow_spec_default  rina_flow_spec_unreliable
 
 /*
  * Retrieve the MSS (Maximum Segment Size) that can be written to the flow
