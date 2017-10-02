@@ -794,12 +794,10 @@ Remote::mss_configure() const
         cout << "Warning: using tentative MSS = " << mss << " bytes" << endl;
     }
 
-    if (mss > 65535) {
-        /* Linux does not support MTU larger than that for tun devices. */
-        mss = 65535;
+    if (mss > FDFWD_MAX_BUFSZ) {
+        /* Linux does not support MTU larger than 65535 for tun devices. */
+        mss = FDFWD_MAX_BUFSZ;
     }
-
-    mss -= 14; /* needs more investigation */
 
     cmdss << "ip link set mtu " << mss << " dev " << tun_name;
 

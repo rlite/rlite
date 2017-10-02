@@ -295,7 +295,7 @@ FwdWorker::run()
                 /* The output buffer for entry j is empty and, there
                  * is data to read from the mapped entry i. Load the
                  * output buffer with this data. */
-                m = read(fds[i].fd, fds[j].data, MAX_BUF_SIZE);
+                m = read(fds[i].fd, fds[j].data, FDFWD_MAX_BUFSZ);
                 if (m <= 0) {
                     terminate(i, m, errno);
                 } else {

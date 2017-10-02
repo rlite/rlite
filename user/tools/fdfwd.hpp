@@ -30,14 +30,14 @@
 #define __FDFWD_HH__
 
 #define MAX_SESSIONS    16
-#define MAX_BUF_SIZE    1460
+#define FDFWD_MAX_BUFSZ    16384
 
 struct Fd {
     int fd;
     int len;
     int ofs;
     char close;
-    char data[MAX_BUF_SIZE];
+    char data[FDFWD_MAX_BUFSZ];
 
     Fd(int _fd): fd(_fd), len(0), ofs(0), close(0) { }
     Fd(): fd(0), len(0), ofs(0), close(0) { }
