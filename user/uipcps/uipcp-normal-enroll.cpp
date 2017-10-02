@@ -317,11 +317,14 @@ Neighbor::n_flow_set(NeighFlow *nf)
     assert(nf != NULL);
     assert(has_flows());
 
-    /* Inherit CDAP connection and enrollment state, and switch
+    /* Inherit enrollment state and CDAP connection state, and switch
      * keepalive timer. */
     kbnf = flows.begin()->second;
     nf->enroll_state = kbnf->enroll_state;
-    nf->conn = kbnf->conn;
+    nf->conn = new CDAPConn(nf->flow_fd, 1);
+    if (kbnf->conn) {
+        nf->conn->state_set(kbnf->conn->state_get());
+    }
     kbnf->keepalive_tmr_stop();
     nf->keepalive_tmr_start();
 

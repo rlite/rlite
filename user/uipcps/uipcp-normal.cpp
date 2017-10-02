@@ -1261,12 +1261,16 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
         UPE(rib->uipcp, "Rejected N-flow request from %s, N-1 flow "
                         "is already reliable\n", req->remote_appl);
 
+    } else if (!is_reliable_spec(&req->flowspec)) {
+        UPE(rib->uipcp, "Rejected N-flow request from %s, flow is "
+                        "not reliable\n", req->remote_appl);
+
     } else {
         response = RLITE_SUCC;
     }
 
     ret = uipcp_fa_resp(rib->uipcp, req->kevent_id, req->ipcp_id,
-                        0xffff, req->port_id, response);
+                        RL_IPCP_ID_NONE, req->port_id, response);
     if (ret || response == RLITE_ERR) {
         if (ret) {
             UPE(rib->uipcp, "uipcp_fa_resp() failed[%s]\n", strerror(errno));
