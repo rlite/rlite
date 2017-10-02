@@ -751,7 +751,7 @@ for vmname in sorted(vms):
     outs += '(\n'\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     'set -x\n'\
                     'SUDO=%(sudo)s\n'\
                     '$SUDO hostname %(name)s\n'\
@@ -933,7 +933,7 @@ if not args.parallelize:
 
             outs += 'DONE=255\n'\
                     'while [ $DONE != "0" ]; do\n'\
-                    '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+                    '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     'set -x\n'\
                     'SUDO=%(sudo)s\n'\
                     '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
@@ -1114,7 +1114,7 @@ if args.register:
         outs += 'echo "Use \"%(pivot)s\" as a pivot for DIF %(dif)s"\n'\
             'DONE=255\n'\
             'while [ $DONE != "0" ]; do\n'\
-            '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
+            '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     '#set -x\n' % {'sshopts': sshopts, 'username': args.user,
                                   'ssh': vms[pivot]['ssh'], 'pivot': pivot,
                                   'dif': dif}
@@ -1154,7 +1154,7 @@ for vmname in sorted(vms):
     outs += ''\
         'DONE=255\n'\
         'while [ $DONE != "0" ]; do\n'\
-        '   ssh %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
+        '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost <<ENDSSH\n'\
                         % {'sshopts': sshopts, 'username': args.user,
                               'ssh': vm['ssh'],
                               'dif': dif}
