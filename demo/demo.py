@@ -232,8 +232,7 @@ argparser.add_argument('-f', '--frontend',
                        default = 'virtio-net-pci')
 argparser.add_argument('-b', '--backend',
                        help = "Choose network backend used by nodes",
-                       type = str, choices = ['tap', 'udp'],
-                       default = 'tap')
+                       type = str, choices = ['tap', 'udp'], default = None)
 argparser.add_argument('--vhost', action='store_true',
                        help = "Use vhost acceleration for virtio-net frontend")
 argparser.add_argument('-k', '--keepalive', default = 10,
@@ -542,9 +541,13 @@ for vmname in hostfwds:
 
 
 boot_batch_size = max(1, multiprocessing.cpu_count() / 2)
-if len(vms) > 8:
+if len(vms) > boot_batch_size:
     print("You want to run a lot of nodes, so it's better if I give "
           "each node some time to boot (since the boot is CPU-intensive)")
+
+if not args.backend:
+    args.backend = 'tap' if len(vms) <= 10 else 'udp'
+
 
 ############ Compute registration/enrollment order for DIFs ###############
 
