@@ -182,7 +182,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
                                      0 /* don't care */,
                                      0 /* don't care */,
                                      0 /* don't care */,
-                                     1, NULL);
+                                     1, nullptr);
     }
 
     conn_id.qos_id = 0;
@@ -453,7 +453,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     m = rl_new(CDAPMessage(), RL_MT_CDAP);
     m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name, 0, 0, string());
 
-    return rib->send_to_dst_addr(m, remote_addr, NULL);
+    return rib->send_to_dst_addr(m, remote_addr, nullptr);
 }
 
 int
