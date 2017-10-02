@@ -405,7 +405,7 @@ LowerFlow::operator std::string() const
 {
     stringstream ss;
 
-    ss << local_node << "-" << remote_node;
+    ss << "(" << local_node << "," << remote_node << ")";
 
     return ss.str();
 }
