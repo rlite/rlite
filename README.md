@@ -121,8 +121,6 @@ Install *rlite* on the system
     # make install
 
 
-
-
 ## 4. Overview of the software components
 
 This section briefly describes the software components of *rlite*.
@@ -137,15 +135,15 @@ A main kernel module **rlite** which implements core functionalities:
 
 A separate module for each type of IPCP:
 
-* **rlite-normal**, implementing the kernel-space part of the regular IPCPs.
+* **rlite-normal**: implements the kernel-space part of the regular IPCPs.
                     Includes EFCP and RMT.
-* **rlite-shim-eth**, implementing the shim IPCP over Ethernet.
-* **rlite-shim-udp4**, implementing the kernel-space part of the shim IPCP
+* **rlite-shim-eth**: implements the shim IPCP over Ethernet.
+* **rlite-shim-udp4**: implements the kernel-space part of the shim IPCP
                        over UDP and IPv4.
-* **rlite-shim-tcp4**, implementing the kernel-space part of the shim IPCP
+* **rlite-shim-tcp4**: implements the kernel-space part of the shim IPCP
                        over TCP and IPv4. This follows an older specification
                        and it is deprecated in favour of the UDP shim IPCP.
-* **rlite-shim-loopback**, implementing a loopback shim IPCP.
+* **rlite-shim-loopback**: implements a loopback shim IPCP.
 
 
 ### 4.2. Userspace IPCPs daemon
@@ -182,7 +180,7 @@ The following libraries are available:
                 to provide the RINA POSIX-like API.
                 This is the library used by applications to register names
                 and allocate flows.
-* **rlite-conf**, implementing the management and monitoring functionalities
+* **rlite-conf**: implements the management and monitoring functionalities
                      of *rlite*, such as IPCP creation, removal and
                      configuration, flow monitoring, etc.
 * **cdap**, a C++ implementation of the CDAP protocol.
@@ -238,20 +236,22 @@ Other programs are available for testing and deployment:
 
 #### Examples of rinaperf usage
 
-Run the server, registering on a DIF called *n.DIF*:
+Run the server, registering on a DIF called *n.DIF* (if no DIF name is
+specified, the system will chose the one with the higher rank):
 
     $ rinaperf -l -d n.DIF
 
 Note that rinaperf is multi-threaded, and can serve multiple requests
 concurrently.
 
-Run the client in ping mode, asking a DIF called *n.DIF* to allocate three
-flows in parallel:
+Run the client in ping mode with the default 2-bytes size, asking a DIF
+called *n.DIF* to allocate three flows in parallel:
 
     $ rinaperf -p 3 -t ping -d n.DIF
 
 Run the client in perf mode, asking a DIF called *n.DIF* to allocate a
-flow, using 1200 bytes sized SDUs:
+flow, using 1200 bytes sized SDUs (if no size is specified, in perf mode
+rinaperf will use the maximum SDU size):
 
     $ rinaperf -t perf -d -n.DIF -s 1200
 
@@ -298,6 +298,8 @@ following differences:
 1. The **policy** and **appmap** directives are not supported
 2. The name of **eth** instances does not need to be a valid VLAN id
 
+Note that the rlite demonstrator has some features that are not currently
+supported by the IRATI demonstrator.
 
 #### 5.1.1 Mini-tutorial
 
