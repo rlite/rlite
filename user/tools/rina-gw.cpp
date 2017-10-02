@@ -40,7 +40,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <sys/eventfd.h>
 #include <poll.h>
 #include <signal.h>
