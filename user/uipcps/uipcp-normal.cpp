@@ -302,12 +302,12 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 void
 normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 {
-    struct Neighbor *neigh = (struct Neighbor *)opaque;
+    struct NeighFlow *nf = (struct NeighFlow *)opaque;
     char mgmtbuf[MGMTBUF_SIZE_MAX];
-    uipcp_rib *rib = neigh->rib;
+    uipcp_rib *rib = nf->neigh->rib;
     int n;
 
-    n = read(neigh->mgmt_only->flow_fd, mgmtbuf, sizeof(mgmtbuf));
+    n = read(nf->flow_fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
         UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n",
                 strerror(errno));
@@ -316,7 +316,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     ScopeLock lock_(rib->lock);
 
-    rib_recv_msg(rib, mgmtbuf, n, neigh->mgmt_only);
+    rib_recv_msg(rib, mgmtbuf, n, nf);
 }
 
 
@@ -1286,6 +1286,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     const char *supp_dif = req->dif_name;
     rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
+    NeighFlow *nf;
     int flow_fd;
     int result = RLITE_SUCC;
     int ret;
@@ -1316,13 +1317,24 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    neigh->flows[neigh_port_id] = rl_new(NeighFlow(neigh, string(supp_dif),
-                                         neigh_port_id, 0, lower_ipcp_id),
-                                         RL_MT_NEIGHFLOW);
-    neigh->flows[neigh_port_id]->reliable = is_reliable_spec(&req->flowspec);
+    nf = rl_new(NeighFlow(neigh, string(supp_dif),
+                          neigh_port_id, 0, lower_ipcp_id),
+                          RL_MT_NEIGHFLOW);
+    nf->reliable = is_reliable_spec(&req->flowspec);
+
+    /* If flow is reliable, we assume it is a management-only flow, and so
+     * we don't bound the kernel datapath. If we bound it, EFCP would be
+     * bypassed, and then the management PDUs wouldn't be transferred
+     * reliably. */
+    if (nf->reliable) {
+        neigh->mgmt_only_set(nf);
+    } else {
+        neigh->flows[neigh_port_id] = nf;
+    }
 
     ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
-                        uipcp->id, req->port_id, result);
+                        nf->reliable ? RL_IPCP_ID_NONE : uipcp->id,
+                        req->port_id, result);
 
     if (ret || result != RLITE_SUCC) {
         if (ret) {
@@ -1337,17 +1349,17 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
         goto err;
     }
 
-    neigh->flows[neigh_port_id]->flow_fd = flow_fd;
+    nf->flow_fd = flow_fd;
     UPD(rib->uipcp, "N-1 %sreliable flow allocated [fd=%d, port_id=%u]\n",
-                    neigh->flows[neigh_port_id]->reliable ? "" : "un",
-                    neigh->flows[neigh_port_id]->flow_fd,
-                    neigh->flows[neigh_port_id]->port_id);
+                    nf->reliable ? "" : "un", nf->flow_fd, nf->port_id);
 
-    topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
-
-    /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
-     * the local entries. */
-    rib->lfdb->update_local(neigh->ipcp_name);
+    /* Add the flow to the datapath topology if it's not management-only. */
+    if (!nf->reliable) {
+        topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
+        /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
+         * the local entries. */
+        rib->lfdb->update_local(neigh->ipcp_name);
+    }
 
     return 0;
 

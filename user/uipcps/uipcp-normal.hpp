@@ -195,6 +195,7 @@ struct Neighbor {
 
     static const char *enroll_state_repr(enroll_state_t s);
 
+    void mgmt_only_set(NeighFlow *nf);
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_mgmt_flow() const { return !flows.empty(); }
