@@ -59,6 +59,12 @@ Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are explicitly
 indicated here, but using other distributions should be equally
 straightforward.
 
+The software has been built and used on Linux kernels starting from the 4.1
+series. Using older Linux versions may generate compilation warnings or errors
+due to the evolution of the Linux internal APIs.
+The rlite kernel code can easily be adapted to these older versions, if
+necessary. If not necessary, it is recommended to use newer versions.
+
 ### Ubuntu 14.04 and Debian 8
 
 * gcc
