@@ -66,7 +66,14 @@ struct uipcps {
 
     /* Control file descriptor for the main loop. */
     int cfd;
+
+    /* Event file descriptor to trigger uipcp loop. */
+    int efd;
 };
+
+int eventfd_signal(int efd, unsigned int code);
+uint64_t eventfd_drain(int efd);
+int uipcps_loop_signal(struct uipcps *uipcps);
 
 struct enrolled_neigh {
     char *dif_name;

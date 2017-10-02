@@ -41,6 +41,7 @@
 #include <pthread.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <sys/eventfd.h>
 
 #include "rlite/kernel-msg.h"
 #include "rlite/uipcps-msg.h"
@@ -441,6 +442,44 @@ unix_server(struct uipcps *uipcps)
 #undef RL_MAX_THREADS
 }
 
+int
+eventfd_signal(int efd, unsigned int code)
+{
+    uint64_t x = code;
+    int n;
+
+    n = write(efd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("write(eventfd)");
+        if (n < 0) {
+            return n;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+uint64_t
+eventfd_drain(int efd)
+{
+    uint64_t x = (uint64_t)-1;
+    int n;
+
+    n = read(efd, &x, sizeof(x));
+    if (n != sizeof(x)) {
+        perror("read(eventfd)");
+    }
+
+    return x;
+}
+
+int
+uipcps_loop_signal(struct uipcps *uipcps)
+{
+    return eventfd_signal(uipcps->efd, 0);
+}
+
 /* Time interval (in seconds) between two consecutive run of
  * per-ipcp periodic tasks (e.g. re-enrollments). */
 #define PERIODIC_TASK_INTVAL             10
@@ -491,20 +530,25 @@ uipcps_loop(void *opaque)
 
     for (;;) {
         struct rl_kmsg_ipcp_update *upd;
-        struct pollfd pfd;
+        struct pollfd pfd[2];
         int ret = 0;
 
-        pfd.fd = uipcps->cfd;
-        pfd.events = POLLIN;
+        pfd[0].fd = uipcps->cfd;
+        pfd[0].events = POLLIN;
+        pfd[1].fd = uipcps->efd;
+        pfd[1].events = POLLIN;
 
-        ret = poll(&pfd, 1, PERIODIC_TASK_INTVAL * 1000);
+        ret = poll(pfd, 2, PERIODIC_TASK_INTVAL * 1000);
         if (ret < 0) {
             PE("poll() failed [%s]\n", strerror(errno));
             break;
         }
 
-        if (ret == 0) {
-            /* Timeout, run the periodic tasks. */
+        if (ret == 0 || pfd[1].revents & POLLIN) {
+            /* Timeout or notification, run the periodic tasks. */
+            if (pfd[1].revents & POLLIN) {
+                eventfd_drain(uipcps->efd);
+            }
             periodic_tasks(uipcps);
             continue;
         }
@@ -825,6 +869,12 @@ int main(int argc, char **argv)
     ret = ioctl(uipcps->cfd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
     if (ret) {
         PE("ioctl() failed [%s]\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    uipcps->efd = eventfd(0, 0);
+    if (uipcps->efd < 0) {
+        PE("eventfd() failed [%s]\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
