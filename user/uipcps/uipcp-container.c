@@ -407,13 +407,7 @@ uipcp_loop(void *opaque)
 
         if (FD_ISSET(uipcp->eventfd, &rdfs)) {
             /* A signal arrived. */
-            uint64_t x;
-            int n;
-
-            n = read(uipcp->eventfd, &x, sizeof(x));
-            if (n != sizeof(x)) {
-                perror("read(eventfd)");
-            }
+            uint64_t x = eventfd_drain(uipcp->eventfd);
 
             if (x == RL_SIGNAL_STOP) {
                 /* Stop the event loop. */
@@ -538,19 +532,7 @@ uipcp_loop(void *opaque)
 static int
 uipcp_loop_signal(struct uipcp *uipcp, unsigned int code)
 {
-    uint64_t x = code;
-    int n;
-
-    n = write(uipcp->eventfd, &x, sizeof(x));
-    if (n != sizeof(x)) {
-        perror("write(eventfd)");
-        if (n < 0) {
-            return n;
-        }
-        return -1;
-    }
-
-    return 0;
+    return eventfd_signal(uipcp->eventfd, code);
 }
 
 #define TIMER_EVENTS_MAX    64
