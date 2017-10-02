@@ -61,7 +61,7 @@ struct rina_name {
     char *aei;
 } __attribute__((packed));
 
-typedef uint32_t rl_port_t;
+typedef uint16_t rl_port_t;
 typedef uint16_t rl_ipcp_id_t;
 typedef uint16_t rl_msg_t;
 

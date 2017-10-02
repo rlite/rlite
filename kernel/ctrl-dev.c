@@ -1176,9 +1176,13 @@ flow_del(struct flow_entry *entry)
     rl_free(entry, RL_MT_FLOW);
 
     if (ipcp->uipcp) {
-        /* Notify the uipcp about flow deallocation. */
-        rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
-                          true);
+        /* Notify the uipcp about flow deallocation, if it makes sense. */
+        if (ntfy.local_port_id != RL_PORT_ID_NONE &&
+                ntfy.remote_port_id != RL_PORT_ID_NONE &&
+                    ntfy.remote_addr != RL_ADDR_NULL) {
+            rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
+                              true);
+        }
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
                        RLITE_MB(&ntfy));
     }
@@ -1271,8 +1275,8 @@ flow_add(struct ipcp_entry *ipcp, struct upper_ref upper,
         /* Build and insert a flow entry in the hash table. */
         entry->local_appl = rl_strdup(local_appl, GFP_ATOMIC, RL_MT_FLOW);
         entry->remote_appl = rl_strdup(remote_appl, GFP_ATOMIC, RL_MT_FLOW);
-        entry->remote_port = 0;  /* Not valid. */
-        entry->remote_cep = 0;   /* Not valid. */
+        entry->remote_port = RL_PORT_ID_NONE;  /* Not valid. */
+        entry->remote_cep = RL_PORT_ID_NONE;   /* Not valid. */
         entry->remote_addr = RL_ADDR_NULL;  /* Not valid. */
         entry->upper = upper;
         if (upper.rc) {
