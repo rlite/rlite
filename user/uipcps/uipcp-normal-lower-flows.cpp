@@ -596,8 +596,7 @@ RoutingEngine::compute_fwd_table()
             string neigh_name;
             rl_port_t port_id;
 
-            neigh_name = static_cast<string>(
-                        rib->lookup_neighbor_by_address(*lfa));
+            neigh_name = rib->lookup_neighbor_by_address(*lfa);
             if (neigh_name == string()) {
                 UPE(uipcp, "Could not find neighbor with address %lu\n",
                         (long unsigned)*lfa);

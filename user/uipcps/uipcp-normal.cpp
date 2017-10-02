@@ -472,8 +472,6 @@ uipcp_rib::dump() const
             continue;
         }
 
-        neigh = neighbors.find(neigh_name);
-
         ss << "    Name: " << cand.apn << ":" << cand.api
             << ", Address: " << cand.address << ", Lower DIFs: {";
 
@@ -492,6 +490,7 @@ uipcp_rib::dump() const
             ss << "} ";
         }
 
+        neigh = neighbors.find(neigh_name);
         if (neigh != neighbors.end() && neigh->second->has_mgmt_flow()) {
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, last heard " <<
