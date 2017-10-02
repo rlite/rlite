@@ -716,6 +716,13 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    ret = mkdir(RLITE_UIPCPS_VAR, 0x777);
+    if (ret && errno != EEXIST) {
+        fprintf(stderr, "warning: mkdir(%s) failed: %s\n",
+                        RLITE_UIPCPS_VAR, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
     /* Create pidfile and check for uniqueness. */
     {
         char strbuf[128];
@@ -775,13 +782,6 @@ int main(int argc, char **argv)
          * could still exist and so the following bind() would fail.
          * This unlink() will clean up in this situation. */
         PI("Cleaned up existing unix domain socket\n");
-    }
-
-    ret = mkdir(RLITE_UIPCPS_VAR, 0x777);
-    if (ret && errno != EEXIST) {
-        fprintf(stderr, "warning: mkdir(%s) failed: %s\n",
-                        RLITE_UIPCPS_VAR, strerror(errno));
-        exit(EXIT_FAILURE);
     }
 
     ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
@@ -870,7 +870,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* The main control loop */
+    /* The main control loop need to receive IPCP updates (creation, removal
+     * and configuration changes). */
     ret = ioctl(uipcps->cfd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
     if (ret) {
         PE("ioctl() failed [%s]\n", strerror(errno));
