@@ -25,7 +25,7 @@
 #define __CDAP_H__
 
 #include <string>
-#include <set>
+#include <unordered_set>
 
 #include "rlite/common.h"
 #include "CDAP.pb.h"
@@ -55,13 +55,22 @@ class InvokeIdMgr {
         bool operator<(const Id &o) const { return iid < o.iid; }
         bool operator>(const Id &o) const { return iid > o.iid; }
     };
-    std::set<Id> pending_invoke_ids;
+
+    /* Hasher class to allow for struct Id to be used as key type for
+     * unordered maps and unordered sets. */
+    struct IdHasher {
+        std::size_t operator()(const Id& i) const {
+            return std::hash<int>()(i.iid);
+        }
+    };
+
+    std::unordered_set<Id, IdHasher> pending_invoke_ids;
     int invoke_id_next;
     unsigned discard_secs;
-    std::set<Id> pending_invoke_ids_remote;
+    std::unordered_set<Id, IdHasher> pending_invoke_ids_remote;
 
-    int __put_invoke_id(std::set<Id> &pending, int invoke_id);
-    void __discard(std::set<Id>& pending);
+    int __put_invoke_id(std::unordered_set<Id, IdHasher> &pending, int invoke_id);
+    void __discard(std::unordered_set<Id, IdHasher>& pending);
     void discard();
 
 public:
