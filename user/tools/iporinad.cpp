@@ -37,6 +37,17 @@ struct IPSubnet {
 
     IPSubnet() : netaddr(0), netbits(0) { }
     IPSubnet(const string &p);
+    bool operator<(const IPSubnet& o) const {
+        return netaddr < o.netaddr ||
+                (netaddr == o.netaddr && netbits < o.netbits);
+    }
+};
+
+struct Route {
+    IPSubnet subnet;
+
+    Route(const IPSubnet &i) : subnet(i) { }
+    bool operator<(const Route& o) const { return subnet < o.subnet; }
 };
 
 struct Local {
@@ -54,20 +65,17 @@ struct Remote {
     string tun_name;
     int tun_fd;
 
-    /* True if we need to publish our routes to this remote. */
+    /* True if we need to advertise local routes to this remote. */
     bool pending;
+
+    /* Routes reachable through this remote. */
+    set<Route> routes;
 
     Remote() : tun_fd(-1), pending(true) { }
     Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
                         dif_name(d), tun_subnet(i), tun_fd(-1),
                         pending(true) { }
     int tun_alloc();
-};
-
-struct Route {
-    IPSubnet subnet;
-
-    Route(const IPSubnet &i) : subnet(i) { }
 };
 
 struct IPoRINA {
@@ -79,7 +87,7 @@ struct IPoRINA {
 
     Local                   local;
     map<string, Remote>     remotes;
-    list<Route>             routes;
+    list<Route>             local_routes;
 
     IPoRINA() : verbose(0), rfd(-1) { }
 };
@@ -424,7 +432,7 @@ parse_conf(const char *path)
                 return -1;
             }
 
-            g->routes.push_back(Route(subnet));
+            g->local_routes.push_back(Route(subnet));
         }
     }
 
@@ -451,8 +459,8 @@ dump_conf(void)
     }
 
     cout << "Advertised routes:" << endl;
-    for (list<Route>::iterator l = g->routes.begin();
-                            l != g->routes.end(); l ++) {
+    for (list<Route>::iterator l = g->local_routes.begin();
+                            l != g->local_routes.end(); l ++) {
         cout << "   " << l->subnet.repr << endl;
     }
 }
@@ -602,15 +610,15 @@ connect_to_remotes(void *opaque)
             /* Exchange routes. */
             m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
                       0, 0, string());
-            hello.num_routes = g->routes.size();
+            hello.num_routes = g->local_routes.size();
             hello.tun_subnet = re->second.tun_subnet.repr;
             if (cdap_obj_send(&conn, &m, 0, &hello)) {
                 cerr << "Failed to send M_START" << endl;
                 goto abor;
             }
 
-            for (list<Route>::iterator ro = g->routes.begin();
-                    ro != g->routes.end(); ro ++) {
+            for (list<Route>::iterator ro = g->local_routes.begin();
+                    ro != g->local_routes.end(); ro ++) {
                 RouteObj robj(ro->subnet.repr);
 
                 m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
@@ -759,8 +767,22 @@ int main(int argc, char **argv)
         cout << "Hello received: " << hello.num_routes << " routes, tun_subnet "
                 << hello.tun_subnet << endl;
 
+        if (g->remotes.count(remote_name) == 0) {
+            g->remotes[remote_name] = Remote();
+
+            Remote& r = g->remotes[remote_name];
+
+            r.app_name = remote_name;
+            r.dif_name = string();
+            if (r.tun_alloc()) {
+                close(cfd);
+                goto abor;
+            }
+        }
+
         for (unsigned int i = 0; i < hello.num_routes; i ++) {
             RouteObj robj;
+            size_t prevlen;
 
             rm = conn.msg_recv();
             if (rm->op_code != gpb::M_WRITE) {
@@ -775,21 +797,17 @@ int main(int argc, char **argv)
             }
             robj = RouteObj(objbuf, objlen);
             delete rm; rm = NULL;
-            cout << "Received route " << robj.route << endl;
-        }
 
-        if (g->remotes.count(remote_name) == 0) {
-            g->remotes[remote_name] = Remote();
-
-            Remote& r = g->remotes[remote_name];
-
-            r.app_name = remote_name;
-            r.dif_name = string();
-            if (r.tun_alloc()) {
-                close(cfd);
-                continue;
+            /* Add the route in the set. */
+            prevlen = g->remotes[remote_name].routes.size();
+            g->remotes[remote_name].routes.insert(Route(robj.route));
+            if (g->remotes[remote_name].routes.size() > prevlen) {
+                /* Log only if the route was added to the set. */
+                cout << "Route " << robj.route << " reachable through " <<
+                        remote_name << endl;
             }
         }
+
 abor:
         close(cfd);
     }
