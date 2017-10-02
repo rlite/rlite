@@ -827,16 +827,20 @@ for vmname in sorted(vms):
             del vars_dict
 
         vars_dict = {'echoname': 'rina-echo-async:%s' % vm['name'],
-                       'dif': dif, 'perfname': 'rinaperf:%s' % vm['name'],
-                       'randperiod': args.rand_period,
-                       'randdur': args.rand_duration,
-                       'randmax': args.rand_max}
+                       'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
         if args.register:
             outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' % vars_dict
         if args.simulate:
-            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' \
-                    'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s '\
-                                '-v > rlite-rand-clients.log &\n' % vars_dict
+            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' % vars_dict
+        del vars_dict
+
+    # Run rlite-rand clients
+    if args.simulate:
+        outs += 'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s '\
+                    '-v > rlite-rand-clients.log &\n' % \
+                    {'randperiod': args.rand_period,
+                     'randdur': args.rand_duration,
+                     'randmax': args.rand_max }
 
     outs +=         '\n'\
                     'sleep 1\n'\
