@@ -313,30 +313,46 @@ static void *
 worker_fn(void *opaque)
 {
     struct worker_info *wi = opaque;
-    struct rl_msg_base *req;
+    struct rl_msg_base *req = NULL;
     char serbuf[4096];
     char msgbuf[4096];
     int ret;
-    int n;
 
     PV("Worker %p started\n", wi);
 
     /* Read the request message in serialized form. */
-    n = read(wi->cfd, serbuf, sizeof(serbuf));
-    if (n < 0) {
-        PE("read() error [%d]\n", n);
+    ret = read(wi->cfd, serbuf, sizeof(serbuf));
+    if (ret < 0) {
+        PE("read() error [%d]\n", ret);
+        goto out;
     }
 
     /* Deserialize into a formatted message. */
     ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-            serbuf, n, msgbuf, sizeof(msgbuf));
+            serbuf, ret, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("deserialization error [%d]\n", ret);
+        goto out;
     }
 
     /* Lookup the message type. */
     req = RLITE_MB(msgbuf);
     if (rl_config_handlers[req->msg_type] == NULL) {
+        ret = -1;
+        goto out;
+    }
+
+    /* Valid message type: handle the request. */
+    ret = rl_config_handlers[req->msg_type](wi->uipcps, wi->cfd, req);
+    if (ret) {
+        PE("Error while handling message type [%d]\n",
+                req->msg_type);
+    }
+out:
+    if (req) {
+        rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
+    }
+    if (ret) {
         struct rl_msg_base_resp resp;
 
         PE("Invalid message received [type=%d]\n",
@@ -345,16 +361,7 @@ worker_fn(void *opaque)
         resp.event_id = req->event_id;
         resp.result = RLITE_ERR;
         rl_msg_write_fd(wi->cfd, RLITE_MB(&resp));
-    } else {
-        /* Valid message type: handle the request. */
-        ret = rl_config_handlers[req->msg_type](wi->uipcps, wi->cfd, req);
-        if (ret) {
-            PE("Error while handling message type [%d]\n",
-                    req->msg_type);
-        }
     }
-
-    rl_msg_free(rl_uipcps_numtables, RLITE_U_MSG_MAX, req);
 
     /* Close the connection. */
     close(wi->cfd);
