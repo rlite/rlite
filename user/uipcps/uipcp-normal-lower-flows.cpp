@@ -45,12 +45,12 @@ lfdb_default::_find(const NodeId& local_node, const NodeId& remote_node) const
     unordered_map<NodeId, LowerFlow>::const_iterator jt;
 
     if (it == db.end()) {
-        return NULL;
+        return nullptr;
     }
 
     jt = it->second.find(remote_node);
 
-    return jt == it->second.end() ? NULL : &jt->second;
+    return jt == it->second.end() ? nullptr : &jt->second;
 }
 
 /* The add method has overwrite semantic, and possibly resets the age.
@@ -119,7 +119,7 @@ lfdb_default::update_local(const string& node_name)
     LowerFlow lf;
     CDAPMessage *sm;
 
-    if (rib->get_neighbor(node_name, false) == NULL) {
+    if (rib->get_neighbor(node_name, false) == nullptr) {
         return; /* Not our neighbor. */
     }
 
@@ -180,7 +180,7 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     if (modified) {
         /* Send the received lower flows to the other neighbors. */
-        rib->neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add_f, obj_class::lfdb,
+        rib->neighs_sync_obj_excluding(nf ? nf->neigh : nullptr, add_f, obj_class::lfdb,
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
@@ -427,7 +427,7 @@ RoutingEngine::compute_next_hops(const NodeId& local_node)
             revlf = rib->lfdb->find(kvj.second.local_node,
                                    kvj.second.remote_node);
 
-            if (revlf == NULL || revlf->cost != kvj.second.cost) {
+            if (revlf == nullptr || revlf->cost != kvj.second.cost) {
                 /* Something is wrong, this could be malicious or erroneous. */
                 continue;
             }
@@ -677,7 +677,7 @@ RoutingEngine::compute_fwd_table()
 void
 RoutingEngine::update_kernel_routing(const NodeId& addr)
 {
-    assert(rib != NULL);
+    assert(rib != nullptr);
 
     UPV(rib->uipcp, "Recomputing routing and forwarding tables\n");
 
