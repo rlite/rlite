@@ -669,7 +669,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         return;
     }
 
-    skb_copy_bits(skb, 0, RLITE_BUF_DATA(rb), skb->len);
+    skb_copy_bits(skb, 0, RL_BUF_DATA(rb), skb->len);
 
     /* Try to shortcut the packet to the upper IPCP. */
     if ((rb = rl_sdu_rx_shortcut(priv->ipcp, rb)) == NULL) {
@@ -909,7 +909,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp,
     skb_shinfo(skb)->destructor_arg = (void *)flow;
 
     /* Copy data into the skb. */
-    memcpy(skb_put(skb, rb->len), RLITE_BUF_DATA(rb), rb->len);
+    memcpy(skb_put(skb, rb->len), RL_BUF_DATA(rb), rb->len);
 
     /* Send the skb to the device for transmission. */
     ret = dev_queue_xmit(skb);

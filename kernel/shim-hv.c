@@ -63,7 +63,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
     }
 
     ret = serialize_rlite_msg(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
-                              RLITE_BUF_DATA(rb), msg);
+                              RL_BUF_DATA(rb), msg);
     if (ret != serlen) {
         PE("Error while serializing\n");
         return -EINVAL;
@@ -83,14 +83,14 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
 {
     int ret = 0;
 
-    rl_msg_t ty = *((const rl_msg_t *)RLITE_BUF_DATA(rb));
+    rl_msg_t ty = *((const rl_msg_t *)RL_BUF_DATA(rb));
 
     if (ty == RLITE_SHIM_HV_FA_REQ) {
         struct rl_hmsg_fa_req req;
 
         ret = deserialize_rlite_msg(rl_shim_hv_numtables,
                                     RLITE_SHIM_HV_MSG_MAX,
-                                    RLITE_BUF_DATA(rb), rb->len,
+                                    RL_BUF_DATA(rb), rb->len,
                                     &req, sizeof(req));
         if (ret) {
             PE("Failed to deserialize msg type %u\n", ty);
@@ -108,7 +108,7 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
 
         ret = deserialize_rlite_msg(rl_shim_hv_numtables,
                                    RLITE_SHIM_HV_MSG_MAX,
-                                   RLITE_BUF_DATA(rb), rb->len,
+                                   RL_BUF_DATA(rb), rb->len,
                                    &resp, sizeof(resp));
         if (ret) {
             PE("Failed to deserialize msg type %u\n", ty);

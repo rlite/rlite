@@ -10,7 +10,7 @@
 #define vmpi_buf_alloc      rl_buf_alloc
 #define vmpi_buf_clone      rl_buf_clone
 #define vmpi_buf_free       rl_buf_free
-#define vmpi_buf_data(_vb)  RLITE_BUF_DATA(_vb)
+#define vmpi_buf_data(_vb)  RL_BUF_DATA(_vb)
 
 
 static inline size_t vmpi_buf_size(struct vmpi_buf *vb)

@@ -136,7 +136,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 
         } else {
             /* We're reading the SDU. */
-            iov.iov_base = RLITE_BUF_DATA(priv->cur_rx_rb);
+            iov.iov_base = RL_BUF_DATA(priv->cur_rx_rb);
             iov.iov_len = priv->cur_rx_rblen;
         }
 
@@ -333,7 +333,7 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv,
     memset(&msghdr, 0, sizeof(msghdr));
     iov[0].iov_base = &lenhdr;
     iov[0].iov_len = sizeof(lenhdr);
-    iov[1].iov_base = RLITE_BUF_DATA(rb);
+    iov[1].iov_base = RL_BUF_DATA(rb);
     iov[1].iov_len = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;

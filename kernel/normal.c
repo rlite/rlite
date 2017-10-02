@@ -373,7 +373,7 @@ rtx_tmr_cb(long unsigned arg)
 
     /* Send PDUs popped out from RTX queue. */
     list_for_each_entry_safe(crb, tmp, &rrbq, node) {
-        struct rina_pci *pci = RLITE_BUF_PCI(crb);
+        struct rina_pci *pci = RL_BUF_PCI(crb);
 
         RPD(2, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
         list_del_init(&crb->node);
@@ -630,7 +630,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
         mod_timer(&dtp->rtx_tmr, crb->u.rtx.rtx_jiffies);
     }
     NPD("cloning [%lu] into rtxq\n",
-            (long unsigned)RLITE_BUF_PCI(crb)->seqnum);
+            (long unsigned)RL_BUF_PCI(crb)->seqnum);
 
     return 0;
 }
@@ -717,7 +717,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
         return -ENOSPC;
     }
 
-    pci = RLITE_BUF_PCI(rb);
+    pci = RL_BUF_PCI(rb);
     pci->dst_addr = flow->remote_addr;
     pci->src_addr = ipcp->addr;
     pci->qos_id = 0;
@@ -839,7 +839,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
         return -ENOSPC;
     }
 
-    pci = RLITE_BUF_PCI(rb);
+    pci = RL_BUF_PCI(rb);
     pci->dst_addr = dst_addr;
     pci->src_addr = ipcp->addr;
     pci->qos_id = 0;  /* Not valid. */
@@ -988,7 +988,7 @@ ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
     struct rina_pci_ctrl *pcic;
 
     if (rb) {
-        pcic = (struct rina_pci_ctrl *)RLITE_BUF_DATA(rb);
+        pcic = (struct rina_pci_ctrl *)RL_BUF_DATA(rb);
         pcic->base.dst_addr = flow->remote_addr;
         pcic->base.src_addr = ipcp->addr;
         pcic->base.qos_id = 0;
@@ -1083,7 +1083,7 @@ static void
 seqq_push(struct dtp *dtp, struct rl_buf *rb)
 {
     struct rl_buf *cur;
-    rl_seq_t seqnum = RLITE_BUF_PCI(rb)->seqnum;
+    rl_seq_t seqnum = RL_BUF_PCI(rb)->seqnum;
     struct list_head *pos = &dtp->seqq;
 
     if (unlikely(dtp->seqq_len >= SEQQ_MAX_LEN)) {
@@ -1094,7 +1094,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     }
 
     list_for_each_entry(cur, &dtp->seqq, node) {
-        struct rina_pci *pci = RLITE_BUF_PCI(cur);
+        struct rina_pci *pci = RL_BUF_PCI(cur);
 
         if (seqnum < pci->seqnum) {
             pos = &cur->node;
@@ -1123,7 +1123,7 @@ seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct list_head *qrbs)
 
     INIT_LIST_HEAD(qrbs);
     list_for_each_entry_safe(qrb, tmp, &dtp->seqq, node) {
-        struct rina_pci *pci = RLITE_BUF_PCI(qrb);
+        struct rina_pci *pci = RL_BUF_PCI(qrb);
 
         if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
             list_del_init(&qrb->node);
@@ -1140,7 +1140,7 @@ static int
 sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
             struct rl_buf *rb)
 {
-    struct rina_pci_ctrl *pcic = RLITE_BUF_PCI_CTRL(rb);
+    struct rina_pci_ctrl *pcic = RL_BUF_PCI_CTRL(rb);
     struct dtp *dtp = &flow->dtp;
     struct list_head qrbs;
     struct rl_buf *qrb, *tmp;
@@ -1223,7 +1223,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
             case PDU_T_ACK:
                 list_for_each_entry_safe(cur, tmp, &dtp->rtxq, node) {
-                    struct rina_pci *pci = RLITE_BUF_PCI(cur);
+                    struct rina_pci *pci = RL_BUF_PCI(cur);
 
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
                         NPD("Remove [%lu] from rtxq\n",
@@ -1288,7 +1288,7 @@ out:
     /* Send PDUs popped out from cwq, if any. Note that the qrbs list
      * is not emptied and must not be used after the scan.*/
     list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
-        struct rina_pci *pci = RLITE_BUF_PCI(qrb);
+        struct rina_pci *pci = RL_BUF_PCI(qrb);
 
         NPD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
@@ -1306,7 +1306,7 @@ static struct rl_buf *
 rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                  struct flow_entry *lower_flow)
 {
-    struct rina_pci *pci = RLITE_BUF_PCI(rb);
+    struct rina_pci *pci = RL_BUF_PCI(rb);
     struct flow_entry *flow;
     rl_seq_t seqnum = pci->seqnum;
     struct rl_buf *crb = NULL;
@@ -1366,14 +1366,14 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
                 return NULL; /* -ENOMEM */;
             }
 
-            memcpy(RLITE_BUF_DATA(nrb), RLITE_BUF_DATA(rb), rb->len);
+            memcpy(RL_BUF_DATA(nrb), RL_BUF_DATA(rb), rb->len);
             nrb->len = rb->len;
             rl_buf_free(rb);
             rb = nrb;
         }
         ret = rl_buf_custom_push(rb, sizeof(*mhdr));
         BUG_ON(ret);
-        mhdr = (struct rl_mgmt_hdr *)RLITE_BUF_DATA(rb);
+        mhdr = (struct rl_mgmt_hdr *)RL_BUF_DATA(rb);
         mhdr->type = RLITE_MGMT_HDR_T_IN;
         mhdr->local_port = lower_flow->local_port;
         mhdr->remote_addr = src_addr;
