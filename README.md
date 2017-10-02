@@ -951,7 +951,7 @@ The rinaperf program is a simple multi-threaded client/server application that i
 network throughput and latency. It aims at providing basic performance measurement functionalities
 akin to those provided by the popular netperf [12] and iperf [13] tools. In particular, rinaperf
 tries to imitate netperf. In addition to that, rinaperf can also be seen as an example program
-showing the usage of the RINA API in blocking mode, as illustrated in Figure 3.
+showing the usage of the RINA API in blocking mode.
 When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
 The server main thread runs a loop to accept new flow requests (`rina_flow_accept()`), and
 each request is handled by a dedicated worker thread created on-demand. The main loop is also
@@ -1008,6 +1008,8 @@ response coming back. In client mode, rina-echo-async keeps an array of independ
 machines, to handle multiple concurrent echo sessions. The -p option can be used to specify how
 many flows (sessions) to create and handle; by default, only a single flow is created.
 
+![Client state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-client.png)
+
 The server state machines are illustrated in Figure 6. After completing the registration, the
 server starts accepting new sessions, denying them if the number of ongoing sessions grows beyond
 a limit (128 in the current implementation). A new state machine is created for each accepted
@@ -1016,6 +1018,7 @@ session. The server therefore manages two types of state machines: one to accept
 instance of the first kind and multiple instance of the second, one per client. The per-client state
 machine just receives the echo request and sends the echo response back to the client.
 
+![Server state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-server.png)
 
 
 ## 9. RINA API documentation
@@ -1030,12 +1033,15 @@ valid also for other distributed application paradigms (e.g. peer-to-peer).
 The workflow presented in this subsection refers to the
 case of blocking operation, that is the API calls may block waiting for
 asynchronous events; moreover, for the sake
-of exposition, we assume that the operations do not fail. Non-blocking
-operations and errors are however covered by the API specification (section
-9.3) and the examples (sections 7.3 and 7.4).
+of exposition, we assume that the operations do not fail.
+
+![RINA API workflow for blocking operation](https://bitbucket.org/vmaffione/rina-images/downloads/api-blocking-workflow.png)
+
+Non-blocking operations and errors are however covered by the API specification
+(section 9.3) and the examples (sections 7.3 and 7.4).
 
 ### 9.1 Server-side operations
-The first operation needed by the server, (1) in figure 3, is `rina_open`, which
+The first operation needed by the server, (1) the figure above, is `rina_open`, which
 takes no arguments and returns a listening file descriptor (an integer, as
 usual) to be used for subsequent server-side calls. This file descriptor is the
 handler for an instance of a RINA control device which acts as a receiver for
@@ -1232,7 +1238,7 @@ exchange is the message.
 
 
 ### 9.4 Mapping sockets API to RINA API
-The walkthough presented in section 2.1.1 and figure 3 highlights the strong relationship between
+The walkthough presented in section 9.2 and 9.3 highlights the strong relationship between
 the RINA POSIX API and the socket API. In this section we will explore this relationship in depth,
 in order to
  * Define a clear mapping from socket calls to RINA calls, that can be used as a reference
@@ -1244,6 +1250,8 @@ no corresponding functionality in the socket API.
 The mapping is illustrated separately for client-side operations and server-side ones. Moreover,
 for the sake of simplicity, it refers to Internet sockets, i.e. sockets belonging to the AF INET
 and AF INET6 family.
+
+![Mapping to the socket API](https://bitbucket.org/vmaffione/rina-images/downloads/socket-rina-mapping.png)
 
 #### 9.4.1 Client-side mapping
 The typical workflow of a TCP or UDP client – w.r.t socket calls – starts by creating a kernel socket
@@ -1300,7 +1308,7 @@ must indicate on what IP address and ports it is available to receive incoming T
 or UDP datagrams. If the socket is UDP, at this point the server can start receiving and sending
 datagrams, using the recvfrom, recvmsg, sendto and sendmsg system calls. It could
 also optionally bind a remote name with connect(), if it is going to serve only a client (the
-considerations about connected UDP sockets reported in Section 2.1.3.1 are also valid here).
+considerations about connected UDP sockets reported in section 9.4.1 are also valid here).
 If the socket is TCP, the server needs to call the listen() system call to indicate that is going
 to accept incoming TCP connection on the address and port bound to the socket, indicating the size
 of the backlog queue as a parameter. This operation puts the socket in listening mode. Afterwards,
@@ -1335,8 +1343,8 @@ spec output argument.
 Non-blocking accept is also possible, since the control file descriptor can be set in non-blocking
 mode and passed to poll/select. The control file descriptor becomes readable when there is a
 pending flow allocation request ready to be accepted.
-Also the server-side analysis, summarized in Figure 4, uncovers some capabilities of the RINA
-API that are not possible with the socket API:
+Also the server-side analysis, summarized in the figure abovev, uncovers some capabilities
+of the RINA API that are not possible with the socket API:
  * When the `RINA_F_NOWAIT` flag is passed to `rina_flow_accept`, the application can
 decide whether to accept or deny the flow allocation request, possibly taking into account
 the flow QoS, the remote application name and the server internal state. The verdict is
