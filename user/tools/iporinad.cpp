@@ -20,7 +20,7 @@ using namespace std;
 
 struct IPSubnet {
     string      repr;
-    unsigned    netaddr;
+    uint32_t    netaddr;
     unsigned    netbits;
 
     IPSubnet() : netaddr(0), netbits(0) { }
@@ -105,7 +105,7 @@ IPSubnet::IPSubnet(const string &_p) : repr(_p)
         goto ex;
     }
     netbits = m;
-    p = p.substr(0, slash - 1);
+    p = p.substr(0, slash);
 
     /* Extract a, b, c and d. */
     std::replace(p.begin(), p.end(), '.', ' ');
