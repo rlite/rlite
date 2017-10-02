@@ -38,6 +38,7 @@
 #include <asm/atomic.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <linux/uaccess.h>
 
 /* Include for signal_pending() */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0)
@@ -221,6 +222,12 @@ rl_buf_append(struct rl_buf *rb, size_t len)
     BUG_ON((uint8_t *)(rb->pci) + rb->len > rb->raw->buf + rb->raw->size);
 }
 
+static inline int
+rl_buf_copy_to_user(struct rl_buf *rb, void __user *ubuf, size_t bytes)
+{
+    return copy_to_user(ubuf, RL_BUF_DATA(rb), bytes);
+}
+
 #define rl_buf_free(_rb) \
     do { \
         BUG_ON((_rb) == NULL); \
@@ -285,6 +292,17 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 }
 
 #define rl_buf_append(_rb, _len)        skb_put(_rb, _len)
+
+static inline int
+rl_buf_copy_to_user(struct rl_buf *rb, void __user *ubuf, size_t bytes)
+{
+    struct iovec iov = { .iov_base = ubuf, .iov_len = bytes };
+    struct iov_iter to;
+
+    iov_iter_init(&to, READ, &iov, 1, bytes);
+
+    return skb_copy_datagram_iter(rb, 0, &to, bytes);
+}
 
 #define rl_buf_free(_rb) \
     do { \

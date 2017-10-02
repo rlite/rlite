@@ -455,7 +455,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
 	if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
             ret = ulen;
-            if (unlikely(copy_to_user(ubuf, RL_BUF_DATA(rb), ret))) {
+            if (unlikely(rl_buf_copy_to_user(rb, ubuf, ret))) {
                 ret = -EFAULT;
             }
 
@@ -470,7 +470,7 @@ rl_io_read(struct file *f, char __user *ubuf, size_t ulen, loff_t *ppos)
             spin_unlock_bh(&txrx->rx_lock);
 
             ret = rb->len;
-            if (unlikely(copy_to_user(ubuf, RL_BUF_DATA(rb), ret))) {
+            if (unlikely(rl_buf_copy_to_user(rb, ubuf, ret))) {
                 ret = -EFAULT;
             }
 
