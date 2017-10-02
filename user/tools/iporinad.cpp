@@ -194,6 +194,26 @@ RouteMsg::serialize(char *buf, unsigned int size) const
     return ser_common(gm, buf, size);
 }
 
+static int
+cdap_send(int fd, CDAPMessage *m, int invoke_id, const Msg *obj)
+{
+    char objbuf[4096];
+    int objlen;
+
+    if (obj) {
+        objlen = obj->serialize(objbuf, sizeof(objbuf));
+        if (objlen < 0) {
+            errno = EINVAL;
+            fprintf(stderr, "serialization failed\n");
+            return objlen;
+        }
+
+        m->set_obj_value(objbuf, objlen);
+    }
+
+    return 0;
+}
+
 /*
  * Global variables to hold the daemon state.
  */
@@ -481,6 +501,8 @@ setup(void)
 static void *
 connect_to_remotes(void *opaque)
 {
+    string myname = g->locals.front().app_name;
+
     for (;;) {
         for (list<Remote>::iterator l = g->remotes.begin();
                             l != g->remotes.end(); l ++) {
@@ -498,9 +520,9 @@ connect_to_remotes(void *opaque)
             rina_flow_spec_default(&spec);
             spec.max_sdu_gap = 0;
             spec.in_order_delivery = 1;
-            spec.msg_boundaries = 0;
+            spec.msg_boundaries = 1;
             spec.spare3 = 1;
-            wfd = rina_flow_alloc(l->dif_name.c_str(), "iporinad",
+            wfd = rina_flow_alloc(l->dif_name.c_str(), myname.c_str(),
                                   l->app_name.c_str(), &spec, RINA_F_NOWAIT);
             if (wfd < 0) {
                 perror("rina_flow_alloc()");
@@ -534,6 +556,33 @@ connect_to_remotes(void *opaque)
                 cout << "Connected to remote " << l->app_name <<
                         " through DIF " << l->dif_name << endl;
             }
+
+            CDAPConn conn(l->rfd, 1);
+            CDAPMessage m, *rm = NULL;
+
+            m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
+                                              /* dst */ l->app_name);
+            if (conn.msg_send(&m, 0)) {
+                cerr << "Failed to send M_CONNECT" << endl;
+                goto abor;
+            }
+
+            rm = conn.msg_recv();
+            if (rm->op_code != gpb::M_CONNECT_R) {
+                cerr << "M_CONNECT_R expected" << endl;
+                goto abor;
+            }
+
+            cout << "Connected to remote peer" << endl;
+
+            //m.m_start(gpb::F_NO_FLAGS, "enrollment", "enrollment",
+            //          0, 0, string());
+
+abor:
+            if (rm) {
+                delete rm;
+            }
+            close(l->rfd);
         }
 
         sleep(5);
@@ -598,7 +647,6 @@ int main(int argc, char **argv)
     /* Wait for incoming control connections. */
     for (;;) {
         Remote r;
-        char *srcname;
         int cfd;
         int ret;
 
@@ -614,7 +662,7 @@ int main(int argc, char **argv)
 		continue;
 	}
 
-        cfd = rina_flow_accept(g->rfd, &srcname, NULL, 0);
+        cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
         if (cfd < 0) {
             if (errno == ENOSPC) {
                 continue;
@@ -623,8 +671,8 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        r.app_name = string(srcname); free(srcname);
-        r.dif_name = string();
+        cout << "Flow accepted!" << endl;
+
         r.rfd = cfd;
         if (remote_tun_alloc(r)) {
             close(r.rfd);
@@ -632,7 +680,27 @@ int main(int argc, char **argv)
         }
         g->remotes.push_back(r);
 
-        cout << "Flow accepted!" << endl;
+        CDAPConn conn(r.rfd, 1);
+        CDAPMessage *rm;
+        CDAPMessage m;
+
+        rm = conn.msg_recv();
+        if (rm->op_code != gpb::M_CONNECT) {
+            cerr << "M_CONNECT expected" << endl;
+            goto abor;
+        }
+
+        r.app_name = rm->src_appl;
+        r.dif_name = string();
+
+        m.m_connect_r(rm, 0, string());
+        if (conn.msg_send(&m, rm->invoke_id)) {
+            cerr << "Failed to send M_CONNECT_R" << endl;
+            goto abor;
+        }
+
+abor:
+        close(r.rfd);
     }
 
     pthread_exit(NULL);
