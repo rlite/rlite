@@ -354,9 +354,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    params_map["enrollment"].insert({"keepalive", PolicyParam(NEIGH_KEEPALIVE_TO)});
-    params_map["resource-allocator"].insert({"reliable-flows", PolicyParam(false)});
-    params_map["resource-allocator"].insert({"reliable-n-flows", PolicyParam(false)});
+    params_map["enrollment"]["keepalive"] = PolicyParam(NEIGH_KEEPALIVE_TO);
+    params_map["resource-allocator"]["reliable-flows"] = PolicyParam(false);
+    params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
+    params_map["routing"] = {};
+    params_map["address-allocator"] = {};
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
@@ -1227,7 +1229,7 @@ uipcp_rib::policy_param_mod(const std::string& component,
 {
     int ret = 0;
 
-    if (!available_policies.count(component)) {
+    if (!params_map.count(component)) {
         UPE(uipcp, "Unknown component %s\n", component.c_str());
         return -1;
     }
@@ -1677,13 +1679,13 @@ PolicyParam::PolicyParam()
 PolicyParam::PolicyParam(bool param_value)
 {
     type = PolicyParamType::BOOL;
-    value.BOOL = param_value;
+    value.b = param_value;
 }
 
 PolicyParam::PolicyParam(int param_value)
 {
     type = PolicyParamType::INT;
-    value.INT = param_value;
+    value.i = param_value;
 }
 
 int
@@ -1697,14 +1699,14 @@ PolicyParam::set_value(const std::string& param_value)
         if (string2int(param_value, val)) {
             return -1;
         }
-        value.INT = val;
+        value.i = val;
         break;
     case PolicyParamType::BOOL:
         enable = (param_value == "true");
         if (!enable && param_value != "false") {
             return -1;
         }
-        value.BOOL = enable;
+        value.b = enable;
         break;
     default:
         return -1;
@@ -1717,14 +1719,14 @@ int
 PolicyParam::get_int_value() const
 {
     assert(type == PolicyParamType::INT);
-    return value.INT;
+    return value.i;
 };
 
 bool
 PolicyParam::get_bool_value() const
 {
     assert(type == PolicyParamType::BOOL);
-    return value.BOOL;
+    return value.b;
 }
 
 extern "C" void

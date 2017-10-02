@@ -109,8 +109,8 @@ enum class PolicyParamType {
 struct PolicyParam {
     PolicyParamType type;
     union {
-        bool BOOL;
-        int INT;
+        bool b;
+        int  i;
     } value;
 
     PolicyParam();
