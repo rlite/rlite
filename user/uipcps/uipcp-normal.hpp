@@ -465,6 +465,8 @@ void normal_trigger_tasks(struct uipcp *uipcp);
 int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
+void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
+
 void age_incr_cb(struct uipcp *uipcp, void *arg);
 void neighs_refresh_cb(struct uipcp *uipcp, void *arg);
 
