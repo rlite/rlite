@@ -821,6 +821,7 @@ for vmname in sorted(vms):
         if args.register:
             outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' \
                     'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' \
+                    'nohup rlite-rand-clients -v > rlite-rand-clients.log &\n'\
                         % {'echoname': 'rina-echo-async:%s' % vm['name'],
                            'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
 
@@ -880,8 +881,6 @@ for dif in dif_ordering:
             outs += '%(dif)s.%(pvid)s.IPCP:%(pvid)s\n' % vars_dict
         else:
             outs += '\n'
-        if args.register:
-            outs += 'nohup rlite-rand-clients -v 2&>1 > rlite-rand-clients.log &\n'
         outs += 'sleep 1\n'\
                 'true\n'\
                 'ENDSSH\n'\
