@@ -527,7 +527,10 @@ if len(circular_set):
 
 for dif in dif_ordering:
     if dif not in dif_policies:
-        dif_policies[dif] = dict()
+        dif_policies[dif] = []
+        if args.addr_alloc_policy == "manual":
+            dif_policies[dif].append({'path': 'address-allocator', 'nodes': [],
+                                      'ps': 'manual', 'parms' : []})
 
 
 ####################### Compute DIF graphs #######################
@@ -802,6 +805,7 @@ for vmname in sorted(vms):
             if args.addr_alloc_policy == "manual":
                 outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
+
             for p in dif_policies[dif]:
                 if len(p['nodes']) == 0 or vmname in p.nodes:
                     outs += '$SUDO rlite-ctl dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
