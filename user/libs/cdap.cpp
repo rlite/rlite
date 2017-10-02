@@ -261,6 +261,48 @@ CDAPConn::reset()
     PV("Connection reset to %s\n", conn_state_repr(state));
 }
 
+int
+CDAPConn::connect(const std::string& src, const std::string& dst,
+                  gpb::authTypes_t auth_mech,
+                  const struct CDAPAuthValue *auth_value)
+{
+    CDAPMessage *rm;
+    CDAPMessage m;
+
+    m.m_connect(auth_mech, auth_value, src, dst);
+    if (msg_send(&m, 0)) {
+        return -1;
+    }
+
+    rm = msg_recv();
+    if (rm->op_code != gpb::M_CONNECT_R) {
+        return -1;
+    }
+    delete rm;
+
+    return 0;
+}
+
+CDAPMessage *
+CDAPConn::accept()
+{
+    CDAPMessage *rm = msg_recv();
+    CDAPMessage m;
+
+    if (rm->op_code != gpb::M_CONNECT) {
+        delete rm;
+        return NULL;
+    }
+
+    m.m_connect_r(rm, 0, string());
+    if (msg_send(&m, rm->invoke_id)) {
+        delete rm;
+        return NULL;
+    }
+
+    return rm;
+}
+
 const char *
 CDAPConn::conn_state_repr(int st)
 {

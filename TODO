@@ -19,9 +19,3 @@
 
 - routing: use IPCP names to identify graph nodes, rather than using
   addresses. This is a first step towards supporting live renumbering
-
-- add CDAPConn::cdap_connect() and CDAPConn::cdap_accept() functions in
-  libcdap
-
-- write documentation about interoperability: shim-udp4, rina-gw, iporinad;
-  mention tso/gso must be off on tunnel devices for iporinad

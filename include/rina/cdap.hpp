@@ -104,6 +104,16 @@ public:
 
     void reset();
 
+    /* Helper function to send M_CONNECT and wait for the M_CONNECT_R
+     * response. */
+    int connect(const std::string& src, const std::string& dst,
+                gpb::authTypes_t auth_mech,
+                const struct CDAPAuthValue *auth_value);
+
+    /* Helper function to wait for M_CONNECT and send the M_CONNECT_R
+     * response. */
+    CDAPMessage *accept();
+
     std::string local_appl;
     std::string remote_appl;
     int fd;
