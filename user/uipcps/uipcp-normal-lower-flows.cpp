@@ -619,8 +619,8 @@ RoutingEngine::compute_fwd_table()
                 continue;
             }
 
-            /* Just take one of the flows towards the neighbor for now. */
-            port_id = neigh->second->mgmt_conn()->port_id;
+            /* Take one of the kernel-bound flows towards the neighbor. */
+            port_id = neigh->second->flows.begin()->second->port_id;
             if (ports_down.count(port_id)) {
                 UPD(uipcp, "Skipping port %u as it is down\n", port_id);
                 continue;
