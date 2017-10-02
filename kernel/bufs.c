@@ -26,6 +26,10 @@
 #include "rlite-kernel.h"
 
 
+/*
+ * Allocate a buffer to hold PDU header and data.
+ * The returned buffer has zero length (i.e. it's empty).
+ */
 struct rl_buf *
 rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp)
 {
@@ -50,7 +54,7 @@ rl_buf_alloc(size_t size, size_t hdroom, gfp_t gfp)
     rb->raw->size = real_size;
     atomic_set(&rb->raw->refcnt, 1);
     rb->pci = (struct rina_pci *)(rb->raw->buf + hdroom);
-    rb->len = size;
+    rb->len = 0;
     rb->u.rmt.compl_flow = NULL;
     INIT_LIST_HEAD(&rb->node);
 

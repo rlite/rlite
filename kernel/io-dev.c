@@ -327,6 +327,7 @@ rl_io_write(struct file *f, const char __user *ubuf, size_t ulen, loff_t *ppos)
         rl_buf_free(rb);
         return -EFAULT;
     }
+    rb->len = ulen;
 
     if (unlikely(rio->mode == RLITE_IO_MODE_IPCP_MGMT)) {
         struct ipcp_entry *lower_ipcp;

@@ -158,6 +158,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             PE("Out of memory\n");
             break;
         }
+        rb->len = ret;
 
         if (unlikely(update_port)) {
             msg.msg_name = &remote_addr;
