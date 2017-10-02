@@ -192,8 +192,10 @@ argparser.add_argument('-e', '--enrollment-strategy',
                        default = 'minimal')
 argparser.add_argument('--ring', type = int,
                        help = "Use ring topology with variable number of nodes")
-argparser.add_argument('--star', type = int,
-                       help = "Use star topology with variable number of nodes")
+argparser.add_argument('--tree', type = int,
+                       help = "Use tree topology with variable number of nodes")
+argparser.add_argument('--tree-cardinality', type = int, default = 3,
+                       help = "Number of children per node for the tree topology")
 argparser.add_argument('--verbosity',
                        help = "Set verbosity level for kernel and userspace",
                        choices = ['VERY', 'DBG', 'INFO', 'WARN', 'QUIET'],
@@ -285,20 +287,42 @@ if args.ring != None and args.ring > 0:
     args.conf = 'ring.conf'
 
 
-# Possibly autogenerate star topology
-if args.star != None and args.star > 0:
-    print("Ignoring %s, generating star topology" % (args.conf,))
-    fout = open('star.conf', 'w')
-    for i in range(args.star):
-        fout.write('eth b%(i)s 0Mbps m%(i)03d mc\n' % {'i': i+1})
-    for i in range(args.star):
-        fout.write('dif n m%(i)03d b%(i)s\n' % {'i': i+1})
-    ds = ""
-    for i in range(args.star):
-        ds += 'b%(i)s ' % {'i': i+1}
-    fout.write('dif n mc %s\n' % ds)
+# Possibly autogenerate multi-layer tree topology
+if args.tree != None and args.tree > 0:
+    print("Ignoring %s, generating tree topology" % (args.conf,))
+    fout = open('tree.conf', 'w')
+
+    prev_level = [1]
+    next_level = []
+    cur_node_idx = 2
+    n = args.tree - 1
+    lowers = dict()
+    while n > 0:
+        for p in prev_level:
+            for j in range(args.tree_cardinality):
+                fout.write('eth b%(i)s 0Mbps m%(i)03d m%(parent)03d\n' \
+                                % {'i': cur_node_idx, 'parent': p})
+                next_level.append(cur_node_idx)
+                if p not in lowers:
+                    lowers[p] = []
+                lowers[p].append(cur_node_idx)
+                if cur_node_idx not in lowers:
+                    lowers[cur_node_idx] = []
+                lowers[cur_node_idx].append(cur_node_idx)
+                cur_node_idx += 1
+                n -= 1
+                if n == 0:
+                    break
+            if n == 0:
+                break
+        prev_level = next_level
+        next_level = []
+
+    for p in lowers:
+        lstring = ' '.join([('b%d' % x) for x in lowers[p]])
+        fout.write('dif n m%03d %s\n' % (p, lstring))
     fout.close()
-    args.conf = 'star.conf'
+    args.conf = 'tree.conf'
 
 # Generated files needed by access.sh
 fout = open('user', 'w')
