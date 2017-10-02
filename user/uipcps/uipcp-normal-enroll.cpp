@@ -48,8 +48,8 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                                   keepalive_tmrid(0),
                                   pending_keepalive_reqs(0)
 {
-    last_activity = time(NULL);
-    stats.bytes_sent = stats.bytes_recvd = 0;
+    last_activity = stats.t_last = time(NULL);
+    memset(&stats.win, 0, sizeof(stats.win));
     assert(neigh);
 }
 
@@ -140,14 +140,22 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 
         ret = mgmt_write_to_local_port(neigh->rib->uipcp, port_id,
                                        serbuf, serlen);
-
+        if (ret == 0) {
+            ret = serlen;
+        }
         if (serbuf) {
             delete [] serbuf;
         }
     }
 
-    if (ret > 0) {
+    if (ret >= 0) {
         last_activity = time(NULL);
+        stats.win[0].bytes_sent += ret;
+        if (last_activity - stats.t_last >= RL_NEIGHFLOW_STATS_PERIOD) {
+            stats.win[1] = stats.win[0];
+            stats.win[0].bytes_sent = stats.win[0].bytes_recvd = 0;
+            stats.t_last = last_activity;
+        }
     }
 
     return ret >= 0 ? 0 : ret;

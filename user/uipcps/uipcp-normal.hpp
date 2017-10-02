@@ -82,6 +82,8 @@ namespace obj_name {
  * RIB synchronizations. */
 #define RL_NEIGH_REFRESH_INTVAL     30
 
+#define RL_NEIGHFLOW_STATS_PERIOD   20
+
 enum enroll_state_t {
     NEIGH_NONE = 0,
 
@@ -148,9 +150,11 @@ struct NeighFlow {
 
     /* Statistics about management traffic. */
     struct {
-        unsigned int bytes_sent;
-        unsigned int bytes_recvd;
-        time_t t_start;
+        struct {
+            unsigned int bytes_sent;
+            unsigned int bytes_recvd;
+        } win[2];
+        time_t t_last;
     } stats;
 
     NeighFlow(Neighbor *n, const std::string& supp_dif, rl_port_t pid,

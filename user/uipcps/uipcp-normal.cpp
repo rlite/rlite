@@ -148,6 +148,10 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
     Neighbor *neigh;
     int ret = 0;
 
+    if (nf) {
+        nf->stats.win[0].bytes_recvd += serlen;
+    }
+
     try {
         m = msg_deser_stateless(serbuf, serlen);
         if (m == NULL) {
@@ -511,13 +515,17 @@ uipcp_rib::dump() const
 
         neigh = neighbors.find(neigh_name);
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
+            NeighFlow *nf = neigh->second->mgmt_conn();
+
             if (neigh->second->enrollment_complete()) {
-                ss << "[Enrolled, last heard " <<
+                ss << "[Enrolled, heard " <<
                     static_cast<int>(time(NULL) - neigh->second->unheard_since)
-                        << " seconds ago]";
+                        << "s ago, " << (nf->stats.win[1].bytes_sent/1000.0)
+                        << "KB sent, " << (nf->stats.win[1].bytes_recvd/1000.0)
+                        << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD
+                        << "s]";
             } else {
-                ss << "[Enrollment ongoing <" <<
-                        neigh->second->mgmt_conn()->enroll_state << ">]";
+                ss << "[Enrollment ongoing <" << nf->enroll_state << ">]";
             }
         } else {
             ss << "[Disconnected]";
