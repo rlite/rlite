@@ -442,7 +442,8 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     remote_addr = req->initiator ? f->second.dst_addr : f->second.src_addr;
     flow_reqs.erase(f);
 
-    UPD(rib->uipcp, "Removed flow request %s\n", obj_name_ext.str().c_str());
+    UPD(rib->uipcp, "Removed flow request %s [port %u]\n",
+                    obj_name_ext.str().c_str(), req->local_port_id);
 
     if (!(f->second.flags & RL_FLOWREQ_SEND_DEL)) {
         return 0;
@@ -464,7 +465,6 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
     string objname;
     unsigned addr, port;
     char separator;
-    int ret;
 
     decode << rm->obj_name.substr(obj_name::flows.size() + 1);
     decode >> addr >> separator >> port;
@@ -475,7 +475,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
     }
     f = flow_reqs.find(objname);
     if (f == flow_reqs.end()) {
-        UPD(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
+        UPV(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
         return 0;
     }
 
@@ -494,9 +494,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
      * him a delete request. */
     f->second.flags &= RL_FLOWREQ_SEND_DEL;
 
-    ret = uipcp_issue_flow_dealloc(rib->uipcp, local_port, f->second.uid);
-
-    return ret;
+    return uipcp_issue_flow_dealloc(rib->uipcp, local_port, f->second.uid);
 }
 
 int
