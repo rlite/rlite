@@ -360,6 +360,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     params_map["resource-allocator"]["reliable-flows"] = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
     params_map["routing"]["age-incr-intval"] = PolicyParam(RL_AGE_INCR_INTERVAL);
+    params_map["routing"]["age-max"] = PolicyParam(RL_AGE_MAX);
     params_map["address-allocator"] = {};
     params_map["rib-daemon"]["refresh-intval"] = PolicyParam(RL_NEIGH_REFRESH_INTVAL);
 
