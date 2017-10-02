@@ -55,11 +55,16 @@ NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
 NeighFlow::~NeighFlow()
 {
     struct uipcp *uipcp = neigh->rib->uipcp;
+    const char *flowlev = "N-1";
     int ret;
 
     if (!neigh) {
         /* This is an empty instance. */
         return;
+    }
+
+    if (supp_dif == string(neigh->rib->uipcp->dif_name)) {
+        flowlev = "N";
     }
 
     assert(enrollment_rsrc == NULL);
@@ -71,9 +76,9 @@ NeighFlow::~NeighFlow()
 
     ret = close(flow_fd);
     if (ret) {
-        UPE(uipcp, "Error deallocating N-1-flow [fd=%d]\n", flow_fd);
+        UPE(uipcp, "Error deallocating %s-flow [fd=%d]\n", flowlev, flow_fd);
     } else {
-        UPD(uipcp, "N-1-flow deallocated [fd=%d]\n", flow_fd);
+        UPD(uipcp, "%s-flow deallocated [fd=%d]\n", flowlev, flow_fd);
     }
 
     if (!reliable) {
@@ -1801,6 +1806,7 @@ normal_allocate_n_flows(struct uipcp *uipcp)
         neigh = rib->neighbors.find(*lit);
         if (neigh != rib->neighbors.end()) {
             NeighFlow *nf;
+
             nf = rl_new(NeighFlow(neigh->second, string(uipcp->dif_name),
                                   RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE),
                         RL_MT_NEIGHFLOW);
