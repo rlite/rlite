@@ -1186,10 +1186,10 @@ uipcp_rib::del_neighbor(const std::string& neigh_name)
 }
 
 rlm_addr_t
-uipcp_rib::lookup_neighbor_address(const std::string& neigh_name) const
+uipcp_rib::lookup_node_address(const std::string& node_name) const
 {
     map< string, NeighborCandidate >::const_iterator
-            mit = neighbors_seen.find(neigh_name);
+            mit = neighbors_seen.find(node_name);
 
     if (mit != neighbors_seen.end()) {
         return mit->second.address;

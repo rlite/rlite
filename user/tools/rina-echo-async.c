@@ -401,8 +401,8 @@ main(int argc, char **argv)
 
     memset(&rea, 0, sizeof(rea));
 
-    rea.cli_appl_name = "rina-echo-async:client";
-    rea.srv_appl_name = "rina-echo-async:server";
+    rea.cli_appl_name = "rina-echo-async|client";
+    rea.srv_appl_name = "rina-echo-async|server";
     rea.p = 1;
 
     /* Start with a default flow configuration (unreliable flow). */

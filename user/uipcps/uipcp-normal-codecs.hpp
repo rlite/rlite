@@ -48,6 +48,8 @@
 #define rl_delete(_exp, _ty)    delete _exp
 #endif /* RL_MEMTRACK */
 
+typedef std::string NodeId;
+
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
     virtual ~UipcpObject() { }
@@ -132,20 +134,19 @@ struct NeighborCandidateList : public UipcpObject {
 };
 
 struct LowerFlow : public UipcpObject {
-    rlm_addr_t local_addr;
-    rlm_addr_t remote_addr;
+    NodeId local_node;
+    NodeId remote_node;
     unsigned int cost;
     unsigned int seqnum;
     bool state;
     unsigned int age;
 
-    LowerFlow() : local_addr(0), remote_addr(0), cost(0), seqnum(0),
-                  state(false), age(0) { }
+    LowerFlow() : cost(0), seqnum(0), state(false), age(0) { }
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
     bool operator==(const LowerFlow& o) {
         /* Don't use seqnum and age for the comparison. */
-        return local_addr == o.local_addr && remote_addr == o.remote_addr &&
+        return local_node == o.local_node && remote_node == o.remote_node &&
                 cost == o.cost;
     }
     bool operator!=(const LowerFlow& o) {

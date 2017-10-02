@@ -892,7 +892,7 @@ for vmname in sorted(vms):
             print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
             del vars_dict
 
-        vars_dict = {'echoname': 'rina-echo-async:%s' % vm['name'],
+        vars_dict = {'echoname': 'rina-echo-async.%s' % vm['name'],
                        'dif': dif, 'perfname': 'rinaperf:%s' % vm['name']}
         if args.register:
             outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' % vars_dict
@@ -1170,7 +1170,7 @@ if args.register:
 
         for vmname in sorted(difs[dif]):
             outs += 'echo "%(pivot)s --> %(vmname)s"\n'\
-                    'rina-echo-async -z rina-echo-async:%(vmname)s -d %(dif)s.DIF\n' \
+                    'rina-echo-async -z rina-echo-async.%(vmname)s -d %(dif)s.DIF\n' \
                     '[ "$?" == "0" ] || echo "Failed to reach %(vmname)s ' \
                         'in DIF %(dif)s"\n'\
                         % {'vmname': vmname, 'dif': dif, 'pivot': pivot}

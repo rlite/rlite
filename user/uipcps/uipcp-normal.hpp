@@ -316,11 +316,12 @@ struct lfdb {
     virtual void dump(std::stringstream& ss) const = 0;
     virtual void dump_routing(std::stringstream& ss) const = 0;
 
-    virtual const LowerFlow *find(rlm_addr_t local_addr,
-                               rlm_addr_t remote_addr) const = 0;
-    virtual LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr) = 0;
+    virtual const LowerFlow *find(const NodeId& local_node,
+                                  const NodeId& remote_node) const = 0;
+    virtual LowerFlow *find(const NodeId& local_node,
+                            const NodeId& remote_node) = 0;
     virtual bool add(const LowerFlow &lf) = 0;
-    virtual bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr) = 0;
+    virtual bool del(const NodeId& local_node, const NodeId& remote_node) = 0;
     virtual void update_local(const std::string& neigh_name) = 0;
     virtual void update_address(rlm_addr_t new_addr) = 0;
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd) = 0;
@@ -437,7 +438,7 @@ struct uipcp_rib {
     int update_lower_difs(int reg, std::string lower_dif);
     int realize_registrations(bool reg);
     int enroller_enable(bool enable);
-    rlm_addr_t lookup_neighbor_address(const std::string& neigh_name) const;
+    rlm_addr_t lookup_node_address(const std::string& node_name) const;
     std::string lookup_neighbor_by_address(rlm_addr_t address);
     int lookup_neigh_flow_by_port_id(rl_port_t port_id,
                                      NeighFlow **nfp);
@@ -580,7 +581,7 @@ public:
 
     /* Recompute routing and forwarding table and possibly
      * update kernel forwarding data structures. */
-    void update_kernel_routing(rlm_addr_t);
+    void update_kernel_routing(const NodeId&);
 
     void flow_state_update(struct rl_kmsg_flow_state *upd);
 
@@ -592,33 +593,33 @@ public:
 
 private:
     struct Edge {
-        rlm_addr_t to;
+        NodeId to;
         unsigned int cost;
 
-        Edge(rlm_addr_t to_, unsigned int cost_) :
+        Edge(const NodeId& to_, unsigned int cost_) :
                             to(to_), cost(cost_) { }
     };
 
     struct Info {
         unsigned int dist;
-        rlm_addr_t nhop;
+        NodeId nhop;
         bool visited;
     };
 
     /* Step 1. Shortest Path algorithm. */
-    void compute_shortest_paths(rlm_addr_t source_addr,
-                        const std::map<rlm_addr_t, std::list<Edge> >& graph,
-                        std::map<rlm_addr_t, Info>& info);
-    int compute_next_hops(rlm_addr_t);
+    void compute_shortest_paths(const NodeId& source_node,
+                        const std::map<NodeId, std::list<Edge> >& graph,
+                        std::map<NodeId, Info>& info);
+    int compute_next_hops(const NodeId&);
 
     /* Step 3. Forwarding table computation and kernel update. */
     int compute_fwd_table();
 
     /* The routing table computed by compute_next_hops(). */
-    std::map<rlm_addr_t, std::list<rlm_addr_t> > next_hops;
+    std::map<NodeId, std::list<NodeId> > next_hops;
 
     /* The forwarding table computed by compute_fwd_table(). */
-    std::map<rlm_addr_t, rl_port_t> next_ports;
+    std::map<NodeId, rl_port_t> next_ports;
 
     /* Set of ports that are currently down. */
     std::set<rl_port_t> ports_down;
@@ -628,7 +629,7 @@ private:
 
 struct lfdb_default : public lfdb {
     /* Lower Flow Database. */
-    std::map< rlm_addr_t, std::map<rlm_addr_t, LowerFlow > > db;
+    std::map< NodeId, std::map<NodeId, LowerFlow > > db;
 
     RoutingEngine re;
 
@@ -638,19 +639,19 @@ struct lfdb_default : public lfdb {
     void dump(std::stringstream& ss) const;
     void dump_routing(std::stringstream& ss) const;
 
-    const LowerFlow *find(rlm_addr_t local_addr,
-                               rlm_addr_t remote_addr) const {
-        return _find(local_addr, remote_addr);
+    const LowerFlow *find(const NodeId& local_node,
+                          const NodeId& remote_node) const {
+        return _find(local_node, remote_node);
     };
-    LowerFlow *find(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    LowerFlow *find(const NodeId& local_node, const NodeId& remote_node);
     bool add(const LowerFlow &lf);
-    bool del(rlm_addr_t local_addr, rlm_addr_t remote_addr);
+    bool del(const NodeId& local_node, const NodeId& remote_node);
     void update_local(const std::string& neigh_name);
     void update_address(rlm_addr_t new_addr);
     int flow_state_update(struct rl_kmsg_flow_state *upd);
 
-    const LowerFlow *_find(rlm_addr_t local_addr,
-                                rlm_addr_t remote_addr) const;
+    const LowerFlow *_find(const NodeId& local_node,
+                           const NodeId& remote_node) const;
 
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 

@@ -361,8 +361,8 @@ NeighborCandidateList::serialize(char *buf, unsigned int size) const
 static void
 gpb2LowerFlow(LowerFlow& lf, const gpb::flowStateObject_t &gm)
 {
-    lf.local_addr = gm.address();
-    lf.remote_addr = gm.neighbor_address();
+    lf.local_node = gm.name();
+    lf.remote_node = gm.neighbor_name();
     lf.cost = gm.cost();
     lf.seqnum = gm.sequence_number();
     lf.state = gm.state();
@@ -372,8 +372,8 @@ gpb2LowerFlow(LowerFlow& lf, const gpb::flowStateObject_t &gm)
 static int
 LowerFlow2gpb(const LowerFlow& lf, gpb::flowStateObject_t &gm)
 {
-    gm.set_address(lf.local_addr);
-    gm.set_neighbor_address(lf.remote_addr);
+    gm.set_name(lf.local_node);
+    gm.set_neighbor_name(lf.remote_node);
     gm.set_cost(lf.cost);
     gm.set_sequence_number(lf.seqnum);
     gm.set_state(lf.state);
@@ -405,7 +405,7 @@ LowerFlow::operator std::string() const
 {
     stringstream ss;
 
-    ss << local_addr << "-" << remote_addr;
+    ss << local_node << "-" << remote_node;
 
     return ss.str();
 }

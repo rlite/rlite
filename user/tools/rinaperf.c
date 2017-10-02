@@ -1205,8 +1205,8 @@ main(int argc, char **argv)
     wt.cfd = -1;
 
     memset(rp, 0, sizeof(*rp));
-    rp->cli_appl_name = "rinaperf-data:client";
-    rp->srv_appl_name = "rinaperf-data:server";
+    rp->cli_appl_name = "rinaperf-data|client";
+    rp->srv_appl_name = "rinaperf-data|server";
     rp->parallel = 1;
     rp->duration = 0;
     rp->use_mss_size = 1;
