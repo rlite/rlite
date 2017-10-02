@@ -97,6 +97,25 @@ ipcp_by_dif(const char *dif_name)
     return NULL;
 }
 
+/* Select the IPCP with the smaller MSS, which is
+ * probably the one with the higher rank. */
+static struct ipcp_attrs *
+select_ipcp()
+{
+    unsigned int smaller_mss = ~0U;
+    struct ipcp_attrs *ret = NULL;
+    struct ipcp_attrs *attrs;
+
+    list_for_each_entry(attrs, &ipcps, node) {
+        if (attrs->max_sdu_size < smaller_mss) {
+            smaller_mss = attrs->max_sdu_size;
+            ret = attrs;
+        }
+    }
+
+    return ret;
+}
+
 static int
 uipcps_connect(void)
 {
@@ -717,26 +736,34 @@ static int
 ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_rib_show_req req;
-    const char *name;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 1);
-    name = argv[0];
+    if (argc >= 1) {
+        const char *name;
 
-    if (strncmp(cd->name, "dif-", 4) == 0) {
-        attrs = ipcp_by_dif(name);
+        name = argv[0];
+        if (strncmp(cd->name, "dif-", 4) == 0) {
+            attrs = ipcp_by_dif(name);
+            if (!attrs) {
+                PE("Could not find any IPCP in DIF %s\n", name);
+                return -1;
+            }
+            req.ipcp_name = strdup(attrs->name);
+        } else {
+            req.ipcp_name = strdup(name);
+            attrs = lookup_ipcp_by_name(req.ipcp_name);
+            if (!attrs) {
+                PE("Could not find IPC process %s\n", name);
+                return -1;
+            }
+        }
+    } else {
+        attrs = select_ipcp();
         if (!attrs) {
-            PE("Could not find any IPCP in DIF %s\n", name);
+            PE("Could not find any IPCP\n");
             return -1;
         }
         req.ipcp_name = strdup(attrs->name);
-    } else {
-        req.ipcp_name = strdup(name);
-        attrs = lookup_ipcp_by_name(req.ipcp_name);
-        if (!attrs) {
-            PE("Could not find IPC process %s\n", name);
-            return -1;
-        }
     }
 
     if (strcmp(cd->name, "dif-rib-show") == 0 ||
@@ -886,14 +913,14 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name = "dif-rib-show",
-        .usage = "DIF_NAME",
-        .num_args = 1,
+        .usage = "[DIF_NAME]",
+        .num_args = 0,
         .func = ipcp_rib_show,
     },
     {
         .name = "dif-routing-show",
-        .usage = "DIF_NAME",
-        .num_args = 1,
+        .usage = "[DIF_NAME]",
+        .num_args = 0,
         .func = ipcp_rib_show,
     },
     {
