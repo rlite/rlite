@@ -1466,6 +1466,24 @@ __ipcp_put(struct ipcp_entry *entry)
 }
 
 static int
+ipcp_pduft_flush(struct ipcp_entry *ipcp)
+{
+    int ret = 0;
+
+    if (!ipcp) {
+        return -EINVAL;
+    }
+
+    if (ipcp->ops.pduft_flush) {
+        mutex_lock(&ipcp->lock);
+        ret = ipcp->ops.pduft_flush(ipcp);
+        mutex_unlock(&ipcp->lock);
+    }
+
+    return ret;
+}
+
+static int
 ipcp_del(rl_ipcp_id_t ipcp_id)
 {
     struct ipcp_entry *entry;
@@ -1495,6 +1513,9 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
     }
     entry->flags |= RL_K_IPCP_ZOMBIE;
 
+    /* Flush the PDUFT. */
+    ipcp_pduft_flush(entry);
+
     /* Unregister all the applications associated to this IPCP. */
     {
         struct list_head remove_apps;
@@ -1517,7 +1538,7 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
     /* Shutdown all the allocated flows bound by user-space applications. */
     rl_iodevs_shutdown_by_ipcp(entry);
 
-    ret = ipcp_put(entry); /* To let the recount drop to 0. */
+    ret = ipcp_put(entry); /* Let the recount drop to 0. */
 
     return ret;
 }
@@ -1649,7 +1670,7 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     ret = ipcp_del(req->ipcp_id);
 
     if (ret == 0) {
-        PI("IPC process %u destroyed\n", req->ipcp_id);
+        PI("IPC process %u is going to be removed\n", req->ipcp_id);
 
         {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
@@ -1953,16 +1974,10 @@ rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     struct rl_kmsg_ipcp_pduft_flush *req =
                     (struct rl_kmsg_ipcp_pduft_flush *)bmsg;
     struct ipcp_entry *ipcp;
-    int ret = -EINVAL;  /* Report failure by default. */
+    int ret;
 
     ipcp = ipcp_get(req->ipcp_id);
-
-    if (ipcp && ipcp->ops.pduft_flush) {
-        mutex_lock(&ipcp->lock);
-        ret = ipcp->ops.pduft_flush(ipcp);
-        mutex_unlock(&ipcp->lock);
-    }
-
+    ret = ipcp_pduft_flush(ipcp);
     ipcp_put(ipcp);
 
     if (ret == 0) {
@@ -1971,6 +1986,7 @@ rl_ipcp_pduft_flush(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     return ret;
 }
+
 static int
 rl_ipcp_qos_supported(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
