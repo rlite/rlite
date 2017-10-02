@@ -199,7 +199,8 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 void
 lfdb_default::update_address(rlm_addr_t new_addr)
 {
-    LowerFlowList lfl;
+    LowerFlowList lfl_prop;
+    LowerFlowList lfl_del;
 
     /* Update local entries and propagate them. */
     for (map<rlm_addr_t, map<rlm_addr_t, LowerFlow > >::iterator
@@ -209,24 +210,29 @@ lfdb_default::update_address(rlm_addr_t new_addr)
             LowerFlow &flow = jt->second;
 
             if (flow.local_addr == rib->myaddr) {
+                lfl_del.flows.push_back(flow);
                 flow.local_addr = new_addr;
                 flow.seqnum ++;
-                lfl.flows.push_back(flow);
+                lfl_prop.flows.push_back(flow);
                 UPD(rib->uipcp, "Local lower flow entry updated: %s\n",
                            static_cast<string>(flow).c_str());
             }
         }
     }
 
-    if (lfl.flows.size()) {
-        rib->neighs_sync_obj_all(true, obj_class::lfdb, obj_name::lfdb, &lfl);
+    if (lfl_prop.flows.size()) {
+        rib->neighs_sync_obj_all(true, obj_class::lfdb, obj_name::lfdb, &lfl_prop);
+    }
+
+    if (lfl_del.flows.size()) {
+        rib->neighs_sync_obj_all(false, obj_class::lfdb, obj_name::lfdb, &lfl_del);
     }
 
     /* Move entries. */
     db[new_addr] = db[rib->myaddr];
     db.erase(rib->myaddr);
 
-    if (lfl.flows.size()) {
+    if (lfl_prop.flows.size()) {
         /* Update the routing table. */
         re.update_kernel_routing(new_addr);
     }
