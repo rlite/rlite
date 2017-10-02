@@ -104,6 +104,8 @@ public:
 
     void reset();
 
+    bool connected() const { return state == CONNECTED; }
+
     /* Helper function to send M_CONNECT and wait for the M_CONNECT_R
      * response. */
     int connect(const std::string& src, const std::string& dst,
