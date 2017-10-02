@@ -223,16 +223,16 @@ snd_inact_tmr_cb(long unsigned arg)
 
     /* Flush the retransmission queue. */
     PD("dropping %u PDUs from rtxq\n", dtp->rtxq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->rtxq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->rtxq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
         dtp->rtxq_len--;
     }
 
     /* Flush the closed window queue */
     PD("dropping %u PDUs from cwq\n", dtp->cwq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->cwq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->cwq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
         dtp->cwq_len--;
     }
@@ -264,8 +264,8 @@ rcv_inact_tmr_cb(long unsigned arg)
 
     /* Flush sequencing queue. */
     PD("dropping %u PDUs from seqq\n", dtp->seqq_len);
-    list_for_each_entry_safe(rb, tmp, &dtp->seqq, node) {
-        list_del_init(&rb->node);
+    rb_list_foreach_safe(rb, tmp, &dtp->seqq) {
+        rb_list_del(rb);
         rl_buf_free(rb);
         dtp->seqq_len--;
     }
@@ -321,11 +321,11 @@ rtx_tmr_cb(long unsigned arg)
     struct rl_buf *rb, *crb, *tmp;
     long unsigned next_exp = ~0U;
     bool next_exp_set = false;
-    struct list_head rrbq;
+    struct rb_list rrbq;
 
     RPD(1, "\n");
 
-    INIT_LIST_HEAD(&rrbq);
+    rb_list_init(&rrbq);
 
     spin_lock_bh(&dtp->lock);
 
@@ -336,7 +336,7 @@ rtx_tmr_cb(long unsigned arg)
 
     /* We scan all the retransmission list, since it is order by
      * ascending sequence number, not by ascending expiration time. */
-    list_for_each_entry(rb, &dtp->rtxq, node) {
+    rb_list_foreach(rb, &dtp->rtxq) {
         if (!time_before(jiffies, RL_BUF_RTX(rb).rtx_jiffies)) {
             /* This rb should be retransmitted. We also invalidate
              * RL_BUF_RTX(rb).jiffies, so that RTT is not updated on
@@ -348,7 +348,7 @@ rtx_tmr_cb(long unsigned arg)
             if (unlikely(!crb)) {
                 RPD(1, "OOM\n");
             } else {
-                list_add_tail_safe(&crb->node, &rrbq);
+                rb_list_enq(crb, &rrbq);
             }
 
         } else if (!next_exp_set ||
@@ -366,11 +366,11 @@ rtx_tmr_cb(long unsigned arg)
     spin_unlock_bh(&dtp->lock);
 
     /* Send PDUs popped out from RTX queue. */
-    list_for_each_entry_safe(crb, tmp, &rrbq, node) {
+    rb_list_foreach_safe(crb, tmp, &rrbq) {
         struct rina_pci *pci = RL_BUF_PCI(crb);
 
         RPD(2, "sending [%lu] from rtxq\n", (long unsigned)pci->seqnum);
-        list_del_init(&crb->node);
+        rb_list_del(crb);
         rmt_tx(flow->txrx.ipcp, pci->dst_addr, crb, false);
     }
 
@@ -572,7 +572,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
             spin_lock_bh(&lower_ipcp->rmtq_lock);
             if (lower_ipcp->rmtq_size < RMTQ_MAX_SIZE) {
                 RL_BUF_RMT(rb).compl_flow = lower_flow;
-                list_add_tail_safe(&rb->node, &lower_ipcp->rmtq);
+                rb_list_enq(rb, &lower_ipcp->rmtq);
                 lower_ipcp->rmtq_size += rl_buf_truesize(rb);
             } else {
                 /* No room in the RMT queue, we are forced to drop. */
@@ -616,7 +616,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
-    list_add_tail_safe(&crb->node, &dtp->rtxq);
+    rb_list_enq(crb, &dtp->rtxq);
     dtp->rtxq_len++;
     if (!timer_pending(&dtp->rtx_tmr)) {
         NPD("Forward rtx timer by %u\n",
@@ -742,7 +742,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp,
                  * insert it into the Closed Window Queue.
                  * Because of the check above, we are sure
                  * that dtp->cwq_len < dtp->max_cwq_len. */
-                list_add_tail_safe(&rb->node, &dtp->cwq);
+                rb_list_enq(rb, &dtp->cwq);
                 dtp->cwq_len++;
                 NPD("push [%lu] into cwq\n",
                         (long unsigned)pci->seqnum);
@@ -1089,7 +1089,7 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
         return;
     }
 
-    list_for_each_entry(cur, &dtp->seqq, node) {
+    rb_list_foreach(cur, &dtp->seqq) {
         struct rina_pci *pci = RL_BUF_PCI(cur);
 
         if (seqnum < pci->seqnum) {
@@ -1107,24 +1107,24 @@ seqq_push(struct dtp *dtp, struct rl_buf *rb)
     }
 
     /* Insert the rb right before 'pos'. */
-    list_add_tail_safe(&rb->node, pos);
+    rb_list_enq(rb, pos);
     dtp->seqq_len++;
     RPD(2, "[%lu] inserted\n", (long unsigned)seqnum);
 }
 
 static void
-seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct list_head *qrbs)
+seqq_pop_many(struct dtp *dtp, rl_seq_t max_sdu_gap, struct rb_list *qrbs)
 {
     struct rl_buf *qrb, *tmp;
 
-    INIT_LIST_HEAD(qrbs);
-    list_for_each_entry_safe(qrb, tmp, &dtp->seqq, node) {
+    rb_list_init(qrbs);
+    rb_list_foreach_safe(qrb, tmp, &dtp->seqq) {
         struct rina_pci *pci = RL_BUF_PCI(qrb);
 
         if (pci->seqnum - dtp->rcv_lwe_priv <= max_sdu_gap) {
-            list_del_init(&qrb->node);
+            rb_list_del(qrb);
             dtp->seqq_len--;
-            list_add_tail_safe(&qrb->node, qrbs);
+            rb_list_enq(qrb, qrbs);
             dtp->rcv_lwe_priv = pci->seqnum + 1;
             RPD(2, "[%lu] popped out from seqq\n",
                     (long unsigned)pci->seqnum);
@@ -1138,7 +1138,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     struct rina_pci_ctrl *pcic = RL_BUF_PCI_CTRL(rb);
     struct dtp *dtp = &flow->dtp;
-    struct list_head qrbs;
+    struct rb_list qrbs;
     struct rl_buf *qrb, *tmp;
 
     if (unlikely((pcic->base.pdu_type & PDU_T_CTRL)
@@ -1148,7 +1148,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
         return 0;
     }
 
-    INIT_LIST_HEAD(&qrbs);
+    rb_list_init(&qrbs);
 
     spin_lock_bh(&dtp->lock);
 
@@ -1193,13 +1193,13 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
             /* The update may have unblocked PDU in the cwq,
              * let's pop them out. */
-            list_for_each_entry_safe(qrb, tmp, &dtp->cwq, node) {
+            rb_list_foreach_safe(qrb, tmp, &dtp->cwq) {
                 if (dtp->snd_lwe >= dtp->snd_rwe) {
                     break;
                 }
-                list_del_init(&qrb->node);
+                rb_list_del(qrb);
                 dtp->cwq_len--;
-                list_add_tail_safe(&qrb->node, &qrbs);
+                rb_list_enq(qrb, &qrbs);
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
 
                 if (flow->cfg.dtcp.rtx_control) {
@@ -1218,7 +1218,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
 
         switch (pcic->base.pdu_type & PDU_T_ACK_MASK) {
             case PDU_T_ACK:
-                list_for_each_entry_safe(cur, tmp, &dtp->rtxq, node) {
+                rb_list_foreach_safe(cur, tmp, &dtp->rtxq) {
                     struct rina_pci *pci = RL_BUF_PCI(cur);
 
                     if (pci->seqnum <= pcic->ack_nack_seq_num) {
@@ -1260,7 +1260,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow,
                     }
                 }
 
-                if (list_empty(&dtp->rtxq)) {
+                if (rb_list_empty(&dtp->rtxq)) {
                     /* Everything has been acked, we can stop the rtx timer. */
                     del_timer(&dtp->rtx_tmr);
                 }
@@ -1283,12 +1283,12 @@ out:
 
     /* Send PDUs popped out from cwq, if any. Note that the qrbs list
      * is not emptied and must not be used after the scan.*/
-    list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
+    rb_list_foreach_safe(qrb, tmp, &qrbs) {
         struct rina_pci *pci = RL_BUF_PCI(qrb);
 
         NPD("sending [%lu] from cwq\n",
                 (long unsigned)pci->seqnum);
-        list_del_init(&qrb->node);
+        rb_list_del(qrb);
         rmt_tx(ipcp, pci->dst_addr, qrb, false);
     }
 
@@ -1581,8 +1581,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         /* Also deliver PDUs just extracted from the seqq. Note
          * that we must use the safe version of list scanning, since
          * rl_sdu_rx_flow() will modify qrb->node. */
-        list_for_each_entry_safe(qrb, tmp, &qrbs, node) {
-            list_del_init(&qrb->node);
+        rb_list_foreach_safe(qrb, tmp, &qrbs) {
+            rb_list_del(qrb);
             RL_BUF_RX(qrb).cons_seqnum = seqnum;
             if (unlikely(rl_buf_pci_pop(qrb))) {
                 rl_buf_free(qrb);

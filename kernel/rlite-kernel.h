@@ -209,6 +209,18 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
         __rl_buf_free(_rb); \
     } while (0)
 
+/* Support for list of buffers. */
+#define rb_list                 list_head
+#define rb_list_init(l)         INIT_LIST_HEAD((l))
+#define rb_list_enq(rb, q)      list_add_tail_safe(&(rb)->node, q)
+#define rb_list_del(rb)         list_del_init(&(rb)->node)
+#define rb_list_empty(l)        list_empty(l)
+#define rb_list_front(l)        list_first_entry(l, struct rl_buf, node)
+#define rb_list_foreach(rb, l) \
+            list_for_each_entry(rb, l, node)
+#define rb_list_foreach_safe(rb, tmp, l) \
+            list_for_each_entry_safe(rb, tmp, l, node)
+
 #else  /* RL_SKB */
 
 #include <linux/skbuff.h>
@@ -310,7 +322,7 @@ struct ipcp_ops {
 
 struct txrx {
     /* Read operation support. */
-    struct list_head    rx_q;
+    struct rb_list      rx_q;
     unsigned int        rx_qsize; /* in bytes */
     wait_queue_head_t   rx_wqh;
     spinlock_t          rx_lock;
@@ -359,7 +371,7 @@ struct ipcp_entry {
     struct txrx         *mgmt_txrx;
 
     /* TX completion structures. */
-    struct list_head    rmtq;
+    struct rb_list      rmtq;
     unsigned int        rmtq_size;
     spinlock_t          rmtq_lock;
     struct tasklet_struct   tx_completion;
@@ -407,11 +419,11 @@ struct dtp {
     rlm_seq_t next_seq_num_to_send;
     rlm_seq_t last_seq_num_sent;
     rlm_seq_t last_ctrl_seq_num_rcvd;
-    struct list_head cwq;
+    struct rb_list cwq;
     unsigned int cwq_len;
     unsigned int max_cwq_len;
     struct timer_list snd_inact_tmr;
-    struct list_head rtxq;
+    struct rb_list rtxq;
     unsigned int rtxq_len;
     unsigned int max_rtxq_len;
     struct timer_list rtx_tmr;
@@ -429,7 +441,7 @@ struct dtp {
     rlm_seq_t next_snd_ctl_seq;
     rlm_seq_t last_lwe_sent;
     struct timer_list rcv_inact_tmr;
-    struct list_head seqq;
+    struct rb_list seqq;
     unsigned int seqq_len;
     struct timer_list a_tmr;
 
@@ -568,7 +580,7 @@ static inline void
 txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
 {
     spin_lock_init(&txrx->rx_lock);
-    INIT_LIST_HEAD(&txrx->rx_q);
+    rb_list_init(&txrx->rx_q);
     txrx->rx_qsize = 0;
     init_waitqueue_head(&txrx->rx_wqh);
     txrx->ipcp = ipcp;
