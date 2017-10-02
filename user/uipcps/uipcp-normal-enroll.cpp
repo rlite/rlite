@@ -1331,47 +1331,37 @@ uipcp_rib::neighbor_cand_get() const
     return cand;
 }
 
+/* Reuse internal flow allocation functionalities from the API
+ * implementation, in order to specify an upper IPCP id and get the port
+ * id. These functionalities are not exposed through api.h */
+extern "C"
+int __rina_flow_alloc(const char *dif_name, const char *local_appl,
+                      const char *remote_appl,
+                      const struct rina_flow_spec *flowspec,
+                      unsigned int flags, uint16_t upper_ipcp_id);
+
+extern "C"
+int __rina_flow_alloc_wait(int wfd, rl_port_t *port_id);
+
 static int
 uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
                        const char *local_appl, const char *remote_appl,
                        const struct rina_flow_spec *flowspec,
                        rl_ipcp_id_t upper_ipcp_id, rl_port_t *port_id)
 {
-    struct rl_kmsg_fa_resp_arrived *kresp;
-    struct rl_kmsg_fa_req req;
     struct pollfd pfd;
     int ret;
-    int fd;
+    int wfd;
 
-    if (port_id) {
-        *port_id = ~0U;
-    }
-
-    fd = rina_open();
-    if (fd < 0) {
-        UPE(uipcp, "rina_open() failed [%s]\n", strerror(errno));
-        return fd;
-    }
-
-    /* Create a request message. */
-    ret = rl_fa_req_fill(&req, 1, dif_name, local_appl, remote_appl,
-                         flowspec, upper_ipcp_id);
-    if (ret) {
-        UPE(uipcp, "rl_fa_req_fill() failed\n");
-        goto out;
-    }
-
-    /* Submit the request. */
-    PV("Requesting flow allocation...\n");
-    ret = rl_write_msg(fd, RLITE_MB(&req), 1);
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
-    if (ret) {
-        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
-        goto out;
+    wfd = __rina_flow_alloc(dif_name, local_appl, remote_appl, flowspec,
+                            RINA_F_NOWAIT, upper_ipcp_id);
+    if (wfd < 0) {
+        UPE(uipcp, "Flow allocation request failed [%s]\n", strerror(errno));
+        return wfd;
     }
 
     /* Wait for the response and get it. */
-    pfd.fd = fd;
+    pfd.fd = wfd;
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, 2000);
     if (ret <= 0) {
@@ -1381,30 +1371,12 @@ uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
         } else {
             UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
         }
-        goto out;
+        close(wfd);
+
+        return -1;
     }
 
-    kresp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(fd, 1);
-    if (!kresp) {
-        UPE(uipcp, "rl_read_next_msg failed() [%s]\n", strerror(errno));
-        goto out;
-    }
-    assert(kresp->msg_type == RLITE_KER_FA_RESP_ARRIVED);
-    assert(kresp->event_id == req.event_id);
-
-    /* Ccollect the verdict and the port_id. */
-    PV("Flow allocation response: ret = %u, port-id = %u\n",
-       kresp->response, kresp->port_id);
-    ret = kresp->response;
-    if (port_id) {
-        *port_id = kresp->port_id;
-    }
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(kresp));
-    rl_free(kresp, RL_MT_MSG);
-out:
-    close(fd);
-
-    return ret;
+    return __rina_flow_alloc_wait(wfd, port_id);
 }
 
 int
@@ -1442,17 +1414,12 @@ Neighbor::alloc_flow(const char *supp_dif)
 
     /* Allocate a kernel-bound N-1 flow for the I/O. If N-1-DIF is not
      * normal, this N-1 flow is also used for management. */
-    ret = uipcp_bound_flow_alloc(rib->uipcp, supp_dif,
-                                 rib->uipcp->name, ipcp_name.c_str(),
-                                 NULL, rib->uipcp->id, &port_id_);
-    if (ret) {
-        UPW(rib->uipcp, "Failed to allocate N-1 flow towards neighbor\n");
-        return -1;
-    }
-
-    flow_fd_ = rl_open_appl_port(port_id_);
+    flow_fd_ = uipcp_bound_flow_alloc(rib->uipcp, supp_dif,
+                                      rib->uipcp->name, ipcp_name.c_str(),
+                                      NULL, rib->uipcp->id, &port_id_);
     if (flow_fd_ < 0) {
-        UPE(rib->uipcp, "Failed to access N-1 flow towards the neighbor\n");
+        UPE(rib->uipcp, "Failed to allocate N-1 flow towards neighbor "
+                    "failed [%s]\n", strerror(errno));
         return -1;
     }
 

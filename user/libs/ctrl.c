@@ -365,10 +365,14 @@ rina_unregister(int fd, const char *dif_name, const char *local_appl,
 #define RINA_FA_EVENT_ID    0x6271 /* casual value, used just for assert() */
 
 int
-rina_flow_alloc_wait(int wfd)
+__rina_flow_alloc_wait(int wfd, rl_port_t *port_id)
 {
     struct rl_kmsg_fa_resp_arrived *resp;
     int ret = -1;
+
+    if (port_id) {
+        *port_id = ~0U;
+    }
 
     resp = (struct rl_kmsg_fa_resp_arrived *)rl_read_next_msg(wfd, 1);
     if (!resp && errno == EAGAIN) {
@@ -386,6 +390,9 @@ rina_flow_alloc_wait(int wfd)
     if (resp->response) {
         errno = EPERM;
     } else {
+        if (port_id) {
+            *port_id = resp->port_id;
+        }
         ret = rl_open_appl_port(resp->port_id);
     }
 
@@ -398,9 +405,15 @@ out:
 }
 
 int
-rina_flow_alloc(const char *dif_name, const char *local_appl,
+rina_flow_alloc_wait(int wfd)
+{
+    return __rina_flow_alloc_wait(wfd, NULL);
+}
+
+int
+__rina_flow_alloc(const char *dif_name, const char *local_appl,
                 const char *remote_appl, const struct rina_flow_spec *flowspec,
-                unsigned int flags)
+                unsigned int flags, uint16_t upper_ipcp_id)
 {
     struct rl_kmsg_fa_req req;
     int wfd, ret;
@@ -411,7 +424,7 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
     }
 
     ret = rl_fa_req_fill(&req, RINA_FA_EVENT_ID, dif_name, local_appl,
-                         remote_appl, flowspec, 0xffff);
+                         remote_appl, flowspec, upper_ipcp_id);
     if (ret) {
         errno = ENOMEM;
         return -1;
@@ -436,6 +449,15 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
 
     /* Return the I/O file descriptor (or an error). */
     return rina_flow_alloc_wait(wfd);
+}
+
+int
+rina_flow_alloc(const char *dif_name, const char *local_appl,
+                const char *remote_appl, const struct rina_flow_spec *flowspec,
+                unsigned int flags)
+{
+    return __rina_flow_alloc(dif_name, local_appl, remote_appl, flowspec,
+                             flags, 0xffff);
 }
 
 /* Split accept lock and pending lists. */
