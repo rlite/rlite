@@ -316,7 +316,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
         }
 
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            jt->second.age += RL_AGE_INCR_INTERVAL;
+            jt->second.age += rib->params_map["routing"]["age-incr-intval"].get_int_value();
 
             if (jt->second.age > RL_AGE_MAX) {
                 /* Insert this into the list of entries to be discarded. */
@@ -339,8 +339,8 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     /* Reschedule */
     rib->age_incr_tmrid = uipcp_loop_schedule(uipcp,
-                                        RL_AGE_INCR_INTERVAL * 1000,
-                                        age_incr_cb, rib);
+            rib->params_map["routing"]["age-incr-intval"].get_int_value() * 1000,
+            age_incr_cb, rib);
 }
 
 void

@@ -354,11 +354,14 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     }
 #endif /* RL_USE_QOS_CUBES */
 
+    params_map["enrollment"]["timeout"] = PolicyParam(NEIGH_ENROLL_TO);
     params_map["enrollment"]["keepalive"] = PolicyParam(NEIGH_KEEPALIVE_TO);
+    params_map["enrollment"]["keepalive-thresh"] = PolicyParam(NEIGH_KEEPALIVE_THRESH);
     params_map["resource-allocator"]["reliable-flows"] = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
-    params_map["routing"] = {};
+    params_map["routing"]["age-incr-intval"] = PolicyParam(RL_AGE_INCR_INTERVAL);
     params_map["address-allocator"] = {};
+    params_map["rib-daemon"]["refresh-intval"] = PolicyParam(RL_NEIGH_REFRESH_INTVAL);
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
@@ -381,10 +384,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 
     /* Start timers for periodic tasks. */
     age_incr_tmrid = uipcp_loop_schedule(uipcp,
-                                         RL_AGE_INCR_INTERVAL * 1000,
-                                         age_incr_cb, this);
-    sync_tmrid = uipcp_loop_schedule(uipcp, RL_NEIGH_REFRESH_INTVAL * 1000,
-                                     neighs_refresh_cb, this);
+            params_map["routing"]["age-incr-intval"].get_int_value() * 1000,
+            age_incr_cb, this);
+    sync_tmrid = uipcp_loop_schedule(uipcp,
+            params_map["rib-daemon"]["refresh-intval"].get_int_value() * 1000,
+            neighs_refresh_cb, this);
 
     /* Set a valid address, 0 is the null address. */
     set_address(1);

@@ -33,10 +33,6 @@
 using namespace std;
 
 
-/* Timeout intervals are expressed in milliseconds. */
-#define NEIGH_KEEPALIVE_THRESH      3
-#define NEIGH_ENROLL_TO             7000
-
 NeighFlow::NeighFlow(Neighbor *n, const string& supdif,
                      rl_port_t pid, int ffd, rl_ipcp_id_t lid) :
                                   neigh(n), supp_dif(supdif),
@@ -227,7 +223,7 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
     }
     nf->pending_keepalive_reqs++;
 
-    if (nf->pending_keepalive_reqs > NEIGH_KEEPALIVE_THRESH) {
+    if (nf->pending_keepalive_reqs > neigh->rib->params_map["enrollment"]["keepalive-thresh"].get_int_value()) {
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(rib->uipcp, "Neighbor %s is not alive on N-1 flow %u "
@@ -419,7 +415,7 @@ NeighFlow::next_enroll_msg()
         int ret;
 
         clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_sec += NEIGH_ENROLL_TO / 1000;
+        to.tv_sec += neigh->rib->params_map["enrollment"]["timeout"].get_int_value() / 1000;
 
         ret = pthread_cond_timedwait(&enrollment_rsrc->msgs_avail,
                                      &neigh->rib->lock, &to);
@@ -1149,8 +1145,8 @@ neighs_refresh_cb(struct uipcp *uipcp, void *arg)
                                    obj_name::neighbors, &ncl);
     }
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
-					  RL_NEIGH_REFRESH_INTVAL * 1000,
-                                          neighs_refresh_cb, rib);
+            rib->params_map["rib-daemon"]["refresh-intval"].get_int_value() * 1000,
+            neighs_refresh_cb, rib);
 }
 
 Neighbor *

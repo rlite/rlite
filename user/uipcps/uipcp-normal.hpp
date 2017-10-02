@@ -91,6 +91,10 @@ namespace obj_name {
 /* default value for keepalive parameter */
 #define NEIGH_KEEPALIVE_TO      10
 
+/* Timeout intervals are expressed in milliseconds. */
+#define NEIGH_KEEPALIVE_THRESH      3
+#define NEIGH_ENROLL_TO             7000
+
 enum class EnrollState {
     NEIGH_NONE = 0,
 
