@@ -325,7 +325,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), enrolled(0),
     }
 
 #ifdef RL_USE_QOS_CUBES
-    if (load_qos_cubes("/etc/rlite/uipcp-qoscubes.qos")) {
+    if (load_qos_cubes("/etc/rina/uipcp-qoscubes.qos")) {
         close(mgmtfd);
         throw std::exception();
     }

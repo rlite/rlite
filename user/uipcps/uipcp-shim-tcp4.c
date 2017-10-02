@@ -65,7 +65,7 @@ static int
 parse_directory(struct shim_tcp4 *shim, int appl2sock,
                 struct sockaddr_in *addr, char **appl_name)
 {
-    const char *dirfile = "/etc/rlite/shim-tcp4-dir";
+    const char *dirfile = "/etc/rina/shim-tcp4-dir";
     FILE *fin;
     char *linebuf = NULL;
     size_t sz;
