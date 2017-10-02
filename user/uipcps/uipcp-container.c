@@ -946,6 +946,10 @@ uipcp_put(struct uipcp *uipcp)
 {
     int destroy;
 
+    if (!uipcp) {
+        return 0;
+    }
+
     pthread_mutex_lock(&uipcp->uipcps->lock);
 
     uipcp->refcnt--;
