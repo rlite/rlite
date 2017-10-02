@@ -335,8 +335,6 @@ rtx_tmr_cb(long unsigned arg)
     bool next_exp_set = false;
     struct rb_list rrbq;
 
-    RPD(1, "\n");
-
     rb_list_init(&rrbq);
 
     spin_lock_bh(&dtp->lock);
@@ -1448,9 +1446,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         dtp->last_lwe_sent = dtp->rcv_lwe = dtp->rcv_lwe_priv = seqnum + 1;
         dtp->max_seq_num_rcvd = seqnum;
 
-	if (flow->upper.ipcp) {
-	    crb = sdu_rx_sv_update(ipcp, flow, false);
-	}
+	crb = sdu_rx_sv_update(ipcp, flow, false);
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;
@@ -1575,8 +1571,8 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
          * called. */
         if (flow->upper.ipcp) {
             dtp->rcv_lwe = dtp->rcv_lwe_priv;
-            crb = sdu_rx_sv_update(ipcp, flow, false);
         }
+        crb = sdu_rx_sv_update(ipcp, flow, false);
 
         flow->stats.rx_pkt++;
         flow->stats.rx_byte += rb->len;

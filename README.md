@@ -48,7 +48,7 @@ presentations and articles, visit http://www.pouzinsociety.org/.
 The main goal of *rlite* is to become a baseline implementation for RINA
 systems to be used in production. In order to achieve this goal, *rlite*
 focuses on robustness and performance by leveraging on a clean keep-it-simple
-design. The current implementation includes about 26 Klocs of C/C++ code,
+design. The current implementation includes about 30 Klocs of C/C++ code,
 splitted between kernel-space and user-space.
 
 Considerable attention is devoted to provide a POSIX-like API for applications
