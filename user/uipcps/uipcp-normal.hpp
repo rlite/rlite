@@ -272,7 +272,8 @@ struct dft {
     virtual void dump(std::stringstream& ss) const = 0;
 
     virtual int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
-                             const rlm_addr_t preferred) const = 0;
+                             const rlm_addr_t preferred,
+                             uint32_t cookie) const = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req) = 0;
     virtual void update_address(rlm_addr_t new_addr) = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
@@ -544,7 +545,7 @@ struct dft_default : public dft {
     void dump(std::stringstream& ss) const;
 
     int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
-                     const rlm_addr_t preferred) const;
+                     const rlm_addr_t preferred, uint32_t cookie) const;
     int appl_register(const struct rl_kmsg_appl_register *req);
     void update_address(rlm_addr_t new_addr);
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);

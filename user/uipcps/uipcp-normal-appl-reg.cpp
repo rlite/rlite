@@ -46,7 +46,7 @@ static uint64_t time64()
 
 int
 dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
-                          const rlm_addr_t preferred) const
+                          const rlm_addr_t preferred, uint32_t cookie) const
 {
     pair< multimap< string, DFTEntry >::const_iterator,
           multimap< string, DFTEntry >::const_iterator > range;
@@ -74,13 +74,12 @@ dft_default::lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
                 }
             }
         } else {
-            int r;
-
-            /* Load balance by selecting a random entry. */
-            r = rand() % d;
-            while (r > 0 && mit != range.second) {
+            /* Load balance by selecting an entry based on
+             * the cookie value. */
+            cookie %= d;
+            while (cookie > 0 && mit != range.second) {
                 mit ++;
-                r --;
+                cookie --;
             }
         }
 
