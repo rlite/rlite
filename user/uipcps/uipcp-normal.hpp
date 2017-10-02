@@ -621,6 +621,7 @@ private:
 
     /* The routing table computed by compute_next_hops(). */
     std::map<NodeId, std::list<NodeId> > next_hops;
+    NodeId dflt_nhop;
 
     /* The forwarding table computed by compute_fwd_table().
      * It maps a NodeId --> (dst_addr, local_port). */
