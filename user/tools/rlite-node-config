@@ -28,6 +28,8 @@ argparser = argparse.ArgumentParser(description = description,
 argparser.add_argument('-s', '--script',
                        help = "Path of the script file to be run",
                        type = str, default = '/etc/rina/initscript')
+argparser.add_argument('--no-reset', dest = 'reset', action = 'store_false',
+                       help = "Don't issue reset command at startup")
 argparser.add_argument('-v', '--verbose',
                        help = "Be verbose",
                        action = 'store_true')
@@ -45,7 +47,9 @@ except:
     print("Failed to open script file %s" % args.script)
     quit()
 
-cmds = [(0, ['reset'])] # always start from a reset to remove all the IPCPs
+cmds = []
+if args.reset:
+    cmds.append((0, ['reset'])) # reset to remove all the IPCPs
 enrolls = []
 
 linecnt = 0
