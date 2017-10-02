@@ -1151,6 +1151,121 @@ The I/O system calls are used to exchanges messages (SDUs), and the granularity 
 exchange is the message.    
 
 
+### 9.4 Mapping sockets API to RINA API
+The walkthough presented in section 2.1.1 and figure 3 highlights the strong relationship between
+the RINA POSIX API and the socket API. In this section we will explore this relationship in depth,
+in order to
+ * Define a clear mapping from socket calls to RINA calls, that can be used as a reference
+strategy to port existing socket applications to RINA; it can never be stressed enough how
+important the availability of real-world applications is to attract people to RINA.
+ * Highlight the functionalities in the RINA API that are left outside the mapping, as there is
+no corresponding functionality in the socket API.
+
+The mapping is illustrated separately for client-side operations and server-side ones. Moreover,
+for the sake of simplicity, it refers to Internet sockets, i.e. sockets belonging to the AF INET
+and AF INET6 family.
+
+#### 9.4.1 Client-side operations
+The typical workflow of a TCP or UDP client – w.r.t socket calls – starts by creating a kernel socket
+with the socket() system call; the arguments specify the type of socket to be created, i.e. the
+address family (usually internet addresses over IPv4 or IPv6) and the contract with the application
+(stream-oriented or datagram-oriented socket). The system call returns a file descriptor that is
+passed to subsequent API and I/O calls. The client can optionally bind a local name to the socket,
+that is a name for the local endpoint (e.g. source IP address and/or source UDP/TCP port); this
+operation can be performed with the bind() system call.
+Afterwards, the client can specify the name of the remote endpoint (e.g. destination IP address
+and destination UDP/TCP port), using the connect() system call. This step is mandatory for
+TCP sockets since it is also used to perform (or at least initiate) the TCP handshake, whereas it
+is only optional for UDP sockets. A connected UDP socket can be useful when there is a single
+remote endpoint, so that the client can use the write(), send(), read() and recv() system
+calls that do not require the address of the remote address as an argument. If multiple endpoints
+are possible (and the the client does not want to use multiple connected UDP sockets) a single
+not-connected socket can be used with the sendmsg, sendto, recvmsg, recvfrom variants
+to specify the address of the remote endpoint at each I/O operation.
+If the socket file descriptor is set in non-blocking mode, the connect() system call on a
+TCP socket will not block waiting for the TCP handshake to complete, but return immediately;
+the client can then feed the file descriptor to select() (or poll()) waiting for it to become
+writable, and when this happens it means that the TCP handshake is complete. Once the client-side
+operations are done, I/O can start with the standard I/O system calls (write, read) or socketspecific
+ones (recv(), send(), ...). When the session ends, the client closes the socket with
+close().
+The corresponding client-side operations can be done with the RINA API through
+rina flow alloc and rina flow alloc wait. In detail, rina flow alloc replaces the socket(),
+bind() and connect() calls:
+ * The name of the local endpoint is specified by the local appl argument.
+ * The name of the remote endpoint is specified by the remote appl argument.
+ * The return value is a file descriptor that can be used for flow I/O, so that there is no need for
+a specific call to create the file descriptor (like socket()).
+
+The non-blocking connect functionality is supported by passing the RINA F NOWAIT flag
+to rina flow alloc; when this happens, the function does not wait for flow allocation to
+complete, but returns a control file descriptor that can then be used with select/poll to wait;
+when the control file descriptor becomes readable, it means that the flow allocation procedure is
+complete and the client can call rina flow alloc wait to receive the I/O file descriptor.
+This analysis outlines the capabilities that the RINA API offers and that are not available
+through the socket API:
+ * In RINA the client can optionally specify the layer (i.e. the DIF) where the flow allocation
+should happen, while with sockets the layer is implicit.
+ * In RINA the client can specify the QoS required for the flow.
+ * RINA has a complete naming scheme that is valid for any network application, whereas
+sockets have multiple families with different (incomplete) naming schemes like IPv4+TCP/UDP,
+IPv6+TCP/UDP, etc.
+
+#### 9.4.2 Server-side operations
+Server-side socket operations start with the creation of a socket to be used to listen for incoming
+requests. Similarly to the client, this is done with the socket system call and the returned file
+descriptor is used for subsequent operations. The server then binds a local name to the socket,
+using the bind() system call; differently from the client case, this step is mandatory, as the server
+must indicate on what IP address and ports it is available to receive incoming TCP connections
+or UDP datagrams. If the socket is UDP, at this point the server can start receiving and sending
+datagrams, using the recvfrom, recvmsg, sendto and sendmsg system calls. It could
+also optionally bind a remote name with connect(), if it is going to serve only a client (the
+considerations about connected UDP sockets reported in Section 2.1.3.1 are also valid here).
+If the socket is TCP, the server needs to call the listen() system call to indicate that is going
+to accept incoming TCP connection on the address and port bound to the socket, indicating the size
+of the backlog queue as a parameter. This operation puts the socket in listening mode. Afterwards,
+the server can invoke the accept() system call to wait for the next TCP connection to come
+from a client. The accept() function returns a new file descriptor and the name of the remote
+endpoint (that is the address and port of the client). The file descriptor can then be used to perform
+the I/O with the client, using read(), write(), send(), recv(), etc., and possibly using
+I/O multiplexing (select and poll). Moreover, if the listening socket is set in non-blocking
+mode, the server can use select() or poll() to wait for the socket to become readable, which
+indicates a new TCP connection has arrived and can be accepted with accept(). When the I/O
+session ends, the server closes the client socket with close().
+Similar server-side operations can be performed with the RINA API. A RINA control device
+to receive incoming flow request is open with rina open, similarly to the socket() call. This
+function returns a file descriptor that can be used to register names and accept requests. The
+rina register function is called to register an application name, possibly specifying a DIF
+name; the control file descriptor is passed as a first parameter, so that the file descriptor can be
+used to accept requests for the registered name. The rina register operations corresponds
+therefore to the combined effect of bind and listen for sockets. It is possible to call rina -
+register multiple times to register multiple names.
+At this point the server can start accepting incoming flow allocation requests by calling rina -
+flow accept on the control file descriptor (passed as first argument). When the
+RINA F NOWAIT flag is not specified, this operation has the same meaning of the socket accept
+call. In detail:
+ * The function blocks until a flow allocation request comes, and the request is implicitely
+accepted.
+ * A file descriptor is returned to be used for flow I/O.
+ * The name of the remote application can be obtained through the remote appl output
+argument.
+ * The QoS of the new flow (specified by the remote application) can be obtained through the
+spec output argument.
+
+Non-blocking accept is also possible, since the control file descriptor can be set in non-blocking
+mode and passed to poll/select. The control file descriptor becomes readable when there is a
+pending flow allocation request ready to be accepted.
+Also the server-side analysis, summarized in Figure 4, uncovers some capabilities of the RINA
+API that are not possible with the socket API:
+ * When the RINA F NOWAIT flag is passed to rina flow accept, the application can
+decide whether to accept or deny the flow allocation request, possibly taking into account
+the flow QoS, the remote application name and the server internal state. The verdict is
+emitted using the rina flow respond call.
+ * The server can use the QoS to customize its action (e.g. a video streaming server application
+could choose among different encodings).
+
+
+
 
 ## Credits
 
