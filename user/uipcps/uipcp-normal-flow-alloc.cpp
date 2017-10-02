@@ -415,37 +415,27 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     rlm_addr_t remote_addr;
     CDAPMessage *m;
 
-    /* Lookup the corresponding FlowRequest, and figure out whether we
-     * were the initiator of the request. */
-
-    obj_name << obj_name::flows << "/" << rib->myaddr
-                << "-" << req->local_port_id;
-
-    f = flow_reqs.find(obj_name.str() + string("L"));
-
-    if (f == flow_reqs.end()) {
-        /* We were not the initiator, let's see if we were the target. */
-        obj_name.str(string());
+    /* Lookup the corresponding FlowRequest, depending on whether we were
+     * the initiator or not. */
+    if (req->initiator) {
+        obj_name << obj_name::flows << "/" << rib->myaddr
+                    << "-" << req->local_port_id;
+        f = flow_reqs.find(obj_name.str() + string("L"));
+    } else {
         obj_name << obj_name::flows << "/" << req->remote_addr
             << "-" << req->remote_port_id;
 
         f = flow_reqs.find(obj_name.str() + string("R"));
-
-        if (f == flow_reqs.end()) {
-            UPE(rib->uipcp, "Spurious flow deallocated notification, no object with name %s\n",
-                    obj_name.str().c_str());
-            return -1;
-
-        } else {
-            /* We were the target. */
-            assert(!f->second.initiator);
-        }
-
-    } else {
-        /* We were the initiator. */
-        assert(f->second.initiator);
     }
 
+    if (f == flow_reqs.end()) {
+        UPE(rib->uipcp, "Spurious flow deallocated notification, no object with name %s\n",
+                obj_name.str().c_str());
+        return -1;
+    }
+
+    /* We were the initiator. */
+    assert(f->second.initiator == !!req->initiator);
     remote_addr = f->second.initiator ? f->second.dst_addr : f->second.src_addr;
     flow_reqs.erase(f);
 
