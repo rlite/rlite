@@ -1105,8 +1105,8 @@ uipcp_rib::del_neighbor(const std::string& neigh_name)
 
     rl_delete(mit->second, RL_MT_NEIGH);
     neighbors.erase(mit);
-
     neighbors_deleted.insert(neigh_name);
+    UPI(uipcp, "Neighbor %s deleted\n", neigh_name.c_str());
 
     return 0;
 }
