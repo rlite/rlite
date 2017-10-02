@@ -1166,6 +1166,7 @@ CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
                        const std::string& local_appl,
                        const std::string& remote_appl)
 {
+    clear();
     op_code = gpb::M_CONNECT;
     abs_syntax = CDAP_ABS_SYNTAX;
     auth_mech = auth_mech_;
@@ -1180,6 +1181,7 @@ int
 CDAPMessage::m_connect_r(const struct CDAPMessage *req, int result_,
                       const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_CONNECT_R;
     abs_syntax = CDAP_ABS_SYNTAX;
     auth_mech = req->auth_mech;
@@ -1196,6 +1198,7 @@ CDAPMessage::m_connect_r(const struct CDAPMessage *req, int result_,
 int
 CDAPMessage::m_release(gpb::flagValues_t flags_)
 {
+    clear();
     op_code = gpb::M_RELEASE;
     flags = flags_;
 
@@ -1206,6 +1209,7 @@ int
 CDAPMessage::m_release_r(gpb::flagValues_t flags_, int result_,
                          const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_RELEASE_R;
     flags = flags_;
 
@@ -1222,6 +1226,7 @@ CDAPMessage::m_common(gpb::flagValues_t flags_,
                    int scope_, const std::string& filter_,
                    gpb::opCode_t op_code_)
 {
+    clear();
     op_code = op_code_;
     flags = flags_;
     obj_class = obj_class_;
@@ -1240,6 +1245,7 @@ CDAPMessage::m_common_r(gpb::flagValues_t flags_,
                      int result_, const std::string& result_reason_,
                      gpb::opCode_t op_code_)
 {
+    clear();
     op_code = op_code_;
     flags = flags_;
     obj_class = obj_class_;
@@ -1315,6 +1321,7 @@ CDAPMessage::m_write(gpb::flagValues_t flags_,
                      const std::string& obj_name_, long obj_inst_,
                      int scope_, const std::string& filter_)
 {
+    clear();
     op_code = gpb::M_WRITE;
     flags = flags_;
     obj_class = obj_class_;
@@ -1330,6 +1337,7 @@ int
 CDAPMessage::m_write_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_WRITE_R;
     flags = flags_;
 
@@ -1342,6 +1350,7 @@ CDAPMessage::m_write_r(gpb::flagValues_t flags_, int result_,
 int
 CDAPMessage::m_cancelread(gpb::flagValues_t flags_)
 {
+    clear();
     op_code = gpb::M_CANCELREAD;
     flags = flags_;
 
@@ -1352,6 +1361,7 @@ int
 CDAPMessage::m_cancelread_r(gpb::flagValues_t flags_, int result_,
                          const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_CANCELREAD_R;
     flags = flags_;
 
@@ -1375,6 +1385,7 @@ int
 CDAPMessage::m_start_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_START_R;
     flags = flags_;
 
@@ -1398,6 +1409,7 @@ int
 CDAPMessage::m_stop_r(gpb::flagValues_t flags_, int result_,
                     const std::string& result_reason_)
 {
+    clear();
     op_code = gpb::M_STOP_R;
     flags = flags_;
 

@@ -245,6 +245,8 @@ struct CDAPMessage {
     int m_stop_r(gpb::flagValues_t flags, int result,
                  const std::string& result_reason);
 
+    void clear() { *this = CDAPMessage(); }
+
 private:
     int m_common(gpb::flagValues_t flags,
                  const std::string& obj_class,
