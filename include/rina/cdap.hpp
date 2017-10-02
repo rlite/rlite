@@ -77,7 +77,7 @@ class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
     unsigned int discard_secs;
 
-    enum {
+    enum state_t {
         NONE = 1,
         AWAITCON,
         CONNECTED,
@@ -103,8 +103,9 @@ public:
     struct CDAPMessage * msg_deser(const char *serbuf, size_t serlen);
 
     void reset();
-
     bool connected() const { return state == CONNECTED; }
+    void state_set(unsigned int s) { state = static_cast<state_t>(s); }
+    unsigned int state_get() { return static_cast<unsigned int>(state); }
 
     /* Helper function to send M_CONNECT and wait for the M_CONNECT_R
      * response. */
