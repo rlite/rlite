@@ -915,15 +915,24 @@ rl_normal_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
             /* Move from the old list to the new one. */
             list_del_init(&entry->fnode);
             list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
+            flow_put(entry->flow);
         }
 
         entry->flow = flow;
         entry->address = dst_addr;
     }
-
+    flow_get_ref(flow);
     write_unlock_bh(&priv->pduft_lock);
 
     return 0;
+}
+
+static void
+pduft_entry_unlink(struct pduft_entry *entry)
+{
+    list_del_init(&entry->fnode);
+    hash_del(&entry->node);
+    flow_put(entry->flow);
 }
 
 static int
@@ -936,23 +945,18 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
 
     write_lock_bh(&priv->pduft_lock);
 
-    priv->pduft_dflt = NULL;
+    if (priv->pduft_dflt) {
+        flow_put(priv->pduft_dflt);
+        priv->pduft_dflt = NULL;
+    }
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
-        list_del_init(&entry->fnode);
-        hash_del(&entry->node);
+        pduft_entry_unlink(entry);
         rl_free(entry, RL_MT_PDUFT);
     }
 
     write_unlock_bh(&priv->pduft_lock);
 
     return 0;
-}
-
-static void
-pduft_entry_unlink(struct pduft_entry *entry)
-{
-    list_del_init(&entry->fnode);
-    hash_del(&entry->node);
 }
 
 static int
@@ -980,6 +984,7 @@ rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
     if (dst_addr == 0) {
         /* Default entry. */
         if (priv->pduft_dflt) {
+            flow_put(priv->pduft_dflt);
             priv->pduft_dflt = NULL;
             ret = 0;
         }
@@ -1002,9 +1007,9 @@ rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
 static int
 rl_normal_qos_supported(struct ipcp_entry *ipcp, struct rina_flow_spec *spec)
 {
-    /* For the moment being we say we support any QoS. In future we
-     * should take into account resource allocation, e.g. to check whether
-     * there is enough bandwidth. */
+    /* For the moment being we boast about being able to support any QoS.
+     * In future ww should take into account resource allocation, e.g. to
+     * check if there is enough bandwidth, latency constraints, etc. */
     return 0;
 }
 
