@@ -100,6 +100,28 @@ enum class EnrollState {
     NEIGH_STATE_LAST,
 };
 
+enum class PolicyParamType {
+    INT = 0,
+    BOOL,
+    UNDEFINED,
+};
+
+struct PolicyParam {
+    PolicyParamType type;
+    union {
+        bool BOOL;
+        int INT;
+    } value;
+
+    PolicyParam();
+    PolicyParam(bool param_value);
+    PolicyParam(int param_value);
+
+    int set_value(const std::string& param_value);
+    bool get_bool_value() const;
+    int get_int_value() const;
+};
+
 struct Neighbor;
 struct NeighFlow;
 
@@ -404,14 +426,10 @@ struct uipcp_rib {
     /* Lower DIFs. */
     std::list< std::string > lower_difs;
 
-    /* Keepalive timeout in seconds. */
-    int keepalive;
-
-    /* Use reliable N-flows if reliable N-1-flows are not available. */
-    bool reliable_n_flows;
-
-    /* Use reliable N-1-flows rather than unreliable ones. */
-    bool reliable_flows;
+    /* A map containing the values for policy parameters
+     * that can be tuned by the administrator. */
+    std::unordered_map<std::string,
+        std::unordered_map<std::string, PolicyParam>> params_map;
 
     /* Neighbors. We keep track of all the NeighborCandidate objects seen,
      * even for candidates that have no lower DIF in common with us. This

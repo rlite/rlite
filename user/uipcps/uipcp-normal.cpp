@@ -354,9 +354,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    keepalive = NEIGH_KEEPALIVE_TO;
-    reliable_flows = false;
-    reliable_n_flows = false;
+    params_map["enrollment"].insert({"keepalive", PolicyParam(NEIGH_KEEPALIVE_TO)});
+    params_map["resource-allocator"].insert({"reliable-flows", PolicyParam(false)});
+    params_map["resource-allocator"].insert({"reliable-n-flows", PolicyParam(false)});
 
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
@@ -608,7 +608,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         lower_difs.erase(lit);
     }
 
-    if (reliable_n_flows) {
+    if (params_map["resource-allocator"]["reliable-n-flows"].get_bool_value()) {
         /* Check whether we need to do or undo self-registration. */
         struct rina_flow_spec relspec;
 
@@ -1235,40 +1235,33 @@ uipcp_rib::policy_param_mod(const std::string& component,
     if (component == "address-allocator") {
         ret = addra->param_mod(param_name, param_value);
 
-    } else if (component == "enrollment") {
-        if (param_name == "keepalive") {
-            int keepalive_old = keepalive;
-            if ((ret = string2int(param_value, keepalive))) {
-                keepalive = keepalive_old;
-                UPE(uipcp, "Could not convert parameter value to a number.\n");
-            }
-        } else {
+    } else {
+        if (!params_map[component].count(param_name)) {
             UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
             return -1;
         }
 
-    } else if (component == "resource-allocator") {
-        bool enable = (param_value == "true");
+        if (component == "resource-allocator" && param_name == "reliable-n-flows" &&
+                param_value == "true" &&
+                !params_map["resource-allocator"]["reliable-flows"].get_bool_value()) {
+            UPE(uipcp, "Cannot enable reliable N-flows as reliable "
+                    "flows are disabled.\n");
+            return -1;
+        }
 
-        if (param_name == "reliable-flows") {
-            if (!enable && param_value != "false") {
+        if ((ret = params_map[component][param_name].set_value(param_value))) {
+            assert(params_map[component][param_name].type != PolicyParamType::UNDEFINED);
+            switch (params_map[component][param_name].type) {
+            case PolicyParamType::INT:
+                UPE(uipcp, "Could not convert parameter value to a number.\n");
+                break;
+            case PolicyParamType::BOOL:
                 UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
-                return -1;
+                break;
+            default:
+                UPE(uipcp, "Unknown parameter type.\n");
+                break;
             }
-            reliable_flows = enable;
-        } else if (param_name == "reliable-n-flows") {
-            if (!enable && param_value != "false") {
-                UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
-                return -1;
-            }
-            if (enable && !reliable_flows) {
-                UPE(uipcp, " Cannot enable reliable N-flows as reliable "
-                           "flows are disabled.\n");
-                return -1;
-            }
-            reliable_n_flows = enable;
-        } else {
-            UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
             return -1;
         }
     }
@@ -1573,7 +1566,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
         return ret;
     }
 
-    if (!reliable_n_flows) {
+    if (!params_map["resource-allocator"]["reliable-n-flows"].get_bool_value()) {
         pthread_mutex_unlock(&lock);
     } else {
         bool self_reg_pending;
@@ -1675,6 +1668,64 @@ normal_enroller_enable(struct uipcp *uipcp,
 
 std::unordered_map< std::string,
     std::unordered_set<std::string> > available_policies;
+
+PolicyParam::PolicyParam()
+{
+    type = PolicyParamType::UNDEFINED;
+}
+
+PolicyParam::PolicyParam(bool param_value)
+{
+    type = PolicyParamType::BOOL;
+    value.BOOL = param_value;
+}
+
+PolicyParam::PolicyParam(int param_value)
+{
+    type = PolicyParamType::INT;
+    value.INT = param_value;
+}
+
+int
+PolicyParam::set_value(const std::string& param_value)
+{
+    assert(type != PolicyParamType::UNDEFINED);
+    int val;
+    bool enable;
+    switch (type) {
+    case PolicyParamType::INT:
+        if (string2int(param_value, val)) {
+            return -1;
+        }
+        value.INT = val;
+        break;
+    case PolicyParamType::BOOL:
+        enable = (param_value == "true");
+        if (!enable && param_value != "false") {
+            return -1;
+        }
+        value.BOOL = enable;
+        break;
+    default:
+        return -1;
+        break;
+    }
+    return 0;
+}
+
+int
+PolicyParam::get_int_value() const
+{
+    assert(type == PolicyParamType::INT);
+    return value.INT;
+};
+
+bool
+PolicyParam::get_bool_value() const
+{
+    assert(type == PolicyParamType::BOOL);
+    return value.BOOL;
+}
 
 extern "C" void
 normal_lib_init(void)
