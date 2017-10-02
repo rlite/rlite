@@ -8,6 +8,38 @@ import random
 import time
 
 
+def fetch_destinations():
+    # List all the ipcps to extract all the DIF names
+    destinations = []
+    try:
+        o = subprocess.check_output(['rlite-ctl'])
+        o = str(o)
+        difs = re.findall(r"dif_name = '([^']+)'", o)
+    except:
+        print("Failed to get list of IPCPs")
+        quit()
+
+    if len(difs) == 0:
+        return destinations
+
+    # Look for registered applications that contain 'rinaperf' in their name
+    for dif in difs:
+        try:
+            o = subprocess.check_output(['rlite-ctl', 'dif-rib-show', dif])
+            o = str(o)
+            applications = re.findall(r"Application:\s+([^,]+)", o)
+            for a in applications:
+                if args.filter_name in a:
+                    destinations.append((dif, a))
+        except Exception as e:
+            pass
+
+    if args.verbose and len(destinations) > 0:
+        print("Destinations: %s" % destinations)
+
+    return destinations
+
+
 description = "Python script to generate random rinaperf clients"
 epilog = "2017 Vincenzo Maffione <v.maffione@gmail.com>"
 
@@ -33,42 +65,6 @@ if args.D < 1 or args.D > 100:
     print("Invalid parameter D: it must be 1 <= D <= 100")
     quit()
 
-while 1:
-    # List all the ipcps to extract all the DIF names
-    try:
-        o = subprocess.check_output(['rlite-ctl'])
-        o = str(o)
-        difs = re.findall(r"dif_name = '([^']+)'", o)
-    except:
-        print("Failed to get list of IPCPs")
-        quit()
-
-    if len(difs) == 0:
-        print("No DIFs found")
-        quit
-
-    # Look for registered applications that contain 'rinaperf' in their name
-    destinations = []
-    for dif in difs:
-        try:
-            o = subprocess.check_output(['rlite-ctl', 'dif-rib-show', dif])
-            o = str(o)
-            applications = re.findall(r"Application:\s+([^,]+)", o)
-            for a in applications:
-                if args.filter_name in a:
-                    destinations.append((dif, a))
-        except Exception as e:
-            pass
-
-    if len(destinations) > 0:
-        break
-
-    print("No destination application found, retrying ...")
-    time.sleep(4)
-
-if args.verbose:
-    print("Destinations: %s" % destinations)
-
 # Generate clients
 random.seed()
 clients = []
@@ -92,6 +88,11 @@ try:
 
         # Limit the number of active clients
         if len(clients) >= args.M:
+            continue
+
+        destinations = fetch_destinations()
+        if len(destinations) == 0:
+            print("No destination application found, retrying ...")
             continue
 
         # Generate a new client
