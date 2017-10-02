@@ -155,7 +155,6 @@ flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
 int
 flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
 {
-    string dest_appl(req->remote_appl);
     rlm_addr_t remote_addr;
     CDAPMessage *m;
     FlowRequest freq;
@@ -163,7 +162,14 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     stringstream obj_name;
     string cubename;
     struct rl_flow_config flowcfg;
+    string dest_appl;
     int ret;
+
+    if (!req->remote_appl) {
+        UPE(rib->uipcp, "Null remote application name\n");
+        return -1;
+    }
+    dest_appl = string(req->remote_appl);
 
     ret = rib->dft->lookup_entry(dest_appl, remote_addr, 0);
     if (ret) {
@@ -182,7 +188,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     conn_id.src_cep = req->local_cep;
     conn_id.dst_cep = 0;
 
-    freq.src_app = RinaName(req->local_appl);
+    freq.src_app = RinaName(req->local_appl); /* req->local_appl may be NULL */
     freq.dst_app = RinaName(dest_appl);
     freq.src_port = req->local_port;
     freq.dst_port = 0;
