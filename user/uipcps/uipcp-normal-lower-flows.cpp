@@ -315,8 +315,9 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
             continue;
         }
 
+        int age_inc_intval = rib->params_map["routing"]["age-incr-intval"].get_int_value();
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
-            jt->second.age += rib->params_map["routing"]["age-incr-intval"].get_int_value();
+            jt->second.age += age_inc_intval;
 
             if (jt->second.age > RL_AGE_MAX) {
                 /* Insert this into the list of entries to be discarded. */
