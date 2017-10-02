@@ -112,9 +112,15 @@ extern int verbosity;
 /* PCI header is opaque here, only the normal IPCP can use
  * its layout. */
 struct rina_pci;
-struct rl_buf;
 
 //#define RL_SKB
+
+#ifndef RL_SKB
+struct rl_buf;
+#else
+#include <linux/skbuff.h>
+#define rl_buf  sk_buff
+#endif
 
 struct rl_buf *rl_buf_alloc(size_t size, size_t hdroom,
                             size_t tailroom, gfp_t gfp);
@@ -223,10 +229,6 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
 
 #else  /* RL_SKB */
 
-#include <linux/skbuff.h>
-
-#define rl_buf  sk_buff
-
 #define RL_BUF_DATA(rb)         ((uint8_t *)(rb)->data)
 #define RL_BUF_PCI(rb)          ((struct rina_pci *)(rb)->data)
 #define RL_BUF_PCI_CTRL(rb)     ((struct rina_pci_ctrl *)(rb)->data)
@@ -256,7 +258,7 @@ rl_buf_custom_pop(struct rl_buf *rb, size_t len)
 static inline int
 rl_buf_custom_push(struct rl_buf *rb, size_t len)
 {
-    if (unlikely(skb_headroom(rb) < len) {
+    if (unlikely(skb_headroom(rb) < len)) {
         RPD(2, "No space to push %d bytes\n", (int)len);
         return -1;
     }
@@ -266,6 +268,63 @@ rl_buf_custom_push(struct rl_buf *rb, size_t len)
     return 0;
 }
 
+#define rl_buf_free(_rb) \
+    do { \
+        BUG_ON((_rb) == NULL); \
+        BUG_ON((_rb)->next != NULL); \
+        __rl_buf_free(_rb); \
+    } while (0)
+
+/* Support for list of buffers. */
+struct rb_list {
+    struct rl_buf *next;
+    struct rl_buf *prev;
+};
+
+static inline void
+rb_list_init(struct rb_list *list)
+{
+    list->prev = list->next = (struct rl_buf *)list;
+}
+
+static inline int
+rb_list_empty(struct rb_list *list)
+{
+    return ((struct rl_buf *)list) == list->prev;
+}
+
+static inline void
+rb_list_enq(struct rl_buf *elem, struct rb_list *list)
+{
+    /* TODO make safe */
+    list->prev->next = elem;
+    elem->next = (struct rl_buf *)list;
+    elem->prev = list->prev;
+    list->prev = elem;
+}
+
+static inline void
+rb_list_del(struct rl_buf *elem)
+{
+    elem->prev->next = elem->next;
+    elem->next->prev = elem->prev;
+    /* Also init, in order to be safe. */
+    elem->prev = elem->next = NULL;
+}
+
+static inline
+struct rl_buf *rb_list_front(struct rb_list *list)
+{
+    return list->next;
+}
+
+#define rb_list_foreach(_cur, _l)   \
+        for (_cur = (_l)->next; _cur != ((struct rl_buf *)(_l)); \
+                _cur = _cur->next)
+#define rb_list_foreach_safe(_cur, _tmp, _l) \
+        for (_cur = (_l)->next, _tmp = _cur->next;  \
+                _cur != ((struct rl_buf *)(_l)); \
+                _cur = _tmp, _tmp = _tmp->next)
 #endif /* RL_SKB */
 
 /*
