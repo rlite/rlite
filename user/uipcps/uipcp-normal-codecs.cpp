@@ -93,7 +93,7 @@ RinaName::RinaName(const string& str)
 
 RinaName::RinaName(const char *str)
 {
-    if (str == NULL) {
+    if (str == nullptr) {
         str = "";
     }
     rina_components_from_string(string(str), apn, api, aen, aei);
@@ -1018,7 +1018,7 @@ gpb2FlowRequest(FlowRequest& fr,
     fr.state = gm.state();
     gpb2QosSpec(fr.qos, gm.qosparameters());
     gpb2ConnPolicies(fr.policies, gm.connectionpolicies());
-    fr.access_ctrl = NULL;
+    fr.access_ctrl = nullptr;
     fr.max_create_flow_retries = gm.maxcreateflowretries();
     fr.create_flow_retries = gm.createflowretries();
     fr.hop_cnt = gm.hopcount();
@@ -1107,7 +1107,7 @@ int
 AData::serialize(char *buf, unsigned int size) const
 {
     gpb::a_data_t gm;
-    char *serbuf = NULL;
+    char *serbuf = nullptr;
     size_t serlen;
     int ret;
 
