@@ -706,20 +706,26 @@ struct uipcp *
 uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
 {
     struct uipcp *uipcp;
+    int kernelspace = 0;
 
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry(uipcp, &uipcps->uipcps, node) {
-        if (!uipcp_is_kernelspace(uipcp) && rina_sername_valid(uipcp->name) &&
+        if (rina_sername_valid(uipcp->name) &&
                         strcmp(uipcp->name, ipcp_name) == 0) {
-            uipcp->refcnt++;
-            pthread_mutex_unlock(&uipcps->lock);
+            kernelspace = uipcp_is_kernelspace(uipcp);
+            if (!uipcp_is_kernelspace(uipcp)) {
+                uipcp->refcnt++;
+                pthread_mutex_unlock(&uipcps->lock);
 
-            return uipcp;
+                return uipcp;
+            }
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
 
-    PE("No such IPCP '%s'\n", ipcp_name);
+    if (!kernelspace) {
+        PE("No such IPCP '%s'\n", ipcp_name);
+    }
 
     return NULL;
 }
