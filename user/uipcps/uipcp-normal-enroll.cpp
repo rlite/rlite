@@ -1044,7 +1044,7 @@ sync_timeout_cb(struct uipcp *uipcp, void *arg)
 
     UPV(rib->uipcp, "Syncing lower flows with neighbors\n");
 
-    rib->lfdb->neighs_refresh_lower_flows();
+    rib->lfdb->neighs_refresh();
     rib->sync_tmrid = uipcp_loop_schedule(rib->uipcp,
 					  RL_NEIGH_SYNC_INTVAL * 1000,
                                           sync_timeout_cb, rib);
