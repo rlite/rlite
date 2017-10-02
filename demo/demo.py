@@ -113,16 +113,16 @@ def netem_validate(netem_args):
 
     try:
         fdevnull = open(os.devnull, 'w')
-        subprocess.check_call('sudo ip tuntap add mode tap name tapiratiprobe'.split())
+        subprocess.check_call('sudo ip tuntap add mode tap name tapbrobe'.split())
         subprocess.check_call(('sudo tc qdisc add dev '\
-                               'tapiratiprobe root netem %s'\
+                               'tapbrobe root netem %s'\
                                 % netem_args).split(), stdout=fdevnull,
                                 stderr=fdevnull)
         fdevnull.close()
     except:
         ret = False
 
-    subprocess.call('sudo ip tuntap del mode tap name tapiratiprobe'.split())
+    subprocess.call('sudo ip tuntap del mode tap name tapbrobe'.split())
 
     return ret
 
@@ -633,13 +633,6 @@ for l in sorted(links):
 
     if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
         speed = '%d%sbit' % (shims[shim]['speed'], shims[shim]['speed_unit'])
-        if shim not in netems:
-            netems[shim] = dict()
-        if vm not in netems[shim]:
-            netems[shim][vm] = {'args': '', 'linecnt': 0}
-
-        # Rate limit the traffic transmitted on the TAP interface
-        netems[shim][vm]['args'] += ' rate %s' % (speed,)
 
         # Rate limit the traffic transmitted on the TAP interface
         outs += 'sudo tc qdisc add dev %(tap)s handle 1: root '     \
