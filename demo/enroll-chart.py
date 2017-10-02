@@ -24,7 +24,8 @@ o = subprocess.check_output(['./greplog.sh', 'Enroller enabled'])
 o = str(o)
 if o.startswith("b'"):
     o = o[2:]
-o = o.split('\\n')
+o = o.replace('\\n', '\n')
+o = o.split('\n')
 
 events = []
 i = 0
