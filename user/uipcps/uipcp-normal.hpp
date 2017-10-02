@@ -341,6 +341,8 @@ struct addr_allocator {
     virtual rlm_addr_t allocate() = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
+    virtual int param_mod(const std::string& name,
+                          const std::string& value) {return -1;}
 };
 
 extern std::map< std::string, std::set<std::string> > available_policies;
@@ -478,6 +480,9 @@ struct uipcp_rib {
 
     int policy_mod(const std::string& component,
                    const std::string& policy_name);
+    int policy_param_mod(const std::string& component,
+                         const std::string& param_name,
+                         const std::string& param_value);
 
 private:
 #ifdef RL_USE_QOS_CUBES
@@ -665,6 +670,7 @@ struct addr_allocator_distributed : public addr_allocator {
     rlm_addr_t allocate();
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+    int param_mod(const std::string& name, const std::string& value);
 
     /* How many seconds to wait for NACKs before considering the address
      * allocation successful. */

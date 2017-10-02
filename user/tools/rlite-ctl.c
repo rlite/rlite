@@ -619,6 +619,47 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
 }
 
 static int
+ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_policy_param_mod req;
+    const char *name;
+    const char *comp_name;
+    const char *param_name;
+    const char *param_value;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 4);
+    name = argv[0];
+    comp_name = argv[1];
+    param_name = argv[2];
+    param_value = argv[3];
+
+    if (strcmp(cd->name, "dif-policy-param-mod") == 0) {
+        attrs = ipcp_by_dif(name);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", name);
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else {
+        req.ipcp_name = strdup(name);
+        attrs = lookup_ipcp_by_name(req.ipcp_name);
+        if (!attrs) {
+            PE("Could not find IPC process %s\n", name);
+            return -1;
+        }
+    }
+
+    req.msg_type = RLITE_U_IPCP_POLICY_PARAM_MOD;
+    req.event_id = 0;
+    req.comp_name = strdup(comp_name);
+    req.param_name = strdup(param_name);
+    req.param_value = strdup(param_value);
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
+static int
 ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_enroller_enable req;
@@ -896,6 +937,18 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
         .func = ipcp_policy_mod,
+    },
+    {
+        .name = "ipcp-policy-param-mod",
+        .usage = "IPCP_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
+        .num_args = 4,
+        .func = ipcp_policy_param_mod,
+    },
+    {
+        .name = "dif-policy-param-mod",
+        .usage = "DIF_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
+        .num_args = 4,
+        .func = ipcp_policy_param_mod,
     },
     {
         .name = "ipcp-enroller-enable",

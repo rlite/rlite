@@ -44,6 +44,7 @@ enum {
     RLITE_U_IPCP_ENROLLER_ENABLE,       /* 9 */
     RLITE_U_IPCP_ROUTING_SHOW_REQ,      /* 10 */
     RLITE_U_IPCP_ROUTING_SHOW_RESP,     /* 11 */
+    RLITE_U_IPCP_POLICY_PARAM_MOD,      /* 12 */
 
     RLITE_U_MSG_MAX,
 };
@@ -95,7 +96,7 @@ struct rl_cmsg_ipcp_rib_show_resp {
     struct rl_buf_field dump;
 } __attribute__((packed));
 
-/* rlite-ctl --> uipcps message to change an IPC policy */
+/* rlite-ctl --> uipcps message to change a DIF policy */
 struct rl_cmsg_ipcp_policy_mod {
     rl_msg_t msg_type;
     uint32_t event_id;
@@ -103,6 +104,17 @@ struct rl_cmsg_ipcp_policy_mod {
     char *ipcp_name;
     char *comp_name;
     char *policy_name;
+} __attribute__((packed));
+
+/* rlite-ctl --> uipcps message to change a DIF policy parameter */
+struct rl_cmsg_ipcp_policy_param_mod {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    char *ipcp_name;
+    char *comp_name;
+    char *param_name;
+    char *param_value;
 } __attribute__((packed));
 
 /* rlite-ctl --> uipcp message to let the IPCP accept
