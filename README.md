@@ -853,8 +853,8 @@ towards the tun device associated to the peer.
 
 
 ## 8. Development workflow
-The *rlite* project defines a verfication workflow that should be followed by
-developers after any modification to the software.
+The *rlite* project defines a verfication workflow that developers should follow
+after performing any modification to the software.
 
 ![Development and verification workflow](https://bitbucket.org/vmaffione/rina-images/downloads/verification-workflow-rlite.png)
 
@@ -870,12 +870,13 @@ inside the script itself:
 
     $ git clone -b rlite https://github.com/vmaffione/buildroot
     $ cd buildroot
-    $ vi update.sh  # change the last line to use the local path of your local rlite repo
+    $ vi update.sh  # change the last line to specify the path of your local rlite repo
     $ ./update.sh   # step 8 (make buildroot image)
 
-Note that the first time you run the ./update.sh script, it will build a
-complete Linux system from sources, so it may take hours, depending on the
-speed of your internet connection. Subsequent invocations will only rebuild
+Note that the first time you run the ./update.sh script, it will download and
+build a complete GNU/Linux system from source; it may take hours, depending on the
+speed of your internet connection and the computing power of your machine.
+Subsequent invocations will only rebuild
 rlite, which does not usually take more than 40 seconds.
 The `update.sh` script will also copy the generated images to the `buildroot/`
 directory inside your rlite local repo. This is necessary to let the
