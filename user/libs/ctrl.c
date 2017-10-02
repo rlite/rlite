@@ -234,6 +234,7 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     }
     req->local_appl = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
     req->remote_appl = remote_appl ? rl_strdup(remote_appl, RL_MT_UTILS) : NULL;
+    req->cookie = (uint32_t)getpid() >> 1;
 
     return 0;
 }

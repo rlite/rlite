@@ -211,9 +211,17 @@ struct rl_kmsg_fa_req {
 
     rl_ipcp_id_t upper_ipcp_id;
     struct rina_flow_spec flowspec;
-    rl_port_t local_port; /* Filled by kernel before reflection to userspace. */
-    uint32_t local_cep;  /* Filled by kernel before reflection to userspace. */
-    uint32_t uid;        /* unique id filled in by kernel before reflection. */
+
+    /* The local port, local CEP and unique id are filled by kernel before
+     * reflection to userspace. */
+    rl_port_t local_port;
+    uint32_t local_cep;
+    uint32_t uid;
+
+    /* A value associated to the requesting application. It may be used by
+     * the uipcp e.g. for consistent load balancing. */
+    uint32_t cookie;
+
     char *local_appl;
     char *remote_appl;
     char *dif_name;
