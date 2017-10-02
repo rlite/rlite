@@ -75,6 +75,50 @@ generate_flavours() {
     echo "... flavours generated"
 }
 
+KTESTDIR="kernel-test-dir"
+KTESTOBJS=""
+
+add_test() {
+    {
+        cat <<EOF
+        #include <linux/module.h>
+        #include <linux/kernel.h>
+        #include <linux/init.h>
+EOF
+        cat  # output the test code read from stdin
+    } > $KTESTDIR/$1.c
+    {
+        cat <<EOF
+##############################################################################
+##            TEST:  $1
+##############################################################################
+EOF
+        cat $KTESTDIR/$1.c
+    } >> config.log
+    # add the compilation unit to the running list
+    KTESTOBJS="$1.o $KTESTOBJS"
+}
+
+probe_kernel_version() {
+    mkdir $KTESTDIR
+
+    add_test 'have_chrdev_rw_iter' <<EOF
+        #include <linux/fs.h>
+        void dummy() {
+            struct file_operations *fops = NULL;
+            (void)fops->write_iter;
+            (void)fops->read_iter;
+        }
+EOF
+    add_test 'signal_pending_in_sched_signal' <<EOF
+        #include <linux/sched/signal.h>
+
+        int dummy() {
+            return signal_pending(NULL);
+        }
+EOF
+}
+
 usage() {
     cat <<EOF
 configure options:
@@ -260,6 +304,8 @@ fi
 # Generate kernel makefile
 cp kernel/Makefile.in kernel/Makefile
 generate_flavours
+
+probe_kernel_version
 
 # Generate kerconfig.h file
 KCF=kernel/kerconfig.h
