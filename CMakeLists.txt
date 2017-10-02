@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 project(rlite)
 
@@ -13,6 +13,8 @@ endif()
 if(CMAKE_CXX_COMPILER STREQUAL "CMAKE_CXX_COMPILER-NOTFOUND")
 	message(FATAL_ERROR "Cannot find C++ compiler")
 endif()
+
+set(CMAKE_CXX_STANDARD 11)
 
 # Some globbing and headers include
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
