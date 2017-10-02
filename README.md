@@ -983,6 +983,7 @@ different. Once the I/O session ends, the server can close the flow, triggering
 flow deallocation, using the close system call (5). The server can then decide
 whether to terminate or accept another flow allocation request (3).
 
+
 ### 9.2 Client-side operations
 Client operation is straightforward; the client calls rina flow alloc (1) to
 issue a flow allocation request, passing as arguments the name of the DIF that
@@ -995,6 +996,84 @@ the server (2), using the I/O file descriptor either in blocking or not
 blocking mode, similarly to what is possible to do with sockets. When the I/O
 session terminates, the client can deallocate the flow with the close system
 call.
+
+
+### 9.3 API specification 
+In the following, the API calls are listed and documented in depth.
+Some general considerations:
+ * The API functions typically return 0 or a positive value on success. On
+   error, -1 is returned with the errno variable set accordingly to the
+   specific error.
+ * Each application name is specified using a C string, where the name’s components (Applica-
+tion Process Name, Application Process Instance, Application Entity Name and Applicati-
+ion Entity Instance) are separated by the | separator (pipe). The separator can be omitted if
+it is only used to separate empty strings or a non-empty string from an empty string. Valid
+strings are for instance "aa|bb|cc|dd", "aa|bb||", "aa|bb", "aa".
+
+    int rina_open(void)
+    
+This function opens a RINA control device that can be used to register/unregister names,
+and manage incoming flow allocation requests. On success, it returns a file descriptor that can
+be later passed to rina register(), rina unregister(), rina flow accept(), and
+rina flow respond(). On error -1 is returned with errno set properly. Applications typically
+call this function as a first step to implement server-side functionalities.
+
+    int rina_register(int fd, const char *dif, const char *appl, int flags)
+    
+    This function registers the application name appl to a DIF in the system. After a successful
+registration, flow allocation requests can be received on fd by means of rina flow accept().
+If dif is not NULL, the system may register the application to dif. However, the dif argument
+is only advisory and the implementation is free to ignore it. If DIF is NULL, the system au-
+tonomously decide to which DIF appl will be registered to.
+If RINA F NOWAIT is not specified in flags, this function will block the caller until the
+operation completes, and 0 is returned on success.
+If RINA F NOWAIT is specified in flags, the function returns a file descriptor (different
+from fd) which can be used to wait for the operation to complete (e.g. using POLLIN with
+poll() or select()). In this case the operation can be completed by a subsequent call to
+rina register wait().
+On error -1 is returned, with the errno code properly set.
+
+    int rina_unregister(int fd, const char *dif, const char *appl, int flags)
+    
+This function unregisters the application name appl from the DIF where it was registered to. The
+dif argument must match the one passed to rina register(). After a successful unregis-
+tration, flow allocation requests can no longer be received on fd. The meaning of the RINA F -
+NOWAIT flag is the same as in rina register(), allowing non-blocking unregistration, to be
+later completed by calling rina register wait().
+Returns 0 on success, -1 on error, with the errno code properly set.
+
+    int rina_register_wait(int fd, int wfd)
+    
+This function is called to wait for the completion of a (un)registration procedure previously ini-
+tiated with a call to rina register() or rina unregister on fd which had the RINA -
+F NOWAIT flag set. The wfd file descriptor must match the one that was returned by rina -
+[un]register(). It returns 0 on success, -1 error, with the errno code properly set.
+
+    int rina_flow_accept(int fd, char **remote_appl,
+                        struct rina_flow_spec *spec, unsigned int flags)
+
+This function is called to accept an incoming flow request arrived on fd. If flags does not
+contain RINA F NORESP, it also sends a positive response to the requesting application; other-
+wise, the response (positive or negative) can be sent by a subsequent call to the rina flow -
+respond(). On success, the char* pointed by remote appl, if not NULL, is assigned the
+name of the requesting application. The memory for the requestor name is allocated by the callee
+and must be freed by the caller. Moreover, if spec is not NULL, the referenced data structure is
+filled with the QoS specification specified by the requesting application.
+If flags does not contain RINA F NORESP, on success this function returns a file descriptor
+that can be subsequently used with standard I/O system calls (write(), read(), select()...)
+to exchange SDUs on the flow and synchronize. If flags does contain RINA F NORESP, on
+success a positive number is returned as an handle to be passed to a subsequent call to rina -
+flow respond(). Hence the code
+
+    cfd = rina_flow_accept(fd, &x, flags &  RINA_F_NORESP)
+    
+is functionally equivalent to
+
+    h = rina_flow_accept(sfd, &x, flags | RINA_F_NORESP);
+    cfd = rina_flow_respond(sfd, h, 0 /* positive response */);
+    
+On error -1 is returned, with the errno code properly set.
+
 
 
 ## Credits
