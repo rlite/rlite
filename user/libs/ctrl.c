@@ -190,6 +190,10 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
                      const char *dif_name, int reg,
                      const char *appl_name)
 {
+    if (dif_name && strcmp(dif_name, "") == 0) {
+        dif_name = NULL;
+    }
+
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_APPL_REGISTER;
     req->event_id = event_id;
@@ -207,11 +211,14 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 int
 rl_fa_req_fill(struct rl_kmsg_fa_req *req,
                uint32_t event_id, const char *dif_name,
-               const char *local_appl,
-               const char *remote_appl,
+               const char *local_appl, const char *remote_appl,
                const struct rina_flow_spec *flowspec,
                rl_ipcp_id_t upper_ipcp_id)
 {
+    if (dif_name && strcmp(dif_name, "") == 0) {
+        dif_name = NULL;
+    }
+
     memset(req, 0, sizeof(*req));
     req->msg_type = RLITE_KER_FA_REQ;
     req->event_id = event_id;
