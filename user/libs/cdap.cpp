@@ -239,7 +239,7 @@ CDAPConn::CDAPConn(int arg_fd, long arg_version,
     discard_secs = ds;
     fd = arg_fd;
     version = arg_version;
-    state = NONE;
+    state = ConnState::NONE;
 }
 
 CDAPConn::CDAPConn(const CDAPConn& o)
@@ -254,7 +254,7 @@ CDAPConn::~CDAPConn()
 void
 CDAPConn::reset()
 {
-    state = NONE;
+    state = ConnState::NONE;
     local_appl = string();
     remote_appl = string();
     invoke_id_mgr = InvokeIdMgr(discard_secs);
@@ -304,19 +304,19 @@ CDAPConn::accept()
 }
 
 const char *
-CDAPConn::conn_state_repr(int st)
+CDAPConn::conn_state_repr(ConnState st)
 {
-    switch(st) {
-        case NONE:
+    switch (st) {
+        case ConnState::NONE:
             return "NONE";
 
-        case AWAITCON:
+        case ConnState::AWAITCON:
             return "AWAITCON";
 
-        case CONNECTED:
+        case ConnState::CONNECTED:
             return "CONNECTED";
 
-        case AWAITCLOSE:
+        case ConnState::AWAITCLOSE:
             return "AWAITCLOSE";
     }
 
@@ -425,7 +425,7 @@ CDAPMessage::CDAPMessage()
     invoke_id = 0;
     obj_inst = 0;
     op_code = gpb::M_CONNECT;
-    obj_value.ty = NONE;
+    obj_value.ty = ObjValType::NONE;
     result = 0;
     scope = 0;
     version = 0;
@@ -452,7 +452,7 @@ CDAPMessage::copy(const CDAPMessage& o)
     version = o.version;
 
     switch (o.obj_value.ty) {
-        case BYTES:
+        case ObjValType::BYTES:
             obj_value.u.buf.owned = true;
             obj_value.u.buf.len = o.obj_value.u.buf.len;
             obj_value.u.buf.ptr = new char[obj_value.u.buf.len];
@@ -460,13 +460,13 @@ CDAPMessage::copy(const CDAPMessage& o)
                    obj_value.u.buf.len);
             break;
 
-        case NONE:
-        case I32:
-        case I64:
-        case FLOAT:
-        case DOUBLE:
-        case BOOL:
-        case STRING:
+        case ObjValType::NONE:
+        case ObjValType::I32:
+        case ObjValType::I64:
+        case ObjValType::FLOAT:
+        case ObjValType::DOUBLE:
+        case ObjValType::BOOL:
+        case ObjValType::STRING:
             obj_value = o.obj_value;
             break;
 
@@ -478,7 +478,7 @@ CDAPMessage::destroy()
 {
     src_appl.clear();
     dst_appl.clear();
-    if (obj_value.ty == BYTES && obj_value.u.buf.owned
+    if (obj_value.ty == ObjValType::BYTES && obj_value.u.buf.owned
                 && obj_value.u.buf.ptr) {
         delete [] obj_value.u.buf.ptr;
     }
@@ -508,7 +508,7 @@ CDAPMessage::operator=(const CDAPMessage& o)
 }
 
 bool
-CDAPMessage::is_type(obj_value_t tt) const
+CDAPMessage::is_type(ObjValType tt) const
 {
     return obj_value.ty == tt;
 }
@@ -517,7 +517,7 @@ void
 CDAPMessage::get_obj_value(int32_t& v) const
 {
     v = 0;
-    if (obj_value.ty == I32) {
+    if (obj_value.ty == ObjValType::I32) {
         v = obj_value.u.i32;
     }
 }
@@ -525,7 +525,7 @@ CDAPMessage::get_obj_value(int32_t& v) const
 void
 CDAPMessage::set_obj_value(int32_t v)
 {
-    obj_value.ty = I32;
+    obj_value.ty = ObjValType::I32;
     obj_value.u.i32 = v;
 }
 
@@ -533,7 +533,7 @@ void
 CDAPMessage::get_obj_value(int64_t& v) const
 {
     v = 0;
-    if (obj_value.ty == I64) {
+    if (obj_value.ty == ObjValType::I64) {
         v = obj_value.u.i64;
     }
 }
@@ -541,7 +541,7 @@ CDAPMessage::get_obj_value(int64_t& v) const
 void
 CDAPMessage::set_obj_value(int64_t v)
 {
-    obj_value.ty = I64;
+    obj_value.ty = ObjValType::I64;
     obj_value.u.i64 = v;
 }
 
@@ -549,7 +549,7 @@ void
 CDAPMessage::get_obj_value(float& v) const
 {
     v = 0.0;
-    if (obj_value.ty == FLOAT) {
+    if (obj_value.ty == ObjValType::FLOAT) {
         v = obj_value.u.fp_single;
     }
 }
@@ -557,7 +557,7 @@ CDAPMessage::get_obj_value(float& v) const
 void
 CDAPMessage::set_obj_value(float v)
 {
-    obj_value.ty = FLOAT;
+    obj_value.ty = ObjValType::FLOAT;
     obj_value.u.fp_single = v;
 }
 
@@ -565,7 +565,7 @@ void
 CDAPMessage::get_obj_value(double& v) const
 {
     v = 0.0;
-    if (obj_value.ty == DOUBLE) {
+    if (obj_value.ty == ObjValType::DOUBLE) {
         v = obj_value.u.fp_double;
     }
 }
@@ -573,7 +573,7 @@ CDAPMessage::get_obj_value(double& v) const
 void
 CDAPMessage::set_obj_value(double v)
 {
-    obj_value.ty = DOUBLE;
+    obj_value.ty = ObjValType::DOUBLE;
     obj_value.u.fp_double = v;
 }
 
@@ -581,7 +581,7 @@ void
 CDAPMessage::get_obj_value(bool& v) const
 {
     v = false;
-    if (obj_value.ty == BOOL) {
+    if (obj_value.ty == ObjValType::BOOL) {
         v = obj_value.u.boolean;
     }
 }
@@ -589,7 +589,7 @@ CDAPMessage::get_obj_value(bool& v) const
 void
 CDAPMessage::set_obj_value(bool v)
 {
-    obj_value.ty = BOOL;
+    obj_value.ty = ObjValType::BOOL;
     obj_value.u.boolean = v;
 }
 
@@ -597,7 +597,7 @@ void
 CDAPMessage::get_obj_value(std::string& v) const
 {
     v = std::string();
-    if (obj_value.ty == STRING) {
+    if (obj_value.ty == ObjValType::STRING) {
         v = obj_value.str;
     }
 }
@@ -605,14 +605,14 @@ CDAPMessage::get_obj_value(std::string& v) const
 void
 CDAPMessage::set_obj_value(const std::string& v)
 {
-    obj_value.ty = STRING;
+    obj_value.ty = ObjValType::STRING;
     obj_value.str = v;
 }
 
 void
 CDAPMessage::set_obj_value(const char *v)
 {
-    obj_value.ty = STRING;
+    obj_value.ty = ObjValType::STRING;
     obj_value.str = std::string(v);
 }
 
@@ -621,7 +621,7 @@ CDAPMessage::get_obj_value(const char *& p, size_t& l) const
 {
     p = NULL;
     l = 0;
-    if (obj_value.ty == BYTES) {
+    if (obj_value.ty == ObjValType::BYTES) {
         p = obj_value.u.buf.ptr;
         l = obj_value.u.buf.len;
     }
@@ -630,7 +630,7 @@ CDAPMessage::get_obj_value(const char *& p, size_t& l) const
 void
 CDAPMessage::set_obj_value(const char *buf, size_t len)
 {
-    obj_value.ty = BYTES;
+    obj_value.ty = ObjValType::BYTES;
     obj_value.u.buf.ptr = const_cast<char *>(buf);
     obj_value.u.buf.len = len;
     obj_value.u.buf.owned = false;
@@ -652,35 +652,35 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
     /* Convert object value. */
     if (objvalue.has_intval()) {
         obj_value.u.i32 = objvalue.intval();
-        obj_value.ty = I32;
+        obj_value.ty = ObjValType::I32;
 
     } else if (objvalue.has_sintval()) {
         obj_value.u.i32 = objvalue.sintval();
-        obj_value.ty = I32;
+        obj_value.ty = ObjValType::I32;
 
     } else if (objvalue.has_int64val()) {
         obj_value.u.i64 = objvalue.int64val();
-        obj_value.ty = I64;
+        obj_value.ty = ObjValType::I64;
 
     } else if (objvalue.has_sint64val()) {
         obj_value.u.i64 = objvalue.sint64val();
-        obj_value.ty = I64;
+        obj_value.ty = ObjValType::I64;
 
     } else if (objvalue.has_strval()) {
         obj_value.str = objvalue.strval();
-        obj_value.ty = STRING;
+        obj_value.ty = ObjValType::STRING;
 
     } else if (objvalue.has_floatval()) {
         obj_value.u.fp_single = objvalue.floatval();
-        obj_value.ty = FLOAT;
+        obj_value.ty = ObjValType::FLOAT;
 
     } else if (objvalue.has_doubleval()) {
         obj_value.u.fp_double = objvalue.doubleval();
-        obj_value.ty = DOUBLE;
+        obj_value.ty = ObjValType::DOUBLE;
 
     } else if (objvalue.has_boolval()) {
         obj_value.u.boolean = objvalue.boolval();
-        obj_value.ty = BOOL;
+        obj_value.ty = ObjValType::BOOL;
 
     } else if (objvalue.has_byteval()) {
         try {
@@ -689,15 +689,15 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage& gm)
                     objvalue.byteval().size());
             obj_value.u.buf.len = objvalue.byteval().size();
             obj_value.u.buf.owned = true;
-            obj_value.ty = BYTES;
+            obj_value.ty = ObjValType::BYTES;
 
         } catch (std::bad_alloc) {
             PE("BYTES object allocation failed\n");
-            obj_value.ty = NONE;
+            obj_value.ty = ObjValType::NONE;
         }
 
     } else {
-        obj_value.ty = NONE;
+        obj_value.ty = ObjValType::NONE;
     }
 
     result = gm.result();
@@ -744,31 +744,31 @@ CDAPMessage::operator gpb::CDAPMessage() const
 
     /* Convert object value. */
     switch (obj_value.ty) {
-        case I32:
+        case ObjValType::I32:
             objvalue->set_intval(obj_value.u.i32);
             break;
 
-        case I64:
+        case ObjValType::I64:
             objvalue->set_int64val(obj_value.u.i64);
             break;
 
-        case STRING:
+        case ObjValType::STRING:
             objvalue->set_strval(obj_value.str);
             break;
 
-        case FLOAT:
+        case ObjValType::FLOAT:
             objvalue->set_floatval(obj_value.u.fp_single);
             break;
 
-        case DOUBLE:
+        case ObjValType::DOUBLE:
             objvalue->set_doubleval(obj_value.u.fp_double);
             break;
 
-        case BOOL:
+        case ObjValType::BOOL:
             objvalue->set_boolval(obj_value.u.boolean);
             break;
 
-        case BYTES:
+        case ObjValType::BYTES:
             objvalue->set_byteval(obj_value.u.buf.ptr, obj_value.u.buf.len);
             break;
 
@@ -776,7 +776,7 @@ CDAPMessage::operator gpb::CDAPMessage() const
             break;
     }
 
-    if (obj_value.ty != NONE) {
+    if (obj_value.ty != ObjValType::NONE) {
         gm.set_allocated_objvalue(objvalue);
     } else {
         delete objvalue;
@@ -848,7 +848,7 @@ CDAPMessage::valid(bool check_invoke_id) const
                           obj_name != string());
 
     ret = ret && vt.check(FLNUM(ObjValue), "obj_value", op_code,
-                          obj_value.ty != NONE);
+                          obj_value.ty != ObjValType::NONE);
 
     ret = ret && vt.check(FLNUM(Result), "result", op_code,
                           result != 0);
@@ -899,31 +899,31 @@ CDAPMessage::dump() const
 
     /* Print object value. */
     switch (obj_value.ty) {
-        case I32:
+        case ObjValType::I32:
             PD_S("obj_value: %d, ", obj_value.u.i32);
             break;
 
-        case I64:
+        case ObjValType::I64:
             PD_S("obj_value: %lld, ", (long long)obj_value.u.i64);
             break;
 
-        case STRING:
+        case ObjValType::STRING:
             PD_S("obj_value: %s, ", obj_value.str.c_str());
             break;
 
-        case FLOAT:
+        case ObjValType::FLOAT:
             PD_S("obj_value: %f,", obj_value.u.fp_single);
             break;
 
-        case DOUBLE:
+        case ObjValType::DOUBLE:
             PD_S("obj_value: %f, ", obj_value.u.fp_double);
             break;
 
-        case BOOL:
+        case ObjValType::BOOL:
             PD_S("obj_value: %s, ", (obj_value.u.boolean ? "true" : "false"));
             break;
 
-        case BYTES:
+        case ObjValType::BYTES:
             PD_S("obj_value: %d bytes at %p, ", (int)obj_value.u.buf.len,
                                               obj_value.u.buf.ptr);
             break;
@@ -969,7 +969,7 @@ int
 CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 {
     const char *action = sender ? "send" : "receive";
-    int old_state = state;
+    ConnState old_state = state;
 
     if (m->op_code > MAX_CDAP_OPCODE) {
         PE("Invalid opcode %d\n", m->op_code);
@@ -981,7 +981,7 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
             {
                 std::string local, remote;
 
-                if (state != NONE) {
+                if (state != ConnState::NONE) {
                     PE("Cannot %s M_CONNECT message: Invalid state %s\n",
                             action, conn_state_repr(state));
                     return -1;
@@ -998,42 +998,42 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
                 local_appl = local;
                 remote_appl = remote;
 
-                state = AWAITCON;
+                state = ConnState::AWAITCON;
             }
             break;
 
         case gpb::M_CONNECT_R:
-            if (state != AWAITCON) {
+            if (state != ConnState::AWAITCON) {
                 PE("Cannot %s M_CONNECT_R message: Invalid state %s\n",
                                     action, conn_state_repr(state));
                 return -1;
             }
-            state = CONNECTED;
+            state = ConnState::CONNECTED;
             break;
 
         case gpb::M_RELEASE:
-            if (state != CONNECTED) {
+            if (state != ConnState::CONNECTED) {
                 PE("Cannot %s M_RELEASE message: Invalid state %s\n",
                                     action, conn_state_repr(state));
                 return -1;
             }
             local_appl = string();
             remote_appl = string();
-            state = AWAITCLOSE;
+            state = ConnState::AWAITCLOSE;
             break;
 
         case gpb::M_RELEASE_R:
-            if (state != AWAITCLOSE) {
+            if (state != ConnState::AWAITCLOSE) {
                 PE("Cannot %s M_RELEASE message: Invalid state %s\n",
                                     action, conn_state_repr(state));
                 return -1;
             }
-            state = NONE;
+            state = ConnState::NONE;
             break;
 
         default:
             /* All the operational messages. */
-            if (state != CONNECTED) {
+            if (state != ConnState::CONNECTED) {
                 PE("Cannot %s %s message: Invalid state %s\n",
                     action, opcode_names_table[m->op_code],
                     conn_state_repr(state));

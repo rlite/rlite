@@ -88,7 +88,7 @@ namespace obj_name {
 /* Time window to compute statistics about management traffic. */
 #define RL_NEIGHFLOW_STATS_PERIOD   20
 
-enum enroll_state_t {
+enum class EnrollState {
     NEIGH_NONE = 0,
 
     NEIGH_ENROLLING,
@@ -141,7 +141,7 @@ struct NeighFlow {
 
     time_t last_activity;
 
-    enum enroll_state_t enroll_state;
+    EnrollState enroll_state;
     struct EnrollmentResources *enrollment_rsrc;
     struct EnrollmentResources *enrollment_rsrc_get(bool initiator);
     void enrollment_rsrc_put();
@@ -165,7 +165,7 @@ struct NeighFlow {
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
 
-    void enroll_state_set(enroll_state_t st);
+    void enroll_state_set(EnrollState st);
     const CDAPMessage *next_enroll_msg();
     void enrollment_commit();
     void enrollment_abort();
@@ -210,7 +210,7 @@ struct Neighbor {
         { return !(*this == other); }
     ~Neighbor();
 
-    static const char *enroll_state_repr(enroll_state_t s);
+    static const char *enroll_state_repr(EnrollState s);
 
     void mgmt_only_set(NeighFlow *nf);
     void n_flow_set(NeighFlow *nf);

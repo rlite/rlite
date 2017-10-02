@@ -48,7 +48,7 @@
 #define rl_delete(_exp, _ty)    delete _exp
 #endif /* RL_MEMTRACK */
 
-typedef std::string NodeId;
+using NodeId = std::string;
 
 /* Helper for pretty printing of default route. */
 static inline std::string node_id_pretty(const NodeId& node) {
