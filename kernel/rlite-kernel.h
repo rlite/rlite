@@ -50,6 +50,10 @@
 #include <linux/sched.h>
 #endif
 
+#ifndef RL_HAVE_CHRDEV_RW_ITER
+#include <linux/socket.h>  /* memcpy_{to,from}iovecend */
+#endif
+
 /*
  * Logging support.
  */
