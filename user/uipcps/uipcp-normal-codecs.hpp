@@ -330,10 +330,12 @@ struct FlowRequest : public UipcpObject {
     int invoke_id;
     uint32_t uid;
     struct rl_flow_config flowcfg;
-    bool initiator;  /* Was I the initiator? */
+#define RL_FLOWREQ_INITIATOR    0x1 /* Was I the initiator? */
+#define RL_FLOWREQ_SEND_DEL     0x2 /* Should I send a delete message ? */
+    uint8_t flags;
     /* End of local storage. */
 
-    FlowRequest() : access_ctrl(NULL) { }
+    FlowRequest() : access_ctrl(NULL), flags(0) { }
     FlowRequest(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
