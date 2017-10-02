@@ -163,6 +163,8 @@ argparser = argparse.ArgumentParser(description = description,
 argparser.add_argument('-c', '--conf',
                        help = "demo.conf configuration file", type = str,
                        default = 'demo.conf')
+argparser.add_argument('--debug', action='store_true',
+                       help = "When downloading images, select the debug one")
 argparser.add_argument('-g', '--graphviz', action='store_true',
                        help = "Generate DIF graphs with graphviz")
 argparser.add_argument('-m', '--memory',
@@ -236,8 +238,9 @@ flavour_suffix = ''
 if args.flavour != '':
     flavour_suffix = '-' + args.flavour
 
-download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/rlite.rootfs.cpio')
-download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/rlite.bzImage')
+imgprefix = "rlite.%s" % ('debug' if args.debug else 'prod',)
+download_if_needed(vmimgpath, 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.rootfs.cpio' % imgprefix)
+download_if_needed('buildroot/bzImage', 'https://bitbucket.org/vmaffione/rina-images/downloads/%s.bzImage' % imgprefix)
 
 # Possibly autogenerate ring topology
 if args.ring != None and args.ring > 0:
