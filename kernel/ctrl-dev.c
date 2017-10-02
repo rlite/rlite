@@ -1020,16 +1020,18 @@ __flow_put(struct flow_entry *entry, bool lock)
         return;
     }
 
-    if (lock)
+    if (lock) {
         FLOCK();
+    }
 
     dtp = &entry->dtp;
 
     entry->refcnt--;
     if (entry->refcnt) {
         /* Flow is still being used by someone. */
-        if (lock)
+        if (lock) {
             FUNLOCK();
+        }
         return;
     }
 
@@ -1062,8 +1064,9 @@ __flow_put(struct flow_entry *entry, bool lock)
         entry->refcnt++;
         PV("FLOWREFCNT %u ++: %u\n", entry->local_port, entry->refcnt);
         flows_putq_add(entry, msecs_to_jiffies(5000) /* should be MPL */);
-        if (lock)
+        if (lock) {
             FUNLOCK();
+        }
         return;
     }
 
@@ -1079,8 +1082,9 @@ __flow_put(struct flow_entry *entry, bool lock)
     list_add_tail_safe(&entry->node_rm, &rl_dm.flows_removeq);
     schedule_work(&rl_dm.flows_removew);
 
-    if (lock)
+    if (lock) {
         FUNLOCK();
+    }
 }
 EXPORT_SYMBOL(__flow_put);
 
