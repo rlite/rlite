@@ -960,7 +960,7 @@ NeighFlow::enrollment_rsrc_get(bool initiator)
                             neigh->ipcp_name.c_str());
     enroll_state_set(NEIGH_ENROLLING);
     enrollment_rsrc = rl_new(EnrollmentResources(this, initiator),
-                             MT_NEIGHFLOW);
+                             RL_MT_NEIGHFLOW);
     return enrollment_rsrc;
 }
 
@@ -1792,7 +1792,7 @@ normal_clean_enrollment_resources(struct uipcp *uipcp)
     for (list<EnrollmentResources *>::iterator
             lit = snapshot.begin();
                 lit != snapshot.end(); lit ++) {
-        rl_delete(*lit, MT_NEIGHFLOW);
+        rl_delete(*lit, RL_MT_NEIGHFLOW);
     }
 }
 
