@@ -1,14 +1,18 @@
 #!/bin/bash
 
 
+printmsg() {
+    echo "$@" | tee -a config.log
+}
+
 no_cmake() {
-    echo "Cannot find CMake, required for build of userspace components"
+    printmsg "Cannot find CMake, required for build of userspace components"
     exit 255
 }
 
 
 generate_flavours() {
-    echo "Generating IPCP flavours ..."
+    printmsg "Generating IPCP flavours ..."
 
     # Read the file line by line
     while read -r line || [[ -n "$line" ]]; do
@@ -25,7 +29,7 @@ generate_flavours() {
 
         # Check that flavour name is ok
         if ! [[ $FLAVOUR =~ ^[a-z]+$ ]]; then
-            echo "Invalid flavour name <$FLAVOUR>"
+            printmsg "Invalid flavour name <$FLAVOUR>"
             exit 255
         fi
 
@@ -45,7 +49,7 @@ generate_flavours() {
                         BITSIZE=$((SIZE * 8))
                         ;;
                     *)
-                        echo "Invalid field size <$SIZE>"
+                        printmsg "Invalid field size <$SIZE>"
                         exit 255
                         ;;
                 esac
@@ -54,7 +58,7 @@ generate_flavours() {
                         CCMACROS=$CCMACROS"-Drl_${FIELD}_t=uint${BITSIZE}_t "
                         ;;
                     *)
-                        echo "Unknown EFCP field <$FIELD>"
+                        printmsg "Unknown EFCP field <$FIELD>"
                         exit 255
                         ;;
                 esac
@@ -72,7 +76,7 @@ generate_flavours() {
         (cd kernel && ln -sf normal.c normal-${FLAVOUR}.c)
 
     done < "flavours.conf"
-    echo "... flavours generated"
+    printmsg "... flavours generated"
 }
 
 KTESTDIR="kernel-test-dir"
@@ -136,6 +140,30 @@ else
 all:
 	make -C ${KERNBUILDDIR} M=\$\$PWD
 endif
+EOF
+
+    # Run tests.
+    {
+        cat <<EOF
+##############################################################################
+# BEGIN RUNNING TESTS: $(date)
+##############################################################################
+## Makefile:
+EOF
+        cat $KTESTDIR/Makefile
+        cat <<EOF
+##############################################################################
+EOF
+    } >> config.log
+    (
+        cd $KTESTDIR
+        make -k -j $(grep -c processor /proc/cpuinfo)
+    )  >> config.log 2>&1
+    #eval "$TESTPOSTPROC"
+    cat >> config.log <<EOF
+##############################################################################
+# END RUNNING TESTS: $(date)
+##############################################################################
 EOF
 }
 
@@ -266,8 +294,8 @@ done
 
 # Check if kernel headers are there for out-of-tree build
 if [ ! -d /lib/modules/`uname -r`/build ]; then
-    echo "Cannot find '/lib/modules/$(uname -r)/build' directory"
-    echo "Make sure headers for the running kernel are installed"
+    printmsg "Cannot find '/lib/modules/$(uname -r)/build' directory"
+    printmsg "Make sure headers for the running kernel are installed"
     exit 255
 fi
 
@@ -275,6 +303,12 @@ fi
 which cmake || no_cmake
 
 rm -f config.log
+
+cat >> config.log <<EOF
+##############################################################################
+# CONFIGURING RLITE FOR BUILD on $(date)
+##############################################################################
+EOF
 
 # Generate symbolic links for common code
 (
@@ -296,7 +330,7 @@ mkdir build || exit 255
 (
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG}
-)
+) | tee -a config.log
 
 # Generate the main Makefile
 cp Makefile.in Makefile
