@@ -2,6 +2,10 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <list>
+#include <vector>
+#include <sstream>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -12,6 +16,37 @@
 #include <linux/if_tun.h>
 
 using namespace std;
+
+struct IPSubnet {
+    string      prefix;
+    unsigned    netbits;
+};
+
+struct Local {
+    string app_name;
+    string dif_name;
+
+    Local(const string &a, const string &d) : app_name(a), dif_name(d) { }
+};
+
+struct Remote {
+    string app_name;
+    string dif_name;
+    IPSubnet tun_subnet;
+
+    Remote(const string &a, const string &d, const IPSubnet &i) : app_name(a),
+                        dif_name(d), tun_subnet(i) { }
+};
+
+struct Route {
+    IPSubnet subnet;
+};
+
+struct IPoRINA {
+    list<Local>     locals;
+    list<Remote>    remotes;
+    list<Route>     routes;
+};
 
 /* Arguments taken by the function:
  *
@@ -78,6 +113,25 @@ parse_conf(const char *path)
     if (fin.fail()) {
         cerr << "Cannot open configuration file " << path << endl;
         return -1;
+    }
+
+    for (unsigned int lines_cnt = 1; !fin.eof(); lines_cnt++) {
+        string line;
+
+        getline(fin, line);
+
+        istringstream iss(line);
+        vector<string> tokens;
+        string token;
+
+        while (iss >> token) {
+            tokens.push_back(token);
+        }
+
+        if (tokens.size() <= 0 || tokens[0][0] == '#') {
+            /* Ignore comments and white spaces. */
+            continue;
+        }
     }
 
     fin.close();
