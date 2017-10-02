@@ -123,9 +123,10 @@ rina_pci_dump(struct rina_pci *pci)
 struct rl_normal {
     struct ipcp_entry *ipcp;
 
-    /* Implementation of the PDU Forwarding Table (PDUFT). */
+    /* Implementation of the PDU Forwarding Table (PDUFT).
+     * An hash table, a default entry and a lock. */
     DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
-
+    struct flow_entry *pduft_dflt;
     rwlock_t pduft_lock;
 };
 
@@ -161,6 +162,7 @@ rl_normal_create(struct ipcp_entry *ipcp)
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
+    priv->pduft_dflt = NULL;
     rwlock_init(&priv->pduft_lock);
 
     PD("New IPC created [%p]\n", priv);
@@ -514,7 +516,7 @@ pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
 
     read_lock_bh(&priv->pduft_lock);
     entry = pduft_lookup_internal(priv, dst_addr);
-    flow = entry ? entry->flow : NULL;
+    flow = entry ? entry->flow : priv->pduft_dflt;
     read_unlock_bh(&priv->pduft_lock);
 
     return flow;
@@ -884,32 +886,37 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
 
 static int
 rl_normal_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
-                      struct flow_entry *flow)
+                    struct flow_entry *flow)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
     struct pduft_entry *entry;
 
     write_lock_bh(&priv->pduft_lock);
 
-    entry = pduft_lookup_internal(priv, dst_addr);
+    if (dst_addr == 0) {
+        /* Default entry. */
+        priv->pduft_dflt = flow;
+    } else {
+        entry = pduft_lookup_internal(priv, dst_addr);
 
-    if (!entry) {
-        entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
         if (!entry) {
-            write_unlock_bh(&priv->pduft_lock);
-            return -ENOMEM;
+            entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
+            if (!entry) {
+                write_unlock_bh(&priv->pduft_lock);
+                return -ENOMEM;
+            }
+
+            hash_add(priv->pdu_ft, &entry->node, dst_addr);
+            list_add_tail(&entry->fnode, &flow->pduft_entries);
+        } else {
+            /* Move from the old list to the new one. */
+            list_del_init(&entry->fnode);
+            list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
         }
 
-        hash_add(priv->pdu_ft, &entry->node, dst_addr);
-        list_add_tail(&entry->fnode, &flow->pduft_entries);
-    } else {
-        /* Move from the old list to the new one. */
-        list_del_init(&entry->fnode);
-        list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
+        entry->flow = flow;
+        entry->address = dst_addr;
     }
-
-    entry->flow = flow;
-    entry->address = dst_addr;
 
     write_unlock_bh(&priv->pduft_lock);
 
@@ -926,6 +933,7 @@ rl_normal_pduft_flush(struct ipcp_entry *ipcp)
 
     write_lock_bh(&priv->pduft_lock);
 
+    priv->pduft_dflt = NULL;
     hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node) {
         list_del_init(&entry->fnode);
         hash_del(&entry->node);
@@ -962,12 +970,22 @@ static int
 rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
 {
     struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-    struct pduft_entry *entry;
+    struct pduft_entry *entry = NULL;
+    int ret = -1;
 
     write_lock_bh(&priv->pduft_lock);
-    entry = pduft_lookup_internal(priv, dst_addr);
-    if (entry) {
-        pduft_entry_unlink(entry);
+    if (dst_addr == 0) {
+        /* Default entry. */
+        if (priv->pduft_dflt) {
+            priv->pduft_dflt = NULL;
+            ret = 0;
+        }
+    } else {
+        entry = pduft_lookup_internal(priv, dst_addr);
+        if (entry) {
+            pduft_entry_unlink(entry);
+            ret = 0;
+        }
     }
     write_unlock_bh(&priv->pduft_lock);
 
@@ -975,7 +993,7 @@ rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
         rl_free(entry, RL_MT_PDUFT);
     }
 
-    return (entry != NULL) ? 0 : -1;
+    return ret;
 }
 
 static int
