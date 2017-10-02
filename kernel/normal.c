@@ -1357,7 +1357,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         RPD(2, "Dropping SDU shorter [%u] than PCI\n",
                 (unsigned int)rb->len);
         rl_buf_free(rb);
-        return NULL; /* -EINVAL */;
+        return NULL; /* -EINVAL */
     }
 
     if (pci->pdu_len < rb->len) {
@@ -1383,7 +1383,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
         if (!ipcp->mgmt_txrx) {
             PE("Missing mgmt_txrx\n");
             rl_buf_free(rb);
-            return NULL; /* -EINVAL */;
+            return NULL; /* -EINVAL */
         }
         RL_BUF_RX(rb).cons_seqnum = pci->seqnum;
         ret = rl_buf_pci_pop(rb);
@@ -1398,7 +1398,7 @@ rl_normal_sdu_rx(struct ipcp_entry *ipcp, struct rl_buf *rb,
             if (!nrb) {
                 PE("Out of memory\n");
                 rl_buf_free(rb);
-                return NULL; /* -ENOMEM */;
+                return NULL; /* -ENOMEM */
             }
 
             memcpy(RL_BUF_DATA(nrb), RL_BUF_DATA(rb), rb->len);
