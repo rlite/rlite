@@ -565,9 +565,13 @@ connect_to_remotes(void *opaque)
 
             rfd = rina_flow_alloc_wait(wfd);
             if (rfd < 0) {
-                perror("rina_flow_alloc_wait()");
-                cout << "Failed to connect to remote " << re->second.app_name <<
+                if (errno != EPERM || g->verbose) {
+                    if (errno != EPERM) {
+                        perror("rina_flow_alloc_wait()");
+                    }
+                    cout << "Failed to connect to remote " << re->second.app_name <<
                         " through DIF " << re->second.dif_name << endl;
+                }
                 continue;
             }
 
@@ -721,6 +725,7 @@ int main(int argc, char **argv)
         Hello hello;
         string remote_name;
 
+        /* CDAP connection setup. */
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_CONNECT) {
             cerr << "M_CONNECT expected" << endl;
@@ -736,6 +741,7 @@ int main(int argc, char **argv)
         }
         delete rm; rm = NULL;
 
+        /* Receive routes from peer. */
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_START) {
             cerr << "M_START expected" << endl;
