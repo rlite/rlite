@@ -991,7 +991,8 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         /* Set IPCP max_sdu_size using the device MTU. However, MTU can be
          * changed; we should intercept those changes, reflect the change
          * in the ipcp_entry and notify userspace. */
-        *notify = (ipcp->max_sdu_size != priv->netdev->mtu);
+        *notify = (ipcp->max_sdu_size != priv->netdev->mtu) ||
+                    (ipcp->tailroom != priv->netdev->needed_tailroom);
         ipcp->max_sdu_size = priv->netdev->mtu;
         ipcp->tailroom = priv->netdev->needed_tailroom;
 
