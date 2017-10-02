@@ -70,7 +70,7 @@ struct EnrollmentInfo : public UipcpObject {
 
     EnrollmentInfo() : address(RL_ADDR_NULL), start_early(false) { }
     EnrollmentInfo(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct RinaName {
@@ -104,7 +104,7 @@ struct DFTEntry : public UipcpObject {
 
     DFTEntry() : address(RL_ADDR_NULL), timestamp(0), local(false) { }
     DFTEntry(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct DFTSlice : public UipcpObject {
@@ -112,7 +112,7 @@ struct DFTSlice : public UipcpObject {
 
     DFTSlice() = default;
     DFTSlice(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct NeighborCandidate : public UipcpObject {
@@ -125,7 +125,7 @@ struct NeighborCandidate : public UipcpObject {
 
     NeighborCandidate() = default;
     NeighborCandidate(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 
     bool operator==(const NeighborCandidate &o) const;
     bool operator!=(const NeighborCandidate &o) const {
@@ -138,7 +138,7 @@ struct NeighborCandidateList : public UipcpObject {
 
     NeighborCandidateList() = default;
     NeighborCandidateList(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct LowerFlow : public UipcpObject {
@@ -151,7 +151,7 @@ struct LowerFlow : public UipcpObject {
 
     LowerFlow() : cost(0), seqnum(0), state(false), age(0) { }
     LowerFlow(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
     bool operator==(const LowerFlow& o) {
         /* Don't use seqnum and age for the comparison. */
         return local_node == o.local_node && remote_node == o.remote_node &&
@@ -169,7 +169,7 @@ struct LowerFlowList : public UipcpObject {
 
     LowerFlowList() = default;
     LowerFlowList(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct Property : public UipcpObject {
@@ -178,7 +178,7 @@ struct Property : public UipcpObject {
 
     Property() = default;
     Property(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct QosSpec : public UipcpObject {
@@ -198,7 +198,7 @@ struct QosSpec : public UipcpObject {
 
     QosSpec() = default;
     QosSpec(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct PolicyDescr : public UipcpObject {
@@ -209,7 +209,7 @@ struct PolicyDescr : public UipcpObject {
 
     PolicyDescr() = default;
     PolicyDescr(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct WindowBasedFlowCtrlConfig : public UipcpObject {
@@ -220,7 +220,7 @@ struct WindowBasedFlowCtrlConfig : public UipcpObject {
 
     WindowBasedFlowCtrlConfig() = default;
     WindowBasedFlowCtrlConfig(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct RateBasedFlowCtrlConfig : public UipcpObject {
@@ -232,7 +232,7 @@ struct RateBasedFlowCtrlConfig : public UipcpObject {
 
     RateBasedFlowCtrlConfig() = default;
     RateBasedFlowCtrlConfig(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct FlowCtrlConfig : public UipcpObject {
@@ -252,7 +252,7 @@ struct FlowCtrlConfig : public UipcpObject {
 
     FlowCtrlConfig() = default;
     FlowCtrlConfig(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct RtxCtrlConfig : public UipcpObject {
@@ -269,7 +269,7 @@ struct RtxCtrlConfig : public UipcpObject {
 
     RtxCtrlConfig() = default;
     RtxCtrlConfig(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct DtcpConfig : public UipcpObject {
@@ -282,7 +282,7 @@ struct DtcpConfig : public UipcpObject {
 
     DtcpConfig() = default;
     DtcpConfig(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct ConnPolicies : public UipcpObject {
@@ -296,7 +296,7 @@ struct ConnPolicies : public UipcpObject {
 
     ConnPolicies() = default;
     ConnPolicies(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct ConnId : public UipcpObject {
@@ -306,7 +306,7 @@ struct ConnId : public UipcpObject {
 
     ConnId() : qos_id(0), src_cep(0), dst_cep(0) { }
     ConnId(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct FlowRequest : public UipcpObject {
@@ -337,7 +337,7 @@ struct FlowRequest : public UipcpObject {
 
     FlowRequest() : access_ctrl(NULL), flags(0) { }
     FlowRequest(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct AData : public UipcpObject {
@@ -348,7 +348,7 @@ struct AData : public UipcpObject {
     AData() : cdap(NULL) { }
     AData(const char *buf, unsigned int size);
     ~AData() { if (cdap) rl_delete(cdap, RL_MT_CDAP); }
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct AddrAllocRequest : public UipcpObject {
@@ -361,7 +361,7 @@ struct AddrAllocRequest : public UipcpObject {
     AddrAllocRequest(rlm_addr_t a, rlm_addr_t r) : requestor(r), address(a),
                                                  pending(true) { }
     AddrAllocRequest(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 
 struct AddrAllocEntries : public UipcpObject {
@@ -369,6 +369,6 @@ struct AddrAllocEntries : public UipcpObject {
 
     AddrAllocEntries() = default;
     AddrAllocEntries(const char *buf, unsigned int size);
-    int serialize(char *buf, unsigned int size) const;
+    int serialize(char *buf, unsigned int size) const override;
 };
 #endif  /* __UIPCP_CODECS_H__ */

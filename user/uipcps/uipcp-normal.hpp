@@ -561,35 +561,35 @@ struct dft_default : public dft {
     dft_default(struct uipcp_rib *_ur) : dft(_ur) { }
     ~dft_default() { }
 
-    void dump(std::stringstream& ss) const;
+    void dump(std::stringstream& ss) const override;
 
     int lookup_entry(const std::string& appl_name, rlm_addr_t& dstaddr,
-                     const rlm_addr_t preferred, uint32_t cookie) const;
-    int appl_register(const struct rl_kmsg_appl_register *req);
-    void update_address(rlm_addr_t new_addr);
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int neighs_refresh(size_t limit);
+                const rlm_addr_t preferred, uint32_t cookie) const override;
+    int appl_register(const struct rl_kmsg_appl_register *req) override;
+    void update_address(rlm_addr_t new_addr) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
 };
 
 struct flow_allocator_default : public flow_allocator {
     flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) { }
     ~flow_allocator_default() { }
 
-    void dump(std::stringstream& ss) const;
-    void dump_memtrack(std::stringstream& ss) const;
+    void dump(std::stringstream& ss) const override;
+    void dump_memtrack(std::stringstream& ss) const override;
 
     std::unordered_map< std::string, FlowRequest > flow_reqs;
     std::unordered_map< unsigned int, FlowRequest > flow_reqs_tmp;
 
-    int fa_req(struct rl_kmsg_fa_req *req);
-    int fa_resp(struct rl_kmsg_fa_resp *resp);
+    int fa_req(struct rl_kmsg_fa_req *req) override;
+    int fa_resp(struct rl_kmsg_fa_resp *resp) override;
 
-    int flow_deallocated(struct rl_kmsg_flow_deallocated *req);
+    int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
 
-    int flows_handler_create(const CDAPMessage *rm);
-    int flows_handler_create_r(const CDAPMessage *rm);
-    int flows_handler_delete(const CDAPMessage *rm);
+    int flows_handler_create(const CDAPMessage *rm) override;
+    int flows_handler_create_r(const CDAPMessage *rm) override;
+    int flows_handler_delete(const CDAPMessage *rm) override;
 };
 
 class RoutingEngine {
@@ -656,27 +656,28 @@ struct lfdb_default : public lfdb {
     lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) { }
     ~lfdb_default() { }
 
-    void dump(std::stringstream& ss) const;
-    void dump_routing(std::stringstream& ss) const;
+    void dump(std::stringstream& ss) const override;
+    void dump_routing(std::stringstream& ss) const override;
 
     const LowerFlow *find(const NodeId& local_node,
-                          const NodeId& remote_node) const {
+                          const NodeId& remote_node) const override {
         return _find(local_node, remote_node);
     };
-    LowerFlow *find(const NodeId& local_node, const NodeId& remote_node);
-    bool add(const LowerFlow &lf);
-    bool del(const NodeId& local_node, const NodeId& remote_node);
-    void update_local(const std::string& neigh_name);
-    void update_routing();
-    int flow_state_update(struct rl_kmsg_flow_state *upd);
+    LowerFlow *find(const NodeId& local_node,
+                    const NodeId& remote_node) override;
+    bool add(const LowerFlow &lf) override;
+    bool del(const NodeId& local_node, const NodeId& remote_node) override;
+    void update_local(const std::string& neigh_name) override;
+    void update_routing() override;
+    int flow_state_update(struct rl_kmsg_flow_state *upd) override;
 
     const LowerFlow *_find(const NodeId& local_node,
                            const NodeId& remote_node) const;
 
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
 
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int neighs_refresh(size_t limit);
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
 };
 
 struct addr_allocator_distributed : public addr_allocator {
@@ -688,11 +689,11 @@ struct addr_allocator_distributed : public addr_allocator {
                 addr_allocator(_ur), nack_wait_secs(4) { }
     ~addr_allocator_distributed() { }
 
-    void dump(std::stringstream& ss) const;
-    rlm_addr_t allocate();
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const;
-    int param_mod(const std::string& name, const std::string& value);
+    void dump(std::stringstream& ss) const override;
+    rlm_addr_t allocate() override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int param_mod(const std::string& name, const std::string& value) override;
 
     /* How many seconds to wait for NACKs before considering the address
      * allocation successful. */
@@ -702,7 +703,7 @@ struct addr_allocator_distributed : public addr_allocator {
 struct addr_allocator_manual : public addr_allocator_distributed {
     addr_allocator_manual(struct uipcp_rib *_ur)
         : addr_allocator_distributed(_ur) { }
-    rlm_addr_t allocate() { return RL_ADDR_NULL; }
+    rlm_addr_t allocate() override { return RL_ADDR_NULL; }
 };
 
 #endif  /* __UIPCP_RIB_H__ */
