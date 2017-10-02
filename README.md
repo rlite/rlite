@@ -869,6 +869,81 @@ towards the tun device associated to the peer.
     route       10.9.3.0/24
 
 
+### 7.3 rinaperf
+The rinaperf program is a simple multi-threaded client/server application that is able to measure
+network throughput and latency. It aims at providing basic performance measurement functionalities
+akin to those provided by the popular netperf [12] and iperf [13] tools. In particular, rinaperf
+tries to imitate netperf. In addition to that, rinaperf can also be seen as an example program
+showing the usage of the RINA API in blocking mode.
+When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
+The server main thread runs a loop to accept new flow requests (`rina_flow_accept()`), and
+each request is handled by a dedicated worker thread created on-demand. The main loop is also
+responsible for joining the worker threads that finished serving their requests. A limit on the total
+number of worker threads at each moment is used to keep the memory usage under control.
+In client mode, rinaperf uses `rina_flow_alloc()` to allocate a flow, and then uses blocking
+I/O to perform the test. The -p option can be specified to provide the number of flows that the
+client is asked to allocate in parallel. Each flow is allocated and handled by a dedicated thread. The
+default value for the -p option is 1, so that by default rinaperf allocates only one flow (using the
+main thread). The client can specify various options to customize the performance test, including
+the number of packets to send (or transactions to perform), the packet size, the flow QoS, the DIF
+to use, the inter-packet transmission interval, the burst size, etc.
+To date, three test types are supported:
+ * ping, implementing a simple ping functionality for quick connectivity checks.
+ * perf, which provides an unidirectional throughput test, similar to netperf UDP STREAM or
+TCP STREAM tests.
+ * rr, which measures the average latency of request/response transactions, similar to netperf
+TCP RR or UDP RR tests.
+
+For both client and server, each thread manages the I/O for a single flow, blocking on the I/O
+calls when necessary. Concurrency is therefore achieved by means of multithreading. Running
+rinaperf with the -h option will list all the available options.
+As an example, the following rinaperf invocation will perform request-response tests with a
+million transactions of 400 bytes packets:
+
+    user@host ˜/rina # rinaperf -c 1000000 -t rr -s 400
+    Starting request-response test; message size: 400, number of messages: 1000000, duration: inf
+            Transactions    Kpps        Mbps        Latency (ns)
+    Sender  1000000         145.569     465.821     6869
+
+while the following performs a five seconds long undirectional throughput test with 1460 bytes
+packets:
+
+    user@host ˜/rina # rinaperf -t perf -s 1460 -D 5
+    Starting unidirectional throughput test; message size: 1460, number of messages: inf, duration: 5 secs
+                Packets     Kpps        Mbps
+    Sender      6790377     1358.417    15866.311
+    Receiver    5037989     988.051     11540.436
+
+
+### 7.4 rina-echo-async
+The rina-echo-async program is a single-threaded client/server application that implements an
+echo service using only non-blocking I/O. Differently from rinaperf, rina-echo-async is meant to
+be used for functional testing only; nevertheless, it is a compact educational example that shows
+all the features of the RINA API in non-blocking mode.
+When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
+Both client and server are able to manage multiple flows in parallel, using a single thread and
+without blocking on allocation, registration, accept or I/O. To achieve concurrency with a single
+thread, the program is structured as an event-loop that manages an array of state machines. The
+client state machine is illustrated in Figure 5. The edges in the graph show the pre-conditions for
+the state transition (if any) and the actions to be performed when the transition happens. After
+completing the flow allocation, the client writes a message to the server and receives the echoed
+response coming back. In client mode, rina-echo-async keeps an array of independent client state
+machines, to handle multiple concurrent echo sessions. The -p option can be used to specify how
+many flows (sessions) to create and handle; by default, only a single flow is created.
+
+![Client state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-client.png)
+
+The server state machines are illustrated in Figure 6. After completing the registration, the
+server starts accepting new sessions, denying them if the number of ongoing sessions grows beyond
+a limit (128 in the current implementation). A new state machine is created for each accepted
+session. The server therefore manages two types of state machines: one to accept new requests
+(top of Figure 6), and the other one to serve a single client (bottom of Figure 6). There is one
+instance of the first kind and multiple instance of the second, one per client. The per-client state
+machine just receives the echo request and sends the echo response back to the client.
+
+![Server state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-server.png)
+
+
 ## 8. Development workflow
 The *rlite* project defines a verfication workflow that developers should follow
 after performing any modification to the software.
@@ -945,80 +1020,6 @@ so that the demonstrator will automatically define a network of 200 nodes
 arranged in a ring, with a single normal DIF including them all. On a machine
 with 64 GB of RAM it is possible to deploy a ring of 350 nodes, when
 giving each node the default amount of memory.
-
-### 7.3 rinaperf
-The rinaperf program is a simple multi-threaded client/server application that is able to measure
-network throughput and latency. It aims at providing basic performance measurement functionalities
-akin to those provided by the popular netperf [12] and iperf [13] tools. In particular, rinaperf
-tries to imitate netperf. In addition to that, rinaperf can also be seen as an example program
-showing the usage of the RINA API in blocking mode.
-When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
-The server main thread runs a loop to accept new flow requests (`rina_flow_accept()`), and
-each request is handled by a dedicated worker thread created on-demand. The main loop is also
-responsible for joining the worker threads that finished serving their requests. A limit on the total
-number of worker threads at each moment is used to keep the memory usage under control.
-In client mode, rinaperf uses `rina_flow_alloc()` to allocate a flow, and then uses blocking
-I/O to perform the test. The -p option can be specified to provide the number of flows that the
-client is asked to allocate in parallel. Each flow is allocated and handled by a dedicated thread. The
-default value for the -p option is 1, so that by default rinaperf allocates only one flow (using the
-main thread). The client can specify various options to customize the performance test, including
-the number of packets to send (or transactions to perform), the packet size, the flow QoS, the DIF
-to use, the inter-packet transmission interval, the burst size, etc.
-To date, three test types are supported:
- * ping, implementing a simple ping functionality for quick connectivity checks.
- * perf, which provides an unidirectional throughput test, similar to netperf UDP STREAM or
-TCP STREAM tests.
- * rr, which measures the average latency of request/response transactions, similar to netperf
-TCP RR or UDP RR tests.
-
-For both client and server, each thread manages the I/O for a single flow, blocking on the I/O
-calls when necessary. Concurrency is therefore achieved by means of multithreading. Running
-rinaperf with the -h option will list all the available options.
-As an example, the following rinaperf invocation will perform request-response tests with a
-million transactions of 400 bytes packets:
-
-    user@host ˜/rina # rinaperf -c 1000000 -t rr -s 400
-    Starting request-response test; message size: 400, number of messages: 1000000, duration: inf
-            Transactions    Kpps        Mbps        Latency (ns)
-    Sender  1000000         145.569     465.821     6869
-
-while the following performs a five seconds long undirectional throughput test with 1460 bytes
-packets:
-
-    user@host ˜/rina # rinaperf -t perf -s 1460 -D 5
-    Starting unidirectional throughput test; message size: 1460, number of messages: inf, duration: 5 secs
-                Packets     Kpps        Mbps
-    Sender      6790377     1358.417    15866.311
-    Receiver    5037989     988.051     11540.436
-
-
-### 7.4 rina-echo-async
-The rina-echo-async program is a single-threaded client/server application that implements an
-echo service using only non-blocking I/O. Differently from rinaperf, rina-echo-async is meant to
-be used for functional testing only; nevertheless, it is a compact educational example that shows
-all the features of the RINA API in non-blocking mode.
-When the -l option is used, rinaperf runs in server mode, otherwise it runs in client mode.
-Both client and server are able to manage multiple flows in parallel, using a single thread and
-without blocking on allocation, registration, accept or I/O. To achieve concurrency with a single
-thread, the program is structured as an event-loop that manages an array of state machines. The
-client state machine is illustrated in Figure 5. The edges in the graph show the pre-conditions for
-the state transition (if any) and the actions to be performed when the transition happens. After
-completing the flow allocation, the client writes a message to the server and receives the echoed
-response coming back. In client mode, rina-echo-async keeps an array of independent client state
-machines, to handle multiple concurrent echo sessions. The -p option can be used to specify how
-many flows (sessions) to create and handle; by default, only a single flow is created.
-
-![Client state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-client.png)
-
-The server state machines are illustrated in Figure 6. After completing the registration, the
-server starts accepting new sessions, denying them if the number of ongoing sessions grows beyond
-a limit (128 in the current implementation). A new state machine is created for each accepted
-session. The server therefore manages two types of state machines: one to accept new requests
-(top of Figure 6), and the other one to serve a single client (bottom of Figure 6). There is one
-instance of the first kind and multiple instance of the second, one per client. The per-client state
-machine just receives the echo request and sends the echo response back to the client.
-
-![Server state machine](https://bitbucket.org/vmaffione/rina-images/downloads/rina-echo-async-server.png)
 
 
 ## 9. RINA API documentation
