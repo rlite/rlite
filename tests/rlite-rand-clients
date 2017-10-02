@@ -33,35 +33,38 @@ if args.D < 1 or args.D > 100:
     print("Invalid parameter D: it must be 1 <= D <= 100")
     quit()
 
-# List all the ipcps to extract all the DIF names
-try:
-    o = subprocess.check_output(['rlite-ctl'])
-    o = str(o)
-    difs = re.findall(r"dif_name = '([^']+)'", o)
-except:
-    print("Failed to get list of IPCPs")
-    quit()
-
-if len(difs) == 0:
-    print("No DIFs found")
-    quit
-
-# Look for registered applications that contain 'rinaperf' in their name
-destinations = []
-for dif in difs:
+while 1:
+    # List all the ipcps to extract all the DIF names
     try:
-        o = subprocess.check_output(['rlite-ctl', 'dif-rib-show', dif])
+        o = subprocess.check_output(['rlite-ctl'])
         o = str(o)
-        applications = re.findall(r"Application:\s+([^,]+)", o)
-        for a in applications:
-            if args.filter_name in a:
-                destinations.append((dif, a))
-    except Exception as e:
-        pass
+        difs = re.findall(r"dif_name = '([^']+)'", o)
+    except:
+        print("Failed to get list of IPCPs")
+        quit()
 
-if len(destinations) == 0:
-    print("No destination application found")
-    quit()
+    if len(difs) == 0:
+        print("No DIFs found")
+        quit
+
+    # Look for registered applications that contain 'rinaperf' in their name
+    destinations = []
+    for dif in difs:
+        try:
+            o = subprocess.check_output(['rlite-ctl', 'dif-rib-show', dif])
+            o = str(o)
+            applications = re.findall(r"Application:\s+([^,]+)", o)
+            for a in applications:
+                if args.filter_name in a:
+                    destinations.append((dif, a))
+        except Exception as e:
+            pass
+
+    if len(destinations) > 0:
+        break
+
+    print("No destination application found, retrying ...")
+    time.sleep(4)
 
 if args.verbose:
     print("Destinations: %s" % destinations)
