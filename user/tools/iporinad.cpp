@@ -20,8 +20,13 @@
 #include <pthread.h>
 
 #include <rina/cdap.hpp>
+#include "iporina.pb.h"
 
 using namespace std;
+
+/*
+ * Internal data structures.
+ */
 
 struct IPSubnet {
     string      repr;
@@ -73,6 +78,84 @@ struct IPoRINA {
 
     IPoRINA() : verbose(0), rfd(-1) { }
 };
+
+/*
+ * CDAP objects with their serialization and deserialization routines
+ */
+
+struct Msg {
+    virtual int serialize(char *buf, unsigned int size) const = 0;
+    virtual ~Msg() { }
+};
+
+static int
+ser_common(::google::protobuf::MessageLite &gm, char *buf,
+           int size)
+{
+    if (gm.ByteSize() > size) {
+        fprintf(stderr, "User buffer too small [%u/%u]\n",
+                gm.ByteSize(), size);
+        return -1;
+    }
+
+    gm.SerializeToArray(buf, size);
+
+    return gm.ByteSize();
+}
+
+struct HelloMsg : public Msg {
+    string myname;      /* Name of the sender. */
+    string yourname;    /* Name of the receiver. */
+    string tun_subnet;  /* Subnet to be used for the tunnel */
+    uint32_t num_routes; /* How many route to exchange */
+
+    HelloMsg() : num_routes(0) { }
+    HelloMsg(const char *buf, unsigned int size);
+    int serialize(char *buf, unsigned int size) const;
+};
+
+static void
+gpb2HelloMsg(HelloMsg &m, const gpb::hello_msg_t &gm)
+{
+    m.myname = gm.myname();
+    m.yourname = gm.yourname();
+    m.tun_subnet = gm.tun_subnet();
+    m.num_routes = gm.num_routes();
+}
+
+static int
+HelloMsg2gpb(const HelloMsg &m, gpb::hello_msg_t &gm)
+{
+    gm.set_myname(m.myname);
+    gm.set_yourname(m.yourname);
+    gm.set_tun_subnet(m.tun_subnet);
+    gm.set_num_routes(m.num_routes);
+
+    return 0;
+}
+
+HelloMsg::HelloMsg(const char *buf, unsigned int size) : num_routes(0)
+{
+    gpb::hello_msg_t gm;
+
+    gm.ParseFromArray(buf, size);
+
+    gpb2HelloMsg(*this, gm);
+}
+
+int
+HelloMsg::serialize(char *buf, unsigned int size) const
+{
+    gpb::hello_msg_t gm;
+
+    HelloMsg2gpb(*this, gm);
+
+    return ser_common(gm, buf, size);
+}
+
+/*
+ * Global variables to hold the daemon state.
+ */
 
 static IPoRINA _g;
 static IPoRINA *g = &_g;

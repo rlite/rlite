@@ -1,0 +1,10 @@
+syntax="proto2";
+package gpb;
+option optimize_for = LITE_RUNTIME;
+
+message hello_msg_t {
+    required string myname = 1;
+    required string yourname = 2;
+    required string tun_subnet = 3;
+    required uint32 num_routes = 4;
+}
