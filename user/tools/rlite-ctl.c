@@ -885,20 +885,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func = ipcps_show,
     },
     {
-        .name = "ipcp-rib-show",
-        .usage = "IPCP_NAME",
-        .num_args = 1,
-        .func = ipcp_rib_show,
-    },
-    {
         .name = "dif-rib-show",
         .usage = "DIF_NAME",
-        .num_args = 1,
-        .func = ipcp_rib_show,
-    },
-    {
-        .name = "ipcp-routing-show",
-        .usage = "IPCP_NAME",
         .num_args = 1,
         .func = ipcp_rib_show,
     },
@@ -927,22 +915,10 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func = regs_show,
     },
     {
-        .name = "ipcp-policy-mod",
-        .usage = "IPCP_NAME COMPONENT_NAME POLICY_NAME",
-        .num_args = 3,
-        .func = ipcp_policy_mod,
-    },
-    {
         .name = "dif-policy-mod",
         .usage = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
         .func = ipcp_policy_mod,
-    },
-    {
-        .name = "ipcp-policy-param-mod",
-        .usage = "IPCP_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
-        .num_args = 4,
-        .func = ipcp_policy_param_mod,
     },
     {
         .name = "dif-policy-param-mod",
@@ -956,6 +932,32 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .num_args = 1,
         .func = ipcp_enroller_enable,
     },
+#if 0
+    {
+        .name = "ipcp-rib-show",
+        .usage = "IPCP_NAME",
+        .num_args = 1,
+        .func = ipcp_rib_show,
+    },
+    {
+        .name = "ipcp-routing-show",
+        .usage = "IPCP_NAME",
+        .num_args = 1,
+        .func = ipcp_rib_show,
+    },
+    {
+        .name = "ipcp-policy-mod",
+        .usage = "IPCP_NAME COMPONENT_NAME POLICY_NAME",
+        .num_args = 3,
+        .func = ipcp_policy_mod,
+    },
+    {
+        .name = "ipcp-policy-param-mod",
+        .usage = "IPCP_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
+        .num_args = 4,
+        .func = ipcp_policy_param_mod,
+    },
+#endif
 #ifdef RL_MEMTRACK
     {
         .name = "memtrack",
