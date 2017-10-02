@@ -468,23 +468,19 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 
     decode << rm->obj_name.substr(obj_name::flows.size() + 1);
     decode >> addr >> separator >> port;
+    /* TODO the following is wrong when flows are local to the node, as
+     * local and remote address are the same. */
     if (addr == rib->myaddr) {
+        /* We were the initiator. */
         objname = rm->obj_name + string("L");
     } else {
+        /* We were the target. */
         objname = rm->obj_name + string("R");
     }
     f = flow_reqs.find(objname);
     if (f == flow_reqs.end()) {
         UPV(rib->uipcp, "Flow '%s' already deleted locally\n", objname.c_str());
         return 0;
-    }
-
-    if (addr == rib->myaddr) {
-        /* We were the target. */
-        assert(!(f->second.flags & RL_FLOWREQ_INITIATOR));
-    } else {
-        /* We were the initiator. */
-        assert(f->second.flags & RL_FLOWREQ_INITIATOR);
     }
 
     local_port = (f->second.flags & RL_FLOWREQ_INITIATOR) ?
