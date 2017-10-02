@@ -144,7 +144,7 @@ static int
 rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
              NeighFlow *nf)
 {
-    CDAPMessage *m = NULL;
+    CDAPMessage *m = nullptr;
     Neighbor *neigh;
     int ret = 0;
 
@@ -154,7 +154,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
 
     try {
         m = msg_deser_stateless(serbuf, serlen);
-        if (m == NULL) {
+        if (m == nullptr) {
             return -1;
         }
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
@@ -184,7 +184,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
                 return 0;
             }
 
-            rib->cdap_dispatch(adata.cdap, NULL);
+            rib->cdap_dispatch(adata.cdap, nullptr);
 
             return 0;
         }
@@ -200,7 +200,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
          * deserialization can be avoided extending the CDAP
          * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
         rl_delete(m, RL_MT_CDAP);
-        m = NULL;
+        m = nullptr;
 
         if (!nf) {
             UPE(rib->uipcp, "Received message from unknown port id\n");
@@ -221,7 +221,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
         }
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
-        nf->last_activity = time(NULL);
+        nf->last_activity = time(nullptr);
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
                 !neigh->initiator && m->op_code == gpb::M_START &&
@@ -245,7 +245,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
             nf->enrollment_rsrc->msgs.push_back(m);
-            m = NULL;
+            m = nullptr;
             pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
             nf->enrollment_rsrc_put();
         } else {
@@ -296,7 +296,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     ScopeLock lock_(rib->lock);
 
     /* Lookup neighbor by port id. If ADATA, it is not an error
-     * if the lookup fails (nf == NULL). */
+     * if the lookup fails (nf == nullptr). */
     rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
 
     /* Hand off the message to the RIB. */
@@ -333,7 +333,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 {
     int ret;
 
-    pthread_mutex_init(&lock, NULL);
+    pthread_mutex_init(&lock, nullptr);
 
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
@@ -341,7 +341,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
         throw std::exception();
     }
 
-    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_bound_flow_ready, NULL);
+    ret = uipcp_loop_fdh_add(uipcp, mgmtfd, mgmt_bound_flow_ready, nullptr);
     if (ret) {
         close(mgmtfd);
         throw std::exception();
@@ -358,7 +358,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     fa = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
     policy_mod("routing", "link-state");
-    addra = NULL;
+    addra = nullptr;
     policy_mod("address-allocator", "distributed");
 
     /* Insert the handlers for the RIB objects. */
@@ -509,7 +509,7 @@ uipcp_rib::dump() const
 
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, heard " <<
-                    static_cast<int>(time(NULL) - neigh->second->unheard_since)
+                    static_cast<int>(time(nullptr) - neigh->second->unheard_since)
                         << "s ago, " << (nf->stats.win[1].bytes_sent/1000.0)
                         << "KB sent, " << (nf->stats.win[1].bytes_recvd/1000.0)
                         << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD
@@ -690,7 +690,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
     CDAPMessage am;
     char objbuf[4096];  /* Don't change the scope of this buffer. */
     char aobjbuf[4096];
-    char *serbuf = NULL;
+    char *serbuf = nullptr;
     int aobjlen;
     size_t serlen;
     int ret;
@@ -713,7 +713,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m, NULL);
+        int ret = cdap_dispatch(m, nullptr);
 
         rl_delete(m, RL_MT_CDAP);
 
@@ -790,7 +790,7 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
     }
 
     if (nf && nf->neigh) {
-        nf->neigh->unheard_since = time(NULL); /* update */
+        nf->neigh->unheard_since = time(nullptr); /* update */
     }
 
     if (hi == handlers.end()) {
@@ -1018,8 +1018,8 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         }
 
         if (propagate) {
-            /* nf can be NULL for M_DELETE messages */
-            rib->neighs_sync_obj_excluding(nf ? nf->neigh : NULL, create,
+            /* nf can be nullptr for M_DELETE messages */
+            rib->neighs_sync_obj_excluding(nf ? nf->neigh : nullptr, create,
                                            rm->obj_class, rm->obj_name, &aar);
         }
 
@@ -1119,7 +1119,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
             continue;
         }
 
-        kvn.second->neigh_sync_obj(NULL, create, obj_class,
+        kvn.second->neigh_sync_obj(nullptr, create, obj_class,
                                    obj_name, obj_value);
     }
 
@@ -1131,7 +1131,7 @@ uipcp_rib::neighs_sync_obj_all(bool create, const string& obj_class,
                            const string& obj_name,
                            const UipcpObject *obj_value) const
 {
-    return neighs_sync_obj_excluding(NULL, create, obj_class, obj_name, obj_value);
+    return neighs_sync_obj_excluding(nullptr, create, obj_class, obj_name, obj_value);
 }
 
 void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
@@ -1187,7 +1187,7 @@ uipcp_rib::policy_mod(const std::string& component,
          * carried out. */
         struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb);
 
-        assert(lfdbd != NULL);
+        assert(lfdbd != nullptr);
 
         if (policy_name == "link-state") {
             if (lfdbd->re.lfa_enabled) {
@@ -1208,7 +1208,7 @@ uipcp_rib::policy_mod(const std::string& component,
         } else if (policy_name == "distributed") {
             addra = new addr_allocator_distributed(this);
         }
-        if (addra_old != NULL) {
+        if (addra_old != nullptr) {
             delete addra_old;
         }
     }
