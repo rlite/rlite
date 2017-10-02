@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -96,7 +97,12 @@ struct Remote {
     Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
                         dif_name(d), tun_subnet(i), tun_fd(-1),
                         pending(true) { }
+
+    /* Allocate a tunnel device for this remote. */
     int tun_alloc();
+
+    /* Configure tunnel device IP address and routes. */
+    int ip_configure() const;
 };
 
 struct IPoRINA {
@@ -541,6 +547,80 @@ Remote::tun_alloc()
 }
 
 static int
+execute_command(const char *cargv[])
+{
+    pid_t child_pid;
+    int child_status;
+    int ret = -1;
+    char **argv;
+
+    /* Allocate a working copy for the arguments. */
+    argv = (char **)cargv; /* reuse the array */
+    for (int i = 0; ; i++) {
+        if (argv[i] == NULL) {
+            break;
+        }
+        argv[i] = strdup(argv[i]);
+        if (!argv[i]) {
+            cerr << "Out of memory while allocating arguments" << endl;
+            while (i > 0) {
+                free(argv[--i]);
+            }
+            return -1;
+        }
+    }
+
+    child_pid = fork();
+    if (child_pid == 0) {
+        /* Child process --> run the command. */
+
+        execvp(argv[0], argv);
+        perror("execvp()");
+        exit(0);
+    }
+
+    /* Parent process. Wait for the child to exit. */
+    waitpid(child_pid, &child_status, 0);
+    if (WIFEXITED(child_status)) {
+        ret = WEXITSTATUS(child_status);
+    }
+
+    for (int i = 0; ; i++) {
+        if (argv[i] == NULL) {
+            break;
+        }
+        free(argv[i]);
+    }
+
+    return ret;
+}
+
+int
+Remote::ip_configure() const
+{
+    const char *c0[] = {"ip", "link", "set", "dev", tun_name.c_str(), "up", NULL};
+    const char *c1[] = {"ip", "addr", "flush", "dev", tun_name.c_str(), NULL};
+    const char *c2[] = {"ip", "addr", "add", tun_local_addr.repr.c_str(),
+                        "dev", tun_name.c_str(), NULL};
+
+    if (execute_command(c0)) {
+        cerr << "Failed to bring device " << tun_name << " up" << endl;
+        return -1;
+    }
+    if (execute_command(c1)) {
+        cerr << "Failed to flush address for interface " << tun_name << endl;
+        return -1;
+    }
+
+    if (execute_command(c2)) {
+        cerr << "Failed to assign IP address to interface " << tun_name << endl;
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
 setup(void)
 {
     g->rfd = rina_open();
@@ -694,6 +774,8 @@ abor:
             }
             re->second.pending = false;
             close(rfd);
+
+            re->second.ip_configure();
         }
 
         sleep(5);
@@ -875,6 +957,8 @@ int main(int argc, char **argv)
                         remote_name << endl;
             }
         }
+
+        g->remotes[remote_name].ip_configure();
 
 abor:
         close(cfd);
