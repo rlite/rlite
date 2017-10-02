@@ -854,14 +854,6 @@ for vmname in sorted(vms):
             else:
                 oper = 'enroll'
 
-            info = "%s %s to DIF %s through lower DIF %s" % (oper,
-                        enrollment['enrollee'], dif, enrollment['lower_dif'])
-            if not args.broadcast_enrollment:
-                info += " [unicast to neighbor %s]" % enrollment['enroller']
-            else:
-                info += " [broadcast]"
-            print(info)
-
             vars_dict = {'id': vm['id'],
                          'pvid': vms[enrollment['enroller']]['id'],
                          'vmname': vmname, 'oper': oper,
@@ -951,6 +943,25 @@ if not args.parallelize:
                     '       sleep 1\n'\
                     '   fi\n'\
                     'done\n\n' % vars_dict
+
+# Just for debugging
+for dif in dif_ordering:
+    enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+    for enrollment in enrollments_list:
+        vm = vms[enrollment['enrollee']]
+
+        if enrollment in lowerflowallocs[dif]:
+            oper = 'lower-flow-alloc'
+        else:
+            oper = 'enroll'
+
+        info = "%s %s to DIF %s through lower DIF %s" % (oper,
+                    enrollment['enrollee'], dif, enrollment['lower_dif'])
+        if not args.broadcast_enrollment:
+            info += " [unicast to neighbor %s]" % enrollment['enroller']
+        else:
+            info += " [broadcast]"
+        print(info)
 
 
 # Apply netem rules. For now this step is done after enrollment in order to
