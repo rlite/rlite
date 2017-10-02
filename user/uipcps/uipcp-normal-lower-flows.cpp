@@ -76,7 +76,7 @@ lfdb_default::add(const LowerFlow &lf)
     /* Entry is already there. Update if needed (this expression
      * was obtained by means of a Karnaugh map on three variables:
      * local, newer, equal). */
-    local_entry = (lfz.local_node == string(rib->uipcp->name));
+    local_entry = (lfz.local_node == rib->myname);
     if ((!local_entry && lfz.seqnum > it->second[lfz.remote_node].seqnum)
                 || (local_entry && lfz != it->second[lfz.remote_node])) {
         it->second[lfz.remote_node] = lfz; /* Update the entry */
@@ -120,7 +120,7 @@ lfdb_default::update_local(const string& neigh_name)
     LowerFlow lf;
     CDAPMessage *sm;
 
-    lf.local_node = string(rib->uipcp->name);
+    lf.local_node = rib->myname;
     lf.remote_node = neigh_name;
     lf.cost = 1;
     lf.seqnum = 1; /* not meaningful */
@@ -182,7 +182,7 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                                   obj_name::lfdb, &prop_lfl);
 
         /* Update the routing table. */
-        re.update_kernel_routing(string(rib->uipcp->name));
+        re.update_kernel_routing(rib->myname);
     }
 
     return 0;
@@ -192,7 +192,7 @@ void
 lfdb_default::update_address(rlm_addr_t new_addr)
 {
     /* Update the routing table. */
-    re.update_kernel_routing(string(rib->uipcp->name));
+    re.update_kernel_routing(rib->myname);
 }
 
 int
@@ -282,7 +282,7 @@ lfdb_default::neighs_refresh(size_t limit)
 
     /* Fetch the map containing all the LFDB entries with the local
      * address corresponding to me. */
-    it = db.find(string(rib->uipcp->name));
+    it = db.find(rib->myname);
     assert(it != db.end());
 
     for (map< NodeId, LowerFlow >::iterator jt = it->second.begin();
@@ -315,7 +315,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
                 = lfdb->db.begin(); it != lfdb->db.end(); it++) {
         list<map<NodeId, LowerFlow >::iterator> discard_list;
 
-        if (it->first == string(rib->uipcp->name)) {
+        if (it->first == rib->myname) {
             /* Don't age local entries, we pretend they
              * are always refreshed. */
             continue;
@@ -342,7 +342,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     if (discarded) {
         /* Update the routing table. */
-        lfdb->re.update_kernel_routing(string(rib->uipcp->name));
+        lfdb->re.update_kernel_routing(rib->myname);
     }
 
     /* Reschedule */
@@ -686,7 +686,7 @@ RoutingEngine::update_kernel_routing(const NodeId& addr)
 void
 RoutingEngine::dump(std::stringstream& ss) const
 {
-    ss << "Routing table for node " << string(rib->uipcp->name) << ":" << endl;
+    ss << "Routing table for node " << rib->myname << ":" << endl;
     for (map<NodeId, list<NodeId> >::const_iterator
                 h = next_hops.begin(); h != next_hops.end(); h++) {
         ss << "    Remote: " << h->first << ", Next hops: ";

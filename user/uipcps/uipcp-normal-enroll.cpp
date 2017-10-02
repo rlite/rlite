@@ -625,7 +625,7 @@ enrollee_thread(void *opaque)
         }
         nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
 
-        m.m_connect(gpb::AUTH_NONE, &av, rib->uipcp->name,
+        m.m_connect(gpb::AUTH_NONE, &av, rib->myname,
                           neigh->ipcp_name);
 
         ret = nf->send_to_port_id(&m, 0, NULL);
@@ -908,10 +908,10 @@ enroller_thread(void *opaque)
 
         /* Rewrite the m.src_appl just in case the enrollee used the N-DIF
          * name as a neighbor name */
-        if (m.src_appl != rib->uipcp->name) {
+        if (m.src_appl != rib->myname) {
             UPI(rib->uipcp, "M_CONNECT_R::src_appl overwritten %s --> %s\n",
                 m.src_appl.c_str(), rib->uipcp->name);
-            m.src_appl = rib->uipcp->name;
+            m.src_appl = rib->myname;
         }
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, NULL);
@@ -1095,7 +1095,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
     /* Synchronize neighbors. */
     {
         NeighborCandidate cand = rib->neighbor_cand_get();
-        string my_name = string(rib->uipcp->name);
+        string my_name = rib->myname;
 
         /* Temporarily insert a neighbor representing myself,
          * to simplify the loop below. */
@@ -1254,7 +1254,6 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     NeighborCandidateList ncl(objbuf, objlen);
     NeighborCandidateList prop_ncl;
-    string my_name = string(uipcp->name);
 
     for (list<NeighborCandidate>::iterator neigh = ncl.candidates.begin();
                                 neigh != ncl.candidates.end(); neigh++) {
@@ -1263,7 +1262,7 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
         map< string, NeighborCandidate >::iterator
                                     mit = neighbors_seen.find(neigh_name);
 
-        if (neigh_name == my_name) {
+        if (neigh_name == myname) {
             /* Skip myself (as a neighbor of the slave). */
             continue;
         }
@@ -1382,9 +1381,8 @@ NeighborCandidate
 uipcp_rib::neighbor_cand_get() const
 {
     NeighborCandidate cand;
-    string my_name = string(uipcp->name);
 
-    rina_components_from_string(my_name, cand.apn, cand.api,
+    rina_components_from_string(myname, cand.apn, cand.api,
                                 cand.aen, cand.aei);
     cand.address = myaddr;
     cand.lower_difs = lower_difs;
@@ -1849,7 +1847,7 @@ normal_check_for_address_conflicts(struct uipcp *uipcp)
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock lock_(rib->lock);
     NeighborCandidate cand = rib->neighbor_cand_get();
-    string my_name = string(rib->uipcp->name);
+    string my_name = rib->myname;
     bool need_to_change = false;
     map<rlm_addr_t, string> m;
 
