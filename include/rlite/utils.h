@@ -50,8 +50,8 @@ unsigned int serialize_rlite_msg(struct rl_msg_layout *numtables,
                                 size_t num_entries,
                                 void *serbuf,
                                 const struct rl_msg_base *msg);
-int deserialize_string(const void **pptr, char **s);
-int deserialize_rina_name(const void **pptr, struct rina_name *name);
+int deserialize_string(const void **pptr, char **s, int *sleft);
+int deserialize_rina_name(const void **pptr, struct rina_name *name, int *sleft);
 int deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
                          const void *serbuf, unsigned int serbuf_len,
                          void *msgbuf, unsigned int msgbuf_len);
