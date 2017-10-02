@@ -919,7 +919,7 @@ addr_allocator_distributed::allocate()
 
         pthread_mutex_unlock(&rib->lock);
         /* Wait a bit for possible negative responses. */
-        sleep(1);
+        sleep(nack_wait_secs);
         pthread_mutex_lock(&rib->lock);
 
         map<rlm_addr_t, AddrAllocRequest>::iterator mit;

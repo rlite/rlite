@@ -82,6 +82,7 @@ namespace obj_name {
  * RIB synchronizations. */
 #define RL_NEIGH_REFRESH_INTVAL     30
 
+/* Time window to compute statistics about management traffic. */
 #define RL_NEIGHFLOW_STATS_PERIOD   20
 
 enum enroll_state_t {
@@ -656,13 +657,18 @@ struct addr_allocator_distributed : public addr_allocator {
      * It maps (address allocated) --> (requestor address). */
     std::map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
-    addr_allocator_distributed(struct uipcp_rib *_ur) : addr_allocator(_ur) { }
+    addr_allocator_distributed(struct uipcp_rib *_ur) :
+                addr_allocator(_ur), nack_wait_secs(4) { }
     ~addr_allocator_distributed() { }
 
     void dump(std::stringstream& ss) const;
     rlm_addr_t allocate();
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
     int sync_neigh(NeighFlow *nf, unsigned int limit) const;
+
+    /* How many seconds to wait for NACKs before considering the address
+     * allocation successful. */
+    unsigned int nack_wait_secs;
 };
 
 struct addr_allocator_manual : public addr_allocator_distributed {
