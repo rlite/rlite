@@ -354,6 +354,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     }
 #endif /* RL_USE_QOS_CUBES */
 
+    keepalive = NEIGH_KEEPALIVE_TO;
+
     dft = new dft_default(this);
     fa = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
@@ -1230,6 +1232,14 @@ uipcp_rib::policy_param_mod(const std::string& component,
 
     if (component == "address-allocator") {
         ret = addra->param_mod(param_name, param_value);
+    } else if (component == "enrollment") {
+        if (param_name == "keepalive") {
+            int keepalive_old = keepalive;
+            if ((ret = string2int(param_value, keepalive))) {
+                keepalive = keepalive_old;
+                UPE(uipcp, "Could not convert parameter value to a number.\n");
+            }
+        }
     }
 
     if (!ret) {
@@ -1642,6 +1652,7 @@ normal_lib_init(void)
     available_policies["routing"].insert("link-state-lfa");
     available_policies["address-allocator"].insert("manual");
     available_policies["address-allocator"].insert("distributed");
+    available_policies["enrollment"].insert("default");
 }
 
 struct uipcp_ops normal_ops = {

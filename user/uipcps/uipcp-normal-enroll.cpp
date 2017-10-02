@@ -246,7 +246,7 @@ void
 NeighFlow::keepalive_tmr_start()
 {
     /* keepalive is in seconds, we need to convert it to milliseconds. */
-    unsigned int keepalive = neigh->rib->uipcp->uipcps->keepalive;
+    unsigned int keepalive = neigh->rib->keepalive;
 
     if (keepalive == 0) {
         /* no keepalive */
@@ -1645,7 +1645,7 @@ uipcp_rib::trigger_re_enrollments()
 {
     list< pair<string, string> > re_enrollments;
 
-    if (uipcp->uipcps->keepalive == 0) {
+    if (keepalive == 0) {
         /* Keepalive mechanism disabled, don't trigger re-enrollments. */
         return;
     }

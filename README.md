@@ -711,10 +711,11 @@ A normal IPC Process can be manually configured with an address unique in its
 DIF.
 This step is not necessary, since a simple default policy for distributed
 address allocation is already available.
-To deactivate automatic address allocation, you need to pass the "-A manual"
-option to the **rlite-uipcps** program, and configure addresses manually
-like in the following example:
+To deactivate automatic address allocation, you need to set the **manual**
+policy for the **address-allocator** component using **rlite-ctl** program,
+and configure addresses manually like in the following example:
 
+    $ sudo rlite-ctl dif-policy-mod n.DIF adddress-allocator manual
     $ sudo rlite-ctl ipcp-config normal1:xyz address 7382
 
 where a normal IPCP called normal1:xyz is given the address 7382 to be used
@@ -774,6 +775,7 @@ of a normal IPCP process:
 | Component           | Policy            | Parameter       | Description     |
 | --------------------| ------------------|-----------------|-----------------|
 | address-allocator   | distributed       | nack-wait-secs  | Time to wait for a NACK before deciding that the address is good |
+| enrollment          | *                 | keepalive       | Neighbor keepalive timeout in seconds (0 to disable)             |
 
 This is an example of how to change the nack-wait-secs parameter of the
 distributed address allocation policy of a normal IPCP process

@@ -88,6 +88,9 @@ namespace obj_name {
 /* Time window to compute statistics about management traffic. */
 #define RL_NEIGHFLOW_STATS_PERIOD   20
 
+/* default value for keepalive parameter */
+#define NEIGH_KEEPALIVE_TO      10
+
 enum class EnrollState {
     NEIGH_NONE = 0,
 
@@ -400,6 +403,9 @@ struct uipcp_rib {
 
     /* Lower DIFs. */
     std::list< std::string > lower_difs;
+
+    /* Keepalive timeout in seconds. */
+    int keepalive;
 
     /* Neighbors. We keep track of all the NeighborCandidate objects seen,
      * even for candidates that have no lower DIF in common with us. This
