@@ -121,6 +121,8 @@ struct Remote {
 
     /* Configure tunnel device IP address and routes. */
     int ip_configure() const;
+
+    int mss_configure() const;
 };
 
 #define NUM_WORKERS     1
@@ -462,8 +464,9 @@ os_tun_alloc(char *dev, int flags)
     return fd;
 }
 
+/* Binary search for the MSS size for a RINA flow :) */
 static unsigned int
-probe_mtu(int fd)
+probe_mss(int fd)
 {
     unsigned int ub = 1;
     unsigned int lb = 1;
@@ -779,6 +782,17 @@ Remote::ip_configure() const
     return 0;
 }
 
+int
+Remote::mss_configure() const
+{
+    stringstream cmdss;
+
+    cmdss << "ip link set mtu " << probe_mss(rfd)
+            << " dev " << tun_name;
+
+    return execute_command(cmdss);
+}
+
 static int
 setup(void)
 {
@@ -909,6 +923,8 @@ connect_to_remotes(void *opaque)
                         goto abor;
                     }
                     re->second.rfd = rfd;
+                    re->second.mss_configure();
+
                     /* Submit the new fd mapping to a worker thread. */
                     g->workers[0]->submit(re->second.rfd, re->second.tun_fd);
 
@@ -1108,6 +1124,7 @@ int main(int argc, char **argv)
             }
             g->remotes[remote_name].rfd = cfd;
             g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
+            g->remotes[remote_name].mss_configure();
             /* Submit the new fd mapping to a worker thread. */
             g->workers[0]->submit(g->remotes[remote_name].rfd,
                                   g->remotes[remote_name].tun_fd);
