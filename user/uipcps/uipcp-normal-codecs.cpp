@@ -92,6 +92,9 @@ RinaName::RinaName(const string& str)
 
 RinaName::RinaName(const char *str)
 {
+    if (str == NULL) {
+        str = "";
+    }
     rina_components_from_string(string(str), apn, api, aen, aei);
 }
 
