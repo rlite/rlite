@@ -703,7 +703,11 @@ software, but they are not part of the stack implementation.
 
 ### 7.1. rina-gw
 The **rina-gw** program is a C++ daemon that acts as a proxy/gateway
-between a TCP/IP network and a RINA network, as depicted in XXX.
+between a TCP/IP network and a RINA network, as depicted in the following
+figure.
+
+![RINA/TCP gateway](https://bitbucket.org/vmaffione/rina-images/downloads/rina-gw.png)
+
 On the one side, the gateway accepts TCP connections coming from
 a TCP/IP network and proxies them by allocating RINA flows towards the
 proper server applications in the RINA network. On the other side,
