@@ -592,18 +592,22 @@ outs =  '#!/bin/bash\n'             \
         '\n';
 
 for shim in sorted(shims):
-    outs += 'sudo brctl addbr %(br)s\n'         \
+    outs += '(\n'                               \
+            'sudo brctl addbr %(br)s\n'         \
             'sudo ip link set %(br)s up\n'      \
-            '\n' % {'br': shim}
+            ') &\n' % {'br': shim}
+
+outs += 'wait\n'
 
 for l in sorted(links):
     shim, vm = l
     idx = len(vms[vm]['ports']) + 1
     tap = '%s.%02x' % (vm, idx)
 
-    outs += 'sudo ip tuntap add mode tap name %(tap)s\n'    \
+    outs += '(\n'                                           \
+            'sudo ip tuntap add mode tap name %(tap)s\n'    \
             'sudo ip link set %(tap)s up\n'                 \
-            'sudo brctl addif %(br)s %(tap)s\n\n'           \
+            'sudo brctl addif %(br)s %(tap)s\n'             \
                 % {'tap': tap, 'br': shim}
 
     if shims[shim]['type'] == 'eth' and shims[shim]['speed'] > 0:
@@ -625,9 +629,13 @@ for l in sorted(links):
                                 '1:11 htb rate %(speed)s\n'         \
                 % {'tap': tap, 'speed': speed}
 
+    outs += ') & \n'
+
     vms[vm]['ports'].append({'tap': tap, 'shim': shim, 'idx': idx,
                              'ip': dns_mappings[shim][vm]['ip'] if shim in dns_mappings else None})
 
+
+outs += 'wait\n'
 
 vmid = 1
 budget = boot_batch_size
@@ -931,15 +939,22 @@ for vmname in sorted(vms):
         tap = port['tap']
         shim = port['shim']
 
-        outs += 'sudo brctl delif %(br)s %(tap)s\n'             \
+        outs += '(\n'                                           \
+                'sudo brctl delif %(br)s %(tap)s\n'             \
                 'sudo ip link set %(tap)s down\n'               \
-                'sudo ip tuntap del mode tap name %(tap)s\n\n'  \
+                'sudo ip tuntap del mode tap name %(tap)s\n'    \
+                ') &\n'                                         \
                     % {'tap': tap, 'br': shim}
 
+outs += 'wait\n'
+
 for shim in sorted(shims):
-    outs += 'sudo ip link set %(br)s down\n'        \
+    outs += '(\n'                                   \
+            'sudo ip link set %(br)s down\n'        \
             'sudo brctl delbr %(br)s\n'             \
-            '\n' % {'br': shim}
+            ') &\n' % {'br': shim}
+
+outs += 'wait\n'
 
 fout.write(outs)
 

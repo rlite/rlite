@@ -92,6 +92,9 @@ configure options:
 EOF
 }
 
+
+# Default parameter values
+
 WITH_VMPI="n"
 WITH_SHIM_TCP4="y"
 WITH_SHIM_UDP4="y"
