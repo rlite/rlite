@@ -104,8 +104,6 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
 }
 
 struct HelloMsg : public Msg {
-    string myname;      /* Name of the sender. */
-    string yourname;    /* Name of the receiver. */
     string tun_subnet;  /* Subnet to be used for the tunnel */
     uint32_t num_routes; /* How many route to exchange */
 
@@ -117,8 +115,6 @@ struct HelloMsg : public Msg {
 static void
 gpb2HelloMsg(HelloMsg &m, const gpb::hello_msg_t &gm)
 {
-    m.myname = gm.myname();
-    m.yourname = gm.yourname();
     m.tun_subnet = gm.tun_subnet();
     m.num_routes = gm.num_routes();
 }
@@ -126,8 +122,6 @@ gpb2HelloMsg(HelloMsg &m, const gpb::hello_msg_t &gm)
 static int
 HelloMsg2gpb(const HelloMsg &m, gpb::hello_msg_t &gm)
 {
-    gm.set_myname(m.myname);
-    gm.set_yourname(m.yourname);
     gm.set_tun_subnet(m.tun_subnet);
     gm.set_num_routes(m.num_routes);
 
@@ -195,7 +189,7 @@ RouteMsg::serialize(char *buf, unsigned int size) const
 }
 
 static int
-cdap_send(int fd, CDAPMessage *m, int invoke_id, const Msg *obj)
+cdap_obj_send(CDAPConn *conn, CDAPMessage *m, int invoke_id, const Msg *obj)
 {
     char objbuf[4096];
     int objlen;
@@ -211,7 +205,7 @@ cdap_send(int fd, CDAPMessage *m, int invoke_id, const Msg *obj)
         m->set_obj_value(objbuf, objlen);
     }
 
-    return 0;
+    return conn->msg_send(m, invoke_id);
 }
 
 /*
@@ -559,7 +553,9 @@ connect_to_remotes(void *opaque)
 
             CDAPConn conn(l->rfd, 1);
             CDAPMessage m, *rm = NULL;
+            HelloMsg hello;
 
+            /* CDAP connection setup. */
             m.m_connect(gpb::AUTH_NONE, NULL, /* src */ myname,
                                               /* dst */ l->app_name);
             if (conn.msg_send(&m, 0)) {
@@ -575,8 +571,15 @@ connect_to_remotes(void *opaque)
 
             cout << "Connected to remote peer" << endl;
 
-            //m.m_start(gpb::F_NO_FLAGS, "enrollment", "enrollment",
-            //          0, 0, string());
+            /* Exchange routes. */
+            m.m_start(gpb::F_NO_FLAGS, "enrollment", "enrollment",
+                      0, 0, string());
+            hello.num_routes = g->routes.size();
+            hello.tun_subnet = l->tun_subnet.repr;
+            if (cdap_obj_send(&conn, &m, 0, &hello)) {
+                cerr << "Failed to send M_START" << endl;
+                goto abor;
+            }
 
 abor:
             if (rm) {
@@ -683,6 +686,9 @@ int main(int argc, char **argv)
         CDAPConn conn(r.rfd, 1);
         CDAPMessage *rm;
         CDAPMessage m;
+        const char *objbuf;
+        size_t objlen;
+        HelloMsg hello;
 
         rm = conn.msg_recv();
         if (rm->op_code != gpb::M_CONNECT) {
@@ -699,6 +705,20 @@ int main(int argc, char **argv)
             goto abor;
         }
 
+        rm = conn.msg_recv();
+        if (rm->op_code != gpb::M_START) {
+            cerr << "M_START expected" << endl;
+            goto abor;
+        }
+
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            cerr << "M_START does not contain a nested message" << endl;
+            goto abor;
+        }
+        hello = HelloMsg(objbuf, objlen);
+
+        cout << "Hello received " << hello.num_routes << " " << hello.tun_subnet << endl;
 abor:
         close(r.rfd);
     }
