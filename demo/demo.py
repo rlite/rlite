@@ -774,7 +774,7 @@ for vmname in sorted(vms):
         for lower_dif in sorted(difs[dif][vmname]):
             if lower_dif in shims and shims[lower_dif]['type'] == 'udp4':
                 vars_dict = {'dif': dif, 'id': vm['id']}
-                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP:%(id)s' % vars_dict
+                dns_mappings[lower_dif][vmname]['name'] = '%(dif)s.%(id)s.IPCP' % vars_dict
                 del vars_dict
 
 
@@ -833,10 +833,10 @@ for vmname in sorted(vms):
                      'shimtype': shim['type']}
         outs +=     'PORT=$(mac2ifname %(mac)s)\n'\
                     '$SUDO ip link set $PORT up\n'\
-                    '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP:%(idx)s shim-%(shimtype)s %(shim)s.DIF\n'\
+                    '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'\
                     % vars_dict
         if shim['type'] == 'eth':
-                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP:%(idx)s netdev $PORT\n'\
+                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP netdev $PORT\n'\
                 % vars_dict
         elif shim['type'] == 'udp4':
                 outs += '$SUDO ip addr add %s dev $PORT\n' % (port['ip'])
@@ -845,11 +845,11 @@ for vmname in sorted(vms):
     # Create normal IPCPs (it's handy to do it in topological DIF order)
     for dif in dif_ordering:
         if dif not in shims and vmname in difs[dif]:
-            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP:%(id)s normal%(flsuf)s %(dif)s.DIF\n'\
+            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'\
                                                                 % {'dif': dif, 'id': vm['id'],
                                                                    'flsuf': flavour_suffix}
             if args.addr_alloc_policy == "manual":
-                outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP:%(id)s address %(id)d\n'\
+                outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n'\
                                                                 % {'dif': dif, 'id': vm['id']}
             elif args.addr_alloc_policy == "distributed":
                 nack_wait_secs = 5 if args.parallelize and len(vms) > 30 else 1
@@ -881,13 +881,13 @@ for vmname in sorted(vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in sorted(difs[dif][vmname]):
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            outs += '$SUDO rlite-ctl ipcp-register %(dif)s.%(id)s.IPCP:%(id)s %(lodif)s.DIF\n'\
+            outs += '$SUDO rlite-ctl ipcp-register %(dif)s.%(id)s.IPCP %(lodif)s.DIF\n'\
                         % vars_dict
             del vars_dict
 
         if dif not in vm['enrolling']:
             vars_dict = {'dif': dif, 'id': vm['id']}
-            outs += '$SUDO rlite-ctl ipcp-enroller-enable %(dif)s.%(id)s.IPCP:%(id)s\n'\
+            outs += '$SUDO rlite-ctl ipcp-enroller-enable %(dif)s.%(id)s.IPCP\n'\
                         % vars_dict
             print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
             del vars_dict
@@ -914,9 +914,9 @@ for vmname in sorted(vms):
                          'pvid': vms[enrollment['enroller']]['id'],
                          'vmname': vmname, 'oper': oper,
                          'dif': dif, 'ldif': enrollment['lower_dif'] }
-            cmd = 'ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF %(ldif)s.DIF' % vars_dict
+            cmd = 'ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF %(ldif)s.DIF' % vars_dict
             if not args.broadcast_enrollment:
-                cmd += ' %(dif)s.%(pvid)s.IPCP:%(pvid)s' % vars_dict
+                cmd += ' %(dif)s.%(pvid)s.IPCP' % vars_dict
             cmd += '\n'
             del vars_dict
             enroll_cmds.append(cmd)
@@ -985,10 +985,10 @@ if not args.parallelize:
                     '   ssh -T %(sshopts)s -p %(ssh)s %(username)s@localhost << \'ENDSSH\'\n'\
                     'set -x\n'\
                     'SUDO=%(sudo)s\n'\
-                    '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF '\
+                    '$SUDO rlite-ctl ipcp-%(oper)s %(dif)s.%(id)s.IPCP %(dif)s.DIF '\
                             '%(ldif)s.DIF ' % vars_dict
             if not args.broadcast_enrollment:
-                outs += '%(dif)s.%(pvid)s.IPCP:%(pvid)s\n' % vars_dict
+                outs += '%(dif)s.%(pvid)s.IPCP\n' % vars_dict
             else:
                 outs += '\n'
             outs += 'sleep 1\n'\
