@@ -655,8 +655,7 @@ static void
 shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
 {
     struct ipcp_entry *ipcp = priv->ipcp;
-    struct rl_buf *rb = rl_buf_alloc(skb->len, ipcp->hdroom,
-                                     ipcp->tailroom, GFP_ATOMIC);
+    struct rl_buf *rb;
     struct ethhdr *hh = eth_hdr(skb);
     struct arpt_entry *entry;
     struct flow_entry *flow = NULL;
@@ -667,13 +666,18 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
             hh->h_source[3], hh->h_source[4], hh->h_source[5],
             skb->len);
 
+#ifndef RL_SKB
+    rb = rl_buf_alloc(skb->len, ipcp->hdroom,
+                      ipcp->tailroom, GFP_ATOMIC);
     if (unlikely(!rb)) {
         PD("Out of memory\n");
         return;
     }
-
     skb_copy_bits(skb, 0, RL_BUF_DATA(rb), skb->len);
     rl_buf_append(rb, skb->len);
+#else  /* RL_SKB */
+    rb = skb;
+#endif
 
     /* Try to shortcut the packet to the upper IPCP. */
     if ((rb = rl_sdu_rx_shortcut(ipcp, rb)) == NULL) {
@@ -788,8 +792,9 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         struct arphdr *arp = (struct arphdr *)skb->data;
 
         if (ntohs(arp->ar_pro) == ETH_P_RLITE) {
-            /* This ARP operation belongs to RLITE stack. */
+            /* This ARP operation belongs to rlite. */
             shim_eth_arp_rx(priv, arp, skb->len);
+            dev_kfree_skb_any(skb);
 
         } else {
             /* This ARP message belongs to Linux stack. */
@@ -800,16 +805,18 @@ shim_eth_rx_handler(struct sk_buff **skbp)
         /* This is a RLITE shim-eth PDU. */
         shim_eth_pdu_rx(priv, skb);
 
+#ifndef RL_SKB
+        /* We should use dev_consume_skb_any(),
+         * for those kernel where this is defined (this would require figure out
+         * the kernel features at configuration time. */
+        dev_kfree_skb_any(skb);
+#endif /* !RL_SKB */
     } else {
-        /* This frame doesn't belong to RLITE stack. */
+        /* This frame doesn't belong to us, do not touch it. */
         return RX_HANDLER_PASS;
     }
 
-    /* Steal the skb from the Linux stack. We should use dev_consume_skb_any(),
-     * for those kernel where this is defined (this would require figure out
-     * the kernel features at configuration time. */
-    dev_kfree_skb_any(skb);
-
+    /* We stole the skb from the Linux stack. */
     return RX_HANDLER_CONSUMED;
 }
 
