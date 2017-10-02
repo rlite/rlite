@@ -233,6 +233,7 @@ private:
     bool verb;
 };
 
+#ifdef RL_DEBUG
 #define RL_LOCK_ASSERT(_lock, _locked) \
     do { \
         int ret = pthread_mutex_trylock(_lock); \
@@ -242,6 +243,9 @@ private:
             pthread_mutex_unlock(_lock); \
         } \
     } while (0)
+#else
+#define RL_LOCK_ASSERT(_lock, _locked)
+#endif
 
 struct dft {
     /* Backpointer to parent data structure. */
