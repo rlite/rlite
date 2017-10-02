@@ -171,6 +171,8 @@ argparser.add_argument('--debug', action='store_true',
                        help = "When downloading images, select the debug one")
 argparser.add_argument('-g', '--graphviz', action='store_true',
                        help = "Generate DIF graphs with graphviz")
+argparser.add_argument('--valgrind', action='store_true',
+                       help = "Run the uipcps daemon under valgrind (e.g. to catch SIGSEGV)")
 argparser.add_argument('-m', '--memory',
                        help = "Amount of memory in megabytes", type = int,
                        default = 164) # 128 without KASAN
@@ -770,7 +772,7 @@ for vmname in sorted(vms):
                     '$SUDO chmod -R a+rw /run/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
-                    '$SUDO nohup rlite-uipcps -v %(verb)s -k %(keepalive)s '\
+                    '$SUDO nohup %(valgrind)s rlite-uipcps -v %(verb)s -k %(keepalive)s '\
                                         '%(relnflows)s %(relflows)s '\
                                         '&> uipcp.log &\n'\
                         % {'verb': args.verbosity,
@@ -778,7 +780,8 @@ for vmname in sorted(vms):
                            'keepalive': args.keepalive,
                            'relnflows': '-N' if args.reliable_n_flows else '',
                            'relflows': '-R' if args.reliable_flows else '',
-                           'flsuf': flavour_suffix}
+                           'flsuf': flavour_suffix,
+                           'valgrind': 'valgrind' if args.valgrind else ''}
 
     # Create and configure shim IPCPs
     for port in vm['ports']:
