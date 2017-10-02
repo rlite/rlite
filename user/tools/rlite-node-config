@@ -28,6 +28,9 @@ argparser = argparse.ArgumentParser(description = description,
 argparser.add_argument('-s', '--script',
                        help = "Path of the script file to be run",
                        type = str, default = '/etc/rina/initscript')
+argparser.add_argument('-v', '--verbose',
+                       help = "Be verbose",
+                       action = 'store_true')
 
 args = argparser.parse_args()
 
@@ -72,8 +75,11 @@ for cmd in cmds:
         o = strclean(e.output)
         print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
         quit()
-    print('executed %s' % ' '.join(cmdargs))
     o = strclean(o)
+    if args.verbose:
+        print('executed %s' % ' '.join(cmdargs))
+        if len(o) > 0:
+            print(o)
 
 i = 1
 n = len(enrolls)
@@ -87,8 +93,11 @@ for cmd in enrolls:
             o = strclean(e.output)
             print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
             time.sleep(3)
-    print('executed %s' % ' '.join(cmdargs))
     o = strclean(o)
+    if args.verbose and len(o) > 0:
+        print('executed %s' % ' '.join(cmdargs))
+        if len(o) > 0:
+            print(o)
 
     print('Enrollment %d/%d successfully completed' % (i, n))
     i += 1
