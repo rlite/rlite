@@ -811,7 +811,8 @@ for vmname in sorted(vms):
             outs += 'echo "%(ip)s %(name)s" >> /etc/hosts\n' \
                     % {'ip': prefix_prune_size(dns_mappings[sh][nm]['ip']), 'name': dns_mappings[sh][nm]['name']}
 
-    # Carry out registrations following the DIF ordering
+    # Carry out registrations following the DIF ordering,
+    enroll_cmds = []
     for dif in dif_ordering:
         if dif in shims:
             # Shims don't register to other IPCPs
@@ -835,6 +836,43 @@ for vmname in sorted(vms):
         if args.simulate:
             outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' % vars_dict
         del vars_dict
+
+        enrollments_list = enrollments[dif] + lowerflowallocs[dif]
+        for enrollment in enrollments_list:
+            if enrollment['enrollee'] != vmname:
+                continue
+
+            if enrollment in lowerflowallocs[dif]:
+                oper = 'lower-flow-alloc'
+            else:
+                oper = 'enroll'
+
+            info = "%s %s to DIF %s through lower DIF %s" % (oper,
+                        enrollment['enrollee'], dif, enrollment['lower_dif'])
+            if not args.broadcast_enrollment:
+                info += " [unicast to neighbor %s]" % enrollment['enroller']
+            else:
+                info += " [broadcast]"
+            print(info)
+
+            vars_dict = {'id': vm['id'],
+                         'pvid': vms[enrollment['enroller']]['id'],
+                         'vmname': vmname, 'oper': oper,
+                         'dif': dif, 'ldif': enrollment['lower_dif'] }
+            cmd = 'ipcp-%(oper)s %(dif)s.%(id)s.IPCP:%(id)s %(dif)s.DIF %(ldif)s.DIF' % vars_dict
+            if not args.broadcast_enrollment:
+                cmd += ' %(dif)s.%(pvid)s.IPCP:%(pvid)s' % vars_dict
+            cmd += '\n'
+            del vars_dict
+            enroll_cmds.append(cmd)
+
+    # Generate /etc/rina/initscript
+    outs += 'cat > .initscript << EOF\n'
+    for cmd in enroll_cmds:
+        outs += cmd
+    outs += 'EOF\n'\
+            '$SUDO cp .initscript /etc/rina/initscript\n'\
+            'rm .initscript\n'
 
     # Run rlite-rand clients
     if args.simulate:
@@ -873,14 +911,6 @@ for dif in dif_ordering:
             oper = 'lower-flow-alloc'
         else:
             oper = 'enroll'
-
-        info = "%s %s to DIF %s through lower DIF %s" % (oper,
-                    enrollment['enrollee'], dif, enrollment['lower_dif'])
-        if not args.broadcast_enrollment:
-            info += " [unicast to neighbor %s]" % enrollment['enroller']
-        else:
-            info += " [broadcast]"
-        print(info)
 
         vars_dict = {'ssh': vm['ssh'], 'id': vm['id'],
                      'pvid': vms[enrollment['enroller']]['id'],
