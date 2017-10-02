@@ -1250,13 +1250,13 @@ uipcp_rib::policy_param_mod(const std::string& component,
     } else if (component == "resource-allocator") {
         bool enable = (param_value == "true");
 
-        if (param_name == "reliable_flows") {
+        if (param_name == "reliable-flows") {
             if (!enable && param_value != "false") {
                 UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
                 return -1;
             }
             reliable_flows = enable;
-        } else if (param_name == "reliable_n_flows") {
+        } else if (param_name == "reliable-n-flows") {
             if (!enable && param_value != "false") {
                 UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
                 return -1;
