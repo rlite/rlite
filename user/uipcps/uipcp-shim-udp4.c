@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <stdio.h>
@@ -37,23 +37,22 @@
 #include "rlite/list.h"
 #include "uipcp-container.h"
 
-
 struct udp4_sdu {
-    struct list_head    node;
-    int                 len;
-    uint8_t             buf[0];
+    struct list_head node;
+    int len;
+    uint8_t buf[0];
 };
 
 /* Structure associated to a flow, contains information about the
  * remote UDP endpoint. */
 struct udp4_endpoint {
-    int                 fd;
-    struct sockaddr_in  remote_addr;
-    rl_port_t           port_id;
-    uint32_t            kevent_id;
-    int                 alloc_complete;
-    struct list_head    sduq;
-    int                 sduq_len;
+    int fd;
+    struct sockaddr_in remote_addr;
+    rl_port_t port_id;
+    uint32_t kevent_id;
+    int alloc_complete;
+    struct list_head sduq;
+    int sduq_len;
 
     struct list_head node;
 };
@@ -63,25 +62,25 @@ struct udp4_endpoint {
  * name. */
 struct udp4_bindpoint {
     int fd;
-    char *appl_name; /* Used to at unregister time. */
+    char *appl_name;   /* Used to at unregister time. */
     rl_port_t port_id; /* Used at flow dealloc time. */
     struct uipcp *uipcp;
     struct list_head node;
 };
 
 struct shim_udp4 {
-    struct uipcp        *uipcp;
+    struct uipcp *uipcp;
 
     /* An UDP socket used to forward UDP packets to the receive queues
      * of endpoints. */
     int fwdfd;
 
-    struct list_head    endpoints;
-    struct list_head    bindpoints;
-    uint32_t            kevent_id_cnt;
+    struct list_head endpoints;
+    struct list_head bindpoints;
+    uint32_t kevent_id_cnt;
 };
 
-#define SHIM(_u)    ((struct shim_udp4 *)((_u)->priv))
+#define SHIM(_u) ((struct shim_udp4 *)((_u)->priv))
 
 /* Currently unused */
 void
@@ -103,13 +102,13 @@ rina_name_to_ipaddr(struct shim_udp4 *shim, const char *name,
     int ret;
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
     ret = getaddrinfo(name, NULL, &hints, &resaddrlist);
     if (ret) {
         UPE(shim->uipcp, "getaddrinfo(%s) failed: %s\n", name,
-                         gai_strerror(ret));
+            gai_strerror(ret));
         goto err;
     }
 
@@ -147,8 +146,8 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
         return -1;
     }
 
-    ret = getnameinfo((const struct sockaddr *)addr, sizeof(*addr),
-                      host, hostlen, NULL, 0, 0);
+    ret = getnameinfo((const struct sockaddr *)addr, sizeof(*addr), host,
+                      hostlen, NULL, 0, 0);
     if (ret) {
         rl_free(host, RL_MT_SHIMDATA);
         UPE(shim->uipcp, "getnameinfo() failed [%s]\n", gai_strerror(ret));
@@ -157,8 +156,8 @@ ipaddr_to_rina_name(struct shim_udp4 *shim, char **name,
 
     {
         char strbuf[INET_ADDRSTRLEN];
-        UPD(shim->uipcp, "'%s' --> '%s'\n", inet_ntop(AF_INET, &addr->sin_addr,
-            strbuf, sizeof(strbuf)), host);
+        UPD(shim->uipcp, "'%s' --> '%s'\n",
+            inet_ntop(AF_INET, &addr->sin_addr, strbuf, sizeof(strbuf)), host);
     }
 
     *name = host;
@@ -170,8 +169,8 @@ static void
 udp4_flow_config_fill(struct udp4_endpoint *ep, struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
-    cfg->fd = ep->fd;
-    cfg->inet_ip = ep->remote_addr.sin_addr.s_addr;
+    cfg->fd        = ep->fd;
+    cfg->inet_ip   = ep->remote_addr.sin_addr.s_addr;
     cfg->inet_port = ep->remote_addr.sin_port;
 }
 
@@ -183,7 +182,7 @@ udp4_endpoint_lookup(struct shim_udp4 *shim,
 {
     struct udp4_endpoint *ep;
 
-    list_for_each_entry(ep, &shim->endpoints, node) {
+    list_for_each_entry (ep, &shim->endpoints, node) {
         if (memcmp(remote_addr, &ep->remote_addr, sizeof(*remote_addr)) == 0) {
             return ep;
         }
@@ -216,8 +215,8 @@ udp4_endpoint_open(struct shim_udp4 *shim)
     }
 
     /* Ask the kernel to allocate an ephemeral UDP port for us. */
-    addr.sin_family = AF_INET;
-    addr.sin_port = 0;
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = 0;
     addr.sin_addr.s_addr = INADDR_ANY;
     if (bind(ep->fd, (const struct sockaddr *)&addr, sizeof(addr))) {
         UPE(shim->uipcp, "bind() failed [%d]\n", errno);
@@ -236,7 +235,7 @@ udp4_endpoint_close(struct udp4_endpoint *ep)
 {
     struct udp4_sdu *sdu, *tmp;
 
-    list_for_each_entry_safe(sdu, tmp, &ep->sduq, node) {
+    list_for_each_entry_safe (sdu, tmp, &ep->sduq, node) {
         list_del(&sdu->node);
         rl_free(sdu, RL_MT_SHIMDATA);
     }
@@ -333,7 +332,7 @@ udp4_recv_dgram(struct uipcp *uipcp, int bfd, void *opaque)
         udp4_flow_config_fill(ep, &cfg);
         ret = uipcp_issue_fa_req_arrived(uipcp, ep->kevent_id, 0, 0, 0,
                                          local_appl, remote_appl, &cfg);
-skip:
+    skip:
         rl_free(local_appl, RL_MT_SHIMDATA);
         rl_free(remote_appl, RL_MT_SHIMDATA);
         if (ret) {
@@ -365,7 +364,7 @@ skip:
         sdu->len = payload_len;
         memcpy(sdu->buf, payload, payload_len);
         list_add_tail(&sdu->node, &ep->sduq);
-        ep->sduq_len ++;
+        ep->sduq_len++;
 
         UPD(uipcp, "Queuing %d bytes\n", sdu->len);
     } else {
@@ -431,7 +430,8 @@ udp4_bindpoint_open(struct shim_udp4 *shim, char *local_name)
 
 err:
     rl_free(bp->appl_name, RL_MT_SHIMDATA);
-    if (bp->fd >= 0) close(bp->fd);
+    if (bp->fd >= 0)
+        close(bp->fd);
     rl_free(bp, RL_MT_SHIMDATA);
     return NULL;
 }
@@ -442,7 +442,8 @@ udp4_bindpoint_close(struct udp4_bindpoint *bp)
     uipcp_loop_fdh_del(bp->uipcp, bp->fd);
     close(bp->fd);
     list_del(&bp->node);
-    if (bp->appl_name) rl_free(bp->appl_name, RL_MT_SHIMDATA);
+    if (bp->appl_name)
+        rl_free(bp->appl_name, RL_MT_SHIMDATA);
     rl_free(bp, RL_MT_SHIMDATA);
 }
 
@@ -451,7 +452,7 @@ get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
 {
     struct udp4_endpoint *ep;
 
-    list_for_each_entry(ep, &shim->endpoints, node) {
+    list_for_each_entry (ep, &shim->endpoints, node) {
         if (kevent_id == ep->kevent_id) {
             return ep;
         }
@@ -461,21 +462,19 @@ get_endpoint_by_kevent_id(struct shim_udp4 *shim, uint32_t kevent_id)
 }
 
 static int
-shim_udp4_appl_register(struct uipcp *uipcp,
-                        const struct rl_msg_base *msg)
+shim_udp4_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    struct rl_kmsg_appl_register *req =
-                (struct rl_kmsg_appl_register *)msg;
-    struct shim_udp4 *shim = SHIM(uipcp);
+    struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
+    struct shim_udp4 *shim            = SHIM(uipcp);
     struct udp4_bindpoint *bp;
 
     if (req->reg) {
         bp = udp4_bindpoint_open(shim, req->appl_name);
         return uipcp_appl_register_resp(uipcp, uipcp->id,
-                        bp ? RLITE_SUCC : RLITE_ERR, req);
+                                        bp ? RLITE_SUCC : RLITE_ERR, req);
     }
 
-    list_for_each_entry(bp, &shim->bindpoints, node) {
+    list_for_each_entry (bp, &shim->bindpoints, node) {
         if (strcmp(bp->appl_name, req->appl_name) == 0) {
             udp4_bindpoint_close(bp);
             return 0;
@@ -486,11 +485,10 @@ shim_udp4_appl_register(struct uipcp *uipcp,
 }
 
 static int
-shim_udp4_fa_req(struct uipcp *uipcp,
-                 const struct rl_msg_base *msg)
+shim_udp4_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
-    struct shim_udp4 *shim = SHIM(uipcp);
+    struct shim_udp4 *shim     = SHIM(uipcp);
     struct rl_flow_config cfg;
     struct udp4_endpoint *ep;
 
@@ -520,16 +518,15 @@ shim_udp4_fa_req(struct uipcp *uipcp,
     udp4_flow_config_fill(ep, &cfg);
     uipcp_issue_fa_resp_arrived(uipcp, ep->port_id, 0, 0, 0, 0, &cfg);
 
-    ep->alloc_complete = 1;  /* Actually useless for the client. */
+    ep->alloc_complete = 1; /* Actually useless for the client. */
 
     return 0;
 }
 
 static int
-shim_udp4_fa_resp(struct uipcp *uipcp,
-                   const struct rl_msg_base *msg)
+shim_udp4_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    struct shim_udp4 *shim = SHIM(uipcp);
+    struct shim_udp4 *shim       = SHIM(uipcp);
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
     struct udp4_sdu *sdu, *tmp;
     struct udp4_endpoint *ep;
@@ -539,17 +536,16 @@ shim_udp4_fa_resp(struct uipcp *uipcp,
     ep = get_endpoint_by_kevent_id(shim, resp->kevent_id);
     if (!ep) {
         UPE(uipcp, "Cannot find endpoint corresponding to kevent-id '%d'\n",
-                   resp->kevent_id);
+            resp->kevent_id);
         return 0;
     }
 
     ep->port_id = resp->port_id;
 
-
     if (resp->response) {
         /* Negative response, we have to close the endpoint. */
         UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,sfd=%d]\n",
-                ep->port_id, ep->kevent_id, ep->fd);
+            ep->port_id, ep->kevent_id, ep->fd);
         udp4_endpoint_close(ep);
 
         return 0;
@@ -559,10 +555,10 @@ shim_udp4_fa_resp(struct uipcp *uipcp,
     ep->alloc_complete = 1;
 
     /* Foward any pending SDUs. */
-    list_for_each_entry_safe(sdu, tmp, &ep->sduq, node) {
+    list_for_each_entry_safe (sdu, tmp, &ep->sduq, node) {
         udp4_fwd_sdu(shim, ep, sdu->buf, sdu->len);
         list_del(&sdu->node);
-        ep->sduq_len --;
+        ep->sduq_len--;
         rl_free(sdu, RL_MT_SHIMDATA);
     }
 
@@ -570,26 +566,27 @@ shim_udp4_fa_resp(struct uipcp *uipcp,
 }
 
 static int
-shim_udp4_flow_deallocated(struct uipcp *uipcp,
-                       const struct rl_msg_base *msg)
+shim_udp4_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_flow_deallocated *req =
-                (struct rl_kmsg_flow_deallocated *)msg;
+        (struct rl_kmsg_flow_deallocated *)msg;
     struct shim_udp4 *shim = SHIM(uipcp);
     struct udp4_endpoint *ep;
 
     /* Close the UDP endpoint associated to this flow. */
-    list_for_each_entry(ep, &shim->endpoints, node) {
+    list_for_each_entry (ep, &shim->endpoints, node) {
         if (req->local_port_id == ep->port_id) {
-            UPD(uipcp, "Removing endpoint [port=%u,kevent_id=%u,"
-                "sfd=%d]\n", ep->port_id, ep->kevent_id, ep->fd);
+            UPD(uipcp,
+                "Removing endpoint [port=%u,kevent_id=%u,"
+                "sfd=%d]\n",
+                ep->port_id, ep->kevent_id, ep->fd);
             udp4_endpoint_close(ep);
             return 0;
         }
     }
 
     UPE(uipcp, "Cannot find endpoint corresponding to port '%d'\n",
-               req->local_port_id);
+        req->local_port_id);
     return -1;
 }
 
@@ -632,7 +629,7 @@ shim_udp4_fini(struct uipcp *uipcp)
     {
         struct udp4_endpoint *ep, *tmp;
 
-        list_for_each_entry_safe(ep, tmp, &shim->endpoints, node) {
+        list_for_each_entry_safe (ep, tmp, &shim->endpoints, node) {
             udp4_endpoint_close(ep);
         }
     }
@@ -640,7 +637,7 @@ shim_udp4_fini(struct uipcp *uipcp)
     {
         struct udp4_bindpoint *bp, *tmp;
 
-        list_for_each_entry_safe(bp, tmp, &shim->bindpoints, node) {
+        list_for_each_entry_safe (bp, tmp, &shim->bindpoints, node) {
             udp4_bindpoint_close(bp);
         }
     }
@@ -651,11 +648,10 @@ shim_udp4_fini(struct uipcp *uipcp)
 }
 
 struct uipcp_ops shim_udp4_ops = {
-    .init               = shim_udp4_init,
-    .fini               = shim_udp4_fini,
-    .appl_register      = shim_udp4_appl_register,
-    .fa_req             = shim_udp4_fa_req,
-    .fa_resp            = shim_udp4_fa_resp,
-    .flow_deallocated   = shim_udp4_flow_deallocated,
+    .init             = shim_udp4_init,
+    .fini             = shim_udp4_fini,
+    .appl_register    = shim_udp4_appl_register,
+    .fa_req           = shim_udp4_fa_req,
+    .fa_resp          = shim_udp4_fa_resp,
+    .flow_deallocated = shim_udp4_flow_deallocated,
 };
-

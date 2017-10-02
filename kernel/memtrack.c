@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -30,21 +31,14 @@
 static atomic_t mt_count[RL_MT_MAX];
 
 static const char *mt_names[] = {
-    [RL_MT_UTILS]       = "UTILS",
-    [RL_MT_BUFHDR]      = "BUFHDR",
-    [RL_MT_BUFDATA]     = "BUFDATA",
-    [RL_MT_FFETCH]      = "FFETCH",
-    [RL_MT_PDUFT]       = "PDUFT",
-    [RL_MT_SHIMDATA]    = "SHIMDATA",
-    [RL_MT_SHIM]        = "SHIM",
-    [RL_MT_UPQ]         = "UPQ",
-    [RL_MT_DIF]         = "DIF",
-    [RL_MT_IPCP]        = "IPCP",
-    [RL_MT_REGAPP]      = "REGAPP",
-    [RL_MT_FLOW]        = "FLOW",
-    [RL_MT_CTLDEV]      = "CTLDEV",
-    [RL_MT_IODEV]       = "IODEV",
-    [RL_MT_MISC]        = "MISC",
+    [RL_MT_UTILS] = "UTILS",     [RL_MT_BUFHDR] = "BUFHDR",
+    [RL_MT_BUFDATA] = "BUFDATA", [RL_MT_FFETCH] = "FFETCH",
+    [RL_MT_PDUFT] = "PDUFT",     [RL_MT_SHIMDATA] = "SHIMDATA",
+    [RL_MT_SHIM] = "SHIM",       [RL_MT_UPQ] = "UPQ",
+    [RL_MT_DIF] = "DIF",         [RL_MT_IPCP] = "IPCP",
+    [RL_MT_REGAPP] = "REGAPP",   [RL_MT_FLOW] = "FLOW",
+    [RL_MT_CTLDEV] = "CTLDEV",   [RL_MT_IODEV] = "IODEV",
+    [RL_MT_MISC] = "MISC",
 };
 
 void *

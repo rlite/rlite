@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -40,7 +41,6 @@
 #include <linux/version.h>
 #include <net/sock.h>
 
-
 struct rl_shim_udp4 {
     struct ipcp_entry *ipcp;
     struct work_struct txw;
@@ -55,16 +55,17 @@ struct shim_udp4_flow {
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk
 #ifdef RL_SK_DATA_READY_SECOND_ARG
-                          , int unused
-#endif  /* RL_SK_DATA_READY_SECOND_ARG */
-                         );
+                          ,
+                          int unused
+#endif /* RL_SK_DATA_READY_SECOND_ARG */
+    );
     void (*sk_write_space)(struct sock *sk);
     struct sockaddr_in remote_addr;
 
     struct mutex rxw_lock;
 };
 
-#define INET4_MAX_TXQ_LEN     64
+#define INET4_MAX_TXQ_LEN 64
 
 struct txq_entry {
     struct rl_buf *rb;
@@ -97,7 +98,7 @@ rl_shim_udp4_create(struct ipcp_entry *ipcp)
      * not have options, and is not encapsulated in other tunnels, the
      * maximum SDU size is limited by the maximum size of an IP packet,
      * that is (2^16 - 1). */
-    ipcp->max_sdu_size = ((1<<16) - 1) - 8 /* UDP hdr */ - 20 /* IP hdr */;
+    ipcp->max_sdu_size = ((1 << 16) - 1) - 8 /* UDP hdr */ - 20 /* IP hdr */;
 
     return priv;
 }
@@ -134,14 +135,14 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 {
     bool update_port = (priv->remote_addr.sin_port == htons(RL_SHIM_UDP_PORT));
     struct flow_entry *flow = priv->flow;
-    struct socket *sock = priv->sock;
-    struct msghdr msg = {
-            .msg_control = NULL,
-            .msg_controllen = 0,
-            .msg_name = NULL,
-            .msg_namelen = 0,
-            .msg_flags = MSG_DONTWAIT,
-        };
+    struct socket *sock     = priv->sock;
+    struct msghdr msg       = {
+        .msg_control    = NULL,
+        .msg_controllen = 0,
+        .msg_name       = NULL,
+        .msg_namelen    = 0,
+        .msg_flags      = MSG_DONTWAIT,
+    };
 
     mutex_lock(&priv->rxw_lock);
 
@@ -166,14 +167,14 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         rl_buf_append(rb, ret);
 
         if (unlikely(update_port)) {
-            msg.msg_name = &remote_addr;
+            msg.msg_name    = &remote_addr;
             msg.msg_namelen = sizeof(remote_addr);
         }
         iov.iov_base = RL_BUF_DATA(rb);
-        iov.iov_len = rb->len;
+        iov.iov_len  = rb->len;
 
-        ret = kernel_recvmsg(sock, &msg, (struct kvec *)&iov, 1,
-                             iov.iov_len, msg.msg_flags);
+        ret = kernel_recvmsg(sock, &msg, (struct kvec *)&iov, 1, iov.iov_len,
+                             msg.msg_flags);
         if (ret == -EAGAIN) {
             break;
         } else if (unlikely(ret <= 0)) {
@@ -189,9 +190,9 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
         if (unlikely(update_port)) {
             priv->remote_addr.sin_port = remote_addr.sin_port;
             PD("sock %p updated with port %u\n", priv->sock,
-                 ntohs(priv->remote_addr.sin_port));
-            update_port = false;
-            msg.msg_name = NULL;
+               ntohs(priv->remote_addr.sin_port));
+            update_port     = false;
+            msg.msg_name    = NULL;
             msg.msg_namelen = 0;
         }
 
@@ -209,8 +210,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
 static void
 udp4_rx_worker(struct work_struct *w)
 {
-    struct shim_udp4_flow *priv =
-            container_of(w, struct shim_udp4_flow, rxw);
+    struct shim_udp4_flow *priv = container_of(w, struct shim_udp4_flow, rxw);
 
     udp4_drain_socket_rxq(priv);
 }
@@ -218,8 +218,9 @@ udp4_rx_worker(struct work_struct *w)
 static void
 udp4_data_ready(struct sock *sk
 #ifdef RL_SK_DATA_READY_SECOND_ARG
-                , int unused
-#endif  /* RL_SK_DATA_READY_SECOND_ARG */
+                ,
+                int unused
+#endif /* RL_SK_DATA_READY_SECOND_ARG */
 )
 {
     struct shim_udp4_flow *priv = sk->sk_user_data;
@@ -254,7 +255,8 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     /* This increments the file descriptor reference counter. */
     sock = sockfd_lookup(flow->cfg.fd, &err);
     if (!sock) {
-        PE("Cannot find socket corresponding to file descriptor %d\n", flow->cfg.fd);
+        PE("Cannot find socket corresponding to file descriptor %d\n",
+           flow->cfg.fd);
         rl_free(priv, RL_MT_SHIMDATA);
         return err;
     }
@@ -266,22 +268,22 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     mutex_init(&priv->rxw_lock);
 
     memset(&priv->remote_addr, 0, sizeof(priv->remote_addr));
-    priv->remote_addr.sin_family = AF_INET;
-    priv->remote_addr.sin_port = flow->cfg.inet_port;
+    priv->remote_addr.sin_family      = AF_INET;
+    priv->remote_addr.sin_port        = flow->cfg.inet_port;
     priv->remote_addr.sin_addr.s_addr = flow->cfg.inet_ip;
 
     write_lock_bh(&sock->sk->sk_callback_lock);
-    priv->sk_data_ready = sock->sk->sk_data_ready;
-    priv->sk_write_space = sock->sk->sk_write_space;
-    sock->sk->sk_data_ready = udp4_data_ready;
+    priv->sk_data_ready      = sock->sk->sk_data_ready;
+    priv->sk_write_space     = sock->sk->sk_write_space;
+    sock->sk->sk_data_ready  = udp4_data_ready;
     sock->sk->sk_write_space = udp4_write_space;
-    sock->sk->sk_user_data = priv;
+    sock->sk->sk_user_data   = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
     sock_reset_flag(sock->sk, SOCK_USE_WRITE_QUEUE);
 
     PD("Got socket %p, IP %08x, port %u\n", sock, ntohl(flow->cfg.inet_ip),
-                                            ntohs(flow->cfg.inet_port));
+       ntohs(flow->cfg.inet_port));
 
     /* It often happens then the remote endpoint sent some data before
      * this flow_init() function is called, and therefore before we
@@ -296,8 +298,7 @@ rl_shim_udp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp,
-                                 struct flow_entry *flow)
+rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct shim_udp4_flow *priv = flow->priv;
     struct socket *sock;
@@ -311,9 +312,9 @@ rl_shim_udp4_flow_deallocated(struct ipcp_entry *ipcp,
     sock = priv->sock;
 
     write_lock_bh(&sock->sk->sk_callback_lock);
-    sock->sk->sk_data_ready = priv->sk_data_ready;
+    sock->sk->sk_data_ready  = priv->sk_data_ready;
     sock->sk->sk_write_space = priv->sk_write_space;
-    sock->sk->sk_user_data = NULL;
+    sock->sk->sk_user_data   = NULL;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
     /* Decrement the file descriptor reference counter, in order to
@@ -336,20 +337,20 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
     int ret;
 
     iov.iov_base = RL_BUF_DATA(rb);
-    iov.iov_len = rb->len;
+    iov.iov_len  = rb->len;
 
-    msg.msg_name = (struct sockaddr *)&flow_priv->remote_addr;
-    msg.msg_namelen = sizeof(flow_priv->remote_addr);
-    msg.msg_control = NULL;
+    msg.msg_name       = (struct sockaddr *)&flow_priv->remote_addr;
+    msg.msg_namelen    = sizeof(flow_priv->remote_addr);
+    msg.msg_control    = NULL;
     msg.msg_controllen = 0;
-    msg.msg_flags = MSG_DONTWAIT;
+    msg.msg_flags      = MSG_DONTWAIT;
 
-    ret = kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1,
-                         rb->len);
+    ret =
+        kernel_sendmsg(flow_priv->sock, &msg, (struct kvec *)&iov, 1, rb->len);
 
     if (unlikely(ret != rb->len)) {
         RPD(1, "wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
-                                 sock_wspace(flow_priv->sock->sk));
+            sock_wspace(flow_priv->sock->sk));
         if (ret == -EAGAIN) {
             /* Backpressure. Don't destroy the packet, we will called again. */
             return -EAGAIN;
@@ -371,8 +372,7 @@ udp4_xmit(struct shim_udp4_flow *flow_priv, struct rl_buf *rb)
 static void
 udp4_tx_worker(struct work_struct *w)
 {
-    struct rl_shim_udp4 *priv =
-            container_of(w, struct rl_shim_udp4, txw);
+    struct rl_shim_udp4 *priv = container_of(w, struct rl_shim_udp4, txw);
 
     for (;;) {
         struct txq_entry *qe = NULL;
@@ -389,8 +389,8 @@ udp4_tx_worker(struct work_struct *w)
             break;
         }
 
-        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len
-                || udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
+        if (sk_stream_wspace(qe->flow_priv->sock->sk) < qe->rb->len ||
+            udp4_xmit(qe->flow_priv, qe->rb) == -EAGAIN) {
             /* Cannot backpressure here, we have to drop */
             RPD(2, "Dropping SDU [len=%d]\n", (int)qe->rb->len);
             rl_buf_free(qe->rb);
@@ -410,12 +410,11 @@ rl_shim_udp4_flow_writeable(struct flow_entry *flow)
 }
 
 static int
-rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
-                       struct flow_entry *flow,
+rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                        struct rl_buf *rb, bool maysleep)
 {
     struct shim_udp4_flow *flow_priv = flow->priv;
-    struct rl_shim_udp4 *shim = ipcp->priv;
+    struct rl_shim_udp4 *shim        = ipcp->priv;
 
     if (sk_stream_wspace(flow_priv->sock->sk) < rb->len) {
         /* Backpressure: We will be called again. */
@@ -423,8 +422,8 @@ rl_shim_udp4_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (!maysleep) {
-        struct txq_entry *qe = rl_alloc(sizeof(*qe), GFP_ATOMIC,
-                                        RL_MT_SHIMDATA);
+        struct txq_entry *qe =
+            rl_alloc(sizeof(*qe), GFP_ATOMIC, RL_MT_SHIMDATA);
         bool drop = false;
 
         if (unlikely(!qe)) {
@@ -472,13 +471,13 @@ rl_shim_udp4_config(struct ipcp_entry *ipcp, const char *param_name,
 
 static int
 rl_shim_udp4_flow_get_stats(struct flow_entry *flow,
-                                struct rl_flow_stats *stats)
+                            struct rl_flow_stats *stats)
 {
     *stats = flow->stats;
     return 0;
 }
 
-#define SHIM_DIF_TYPE   "shim-udp4"
+#define SHIM_DIF_TYPE "shim-udp4"
 
 static struct ipcp_factory shim_udp4_factory = {
     .owner                  = THIS_MODULE,

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <vector>
@@ -44,43 +44,42 @@
 
 using namespace std;
 
-
 namespace obj_class {
-    string adata = "a_data";
-    string dft = "dft";
-    string neighbors = "neighbors";
-    string enrollment = "enrollment";
-    string status = "operational_status";
-    string address = "address";
-    string lfdb = "fsodb"; /* Lower Flow DB */
-    string flows = "flows"; /* Supported flows */
-    string flow = "flow";
-    string keepalive = "keepalive";
-    string lowerflow = "lowerflow";
-    string addr_alloc_table = "addr_alloc_table";
-    string addr_alloc_req = "addr_alloc_req";
-};
+string adata            = "a_data";
+string dft              = "dft";
+string neighbors        = "neighbors";
+string enrollment       = "enrollment";
+string status           = "operational_status";
+string address          = "address";
+string lfdb             = "fsodb"; /* Lower Flow DB */
+string flows            = "flows"; /* Supported flows */
+string flow             = "flow";
+string keepalive        = "keepalive";
+string lowerflow        = "lowerflow";
+string addr_alloc_table = "addr_alloc_table";
+string addr_alloc_req   = "addr_alloc_req";
+}; // namespace obj_class
 
 namespace obj_name {
-    string adata = "a_data";
-    string dft = "/dif/mgmt/fa/" + obj_class::dft;
-    string neighbors = "/daf/mgmt/" + obj_class::neighbors;
-    string enrollment = "/daf/mgmt/" + obj_class::enrollment;
-    string status = "/daf/mgmt/" + obj_class::status;
-    string address = "/daf/mgmt/naming/" + obj_class::address;
-    string lfdb = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
-    string whatevercast = "/daf/mgmt/naming/whatevercast";
-    string flows = "/dif/ra/fa/" + obj_class::flows;
-    string keepalive = "/daf/mgmt/" + obj_class::keepalive;
-    string lowerflow = "/daf/mgmt/" + obj_class::lowerflow;
-    string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
-};
+string adata            = "a_data";
+string dft              = "/dif/mgmt/fa/" + obj_class::dft;
+string neighbors        = "/daf/mgmt/" + obj_class::neighbors;
+string enrollment       = "/daf/mgmt/" + obj_class::enrollment;
+string status           = "/daf/mgmt/" + obj_class::status;
+string address          = "/daf/mgmt/naming/" + obj_class::address;
+string lfdb             = "/dif/mgmt/pduft/linkstate/" + obj_class::lfdb;
+string whatevercast     = "/daf/mgmt/naming/whatevercast";
+string flows            = "/dif/ra/fa/" + obj_class::flows;
+string keepalive        = "/daf/mgmt/" + obj_class::keepalive;
+string lowerflow        = "/daf/mgmt/" + obj_class::lowerflow;
+string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
+}; // namespace obj_name
 
 #define MGMTBUF_SIZE_MAX 8092
 
 static int
-mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
-           void *buf, size_t buflen)
+mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr, void *buf,
+           size_t buflen)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     char *mgmtbuf;
@@ -115,34 +114,33 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr,
 }
 
 int
-mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
-                         void *buf, size_t buflen)
+mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port, void *buf,
+                         size_t buflen)
 {
     struct rl_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
+    mhdr.type       = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
     mhdr.local_port = local_port;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
 int
-mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr,
-                       void *buf, size_t buflen)
+mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr, void *buf,
+                       size_t buflen)
 {
     struct rl_mgmt_hdr mhdr;
 
     memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.type        = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
     mhdr.remote_addr = dst_addr;
 
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
 static int
-rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
-             NeighFlow *nf)
+rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
 {
     CDAPMessage *m = nullptr;
     Neighbor *neigh;
@@ -160,7 +158,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         if (m->obj_class == obj_class::adata &&
-                    m->obj_name == obj_name::adata) {
+            m->obj_name == obj_name::adata) {
             /* A-DATA message, does not belong to any CDAP
              * session. */
             const char *objbuf;
@@ -168,7 +166,8 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
 
             m->get_obj_value(objbuf, objlen);
             if (!objbuf) {
-                UPE(rib->uipcp, "CDAP message does not contain a nested message\n");
+                UPE(rib->uipcp,
+                    "CDAP message does not contain a nested message\n");
 
                 rl_delete(m, RL_MT_CDAP);
                 return 0;
@@ -224,17 +223,18 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen,
         nf->last_activity = time(nullptr);
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
-                !neigh->initiator && m->op_code == gpb::M_START &&
-                    m->obj_name == obj_name::enrollment &&
-                        m->obj_class == obj_class::enrollment) {
+            !neigh->initiator && m->op_code == gpb::M_START &&
+            m->obj_name == obj_name::enrollment &&
+            m->obj_class == obj_class::enrollment) {
             /* We thought we were already enrolled to this neighbor, but
              * he is trying to start again the enrollment procedure on a
              * different flow. We therefore assume that the neighbor
              * crashed before we could detect it, and select the new flow
              * as the management one. */
-            UPI(rib->uipcp, "Switch management flow, port-id %u --> "
-                            "port-id %u\n", neigh->mgmt_conn()->port_id,
-                            nf->port_id);
+            UPI(rib->uipcp,
+                "Switch management flow, port-id %u --> "
+                "port-id %u\n",
+                neigh->mgmt_conn()->port_id, nf->port_id);
             rib->neigh_flow_prune(neigh->mgmt_conn());
         }
 
@@ -284,8 +284,8 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
         return;
 
     } else if (n < (int)sizeof(*mhdr)) {
-        UPE(uipcp, "Error: read() does not contain mgmt header, %d<%d\n",
-                n, (int)sizeof(*mhdr));
+        UPE(uipcp, "Error: read() does not contain mgmt header, %d<%d\n", n,
+            (int)sizeof(*mhdr));
         return;
     }
 
@@ -313,8 +313,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     n = read(nf->flow_fd, mgmtbuf, sizeof(mgmtbuf));
     if (n < 0) {
-        UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n",
-                strerror(errno));
+        UPE(rib->uipcp, "read(mgmt_flow_fd) failed [%s]\n", strerror(errno));
         return;
     }
 
@@ -323,13 +322,14 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     rib_recv_msg(rib, mgmtbuf, n, nf);
 }
 
-
-uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
-                                         enrolled(0),
-                                         enroller_enabled(false),
-                                         self_registered(false),
-                                         self_registration_needed(false),
-                                         myaddr(RL_ADDR_NULL)
+uipcp_rib::uipcp_rib(struct uipcp *_u)
+    : uipcp(_u),
+      myname(_u->name),
+      enrolled(0),
+      enroller_enabled(false),
+      self_registered(false),
+      self_registration_needed(false),
+      myaddr(RL_ADDR_NULL)
 {
     int ret;
 
@@ -354,18 +354,19 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    params_map["enrollment"]["timeout"] = PolicyParam(kEnrollTimeout);
+    params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
-    params_map["enrollment"]["keepalive-thresh"] = PolicyParam(kKeepaliveThresh);
-    params_map["resource-allocator"]["reliable-flows"] = PolicyParam(false);
+    params_map["enrollment"]["keepalive-thresh"] =
+        PolicyParam(kKeepaliveThresh);
+    params_map["resource-allocator"]["reliable-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
-    params_map["routing"]["age-incr-intval"] = PolicyParam(kAgeIncrIntval);
-    params_map["routing"]["age-max"] = PolicyParam(kAgeMax);
-    params_map["address-allocator"] = {};
+    params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
+    params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
+    params_map["address-allocator"]            = {};
     params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
 
-    dft = new dft_default(this);
-    fa = new flow_allocator_default(this);
+    dft  = new dft_default(this);
+    fa   = new flow_allocator_default(this);
     lfdb = new lfdb_default(this);
     policy_mod("routing", "link-state");
     addra = nullptr;
@@ -373,23 +374,23 @@ uipcp_rib::uipcp_rib(struct uipcp *_u) : uipcp(_u), myname(_u->name),
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
-    handlers.insert(make_pair(obj_name::neighbors,
-                              &uipcp_rib::neighbors_handler));
+    handlers.insert(
+        make_pair(obj_name::neighbors, &uipcp_rib::neighbors_handler));
     handlers.insert(make_pair(obj_name::lfdb, &uipcp_rib::lfdb_handler));
     handlers.insert(make_pair(obj_name::flows, &uipcp_rib::flows_handler));
-    handlers.insert(make_pair(obj_name::keepalive,
-                              &uipcp_rib::keepalive_handler));
+    handlers.insert(
+        make_pair(obj_name::keepalive, &uipcp_rib::keepalive_handler));
     handlers.insert(make_pair(obj_name::status, &uipcp_rib::status_handler));
     handlers.insert(make_pair(obj_name::addr_alloc_table,
                               &uipcp_rib::addr_alloc_table_handler));
 
     /* Start timers for periodic tasks. */
-    age_incr_tmrid = uipcp_loop_schedule(uipcp,
-            get_param_value<int>("routing", "age-incr-intval") * 1000,
-            age_incr_cb, this);
-    sync_tmrid = uipcp_loop_schedule(uipcp,
-            get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
-            neighs_refresh_cb, this);
+    age_incr_tmrid = uipcp_loop_schedule(
+        uipcp, get_param_value<int>("routing", "age-incr-intval") * 1000,
+        age_incr_cb, this);
+    sync_tmrid = uipcp_loop_schedule(
+        uipcp, get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
+        neighs_refresh_cb, this);
 
     /* Set a valid address, 0 is the null address. */
     set_address(1);
@@ -400,7 +401,7 @@ uipcp_rib::~uipcp_rib()
     uipcp_loop_schedule_canc(uipcp, sync_tmrid);
     uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
 
-    for (const auto& kvn : neighbors) {
+    for (const auto &kvn : neighbors) {
         rl_delete(kvn.second, RL_MT_NEIGH);
     }
 
@@ -416,7 +417,8 @@ uipcp_rib::~uipcp_rib()
 
 #ifdef RL_USE_QOS_CUBES
 static inline string
-u82boolstr(uint8_t v) {
+u82boolstr(uint8_t v)
+{
     return v != 0 ? string("true") : string("false");
 }
 #endif
@@ -428,46 +430,46 @@ uipcp_rib::dump() const
 
 #ifdef RL_USE_QOS_CUBES
     ss << "QoS cubes" << endl;
-    for (map<string, struct rl_flow_config>::const_iterator
-                    i = qos_cubes.begin(); i != qos_cubes.end(); i++) {
-            const struct rl_flow_config& c = i->second;
+    for (map<string, struct rl_flow_config>::const_iterator i =
+             qos_cubes.begin();
+         i != qos_cubes.end(); i++) {
+        const struct rl_flow_config &c = i->second;
 
-            ss << i->first.c_str() << ": {" << endl;
-            ss << "   msg_boundaries=" << u82boolstr(c.msg_boundaries)
-                << endl <<
-                "   in_order_delivery=" << u82boolstr(c.in_order_delivery)
-                << endl << "   max_sdu_gap=" <<
-                static_cast<unsigned long long>(c.max_sdu_gap) << endl
-                << "   dtcp_present=" << u82boolstr(c.dtcp_present) << endl
-                << "   dtcp.initial_a=" <<
-                static_cast<unsigned int>(c.dtcp.initial_a) << endl
-                << "   dtcp.bandwidth=" <<
-                static_cast<unsigned int>(c.dtcp.bandwidth) << endl
-                << "   dtcp.flow_control=" << u82boolstr(c.dtcp.flow_control)
-                << endl << "   dtcp.rtx_control=" <<
-                u82boolstr(c.dtcp.rtx_control) << endl;
+        ss << i->first.c_str() << ": {" << endl;
+        ss << "   msg_boundaries=" << u82boolstr(c.msg_boundaries) << endl
+           << "   in_order_delivery=" << u82boolstr(c.in_order_delivery) << endl
+           << "   max_sdu_gap="
+           << static_cast<unsigned long long>(c.max_sdu_gap) << endl
+           << "   dtcp_present=" << u82boolstr(c.dtcp_present) << endl
+           << "   dtcp.initial_a="
+           << static_cast<unsigned int>(c.dtcp.initial_a) << endl
+           << "   dtcp.bandwidth="
+           << static_cast<unsigned int>(c.dtcp.bandwidth) << endl
+           << "   dtcp.flow_control=" << u82boolstr(c.dtcp.flow_control) << endl
+           << "   dtcp.rtx_control=" << u82boolstr(c.dtcp.rtx_control) << endl;
 
-            if (c.dtcp.fc.fc_type == RLITE_FC_T_WIN) {
-                ss << "   dtcp.fc.max_cwq_len=" <<
-                    static_cast<unsigned int>(c.dtcp.fc.cfg.w.max_cwq_len)
-                    << endl << "   dtcp.fc.initial_credit=" <<
-                    static_cast<unsigned int>(c.dtcp.fc.cfg.w.initial_credit)
-                    << endl;
-            } else if (c.dtcp.fc.fc_type == RLITE_FC_T_RATE) {
-                ss << "   dtcp.fc.sending_rate=" <<
-                    static_cast<unsigned int>(c.dtcp.fc.cfg.r.sending_rate)
-                    << endl << "   dtcp.fc.time_period=" <<
-                    static_cast<unsigned int>(c.dtcp.fc.cfg.r.time_period)
-                    << endl;
-            }
+        if (c.dtcp.fc.fc_type == RLITE_FC_T_WIN) {
+            ss << "   dtcp.fc.max_cwq_len="
+               << static_cast<unsigned int>(c.dtcp.fc.cfg.w.max_cwq_len) << endl
+               << "   dtcp.fc.initial_credit="
+               << static_cast<unsigned int>(c.dtcp.fc.cfg.w.initial_credit)
+               << endl;
+        } else if (c.dtcp.fc.fc_type == RLITE_FC_T_RATE) {
+            ss << "   dtcp.fc.sending_rate="
+               << static_cast<unsigned int>(c.dtcp.fc.cfg.r.sending_rate)
+               << endl
+               << "   dtcp.fc.time_period="
+               << static_cast<unsigned int>(c.dtcp.fc.cfg.r.time_period)
+               << endl;
+        }
 
-            ss << "   dtcp.rtx.max_time_to_retry=" <<
-                static_cast<unsigned int>(c.dtcp.rtx.max_time_to_retry)
-                << endl << "   dtcp.rtx.data_rxms_max=" <<
-                static_cast<unsigned int>(c.dtcp.rtx.data_rxms_max) << endl <<
-                "   dtcp.rtx.initial_tr=" <<
-                static_cast<unsigned int>(c.dtcp.rtx.initial_tr) << endl;
-            ss << "}" << endl;
+        ss << "   dtcp.rtx.max_time_to_retry="
+           << static_cast<unsigned int>(c.dtcp.rtx.max_time_to_retry) << endl
+           << "   dtcp.rtx.data_rxms_max="
+           << static_cast<unsigned int>(c.dtcp.rtx.data_rxms_max) << endl
+           << "   dtcp.rtx.initial_tr="
+           << static_cast<unsigned int>(c.dtcp.rtx.initial_tr) << endl;
+        ss << "}" << endl;
     }
 #endif /* RL_USE_QOS_CUBES */
 
@@ -477,7 +479,7 @@ uipcp_rib::dump() const
         bool first = true;
 
         ss << "LowerDIFs: {";
-        for (const string& lower : lower_difs) {
+        for (const string &lower : lower_difs) {
             if (first) {
                 first = false;
             } else {
@@ -488,22 +490,22 @@ uipcp_rib::dump() const
         ss << "}" << endl << endl;
     }
 
-    ss << "Neighbors: " << neighbors_seen.size() <<
-            " seen, " << neighbors.size() << " connected, "
-            << neighbors_cand.size() << " candidates" << endl;
-    for (const auto& kvn : neighbors_seen) {
-        const NeighborCandidate& cand = kvn.second;
-        string neigh_name = rina_string_from_components(cand.apn, cand.api,
-                                                        string(), string());
+    ss << "Neighbors: " << neighbors_seen.size() << " seen, "
+       << neighbors.size() << " connected, " << neighbors_cand.size()
+       << " candidates" << endl;
+    for (const auto &kvn : neighbors_seen) {
+        const NeighborCandidate &cand = kvn.second;
+        string neigh_name =
+            rina_string_from_components(cand.apn, cand.api, string(), string());
         ss << "    Name: "
-                << rina_string_from_components(cand.apn, cand.api,
-                                               cand.aen, cand.aei)
-                << ", Address: " << cand.address << ", Lower DIFs: {";
+           << rina_string_from_components(cand.apn, cand.api, cand.aen,
+                                          cand.aei)
+           << ", Address: " << cand.address << ", Lower DIFs: {";
 
         {
             bool first = true;
 
-            for (const string& lower : cand.lower_difs) {
+            for (const string &lower : cand.lower_difs) {
                 if (first) {
                     first = false;
                 } else {
@@ -519,15 +521,15 @@ uipcp_rib::dump() const
             NeighFlow *nf = neigh->second->mgmt_conn();
 
             if (neigh->second->enrollment_complete()) {
-                ss << "[Enrolled, heard " <<
-                    static_cast<int>(time(nullptr) - neigh->second->unheard_since)
-                        << "s ago, " << (nf->stats.win[1].bytes_sent/1000.0)
-                        << "KB sent, " << (nf->stats.win[1].bytes_recvd/1000.0)
-                        << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD
-                        << "s]";
+                ss << "[Enrolled, heard "
+                   << static_cast<int>(time(nullptr) -
+                                       neigh->second->unheard_since)
+                   << "s ago, " << (nf->stats.win[1].bytes_sent / 1000.0)
+                   << "KB sent, " << (nf->stats.win[1].bytes_recvd / 1000.0)
+                   << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD << "s]";
             } else {
-                ss << "[Enrollment ongoing <" <<
-                    Neighbor::enroll_state_repr(nf->enroll_state) << ">]";
+                ss << "[Enrollment ongoing <"
+                   << Neighbor::enroll_state_repr(nf->enroll_state) << ">]";
             }
         } else if (!neighbors_cand.count(neigh_name)) {
             ss << "[Not a neighbor]";
@@ -546,8 +548,10 @@ uipcp_rib::dump() const
 
 #ifdef RL_MEMTRACK
     fa->dump_memtrack(ss);
-    ss << "    " << invoke_id_mgr.size() << " elements in the "
-          "invoke_id_mgr object" << endl;
+    ss << "    " << invoke_id_mgr.size()
+       << " elements in the "
+          "invoke_id_mgr object"
+       << endl;
 #endif /* RL_MEMTRACK */
 
     return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
@@ -562,8 +566,8 @@ uipcp_rib::update_address(rlm_addr_t new_addr)
 
     dft->update_address(new_addr);
     lfdb->update_routing();
-    UPD(uipcp, "Address updated %lu --> %lu\n",
-               (long unsigned)myaddr, (long unsigned)new_addr);
+    UPD(uipcp, "Address updated %lu --> %lu\n", (long unsigned)myaddr,
+        (long unsigned)new_addr);
     myaddr = new_addr; /* do the update */
 }
 
@@ -578,7 +582,7 @@ uipcp_rib::set_address(rlm_addr_t new_addr)
     ret = rl_conf_ipcp_config(uipcp->id, "address", addr_ss.str().c_str());
     if (ret) {
         UPE(uipcp, "Failed to update address to %lu\n",
-                    (unsigned long)new_addr);
+            (unsigned long)new_addr);
     } else {
         update_address(new_addr);
     }
@@ -620,13 +624,13 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         struct rina_flow_spec relspec;
 
         rl_flow_spec_default(&relspec);
-        relspec.max_sdu_gap = 0;
+        relspec.max_sdu_gap       = 0;
         relspec.in_order_delivery = 1;
         rina_flow_spec_fc_set(&relspec, 1);
 
         self_registration_needed = false;
         /* Scan all the (updated) lower DIFs. */
-        for (const string& lower : lower_difs) {
+        for (const string &lower : lower_difs) {
             rl_ipcp_id_t lower_ipcp_id;
             int ret;
 
@@ -634,7 +638,7 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
                                          &lower_ipcp_id);
             if (ret) {
                 UPE(uipcp, "Failed to find lower IPCP for dif %s\n",
-                           lower.c_str());
+                    lower.c_str());
                 continue;
             }
 
@@ -658,7 +662,7 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
     /* Perform the registration of the IPCP name. */
     if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->name, reg))) {
         UPE(uipcp, "Registration of IPCP name %s into DIF %s failed\n",
-                    uipcp->dif_name, lower_dif);
+            uipcp->dif_name, lower_dif);
         return ret;
     }
 
@@ -666,13 +670,12 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
      * this IPCP is part of. */
     if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
         UPE(uipcp, "Registration of DAF name %s into DIF %s failed\n",
-                    uipcp->dif_name, lower_dif);
+            uipcp->dif_name, lower_dif);
         return ret;
     }
 
     return 0;
 }
-
 
 /* To be called out of RIB lock */
 int
@@ -685,7 +688,7 @@ uipcp_rib::realize_registrations(bool reg)
         snapshot = lower_difs;
     }
 
-    for (const string& lower : snapshot) {
+    for (const string &lower : snapshot) {
         register_to_lower_one(uipcp, lower.c_str(), reg);
     }
 
@@ -699,7 +702,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 {
     AData adata;
     CDAPMessage am;
-    char objbuf[4096];  /* Don't change the scope of this buffer. */
+    char objbuf[4096]; /* Don't change the scope of this buffer. */
     char aobjbuf[4096];
     char *serbuf = nullptr;
     int aobjlen;
@@ -733,10 +736,10 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
     adata.src_addr = myaddr;
     adata.dst_addr = dst_addr;
-    adata.cdap = m; /* Ownership passing */
+    adata.cdap     = m; /* Ownership passing */
 
-    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata,
-               0, 0, string());
+    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata, 0, 0,
+               string());
 
     aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
     if (aobjlen < 0) {
@@ -757,7 +760,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
         UPE(uipcp, "message serialization failed\n");
         invoke_id_mgr.put_invoke_id(m->invoke_id);
         if (serbuf) {
-            delete [] serbuf;
+            delete[] serbuf;
         }
         return -1;
     }
@@ -767,7 +770,7 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
         UPE(uipcp, "mgmt_write(): %s\n", strerror(errno));
     }
 
-    delete [] serbuf;
+    delete[] serbuf;
 
     return ret;
 }
@@ -827,12 +830,12 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-addr_allocator_distributed::dump(std::stringstream& ss) const
+addr_allocator_distributed::dump(std::stringstream &ss) const
 {
     ss << "Address Allocation Table:" << endl;
-    for (const auto& kva : addr_alloc_table) {
+    for (const auto &kva : addr_alloc_table) {
         ss << "    Address: " << kva.first
-            << ", Requestor: " << kva.second.requestor << endl;
+           << ", Requestor: " << kva.second.requestor << endl;
     }
 
     ss << endl;
@@ -846,14 +849,13 @@ addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
     for (auto ati = addr_alloc_table.begin(); ati != addr_alloc_table.end();) {
         AddrAllocEntries l;
 
-        while (l.entries.size() < limit &&
-                ati != addr_alloc_table.end()) {
+        while (l.entries.size() < limit && ati != addr_alloc_table.end()) {
             l.entries.push_back(ati->second);
-            ati ++;
+            ati++;
         }
 
         ret |= nf->neigh->neigh_sync_obj(nf, true, obj_class::addr_alloc_table,
-                obj_name::addr_alloc_table, &l);
+                                         obj_name::addr_alloc_table, &l);
     }
 
     return ret;
@@ -864,7 +866,7 @@ addr_allocator_distributed::allocate()
 {
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
-    rlm_addr_t addr = RL_ADDR_NULL;
+    rlm_addr_t addr   = RL_ADDR_NULL;
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);
@@ -882,30 +884,31 @@ addr_allocator_distributed::allocate()
         /* Discard the address if it is invalid, or it is already (or possibly)
          * in use by us or another IPCP in the DIF. */
         if (!addr || addr == rib->myaddr || addr_alloc_table.count(addr) > 0 ||
-                rib->lookup_neighbor_by_address(addr) != string()) {
+            rib->lookup_neighbor_by_address(addr) != string()) {
             continue;
         }
 
         UPD(rib->uipcp, "Trying with address %lu\n", (unsigned long)addr);
         addr_alloc_table[addr] = AddrAllocRequest(addr, rib->myaddr);
 
-        for (const auto& kvn : rib->neighbors) {
+        for (const auto &kvn : rib->neighbors) {
             if (kvn.second->enrollment_complete()) {
                 AddrAllocRequest aar;
                 CDAPMessage m;
                 int ret;
 
                 m.m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
-                            obj_name::addr_alloc_table, 0, 0, "");
+                           obj_name::addr_alloc_table, 0, 0, "");
                 aar.requestor = rib->myaddr;
-                aar.address = addr;
+                aar.address   = addr;
                 ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send msg to neighbot [%s]\n",
-                               strerror(errno));
+                        strerror(errno));
                     return 0;
                 } else {
-                    UPD(rib->uipcp, "Sent address allocation request to neigh %s, "
+                    UPD(rib->uipcp,
+                        "Sent address allocation request to neigh %s, "
                         "(addr=%lu,requestor=%lu)\n",
                         kvn.second->ipcp_name.c_str(),
                         (long unsigned)aar.address,
@@ -922,7 +925,8 @@ addr_allocator_distributed::allocate()
         /* If the request is still there, then we consider the allocation
          * complete. */
         auto mit = addr_alloc_table.find(addr);
-        if (mit != addr_alloc_table.end() && mit->second.requestor == rib->myaddr) {
+        if (mit != addr_alloc_table.end() &&
+            mit->second.requestor == rib->myaddr) {
             addr_alloc_table[addr].pending = false;
             UPD(rib->uipcp, "Address %lu allocated\n", (unsigned long)addr);
             break;
@@ -968,33 +972,37 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
          * table and among the neighbor candidates. Also check if the proposed
          * address conflicts with our own address. */
         auto mit = addr_alloc_table.find(aar.address);
-        cand_neigh_conflict = aar.address == rib->myaddr ||
-                    rib->lookup_neighbor_by_address(aar.address) != string();
+        cand_neigh_conflict =
+            aar.address == rib->myaddr ||
+            rib->lookup_neighbor_by_address(aar.address) != string();
 
         switch (rm->op_code) {
         case gpb::M_CREATE:
             if (!cand_neigh_conflict && mit == addr_alloc_table.end()) {
                 /* New address allocation request, no conflicts. */
                 addr_alloc_table[aar.address] = aar;
-                UPD(rib->uipcp, "Address allocation request ok, (addr=%lu,"
-                           "requestor=%lu)\n", (long unsigned)aar.address,
-                            (long unsigned)aar.requestor);
+                UPD(rib->uipcp,
+                    "Address allocation request ok, (addr=%lu,"
+                    "requestor=%lu)\n",
+                    (long unsigned)aar.address, (long unsigned)aar.requestor);
                 propagate = true;
 
-            } else if (cand_neigh_conflict || mit->second.requestor != aar.requestor) {
+            } else if (cand_neigh_conflict ||
+                       mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
                 CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
                 int ret;
 
-                UPI(rib->uipcp, "Address allocation request conflicts, (addr=%lu,"
-                           "requestor=%lu)\n", (long unsigned)aar.address,
-                            (long unsigned)aar.requestor);
+                UPI(rib->uipcp,
+                    "Address allocation request conflicts, (addr=%lu,"
+                    "requestor=%lu)\n",
+                    (long unsigned)aar.address, (long unsigned)aar.requestor);
                 m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
                 ret = rib->send_to_dst_addr(m, aar.requestor, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",
-                            (unsigned long)aar.requestor, strerror(errno));
+                        (unsigned long)aar.requestor, strerror(errno));
                 }
             } else {
                 /* We have already seen this request, don't propagate. */
@@ -1007,19 +1015,21 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                     /* Negative feedback on a flow allocation request. */
                     addr_alloc_table.erase(aar.address);
                     propagate = true;
-                    UPI(rib->uipcp, "Address allocation request deleted, "
-                                "(addr=%lu,requestor=%lu)\n",
-                                (long unsigned)aar.address,
-                                (long unsigned)aar.requestor);
+                    UPI(rib->uipcp,
+                        "Address allocation request deleted, "
+                        "(addr=%lu,requestor=%lu)\n",
+                        (long unsigned)aar.address,
+                        (long unsigned)aar.requestor);
                 } else {
                     /* Late negative feedback. This is a serious problem
                      * that we don't manage for now. */
-                    UPE(rib->uipcp, "Conflict on a committed address! "
-                                    "Part of the network may be "
-                                    "unreachable "
-                                    "(addr=%lu,requestor=%lu)\n",
-                                    (long unsigned)aar.address,
-                                    (long unsigned)aar.requestor);
+                    UPE(rib->uipcp,
+                        "Conflict on a committed address! "
+                        "Part of the network may be "
+                        "unreachable "
+                        "(addr=%lu,requestor=%lu)\n",
+                        (long unsigned)aar.address,
+                        (long unsigned)aar.requestor);
                 }
             }
             break;
@@ -1040,26 +1050,28 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         AddrAllocEntries aal(objbuf, objlen);
         AddrAllocEntries prop_aal;
 
-        for (const AddrAllocRequest& r : aal.entries) {
+        for (const AddrAllocRequest &r : aal.entries) {
             auto mit = addr_alloc_table.find(r.address);
 
             if (rm->op_code == gpb::M_CREATE) {
                 if (mit == addr_alloc_table.end() ||
-                                mit->second.requestor != r.requestor) {
+                    mit->second.requestor != r.requestor) {
                     addr_alloc_table[r.address] = r; /* overwrite */
                     prop_aal.entries.push_back(r);
-                    UPD(rib->uipcp, "Address allocation entry created (addr=%lu,"
-                                "requestor=%lu)\n", (long unsigned)r.address,
-                                (long unsigned)r.requestor);
+                    UPD(rib->uipcp,
+                        "Address allocation entry created (addr=%lu,"
+                        "requestor=%lu)\n",
+                        (long unsigned)r.address, (long unsigned)r.requestor);
                 }
             } else { /* M_DELETE */
                 if (mit != addr_alloc_table.end() &&
-                                mit->second.requestor == r.requestor) {
+                    mit->second.requestor == r.requestor) {
                     addr_alloc_table.erase(r.address);
                     prop_aal.entries.push_back(r);
-                    UPD(rib->uipcp, "Address allocation entry deleted (addr=%lu,"
-                                "requestor=%lu)\n", (long unsigned)r.address,
-                                (long unsigned)r.requestor);
+                    UPD(rib->uipcp,
+                        "Address allocation entry deleted (addr=%lu,"
+                        "requestor=%lu)\n",
+                        (long unsigned)r.address, (long unsigned)r.requestor);
                 }
             }
         }
@@ -1067,7 +1079,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         if (prop_aal.entries.size() > 0) {
             assert(nf);
             rib->neighs_sync_obj_excluding(nf->neigh, create, rm->obj_class,
-                                      rm->obj_name, &prop_aal);
+                                           rm->obj_name, &prop_aal);
         }
 
     } else {
@@ -1078,7 +1090,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 static int
-string2int(const string& s, int& ret)
+string2int(const string &s, int &ret)
 {
     char *dummy;
     const char *cstr = s.c_str();
@@ -1093,7 +1105,7 @@ string2int(const string& s, int& ret)
 }
 
 int
-addr_allocator_distributed::param_mod(const string& name, const string& value)
+addr_allocator_distributed::param_mod(const string &name, const string &value)
 {
     if (name == "nack-wait-secs") {
         int val;
@@ -1111,41 +1123,42 @@ addr_allocator_distributed::param_mod(const string& name, const string& value)
 }
 
 int
-uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
-                                 bool create, const string& obj_class,
-                                 const string& obj_name,
-                                 const UipcpObject *obj_value) const
+uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
+                                     const string &obj_class,
+                                     const string &obj_name,
+                                     const UipcpObject *obj_value) const
 {
-    for (const auto& kvn : neighbors) {
+    for (const auto &kvn : neighbors) {
         if (exclude && kvn.second == exclude) {
             continue;
         }
 
-        if (!kvn.second->has_flows() ||
-                kvn.second->mgmt_conn()->enroll_state
-                    != EnrollState::NEIGH_ENROLLED) {
+        if (!kvn.second->has_flows() || kvn.second->mgmt_conn()->enroll_state !=
+                                            EnrollState::NEIGH_ENROLLED) {
             /* Skip this one since it's not enrolled yet or the
              * flow is not there since the neighbor is about to
              * be removed. */
             continue;
         }
 
-        kvn.second->neigh_sync_obj(nullptr, create, obj_class,
-                                   obj_name, obj_value);
+        kvn.second->neigh_sync_obj(nullptr, create, obj_class, obj_name,
+                                   obj_value);
     }
 
     return 0;
 }
 
 int
-uipcp_rib::neighs_sync_obj_all(bool create, const string& obj_class,
-                           const string& obj_name,
-                           const UipcpObject *obj_value) const
+uipcp_rib::neighs_sync_obj_all(bool create, const string &obj_class,
+                               const string &obj_name,
+                               const UipcpObject *obj_value) const
 {
-    return neighs_sync_obj_excluding(nullptr, create, obj_class, obj_name, obj_value);
+    return neighs_sync_obj_excluding(nullptr, create, obj_class, obj_name,
+                                     obj_value);
 }
 
-void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
+void
+uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
     Neighbor *neigh = nf->neigh;
 
@@ -1156,8 +1169,8 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 
     if (!neigh->flows.empty()) {
         UPI(uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
-                static_cast<string>(neigh->ipcp_name).c_str(),
-                neigh->flows.begin()->second->port_id);
+            static_cast<string>(neigh->ipcp_name).c_str(),
+            neigh->flows.begin()->second->port_id);
     }
 
     /* First delete the N-1 flow. */
@@ -1170,8 +1183,8 @@ void uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 }
 
 int
-uipcp_rib::policy_mod(const std::string& component,
-                      const std::string& policy_name)
+uipcp_rib::policy_mod(const std::string &component,
+                      const std::string &policy_name)
 {
     int ret = 0;
 
@@ -1228,9 +1241,9 @@ uipcp_rib::policy_mod(const std::string& component,
 }
 
 int
-uipcp_rib::policy_param_mod(const std::string& component,
-                            const std::string& param_name,
-                            const std::string& param_value)
+uipcp_rib::policy_param_mod(const std::string &component,
+                            const std::string &param_name,
+                            const std::string &param_value)
 {
     int ret = 0;
 
@@ -1248,16 +1261,17 @@ uipcp_rib::policy_param_mod(const std::string& component,
             return -1;
         }
 
-        if (component == "resource-allocator" && param_name == "reliable-n-flows" &&
-                param_value == "true" &&
-                !get_param_value<bool>("resource-allocator", "reliable-flows")) {
+        if (component == "resource-allocator" &&
+            param_name == "reliable-n-flows" && param_value == "true" &&
+            !get_param_value<bool>("resource-allocator", "reliable-flows")) {
             UPE(uipcp, "Cannot enable reliable N-flows as reliable "
-                    "flows are disabled.\n");
+                       "flows are disabled.\n");
             return -1;
         }
 
         if ((ret = params_map[component][param_name].set_value(param_value))) {
-            assert(params_map[component][param_name].type != PolicyParamType::UNDEFINED);
+            assert(params_map[component][param_name].type !=
+                   PolicyParamType::UNDEFINED);
             switch (params_map[component][param_name].type) {
             case PolicyParamType::INT:
                 UPE(uipcp, "Could not convert parameter value to a number.\n");
@@ -1275,18 +1289,16 @@ uipcp_rib::policy_param_mod(const std::string& component,
 
     if (!ret) {
         UPD(uipcp, "set %s policy param %s <== %s\n", component.c_str(),
-                   param_name.c_str(), param_value.c_str());
+            param_name.c_str(), param_value.c_str());
     }
 
     return ret;
 }
 static int
-normal_appl_register(struct uipcp *uipcp,
-                     const struct rl_msg_base *msg)
+normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    struct rl_kmsg_appl_register *req =
-                (struct rl_kmsg_appl_register *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
+    uipcp_rib *rib                    = UIPCP_RIB(uipcp);
     ScopeLock lock_(rib->lock);
 
     rib->dft->appl_register(req);
@@ -1295,11 +1307,10 @@ normal_appl_register(struct uipcp *uipcp,
 }
 
 static int
-normal_fa_req(struct uipcp *uipcp,
-             const struct rl_msg_base *msg)
+normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    uipcp_rib *rib             = UIPCP_RIB(uipcp);
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
@@ -1309,14 +1320,14 @@ normal_fa_req(struct uipcp *uipcp,
 }
 
 static int
-uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id,
-              rl_ipcp_id_t ipcp_id, rl_ipcp_id_t upper_ipcp_id,
-              rl_port_t port_id, uint8_t response)
+uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
+              rl_ipcp_id_t upper_ipcp_id, rl_port_t port_id, uint8_t response)
 {
     struct rl_kmsg_fa_resp resp;
     int ret;
 
-    rl_fa_resp_fill(&resp, kevent_id, ipcp_id, upper_ipcp_id, port_id, response);
+    rl_fa_resp_fill(&resp, kevent_id, ipcp_id, upper_ipcp_id, port_id,
+                    response);
 
     PV("Responding to flow allocation request...\n");
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
@@ -1339,26 +1350,32 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     neigh = get_neighbor(string(req->remote_appl), false);
     if (!neigh || !neigh->enrollment_complete()) {
         UPE(uipcp, "Rejected N-flow request from non-neighbor %s\n",
-                        req->remote_appl);
+            req->remote_appl);
 
     } else if (neigh->n_flow) {
-        UPE(uipcp, "Rejected N-flow request from %s, an N-flow "
-                        "already exists\n", req->remote_appl);
+        UPE(uipcp,
+            "Rejected N-flow request from %s, an N-flow "
+            "already exists\n",
+            req->remote_appl);
 
     } else if (neigh->mgmt_conn()->reliable) {
-        UPE(uipcp, "Rejected N-flow request from %s, N-1 flow "
-                        "is already reliable\n", req->remote_appl);
+        UPE(uipcp,
+            "Rejected N-flow request from %s, N-1 flow "
+            "is already reliable\n",
+            req->remote_appl);
 
     } else if (!is_reliable_spec(&req->flowspec)) {
-        UPE(uipcp, "Rejected N-flow request from %s, flow is "
-                        "not reliable\n", req->remote_appl);
+        UPE(uipcp,
+            "Rejected N-flow request from %s, flow is "
+            "not reliable\n",
+            req->remote_appl);
 
     } else {
         response = RLITE_SUCC;
     }
 
-    ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
-                        RL_IPCP_ID_NONE, req->port_id, response);
+    ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id, RL_IPCP_ID_NONE,
+                        req->port_id, response);
     if (ret || response == RLITE_ERR) {
         if (ret) {
             UPE(uipcp, "uipcp_fa_resp() failed[%s]\n", strerror(errno));
@@ -1369,15 +1386,16 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     mgmt_fd = rl_open_appl_port(req->port_id);
     if (mgmt_fd < 0) {
         UPE(uipcp, "Failed to open I/O port for N-flow towards %s\n",
-                        req->remote_appl);
+            req->remote_appl);
         return 0;
     }
 
     UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
-                    req->remote_appl, req->dif_name, req->port_id);
+        req->remote_appl, req->dif_name, req->port_id);
 
-    nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id,
-                          mgmt_fd, RL_IPCP_ID_NONE), RL_MT_NEIGHFLOW);
+    nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id, mgmt_fd,
+                          RL_IPCP_ID_NONE),
+                RL_MT_NEIGHFLOW);
     nf->reliable = true;
     neigh->n_flow_set(nf);
 
@@ -1387,8 +1405,8 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 int
 uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
-    rl_port_t neigh_port_id = req->port_id;
-    const char *supp_dif = req->dif_name;
+    rl_port_t neigh_port_id    = req->port_id;
+    const char *supp_dif       = req->dif_name;
     rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
     NeighFlow *nf;
     int flow_fd;
@@ -1404,9 +1422,10 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     /* Regular N-1-flow request coming from a remote uipcp who may want to
      * enroll in the DIF or who only wants to establish a new neighborhood. */
 
-    UPD(uipcp, "N-1-flow request arrived: [neigh = %s, supp_dif = %s, "
-               "port_id = %u]\n",
-               req->remote_appl, supp_dif, neigh_port_id);
+    UPD(uipcp,
+        "N-1-flow request arrived: [neigh = %s, supp_dif = %s, "
+        "port_id = %u]\n",
+        req->remote_appl, supp_dif, neigh_port_id);
 
     ScopeLock lock_(lock);
 
@@ -1421,9 +1440,9 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf = rl_new(NeighFlow(neigh, string(supp_dif),
-                          neigh_port_id, 0, lower_ipcp_id),
-                          RL_MT_NEIGHFLOW);
+    nf = rl_new(
+        NeighFlow(neigh, string(supp_dif), neigh_port_id, 0, lower_ipcp_id),
+        RL_MT_NEIGHFLOW);
     nf->reliable = is_reliable_spec(&req->flowspec);
 
     /* If flow is reliable, we assume it is a management-only flow, and so
@@ -1453,7 +1472,7 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 
     nf->flow_fd = flow_fd;
     UPD(uipcp, "%seliable N-1 flow allocated [fd=%d, port_id=%u]\n",
-                    nf->reliable ? "R" : "Unr", nf->flow_fd, nf->port_id);
+        nf->reliable ? "R" : "Unr", nf->flow_fd, nf->port_id);
 
     if (nf->reliable) {
         neigh->mgmt_only_set(nf);
@@ -1462,8 +1481,8 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     /* Add the flow to the datapath topology if it's not management-only. */
     if (!nf->reliable) {
         topo_lower_flow_added(uipcp->uipcps, uipcp->id, req->ipcp_id);
-        /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
-         * the local entries. */
+        /* A new N-1 flow has been allocated. We may need to update or LFDB
+         * w.r.t the local entries. */
         lfdb->update_local(neigh->ipcp_name);
     }
 
@@ -1476,22 +1495,19 @@ err:
 }
 
 static int
-normal_neigh_fa_req_arrived(struct uipcp *uipcp,
-                            const struct rl_msg_base *msg)
+normal_neigh_fa_req_arrived(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    struct rl_kmsg_fa_req_arrived *req =
-                    (struct rl_kmsg_fa_req_arrived *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    struct rl_kmsg_fa_req_arrived *req = (struct rl_kmsg_fa_req_arrived *)msg;
+    uipcp_rib *rib                     = UIPCP_RIB(uipcp);
 
     return rib->neigh_fa_req_arrived(req);
 }
 
 static int
-normal_fa_resp(struct uipcp *uipcp,
-              const struct rl_msg_base *msg)
+normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    uipcp_rib *rib               = UIPCP_RIB(uipcp);
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
@@ -1501,11 +1517,10 @@ normal_fa_resp(struct uipcp *uipcp,
 }
 
 static int
-normal_flow_deallocated(struct uipcp *uipcp,
-                        const struct rl_msg_base *msg)
+normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_flow_deallocated *req =
-                (struct rl_kmsg_flow_deallocated *)msg;
+        (struct rl_kmsg_flow_deallocated *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock lock_(rib->lock);
 
@@ -1526,7 +1541,7 @@ normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 static int
 normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    uipcp_rib *rib                 = UIPCP_RIB(uipcp);
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
     ScopeLock lock_(rib->lock);
 
@@ -1579,15 +1594,14 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
         bool self_reg_pending;
         int self_reg;
 
-        self_reg_pending =
-                (self_registered != self_registration_needed);
-        self_reg = self_registration_needed;
+        self_reg_pending = (self_registered != self_registration_needed);
+        self_reg         = self_registration_needed;
         pthread_mutex_unlock(&lock);
 
         if (self_reg_pending) {
             /* Perform (un)registration out of the lock. */
-            ret = uipcp_do_register(uipcp, uipcp->dif_name,
-                                  uipcp->name, self_reg);
+            ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name,
+                                    self_reg);
 
             if (ret) {
                 UPE(uipcp, "self-(un)registration failed\n");
@@ -1604,28 +1618,31 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     return ret;
 }
 
-template <class T> T
-uipcp_rib::get_param_value(const std::string& component,
-                           const std::string& param_name)
+template <class T>
+T
+uipcp_rib::get_param_value(const std::string &component,
+                           const std::string &param_name)
 {
     assert(0);
 }
 
-template <> bool
-uipcp_rib::get_param_value<bool>(const std::string& component,
-                                 const std::string& param_name)
+template <>
+bool
+uipcp_rib::get_param_value<bool>(const std::string &component,
+                                 const std::string &param_name)
 {
-    assert(params_map.count(component)
-            && params_map[component].count(param_name));
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
     return params_map[component][param_name].get_bool_value();
 }
 
-template <> int
-uipcp_rib::get_param_value<int>(const std::string& component,
-                                const std::string& param_name)
+template <>
+int
+uipcp_rib::get_param_value<int>(const std::string &component,
+                                const std::string &param_name)
 {
-    assert(params_map.count(component)
-            && params_map[component].count(param_name));
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
     return params_map[component][param_name].get_int_value();
 }
 
@@ -1670,7 +1687,7 @@ normal_policy_mod(struct uipcp *uipcp,
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock lock_(rib->lock);
-    const string comp_name = req->comp_name;
+    const string comp_name   = req->comp_name;
     const string policy_name = req->policy_name;
 
     return rib->policy_mod(comp_name, policy_name);
@@ -1682,8 +1699,8 @@ normal_policy_param_mod(struct uipcp *uipcp,
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
     ScopeLock lock_(rib->lock);
-    const string comp_name = req->comp_name;
-    const string param_name = req->param_name;
+    const string comp_name   = req->comp_name;
+    const string param_name  = req->param_name;
     const string param_value = req->param_value;
 
     return rib->policy_param_mod(comp_name, param_name, param_value);
@@ -1698,28 +1715,25 @@ normal_enroller_enable(struct uipcp *uipcp,
     return rib->enroller_enable(!!req->enable);
 }
 
-std::unordered_map< std::string,
-    std::unordered_set<std::string> > available_policies;
+std::unordered_map<std::string, std::unordered_set<std::string> >
+    available_policies;
 
-PolicyParam::PolicyParam()
-{
-    type = PolicyParamType::UNDEFINED;
-}
+PolicyParam::PolicyParam() { type = PolicyParamType::UNDEFINED; }
 
 PolicyParam::PolicyParam(bool param_value)
 {
-    type = PolicyParamType::BOOL;
+    type    = PolicyParamType::BOOL;
     value.b = param_value;
 }
 
 PolicyParam::PolicyParam(int param_value)
 {
-    type = PolicyParamType::INT;
+    type    = PolicyParamType::INT;
     value.i = param_value;
 }
 
 int
-PolicyParam::set_value(const std::string& param_value)
+PolicyParam::set_value(const std::string &param_value)
 {
     assert(type != PolicyParamType::UNDEFINED);
     int val;
@@ -1771,23 +1785,22 @@ normal_lib_init(void)
 }
 
 struct uipcp_ops normal_ops = {
-    .init                   = normal_init,
-    .fini                   = normal_fini,
-    .register_to_lower      = normal_register_to_lower,
-    .enroll                 = normal_ipcp_enroll,
-    .enroller_enable        = normal_enroller_enable,
-    .lower_flow_alloc       = normal_ipcp_enroll,
-    .rib_show               = normal_ipcp_rib_show,
-    .routing_show           = normal_ipcp_routing_show,
-    .appl_register          = normal_appl_register,
-    .fa_req                 = normal_fa_req,
-    .fa_resp                = normal_fa_resp,
-    .flow_deallocated       = normal_flow_deallocated,
-    .neigh_fa_req_arrived   = normal_neigh_fa_req_arrived,
-    .update_address         = normal_update_address,
-    .flow_state_update      = normal_flow_state_update,
-    .trigger_tasks          = normal_trigger_tasks,
-    .policy_mod             = normal_policy_mod,
-    .policy_param_mod       = normal_policy_param_mod,
+    .init                 = normal_init,
+    .fini                 = normal_fini,
+    .register_to_lower    = normal_register_to_lower,
+    .enroll               = normal_ipcp_enroll,
+    .enroller_enable      = normal_enroller_enable,
+    .lower_flow_alloc     = normal_ipcp_enroll,
+    .rib_show             = normal_ipcp_rib_show,
+    .routing_show         = normal_ipcp_routing_show,
+    .appl_register        = normal_appl_register,
+    .fa_req               = normal_fa_req,
+    .fa_resp              = normal_fa_resp,
+    .flow_deallocated     = normal_flow_deallocated,
+    .neigh_fa_req_arrived = normal_neigh_fa_req_arrived,
+    .update_address       = normal_update_address,
+    .flow_state_update    = normal_flow_state_update,
+    .trigger_tasks        = normal_trigger_tasks,
+    .policy_mod           = normal_policy_mod,
+    .policy_param_mod     = normal_policy_param_mod,
 };
-

@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -26,7 +27,6 @@
 #include <linux/timer.h>
 #include "rlite/utils.h"
 #include "rlite-kernel.h"
-
 
 void
 dtp_init(struct dtp *dtp)
@@ -57,21 +57,21 @@ dtp_fini(struct dtp *dtp)
     del_timer_sync(&dtp->rtx_tmr);
     del_timer_sync(&dtp->a_tmr);
 
-    PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n",
-       dtp->cwq_len, dtp->seqq_len, dtp->rtxq_len);
-    rb_list_foreach_safe(rb, tmp, &dtp->cwq) {
+    PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n", dtp->cwq_len,
+       dtp->seqq_len, dtp->rtxq_len);
+    rb_list_foreach_safe (rb, tmp, &dtp->cwq) {
         rb_list_del(rb);
         rl_buf_free(rb);
     }
     dtp->cwq_len = 0;
 
-    rb_list_foreach_safe(rb, tmp, &dtp->seqq) {
+    rb_list_foreach_safe (rb, tmp, &dtp->seqq) {
         rb_list_del(rb);
         rl_buf_free(rb);
     }
     dtp->seqq_len = 0;
 
-    rb_list_foreach_safe(rb, tmp, &dtp->rtxq) {
+    rb_list_foreach_safe (rb, tmp, &dtp->rtxq) {
         rb_list_del(rb);
         rl_buf_free(rb);
     }
@@ -85,18 +85,16 @@ void
 dtp_dump(struct dtp *dtp)
 {
     printk("DTP(%p): flags=%x,snd_lwe=%lu,snd_rwe=%lu,next_seq_num_to_send=%lu,"
-            "last_seq_num_sent=%lu,rcv_lwe=%lu,rcv_rwe=%lu,"
-            "max_seq_num_rcvd=%lu,last_snd_data_ack=%lu,"
-            "next_snd_ctl_seq=%lu,last_ctrl_seq_num_rcvd=%lu\n", dtp,
-            dtp->flags, (long unsigned)dtp->snd_lwe,
-            (long unsigned)dtp->snd_rwe,
-            (long unsigned)dtp->next_seq_num_to_send,
-            (long unsigned)dtp->last_seq_num_sent,
-            (long unsigned)dtp->rcv_lwe,
-            (long unsigned)dtp->rcv_rwe,
-            (long unsigned)dtp->max_seq_num_rcvd,
-            (long unsigned)dtp->last_snd_data_ack,
-            (long unsigned)dtp->next_snd_ctl_seq,
-            (long unsigned)dtp->last_ctrl_seq_num_rcvd);
+           "last_seq_num_sent=%lu,rcv_lwe=%lu,rcv_rwe=%lu,"
+           "max_seq_num_rcvd=%lu,last_snd_data_ack=%lu,"
+           "next_snd_ctl_seq=%lu,last_ctrl_seq_num_rcvd=%lu\n",
+           dtp, dtp->flags, (long unsigned)dtp->snd_lwe,
+           (long unsigned)dtp->snd_rwe,
+           (long unsigned)dtp->next_seq_num_to_send,
+           (long unsigned)dtp->last_seq_num_sent, (long unsigned)dtp->rcv_lwe,
+           (long unsigned)dtp->rcv_rwe, (long unsigned)dtp->max_seq_num_rcvd,
+           (long unsigned)dtp->last_snd_data_ack,
+           (long unsigned)dtp->next_snd_ctl_seq,
+           (long unsigned)dtp->last_ctrl_seq_num_rcvd);
 }
 EXPORT_SYMBOL(dtp_dump);

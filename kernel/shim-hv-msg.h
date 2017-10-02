@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #ifndef __RLITE_SHIM_HV_MSG_H__
@@ -27,7 +28,6 @@
 #include <linux/types.h>
 #include "rlite/common.h"
 #include "rlite/utils.h"
-
 
 enum {
     RLITE_SHIM_HV_FA_REQ = 1,
@@ -38,7 +38,7 @@ enum {
 
 /* Numtables for shim-hv <==> shim-hv messages exchange. */
 
-extern struct rl_msg_layout rl_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX+1];
+extern struct rl_msg_layout rl_shim_hv_numtables[RLITE_SHIM_HV_MSG_MAX + 1];
 
 /* Message to allocate a new flow. */
 struct rl_hmsg_fa_req {
@@ -60,4 +60,4 @@ struct rl_hmsg_fa_resp {
     uint8_t response;
 } __attribute__((packed));
 
-#endif  /* __RLITE_SHIM_HV_MSG_H__ */
+#endif /* __RLITE_SHIM_HV_MSG_H__ */

@@ -18,9 +18,8 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
-
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -53,7 +52,6 @@
 #include "../helpers.h"
 #include "uipcp-container.h"
 
-
 struct registered_ipcp {
     rl_ipcp_id_t id;
     char *name;
@@ -61,7 +59,6 @@ struct registered_ipcp {
 
     struct list_head node;
 };
-
 
 /* Global variable containing the main struct of the uipcps. This variable
  * should be accessed directly only by signal handlers (because I don't know
@@ -82,7 +79,7 @@ rl_u_response(int sfd, const struct rl_msg_base *req,
 
 static int
 rl_u_ipcp_register(struct uipcps *uipcps, int sfd,
-                        const struct rl_msg_base *b_req)
+                   const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_register *req = (struct rl_cmsg_ipcp_register *)b_req;
     struct rl_msg_base_resp resp;
@@ -105,7 +102,7 @@ rl_u_ipcp_register(struct uipcps *uipcps, int sfd,
 
 static int
 rl_u_ipcp_enroll(struct uipcps *uipcps, int sfd,
-                       const struct rl_msg_base *b_req)
+                 const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_enroll *req = (struct rl_cmsg_ipcp_enroll *)b_req;
     struct rl_msg_base_resp resp;
@@ -128,12 +125,12 @@ rl_u_ipcp_enroller_enable(struct uipcps *uipcps, int sfd,
                           const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_enroller_enable *req =
-                    (struct rl_cmsg_ipcp_enroller_enable *)b_req;
+        (struct rl_cmsg_ipcp_enroller_enable *)b_req;
     struct rl_msg_base_resp resp;
     struct uipcp *uipcp;
 
     resp.result = RLITE_ERR;
-    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    uipcp       = uipcp_get_by_name(uipcps, req->ipcp_name);
     if (uipcp && uipcp->ops.enroller_enable) {
         resp.result = uipcp->ops.enroller_enable(uipcp, req);
     }
@@ -169,14 +166,14 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
                    const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_rib_show_req *req =
-                    (struct rl_cmsg_ipcp_rib_show_req *)b_req;
+        (struct rl_cmsg_ipcp_rib_show_req *)b_req;
     struct rl_cmsg_ipcp_rib_show_resp resp;
-    char * (*show)(struct uipcp *) = NULL;
+    char *(*show)(struct uipcp *) = NULL;
     struct uipcp *uipcp;
     char *dumpstr = NULL;
     int ret;
 
-    resp.result = RLITE_ERR; /* Report failure by default. */
+    resp.result   = RLITE_ERR; /* Report failure by default. */
     resp.dump.buf = NULL;
     resp.dump.len = 0;
 
@@ -198,7 +195,7 @@ rl_u_ipcp_rib_show(struct uipcps *uipcps, int sfd,
     if (show) {
         dumpstr = show(uipcp);
         if (dumpstr) {
-            resp.result = RLITE_SUCC;
+            resp.result   = RLITE_SUCC;
             resp.dump.buf = dumpstr;
             resp.dump.len = strlen(dumpstr) + 1; /* include terminator */
         }
@@ -224,7 +221,7 @@ rl_u_ipcp_policy_mod(struct uipcps *uipcps, int sfd,
                      const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_policy_mod *req =
-                (struct rl_cmsg_ipcp_policy_mod *)b_req;
+        (struct rl_cmsg_ipcp_policy_mod *)b_req;
     struct rl_msg_base_resp resp;
     struct uipcp *uipcp;
 
@@ -249,7 +246,7 @@ rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
                            const struct rl_msg_base *b_req)
 {
     struct rl_cmsg_ipcp_policy_param_mod *req =
-                (struct rl_cmsg_ipcp_policy_param_mod *)b_req;
+        (struct rl_cmsg_ipcp_policy_param_mod *)b_req;
     struct rl_msg_base_resp resp;
     struct uipcp *uipcp;
 
@@ -284,7 +281,7 @@ rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
 #endif /* RL_MEMTRACK */
 
 typedef int (*rl_req_handler_t)(struct uipcps *uipcps, int sfd,
-                                   const struct rl_msg_base * b_req);
+                                const struct rl_msg_base *b_req);
 
 /* The table containing all application request handlers. */
 static rl_req_handler_t rl_config_handlers[] = {
@@ -297,22 +294,22 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
 #ifdef RL_MEMTRACK
-    [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
+    [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
     [RLITE_U_MSG_MAX] = NULL,
 };
 
 struct worker_info {
-    pthread_t           th;
-    struct uipcps       *uipcps;
-    int                 cfd;
-    struct list_head    node;
+    pthread_t th;
+    struct uipcps *uipcps;
+    int cfd;
+    struct list_head node;
 };
 
 static void *
 worker_fn(void *opaque)
 {
-    struct worker_info *wi = opaque;
+    struct worker_info *wi  = opaque;
     struct rl_msg_base *req = NULL;
     char serbuf[4096];
     char msgbuf[4096];
@@ -328,8 +325,8 @@ worker_fn(void *opaque)
     }
 
     /* Deserialize into a formatted message. */
-    ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX,
-            serbuf, ret, msgbuf, sizeof(msgbuf));
+    ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX, serbuf,
+                                ret, msgbuf, sizeof(msgbuf));
     if (ret) {
         PE("deserialization error [%d]\n", ret);
         goto out;
@@ -345,8 +342,7 @@ worker_fn(void *opaque)
     /* Valid message type: handle the request. */
     ret = rl_config_handlers[req->msg_type](wi->uipcps, wi->cfd, req);
     if (ret) {
-        PE("Error while handling message type [%d]\n",
-                req->msg_type);
+        PE("Error while handling message type [%d]\n", req->msg_type);
     }
 out:
     if (ret) {
@@ -356,7 +352,7 @@ out:
            req ? req->msg_type : RLITE_U_MSG_MAX);
         resp.msg_type = RLITE_U_BASE_RESP;
         resp.event_id = req ? req->event_id : 0;
-        resp.result = RLITE_ERR;
+        resp.result   = RLITE_ERR;
         rl_msg_write_fd(wi->cfd, RLITE_MB(&resp));
     }
 
@@ -378,7 +374,7 @@ unix_server(struct uipcps *uipcps)
 {
     struct list_head threads;
     int threads_cnt = 0;
-#define RL_MAX_THREADS     16
+#define RL_MAX_THREADS 16
 
     list_init(&threads);
 
@@ -390,7 +386,7 @@ unix_server(struct uipcps *uipcps)
 
         for (;;) {
             /* Try to clean up previously terminated worker threads. */
-            list_for_each_entry_safe(wi, tmp, &threads, node) {
+            list_for_each_entry_safe (wi, tmp, &threads, node) {
                 ret = pthread_tryjoin_np(wi->th, NULL);
                 if (ret == EBUSY) {
                     /* Skip this since it has not finished yet. */
@@ -402,7 +398,7 @@ unix_server(struct uipcps *uipcps)
                 PV("Worker %p cleaned-up\n", wi);
                 list_del(&wi->node);
                 rl_free(wi, RL_MT_MISC);
-                threads_cnt --;
+                threads_cnt--;
             }
 
             if (threads_cnt < RL_MAX_THREADS) {
@@ -416,7 +412,7 @@ unix_server(struct uipcps *uipcps)
             usleep(50000);
         }
 
-        wi = rl_alloc(sizeof(*wi), RL_MT_MISC);
+        wi         = rl_alloc(sizeof(*wi), RL_MT_MISC);
         wi->uipcps = uipcps;
 
         /* Accept a new client and create a thread to serve it. */
@@ -431,7 +427,7 @@ unix_server(struct uipcps *uipcps)
         }
 
         list_add_tail(&wi->node, &threads);
-        threads_cnt ++;
+        threads_cnt++;
     }
 
     return 0;
@@ -478,7 +474,7 @@ uipcps_loop_signal(struct uipcps *uipcps)
 
 /* Time interval (in seconds) between two consecutive run of
  * per-ipcp periodic tasks (e.g. re-enrollments). */
-#define PERIODIC_TASK_INTVAL             10
+#define PERIODIC_TASK_INTVAL 10
 
 static void
 periodic_tasks(struct uipcps *uipcps)
@@ -489,7 +485,7 @@ periodic_tasks(struct uipcps *uipcps)
 
     /* Get a reference to each uipcp. */
     pthread_mutex_lock(&uipcps->lock);
-    n = uipcps->n_uipcps;
+    n       = uipcps->n_uipcps;
     tmplist = rl_alloc(n * sizeof(struct uipcp *), RL_MT_MISC);
     if (!tmplist) {
         pthread_mutex_unlock(&uipcps->lock);
@@ -497,7 +493,7 @@ periodic_tasks(struct uipcps *uipcps)
         return;
     }
 
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         uipcp->refcnt++;
         tmplist[i++] = uipcp;
     }
@@ -505,7 +501,7 @@ periodic_tasks(struct uipcps *uipcps)
     pthread_mutex_unlock(&uipcps->lock);
 
     /* Carry out tasks outside the uipcps lock. */
-    list_for_each_entry(uipcp, &uipcps->uipcps, node) {
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         if (uipcp->ops.trigger_tasks) {
             uipcp->ops.trigger_tasks(uipcp);
         }
@@ -529,9 +525,9 @@ uipcps_loop(void *opaque)
         struct pollfd pfd[2];
         int ret = 0;
 
-        pfd[0].fd = uipcps->cfd;
+        pfd[0].fd     = uipcps->cfd;
         pfd[0].events = POLLIN;
-        pfd[1].fd = uipcps->efd;
+        pfd[1].fd     = uipcps->efd;
         pfd[1].events = POLLIN;
 
         ret = poll(pfd, 2, PERIODIC_TASK_INTVAL * 1000);
@@ -559,28 +555,28 @@ uipcps_loop(void *opaque)
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
         switch (upd->update_type) {
-            case RLITE_UPDATE_ADD:
-            case RLITE_UPDATE_UPD:
-                if (!upd->dif_type || !upd->dif_name ||
-                        !rina_sername_valid(upd->ipcp_name)) {
-                    PE("Invalid ipcp update\n");
-                }
+        case RLITE_UPDATE_ADD:
+        case RLITE_UPDATE_UPD:
+            if (!upd->dif_type || !upd->dif_name ||
+                !rina_sername_valid(upd->ipcp_name)) {
+                PE("Invalid ipcp update\n");
+            }
             break;
         }
 
         switch (upd->update_type) {
-            case RLITE_UPDATE_ADD:
-                ret = uipcp_add(uipcps, upd);
-                break;
+        case RLITE_UPDATE_ADD:
+            ret = uipcp_add(uipcps, upd);
+            break;
 
-            case RLITE_UPDATE_DEL:
-                /* This can be an IPCP with no userspace implementation. */
-                ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
-                break;
+        case RLITE_UPDATE_DEL:
+            /* This can be an IPCP with no userspace implementation. */
+            ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
+            break;
 
-            case RLITE_UPDATE_UPD:
-                ret = uipcp_update(uipcps, upd);
-                break;
+        case RLITE_UPDATE_UPD:
+            ret = uipcp_update(uipcps, upd);
+            break;
         }
 
         rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
@@ -632,7 +628,7 @@ sigint_handler(int signum)
 
     /* We need to destroy all the IPCPs. This would requires to take
      * the uipcps lock, but this lock may be already taken. */
-    list_for_each_entry_safe(uipcp, tmp, &uipcps->uipcps, node) {
+    list_for_each_entry_safe (uipcp, tmp, &uipcps->uipcps, node) {
         if (!uipcp_is_kernelspace(uipcp)) {
             rl_ipcp_id_t uid = uipcp->id;
 
@@ -657,12 +653,13 @@ static void
 usage(void)
 {
     printf("rlite-uipcps [OPTIONS]\n"
-        "   -h : show this help\n"
-        "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
-                           "DBG (default), VERY\n");
+           "   -h : show this help\n"
+           "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
+           "DBG (default), VERY\n");
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     struct uipcps *uipcps = &guipcps;
     struct sockaddr_un server_address;
@@ -672,18 +669,18 @@ int main(int argc, char **argv)
 
     while ((opt = getopt(argc, argv, "hv:")) != -1) {
         switch (opt) {
-            case 'h':
-                usage();
-                return 0;
+        case 'h':
+            usage();
+            return 0;
 
-            case 'v':
-                verbosity = optarg;
-                break;
+        case 'v':
+            verbosity = optarg;
+            break;
 
-            default:
-                printf("    Unrecognized option %c\n", opt);
-                usage();
-                return -1;
+        default:
+            printf("    Unrecognized option %c\n", opt);
+            usage();
+            return -1;
         }
     }
 
@@ -718,8 +715,8 @@ int main(int argc, char **argv)
 
     ret = mkdir(RLITE_UIPCPS_VAR, 0x777);
     if (ret && errno != EEXIST) {
-        fprintf(stderr, "warning: mkdir(%s) failed: %s\n",
-                        RLITE_UIPCPS_VAR, strerror(errno));
+        fprintf(stderr, "warning: mkdir(%s) failed: %s\n", RLITE_UIPCPS_VAR,
+                strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -785,7 +782,7 @@ int main(int argc, char **argv)
     }
 
     ret = bind(uipcps->lfd, (struct sockaddr *)&server_address,
-                sizeof(server_address));
+               sizeof(server_address));
     if (ret) {
         perror("bind(AF_UNIX, path)");
         exit(EXIT_FAILURE);
@@ -800,22 +797,22 @@ int main(int argc, char **argv)
      * Unix socket, so that anyone can read and write. This
      * a temporary solution, to be used until a precise
      * permission scheme is designed. */
-    if (chmod(RLITE_CTRLDEV_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
-                            | S_IROTH | S_IWOTH)) {
-        fprintf(stderr, "warning: chmod(%s) failed: %s\n",
-                        RLITE_CTRLDEV_NAME, strerror(errno));
+    if (chmod(RLITE_CTRLDEV_NAME,
+              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
+        fprintf(stderr, "warning: chmod(%s) failed: %s\n", RLITE_CTRLDEV_NAME,
+                strerror(errno));
     }
 
-    if (chmod(RLITE_IODEV_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
-                               | S_IROTH | S_IWOTH)) {
-        fprintf(stderr, "warning: chmod(%s) failed: %s\n",
-                        RLITE_IODEV_NAME, strerror(errno));
+    if (chmod(RLITE_IODEV_NAME,
+              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
+        fprintf(stderr, "warning: chmod(%s) failed: %s\n", RLITE_IODEV_NAME,
+                strerror(errno));
     }
 
-    if (chmod(RLITE_UIPCPS_UNIX_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
-                                     | S_IROTH | S_IWOTH)) {
+    if (chmod(RLITE_UIPCPS_UNIX_NAME,
+              S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) {
         fprintf(stderr, "warning: chmod(%s) failed: %s\n",
-                        RLITE_UIPCPS_UNIX_NAME, strerror(errno));
+                RLITE_UIPCPS_UNIX_NAME, strerror(errno));
     }
 
     list_init(&uipcps->uipcps);
@@ -828,7 +825,7 @@ int main(int argc, char **argv)
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    ret = sigaction(SIGINT, &sa, NULL);
+    ret         = sigaction(SIGINT, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
         exit(EXIT_FAILURE);
@@ -849,7 +846,7 @@ int main(int argc, char **argv)
      * trying to read/write from/to a Unix domain socket
      * that has been closed by the other end. */
     sa.sa_handler = SIG_IGN;
-    ret = sigaction(SIGPIPE, &sa, NULL);
+    ret           = sigaction(SIGPIPE, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGPIPE)");
         exit(EXIT_FAILURE);

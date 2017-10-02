@@ -5,8 +5,8 @@
 #include <sstream>
 
 static inline std::string
-rina_string_from_components(const std::string& apn, const std::string& api,
-                            const std::string& aen, const std::string& aei)
+rina_string_from_components(const std::string &apn, const std::string &api,
+                            const std::string &aen, const std::string &aei)
 {
 #if 1 /* minimized name */
     std::string acc;
@@ -34,14 +34,15 @@ rina_string_from_components(const std::string& apn, const std::string& api,
 }
 
 static inline void
-rina_components_from_string(const std::string& str , std::string& apn, std::string& api,
-                            std::string& aen, std::string& aei)
+rina_components_from_string(const std::string &str, std::string &apn,
+                            std::string &api, std::string &aen,
+                            std::string &aei)
 {
-    std::string *vps[] = { &apn, &api, &aen, &aei };
+    std::string *vps[] = {&apn, &api, &aen, &aei};
     std::stringstream ss(str);
 
     for (int i = 0; i < 4 && std::getline(ss, *(vps[i]), ':'); i++) {
     }
 }
 
-#endif  /* __RL_CPP_UTILS_H__ */
+#endif /* __RL_CPP_UTILS_H__ */

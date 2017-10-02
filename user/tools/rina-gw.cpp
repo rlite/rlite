@@ -8,22 +8,23 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <iostream>
@@ -66,14 +67,14 @@ struct InetName {
     struct sockaddr_in addr;
 
     InetName() { memset(&addr, 0, sizeof(addr)); }
-    InetName(const struct sockaddr_in& a) : addr(a) { }
+    InetName(const struct sockaddr_in &a) : addr(a) {}
 
-    bool operator<(const InetName& other) const;
+    bool operator<(const InetName &other) const;
     operator std::string() const;
 };
 
 bool
-InetName::operator<(const InetName& other) const
+InetName::operator<(const InetName &other) const
 {
     if (addr.sin_addr.s_addr != other.addr.sin_addr.s_addr) {
         return addr.sin_addr.s_addr < other.addr.sin_addr.s_addr;
@@ -99,51 +100,42 @@ struct RinaName {
     string dif_name;
 
     RinaName();
-    RinaName(const string& n, const string& d);
-    RinaName(const RinaName& other);
-    RinaName& operator=(const RinaName& other);
+    RinaName(const string &n, const string &d);
+    RinaName(const RinaName &other);
+    RinaName &operator=(const RinaName &other);
     ~RinaName();
 
-    bool operator<(const RinaName& other) const {
-        return name < other.name;
-    }
+    bool operator<(const RinaName &other) const { return name < other.name; }
 
     operator std::string() const { return dif_name + ":" + name; }
 };
 
-RinaName::RinaName()
-{
-}
+RinaName::RinaName() {}
 
-RinaName::~RinaName()
-{
-}
+RinaName::~RinaName() {}
 
-RinaName::RinaName(const string& n, const string& d) :
-                        name(n), dif_name(d)
-{
-}
+RinaName::RinaName(const string &n, const string &d) : name(n), dif_name(d) {}
 
-RinaName::RinaName(const RinaName& other)
+RinaName::RinaName(const RinaName &other)
 {
-    name = other.name;
+    name     = other.name;
     dif_name = other.dif_name;
 }
 
-RinaName&
-RinaName::operator=(const RinaName& other)
+RinaName &
+RinaName::operator=(const RinaName &other)
 {
     if (this == &other) {
         return *this;
     }
 
-    name = other.name;
+    name     = other.name;
     dif_name = other.dif_name;
 
     return *this;
 }
 
-#define NUM_WORKERS     1
+#define NUM_WORKERS 1
 
 struct Gateway {
     string appl_name;
@@ -168,7 +160,7 @@ struct Gateway {
      * client_fd --> flow_fd */
     map<int, int> pending_conns;
 
-    vector<FwdWorker*> workers;
+    vector<FwdWorker *> workers;
 
     Gateway();
     ~Gateway();
@@ -179,7 +171,7 @@ Gateway::Gateway()
     appl_name = "rina-gw/1";
 
     /* Start workers. */
-    for (int i = 0; i < NUM_WORKERS; i ++) {
+    for (int i = 0; i < NUM_WORKERS; i++) {
         workers.push_back(new FwdWorker(i, verbose));
     }
 }
@@ -187,16 +179,16 @@ Gateway::Gateway()
 Gateway::~Gateway()
 {
     for (map<int, RinaName>::iterator mit = i2r_fd_map.begin();
-                                    mit != i2r_fd_map.end(); mit++) {
+         mit != i2r_fd_map.end(); mit++) {
         close(mit->first);
     }
 
     for (map<int, InetName>::iterator mit = r2i_fd_map.begin();
-                                    mit != r2i_fd_map.end(); mit++) {
+         mit != r2i_fd_map.end(); mit++) {
         close(mit->first);
     }
 
-    for (unsigned int i=0; i<workers.size(); i++) {
+    for (unsigned int i = 0; i < workers.size(); i++) {
         delete workers[i];
     }
 }
@@ -247,19 +239,19 @@ parse_conf(const char *confname)
 
                 memset(&inet_addr, 0, sizeof(inet_addr));
                 inet_addr.sin_family = AF_INET;
-                port = atoi(tokens[4].c_str());
-                inet_addr.sin_port = htons(port);
+                port                 = atoi(tokens[4].c_str());
+                inet_addr.sin_port   = htons(port);
                 if (port < 0 || port >= 65536) {
                     printf("Invalid configuration entry at line %d: "
-                       "invalid port number '%s'\n", lines_cnt,
-                       tokens[4].c_str());
+                           "invalid port number '%s'\n",
+                           lines_cnt, tokens[4].c_str());
                 }
-                ret = inet_pton(AF_INET, tokens[3].c_str(),
-                                &inet_addr.sin_addr);
+                ret =
+                    inet_pton(AF_INET, tokens[3].c_str(), &inet_addr.sin_addr);
                 if (ret != 1) {
                     printf("Invalid configuration entry at line %d: "
-                       "invalid IP address '%s'\n", lines_cnt,
-                       tokens[3].c_str());
+                           "invalid IP address '%s'\n",
+                           lines_cnt, tokens[3].c_str());
                     continue;
                 }
 
@@ -274,7 +266,8 @@ parse_conf(const char *confname)
 
                 } else {
                     printf("Invalid configuration entry at line %d: %s is "
-                       "unknown\n", lines_cnt, tokens[0].c_str());
+                           "unknown\n",
+                           lines_cnt, tokens[0].c_str());
                     continue;
                 }
             } catch (std::bad_alloc) {
@@ -355,10 +348,10 @@ accept_inet_conn(int lfd, const RinaName &rname)
     /* Issue a non-blocking flow allocation request, asking for a reliable
      * flow without message boundaries (TCP-like). */
     rina_flow_spec_unreliable(&flowspec);
-    flowspec.max_sdu_gap = 0;
+    flowspec.max_sdu_gap       = 0;
     flowspec.in_order_delivery = 1;
-    flowspec.msg_boundaries = 0;
-    flowspec.spare3 = 1;
+    flowspec.msg_boundaries    = 0;
+    flowspec.spare3            = 1;
     wfd = rina_flow_alloc(rname.dif_name.c_str(), gw->appl_name.c_str(),
                           rname.name.c_str(), &flowspec, RINA_F_NOWAIT);
     if (wfd < 0) {
@@ -384,8 +377,8 @@ complete_flow_alloc(int wfd, int cfd)
     /* Complete the flow allocation procedure. */
     rfd = rina_flow_alloc_wait(wfd);
     if (rfd < 0 && errno == EAGAIN) {
-	/* Spurious wake up, tell the caller not to
-	 * remove wfd. */
+        /* Spurious wake up, tell the caller not to
+         * remove wfd. */
         return 1;
     }
 
@@ -402,7 +395,7 @@ complete_flow_alloc(int wfd, int cfd)
 }
 
 static int
-inet_server_socket(const InetName& inet_name)
+inet_server_socket(const InetName &inet_name)
 {
     int enable = 1;
     int fd;
@@ -414,8 +407,7 @@ inet_server_socket(const InetName& inet_name)
         return -1;
     }
 
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable,
-                   sizeof(enable))) {
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable))) {
         perror("setsockopt(SO_REUSEADDR)");
         close(fd);
         return -1;
@@ -443,7 +435,7 @@ setup_for_listening(void)
 {
     /* Open Internet listening sockets. */
     for (map<InetName, RinaName>::iterator mit = gw->i2r_map.begin();
-                                    mit != gw->i2r_map.end(); mit++) {
+         mit != gw->i2r_map.end(); mit++) {
         int fd = inet_server_socket(mit->first);
 
         if (fd < 0) {
@@ -457,7 +449,7 @@ setup_for_listening(void)
 
     /* Open RINA listening "sockets". */
     for (map<RinaName, InetName>::iterator mit = gw->r2i_map.begin();
-                                    mit != gw->r2i_map.end(); mit++) {
+         mit != gw->r2i_map.end(); mit++) {
         int fd = rina_open();
         int ret;
 
@@ -485,15 +477,15 @@ static void
 print_conf()
 {
     for (map<InetName, RinaName>::iterator mit = gw->i2r_map.begin();
-                                    mit != gw->i2r_map.end(); mit++) {
+         mit != gw->i2r_map.end(); mit++) {
         cout << "I2R: " << static_cast<string>(mit->first) << " --> "
-                << static_cast<string>(mit->second) << endl;
+             << static_cast<string>(mit->second) << endl;
     }
 
     for (map<RinaName, InetName>::iterator mit = gw->r2i_map.begin();
-                                    mit != gw->r2i_map.end(); mit++) {
+         mit != gw->r2i_map.end(); mit++) {
         cout << "R2I: " << static_cast<string>(mit->first) << " --> "
-                << static_cast<string>(mit->second) << endl;
+             << static_cast<string>(mit->second) << endl;
     }
 }
 
@@ -501,12 +493,13 @@ static void
 usage(void)
 {
     cout << "rina-gw\n"
-            << "    -h <show this help>\n"
-            << "    -v <increase verbosity>\n"
-            << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rina/rina-gw.conf')\n";
+         << "    -h <show this help>\n"
+         << "    -v <increase verbosity>\n"
+         << "    -c PATH_TO_CONFIG_FILE (default = '/etc/rina/rina-gw.conf')\n";
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     const char *confname = "/etc/rina/rina-gw.conf";
     struct pollfd pfd[128];
@@ -522,22 +515,22 @@ int main(int argc, char **argv)
 
     while ((opt = getopt(argc, argv, "hvc:")) != -1) {
         switch (opt) {
-            case 'h':
-                usage();
-                return 0;
+        case 'h':
+            usage();
+            return 0;
 
-            case 'v':
-                verbose ++;
-                break;
+        case 'v':
+            verbose++;
+            break;
 
-            case 'c':
-                confname = optarg;
-                break;
+        case 'c':
+            confname = optarg;
+            break;
 
-            default:
-                printf("    Unrecognized option %c\n", opt);
-                usage();
-                return -1;
+        default:
+            printf("    Unrecognized option %c\n", opt);
+            usage();
+            return -1;
         }
     }
 
@@ -559,29 +552,29 @@ int main(int argc, char **argv)
 
         /* Load listening RINA "sockets". */
         for (map<int, InetName>::iterator mit = gw->r2i_fd_map.begin();
-                                    mit != gw->r2i_fd_map.end(); mit ++, n ++) {
-            pfd[n].fd = mit->first;
+             mit != gw->r2i_fd_map.end(); mit++, n++) {
+            pfd[n].fd     = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load listening Internet sockets. */
         for (map<int, RinaName>::iterator mit = gw->i2r_fd_map.begin();
-                                    mit != gw->i2r_fd_map.end(); mit ++, n ++) {
-            pfd[n].fd = mit->first;
+             mit != gw->i2r_fd_map.end(); mit++, n++) {
+            pfd[n].fd     = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load pending flow allocation requests. */
         for (map<int, int>::iterator mit = gw->pending_fa_reqs.begin();
-                            mit != gw->pending_fa_reqs.end(); mit ++, n ++) {
-            pfd[n].fd = mit->first;
+             mit != gw->pending_fa_reqs.end(); mit++, n++) {
+            pfd[n].fd     = mit->first;
             pfd[n].events = POLLIN;
         }
 
         /* Load pending TCP connections. */
         for (map<int, int>::iterator mit = gw->pending_conns.begin();
-                            mit != gw->pending_conns.end(); mit ++, n ++) {
-            pfd[n].fd = mit->first;
+             mit != gw->pending_conns.end(); mit++, n++) {
+            pfd[n].fd     = mit->first;
             pfd[n].events = POLLOUT;
         }
 
@@ -595,7 +588,7 @@ int main(int argc, char **argv)
         n = 0;
 
         for (map<int, InetName>::iterator mit = gw->r2i_fd_map.begin();
-                                    mit != gw->r2i_fd_map.end(); mit ++, n ++) {
+             mit != gw->r2i_fd_map.end(); mit++, n++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming flow allocation request from the RINA world. */
                 accept_rina_flow(mit->first, mit->second);
@@ -603,7 +596,7 @@ int main(int argc, char **argv)
         }
 
         for (map<int, RinaName>::iterator mit = gw->i2r_fd_map.begin();
-                                    mit != gw->i2r_fd_map.end(); mit ++, n ++) {
+             mit != gw->i2r_fd_map.end(); mit++, n++) {
             if (pfd[n].revents & POLLIN) {
                 /* Incoming TCP connection from the Internet world. */
                 accept_inet_conn(mit->first, mit->second);
@@ -611,7 +604,7 @@ int main(int argc, char **argv)
         }
 
         for (map<int, int>::iterator mit = gw->pending_fa_reqs.begin();
-                            mit != gw->pending_fa_reqs.end(); mit ++, n ++) {
+             mit != gw->pending_fa_reqs.end(); mit++, n++) {
             if (pfd[n].revents & POLLIN) {
                 int spurious;
 
@@ -624,7 +617,7 @@ int main(int argc, char **argv)
         }
 
         for (map<int, int>::iterator mit = gw->pending_conns.begin();
-                            mit != gw->pending_conns.end(); mit ++, n ++) {
+             mit != gw->pending_conns.end(); mit++, n++) {
             if (pfd[n].revents & POLLOUT) {
                 /* TCP connection handshake completed. */
                 gw->workers[0]->submit(mit->first, mit->second);
@@ -633,12 +626,12 @@ int main(int argc, char **argv)
         }
 
         /* Clean up consumed pending_fa_reqs entries. */
-        for (unsigned i = 0; i < completed_flow_allocs.size(); i ++) {
+        for (unsigned i = 0; i < completed_flow_allocs.size(); i++) {
             gw->pending_fa_reqs.erase(completed_flow_allocs[i]);
         }
 
         /* Clean up consumed pending_conns entries. */
-        for (unsigned i = 0; i < completed_conns.size(); i ++) {
+        for (unsigned i = 0; i < completed_conns.size(); i++) {
             gw->pending_conns.erase(completed_conns[i]);
         }
     }

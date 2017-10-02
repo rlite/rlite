@@ -34,23 +34,24 @@ using namespace std;
  */
 
 struct IPAddr {
-    string      repr;
-    uint32_t    addr;
-    unsigned    netbits;
+    string repr;
+    uint32_t addr;
+    unsigned netbits;
 
-    IPAddr() : addr(0), netbits(0) { }
+    IPAddr() : addr(0), netbits(0) {}
     IPAddr(const string &p);
     IPAddr(uint32_t naddr, unsigned nbits);
 
     bool empty() const { return netbits == 0 && addr == 0; }
 
-    bool operator<(const IPAddr& o) const {
-        return addr < o.addr ||
-                (addr == o.addr && netbits < o.netbits);
+    bool operator<(const IPAddr &o) const
+    {
+        return addr < o.addr || (addr == o.addr && netbits < o.netbits);
     }
 
     /* Pick an host address in belonging to the same subnet. */
-    IPAddr hostaddr(uint32_t host) const {
+    IPAddr hostaddr(uint32_t host) const
+    {
         uint32_t hostmask = ~((1 << (32 - netbits)) - 1);
 
         if (host & hostmask) {
@@ -67,16 +68,16 @@ struct IPAddr {
 struct Route {
     IPAddr subnet;
 
-    Route(const IPAddr &i) : subnet(i) { }
-    bool operator<(const Route& o) const { return subnet < o.subnet; }
+    Route(const IPAddr &i) : subnet(i) {}
+    bool operator<(const Route &o) const { return subnet < o.subnet; }
 };
 
 struct Local {
     string app_name;
     list<string> dif_names;
 
-    Local() { }
-    Local(const string &a) : app_name(a) { }
+    Local() {}
+    Local(const string &a) : app_name(a) {}
 };
 
 enum {
@@ -108,12 +109,14 @@ struct Remote {
     /* Data file descriptor for the flow that supports the tunnel. */
     int rfd;
 
-    Remote() : tun_fd(-1), rfd(-1) {
+    Remote() : tun_fd(-1), rfd(-1)
+    {
         flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
     }
 
-    Remote(const string &a, const string &d, const IPAddr &i) : app_name(a),
-                        dif_name(d), tun_fd(-1), tun_subnet(i), rfd(-1) {
+    Remote(const string &a, const string &d, const IPAddr &i)
+        : app_name(a), dif_name(d), tun_fd(-1), tun_subnet(i), rfd(-1)
+    {
         flow_alloc_needed[IPOR_CTRL] = flow_alloc_needed[IPOR_DATA] = true;
     }
 
@@ -126,7 +129,7 @@ struct Remote {
     int mss_configure() const;
 };
 
-#define NUM_WORKERS     1
+#define NUM_WORKERS 1
 
 struct IPoRINA {
     /* Enable verbose mode */
@@ -136,12 +139,12 @@ struct IPoRINA {
     int rfd;
 
     /* Daemon configuration. */
-    Local                   local;
-    map<string, Remote>     remotes;
-    list<Route>             local_routes;
+    Local local;
+    map<string, Remote> remotes;
+    list<Route> local_routes;
 
     /* Worker threads that forward traffic. */
-    vector<FwdWorker*> workers;
+    vector<FwdWorker *> workers;
 
     IPoRINA();
     ~IPoRINA();
@@ -155,16 +158,14 @@ struct IPoRINA {
 
 struct Obj {
     virtual int serialize(char *buf, unsigned int size) const = 0;
-    virtual ~Obj() { }
+    virtual ~Obj() {}
 };
 
 static int
-ser_common(::google::protobuf::MessageLite &gm, char *buf,
-           int size)
+ser_common(::google::protobuf::MessageLite &gm, char *buf, int size)
 {
     if (gm.ByteSize() > size) {
-        fprintf(stderr, "User buffer too small [%u/%u]\n",
-                gm.ByteSize(), size);
+        fprintf(stderr, "User buffer too small [%u/%u]\n", gm.ByteSize(), size);
         return -1;
     }
 
@@ -174,12 +175,12 @@ ser_common(::google::protobuf::MessageLite &gm, char *buf,
 }
 
 struct Hello : public Obj {
-    string tun_subnet;  /* Subnet to be used for the tunnel */
-    string tun_src_addr;  /* IP address of the source */
-    string tun_dst_addr;  /* IP address of the destination */
+    string tun_subnet;   /* Subnet to be used for the tunnel */
+    string tun_src_addr; /* IP address of the source */
+    string tun_dst_addr; /* IP address of the destination */
     uint32_t num_routes; /* How many route to exchange */
 
-    Hello() : num_routes(0) { }
+    Hello() : num_routes(0) {}
     Hello(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -187,10 +188,10 @@ struct Hello : public Obj {
 static void
 gpb2Hello(Hello &m, const gpb::hello_msg_t &gm)
 {
-    m.tun_subnet = gm.tun_subnet();
+    m.tun_subnet   = gm.tun_subnet();
     m.tun_src_addr = gm.tun_src_addr();
     m.tun_dst_addr = gm.tun_dst_addr();
-    m.num_routes = gm.num_routes();
+    m.num_routes   = gm.num_routes();
 }
 
 static int
@@ -224,10 +225,10 @@ Hello::serialize(char *buf, unsigned int size) const
 }
 
 struct RouteObj : public Obj {
-    string route;   /* Route represented as a string. */
+    string route; /* Route represented as a string. */
 
-    RouteObj() { }
-    RouteObj(const string& s) : route(s) { }
+    RouteObj() {}
+    RouteObj(const string &s) : route(s) {}
     RouteObj(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const;
 };
@@ -304,7 +305,7 @@ int2string(int x)
 #endif
 
 static int
-string2int(const string& s, int& ret)
+string2int(const string &s, int &ret)
 {
     char *dummy;
     const char *cstr = s.c_str();
@@ -318,21 +319,19 @@ string2int(const string& s, int& ret)
     return 0;
 }
 
-IPoRINA::IPoRINA() : verbose(0), rfd(-1)
-{
-}
+IPoRINA::IPoRINA() : verbose(0), rfd(-1) {}
 
 void
 IPoRINA::start_workers()
 {
-    for (int i = 0; i < NUM_WORKERS; i ++) {
+    for (int i = 0; i < NUM_WORKERS; i++) {
         workers.push_back(new FwdWorker(i, verbose));
     }
 }
 
 IPoRINA::~IPoRINA()
 {
-    for (unsigned int i=0; i<workers.size(); i++) {
+    for (unsigned int i = 0; i < workers.size(); i++) {
         delete workers[i];
     }
 }
@@ -358,7 +357,7 @@ IPAddr::IPAddr(const string &_p) : repr(_p)
         throw "Invalid IP prefix";
     }
     netbits = m;
-    p = p.substr(0, slash);
+    p       = p.substr(0, slash);
 
     /* Extract a, b, c and d. */
     std::replace(p.begin(), p.end(), '.', ' ');
@@ -392,7 +391,7 @@ IPAddr::IPAddr(uint32_t naddr, unsigned nbits)
         throw "Invalid IP prefix";
     }
 
-    addr = naddr;
+    addr    = naddr;
     netbits = nbits;
 
     d = naddr & 0xff;
@@ -438,7 +437,7 @@ os_tun_alloc(char *dev, int flags)
 
     memset(&ifr, 0, sizeof(ifr));
 
-    ifr.ifr_flags = flags;   /* IFF_TUN or IFF_TAP, plus maybe IFF_NO_PI */
+    ifr.ifr_flags = flags; /* IFF_TUN or IFF_TAP, plus maybe IFF_NO_PI */
 
     if (*dev) {
         /* If a device name was specified, put it in the structure; otherwise,
@@ -448,7 +447,7 @@ os_tun_alloc(char *dev, int flags)
     }
 
     /* Try to create the device */
-    if ((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0) {
+    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
         perror("ioctl(TUNSETIFF)");
         close(fd);
         return err;
@@ -472,7 +471,7 @@ probe_mss(int fd)
 {
     unsigned int ub = 1;
     unsigned int lb = 1;
-#define BUFSIZE     65536
+#define BUFSIZE 65536
     char buf[BUFSIZE];
 
     memset(buf, 0, sizeof(buf));
@@ -543,19 +542,19 @@ parse_conf(const char *path)
 
         if (tokens[0] == "local") {
             if (tokens.size() < 3) {
-                cerr << "Invalid 'local' directive at line " <<
-                        lines_cnt << endl;
+                cerr << "Invalid 'local' directive at line " << lines_cnt
+                     << endl;
                 return -1;
             }
 
             if (g->local.app_name.size()) {
-                cerr << "Duplicated 'local' directive at line " <<
-                        lines_cnt << endl;
+                cerr << "Duplicated 'local' directive at line " << lines_cnt
+                     << endl;
                 return -1;
             }
 
             g->local = Local(tokens[1]);
-            for (unsigned int i = 2; i < tokens.size(); i ++) {
+            for (unsigned int i = 2; i < tokens.size(); i++) {
                 g->local.dif_names.push_back(tokens[i]);
             }
 
@@ -563,8 +562,8 @@ parse_conf(const char *path)
             IPAddr subnet;
 
             if (tokens.size() != 4) {
-                cerr << "Invalid 'remote' directive at line " <<
-                        lines_cnt << endl;
+                cerr << "Invalid 'remote' directive at line " << lines_cnt
+                     << endl;
                 return -1;
             }
 
@@ -576,8 +575,8 @@ parse_conf(const char *path)
             }
 
             if (g->remotes.count(tokens[1])) {
-                cerr << "Duplicated 'remote' directive at line " <<
-                        lines_cnt << endl;
+                cerr << "Duplicated 'remote' directive at line " << lines_cnt
+                     << endl;
                 return -1;
             }
             g->remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
@@ -586,8 +585,8 @@ parse_conf(const char *path)
             IPAddr subnet;
 
             if (tokens.size() != 2) {
-                cerr << "Invalid 'route' directive at line " <<
-                        lines_cnt << endl;
+                cerr << "Invalid 'route' directive at line " << lines_cnt
+                     << endl;
                 return -1;
             }
 
@@ -612,21 +611,21 @@ dump_conf(void)
 {
     cout << "Local: " << g->local.app_name << " in DIFs";
     for (list<string>::iterator l = g->local.dif_names.begin();
-                            l != g->local.dif_names.end(); l ++) {
+         l != g->local.dif_names.end(); l++) {
         cout << " " << *l;
     }
     cout << endl;
 
     cout << "Remotes:" << endl;
     for (map<string, Remote>::iterator r = g->remotes.begin();
-                            r != g->remotes.end(); r ++) {
+         r != g->remotes.end(); r++) {
         cout << "   " << r->second.app_name << " in DIF " << r->second.dif_name
-            << ", tunnel prefix " << r->second.tun_subnet.repr << endl;
+             << ", tunnel prefix " << r->second.tun_subnet.repr << endl;
     }
 
     cout << "Advertised routes:" << endl;
     for (list<Route>::iterator l = g->local_routes.begin();
-                            l != g->local_routes.end(); l ++) {
+         l != g->local_routes.end(); l++) {
         cout << "   " << l->subnet.repr << endl;
     }
 }
@@ -642,7 +641,7 @@ Remote::tun_alloc()
     }
 
     tname[0] = '\0';
-    tun_fd = os_tun_alloc(tname, IFF_TUN | IFF_NO_PI);
+    tun_fd   = os_tun_alloc(tname, IFF_TUN | IFF_NO_PI);
     if (tun_fd < 0) {
         cerr << "Failed to create tunnel" << endl;
         return -1;
@@ -656,7 +655,7 @@ Remote::tun_alloc()
 }
 
 static int
-execute_command(stringstream& cmdss)
+execute_command(stringstream &cmdss)
 {
     vector<string> tokens;
     string token;
@@ -676,14 +675,15 @@ execute_command(stringstream& cmdss)
 
     /* Allocate a working copy for the arguments. */
     argv = new char *[tokens.size() + 1];
-    for (unsigned i = 0; i <= tokens.size(); i ++) {
+    for (unsigned i = 0; i <= tokens.size(); i++) {
         argv[i] = NULL;
     }
-    for (unsigned i = 0; i < tokens.size(); i ++) {
+    for (unsigned i = 0; i < tokens.size(); i++) {
         argv[i] = strdup(tokens[i].c_str());
         if (!argv[i]) {
             cerr << "execute_command: out of memory while allocating "
-                        "arguments" << endl;
+                    "arguments"
+                 << endl;
             goto out;
         }
     }
@@ -697,8 +697,8 @@ execute_command(stringstream& cmdss)
         close(1);
         close(2);
         if (open("/dev/null", O_RDONLY) < 0 ||
-                open("/dev/null", O_WRONLY) < 0 ||
-                    open("/dev/null", O_WRONLY) < 0) {
+            open("/dev/null", O_WRONLY) < 0 ||
+            open("/dev/null", O_WRONLY) < 0) {
             /* Redirection failed. */
             return -1;
         }
@@ -725,7 +725,7 @@ out:
 }
 
 static int
-execute_command(const string& cmds)
+execute_command(const string &cmds)
 {
     stringstream cmdss(cmds);
 
@@ -741,8 +741,8 @@ Remote::ip_configure() const
 
         cmdss << "ip addr flush dev " << tun_name;
         if (execute_command(cmdss)) {
-            cerr << "Failed to flush address for interface "
-                    << tun_name << endl;
+            cerr << "Failed to flush address for interface " << tun_name
+                 << endl;
             return -1;
         }
     }
@@ -775,21 +775,21 @@ Remote::ip_configure() const
 
         cmdss << "ip addr add " << tun_local_addr.repr << " dev " << tun_name;
         if (execute_command(cmdss)) {
-            cerr << "Failed to assign IP address to interface "
-                    << tun_name << endl;
+            cerr << "Failed to assign IP address to interface " << tun_name
+                 << endl;
             return -1;
         }
     }
 
     /* Setup the routes advertised by the remote peer. */
-    for (set<Route>::iterator ri = routes.begin(); ri != routes.end(); ri ++) {
+    for (set<Route>::iterator ri = routes.begin(); ri != routes.end(); ri++) {
         stringstream cmdss;
 
-        cmdss << "ip route add " << static_cast<string>(ri->subnet) << " via " <<
-                    tun_remote_addr.noprefix() << " dev " << tun_name;
+        cmdss << "ip route add " << static_cast<string>(ri->subnet) << " via "
+              << tun_remote_addr.noprefix() << " dev " << tun_name;
         if (execute_command(cmdss)) {
             cerr << "Failed to add route for subnet "
-                    << static_cast<string>(ri->subnet) << endl;
+                 << static_cast<string>(ri->subnet) << endl;
             return -1;
         }
     }
@@ -833,21 +833,21 @@ setup(void)
 
     /* Register us to one or more local DIFs. */
     for (list<string>::iterator l = g->local.dif_names.begin();
-                            l != g->local.dif_names.end(); l ++) {
+         l != g->local.dif_names.end(); l++) {
         int ret;
 
         ret = rina_register(g->rfd, l->c_str(), g->local.app_name.c_str(), 0);
         if (ret) {
             perror("rina_register()");
             cerr << "Failed to register " << g->local.app_name << " in DIF "
-                    << *l << endl;
+                 << *l << endl;
             return -1;
         }
     }
 
     /* Create a TUN device for each remote. */
     for (map<string, Remote>::iterator r = g->remotes.begin();
-                            r != g->remotes.end(); r ++) {
+         r != g->remotes.end(); r++) {
         if (r->second.tun_alloc()) {
             return -1;
         }
@@ -864,8 +864,8 @@ connect_to_remotes(void *opaque)
 
     for (;;) {
         for (map<string, Remote>::iterator re = g->remotes.begin();
-                            re != g->remotes.end(); re ++) {
-            for (unsigned i = 0; i < IPOR_MAX; i ++) {
+             re != g->remotes.end(); re++) {
+            for (unsigned i = 0; i < IPOR_MAX; i++) {
                 struct rina_flow_spec spec;
                 struct pollfd pfd;
                 int rfd;
@@ -881,32 +881,31 @@ connect_to_remotes(void *opaque)
                  * and an unreliable flow for the data connection. */
                 rina_flow_spec_unreliable(&spec);
                 if (i == IPOR_CTRL) {
-                    spec.max_sdu_gap = 0;
+                    spec.max_sdu_gap       = 0;
                     spec.in_order_delivery = 1;
-                    spec.msg_boundaries = 1;
-                    spec.spare3 = 1;
+                    spec.msg_boundaries    = 1;
+                    spec.spare3            = 1;
                 }
-                wfd = rina_flow_alloc(re->second.dif_name.c_str(),
-                                      myname.c_str(),
-                                      re->second.app_name.c_str(), &spec,
-                                      RINA_F_NOWAIT);
+                wfd = rina_flow_alloc(
+                    re->second.dif_name.c_str(), myname.c_str(),
+                    re->second.app_name.c_str(), &spec, RINA_F_NOWAIT);
                 if (wfd < 0) {
                     perror("rina_flow_alloc()");
-                    cout << "Failed to connect to remote " <<
-                            re->second.app_name << " through DIF "
-                                << re->second.dif_name << endl;
+                    cout << "Failed to connect to remote "
+                         << re->second.app_name << " through DIF "
+                         << re->second.dif_name << endl;
                     continue;
                 }
-                pfd.fd = wfd;
+                pfd.fd     = wfd;
                 pfd.events = POLLIN;
-                ret = poll(&pfd, 1, 3000);
+                ret        = poll(&pfd, 1, 3000);
                 if (ret <= 0) {
                     if (ret < 0) {
                         perror("poll(wfd)");
                     } else if (g->verbose) {
-                        cout << "Failed to connect to remote " <<
-                                re->second.app_name << " through DIF "
-                                    << re->second.dif_name << endl;
+                        cout << "Failed to connect to remote "
+                             << re->second.app_name << " through DIF "
+                             << re->second.dif_name << endl;
                     }
                     close(wfd);
                     continue;
@@ -918,17 +917,16 @@ connect_to_remotes(void *opaque)
                         if (errno != EPERM) {
                             perror("rina_flow_alloc_wait()");
                         }
-                        cout << "Failed to connect to remote " <<
-                            re->second.app_name << " through DIF "
-                                << re->second.dif_name << endl;
+                        cout << "Failed to connect to remote "
+                             << re->second.app_name << " through DIF "
+                             << re->second.dif_name << endl;
                     }
                     continue;
                 }
 
                 if (g->verbose > 1) {
-                    cout << "Flow allocated to remote " <<
-                        re->second.app_name << " through DIF "
-                            << re->second.dif_name << endl;
+                    cout << "Flow allocated to remote " << re->second.app_name
+                         << " through DIF " << re->second.dif_name << endl;
                 }
 
                 CDAPConn conn(rfd);
@@ -936,8 +934,8 @@ connect_to_remotes(void *opaque)
                 Hello hello;
 
                 /* CDAP connection setup. */
-                if (conn.connect(myname, re->second.app_name,
-                                 gpb::AUTH_NONE, NULL)) {
+                if (conn.connect(myname, re->second.app_name, gpb::AUTH_NONE,
+                                 NULL)) {
                     cerr << "CDAP connection failed" << endl;
                     goto abor;
                 }
@@ -945,8 +943,7 @@ connect_to_remotes(void *opaque)
                 if (i == IPOR_DATA) {
                     /* This is a data connection, send an empty CDAP start
                      * message to inform the remote peer. */
-                    m.m_start(gpb::F_NO_FLAGS, "data", "/data",
-                                0, 0, string());
+                    m.m_start(gpb::F_NO_FLAGS, "data", "/data", 0, 0, string());
                     if (cdap_obj_send(&conn, &m, 0, NULL) < 0) {
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
@@ -962,18 +959,18 @@ connect_to_remotes(void *opaque)
 
                     /* Assign tunnel IP addresses if needed. */
                     if (re->second.tun_local_addr.empty() ||
-                                re->second.tun_remote_addr.empty()) {
+                        re->second.tun_remote_addr.empty()) {
                         re->second.tun_local_addr =
-                                    re->second.tun_subnet.hostaddr(1);
+                            re->second.tun_subnet.hostaddr(1);
                         re->second.tun_remote_addr =
-                                    re->second.tun_subnet.hostaddr(2);
+                            re->second.tun_subnet.hostaddr(2);
                     }
 
                     /* Exchange routes. */
-                    m.m_start(gpb::F_NO_FLAGS, "hello", "/hello",
-                              0, 0, string());
-                    hello.num_routes = g->local_routes.size();
-                    hello.tun_subnet = re->second.tun_subnet;
+                    m.m_start(gpb::F_NO_FLAGS, "hello", "/hello", 0, 0,
+                              string());
+                    hello.num_routes   = g->local_routes.size();
+                    hello.tun_subnet   = re->second.tun_subnet;
                     hello.tun_src_addr = re->second.tun_local_addr;
                     hello.tun_dst_addr = re->second.tun_remote_addr;
                     if (cdap_obj_send(&conn, &m, 0, &hello) < 0) {
@@ -982,11 +979,11 @@ connect_to_remotes(void *opaque)
                     }
 
                     for (list<Route>::iterator ro = g->local_routes.begin();
-                            ro != g->local_routes.end(); ro ++) {
+                         ro != g->local_routes.end(); ro++) {
                         RouteObj robj(ro->subnet);
 
-                        m.m_write(gpb::F_NO_FLAGS, "route", "/routes",
-                                    0, 0, string());
+                        m.m_write(gpb::F_NO_FLAGS, "route", "/routes", 0, 0,
+                                  string());
                         if (cdap_obj_send(&conn, &m, 0, &robj) < 0) {
                             cerr << "Failed to send M_WRITE" << endl;
                             goto abor;
@@ -996,7 +993,7 @@ connect_to_remotes(void *opaque)
                 }
 
                 re->second.flow_alloc_needed[i] = false;
-    abor:
+            abor:
                 if (rm) {
                     delete rm;
                 }
@@ -1018,13 +1015,15 @@ connect_to_remotes(void *opaque)
 static void
 usage(void)
 {
-    cout << "iporinad [OPTIONS]" << endl <<
-        "   -h : show this help" << endl <<
-        "   -c CONF_FILE: path to config file "
-                "(default /etc/rina/iporinad.conf)" << endl;
+    cout << "iporinad [OPTIONS]" << endl
+         << "   -h : show this help" << endl
+         << "   -c CONF_FILE: path to config file "
+            "(default /etc/rina/iporinad.conf)"
+         << endl;
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
     struct pollfd pfd[1];
@@ -1033,22 +1032,22 @@ int main(int argc, char **argv)
 
     while ((opt = getopt(argc, argv, "hc:v")) != -1) {
         switch (opt) {
-            case 'h':
-                usage();
-                return 0;
+        case 'h':
+            usage();
+            return 0;
 
-            case 'c':
-		confpath = optarg;
-                break;
+        case 'c':
+            confpath = optarg;
+            break;
 
-            case 'v':
-                g->verbose ++;
-                break;
+        case 'v':
+            g->verbose++;
+            break;
 
-            default:
-                printf("    Unrecognized option %c\n", opt);
-                usage();
-                return -1;
+        default:
+            printf("    Unrecognized option %c\n", opt);
+            usage();
+            return -1;
         }
     }
 
@@ -1091,17 +1090,17 @@ int main(int argc, char **argv)
         int cfd;
         int ret;
 
-        pfd[0].fd = g->rfd;
+        pfd[0].fd     = g->rfd;
         pfd[0].events = POLLIN;
-        ret = poll(pfd, 1, -1);
+        ret           = poll(pfd, 1, -1);
         if (ret < 0) {
             perror("poll(lfd)");
             return -1;
         }
 
         if (!pfd[0].revents & POLLIN) {
-		continue;
-	}
+            continue;
+        }
 
         cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
         if (cfd < 0) {
@@ -1131,7 +1130,8 @@ int main(int argc, char **argv)
             goto abor;
         }
         remote_name = rm->src_appl;
-        delete rm; rm = NULL;
+        delete rm;
+        rm = NULL;
 
         /* Receive Hello or Data message. */
         rm = conn.msg_recv();
@@ -1142,16 +1142,16 @@ int main(int argc, char **argv)
 
         if (rm->obj_class == "data") {
             /* This is a data flow. */
-            delete rm; rm = NULL;
+            delete rm;
+            rm = NULL;
             if (g->remotes.count(remote_name) == 0) {
                 cerr << "M_START(data) for unknown remote" << endl;
                 goto abor;
             }
             if (g->verbose) {
-                cout << "M_START(data) received from " <<
-                            remote_name << endl;
+                cout << "M_START(data) received from " << remote_name << endl;
             }
-            g->remotes[remote_name].rfd = cfd;
+            g->remotes[remote_name].rfd                          = cfd;
             g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
             g->remotes[remote_name].mss_configure();
             /* Submit the new fd mapping to a worker thread. */
@@ -1167,12 +1167,13 @@ int main(int argc, char **argv)
             goto abor;
         }
         hello = Hello(objbuf, objlen);
-        delete rm; rm = NULL;
+        delete rm;
+        rm = NULL;
 
         if (g->remotes.count(remote_name) == 0) {
             g->remotes[remote_name] = Remote();
 
-            Remote& r = g->remotes[remote_name];
+            Remote &r = g->remotes[remote_name];
 
             r.app_name = remote_name;
             r.dif_name = string();
@@ -1182,19 +1183,19 @@ int main(int argc, char **argv)
             }
         }
 
-        g->remotes[remote_name].tun_local_addr = IPAddr(hello.tun_dst_addr);
+        g->remotes[remote_name].tun_local_addr  = IPAddr(hello.tun_dst_addr);
         g->remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
 
         cout << "Hello received from " << remote_name << ": "
-                << hello.num_routes
-                << " routes, tun_subnet " << hello.tun_subnet << ", local IP "
-                << static_cast<string>(g->remotes[remote_name].tun_local_addr)
-                << ", remote IP "
-                << static_cast<string>(g->remotes[remote_name].tun_remote_addr)
-                << endl;
+             << hello.num_routes << " routes, tun_subnet " << hello.tun_subnet
+             << ", local IP "
+             << static_cast<string>(g->remotes[remote_name].tun_local_addr)
+             << ", remote IP "
+             << static_cast<string>(g->remotes[remote_name].tun_remote_addr)
+             << endl;
 
         /* Receive routes from peer. */
-        for (unsigned int i = 0; i < hello.num_routes; i ++) {
+        for (unsigned int i = 0; i < hello.num_routes; i++) {
             RouteObj robj;
             size_t prevlen;
 
@@ -1210,21 +1211,22 @@ int main(int argc, char **argv)
                 goto abor;
             }
             robj = RouteObj(objbuf, objlen);
-            delete rm; rm = NULL;
+            delete rm;
+            rm = NULL;
 
             /* Add the route in the set. */
             prevlen = g->remotes[remote_name].routes.size();
             g->remotes[remote_name].routes.insert(Route(robj.route));
             if (g->remotes[remote_name].routes.size() > prevlen) {
                 /* Log only if the route was added to the set. */
-                cout << "Route " << robj.route << " reachable through " <<
-                        remote_name << endl;
+                cout << "Route " << robj.route << " reachable through "
+                     << remote_name << endl;
             }
         }
 
         g->remotes[remote_name].ip_configure();
 
-abor:
+    abor:
         close(cfd);
     }
 

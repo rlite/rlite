@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -38,7 +39,6 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 
-
 struct rl_shim_hv {
     struct ipcp_entry *ipcp;
     struct vmpi_ops vmpi_ops;
@@ -46,17 +46,15 @@ struct rl_shim_hv {
 };
 
 static int
-shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
-                      struct rl_msg_base *msg)
+shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp, struct rl_msg_base *msg)
 {
     struct rl_shim_hv *priv = (struct rl_shim_hv *)ipcp->priv;
     struct rl_buf *rb;
     unsigned int serlen;
     int ret;
 
-    serlen = rl_msg_serlen(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
-                             msg);
-    rb = rl_buf_alloc(serlen, ipcp->hdroom, ipcp->tailroom, GFP_ATOMIC);
+    serlen = rl_msg_serlen(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX, msg);
+    rb     = rl_buf_alloc(serlen, ipcp->hdroom, ipcp->tailroom, GFP_ATOMIC);
     if (!rb) {
         PE("Out of memory\n");
         return -ENOMEM;
@@ -79,8 +77,7 @@ shim_hv_send_ctrl_msg(struct ipcp_entry *ipcp,
 }
 
 static void
-shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
-                            struct rl_buf *rb)
+shim_hv_handle_ctrl_message(struct rl_shim_hv *priv, struct rl_buf *rb)
 {
     int ret = 0;
 
@@ -89,17 +86,16 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
     if (ty == RLITE_SHIM_HV_FA_REQ) {
         struct rl_hmsg_fa_req req;
 
-        ret = deserialize_rlite_msg(rl_shim_hv_numtables,
-                                    RLITE_SHIM_HV_MSG_MAX,
-                                    RL_BUF_DATA(rb), rb->len,
-                                    &req, sizeof(req));
+        ret =
+            deserialize_rlite_msg(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
+                                  RL_BUF_DATA(rb), rb->len, &req, sizeof(req));
         if (ret) {
             PE("Failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
-        ret = rl_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0,
-                    req.dst_appl, req.src_appl, NULL, NULL, false);
+        ret = rl_fa_req_arrived(priv->ipcp, 0, req.src_port, 0, 0, req.dst_appl,
+                                req.src_appl, NULL, NULL, false);
         if (ret) {
             PE("Failed to report flow allocation request\n");
         }
@@ -107,18 +103,16 @@ shim_hv_handle_ctrl_message(struct rl_shim_hv *priv,
     } else if (ty == RLITE_SHIM_HV_FA_RESP) {
         struct rl_hmsg_fa_resp resp;
 
-        ret = deserialize_rlite_msg(rl_shim_hv_numtables,
-                                   RLITE_SHIM_HV_MSG_MAX,
-                                   RL_BUF_DATA(rb), rb->len,
-                                   &resp, sizeof(resp));
+        ret = deserialize_rlite_msg(rl_shim_hv_numtables, RLITE_SHIM_HV_MSG_MAX,
+                                    RL_BUF_DATA(rb), rb->len, &resp,
+                                    sizeof(resp));
         if (ret) {
             PE("Failed to deserialize msg type %u\n", ty);
             goto des_fail;
         }
 
-        ret = rl_fa_resp_arrived(priv->ipcp, resp.src_port,
-                                    resp.dst_port, 0, 0, resp.response,
-                                    NULL, false);
+        ret = rl_fa_resp_arrived(priv->ipcp, resp.src_port, resp.dst_port, 0, 0,
+                                 resp.response, NULL, false);
         if (ret) {
             PE("Failed to report flow allocation response\n");
         }
@@ -132,8 +126,7 @@ des_fail:
 }
 
 static void
-shim_hv_read_cb(void *opaque, unsigned int channel,
-                struct rl_buf *rb)
+shim_hv_read_cb(void *opaque, unsigned int channel, struct rl_buf *rb)
 {
     struct rl_shim_hv *priv = (struct rl_shim_hv *)opaque;
 
@@ -165,7 +158,7 @@ rl_shim_hv_create(struct ipcp_entry *ipcp)
         return NULL;
     }
 
-    priv->ipcp = ipcp;
+    priv->ipcp    = ipcp;
     priv->vmpi_id = ~0U;
 
     ipcp->max_sdu_size = PAGE_SIZE - 64; /* 64 to stay safe */
@@ -208,9 +201,8 @@ rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
 }
 
 static int
-rl_shim_hv_fa_resp(struct ipcp_entry *ipcp,
-                      struct flow_entry *flow,
-                      uint8_t response)
+rl_shim_hv_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                   uint8_t response)
 {
     struct rl_hmsg_fa_resp resp;
 
@@ -226,13 +218,12 @@ rl_shim_hv_fa_resp(struct ipcp_entry *ipcp,
 }
 
 static int
-rl_shim_hv_sdu_write(struct ipcp_entry *ipcp,
-                     struct flow_entry *flow,
+rl_shim_hv_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
                      struct rl_buf *rb, bool maysleep)
 {
-    struct rl_shim_hv *priv = (struct rl_shim_hv *)ipcp->priv;
+    struct rl_shim_hv *priv   = (struct rl_shim_hv *)ipcp->priv;
     struct vmpi_ops *vmpi_ops = &priv->vmpi_ops;
-    int len = rb->len;
+    int len                   = rb->len;
     ssize_t ret;
 
     if (unlikely(!vmpi_ops->write)) {
@@ -253,7 +244,7 @@ rl_shim_hv_config(struct ipcp_entry *ipcp, const char *param_name,
                   const char *param_value, int *notify)
 {
     struct rl_shim_hv *priv = (struct rl_shim_hv *)ipcp->priv;
-    int ret = -ENOSYS;
+    int ret                 = -ENOSYS;
 
     if (strcmp(param_name, "vmpi-id") == 0) {
         unsigned int provider = VMPI_PROVIDER_AUTO;
@@ -270,10 +261,8 @@ rl_shim_hv_config(struct ipcp_entry *ipcp, const char *param_name,
             return ret;
         }
 
-        ret = priv->vmpi_ops.register_cbs(&priv->vmpi_ops,
-                                          shim_hv_read_cb,
-                                          shim_hv_write_restart_cb,
-                                          priv);
+        ret = priv->vmpi_ops.register_cbs(&priv->vmpi_ops, shim_hv_read_cb,
+                                          shim_hv_write_restart_cb, priv);
         if (ret) {
             PE("register_read_callback() failed\n");
             return ret;
@@ -286,18 +275,18 @@ rl_shim_hv_config(struct ipcp_entry *ipcp, const char *param_name,
     return ret;
 }
 
-#define SHIM_DIF_TYPE   "shim-hv"
+#define SHIM_DIF_TYPE "shim-hv"
 
 static struct ipcp_factory shim_hv_factory = {
-    .owner                      = THIS_MODULE,
-    .dif_type                   = SHIM_DIF_TYPE,
-    .use_cep_ids                = false,
-    .create                     = rl_shim_hv_create,
-    .ops.destroy                = rl_shim_hv_destroy,
-    .ops.flow_allocate_req      = rl_shim_hv_fa_req,
-    .ops.flow_allocate_resp     = rl_shim_hv_fa_resp,
-    .ops.sdu_write              = rl_shim_hv_sdu_write,
-    .ops.config                 = rl_shim_hv_config,
+    .owner                  = THIS_MODULE,
+    .dif_type               = SHIM_DIF_TYPE,
+    .use_cep_ids            = false,
+    .create                 = rl_shim_hv_create,
+    .ops.destroy            = rl_shim_hv_destroy,
+    .ops.flow_allocate_req  = rl_shim_hv_fa_req,
+    .ops.flow_allocate_resp = rl_shim_hv_fa_resp,
+    .ops.sdu_write          = rl_shim_hv_sdu_write,
+    .ops.config             = rl_shim_hv_config,
 };
 
 static int __init

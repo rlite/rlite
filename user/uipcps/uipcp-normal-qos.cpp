@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <string>
@@ -28,12 +28,11 @@
 
 using namespace std;
 
-
 #ifdef RL_USE_QOS_CUBES
 
 /* Helper function that emulates Python's str.strip(). */
 static void
-string_strip(string& s)
+string_strip(string &s)
 {
     unsigned int i;
     unsigned int j;
@@ -54,8 +53,8 @@ string_strip(string& s)
 }
 
 static int
-parse_flowcfg_bool(const string& param, const string& value,
-                   uint8_t *field, const string& fieldname)
+parse_flowcfg_bool(const string &param, const string &value, uint8_t *field,
+                   const string &fieldname)
 {
     if (param != fieldname) {
         return -1;
@@ -66,8 +65,8 @@ parse_flowcfg_bool(const string& param, const string& value,
 }
 
 static int
-parse_flowcfg_int(const string& param, const string& value,
-                  int *field, const string& fieldname)
+parse_flowcfg_int(const string &param, const string &value, int *field,
+                  const string &fieldname)
 {
     if (param != fieldname) {
         return -1;
@@ -79,18 +78,18 @@ parse_flowcfg_int(const string& param, const string& value,
 }
 
 static int
-update_qos_cube(struct rl_flow_config& flowcfg, const string& param,
-                   const string& value)
+update_qos_cube(struct rl_flow_config &flowcfg, const string &param,
+                const string &value)
 {
     int field_int;
 
     if (!parse_flowcfg_bool(param, value, &flowcfg.msg_boundaries,
-                                            "msg_boundaries")) {
+                            "msg_boundaries")) {
         return 0;
     }
 
     if (!parse_flowcfg_bool(param, value, &flowcfg.in_order_delivery,
-                                            "in_order_delivery")) {
+                            "in_order_delivery")) {
         return 0;
     }
 
@@ -103,87 +102,86 @@ update_qos_cube(struct rl_flow_config& flowcfg, const string& param,
     }
 
     if (!parse_flowcfg_bool(param, value, &flowcfg.dtcp_present,
-                                                    "dtcp_present")) {
+                            "dtcp_present")) {
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.intial_a")) {
-        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp_present   = 1;
         flowcfg.dtcp.initial_a = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.bandwidth")) {
-        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp_present   = 1;
         flowcfg.dtcp.bandwidth = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_bool(param, value, &flowcfg.dtcp.flow_control,
-                                                "dtcp.flow_control")) {
+                            "dtcp.flow_control")) {
         flowcfg.dtcp_present = 1;
         return 0;
     }
 
     if (!parse_flowcfg_bool(param, value, &flowcfg.dtcp.rtx_control,
-                                            "dtcp.rtx_control")) {
+                            "dtcp.rtx_control")) {
         flowcfg.dtcp_present = 1;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.sending_rate")) {
-        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_RATE;
-        flowcfg.dtcp.flow_control = 1;
-        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp.fc.fc_type            = RLITE_FC_T_RATE;
+        flowcfg.dtcp.flow_control          = 1;
+        flowcfg.dtcp_present               = 1;
         flowcfg.dtcp.fc.cfg.r.sending_rate = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.time_period")) {
-        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_RATE;
-        flowcfg.dtcp.flow_control = 1;
-        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp.fc.fc_type           = RLITE_FC_T_RATE;
+        flowcfg.dtcp.flow_control         = 1;
+        flowcfg.dtcp_present              = 1;
         flowcfg.dtcp.fc.cfg.r.time_period = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int, "dtcp.fc.max_cwq_len")) {
-        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_WIN;
-        flowcfg.dtcp.flow_control = 1;
-        flowcfg.dtcp_present = 1;
+        flowcfg.dtcp.fc.fc_type           = RLITE_FC_T_WIN;
+        flowcfg.dtcp.flow_control         = 1;
+        flowcfg.dtcp_present              = 1;
         flowcfg.dtcp.fc.cfg.w.max_cwq_len = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int,
-                                            "dtcp.fc.initial_credit")) {
-        flowcfg.dtcp.fc.fc_type = RLITE_FC_T_WIN;
-        flowcfg.dtcp.flow_control = 1;
-        flowcfg.dtcp_present = 1;
+                           "dtcp.fc.initial_credit")) {
+        flowcfg.dtcp.fc.fc_type              = RLITE_FC_T_WIN;
+        flowcfg.dtcp.flow_control            = 1;
+        flowcfg.dtcp_present                 = 1;
         flowcfg.dtcp.fc.cfg.w.initial_credit = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int,
-                                        "dtcp.rtx.max_time_to_retry")) {
-        flowcfg.dtcp.rtx_control = 1;
-        flowcfg.dtcp_present = 1;
+                           "dtcp.rtx.max_time_to_retry")) {
+        flowcfg.dtcp.rtx_control           = 1;
+        flowcfg.dtcp_present               = 1;
         flowcfg.dtcp.rtx.max_time_to_retry = field_int;
         return 0;
     }
 
     if (!parse_flowcfg_int(param, value, &field_int,
-                                            "dtcp.rtx.data_rxms_max")) {
-        flowcfg.dtcp.rtx_control = 1;
-        flowcfg.dtcp_present = 1;
+                           "dtcp.rtx.data_rxms_max")) {
+        flowcfg.dtcp.rtx_control       = 1;
+        flowcfg.dtcp_present           = 1;
         flowcfg.dtcp.rtx.data_rxms_max = field_int;
         return 0;
     }
 
-    if (!parse_flowcfg_int(param, value, &field_int,
-                                            "dtcp.rtx.initial_tr")) {
-        flowcfg.dtcp.rtx_control = 1;
-        flowcfg.dtcp_present = 1;
+    if (!parse_flowcfg_int(param, value, &field_int, "dtcp.rtx.initial_tr")) {
+        flowcfg.dtcp.rtx_control    = 1;
+        flowcfg.dtcp_present        = 1;
         flowcfg.dtcp.rtx.initial_tr = field_int;
         return 0;
     }
@@ -213,8 +211,8 @@ uipcp_rib::load_qos_cubes(const char *filename)
         }
 
         pos = line.find('=');
-        if (pos == string::npos || pos < 1 || line.rfind('=') != pos
-                || pos + 1 >= line.size()) {
+        if (pos == string::npos || pos < 1 || line.rfind('=') != pos ||
+            pos + 1 >= line.size()) {
             UPE(uipcp, "Invalid specification at line %u\n", cnt);
             continue;
         }
@@ -230,7 +228,7 @@ uipcp_rib::load_qos_cubes(const char *filename)
             continue;
         }
         cubename = param.substr(0, pos);
-        param = param.substr(pos + 1);
+        param    = param.substr(pos + 1);
         string_strip(cubename);
         string_strip(param);
 

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include "rlite/utils.h"
@@ -30,11 +30,13 @@
 #include <linux/types.h>
 #include "rlite-kernel.h"
 
-#define COMMON_ALLOC(_sz, _sl)      rl_alloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
-#define COMMON_FREE(_p)             rl_free(_p, RL_MT_UTILS)
-#define COMMON_PRINT(format, ...)   printk(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s, _sl)      rl_strdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
-#define COMMON_EXPORT(_n)           EXPORT_SYMBOL(_n)
+#define COMMON_ALLOC(_sz, _sl)                                                 \
+    rl_alloc(_sz, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
+#define COMMON_FREE(_p) rl_free(_p, RL_MT_UTILS)
+#define COMMON_PRINT(format, ...) printk(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s, _sl)                                                 \
+    rl_strdup(_s, _sl ? GFP_KERNEL : GFP_ATOMIC, RL_MT_UTILS)
+#define COMMON_EXPORT(_n) EXPORT_SYMBOL(_n)
 #define COMMON_STATIC
 
 #else /* user-space */
@@ -44,28 +46,28 @@
 #include <string.h>
 #include <stdint.h>
 
-#define COMMON_ALLOC(_sz, _unused)  rl_alloc(_sz, RL_MT_UTILS)
-#define COMMON_FREE(_p)             rl_free(_p, RL_MT_UTILS)
-#define COMMON_PRINT(format, ...)   printf(format, ##__VA_ARGS__)
-#define COMMON_STRDUP(_s, _unused)  rl_strdup(_s, RL_MT_UTILS)
+#define COMMON_ALLOC(_sz, _unused) rl_alloc(_sz, RL_MT_UTILS)
+#define COMMON_FREE(_p) rl_free(_p, RL_MT_UTILS)
+#define COMMON_PRINT(format, ...) printf(format, ##__VA_ARGS__)
+#define COMMON_STRDUP(_s, _unused) rl_strdup(_s, RL_MT_UTILS)
 #define COMMON_EXPORT(_n)
-#define COMMON_STATIC               static
+#define COMMON_STATIC static
 
 #endif
 
 /* Serialize a numeric variable _v of type _t. */
-#define serialize_obj(_p, _t, _v)       \
-        do {                            \
-            *((_t *)_p) = _v;           \
-            _p += sizeof(_t);           \
-        } while (0)
+#define serialize_obj(_p, _t, _v)                                              \
+    do {                                                                       \
+        *((_t *)_p) = _v;                                                      \
+        _p += sizeof(_t);                                                      \
+    } while (0)
 
 /* Deserialize a numeric variable of type _t from _p into _r. */
-#define deserialize_obj(_p, _t, _r)     \
-        do {                            \
-            *(_r) = *((_t *)_p);        \
-            _p += sizeof(_t);           \
-        } while (0)
+#define deserialize_obj(_p, _t, _r)                                            \
+    do {                                                                       \
+        *(_r) = *((_t *)_p);                                                   \
+        _p += sizeof(_t);                                                      \
+    } while (0)
 
 typedef char *string_t;
 
@@ -91,8 +93,8 @@ rina_name_serlen(const struct rina_name *name)
         return ret;
     }
 
-    return ret + string_prlen(name->apn) + string_prlen(name->api)
-            + string_prlen(name->aen) + string_prlen(name->aei);
+    return ret + string_prlen(name->apn) + string_prlen(name->api) +
+           string_prlen(name->aen) + string_prlen(name->aei);
 }
 
 /* Serialize a C string. */
@@ -218,9 +220,8 @@ deserialize_rina_name(const void **pptr, struct rina_name *name, int *sleft)
 }
 
 unsigned int
-rl_msg_serlen(struct rl_msg_layout *numtables,
-                size_t num_entries,
-                const struct rl_msg_base *msg)
+rl_msg_serlen(struct rl_msg_layout *numtables, size_t num_entries,
+              const struct rl_msg_base *msg)
 {
     unsigned int ret;
     struct rina_name *name;
@@ -258,7 +259,7 @@ COMMON_EXPORT(rl_msg_serlen);
 /* Serialize msg into serbuf. */
 unsigned int
 serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
-                   void *serbuf, const struct rl_msg_base *msg)
+                    void *serbuf, const struct rl_msg_base *msg)
 {
     void *serptr = serbuf;
     unsigned int serlen;
@@ -278,7 +279,7 @@ serialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     memcpy(serbuf, msg, copylen);
 
     serptr = serbuf + copylen;
-    name = (struct rina_name *)(((void *)msg) + copylen);
+    name   = (struct rina_name *)(((void *)msg) + copylen);
     for (i = 0; i < numtables[msg->msg_type].names; i++, name++) {
         serialize_rina_name(&serptr, name);
     }
@@ -302,8 +303,8 @@ COMMON_EXPORT(serialize_rlite_msg);
 /* Deserialize from serbuf into msgbuf. */
 int
 deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
-                     const void *serbuf, unsigned int serbuf_len,
-                     void *msgbuf, unsigned int msgbuf_len)
+                      const void *serbuf, unsigned int serbuf_len, void *msgbuf,
+                      unsigned int msgbuf_len)
 {
     struct rl_msg_base *bmsg = RLITE_MB(serbuf);
     struct rina_name *name;
@@ -325,7 +326,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     copylen = numtables[bmsg->msg_type].copylen;
     if (copylen > sleft) {
         PE("Serialized message shorter than copylen [msg_type=%u]\n",
-            bmsg->msg_type);
+           bmsg->msg_type);
         return -1;
     }
     if (copylen > dleft) {
@@ -337,7 +338,7 @@ deserialize_rlite_msg(struct rl_msg_layout *numtables, size_t num_entries,
     dleft -= copylen;
 
     desptr = serbuf + copylen;
-    name = (struct rina_name *)(msgbuf + copylen);
+    name   = (struct rina_name *)(msgbuf + copylen);
     for (i = 0; i < numtables[bmsg->msg_type].names; i++, name++) {
         if (dleft < sizeof(struct rina_name)) {
             PE("Message buffer too short\n");
@@ -386,7 +387,7 @@ COMMON_EXPORT(deserialize_rlite_msg);
 
 void
 rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
-              struct rl_msg_base *msg)
+            struct rl_msg_base *msg)
 {
     unsigned int copylen = numtables[msg->msg_type].copylen;
     struct rina_name *name;
@@ -415,11 +416,11 @@ rl_msg_free(struct rl_msg_layout *numtables, size_t num_entries,
 }
 COMMON_EXPORT(rl_msg_free);
 
-unsigned int rl_numtables_max_size(struct rl_msg_layout *numtables,
-                                     unsigned int n)
+unsigned int
+rl_numtables_max_size(struct rl_msg_layout *numtables, unsigned int n)
 {
     unsigned int max = 0;
-    int i = 0;
+    int i            = 0;
 
     for (i = 0; i < n; i++) {
         unsigned int cur = numtables[i].copylen +
@@ -502,9 +503,8 @@ rina_name_copy(struct rina_name *dst, const struct rina_name *src)
 }
 
 COMMON_STATIC int
-__rina_name_fill(struct rina_name *name, const char *apn,
-                 const char *api, const char *aen, const char *aei,
-                 int maysleep)
+__rina_name_fill(struct rina_name *name, const char *apn, const char *api,
+                 const char *aen, const char *aei, int maysleep)
 {
     if (!name) {
         return -1;
@@ -516,21 +516,20 @@ __rina_name_fill(struct rina_name *name, const char *apn,
     name->aei = (aei && strlen(aei)) ? COMMON_STRDUP(aei, maysleep) : NULL;
 
     if ((apn && strlen(apn) && !name->apn) ||
-            (api && strlen(api) && !name->api) ||
-            (aen && strlen(aen) && !name->aen) ||
-            (aei && strlen(aei) && !name->aei)) {
+        (api && strlen(api) && !name->api) ||
+        (aen && strlen(aen) && !name->aen) ||
+        (aei && strlen(aei) && !name->aei)) {
         rina_name_free(name);
         PE("FAILED\n");
         return -1;
     }
 
     return 0;
-
 }
 
 int
-rina_name_fill(struct rina_name *name, const char *apn,
-               const char *api, const char *aen, const char *aei)
+rina_name_fill(struct rina_name *name, const char *apn, const char *api,
+               const char *aen, const char *aei)
 {
     return __rina_name_fill(name, apn, api, aen, aei, 1);
 }
@@ -554,8 +553,8 @@ __rina_name_to_string(const struct rina_name *name, int maysleep)
     aen_len = name->aen ? strlen(name->aen) : 0;
     aei_len = name->aei ? strlen(name->aei) : 0;
 
-    str = cur = COMMON_ALLOC(apn_len + 1 + api_len + 1 +
-                             aen_len + 1 + aei_len + 1, maysleep);
+    str = cur = COMMON_ALLOC(
+        apn_len + 1 + api_len + 1 + aen_len + 1 + aei_len + 1, maysleep);
     if (!str) {
         return NULL;
     }
@@ -596,7 +595,7 @@ int
 rina_sername_valid(const char *str)
 {
     const char *orig_str = str;
-    int cnt = 0;
+    int cnt              = 0;
 
     if (!str || strlen(str) == 0) {
         return 0;
@@ -604,11 +603,11 @@ rina_sername_valid(const char *str)
 
     while (*str != '\0') {
         if (*str == ':') {
-            if (++ cnt > 3) {
+            if (++cnt > 3) {
                 return 0;
             }
         }
-        str ++;
+        str++;
     }
 
     return (*orig_str == ':') ? 0 : 1;
@@ -618,9 +617,9 @@ COMMON_STATIC int
 __rina_name_from_string(const char *str, struct rina_name *name, int maysleep)
 {
     char *apn, *api, *aen, *aei;
-    char *strc = COMMON_STRDUP(str, maysleep);
+    char *strc      = COMMON_STRDUP(str, maysleep);
     char *strc_orig = strc;
-    char **strp = &strc;
+    char **strp     = &strc;
 
     memset(name, 0, sizeof(*name));
 
@@ -708,41 +707,36 @@ flow_config_dump(const struct rl_flow_config *c)
     }
 
     COMMON_PRINT("Flow configuration:\n"
-                "   msg_boundaries=%u\n"
-                "   in_order_delivery=%u\n"
-                "   max_sdu_gap=%llu\n"
-                "   dtcp_present=%u\n"
-                "   dtcp.initial_a=%u\n"
-                "   dtcp.bandwidth=%u\n"
-                "   dtcp.flow_control=%u\n"
-                "   dtcp.rtx_control=%u\n",
-                c->msg_boundaries,
-                c->in_order_delivery,
-                (long long unsigned)c->max_sdu_gap,
-                c->dtcp_present,
-                c->dtcp.initial_a,
-                c->dtcp.bandwidth,
-                c->dtcp.flow_control,
-                c->dtcp.rtx_control);
+                 "   msg_boundaries=%u\n"
+                 "   in_order_delivery=%u\n"
+                 "   max_sdu_gap=%llu\n"
+                 "   dtcp_present=%u\n"
+                 "   dtcp.initial_a=%u\n"
+                 "   dtcp.bandwidth=%u\n"
+                 "   dtcp.flow_control=%u\n"
+                 "   dtcp.rtx_control=%u\n",
+                 c->msg_boundaries, c->in_order_delivery,
+                 (long long unsigned)c->max_sdu_gap, c->dtcp_present,
+                 c->dtcp.initial_a, c->dtcp.bandwidth, c->dtcp.flow_control,
+                 c->dtcp.rtx_control);
 
     if (c->dtcp.fc.fc_type == RLITE_FC_T_WIN) {
         COMMON_PRINT("   dtcp.fc.max_cwq_len=%lu\n"
-                    "   dtcp.fc.initial_credit=%lu\n",
-                    (long unsigned)c->dtcp.fc.cfg.w.max_cwq_len,
-                    (long unsigned)c->dtcp.fc.cfg.w.initial_credit);
+                     "   dtcp.fc.initial_credit=%lu\n",
+                     (long unsigned)c->dtcp.fc.cfg.w.max_cwq_len,
+                     (long unsigned)c->dtcp.fc.cfg.w.initial_credit);
     } else if (c->dtcp.fc.fc_type == RLITE_FC_T_RATE) {
         COMMON_PRINT("   dtcp.fc.sending_rate=%lu\n"
-                    "   dtcp.fc.time_period=%lu\n",
-                    (long unsigned)c->dtcp.fc.cfg.r.sending_rate,
-                    (long unsigned)c->dtcp.fc.cfg.r.time_period);
+                     "   dtcp.fc.time_period=%lu\n",
+                     (long unsigned)c->dtcp.fc.cfg.r.sending_rate,
+                     (long unsigned)c->dtcp.fc.cfg.r.time_period);
     }
 
     COMMON_PRINT("   dtcp.rtx.max_time_to_retry=%u\n"
-                "   dtcp.rtx.data_rxms_max=%u\n"
-                "   dtcp.rtx.initial_tr=%u\n",
-                c->dtcp.rtx.max_time_to_retry,
-                c->dtcp.rtx.data_rxms_max,
-                c->dtcp.rtx.initial_tr);
+                 "   dtcp.rtx.data_rxms_max=%u\n"
+                 "   dtcp.rtx.initial_tr=%u\n",
+                 c->dtcp.rtx.max_time_to_retry, c->dtcp.rtx.data_rxms_max,
+                 c->dtcp.rtx.initial_tr);
 }
 COMMON_EXPORT(flow_config_dump);
 
@@ -750,12 +744,12 @@ void
 rl_flow_spec_default(struct rina_flow_spec *spec)
 {
     memset(spec, 0, sizeof(*spec));
-    spec->max_sdu_gap = (rlm_seq_t)-1;  /* unbounded allowed gap */
-    spec->avg_bandwidth = 0;        /* don't care about bandwidth */
-    spec->max_delay = 0;            /* don't care about delay */
-    spec->max_jitter = 0;           /* don't care about jitter */
-    spec->in_order_delivery = 0;    /* don't require that */
-    spec->msg_boundaries = 1;       /* UDP-like */
-    rina_flow_spec_fc_set(spec, 0); /* no flow control */
+    spec->max_sdu_gap       = (rlm_seq_t)-1; /* unbounded allowed gap */
+    spec->avg_bandwidth     = 0;             /* don't care about bandwidth */
+    spec->max_delay         = 0;             /* don't care about delay */
+    spec->max_jitter        = 0;             /* don't care about jitter */
+    spec->in_order_delivery = 0;             /* don't require that */
+    spec->msg_boundaries    = 1;             /* UDP-like */
+    rina_flow_spec_fc_set(spec, 0);          /* no flow control */
 }
 COMMON_EXPORT(rl_flow_spec_default);

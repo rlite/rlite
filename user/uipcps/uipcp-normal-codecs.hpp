@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __UIPCP_CODECS_H__
@@ -31,47 +31,48 @@
 #include "rlite/common.h"
 #include "rina/cdap.hpp"
 
-
 #ifdef RL_MEMTRACK
-#define rl_new(_exp, _ty)           \
-        ({                          \
-            rl_mt_adjust(1, _ty);   \
-            new _exp;               \
-        })
-#define rl_delete(_exp, _ty)        \
-        do {                        \
-            rl_mt_adjust(-1, _ty);  \
-            delete _exp;            \
-        } while (0)
-#else  /* RL_MEMTRACK */
-#define rl_new(_exp, _ty)       new _exp
-#define rl_delete(_exp, _ty)    delete _exp
+#define rl_new(_exp, _ty)                                                      \
+    ({                                                                         \
+        rl_mt_adjust(1, _ty);                                                  \
+        new _exp;                                                              \
+    })
+#define rl_delete(_exp, _ty)                                                   \
+    do {                                                                       \
+        rl_mt_adjust(-1, _ty);                                                 \
+        delete _exp;                                                           \
+    } while (0)
+#else /* RL_MEMTRACK */
+#define rl_new(_exp, _ty) new _exp
+#define rl_delete(_exp, _ty) delete _exp
 #endif /* RL_MEMTRACK */
 
-#define RL_NONCOPIABLE(_CLA) \
-    _CLA(const _CLA&) = delete; \
-    _CLA& operator=(const _CLA&) = delete
+#define RL_NONCOPIABLE(_CLA)                                                   \
+    _CLA(const _CLA &) = delete;                                               \
+    _CLA &operator=(const _CLA &) = delete
 
-#define RL_NODEFAULT_NONCOPIABLE(_CLA) \
-    _CLA() = delete; \
+#define RL_NODEFAULT_NONCOPIABLE(_CLA)                                         \
+    _CLA() = delete;                                                           \
     RL_NONCOPIABLE(_CLA)
 
-#define RL_COPIABLE(_CLA) \
-    _CLA(const _CLA&) = default; \
-    _CLA& operator=(const _CLA&) = default
+#define RL_COPIABLE(_CLA)                                                      \
+    _CLA(const _CLA &) = default;                                              \
+    _CLA &operator=(const _CLA &) = default
 
-#define RL_MOVABLE(_CLA) \
-    _CLA(_CLA&&) = default; \
-    _CLA& operator=(_CLA&&) = default
+#define RL_MOVABLE(_CLA)                                                       \
+    _CLA(_CLA &&) = default;                                                   \
+    _CLA &operator=(_CLA &&) = default
 
-#define RL_COPIABLE_MOVABLE(_CLA) \
-    RL_COPIABLE(_CLA); \
+#define RL_COPIABLE_MOVABLE(_CLA)                                              \
+    RL_COPIABLE(_CLA);                                                         \
     RL_MOVABLE(_CLA)
 
 using NodeId = std::string;
 
 /* Helper for pretty printing of default route. */
-static inline std::string node_id_pretty(const NodeId& node) {
+static inline std::string
+node_id_pretty(const NodeId &node)
+{
     if (node == std::string()) {
         return std::string("any");
     }
@@ -80,12 +81,12 @@ static inline std::string node_id_pretty(const NodeId& node) {
 
 struct UipcpObject {
     virtual int serialize(char *buf, unsigned int size) const = 0;
-    virtual ~UipcpObject() { }
+    virtual ~UipcpObject() {}
 };
 
 struct EnrollmentInfo : public UipcpObject {
     rlm_addr_t address = RL_ADDR_NULL;
-    std::list< std::string > lower_difs;
+    std::list<std::string> lower_difs;
     bool start_early = false;
 
     EnrollmentInfo() = default;
@@ -100,16 +101,14 @@ struct RinaName {
     std::string aei;
 
     RinaName() = default;
-    RinaName(const std::string& apn_,
-             const std::string& api_,
-             const std::string& aen_,
-             const std::string& aei_);
+    RinaName(const std::string &apn_, const std::string &api_,
+             const std::string &aen_, const std::string &aei_);
     RinaName(const struct rina_name *name);
     RinaName(const char *name);
-    RinaName(const std::string& name);
+    RinaName(const std::string &name);
     operator std::string() const;
-    bool operator==(const RinaName& other) const;
-    bool operator!=(const RinaName& other) const;
+    bool operator==(const RinaName &other) const;
+    bool operator!=(const RinaName &other) const;
     int rina_name_fill(struct rina_name *name);
 };
 
@@ -148,9 +147,7 @@ struct NeighborCandidate : public UipcpObject {
     int serialize(char *buf, unsigned int size) const override;
 
     bool operator==(const NeighborCandidate &o) const;
-    bool operator!=(const NeighborCandidate &o) const {
-        return !(*this == o);
-    }
+    bool operator!=(const NeighborCandidate &o) const { return !(*this == o); }
 };
 
 struct NeighborCandidateList : public UipcpObject {
@@ -164,23 +161,22 @@ struct NeighborCandidateList : public UipcpObject {
 struct LowerFlow : public UipcpObject {
     NodeId local_node;
     NodeId remote_node;
-    unsigned int cost = 0;
+    unsigned int cost   = 0;
     unsigned int seqnum = 0;
-    bool state = false;
-    unsigned int age = 0;
+    bool state          = false;
+    unsigned int age    = 0;
 
     LowerFlow() = default;
     RL_COPIABLE_MOVABLE(LowerFlow);
     LowerFlow(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
-    bool operator==(const LowerFlow& o) {
+    bool operator==(const LowerFlow &o)
+    {
         /* Don't use seqnum and age for the comparison. */
         return local_node == o.local_node && remote_node == o.remote_node &&
-                cost == o.cost;
+               cost == o.cost;
     }
-    bool operator!=(const LowerFlow& o) {
-        return !(*this == o);
-    }
+    bool operator!=(const LowerFlow &o) { return !(*this == o); }
 
     operator std::string() const;
 };
@@ -321,7 +317,7 @@ struct ConnPolicies : public UipcpObject {
 };
 
 struct ConnId : public UipcpObject {
-    uint32_t qos_id = 0;
+    uint32_t qos_id  = 0;
     uint32_t src_cep = 0;
     uint32_t dst_cep = 0;
 
@@ -347,12 +343,12 @@ struct FlowRequest : public UipcpObject {
     uint32_t create_flow_retries;
     uint32_t hop_cnt;
 
-     /* Local storage. */
+    /* Local storage. */
     int invoke_id;
     uint32_t uid;
     struct rl_flow_config flowcfg;
-#define RL_FLOWREQ_INITIATOR    0x1 /* Was I the initiator? */
-#define RL_FLOWREQ_SEND_DEL     0x2 /* Should I send a delete message ? */
+#define RL_FLOWREQ_INITIATOR 0x1 /* Was I the initiator? */
+#define RL_FLOWREQ_SEND_DEL 0x2  /* Should I send a delete message ? */
     uint8_t flags = 0;
     /* End of local storage. */
 
@@ -368,18 +364,24 @@ struct AData : public UipcpObject {
 
     AData() = default;
     AData(const char *buf, unsigned int size);
-    ~AData() { if (cdap) rl_delete(cdap, RL_MT_CDAP); }
+    ~AData()
+    {
+        if (cdap)
+            rl_delete(cdap, RL_MT_CDAP);
+    }
     int serialize(char *buf, unsigned int size) const override;
 };
 
 struct AddrAllocRequest : public UipcpObject {
     rlm_addr_t requestor = RL_ADDR_NULL;
-    rlm_addr_t address = RL_ADDR_NULL;
-    bool pending = true; /* not serialized */
+    rlm_addr_t address   = RL_ADDR_NULL;
+    bool pending         = true; /* not serialized */
 
     AddrAllocRequest() = default;
-    AddrAllocRequest(rlm_addr_t a, rlm_addr_t r) : requestor(r), address(a),
-                                                 pending(true) { }
+    AddrAllocRequest(rlm_addr_t a, rlm_addr_t r)
+        : requestor(r), address(a), pending(true)
+    {
+    }
     AddrAllocRequest(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
@@ -391,4 +393,4 @@ struct AddrAllocEntries : public UipcpObject {
     AddrAllocEntries(const char *buf, unsigned int size);
     int serialize(char *buf, unsigned int size) const override;
 };
-#endif  /* __UIPCP_CODECS_H__ */
+#endif /* __UIPCP_CODECS_H__ */

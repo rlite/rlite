@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #ifndef __RLITE_KER_H__
@@ -27,48 +27,47 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 
-
 /* Message types. They MUST be listed alternating requests with
  * the corresponding responses. */
 enum {
     RLITE_KER_IPCP_CREATE = 1,
-    RLITE_KER_IPCP_CREATE_RESP, /* 2 */
-    RLITE_KER_IPCP_DESTROY,     /* 3 */
-    RLITE_KER_APPL_REGISTER, /* 4 */
-    RLITE_KER_APPL_REGISTER_RESP, /* 5 */
-    RLITE_KER_FA_REQ, /* 6 */
-    RLITE_KER_FA_RESP_ARRIVED, /* 7 */
-    RLITE_KER_FA_RESP, /* 8 */
-    RLITE_KER_FA_REQ_ARRIVED, /* 9 */
-    RLITE_KER_IPCP_CONFIG, /* 10 */
-    RLITE_KER_IPCP_PDUFT_SET, /* 11 */
-    RLITE_KER_IPCP_PDUFT_FLUSH, /* 12 */
-    RLITE_KER_IPCP_UIPCP_SET, /* 13 */
-    RLITE_KER_UIPCP_FA_REQ_ARRIVED, /* 14 */
+    RLITE_KER_IPCP_CREATE_RESP,      /* 2 */
+    RLITE_KER_IPCP_DESTROY,          /* 3 */
+    RLITE_KER_APPL_REGISTER,         /* 4 */
+    RLITE_KER_APPL_REGISTER_RESP,    /* 5 */
+    RLITE_KER_FA_REQ,                /* 6 */
+    RLITE_KER_FA_RESP_ARRIVED,       /* 7 */
+    RLITE_KER_FA_RESP,               /* 8 */
+    RLITE_KER_FA_REQ_ARRIVED,        /* 9 */
+    RLITE_KER_IPCP_CONFIG,           /* 10 */
+    RLITE_KER_IPCP_PDUFT_SET,        /* 11 */
+    RLITE_KER_IPCP_PDUFT_FLUSH,      /* 12 */
+    RLITE_KER_IPCP_UIPCP_SET,        /* 13 */
+    RLITE_KER_UIPCP_FA_REQ_ARRIVED,  /* 14 */
     RLITE_KER_UIPCP_FA_RESP_ARRIVED, /* 15 */
-    RLITE_KER_FLOW_DEALLOCATED, /* 16 */
-    RLITE_KER_FLOW_DEALLOC, /* 17 */
-    RLITE_KER_IPCP_UPDATE, /* 18 */
-    RLITE_KER_FLOW_FETCH, /* 19 */
-    RLITE_KER_FLOW_FETCH_RESP, /* 20 */
-    RLITE_KER_IPCP_UIPCP_WAIT, /* 21 */
-    RLITE_KER_FLOW_STATS_REQ, /* 22 */
-    RLITE_KER_FLOW_STATS_RESP, /* 23 */
-    RLITE_KER_FLOW_CFG_UPDATE, /* 24 */
-    RLITE_KER_IPCP_QOS_SUPPORTED, /* 25 */
-    RLITE_KER_APPL_MOVE, /* 26 */
-    RLITE_KER_IPCP_PDUFT_DEL, /* 27 */
-    RLITE_KER_MEMTRACK_DUMP, /* 28 */
-    RLITE_KER_REG_FETCH, /* 29 */
-    RLITE_KER_REG_FETCH_RESP, /* 30 */
-    RLITE_KER_FLOW_STATE, /* 31 */
+    RLITE_KER_FLOW_DEALLOCATED,      /* 16 */
+    RLITE_KER_FLOW_DEALLOC,          /* 17 */
+    RLITE_KER_IPCP_UPDATE,           /* 18 */
+    RLITE_KER_FLOW_FETCH,            /* 19 */
+    RLITE_KER_FLOW_FETCH_RESP,       /* 20 */
+    RLITE_KER_IPCP_UIPCP_WAIT,       /* 21 */
+    RLITE_KER_FLOW_STATS_REQ,        /* 22 */
+    RLITE_KER_FLOW_STATS_RESP,       /* 23 */
+    RLITE_KER_FLOW_CFG_UPDATE,       /* 24 */
+    RLITE_KER_IPCP_QOS_SUPPORTED,    /* 25 */
+    RLITE_KER_APPL_MOVE,             /* 26 */
+    RLITE_KER_IPCP_PDUFT_DEL,        /* 27 */
+    RLITE_KER_MEMTRACK_DUMP,         /* 28 */
+    RLITE_KER_REG_FETCH,             /* 29 */
+    RLITE_KER_REG_FETCH_RESP,        /* 30 */
+    RLITE_KER_FLOW_STATE,            /* 31 */
 
     RLITE_KER_MSG_MAX,
 };
 
 /* Numtables for kernel <==> uipcps messages exchange. */
 
-extern struct rl_msg_layout rl_ker_numtables[RLITE_KER_MSG_MAX+1];
+extern struct rl_msg_layout rl_ker_numtables[RLITE_KER_MSG_MAX + 1];
 
 /* All the messages MUST follow a common format and attribute ordering:
  *   - the first field must be 'rl_msg_t msg_type'
@@ -129,7 +128,7 @@ struct rl_kmsg_flow_fetch_resp {
     struct rina_flow_spec spec;
 } __attribute__((packed));
 
-#define rl_kmsg_reg_fetch   rl_kmsg_flow_fetch
+#define rl_kmsg_reg_fetch rl_kmsg_flow_fetch
 
 struct rl_kmsg_reg_fetch_resp {
     rl_msg_t msg_type;
@@ -141,9 +140,9 @@ struct rl_kmsg_reg_fetch_resp {
     char *appl_name;
 } __attribute__((packed));
 
-#define RLITE_UPDATE_ADD    0x01
-#define RLITE_UPDATE_UPD    0x02
-#define RLITE_UPDATE_DEL    0x03
+#define RLITE_UPDATE_ADD 0x01
+#define RLITE_UPDATE_UPD 0x02
+#define RLITE_UPDATE_DEL 0x03
 
 /* application <-- kernel message to report updated IPCP information. */
 struct rl_kmsg_ipcp_update {
@@ -162,8 +161,8 @@ struct rl_kmsg_ipcp_update {
     char *dif_type;
 } __attribute__((packed));
 
-#define RL_FLOW_STATE_DOWN      0
-#define RL_FLOW_STATE_UP        1
+#define RL_FLOW_STATE_DOWN 0
+#define RL_FLOW_STATE_UP 1
 
 /* application <-- kernel message to report flow up/down state. */
 struct rl_kmsg_flow_state {
@@ -265,7 +264,7 @@ struct rl_kmsg_fa_resp {
     rl_ipcp_id_t upper_ipcp_id;
     uint8_t response;
     rl_port_t port_id;
-    uint32_t cep_id;     /* Filled by kernel before reflecting to userspace. */
+    uint32_t cep_id; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
 /* application --> kernel to configure and IPC process. */
@@ -407,4 +406,4 @@ struct rl_kmsg_ipcp_qos_supported {
     struct rina_flow_spec flowspec;
 } __attribute__((packed));
 
-#endif  /* __RLITE_KER_H__ */
+#endif /* __RLITE_KER_H__ */

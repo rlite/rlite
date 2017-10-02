@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <stdio.h>
@@ -72,9 +73,9 @@ lookup_ipcp_by_name(const char *name)
     struct ipcp_attrs *attrs;
 
     if (rina_sername_valid(name)) {
-        list_for_each_entry(attrs, &ipcps, node) {
-            if (rina_sername_valid(attrs->name)
-                    && strcmp(attrs->name, name) == 0) {
+        list_for_each_entry (attrs, &ipcps, node) {
+            if (rina_sername_valid(attrs->name) &&
+                strcmp(attrs->name, name) == 0) {
                 return attrs;
             }
         }
@@ -88,7 +89,7 @@ ipcp_by_dif(const char *dif_name)
 {
     struct ipcp_attrs *attrs;
 
-    list_for_each_entry(attrs, &ipcps, node) {
+    list_for_each_entry (attrs, &ipcps, node) {
         if (strcmp(attrs->dif_name, dif_name) == 0) {
             return attrs;
         }
@@ -103,13 +104,13 @@ static struct ipcp_attrs *
 select_ipcp()
 {
     unsigned int smaller_mss = ~0U;
-    struct ipcp_attrs *ret = NULL;
+    struct ipcp_attrs *ret   = NULL;
     struct ipcp_attrs *attrs;
 
-    list_for_each_entry(attrs, &ipcps, node) {
+    list_for_each_entry (attrs, &ipcps, node) {
         if (attrs->max_sdu_size < smaller_mss) {
             smaller_mss = attrs->max_sdu_size;
-            ret = attrs;
+            ret         = attrs;
         }
     }
 
@@ -134,7 +135,7 @@ uipcps_connect(void)
     strncpy(server_address.sun_path, RLITE_UIPCPS_UNIX_NAME,
             sizeof(server_address.sun_path) - 1);
     ret = connect(sfd, (struct sockaddr *)&server_address,
-                    sizeof(server_address));
+                  sizeof(server_address));
     if (ret) {
         perror("connect(AF_UNIX, path)");
         PI("Warning: maybe uipcps are not running?\n");
@@ -150,17 +151,17 @@ uipcps_disconnect(int sfd)
     return close(sfd);
 }
 
-typedef int (*response_handler_t )(struct rl_msg_base_resp *);
+typedef int (*response_handler_t)(struct rl_msg_base_resp *);
 
 static int
 read_response(int sfd, response_handler_t handler)
 {
     struct rl_msg_base_resp *resp;
     char msgbuf[4096];
-    char *serbuf = NULL;
+    char *serbuf    = NULL;
     int serbuf_size = 4096;
-    int read_ofs = 0;
-    int ret = -1;
+    int read_ofs    = 0;
+    int ret         = -1;
     int n;
 
     for (;;) {
@@ -192,13 +193,12 @@ read_response(int sfd, response_handler_t handler)
 
     free(serbuf);
     if (ret) {
-        PE("error while deserializing response [%d]\n",
-                ret);
+        PE("error while deserializing response [%d]\n", ret);
         return -1;
     }
 
     resp = RLITE_MBR(msgbuf);
-    ret = (resp->result) == 0 ? 0 : -1;
+    ret  = (resp->result) == 0 ? 0 : -1;
 
     if (ret) {
         PE("Operation failed\n");
@@ -246,8 +246,8 @@ ipcp_create(int argc, char **argv, struct cmd_descriptor *cd)
 
     assert(argc >= 3);
     ipcp_name = argv[0];
-    dif_type = argv[1];
-    dif_name = argv[2];
+    dif_type  = argv[1];
+    dif_name  = argv[2];
 
     ipcp_id = rl_conf_ipcp_create(ipcp_name, dif_type, dif_name);
 
@@ -285,7 +285,6 @@ ipcp_destroy(int argc, char **argv, struct cmd_descriptor *cd)
     if (!attrs) {
         PE("No such IPCP process\n");
         return -1;
-
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
@@ -303,7 +302,7 @@ reset(int argc, char **argv, struct cmd_descriptor *cd)
     struct ipcp_attrs *attrs;
     int ret = 0;
 
-    list_for_each_entry(attrs, &ipcps, node) {
+    list_for_each_entry (attrs, &ipcps, node) {
         int r;
 
         r = rl_conf_ipcp_destroy(attrs->id);
@@ -324,11 +323,11 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
     const char *param_name;
     const char *param_value;
     struct ipcp_attrs *attrs;
-    int ret = -1;  /* Report failure by default. */
+    int ret = -1; /* Report failure by default. */
 
     assert(argc >= 3);
-    ipcp_name = argv[0];
-    param_name = argv[1];
+    ipcp_name   = argv[0];
+    param_name  = argv[1];
     param_value = argv[2];
 
     /* The request specifies an IPCP: lookup that. */
@@ -358,7 +357,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
 
     assert(argc >= 2);
     ipcp_name = argv[0];
-    dif_name = argv[1];
+    dif_name  = argv[1];
 
     req.ipcp_name = strdup(ipcp_name);
     if (!req.ipcp_name) {
@@ -375,7 +374,7 @@ ipcp_register_common(int argc, char **argv, unsigned int reg,
     req.msg_type = RLITE_U_IPCP_REGISTER;
     req.event_id = 0;
     req.dif_name = strdup(dif_name);
-    req.reg = reg;
+    req.reg      = reg;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -404,9 +403,9 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
     int ret;
 
     assert(argc >= 3);
-    ipcp_name = argv[0];
-    dif_name = argv[1];
-    supp_dif_name = argv[2];
+    ipcp_name       = argv[0];
+    dif_name        = argv[1];
+    supp_dif_name   = argv[2];
     neigh_ipcp_name = (argc >= 4) ? argv[3] : NULL;
 
     req.ipcp_name = strdup(ipcp_name);
@@ -421,10 +420,10 @@ ipcp_enroll_common(int argc, char **argv, rl_msg_t msg_type)
         return -1;
     }
 
-    req.msg_type = msg_type;
-    req.event_id = 0;
-    req.dif_name = strdup(dif_name);
-    req.neigh_name = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
+    req.msg_type      = msg_type;
+    req.event_id      = 0;
+    req.dif_name      = strdup(dif_name);
+    req.neigh_name    = neigh_ipcp_name ? strdup(neigh_ipcp_name) : NULL;
     req.supp_dif_name = strdup(supp_dif_name);
 
     ret = request_response(RLITE_MB(&req), NULL);
@@ -455,13 +454,13 @@ ipcp_enroll_retry(int argc, char **argv, struct cmd_descriptor *cd)
     int ret = -1;
     int i;
 
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 3; i++) {
         ret = ipcp_enroll_common(argc, argv, RLITE_U_IPCP_ENROLL);
         if (!ret) {
             break;
         }
-        sleep(i+1);
-        PI("Retry #%d...\n", i+1);
+        sleep(i + 1);
+        PI("Retry #%d...\n", i + 1);
     }
 
     return ret;
@@ -475,7 +474,7 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
 
     PI_S("IPC Processes table:\n");
 
-    list_for_each_entry(attrs, &ipcps, node) {
+    list_for_each_entry (attrs, &ipcps, node) {
         if (attrs->addr == RL_ADDR_NULL) {
             strncpy(addrbuf, "*", sizeof(addrbuf));
         } else {
@@ -483,10 +482,9 @@ ipcps_show(int argc, char **argv, struct cmd_descriptor *cd)
                      (long long unsigned int)attrs->addr);
         }
         PI_S("    id=%d, name='%s', dif_type='%s', dif_name='%s',"
-                " address=%s, hdroom=%u, troom=%u, mss=%u\n",
-                attrs->id, attrs->name, attrs->dif_type,
-                attrs->dif_name, addrbuf,
-                attrs->hdroom, attrs->tailroom, attrs->max_sdu_size);
+             " address=%s, hdroom=%u, troom=%u, mss=%u\n",
+             attrs->id, attrs->name, attrs->dif_type, attrs->dif_name, addrbuf,
+             attrs->hdroom, attrs->tailroom, attrs->max_sdu_size);
     }
 
     return 0;
@@ -525,7 +523,7 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
     int ret;
 
     assert(argc >= 1);
-    errno = 0;
+    errno   = 0;
     port_id = strtoul(argv[0], NULL, 10);
     if (errno) {
         PE("Invalid flow id %s\n", argv[0]);
@@ -538,38 +536,35 @@ flow_dump(int argc, char **argv, struct cmd_descriptor *cd)
         return ret;
     }
 
-    printf( "    snd_lwe                = %lu\n"
-            "    snd_rwe                = %lu\n"
-            "    next_seq_num_to_send   = %lu\n"
-            "    last_seq_num_sent      = %lu\n"
-            "    last_ctrl_seq_num_rcvd = %lu\n"
-            "    cwq_len                = %lu [max=%lu]\n"
-            "    rtxq_len               = %lu [max=%lu]\n"
-            "    rtt                    = %lu [stddev=%lu]\n"
-            "    rcv_lwe                = %lu\n"
-            "    rcv_lwe_priv           = %lu\n"
-            "    rcv_rwe                = %lu\n"
-            "    max_seq_num_rcvd       = %lu\n"
-            "    last_snd_data_ack      = %lu\n"
-            "    next_snd_ctl_seq       = %lu\n"
-            "    last_lwe_sent          = %lu\n"
-            "    seqq_len               = %lu\n",
-            (unsigned long)dtp.snd_lwe, (unsigned long)dtp.snd_rwe,
-            (unsigned long)dtp.next_seq_num_to_send,
-            (unsigned long)dtp.last_seq_num_sent,
-            (unsigned long)dtp.last_ctrl_seq_num_rcvd,
-            (unsigned long)dtp.cwq_len, (unsigned long)dtp.max_cwq_len,
-            (unsigned long)dtp.rtxq_len, (unsigned long)dtp.max_rtxq_len,
-            (unsigned long)dtp.rtt, (unsigned long)dtp.rtt_stddev,
+    printf("    snd_lwe                = %lu\n"
+           "    snd_rwe                = %lu\n"
+           "    next_seq_num_to_send   = %lu\n"
+           "    last_seq_num_sent      = %lu\n"
+           "    last_ctrl_seq_num_rcvd = %lu\n"
+           "    cwq_len                = %lu [max=%lu]\n"
+           "    rtxq_len               = %lu [max=%lu]\n"
+           "    rtt                    = %lu [stddev=%lu]\n"
+           "    rcv_lwe                = %lu\n"
+           "    rcv_lwe_priv           = %lu\n"
+           "    rcv_rwe                = %lu\n"
+           "    max_seq_num_rcvd       = %lu\n"
+           "    last_snd_data_ack      = %lu\n"
+           "    next_snd_ctl_seq       = %lu\n"
+           "    last_lwe_sent          = %lu\n"
+           "    seqq_len               = %lu\n",
+           (unsigned long)dtp.snd_lwe, (unsigned long)dtp.snd_rwe,
+           (unsigned long)dtp.next_seq_num_to_send,
+           (unsigned long)dtp.last_seq_num_sent,
+           (unsigned long)dtp.last_ctrl_seq_num_rcvd,
+           (unsigned long)dtp.cwq_len, (unsigned long)dtp.max_cwq_len,
+           (unsigned long)dtp.rtxq_len, (unsigned long)dtp.max_rtxq_len,
+           (unsigned long)dtp.rtt, (unsigned long)dtp.rtt_stddev,
 
-            (unsigned long)dtp.rcv_lwe, (unsigned long)dtp.rcv_lwe_priv,
-            (unsigned long)dtp.rcv_rwe,
-            (unsigned long)dtp.max_seq_num_rcvd,
-            (unsigned long)dtp.last_snd_data_ack,
-            (unsigned long)dtp.next_snd_ctl_seq,
-            (unsigned long)dtp.last_lwe_sent,
-            (unsigned long)dtp.seqq_len
-            );
+           (unsigned long)dtp.rcv_lwe, (unsigned long)dtp.rcv_lwe_priv,
+           (unsigned long)dtp.rcv_rwe, (unsigned long)dtp.max_seq_num_rcvd,
+           (unsigned long)dtp.last_snd_data_ack,
+           (unsigned long)dtp.next_snd_ctl_seq,
+           (unsigned long)dtp.last_lwe_sent, (unsigned long)dtp.seqq_len);
 
     return 0;
 }
@@ -609,8 +604,8 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
     struct ipcp_attrs *attrs;
 
     assert(argc >= 3);
-    name = argv[0];
-    comp_name = argv[1];
+    name        = argv[0];
+    comp_name   = argv[1];
     policy_name = argv[2];
 
     if (strcmp(cd->name, "dif-policy-mod") == 0) {
@@ -622,16 +617,16 @@ ipcp_policy_mod(int argc, char **argv, struct cmd_descriptor *cd)
         req.ipcp_name = strdup(attrs->name);
     } else {
         req.ipcp_name = strdup(name);
-        attrs = lookup_ipcp_by_name(req.ipcp_name);
+        attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
             return -1;
         }
     }
 
-    req.msg_type = RLITE_U_IPCP_POLICY_MOD;
-    req.event_id = 0;
-    req.comp_name = strdup(comp_name);
+    req.msg_type    = RLITE_U_IPCP_POLICY_MOD;
+    req.event_id    = 0;
+    req.comp_name   = strdup(comp_name);
     req.policy_name = strdup(policy_name);
 
     return request_response(RLITE_MB(&req), NULL);
@@ -648,9 +643,9 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
     struct ipcp_attrs *attrs;
 
     assert(argc >= 4);
-    name = argv[0];
-    comp_name = argv[1];
-    param_name = argv[2];
+    name        = argv[0];
+    comp_name   = argv[1];
+    param_name  = argv[2];
     param_value = argv[3];
 
     if (strcmp(cd->name, "dif-policy-param-mod") == 0) {
@@ -662,17 +657,17 @@ ipcp_policy_param_mod(int argc, char **argv, struct cmd_descriptor *cd)
         req.ipcp_name = strdup(attrs->name);
     } else {
         req.ipcp_name = strdup(name);
-        attrs = lookup_ipcp_by_name(req.ipcp_name);
+        attrs         = lookup_ipcp_by_name(req.ipcp_name);
         if (!attrs) {
             PE("Could not find IPC process %s\n", name);
             return -1;
         }
     }
 
-    req.msg_type = RLITE_U_IPCP_POLICY_PARAM_MOD;
-    req.event_id = 0;
-    req.comp_name = strdup(comp_name);
-    req.param_name = strdup(param_name);
+    req.msg_type    = RLITE_U_IPCP_POLICY_PARAM_MOD;
+    req.event_id    = 0;
+    req.comp_name   = strdup(comp_name);
+    req.param_name  = strdup(param_name);
     req.param_value = strdup(param_value);
 
     return request_response(RLITE_MB(&req), NULL);
@@ -689,7 +684,7 @@ ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
     ipcp_name = argv[0];
 
     req.ipcp_name = strdup(ipcp_name);
-    attrs = lookup_ipcp_by_name(req.ipcp_name);
+    attrs         = lookup_ipcp_by_name(req.ipcp_name);
     if (!attrs) {
         PE("Could not find IPC process %s\n", ipcp_name);
         return -1;
@@ -697,7 +692,7 @@ ipcp_enroller_enable(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.msg_type = RLITE_U_IPCP_ENROLLER_ENABLE;
     req.event_id = 0;
-    req.enable = 1;
+    req.enable   = 1;
 
     return request_response(RLITE_MB(&req), NULL);
 }
@@ -751,7 +746,7 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
             req.ipcp_name = strdup(attrs->name);
         } else {
             req.ipcp_name = strdup(name);
-            attrs = lookup_ipcp_by_name(req.ipcp_name);
+            attrs         = lookup_ipcp_by_name(req.ipcp_name);
             if (!attrs) {
                 PE("Could not find IPC process %s\n", name);
                 return -1;
@@ -767,18 +762,17 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
     }
 
     if (strcmp(cd->name, "dif-rib-show") == 0 ||
-            strcmp(cd->name, "ipcp-rib-show") == 0) {
+        strcmp(cd->name, "ipcp-rib-show") == 0) {
         req.msg_type = RLITE_U_IPCP_RIB_SHOW_REQ;
     } else if (strcmp(cd->name, "dif-routing-show") == 0 ||
-            strcmp(cd->name, "ipcp-routing-show") == 0) {
+               strcmp(cd->name, "ipcp-routing-show") == 0) {
         req.msg_type = RLITE_U_IPCP_ROUTING_SHOW_REQ;
     } else {
         return -1;
     }
     req.event_id = 0;
 
-    return request_response(RLITE_MB(&req),
-                            ipcp_rib_show_handler);
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
 
 /* Build the list of IPCPs running in the system, ordered by id. */
@@ -828,17 +822,20 @@ ipcps_load()
             break;
         }
 
-        attrs->id = upd->ipcp_id;
-        attrs->name = upd->ipcp_name; upd->ipcp_name = NULL;
-        attrs->dif_type = upd->dif_type; upd->dif_type = NULL;
-        attrs->dif_name = upd->dif_name; upd->dif_name = NULL;
-        attrs->addr = upd->ipcp_addr;
-        attrs->hdroom = upd->hdroom;
-        attrs->tailroom = upd->tailroom;
+        attrs->id           = upd->ipcp_id;
+        attrs->name         = upd->ipcp_name;
+        upd->ipcp_name      = NULL;
+        attrs->dif_type     = upd->dif_type;
+        upd->dif_type       = NULL;
+        attrs->dif_name     = upd->dif_name;
+        upd->dif_name       = NULL;
+        attrs->addr         = upd->ipcp_addr;
+        attrs->hdroom       = upd->hdroom;
+        attrs->tailroom     = upd->tailroom;
         attrs->max_sdu_size = upd->max_sdu_size;
         rl_free(upd, RL_MT_MSG);
 
-        list_for_each_entry(scan, &ipcps, node) {
+        list_for_each_entry (scan, &ipcps, node) {
             if (attrs->id < scan->id) {
                 break;
             }
@@ -852,112 +849,112 @@ ipcps_load()
 
 static struct cmd_descriptor cmd_descriptors[] = {
     {
-        .name = "ipcp-create",
-        .usage = "IPCP_NAME DIF_TYPE DIF_NAME",
+        .name     = "ipcp-create",
+        .usage    = "IPCP_NAME DIF_TYPE DIF_NAME",
         .num_args = 3,
-        .func = ipcp_create,
+        .func     = ipcp_create,
     },
     {
-        .name = "ipcp-destroy",
-        .usage = "IPCP_NAME",
+        .name     = "ipcp-destroy",
+        .usage    = "IPCP_NAME",
         .num_args = 1,
-        .func = ipcp_destroy,
+        .func     = ipcp_destroy,
     },
     {
-        .name = "reset",
-        .usage = "",
+        .name     = "reset",
+        .usage    = "",
         .num_args = 0,
-        .func = reset,
+        .func     = reset,
     },
     {
-        .name = "ipcp-config",
-        .usage = "IPCP_NAME PARAM_NAME PARAM_VALUE",
+        .name     = "ipcp-config",
+        .usage    = "IPCP_NAME PARAM_NAME PARAM_VALUE",
         .num_args = 3,
-        .func = ipcp_config,
+        .func     = ipcp_config,
     },
     {
-        .name = "ipcp-register",
-        .usage = "IPCP_NAME DIF_NAME",
+        .name     = "ipcp-register",
+        .usage    = "IPCP_NAME DIF_NAME",
         .num_args = 2,
-        .func = ipcp_register,
+        .func     = ipcp_register,
     },
     {
-        .name = "ipcp-unregister",
-        .usage = "IPCP_NAME DIF_NAME",
+        .name     = "ipcp-unregister",
+        .usage    = "IPCP_NAME DIF_NAME",
         .num_args = 2,
-        .func = ipcp_unregister,
+        .func     = ipcp_unregister,
     },
     {
-        .name = "ipcp-enroll",
-        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .name     = "ipcp-enroll",
+        .usage    = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
-        .func = ipcp_enroll,
+        .func     = ipcp_enroll,
     },
     {
-        .name = "ipcp-enroll-retry",
-        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .name     = "ipcp-enroll-retry",
+        .usage    = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
-        .func = ipcp_enroll_retry,
+        .func     = ipcp_enroll_retry,
     },
     {
-        .name = "ipcp-lower-flow-alloc",
-        .usage = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
+        .name     = "ipcp-lower-flow-alloc",
+        .usage    = "IPCP_NAME DIF_NAME SUPP_DIF_NAME [NEIGH_IPCP_NAME]",
         .num_args = 3,
-        .func = ipcp_lower_flow_alloc,
+        .func     = ipcp_lower_flow_alloc,
     },
     {
-        .name = "ipcps-show",
-        .usage = "",
+        .name     = "ipcps-show",
+        .usage    = "",
         .num_args = 0,
-        .func = ipcps_show,
+        .func     = ipcps_show,
     },
     {
-        .name = "dif-rib-show",
-        .usage = "[DIF_NAME]",
+        .name     = "dif-rib-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func = ipcp_rib_show,
+        .func     = ipcp_rib_show,
     },
     {
-        .name = "dif-routing-show",
-        .usage = "[DIF_NAME]",
+        .name     = "dif-routing-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func = ipcp_rib_show,
+        .func     = ipcp_rib_show,
     },
     {
-        .name = "flows-show",
-        .usage = "[DIF_NAME]",
+        .name     = "flows-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func = flows_show,
+        .func     = flows_show,
     },
     {
-        .name = "flow-dump",
-        .usage = "PORT_ID",
+        .name     = "flow-dump",
+        .usage    = "PORT_ID",
         .num_args = 1,
-        .func = flow_dump,
+        .func     = flow_dump,
     },
     {
-        .name = "regs-show",
-        .usage = "[DIF_NAME]",
+        .name     = "regs-show",
+        .usage    = "[DIF_NAME]",
         .num_args = 0,
-        .func = regs_show,
+        .func     = regs_show,
     },
     {
-        .name = "dif-policy-mod",
-        .usage = "DIF_NAME COMPONENT_NAME POLICY_NAME",
+        .name     = "dif-policy-mod",
+        .usage    = "DIF_NAME COMPONENT_NAME POLICY_NAME",
         .num_args = 3,
-        .func = ipcp_policy_mod,
+        .func     = ipcp_policy_mod,
     },
     {
-        .name = "dif-policy-param-mod",
-        .usage = "DIF_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
+        .name     = "dif-policy-param-mod",
+        .usage    = "DIF_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
         .num_args = 4,
-        .func = ipcp_policy_param_mod,
+        .func     = ipcp_policy_param_mod,
     },
     {
-        .name = "ipcp-enroller-enable",
-        .usage = "IPCP_NAME",
+        .name     = "ipcp-enroller-enable",
+        .usage    = "IPCP_NAME",
         .num_args = 1,
-        .func = ipcp_enroller_enable,
+        .func     = ipcp_enroller_enable,
     },
 #if 0
     {
@@ -987,28 +984,30 @@ static struct cmd_descriptor cmd_descriptors[] = {
 #endif
 #ifdef RL_MEMTRACK
     {
-        .name = "memtrack",
-        .usage = "",
+        .name     = "memtrack",
+        .usage    = "",
         .num_args = 0,
-        .func = memtrack_dump,
+        .func     = memtrack_dump,
     },
 #endif
 };
 
-#define NUM_COMMANDS    (sizeof(cmd_descriptors)/sizeof(struct cmd_descriptor))
+#define NUM_COMMANDS (sizeof(cmd_descriptors) / sizeof(struct cmd_descriptor))
 
 static void
 usage(int i)
 {
     if (i >= 0 && i < NUM_COMMANDS) {
-        printf("    %s %s\n", cmd_descriptors[i].name, cmd_descriptors[i].usage);
+        printf("    %s %s\n", cmd_descriptors[i].name,
+               cmd_descriptors[i].usage);
         return;
     }
 
     printf("\nAvailable commands:\n");
 
     for (i = 0; i < NUM_COMMANDS; i++) {
-        printf("    %s %s\n", cmd_descriptors[i].name, cmd_descriptors[i].usage);
+        printf("    %s %s\n", cmd_descriptors[i].name,
+               cmd_descriptors[i].usage);
     }
 }
 
@@ -1070,7 +1069,8 @@ sigint_handler(int signum)
     exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     struct sigaction sa;
     int ret;
@@ -1080,7 +1080,7 @@ int main(int argc, char **argv)
     sa.sa_handler = sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    ret = sigaction(SIGINT, &sa, NULL);
+    ret         = sigaction(SIGINT, &sa, NULL);
     if (ret) {
         perror("sigaction(SIGINT)");
         exit(EXIT_FAILURE);

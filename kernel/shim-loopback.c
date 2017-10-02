@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -35,15 +36,14 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 
-
 struct rx_entry {
     struct rl_buf *rb;
     struct flow_entry *tx_flow;
     struct flow_entry *rx_flow;
 };
 
-#define RX_POW      8
-#define RX_ENTRIES  (1 << RX_POW)
+#define RX_POW 8
+#define RX_ENTRIES (1 << RX_POW)
 
 struct rl_shim_loopback {
     struct ipcp_entry *ipcp;
@@ -65,7 +65,7 @@ static void
 rcv_work(struct work_struct *w)
 {
     struct rl_shim_loopback *priv =
-            container_of(w, struct rl_shim_loopback, rcv);
+        container_of(w, struct rl_shim_loopback, rcv);
 
     for (;;) {
         struct rl_buf *rb = NULL;
@@ -75,9 +75,9 @@ rcv_work(struct work_struct *w)
 
         spin_lock_bh(&priv->lock);
         if (priv->rdh != priv->rdt) {
-            rb = priv->rxr[priv->rdh].rb;
-            rx_flow = priv->rxr[priv->rdh].rx_flow;
-            tx_flow = priv->rxr[priv->rdh].tx_flow;
+            rb        = priv->rxr[priv->rdh].rb;
+            rx_flow   = priv->rxr[priv->rdh].rx_flow;
+            tx_flow   = priv->rxr[priv->rdh].tx_flow;
             priv->rdh = (priv->rdh + 1) & (RX_ENTRIES - 1);
 
             tx_flow->stats.tx_pkt++;
@@ -115,9 +115,9 @@ rl_shim_loopback_create(struct ipcp_entry *ipcp)
         return NULL;
     }
 
-    priv->ipcp = ipcp;
-    priv->drop_fract = 0;   /* No drops by default. */
-    priv->queued = 0;       /* No queue by default. */
+    priv->ipcp       = ipcp;
+    priv->drop_fract = 0; /* No drops by default. */
+    priv->queued     = 0; /* No queue by default. */
     INIT_WORK(&priv->rcv, rcv_work);
     spin_lock_init(&priv->lock);
     priv->rdt = priv->rdh = 0;
@@ -155,13 +155,13 @@ struct flow_allocate_req_work {
 static void
 flow_allocate_req_work(struct work_struct *w)
 {
-    struct flow_allocate_req_work *faw = container_of(w,
-                        struct flow_allocate_req_work, w);
+    struct flow_allocate_req_work *faw =
+        container_of(w, struct flow_allocate_req_work, w);
     int ret;
 
-    ret = rl_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0,
-                            faw->local_appl, faw->remote_appl, NULL, NULL,
-                            false);
+    ret =
+        rl_fa_req_arrived(faw->ipcp, 0, faw->remote_port, 0, 0, faw->local_appl,
+                          faw->remote_appl, NULL, NULL, false);
     if (ret) {
         PE("Failed to report flow allocation request\n");
     }
@@ -190,9 +190,9 @@ rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
     rl_flow_share_tx_wqh(flow);
 
     faw->remote_appl = rl_strdup(flow->local_appl, GFP_KERNEL, RL_MT_SHIMDATA);
-    faw->local_appl = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MT_SHIMDATA);
+    faw->local_appl  = rl_strdup(flow->remote_appl, GFP_KERNEL, RL_MT_SHIMDATA);
     faw->remote_port = flow->local_port;
-    faw->ipcp = ipcp;
+    faw->ipcp        = ipcp;
     INIT_WORK(&faw->w, flow_allocate_req_work);
     schedule_work(&faw->w);
 
@@ -210,12 +210,12 @@ struct flow_allocate_resp_work {
 static void
 flow_allocate_resp_work(struct work_struct *w)
 {
-    struct flow_allocate_resp_work *farw = container_of(w,
-                        struct flow_allocate_resp_work, w);
+    struct flow_allocate_resp_work *farw =
+        container_of(w, struct flow_allocate_resp_work, w);
     int ret;
 
-    ret = rl_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port,
-                                0, 0, farw->response, NULL, false);
+    ret = rl_fa_resp_arrived(farw->ipcp, farw->local_port, farw->remote_port, 0,
+                             0, farw->response, NULL, false);
     if (ret) {
         PE("failed to report flow allocation response\n");
     }
@@ -224,9 +224,8 @@ flow_allocate_resp_work(struct work_struct *w)
 }
 
 static int
-rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
-                            struct flow_entry *flow,
-                            uint8_t response)
+rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                         uint8_t response)
 {
     struct flow_allocate_resp_work *farw;
 
@@ -238,10 +237,10 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
     rl_flow_share_tx_wqh(flow);
 
-    farw->ipcp = ipcp;
-    farw->local_port = flow->remote_port;
+    farw->ipcp        = ipcp;
+    farw->local_port  = flow->remote_port;
     farw->remote_port = flow->local_port;
-    farw->response = response;
+    farw->response    = response;
     INIT_WORK(&farw->w, flow_allocate_resp_work);
     schedule_work(&farw->w);
 
@@ -250,7 +249,8 @@ rl_shim_loopback_fa_resp(struct ipcp_entry *ipcp,
 
 /* Called under FLOCK. */
 static int
-rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
+rl_shim_loopback_flow_deallocated(struct ipcp_entry *ipcp,
+                                  struct flow_entry *flow)
 {
     struct flow_entry *remote_flow = flow_lookup(flow->remote_port);
 
@@ -265,7 +265,7 @@ static bool
 rl_shim_loopback_flow_writeable(struct flow_entry *flow)
 {
     struct rl_shim_loopback *priv = flow->txrx.ipcp->priv;
-    bool ret = true;
+    bool ret                      = true;
 
     if (priv->queued) {
         spin_lock_bh(&priv->lock);
@@ -277,10 +277,8 @@ rl_shim_loopback_flow_writeable(struct flow_entry *flow)
 }
 
 static int
-rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
-                           struct flow_entry *tx_flow,
-                           struct rl_buf *rb,
-                           bool maysleep)
+rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *tx_flow,
+                           struct rl_buf *rb, bool maysleep)
 {
     struct rl_shim_loopback *priv = ipcp->priv;
     struct flow_entry *rx_flow;
@@ -292,7 +290,7 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
         spin_lock_bh(&priv->lock);
         if (--priv->drop_cdown == 0) {
             priv->drop_cdown = priv->drop_fract;
-            drop = true;
+            drop             = true;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -317,10 +315,10 @@ rl_shim_loopback_sdu_write(struct ipcp_entry *ipcp,
             ret = -EAGAIN;
         } else {
             flow_get_ref(tx_flow);
-            priv->rxr[priv->rdt].rb = rb;
+            priv->rxr[priv->rdt].rb      = rb;
             priv->rxr[priv->rdt].tx_flow = tx_flow;
             priv->rxr[priv->rdt].rx_flow = rx_flow;
-            priv->rdt = next;
+            priv->rdt                    = next;
         }
         spin_unlock_bh(&priv->lock);
 
@@ -359,7 +357,7 @@ rl_shim_loopback_config(struct ipcp_entry *ipcp, const char *param_name,
                         const char *param_value, int *notify)
 {
     struct rl_shim_loopback *priv = (struct rl_shim_loopback *)ipcp->priv;
-    int ret = -ENOSYS;
+    int ret                       = -ENOSYS;
 
     if (strcmp(param_name, "queued") == 0) {
         unsigned int queued;
@@ -395,7 +393,7 @@ rl_shim_loopback_config(struct ipcp_entry *ipcp, const char *param_name,
 
 static int
 rl_shim_loopback_flow_get_stats(struct flow_entry *flow,
-                                   struct rl_flow_stats *stats)
+                                struct rl_flow_stats *stats)
 {
     struct rl_shim_loopback *priv = flow->txrx.ipcp->priv;
 
@@ -406,20 +404,20 @@ rl_shim_loopback_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
-#define SHIM_DIF_TYPE   "shim-loopback"
+#define SHIM_DIF_TYPE "shim-loopback"
 
 static struct ipcp_factory shim_loopback_factory = {
-    .owner                      = THIS_MODULE,
-    .dif_type                   = SHIM_DIF_TYPE,
-    .create                     = rl_shim_loopback_create,
-    .ops.destroy                = rl_shim_loopback_destroy,
-    .ops.flow_allocate_req      = rl_shim_loopback_fa_req,
-    .ops.flow_allocate_resp     = rl_shim_loopback_fa_resp,
-    .ops.flow_deallocated       = rl_shim_loopback_flow_deallocated,
-    .ops.sdu_write              = rl_shim_loopback_sdu_write,
-    .ops.config                 = rl_shim_loopback_config,
-    .ops.flow_get_stats         = rl_shim_loopback_flow_get_stats,
-    .ops.flow_writeable         = rl_shim_loopback_flow_writeable,
+    .owner                  = THIS_MODULE,
+    .dif_type               = SHIM_DIF_TYPE,
+    .create                 = rl_shim_loopback_create,
+    .ops.destroy            = rl_shim_loopback_destroy,
+    .ops.flow_allocate_req  = rl_shim_loopback_fa_req,
+    .ops.flow_allocate_resp = rl_shim_loopback_fa_resp,
+    .ops.flow_deallocated   = rl_shim_loopback_flow_deallocated,
+    .ops.sdu_write          = rl_shim_loopback_sdu_write,
+    .ops.config             = rl_shim_loopback_config,
+    .ops.flow_get_stats     = rl_shim_loopback_flow_get_stats,
+    .ops.flow_writeable     = rl_shim_loopback_flow_writeable,
 };
 
 static int __init

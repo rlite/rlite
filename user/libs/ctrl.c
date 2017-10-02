@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
 #include <stdio.h>
@@ -41,7 +41,6 @@
 #include "rlite/utils.h"
 #include "rlite/ctrl.h"
 
-
 /* Global variable for the user to set verbosity. */
 int rl_verbosity = RL_VERB_DBG;
 
@@ -49,8 +48,8 @@ struct rl_msg_base *
 rl_read_next_msg(int rfd, int quiet)
 {
     unsigned int max_resp_size = rl_numtables_max_size(
-                rl_ker_numtables,
-                sizeof(rl_ker_numtables)/sizeof(struct rl_msg_layout));
+        rl_ker_numtables,
+        sizeof(rl_ker_numtables) / sizeof(struct rl_msg_layout));
     struct rl_msg_base *resp;
     char serbuf[4096];
     int ret;
@@ -74,8 +73,8 @@ rl_read_next_msg(int rfd, int quiet)
     }
 
     /* Deserialize the message from serbuf into resp. */
-    ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                                serbuf, ret, (void *)resp, max_resp_size);
+    ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX, serbuf,
+                                ret, (void *)resp, max_resp_size);
     if (ret) {
         PE("Problems during deserialization [%d]\n", ret);
         rl_free(resp, RL_MT_MSG);
@@ -96,27 +95,25 @@ rl_write_msg(int rfd, struct rl_msg_base *msg, int quiet)
     /* Serialize the message. */
     serlen = rl_msg_serlen(rl_ker_numtables, RLITE_KER_MSG_MAX, msg);
     if (serlen > sizeof(serbuf)) {
-        PE("Serialized message would be too long [%u]\n",
-                    serlen);
+        PE("Serialized message would be too long [%u]\n", serlen);
         errno = EINVAL;
         return -1;
     }
-    serlen = serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                                 serbuf, msg);
+    serlen =
+        serialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX, serbuf, msg);
 
     ret = write(rfd, serbuf, serlen);
     if (ret < 0) {
         /* An uIPCP may try to deallocate an already deallocated
          * flow. Be quiet just in case. */
-        if (!quiet && !(errno == ENXIO &&
-                        msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
+        if (!quiet &&
+            !(errno == ENXIO && msg->msg_type == RLITE_KER_FLOW_DEALLOC)) {
             perror("write(ctrlmsg)");
         }
 
     } else if (ret != serlen) {
         /* This should never happen if kernel code is correct. */
-        PE("Error: partial write [%d/%u]\n",
-                ret, serlen);
+        PE("Error: partial write [%d/%u]\n", ret, serlen);
         ret = -1;
 
     } else {
@@ -137,11 +134,11 @@ void
 rl_flow_cfg_default(struct rl_flow_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
-    cfg->msg_boundaries = 1;
+    cfg->msg_boundaries    = 1;
     cfg->in_order_delivery = 0;
-    cfg->max_sdu_gap = (rlm_seq_t)-1;
-    cfg->dtcp_present = 0;
-    cfg->dtcp.fc.fc_type = RLITE_FC_T_NONE;
+    cfg->max_sdu_gap       = (rlm_seq_t)-1;
+    cfg->dtcp_present      = 0;
+    cfg->dtcp.fc.fc_type   = RLITE_FC_T_NONE;
 }
 
 static int
@@ -160,7 +157,7 @@ open_port_common(rl_port_t port_id, unsigned int mode, rl_ipcp_id_t ipcp_id)
 
     info.port_id = port_id;
     info.ipcp_id = ipcp_id;
-    info.mode = mode;
+    info.mode    = mode;
 
     ret = ioctl(fd, RLITE_IOCTL_FLOW_BIND, &info);
     if (ret) {
@@ -178,7 +175,8 @@ rl_open_appl_port(rl_port_t port_id)
     return open_port_common(port_id, RLITE_IO_MODE_APPL_BIND, 0);
 }
 
-int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
+int
+rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
      * be considered by the kernel. */
@@ -187,18 +185,17 @@ int rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
 
 static int
 rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
-                     const char *dif_name, int reg,
-                     const char *appl_name)
+                     const char *dif_name, int reg, const char *appl_name)
 {
     if (dif_name && strcmp(dif_name, "") == 0) {
         dif_name = NULL;
     }
 
     memset(req, 0, sizeof(*req));
-    req->msg_type = RLITE_KER_APPL_REGISTER;
-    req->event_id = event_id;
-    req->dif_name = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
-    req->reg = reg;
+    req->msg_type  = RLITE_KER_APPL_REGISTER;
+    req->event_id  = event_id;
+    req->dif_name  = dif_name ? rl_strdup(dif_name, RL_MT_UTILS) : NULL;
+    req->reg       = reg;
     req->appl_name = appl_name ? rl_strdup(appl_name, RL_MT_UTILS) : NULL;
 
     if (dif_name && !req->dif_name) {
@@ -209,10 +206,9 @@ rl_register_req_fill(struct rl_kmsg_appl_register *req, uint32_t event_id,
 }
 
 int
-rl_fa_req_fill(struct rl_kmsg_fa_req *req,
-               uint32_t event_id, const char *dif_name,
-               const char *local_appl, const char *remote_appl,
-               const struct rina_flow_spec *flowspec,
+rl_fa_req_fill(struct rl_kmsg_fa_req *req, uint32_t event_id,
+               const char *dif_name, const char *local_appl,
+               const char *remote_appl, const struct rina_flow_spec *flowspec,
                rl_ipcp_id_t upper_ipcp_id)
 {
     if (dif_name && strcmp(dif_name, "") == 0) {
@@ -232,9 +228,9 @@ rl_fa_req_fill(struct rl_kmsg_fa_req *req,
     } else {
         rina_flow_spec_unreliable(&req->flowspec);
     }
-    req->local_appl = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
+    req->local_appl  = local_appl ? rl_strdup(local_appl, RL_MT_UTILS) : NULL;
     req->remote_appl = remote_appl ? rl_strdup(remote_appl, RL_MT_UTILS) : NULL;
-    req->cookie = (uint32_t)getpid() >> 1;
+    req->cookie      = (uint32_t)getpid() >> 1;
 
     return 0;
 }
@@ -246,18 +242,18 @@ rl_fa_resp_fill(struct rl_kmsg_fa_resp *resp, uint32_t kevent_id,
 {
     memset(resp, 0, sizeof(*resp));
 
-    resp->msg_type = RLITE_KER_FA_RESP;
-    resp->event_id = 1;
-    resp->kevent_id = kevent_id;
-    resp->ipcp_id = ipcp_id;  /* Currently unused by the kernel. */
+    resp->msg_type      = RLITE_KER_FA_RESP;
+    resp->event_id      = 1;
+    resp->kevent_id     = kevent_id;
+    resp->ipcp_id       = ipcp_id; /* Currently unused by the kernel. */
     resp->upper_ipcp_id = upper_ipcp_id;
-    resp->port_id = port_id;
-    resp->response = response;
+    resp->port_id       = port_id;
+    resp->response      = response;
 }
 
-/*
- * POSIX-like API
- */
+    /*
+     * POSIX-like API
+     */
 
 #include "rina/api.h"
 
@@ -267,7 +263,7 @@ rina_open(void)
     return open(RLITE_CTRLDEV_NAME, O_RDWR);
 }
 
-#define RINA_REG_EVENT_ID   0x7a6b /* casual value, used just for assert() */
+#define RINA_REG_EVENT_ID 0x7a6b /* casual value, used just for assert() */
 
 int
 rina_register_wait(int fd, int wfd)
@@ -285,7 +281,7 @@ rina_register_wait(int fd, int wfd)
 
     assert(resp->msg_type == RLITE_KER_APPL_REGISTER_RESP);
     assert(resp->event_id == RINA_REG_EVENT_ID);
-    ipcp_id = resp->ipcp_id;
+    ipcp_id  = resp->ipcp_id;
     response = resp->response;
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(resp));
     rl_free(resp, RL_MT_MSG);
@@ -300,13 +296,13 @@ rina_register_wait(int fd, int wfd)
     memset(&move, 0, sizeof(move));
     move.msg_type = RLITE_KER_APPL_MOVE;
     move.event_id = 1;
-    move.ipcp_id = ipcp_id;
-    move.fd = fd;
+    move.ipcp_id  = ipcp_id;
+    move.fd       = fd;
 
     ret = rl_write_msg(wfd, RLITE_MB(&move), 1);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&move));
 out:
-    close (wfd);
+    close(wfd);
 
     return ret;
 }
@@ -331,8 +327,8 @@ rina_register_common(int fd, const char *dif_name, const char *local_appl,
         return wfd;
     }
 
-    ret = rl_register_req_fill(&req, RINA_REG_EVENT_ID, dif_name,
-                               reg, local_appl);
+    ret = rl_register_req_fill(&req, RINA_REG_EVENT_ID, dif_name, reg,
+                               local_appl);
     if (ret) {
         errno = ENOMEM;
         goto out;
@@ -352,7 +348,7 @@ rina_register_common(int fd, const char *dif_name, const char *local_appl,
     /* Wait for the operation to complete right now. */
     return rina_register_wait(fd, wfd);
 out:
-    close (wfd);
+    close(wfd);
 
     return ret;
 }
@@ -364,13 +360,12 @@ rina_register(int fd, const char *dif_name, const char *local_appl, int flags)
 }
 
 int
-rina_unregister(int fd, const char *dif_name, const char *local_appl,
-                int flags)
+rina_unregister(int fd, const char *dif_name, const char *local_appl, int flags)
 {
     return rina_register_common(fd, dif_name, local_appl, flags, 0);
 }
 
-#define RINA_FA_EVENT_ID    0x6271 /* casual value, used just for assert() */
+#define RINA_FA_EVENT_ID 0x6271 /* casual value, used just for assert() */
 
 int
 __rina_flow_alloc_wait(int wfd, rl_port_t *port_id)
@@ -420,8 +415,9 @@ rina_flow_alloc_wait(int wfd)
 
 int
 __rina_flow_alloc(const char *dif_name, const char *local_appl,
-                const char *remote_appl, const struct rina_flow_spec *flowspec,
-                unsigned int flags, uint16_t upper_ipcp_id)
+                  const char *remote_appl,
+                  const struct rina_flow_spec *flowspec, unsigned int flags,
+                  uint16_t upper_ipcp_id)
 {
     struct rl_kmsg_fa_req req;
     int wfd, ret;
@@ -464,16 +460,16 @@ rina_flow_alloc(const char *dif_name, const char *local_appl,
                 const char *remote_appl, const struct rina_flow_spec *flowspec,
                 unsigned int flags)
 {
-    return __rina_flow_alloc(dif_name, local_appl, remote_appl, flowspec,
-                             flags, 0xffff);
+    return __rina_flow_alloc(dif_name, local_appl, remote_appl, flowspec, flags,
+                             0xffff);
 }
 
 /* Split accept lock and pending lists. */
-static volatile char sa_lock_var = 0;
-static int sa_handle = 0;
+static volatile char sa_lock_var   = 0;
+static int sa_handle               = 0;
 static unsigned int sa_pending_len = 0;
 LIST_STATIC_DECL(sa_pending);
-#define SA_PENDING_MAXLEN   (1 << 11)
+#define SA_PENDING_MAXLEN (1 << 11)
 
 struct sa_pending_item {
     int handle;
@@ -519,7 +515,8 @@ remote_appl_fill(char *src, char **remote_appl)
     return 0;
 }
 
-int rina_flow_respond(int fd, int handle, int response)
+int
+rina_flow_respond(int fd, int handle, int response)
 {
     struct sa_pending_item *cur, *spi = NULL;
     struct rl_kmsg_fa_req_arrived *req;
@@ -528,11 +525,11 @@ int rina_flow_respond(int fd, int handle, int response)
     int ret;
 
     sa_lock();
-    list_for_each_entry(cur, &sa_pending, node) {
+    list_for_each_entry (cur, &sa_pending, node) {
         if (handle == cur->handle) {
             spi = cur;
             list_del(&spi->node);
-            sa_pending_len --;
+            sa_pending_len--;
             break;
         }
     }
@@ -546,8 +543,8 @@ int rina_flow_respond(int fd, int handle, int response)
     req = spi->req;
     rl_free(spi, RL_MT_API);
 
-    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
-                    req->port_id, (uint8_t)response);
+    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff, req->port_id,
+                    (uint8_t)response);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(req));
     rl_free(req, RL_MT_MSG);
 
@@ -574,7 +571,7 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
                  unsigned int flags)
 {
     struct rl_kmsg_fa_req_arrived *req = NULL;
-    struct sa_pending_item *spi = NULL;
+    struct sa_pending_item *spi        = NULL;
     struct rl_kmsg_fa_resp resp;
     int ffd = -1;
     int ret;
@@ -622,20 +619,20 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
 
     if (flags & RINA_F_NORESP) {
         sa_lock();
-        spi->req = req;
-        spi->handle = sa_handle ++;
+        spi->req    = req;
+        spi->handle = sa_handle++;
         if (sa_handle < 0) { /* Overflow */
             sa_handle = 0;
         }
         list_add_tail(&spi->node, &sa_pending);
-        sa_pending_len ++;
+        sa_pending_len++;
         sa_unlock();
 
         return spi->handle;
     }
 
-    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff,
-                    req->port_id, RLITE_SUCC);
+    rl_fa_resp_fill(&resp, req->kevent_id, req->ipcp_id, 0xffff, req->port_id,
+                    RLITE_SUCC);
 
     ret = rl_write_msg(fd, RLITE_MB(&resp), 1);
     if (ret < 0) {
@@ -645,11 +642,9 @@ rina_flow_accept(int fd, char **remote_appl, struct rina_flow_spec *spec,
     ffd = rl_open_appl_port(req->port_id);
 
 out2:
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(&resp));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&resp));
 out1:
-    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX,
-                   RLITE_MB(req));
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(req));
     rl_free(req, RL_MT_MSG);
 out0:
     if (spi) {

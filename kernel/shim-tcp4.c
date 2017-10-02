@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #include <linux/types.h>
@@ -40,7 +41,6 @@
 #include <linux/version.h>
 #include <net/sock.h>
 
-
 struct rl_shim_tcp4 {
     struct ipcp_entry *ipcp;
     struct work_struct txw;
@@ -55,9 +55,10 @@ struct shim_tcp4_flow {
     struct work_struct rxw;
     void (*sk_data_ready)(struct sock *sk
 #ifdef RL_SK_DATA_READY_SECOND_ARG
-                          , int unused
-#endif  /* RL_SK_DATA_READY_SECOND_ARG */
-                         );
+                          ,
+                          int unused
+#endif /* RL_SK_DATA_READY_SECOND_ARG */
+    );
     void (*sk_write_space)(struct sock *sk);
 
     struct rl_buf *cur_rx_rb;
@@ -69,7 +70,7 @@ struct shim_tcp4_flow {
     spinlock_t txstats_lock;
 };
 
-#define INET4_MAX_TXQ_LEN     64
+#define INET4_MAX_TXQ_LEN 64
 
 struct txq_entry {
     struct rl_buf *rb;
@@ -122,7 +123,7 @@ static void
 tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 {
     struct flow_entry *flow = priv->flow;
-    struct socket *sock = priv->sock;
+    struct socket *sock     = priv->sock;
     struct msghdr msghdr;
     struct iovec iov;
     int ret;
@@ -136,19 +137,19 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
         if (priv->cur_rx_hdr) {
             /* We're reading the 2-bytes header containing the SDU length. */
             iov.iov_base = &priv->cur_rx_rblen;
-            iov.iov_len = sizeof(priv->cur_rx_rblen);
+            iov.iov_len  = sizeof(priv->cur_rx_rblen);
 
         } else {
             /* We're reading the SDU. */
             iov.iov_base = RL_BUF_DATA(priv->cur_rx_rb);
-            iov.iov_len = priv->cur_rx_rblen;
+            iov.iov_len  = priv->cur_rx_rblen;
         }
 
         iov.iov_base += priv->cur_rx_buflen;
         iov.iov_len -= priv->cur_rx_buflen;
 
-        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1,
-                             iov.iov_len, msghdr.msg_flags);
+        ret = kernel_recvmsg(sock, &msghdr, (struct kvec *)&iov, 1, iov.iov_len,
+                             msghdr.msg_flags);
         if (ret == -EAGAIN) {
             break;
         } else if (unlikely(ret <= 0)) {
@@ -165,18 +166,17 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 
         priv->cur_rx_buflen += ret;
 
-        if (priv->cur_rx_hdr && priv->cur_rx_buflen ==
-                                    sizeof(priv->cur_rx_rblen)) {
+        if (priv->cur_rx_hdr &&
+            priv->cur_rx_buflen == sizeof(priv->cur_rx_rblen)) {
             /* We have completely read the 2-bytes header. */
             priv->cur_rx_rblen = ntohs(priv->cur_rx_rblen);
             if (unlikely(!priv->cur_rx_rblen)) {
                 PE("Warning: zero lenght packet\n");
             } else {
                 priv->cur_rx_hdr = false;
-                priv->cur_rx_rb = rl_buf_alloc(priv->cur_rx_rblen,
-                                               priv->flow->txrx.ipcp->hdroom,
-                                               priv->flow->txrx.ipcp->tailroom,
-                                               GFP_ATOMIC);
+                priv->cur_rx_rb  = rl_buf_alloc(
+                    priv->cur_rx_rblen, priv->flow->txrx.ipcp->hdroom,
+                    priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
                 if (unlikely(!priv->cur_rx_rb)) {
                     flow->stats.rx_err++;
                     PE("Out of memory\n");
@@ -187,16 +187,16 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 
             priv->cur_rx_buflen = 0;
 
-        } else if (!priv->cur_rx_hdr && priv->cur_rx_buflen ==
-                                            priv->cur_rx_rblen) {
+        } else if (!priv->cur_rx_hdr &&
+                   priv->cur_rx_buflen == priv->cur_rx_rblen) {
             /* We have completely read the SDU. */
             rl_sdu_rx_flow(flow->txrx.ipcp, flow, priv->cur_rx_rb, true);
 
             flow->stats.rx_pkt++;
             flow->stats.rx_byte += priv->cur_rx_rblen;
 
-            priv->cur_rx_rb = NULL;
-            priv->cur_rx_hdr = true;
+            priv->cur_rx_rb    = NULL;
+            priv->cur_rx_hdr   = true;
             priv->cur_rx_rblen = 0;
 
             priv->cur_rx_buflen = 0;
@@ -209,8 +209,7 @@ tcp4_drain_socket_rxq(struct shim_tcp4_flow *priv)
 static void
 tcp4_rx_worker(struct work_struct *w)
 {
-    struct shim_tcp4_flow *priv =
-            container_of(w, struct shim_tcp4_flow, rxw);
+    struct shim_tcp4_flow *priv = container_of(w, struct shim_tcp4_flow, rxw);
 
     tcp4_drain_socket_rxq(priv);
 }
@@ -218,8 +217,9 @@ tcp4_rx_worker(struct work_struct *w)
 static void
 tcp4_data_ready(struct sock *sk
 #ifdef RL_SK_DATA_READY_SECOND_ARG
-                , int unused
-#endif  /* RL_SK_DATA_READY_SECOND_ARG */
+                ,
+                int unused
+#endif /* RL_SK_DATA_READY_SECOND_ARG */
 )
 {
     struct shim_tcp4_flow *priv = sk->sk_user_data;
@@ -254,17 +254,18 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     /* This increments the file descriptor reference counter. */
     sock = sockfd_lookup(flow->cfg.fd, &err);
     if (!sock) {
-        PE("Cannot find socket corresponding to file descriptor %d\n", flow->cfg.fd);
+        PE("Cannot find socket corresponding to file descriptor %d\n",
+           flow->cfg.fd);
         rl_free(priv, RL_MT_SHIMDATA);
         return err;
     }
 
     write_lock_bh(&sock->sk->sk_callback_lock);
-    priv->sk_data_ready = sock->sk->sk_data_ready;
-    priv->sk_write_space = sock->sk->sk_write_space;
-    sock->sk->sk_data_ready = tcp4_data_ready;
+    priv->sk_data_ready      = sock->sk->sk_data_ready;
+    priv->sk_write_space     = sock->sk->sk_write_space;
+    sock->sk->sk_data_ready  = tcp4_data_ready;
     sock->sk->sk_write_space = tcp4_write_space;
-    sock->sk->sk_user_data = priv;
+    sock->sk->sk_user_data   = priv;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
     sock_reset_flag(sock->sk, SOCK_USE_WRITE_QUEUE);
@@ -277,10 +278,10 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     spin_lock_init(&priv->txstats_lock);
 
     /* Initialize TCP reader state machine. */
-    priv->cur_rx_rb = NULL;
-    priv->cur_rx_rblen = 0;
+    priv->cur_rx_rb     = NULL;
+    priv->cur_rx_rblen  = 0;
     priv->cur_rx_buflen = 0;
-    priv->cur_rx_hdr = true;
+    priv->cur_rx_hdr    = true;
 
     priv->flow = flow;
     flow->priv = priv;
@@ -298,8 +299,7 @@ rl_shim_tcp4_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 }
 
 static int
-rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
-                                 struct flow_entry *flow)
+rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp, struct flow_entry *flow)
 {
     struct shim_tcp4_flow *priv = flow->priv;
     struct socket *sock;
@@ -313,9 +313,9 @@ rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
     sock = priv->sock;
 
     write_lock_bh(&sock->sk->sk_callback_lock);
-    sock->sk->sk_data_ready = priv->sk_data_ready;
+    sock->sk->sk_data_ready  = priv->sk_data_ready;
     sock->sk->sk_write_space = priv->sk_write_space;
-    sock->sk->sk_user_data = NULL;
+    sock->sk->sk_user_data   = NULL;
     write_unlock_bh(&sock->sk->sk_callback_lock);
 
     /* Decrement the file descriptor reference counter, in order to
@@ -331,34 +331,32 @@ rl_shim_tcp4_flow_deallocated(struct ipcp_entry *ipcp,
 }
 
 static int
-tcp4_xmit(struct shim_tcp4_flow *flow_priv,
-           struct rl_buf *rb)
+tcp4_xmit(struct shim_tcp4_flow *flow_priv, struct rl_buf *rb)
 {
     struct msghdr msghdr;
     struct iovec iov[2];
     uint16_t lenhdr = htons(rb->len);
-    int totlen = rb->len + sizeof(lenhdr);
+    int totlen      = rb->len + sizeof(lenhdr);
     int ret;
 
     memset(&msghdr, 0, sizeof(msghdr));
     iov[0].iov_base = &lenhdr;
-    iov[0].iov_len = sizeof(lenhdr);
+    iov[0].iov_len  = sizeof(lenhdr);
     iov[1].iov_base = RL_BUF_DATA(rb);
-    iov[1].iov_len = rb->len;
+    iov[1].iov_len  = rb->len;
 
     msghdr.msg_flags = MSG_DONTWAIT;
-    ret = kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)iov, 2,
-                         totlen);
+    ret =
+        kernel_sendmsg(flow_priv->sock, &msghdr, (struct kvec *)iov, 2, totlen);
 
     if (unlikely(ret != totlen)) {
         PD("wspaces: %d, %lu\n", sk_stream_wspace(flow_priv->sock->sk),
-                                 sock_wspace(flow_priv->sock->sk));
+           sock_wspace(flow_priv->sock->sk));
         if (ret < 0) {
             PE("kernel_sendmsg(): failed [%d]\n", ret);
 
         } else {
-            PI("kernel_sendmsg(): partial write %d/%d\n",
-               ret, (int)rb->len);
+            PI("kernel_sendmsg(): partial write %d/%d\n", ret, (int)rb->len);
         }
 
         spin_lock_bh(&flow_priv->txstats_lock);
@@ -380,8 +378,7 @@ tcp4_xmit(struct shim_tcp4_flow *flow_priv,
 static void
 tcp4_tx_worker(struct work_struct *w)
 {
-    struct rl_shim_tcp4 *priv =
-            container_of(w, struct rl_shim_tcp4, txw);
+    struct rl_shim_tcp4 *priv = container_of(w, struct rl_shim_tcp4, txw);
     int totlen;
 
     for (;;) {
@@ -423,13 +420,12 @@ rl_shim_tcp4_flow_writeable(struct flow_entry *flow)
 }
 
 static int
-rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
-                      struct flow_entry *flow,
-                      struct rl_buf *rb, bool maysleep)
+rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
+                       struct rl_buf *rb, bool maysleep)
 {
     struct shim_tcp4_flow *flow_priv = flow->priv;
-    struct rl_shim_tcp4 *shim = ipcp->priv;
-    int totlen = rb->len + sizeof(uint16_t);
+    struct rl_shim_tcp4 *shim        = ipcp->priv;
+    int totlen                       = rb->len + sizeof(uint16_t);
 
     if (sk_stream_wspace(flow_priv->sock->sk) < totlen + 2) {
         /* Backpressure: We will be called again. */
@@ -437,8 +433,8 @@ rl_shim_tcp4_sdu_write(struct ipcp_entry *ipcp,
     }
 
     if (!maysleep) {
-        struct txq_entry *qe = rl_alloc(sizeof(*qe), GFP_ATOMIC,
-                                        RL_MT_SHIMDATA);
+        struct txq_entry *qe =
+            rl_alloc(sizeof(*qe), GFP_ATOMIC, RL_MT_SHIMDATA);
         bool drop = false;
 
         if (unlikely(!qe)) {
@@ -486,7 +482,7 @@ rl_shim_tcp4_config(struct ipcp_entry *ipcp, const char *param_name,
 
 static int
 rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
-                                struct rl_flow_stats *stats)
+                            struct rl_flow_stats *stats)
 {
     struct shim_tcp4_flow *priv = flow->priv;
 
@@ -497,7 +493,7 @@ rl_shim_tcp4_flow_get_stats(struct flow_entry *flow,
     return 0;
 }
 
-#define SHIM_DIF_TYPE   "shim-tcp4"
+#define SHIM_DIF_TYPE "shim-tcp4"
 
 static struct ipcp_factory shim_tcp4_factory = {
     .owner                  = THIS_MODULE,

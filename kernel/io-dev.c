@@ -39,7 +39,6 @@
 #include <linux/uio.h>
 #include <asm/compat.h>
 
-
 LIST_HEAD(rl_iodevs);
 DEFINE_MUTEX(rl_iodevs_lock);
 
@@ -66,7 +65,7 @@ hms_time(void)
 void
 tx_completion_func(unsigned long arg)
 {
-    struct ipcp_entry *ipcp= (struct ipcp_entry *)arg;
+    struct ipcp_entry *ipcp = (struct ipcp_entry *)arg;
 
     for (;;) {
         struct rl_buf *rb;
@@ -103,10 +102,11 @@ tx_completion_func(unsigned long arg)
 }
 
 /* Userspace queue threshold in bytes. */
-#define RL_RXQ_SIZE_MAX         (1 << 20)
+#define RL_RXQ_SIZE_MAX (1 << 20)
 
-int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
-                   struct rl_buf *rb, bool qlimit)
+int
+rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
+               struct rl_buf *rb, bool qlimit)
 {
     struct ipcp_entry *upper_ipcp = flow->upper.ipcp;
     struct txrx *txrx;
@@ -130,16 +130,17 @@ int rl_sdu_rx_flow(struct ipcp_entry *ipcp, struct flow_entry *flow,
     spin_lock_bh(&txrx->rx_lock);
     if (unlikely(qlimit && txrx->rx_qsize > RL_RXQ_SIZE_MAX)) {
         /* This is useful when flow control is not used on a flow. */
-        RPD(2, "dropping PDU [length %lu] to avoid userspace rx queue "
-                "overrun\n", (long unsigned)rb->len);
+        RPD(2,
+            "dropping PDU [length %lu] to avoid userspace rx queue "
+            "overrun\n",
+            (long unsigned)rb->len);
         rl_buf_free(rb);
     } else {
         rb_list_enq(rb, &txrx->rx_q);
         txrx->rx_qsize += rl_buf_truesize(rb);
     }
     spin_unlock_bh(&txrx->rx_lock);
-    wake_up_interruptible_poll(&txrx->rx_wqh,
-                               POLLIN | POLLRDNORM | POLLRDBAND);
+    wake_up_interruptible_poll(&txrx->rx_wqh, POLLIN | POLLRDNORM | POLLRDBAND);
 
     return 0;
 }
@@ -168,8 +169,9 @@ rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
 {
     struct ipcp_entry *shortcut = ipcp->shortcut;
 
-    if (shortcut == NULL || (rb = shortcut->ops.sdu_rx(shortcut, rb,
-                                    /* unused */ NULL)) != NULL) {
+    if (shortcut == NULL ||
+        (rb = shortcut->ops.sdu_rx(shortcut, rb,
+                                   /* unused */ NULL)) != NULL) {
         /* We cannot take the shortcut optimization, inform the caller. */
         return rb;
     }
@@ -177,7 +179,6 @@ rl_sdu_rx_shortcut(struct ipcp_entry *ipcp, struct rl_buf *rb)
     /* Shortcut successfully taken! */
 
     return NULL;
-
 }
 EXPORT_SYMBOL(rl_sdu_rx_shortcut);
 
@@ -234,8 +235,8 @@ struct rl_io {
 static int
 rl_io_open(struct inode *inode, struct file *f)
 {
-    struct rl_io *rio = rl_alloc(sizeof(*rio), GFP_KERNEL | __GFP_ZERO,
-                                 RL_MT_IODEV);
+    struct rl_io *rio =
+        rl_alloc(sizeof(*rio), GFP_KERNEL | __GFP_ZERO, RL_MT_IODEV);
 
     if (!rio) {
         PE("Out of memory\n");
@@ -255,12 +256,11 @@ rl_io_write_iter(struct kiocb *iocb,
 #ifdef RL_HAVE_CHRDEV_RW_ITER
                  struct iov_iter *from
 #else  /* AIO_RW */
-                 const struct iovec *from,
-                 unsigned long iov_cnt, loff_t pos
+                 const struct iovec *from, unsigned long iov_cnt, loff_t pos
 #endif /* AIO_RW */
 )
 {
-    struct file *f = iocb->ki_filp;
+    struct file *f    = iocb->ki_filp;
     struct rl_io *rio = (struct rl_io *)f->private_data;
     struct flow_entry *flow;
     struct ipcp_entry *ipcp;
@@ -271,7 +271,7 @@ rl_io_write_iter(struct kiocb *iocb,
 #else  /* AIO_RW */
     size_t left = iov_length(from, iov_cnt);
 #endif /* AIO_RW */
-    size_t tot = 0;
+    size_t tot    = 0;
     bool blocking = !(f->f_flags & O_NONBLOCK);
     bool mgmt_sdu;
     bool something_sent = false;
@@ -284,12 +284,12 @@ rl_io_write_iter(struct kiocb *iocb,
     }
 
     /* If this is a management SDU write, rio->flow is NULL. */
-    ipcp = rio->txrx->ipcp;
-    flow = rio->flow;
+    ipcp     = rio->txrx->ipcp;
+    flow     = rio->flow;
     mgmt_sdu = (rio->mode == RLITE_IO_MODE_IPCP_MGMT);
 
     if (unlikely(mgmt_sdu)) {
-        /* Copy in the management header. */
+    /* Copy in the management header. */
 #ifdef RL_HAVE_CHRDEV_RW_ITER
         if (copy_from_iter(&mhdr, sizeof(mhdr), from) != sizeof(mhdr)) {
             PE("copy_from_iter(mgmthdr)\n");
@@ -305,8 +305,8 @@ rl_io_write_iter(struct kiocb *iocb,
         tot += sizeof(mhdr);
     }
 
-    if (unlikely((mgmt_sdu || flow->cfg.msg_boundaries)
-                    && left > ipcp->max_sdu_size)) {
+    if (unlikely((mgmt_sdu || flow->cfg.msg_boundaries) &&
+                 left > ipcp->max_sdu_size)) {
         /* We cannot split the write(): message boundaries need to be handled
          * by EFCP fragmentation and reassembly. */
         return -EMSGSIZE;
@@ -321,16 +321,18 @@ rl_io_write_iter(struct kiocb *iocb,
             break;
         }
 
-        /* Copy in the userspace SDU. */
+            /* Copy in the userspace SDU. */
 #ifdef RL_HAVE_CHRDEV_RW_ITER
-        if (unlikely(copy_from_iter(RL_BUF_DATA(rb), copylen, from) != copylen)) {
+        if (unlikely(copy_from_iter(RL_BUF_DATA(rb), copylen, from) !=
+                     copylen)) {
             PE("copy_from_iter(data)\n");
             rl_buf_free(rb);
             ret = -EINVAL;
             break;
         }
 #else  /* AIO_RW */
-        if (unlikely(memcpy_fromiovecend(RL_BUF_DATA(rb), from, tot, copylen))) {
+        if (unlikely(
+                memcpy_fromiovecend(RL_BUF_DATA(rb), from, tot, copylen))) {
             PE("memcpy_fromiovecend(data)\n");
             rl_buf_free(rb);
             ret = -EINVAL;
@@ -381,8 +383,8 @@ rl_io_write_iter(struct kiocb *iocb,
                     rb = NULL;
                     /* We avoid restarting the system call, because the other
                      * end could have shutdown the flow, ops.sdu_write()
-                     * could keep returning -EAGAIN forever, and appication could
-                     * get stuck in the write() syscall forever. */
+                     * could keep returning -EAGAIN forever, and appication
+                     * could get stuck in the write() syscall forever. */
                     ret = -EINTR;
                     break;
                 }
@@ -396,7 +398,6 @@ rl_io_write_iter(struct kiocb *iocb,
                 /* No room to write, let's sleep. */
                 schedule();
                 continue;
-
             }
             break;
         }
@@ -423,16 +424,15 @@ rl_io_read_iter(struct kiocb *iocb,
 #ifdef RL_HAVE_CHRDEV_RW_ITER
                 struct iov_iter *to
 #else  /* AIO_RW */
-                const struct iovec *to,
-                unsigned long iov_cnt, loff_t pos
+                const struct iovec *to, unsigned long iov_cnt, loff_t pos
 #endif /* AIO_RW */
 )
 {
-    struct file *f = iocb->ki_filp;
-    struct rl_io *rio = (struct rl_io *)f->private_data;
+    struct file *f          = iocb->ki_filp;
+    struct rl_io *rio       = (struct rl_io *)f->private_data;
     struct flow_entry *flow = rio->flow; /* NULL if mgmt */
-    bool blocking = !(f->f_flags & O_NONBLOCK);
-    struct txrx *txrx = rio->txrx;
+    bool blocking           = !(f->f_flags & O_NONBLOCK);
+    struct txrx *txrx       = rio->txrx;
     DECLARE_WAITQUEUE(wait, current);
 #ifdef RL_HAVE_CHRDEV_RW_ITER
     size_t ulen = iov_iter_count(to);
@@ -481,7 +481,7 @@ rl_io_read_iter(struct kiocb *iocb,
 
         rb = rb_list_front(&txrx->rx_q);
 
-	if (unlikely(ulen < rb->len)) {
+        if (unlikely(ulen < rb->len)) {
             /* Partial SDU read, don't consume the rb. */
             ret = rl_buf_copy_to_user(rb, to, ulen);
             if (likely(ret >= 0)) {
@@ -518,10 +518,10 @@ rl_io_read_iter(struct kiocb *iocb,
 static unsigned int
 rl_io_poll(struct file *f, poll_table *wait)
 {
-    struct rl_io *rio = (struct rl_io *)f->private_data;
-    struct txrx *txrx = rio->txrx;
+    struct rl_io *rio       = (struct rl_io *)f->private_data;
+    struct txrx *txrx       = rio->txrx;
     struct ipcp_entry *ipcp = txrx->ipcp;
-    unsigned int mask = 0;
+    unsigned int mask       = 0;
 
     if (unlikely(!txrx)) {
         return POLLERR;
@@ -540,7 +540,7 @@ rl_io_poll(struct file *f, poll_table *wait)
     spin_unlock_bh(&txrx->rx_lock);
 
     if (!rio->flow || !ipcp->ops.flow_writeable ||
-                ipcp->ops.flow_writeable(rio->flow)) {
+        ipcp->ops.flow_writeable(rio->flow)) {
         mask |= POLLOUT | POLLWRNORM;
     }
 
@@ -553,9 +553,9 @@ rl_iodevs_shutdown_by_ipcp(struct ipcp_entry *ipcp)
     struct rl_io *rio;
 
     IODEVS_LOCK();
-    list_for_each_entry(rio, &rl_iodevs, node) {
-        if (rio->mode == RLITE_IO_MODE_APPL_BIND &&
-                rio->flow && rio->flow->txrx.ipcp == ipcp) {
+    list_for_each_entry (rio, &rl_iodevs, node) {
+        if (rio->mode == RLITE_IO_MODE_APPL_BIND && rio->flow &&
+            rio->flow->txrx.ipcp == ipcp) {
             PD("Shutting down flow %u\n", rio->flow->local_port);
             rl_flow_shutdown(rio->flow);
         }
@@ -569,10 +569,10 @@ rl_iodevs_probe_ipcp_references(struct ipcp_entry *ipcp)
     struct rl_io *rio;
 
     IODEVS_LOCK();
-    list_for_each_entry(rio, &rl_iodevs, node) {
+    list_for_each_entry (rio, &rl_iodevs, node) {
         if (rio->flow && rio->flow->txrx.ipcp == ipcp) {
             PE("iodev bound to flow %u has dangling reference to ipcp %u\n",
-                rio->flow->local_port, ipcp->id);
+               rio->flow->local_port, ipcp->id);
         }
     }
     IODEVS_UNLOCK();
@@ -584,7 +584,7 @@ rl_iodevs_probe_flow_references(struct flow_entry *flow)
     struct rl_io *rio;
 
     IODEVS_LOCK();
-    list_for_each_entry(rio, &rl_iodevs, node) {
+    list_for_each_entry (rio, &rl_iodevs, node) {
         if (rio->flow == flow) {
             PE("iodev bound has dangling reference to flow %u\n",
                flow->local_port);
@@ -644,8 +644,8 @@ rl_io_ioctl_mgmt(struct rl_io *rio, struct rl_ioctl_info *info)
         return -ENXIO;
     }
 
-    rio->txrx = rl_alloc(sizeof(*(rio->txrx)), GFP_KERNEL | __GFP_ZERO,
-                         RL_MT_MISC);
+    rio->txrx =
+        rl_alloc(sizeof(*(rio->txrx)), GFP_KERNEL | __GFP_ZERO, RL_MT_MISC);
     if (!rio->txrx) {
         ipcp_put(ipcp);
         PE("Out of memory\n");
@@ -667,7 +667,7 @@ rl_io_release_internal(struct rl_io *rio)
         /* Drain rx queue. */
         struct rl_buf *rb, *tmp;
 
-        rb_list_foreach_safe(rb, tmp, &rio->txrx->rx_q) {
+        rb_list_foreach_safe (rb, tmp, &rio->txrx->rx_q) {
             rb_list_del(rb);
             rl_buf_free(rb);
         }
@@ -675,36 +675,34 @@ rl_io_release_internal(struct rl_io *rio)
     }
 
     switch (rio->mode) {
-        case RLITE_IO_MODE_APPL_BIND:
-            {
-                struct flow_entry *flow;
+    case RLITE_IO_MODE_APPL_BIND: {
+        struct flow_entry *flow;
 
-                /* A previous flow was bound to this file descriptor,
-                 * so let's unbind from it. */
-                IODEVS_LOCK();
-                BUG_ON(!rio->flow);
-                flow = rio->flow;
-                rio->flow = NULL;
-                rio->txrx = NULL;
-                IODEVS_UNLOCK();
-                flow_put(flow);
-            }
-            break;
+        /* A previous flow was bound to this file descriptor,
+         * so let's unbind from it. */
+        IODEVS_LOCK();
+        BUG_ON(!rio->flow);
+        flow      = rio->flow;
+        rio->flow = NULL;
+        rio->txrx = NULL;
+        IODEVS_UNLOCK();
+        flow_put(flow);
+    } break;
 
-        case RLITE_IO_MODE_IPCP_MGMT:
-            BUG_ON(!rio->txrx);
-            BUG_ON(!rio->txrx->ipcp);
-            /* A previous IPCP was bound to this management file
-             * descriptor, so let's unbind from it. */
-            rio->txrx->ipcp->mgmt_txrx = NULL;
-            ipcp_put(rio->txrx->ipcp);
-            rl_free(rio->txrx, RL_MT_MISC);
-            rio->txrx = NULL;
-            break;
+    case RLITE_IO_MODE_IPCP_MGMT:
+        BUG_ON(!rio->txrx);
+        BUG_ON(!rio->txrx->ipcp);
+        /* A previous IPCP was bound to this management file
+         * descriptor, so let's unbind from it. */
+        rio->txrx->ipcp->mgmt_txrx = NULL;
+        ipcp_put(rio->txrx->ipcp);
+        rl_free(rio->txrx, RL_MT_MISC);
+        rio->txrx = NULL;
+        break;
 
-        default:
-            /* No previous mode, nothing to undo. */
-            break;
+    default:
+        /* No previous mode, nothing to undo. */
+        break;
     }
 
     /* Reset mode for consistency. */
@@ -718,51 +716,48 @@ rl_io_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
     struct rl_io *rio = (struct rl_io *)f->private_data;
     void __user *argp = (void __user *)arg;
-    long ret = 0;
+    long ret          = 0;
 
     switch (cmd) {
-    case RLITE_IOCTL_FLOW_BIND:
-        {
-            struct rl_ioctl_info info;
+    case RLITE_IOCTL_FLOW_BIND: {
+        struct rl_ioctl_info info;
 
-            if (copy_from_user(&info, argp, sizeof(info))) {
-                return -EFAULT;
-            }
+        if (copy_from_user(&info, argp, sizeof(info))) {
+            return -EFAULT;
+        }
 
-            rl_io_release_internal(rio);
+        rl_io_release_internal(rio);
 
-            switch (info.mode) {
-                case RLITE_IO_MODE_APPL_BIND:
-                    ret = rl_io_ioctl_bind(rio, &info);
-                    break;
+        switch (info.mode) {
+        case RLITE_IO_MODE_APPL_BIND:
+            ret = rl_io_ioctl_bind(rio, &info);
+            break;
 
-                case RLITE_IO_MODE_IPCP_MGMT:
-                    ret = rl_io_ioctl_mgmt(rio, &info);
-                    break;
-
-            }
-
-            if (ret == 0) {
-                /* Set the mode only if the ioctl operation was successful.
-                 * This is very important because rl_io_release_internal()
-                 * looks at the mode to perform its action, assuming some
-                 * pointers to be not NULL depending on the mode. */
-                rio->mode = info.mode;
-            }
+        case RLITE_IO_MODE_IPCP_MGMT:
+            ret = rl_io_ioctl_mgmt(rio, &info);
             break;
         }
 
-    case RLITE_IOCTL_MSS_GET:
-        {
-            uint32_t __user *mss = (uint32_t __user *)argp;
-
-            BUG_ON(!rio->txrx);
-            BUG_ON(!rio->txrx->ipcp);
-            if (put_user(rio->txrx->ipcp->max_sdu_size, mss)) {
-                return -EFAULT;
-            }
-            break;
+        if (ret == 0) {
+            /* Set the mode only if the ioctl operation was successful.
+             * This is very important because rl_io_release_internal()
+             * looks at the mode to perform its action, assuming some
+             * pointers to be not NULL depending on the mode. */
+            rio->mode = info.mode;
         }
+        break;
+    }
+
+    case RLITE_IOCTL_MSS_GET: {
+        uint32_t __user *mss = (uint32_t __user *)argp;
+
+        BUG_ON(!rio->txrx);
+        BUG_ON(!rio->txrx->ipcp);
+        if (put_user(rio->txrx->ipcp->max_sdu_size, mss)) {
+            return -EFAULT;
+        }
+        break;
+    }
 
     default:
         ret = -EINVAL;
@@ -790,31 +785,31 @@ rl_io_release(struct inode *inode, struct file *f)
 static long
 rl_io_compat_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	return rl_io_ioctl(f, cmd, (unsigned long)compat_ptr(arg));
+    return rl_io_ioctl(f, cmd, (unsigned long)compat_ptr(arg));
 }
 #endif
 
 static const struct file_operations rl_io_fops = {
-    .owner          = THIS_MODULE,
-    .release        = rl_io_release,
-    .open           = rl_io_open,
+    .owner   = THIS_MODULE,
+    .release = rl_io_release,
+    .open    = rl_io_open,
 #ifdef RL_HAVE_CHRDEV_RW_ITER
-    .write_iter     = rl_io_write_iter,
-    .read_iter      = rl_io_read_iter,
+    .write_iter = rl_io_write_iter,
+    .read_iter  = rl_io_read_iter,
 #else  /* AIO_RW */
-    .aio_write      = rl_io_write_iter,
-    .aio_read       = rl_io_read_iter,
+    .aio_write = rl_io_write_iter,
+    .aio_read = rl_io_read_iter,
 #endif /* AIO_RW */
     .poll           = rl_io_poll,
     .unlocked_ioctl = rl_io_ioctl,
 #ifdef CONFIG_COMPAT
-    .compat_ioctl    = rl_io_compat_ioctl,
+    .compat_ioctl = rl_io_compat_ioctl,
 #endif
-    .llseek         = noop_llseek,
+    .llseek = noop_llseek,
 };
 
 struct miscdevice rl_io_misc = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = "rlite-io",
-    .fops = &rl_io_fops,
+    .name  = "rlite-io",
+    .fops  = &rl_io_fops,
 };
