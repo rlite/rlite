@@ -29,6 +29,7 @@
 #include <fstream>
 #include <cstring>
 #include <sstream>
+#include <cstdlib>
 #include <unistd.h>
 #include <stdint.h>
 #include <cstdlib>
@@ -835,22 +836,28 @@ addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
 rlm_addr_t
 addr_allocator_distributed::allocate()
 {
-    rlm_addr_t addr = rib->myaddr; /* exclude my address */
+    rlm_addr_t modulo = addr_alloc_table.size() + 1;
+    const int inflate = 2;
+    rlm_addr_t addr = 0;
 
-    /* Assign an address to the initiator running a distributed
-     * allocation procedure. */
-
-    /* Look for the highest address already in use. */
-    for (map<rlm_addr_t, AddrAllocRequest>::const_iterator
-                    at = addr_alloc_table.begin();
-                            at != addr_alloc_table.end(); at++) {
-        if (at->first > addr) {
-            addr = at->first;
-        }
+    if ((modulo << inflate) <= modulo) { /* overflow */
+        modulo = ~((rlm_addr_t)0);
+        UPD(rib->uipcp, "overflow\n");
+    } else {
+        modulo <<= inflate;
     }
 
+    srand((unsigned int)rib->myaddr);
+
     for (;;) {
-        addr ++; /* try with the next one */
+        /* Randomly pick an address in [0 .. modulo-1]. */
+        addr = rand() % modulo;
+
+        /* Discard the address if it is invalid, or it is already (or possibly)
+         * in use by us or another IPCP in the DIF. */
+        if (!addr || addr == rib->myaddr || addr_alloc_table.count(addr) > 0) {
+            continue;
+        }
 
         UPD(rib->uipcp, "Trying with address %lu\n", (unsigned long)addr);
         addr_alloc_table[addr] = AddrAllocRequest(addr, rib->myaddr);

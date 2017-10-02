@@ -38,3 +38,5 @@ Open tasks, in decreasing order of priority:
 
 * io-dev: support read_iter() and write_iter() to avoid copies on
   writev() and readv()
+
+* add kernel operation to print forwarding table
