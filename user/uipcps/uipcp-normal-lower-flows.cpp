@@ -23,6 +23,8 @@
 
 #include <climits>
 #include <cerrno>
+#include <sstream>
+#include <iostream>
 
 #include "uipcp-normal.hpp"
 
@@ -254,6 +256,12 @@ lfdb_default::dump(std::stringstream& ss) const
     ss << endl;
 }
 
+void
+lfdb_default::dump_routing(std::stringstream& ss) const
+{
+    re.dump(ss);
+}
+
 int
 lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
@@ -479,7 +487,6 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
         }
     }
 
-#if 1
     PV_S("Graph [%lu]:\n", lfdb->db.size());
     for (map<rlm_addr_t, list<Edge> >::iterator g = graph.begin();
                                             g != graph.end(); g++) {
@@ -490,7 +497,6 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
         }
         PV_S("}\n");
     }
-#endif
 
     /* Compute shortest paths rooted at the local node, and use the
      * result to fill in the next_hops routing table. */
@@ -549,15 +555,11 @@ RoutingEngine::compute_next_hops(rlm_addr_t local_addr)
         }
     }
 
-    PV_S("Routing table:\n");
-    for (map<rlm_addr_t, list<rlm_addr_t> >::iterator h = next_hops.begin();
-                                        h != next_hops.end(); h++) {
-        PV_S("    Address: %lu, Next hops: ", (long unsigned)h->first);
-        for (list<rlm_addr_t>::iterator lfa = h->second.begin();
-                                lfa != h->second.end(); lfa ++) {
-            PV_S("%lu ", (long unsigned)*lfa);
-        }
-        PV_S("\n");
+    if (rl_verbosity >= RL_VERB_VERY) {
+        stringstream ss;
+
+        dump(ss);
+        cout << ss.str();
     }
 
     return 0;
@@ -700,3 +702,17 @@ RoutingEngine::update_kernel_routing(rlm_addr_t addr)
     compute_fwd_table();
 }
 
+void
+RoutingEngine::dump(std::stringstream& ss) const
+{
+    ss << "Routing table for node " << rib->myaddr << ":" << endl;
+    for (map<rlm_addr_t, list<rlm_addr_t> >::const_iterator
+                h = next_hops.begin(); h != next_hops.end(); h++) {
+        ss << "    Address: " << h->first << ", Next hops: ";
+        for (list<rlm_addr_t>::const_iterator lfa = h->second.begin();
+                                lfa != h->second.end(); lfa ++) {
+            ss << *lfa;
+        }
+        ss << endl;
+    }
+}

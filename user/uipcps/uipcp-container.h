@@ -105,6 +105,9 @@ struct uipcp_ops {
     /* User asks for a dump of the RIB. */
     char * (*rib_show)(struct uipcp *);
 
+    /* User asks for a dump of the routing information. */
+    char * (*routing_show)(struct uipcp *);
+
     /* An application asked to be registered within the DIF this
      * uipcp is part of. */
     int (*appl_register)(struct uipcp *uipcp,

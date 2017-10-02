@@ -42,6 +42,8 @@ enum {
     RLITE_U_MEMTRACK_DUMP,              /* 7 */
     RLITE_U_IPCP_POLICY_MOD,            /* 8 */
     RLITE_U_IPCP_ENROLLER_ENABLE,       /* 9 */
+    RLITE_U_IPCP_ROUTING_SHOW_REQ,      /* 10 */
+    RLITE_U_IPCP_ROUTING_SHOW_RESP,     /* 11 */
 
     RLITE_U_MSG_MAX,
 };
@@ -113,5 +115,11 @@ struct rl_cmsg_ipcp_enroller_enable {
     uint8_t enable;
     char *ipcp_name;
 } __attribute__((packed));
+
+/* rlite-ctl --> uipcps message to ask for routing table dump */
+#define rl_cmsg_ipcp_routing_show_req   rl_cmsg_ipcp_rib_show_req
+
+/* rlite-ctl <-- uipcps message to report a routing table dump */
+#define rl_cmsg_ipcp_routing_show_resp  rl_cmsg_ipcp_rib_show_resp
 
 #endif  /* __RLITE_U_MSG_H__ */
