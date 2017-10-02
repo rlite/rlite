@@ -189,7 +189,7 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-lfdb_default::update_address(rlm_addr_t new_addr)
+lfdb_default::update_routing()
 {
     /* Update the routing table. */
     re.update_kernel_routing(rib->myname);

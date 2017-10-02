@@ -1317,6 +1317,8 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
          * so that they can update their Neighbor objects. */
         neighs_sync_obj_excluding(nf ? nf->neigh : NULL, add, obj_class::neighbors,
                                   obj_name::neighbors, &prop_ncl);
+        /* Update the routing, as node addressing information has changed. */
+        lfdb->update_routing();
     }
 
     return 0;
