@@ -229,7 +229,15 @@ rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 {
     return copy_to_iter(RL_BUF_DATA(rb), bytes, to);
 }
-#endif
+#else  /* AIO_RW */
+static inline int
+rl_buf_copy_to_user(struct rl_buf *rb, const struct iovec *to, size_t bytes)
+{
+    int ret = memcpy_toiovecend(to, RL_BUF_DATA(rb), 0, bytes);
+
+    return ret ? ret : bytes;
+}
+#endif /* AIO_RW */
 
 #define rl_buf_free(_rb) \
     do { \
@@ -304,7 +312,15 @@ rl_buf_copy_to_user(struct rl_buf *rb, struct iov_iter *to, size_t bytes)
 
     return ret ? ret : bytes;
 }
-#endif
+#else  /* AIO_RW */
+static inline int
+rl_buf_copy_to_user(struct rl_buf *rb, const struct iovec *to, size_t bytes)
+{
+    int ret = skb_copy_datagram_iovec(rb, 0, to, bytes);
+
+    return ret ? ret : bytes;
+}
+#endif /* AIO_RW */
 
 #define rl_buf_free(_rb) \
     do { \
