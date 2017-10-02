@@ -58,6 +58,7 @@ struct IPAddr {
         return IPAddr((addr & hostmask) + host, netbits);
     }
 
+    string noprefix() const;
     operator string() const { return repr; }
 };
 
@@ -358,6 +359,18 @@ IPAddr::IPAddr(uint32_t naddr, unsigned nbits)
     repr = ss.str();
 }
 
+string
+IPAddr::noprefix() const
+{
+    size_t slash = repr.find("/");
+
+    if (slash == string::npos) {
+        throw "Invalid IP prefix";
+    }
+
+    return repr.substr(0, slash);
+}
+
 /* Arguments taken by the function:
  *
  * char *dev: the name of an interface (or '\0'). MUST have enough
@@ -609,6 +622,7 @@ Remote::ip_configure() const
 {
     stringstream cmdss;
 
+    /* Flush previous IP addresses, if any. */
     cmdss = stringstream();
     cmdss << "ip addr flush dev " << tun_name;
     if (execute_command(cmdss)) {
@@ -616,6 +630,7 @@ Remote::ip_configure() const
         return -1;
     }
 
+    /* Bring the tunnel device up. */
     cmdss = stringstream();
     cmdss << "ip link set dev " << tun_name << " up";
     if (execute_command(cmdss)) {
@@ -623,12 +638,24 @@ Remote::ip_configure() const
         return -1;
     }
 
+    /* Assign the designated IP address to the tunnel device. */
     cmdss = stringstream();
-    cmdss << "ip addr add " << tun_local_addr.repr
-                            << " dev " << tun_name;
+    cmdss << "ip addr add " << tun_local_addr.repr << " dev " << tun_name;
     if (execute_command(cmdss)) {
         cerr << "Failed to assign IP address to interface " << tun_name << endl;
         return -1;
+    }
+
+    /* Setup the routes advertised by the remote peer. */
+    for (set<Route>::iterator ri = routes.begin(); ri != routes.end(); ri ++) {
+        cmdss = stringstream();
+        cmdss << "ip route add " << static_cast<string>(ri->subnet) << " via " <<
+                    tun_remote_addr.noprefix() << " dev " << tun_name;
+        if (execute_command(cmdss)) {
+            cerr << "Failed to add route for subnet "
+                    << static_cast<string>(ri->subnet) << endl;
+            return -1;
+        }
     }
 
     return 0;
