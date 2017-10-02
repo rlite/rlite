@@ -336,7 +336,7 @@ while 1:
 
         for vm in vm_list:
             if vm not in vms:
-                vms[vm] = {'name': vm, 'ports': []}
+                vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
             links.append((shim, vm))
 
         #for i in range(len(vm_list)-1):
@@ -367,7 +367,7 @@ while 1:
                 continue
 
             if vm not in vms:
-                vms[vm] = {'name': vm, 'ports': []}
+                vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
             links.append((shim, vm))
             dns_mappings[shim][vm] = {'ip': ip}
         continue
@@ -379,7 +379,7 @@ while 1:
         dif_list = m.group(3).split()
 
         if vm not in vms:
-            vms[vm] = {'name': vm, 'ports': []}
+            vms[vm] = {'name': vm, 'ports': [], 'enrolling': []}
 
         if dif not in difs:
             difs[dif] = dict()
@@ -576,6 +576,7 @@ for dif in sorted(difs):
                 enrollments[dif].append({'enrollee': edge[0],
                                          'enroller': cur,
                                          'lower_dif': edge[1]})
+                vms[edge[0]]['enrolling'].append(dif)
                 frontier.add(edge[0])
 
     lowerflowallocs[dif] = []
@@ -871,6 +872,9 @@ for vmname in sorted(vms):
             cmd += '\n'
             del vars_dict
             enroll_cmds.append(cmd)
+
+        if dif not in vm['enrolling']:
+            print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
 
     # Generate /etc/rina/initscript
     outs += 'cat > .initscript << EOF\n'
