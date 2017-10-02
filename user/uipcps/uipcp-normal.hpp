@@ -606,7 +606,7 @@ void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 void age_incr_cb(struct uipcp *uipcp, void *arg);
 void neighs_refresh_cb(struct uipcp *uipcp, void *arg);
 
-#define UIPCP_RIB(_u) ((uipcp_rib *)((_u)->priv))
+#define UIPCP_RIB(_u) static_cast<uipcp_rib *>((_u)->priv)
 
 /*
  * Default implementation for IPCP components.
