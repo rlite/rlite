@@ -332,12 +332,12 @@ InvokeIdMgr::InvokeIdMgr(unsigned int ds)
 
 /* Discard pending ids that have been there for too much time. */
 void
-InvokeIdMgr::__discard(set<Id>& pending)
+InvokeIdMgr::__discard(unordered_set<Id, IdHasher>& pending)
 {
-    vector< set<Id>::iterator > torm;
+    vector< unordered_set<Id, IdHasher>::iterator > torm;
     time_t now = time(NULL);
 
-    for (set<Id>::iterator i = pending.begin(); i != pending.end(); i ++) {
+    for (auto i = pending.begin(); i != pending.end(); i ++) {
         if (now - i->created > discard_secs) {
             torm.push_back(i);
         }
@@ -358,7 +358,7 @@ InvokeIdMgr::discard()
 }
 
 int
-InvokeIdMgr::__put_invoke_id(set<Id>& pending, int invoke_id)
+InvokeIdMgr::__put_invoke_id(unordered_set<Id, IdHasher>& pending, int invoke_id)
 {
     discard();
 
