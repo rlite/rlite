@@ -1074,6 +1074,39 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
+static int
+string2int(const string& s, int& ret)
+{
+    char *dummy;
+    const char *cstr = s.c_str();
+
+    ret = strtoul(cstr, &dummy, 10);
+    if (!s.size() || *dummy != '\0') {
+        ret = ~0U;
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+addr_allocator_distributed::param_mod(const string& name, const string& value)
+{
+    if (name == "nack-wait-secs") {
+        int val;
+
+        if (string2int(value, val) || val < 0 || val >= 100) {
+            return -1;
+        }
+
+        nack_wait_secs = static_cast<unsigned int>(val);
+
+        return 0;
+    }
+
+    return -1;
+}
+
 int
 uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude,
                                  bool create, const string& obj_class,
@@ -1192,6 +1225,29 @@ uipcp_rib::policy_mod(const std::string& component,
     return ret;
 }
 
+int
+uipcp_rib::policy_param_mod(const std::string& component,
+                            const std::string& param_name,
+                            const std::string& param_value)
+{
+    int ret = -1;
+
+    if (!available_policies.count(component)) {
+        UPE(uipcp, "Unknown component %s\n", component.c_str());
+        return -1;
+    }
+
+    if (component == "address-allocator") {
+        ret = addra->param_mod(param_name, param_value);
+    }
+
+    if (!ret) {
+        UPD(uipcp, "set %s policy param %s <== %s\n", component.c_str(),
+                   param_name.c_str(), param_value.c_str());
+    }
+
+    return ret;
+}
 static int
 normal_appl_register(struct uipcp *uipcp,
                      const struct rl_msg_base *msg)
@@ -1585,6 +1641,19 @@ normal_policy_mod(struct uipcp *uipcp,
 }
 
 static int
+normal_policy_param_mod(struct uipcp *uipcp,
+                        const struct rl_cmsg_ipcp_policy_param_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->lock);
+    const string comp_name = req->comp_name;
+    const string param_name = req->param_name;
+    const string param_value = req->param_value;
+
+    return rib->policy_param_mod(comp_name, param_name, param_value);
+}
+
+static int
 normal_enroller_enable(struct uipcp *uipcp,
                        const struct rl_cmsg_ipcp_enroller_enable *req)
 {
@@ -1622,5 +1691,6 @@ struct uipcp_ops normal_ops = {
     .flow_state_update      = normal_flow_state_update,
     .trigger_tasks          = normal_trigger_tasks,
     .policy_mod             = normal_policy_mod,
+    .policy_param_mod       = normal_policy_param_mod,
 };
 

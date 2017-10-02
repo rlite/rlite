@@ -274,10 +274,46 @@ static int
 rl_u_ipcp_policy_mod(struct uipcps *uipcps, int sfd,
                      const struct rl_msg_base *b_req)
 {
-    struct rl_cmsg_ipcp_policy_mod *req = (struct rl_cmsg_ipcp_policy_mod *)b_req;
+    struct rl_cmsg_ipcp_policy_mod *req =
+                (struct rl_cmsg_ipcp_policy_mod *)b_req;
     struct rl_msg_base_resp resp;
 
     resp.result = ipcp_policy_mod(uipcps, req);
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
+static int
+ipcp_policy_param_mod(struct uipcps *uipcps,
+                      const struct rl_cmsg_ipcp_policy_param_mod *req)
+{
+    struct uipcp *uipcp;
+    int result = RLITE_ERR;
+
+    /* Grab the corresponding userspace IPCP. */
+    uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    if (!uipcp) {
+        return -1;
+    }
+
+    if (uipcp->ops.policy_mod) {
+        result = uipcp->ops.policy_param_mod(uipcp, req);
+    }
+
+    uipcp_put(uipcp);
+
+    return result;
+}
+
+static int
+rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
+                           const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_policy_param_mod *req =
+                (struct rl_cmsg_ipcp_policy_param_mod *)b_req;
+    struct rl_msg_base_resp resp;
+
+    resp.result = ipcp_policy_param_mod(uipcps, req);
 
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
@@ -308,6 +344,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_POLICY_MOD]       = rl_u_ipcp_policy_mod,
     [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
     [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP]         = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

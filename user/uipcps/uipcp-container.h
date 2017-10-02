@@ -156,6 +156,10 @@ struct uipcp_ops {
     int (*policy_mod)(struct uipcp *uipcp,
                       const struct rl_cmsg_ipcp_policy_mod *req);
 
+    /* User wants to change a policy param of this uipcp. */
+    int (*policy_param_mod)(struct uipcp *uipcp,
+                            const struct rl_cmsg_ipcp_policy_param_mod *req);
+
 };
 
 struct ipcp_node {
