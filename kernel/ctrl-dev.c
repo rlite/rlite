@@ -1883,8 +1883,8 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
             ret = kstrtou32(req->value, 10, &max_sdu_size);
             if (ret == 0) {
+                notify = entry->max_sdu_size != max_sdu_size;
                 entry->max_sdu_size = max_sdu_size;
-                notify = 1;
             }
         } else {
             ret = -EINVAL; /* unknown request */
