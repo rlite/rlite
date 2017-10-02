@@ -302,6 +302,8 @@ int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
     if (rl_verbosity >= RL_VERB_VERY)   \
         UPRINT(_u, "DBG", FMT, ##__VA_ARGS__)
 
+#define UPW(_u, FMT, ...)   UPRINT(_u, "WARN", FMT, ##__VA_ARGS__)
+
 #define UPE(_u, FMT, ...)   UPRINT(_u, "ERR", FMT, ##__VA_ARGS__)
 
 void normal_lib_init(void);
