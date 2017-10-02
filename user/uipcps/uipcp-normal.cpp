@@ -651,7 +651,7 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
     int ret;
 
     /* Perform the registration of the IPCP name. */
-    if ((ret = normal_do_register(uipcp, lower_dif, uipcp->name, reg))) {
+    if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->name, reg))) {
         UPE(uipcp, "Registration of IPCP name %s into DIF %s failed\n",
                     uipcp->dif_name, lower_dif);
         return ret;
@@ -659,7 +659,7 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
 
     /* Also register the N-DIF name, i.e. the name of the DIF that
      * this IPCP is part of. */
-    if ((ret = normal_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
+    if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
         UPE(uipcp, "Registration of DAF name %s into DIF %s failed\n",
                     uipcp->dif_name, lower_dif);
         return ret;
@@ -1304,55 +1304,55 @@ uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id,
     return ret;
 }
 
-static int
-neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
+int
+uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
-    ScopeLock lock_(rib->lock);
+    ScopeLock lock_(lock);
     Neighbor *neigh;
     NeighFlow *nf;
     int mgmt_fd;
     int ret;
 
     /* Check that the N-flow allocation request makes sense. */
-    neigh = rib->get_neighbor(string(req->remote_appl), false);
+    neigh = get_neighbor(string(req->remote_appl), false);
     if (!neigh || !neigh->enrollment_complete()) {
-        UPE(rib->uipcp, "Rejected N-flow request from non-neighbor %s\n",
+        UPE(uipcp, "Rejected N-flow request from non-neighbor %s\n",
                         req->remote_appl);
 
     } else if (neigh->n_flow) {
-        UPE(rib->uipcp, "Rejected N-flow request from %s, an N-flow "
+        UPE(uipcp, "Rejected N-flow request from %s, an N-flow "
                         "already exists\n", req->remote_appl);
 
     } else if (neigh->mgmt_conn()->reliable) {
-        UPE(rib->uipcp, "Rejected N-flow request from %s, N-1 flow "
+        UPE(uipcp, "Rejected N-flow request from %s, N-1 flow "
                         "is already reliable\n", req->remote_appl);
 
     } else if (!is_reliable_spec(&req->flowspec)) {
-        UPE(rib->uipcp, "Rejected N-flow request from %s, flow is "
+        UPE(uipcp, "Rejected N-flow request from %s, flow is "
                         "not reliable\n", req->remote_appl);
 
     } else {
         response = RLITE_SUCC;
     }
 
-    ret = uipcp_fa_resp(rib->uipcp, req->kevent_id, req->ipcp_id,
+    ret = uipcp_fa_resp(uipcp, req->kevent_id, req->ipcp_id,
                         RL_IPCP_ID_NONE, req->port_id, response);
     if (ret || response == RLITE_ERR) {
         if (ret) {
-            UPE(rib->uipcp, "uipcp_fa_resp() failed[%s]\n", strerror(errno));
+            UPE(uipcp, "uipcp_fa_resp() failed[%s]\n", strerror(errno));
         }
         return 0;
     }
 
     mgmt_fd = rl_open_appl_port(req->port_id);
     if (mgmt_fd < 0) {
-        UPE(rib->uipcp, "Failed to open I/O port for N-flow towards %s\n",
+        UPE(uipcp, "Failed to open I/O port for N-flow towards %s\n",
                         req->remote_appl);
         return 0;
     }
 
-    UPD(rib->uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
+    UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
                     req->remote_appl, req->dif_name, req->port_id);
 
     nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id,
@@ -1363,16 +1363,12 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
     return 0;
 }
 
-static int
-normal_neigh_fa_req_arrived(struct uipcp *uipcp,
-                            const struct rl_msg_base *msg)
+int
+uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
-    struct rl_kmsg_fa_req_arrived *req =
-                    (struct rl_kmsg_fa_req_arrived *)msg;
     rl_port_t neigh_port_id = req->port_id;
     const char *supp_dif = req->dif_name;
     rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
     NeighFlow *nf;
     int flow_fd;
     int result = RLITE_SUCC;
@@ -1381,7 +1377,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     if (strcmp(req->dif_name, uipcp->dif_name) == 0) {
         /* This an N-flow coming from a remote uipcp which should already be
          * a neighbor of ours. */
-        return neigh_n_fa_req_arrived(rib, req);
+        return neigh_n_fa_req_arrived(req);
     }
 
     /* Regular N-1-flow request coming from a remote uipcp who may want to
@@ -1391,14 +1387,14 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
                "port_id = %u]\n",
                req->remote_appl, supp_dif, neigh_port_id);
 
-    ScopeLock lock_(rib->lock);
+    ScopeLock lock_(lock);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking uipcp_fa_resp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to add the neighbor with the associated port_id. */
-    Neighbor *neigh = rib->get_neighbor(string(req->remote_appl), true);
+    Neighbor *neigh = get_neighbor(string(req->remote_appl), true);
 
     neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
@@ -1435,7 +1431,7 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
     }
 
     nf->flow_fd = flow_fd;
-    UPD(rib->uipcp, "%seliable N-1 flow allocated [fd=%d, port_id=%u]\n",
+    UPD(uipcp, "%seliable N-1 flow allocated [fd=%d, port_id=%u]\n",
                     nf->reliable ? "R" : "Unr", nf->flow_fd, nf->port_id);
 
     if (nf->reliable) {
@@ -1444,18 +1440,29 @@ normal_neigh_fa_req_arrived(struct uipcp *uipcp,
 
     /* Add the flow to the datapath topology if it's not management-only. */
     if (!nf->reliable) {
-        topo_lower_flow_added(rib->uipcp->uipcps, uipcp->id, req->ipcp_id);
+        topo_lower_flow_added(uipcp->uipcps, uipcp->id, req->ipcp_id);
         /* A new N-1 flow has been allocated. We may need to update or LFDB w.r.t
          * the local entries. */
-        rib->lfdb->update_local(neigh->ipcp_name);
+        lfdb->update_local(neigh->ipcp_name);
     }
 
     return 0;
 
 err:
-    rib->del_neighbor(string(req->remote_appl));
+    del_neighbor(string(req->remote_appl));
 
     return 0;
+}
+
+static int
+normal_neigh_fa_req_arrived(struct uipcp *uipcp,
+                            const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_fa_req_arrived *req =
+                    (struct rl_kmsg_fa_req_arrived *)msg;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    return rib->neigh_fa_req_arrived(req);
 }
 
 static int
@@ -1530,85 +1537,43 @@ normal_fini(struct uipcp *uipcp)
 }
 
 int
-normal_do_register(struct uipcp *uipcp, const char *dif_name,
-                   const char *local_name, int reg)
+uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 {
-    struct pollfd pfd;
     int ret;
 
-    if (reg) {
-        pfd.fd = rina_register(uipcp->cfd, dif_name,
-                               local_name, RINA_F_NOWAIT);
-    } else {
-        pfd.fd = rina_unregister(uipcp->cfd, dif_name,
-                                 local_name, RINA_F_NOWAIT);
+    if (enroller_enabled || !reg) {
+        register_to_lower_one(uipcp, dif_name, reg);
     }
 
-    if (pfd.fd < 0) {
-        UPE(uipcp, "rina_register() failed [%s]\n", strerror(errno));
-        return -1;
-    }
-
-    pfd.events = POLLIN;
-    ret = poll(&pfd, 1, 2000);
-    if (ret <= 0) {
-        if (ret == 0) {
-            UPE(uipcp, "poll() timed out\n");
-            ret = -1;
-        } else {
-            UPE(uipcp, "poll() failed [%s]\n", strerror(errno));
-        }
-        return ret;
-    }
-
-    return rina_register_wait(uipcp->cfd, pfd.fd);
-}
-
-static int
-normal_register_to_lower(struct uipcp *uipcp,
-                         const struct rl_cmsg_ipcp_register *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    int ret;
-
-    if (!req->dif_name) {
-        UPE(uipcp, "lower DIF name is not specified\n");
-        return -1;
-    }
-
-    if (rib->enroller_enabled || !req->reg) {
-        register_to_lower_one(uipcp, req->dif_name, req->reg);
-    }
-
-    pthread_mutex_lock(&rib->lock);
-    ret = rib->update_lower_difs(req->reg, string(req->dif_name));
+    pthread_mutex_lock(&lock);
+    ret = update_lower_difs(reg, string(dif_name));
     if (ret) {
-        pthread_mutex_unlock(&rib->lock);
+        pthread_mutex_unlock(&lock);
         return ret;
     }
 
     if (!uipcp->uipcps->reliable_n_flows) {
-        pthread_mutex_unlock(&rib->lock);
+        pthread_mutex_unlock(&lock);
     } else {
         bool self_reg_pending;
         int self_reg;
 
         self_reg_pending =
-                (rib->self_registered != rib->self_registration_needed);
-        self_reg = rib->self_registration_needed;
-        pthread_mutex_unlock(&rib->lock);
+                (self_registered != self_registration_needed);
+        self_reg = self_registration_needed;
+        pthread_mutex_unlock(&lock);
 
         if (self_reg_pending) {
             /* Perform (un)registration out of the lock. */
-            ret = normal_do_register(uipcp, uipcp->dif_name,
+            ret = uipcp_do_register(uipcp, uipcp->dif_name,
                                   uipcp->name, self_reg);
 
             if (ret) {
                 UPE(uipcp, "self-(un)registration failed\n");
             } else {
-                pthread_mutex_lock(&rib->lock);
-                rib->self_registered = self_reg;
-                pthread_mutex_unlock(&rib->lock);
+                pthread_mutex_lock(&lock);
+                self_registered = self_reg;
+                pthread_mutex_unlock(&lock);
                 UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
                     self_reg ? "" : "un", uipcp->dif_name);
             }
@@ -1616,6 +1581,20 @@ normal_register_to_lower(struct uipcp *uipcp,
     }
 
     return ret;
+}
+
+static int
+normal_register_to_lower(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_register *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    if (!req->dif_name) {
+        UPE(uipcp, "lower DIF name is not specified\n");
+        return -1;
+    }
+
+    return rib->register_to_lower(req->dif_name, req->reg);
 }
 
 static char *

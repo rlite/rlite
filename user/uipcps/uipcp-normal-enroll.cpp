@@ -1524,19 +1524,18 @@ Neighbor::flow_alloc(const char *supp_dif)
     return 0;
 }
 
-static int
-normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
-                 const char *supp_dif_name, int wait_for_completion)
+int
+uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
+                  int wait_for_completion)
 {
     struct EnrollmentResources *rsrc = NULL;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
     Neighbor *neigh;
     NeighFlow *nf;
     int ret;
 
-    pthread_mutex_lock(&rib->lock);
+    pthread_mutex_lock(&lock);
 
-    neigh = rib->get_neighbor(string(neigh_name), true);
+    neigh = get_neighbor(string(neigh_name), true);
     neigh->initiator = true;
 
     /* Create an N-1 flow, if needed. */
@@ -1546,7 +1545,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 
         /* Temporarily unregister the N-DIF (broadcast) name, to avoid that
          * DFT resolves it */
-        n_dif_unreg = (normal_do_register(uipcp, supp_dif_name,
+        n_dif_unreg = (uipcp_do_register(uipcp, supp_dif_name,
                                           uipcp->dif_name, 0) == 0);
         if (n_dif_unreg) {
             UPV(uipcp, "N-DIF name %s temporarily unregistered from N-1-DIF "
@@ -1555,13 +1554,13 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
 #endif
         ret = neigh->flow_alloc(supp_dif_name);
         if (ret) {
-            pthread_mutex_unlock(&rib->lock);
+            pthread_mutex_unlock(&lock);
             return ret;
         }
 #if 0
         if (n_dif_unreg) {
             /* Register the N-DIF name again. */
-            ret = normal_do_register(uipcp, supp_dif_name, uipcp->dif_name, 1);
+            ret = uipcp_do_register(uipcp, supp_dif_name, uipcp->dif_name, 1);
             if (ret == 0) {
                 UPV(uipcp, "N-DIF name %s registered again to N-1-DIF %s\n",
                            uipcp->dif_name, supp_dif_name);
@@ -1575,7 +1574,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
     nf = neigh->mgmt_conn();
 
     if (nf->enroll_state != NEIGH_NONE) {
-        UPI(rib->uipcp, "Enrollment already in progress [state=%s]\n",
+        UPI(uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
     }
 
@@ -1589,7 +1588,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
          * (NEIGH_NONE).
          */
         while (nf->enroll_state == NEIGH_ENROLLING) {
-            pthread_cond_wait(&rsrc->stopped, &rib->lock);
+            pthread_cond_wait(&rsrc->stopped, &lock);
         }
 
         ret = nf->enroll_state == NEIGH_ENROLLED ? 0 : -1;
@@ -1600,7 +1599,7 @@ normal_do_enroll(struct uipcp *uipcp, const char *neigh_name,
     if (rsrc) {
         nf->enrollment_rsrc_put();
     }
-    pthread_mutex_unlock(&rib->lock);
+    pthread_mutex_unlock(&lock);
 
     return ret;
 }
@@ -1610,6 +1609,7 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
                    int wait_for_completion)
 {
     const char *dst_name = req->neigh_name;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
 
     if (!dst_name) {
         /* If no neighbor name is specified, try to use the DIF name
@@ -1622,8 +1622,8 @@ normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
         return -1;
     }
 
-    return normal_do_enroll(uipcp, dst_name, req->supp_dif_name,
-                            wait_for_completion);
+    return rib->enroll(dst_name, req->supp_dif_name,
+                       wait_for_completion);
 }
 
 /* To be called out of RIB lock. */
@@ -1724,7 +1724,7 @@ normal_trigger_re_enrollments(struct uipcp *uipcp)
     /* Start asynchronous re-enrollments outside of the lock. */
     for (list< pair<string, string> >::iterator lit = re_enrollments.begin();
                                         lit != re_enrollments.end(); lit ++) {
-        normal_do_enroll(rib->uipcp, lit->first.c_str(), lit->second.c_str(), 0);
+        rib->enroll(lit->first.c_str(), lit->second.c_str(), 0);
     }
 }
 

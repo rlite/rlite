@@ -253,6 +253,9 @@ int topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper,
 int topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
                             unsigned int lower);
 
+int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
+                      const char *local_name, int reg);
+
 int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
                              uint8_t response,
                              const struct rl_kmsg_appl_register *req);
