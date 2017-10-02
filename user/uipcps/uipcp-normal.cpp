@@ -1281,12 +1281,13 @@ neigh_n_fa_req_arrived(uipcp_rib *rib, struct rl_kmsg_fa_req_arrived *req)
         return 0;
     }
 
-    nf = rl_new(NeighFlow(neigh, string(req->dif_name), RL_PORT_ID_NONE,
+    UPD(rib->uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
+                    req->remote_appl, req->dif_name, req->port_id);
+
+    nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id,
                           mgmt_fd, RL_IPCP_ID_NONE), RL_MT_NEIGHFLOW);
     nf->reliable = true;
     neigh->n_flow_set(nf);
-    UPD(rib->uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
-                    req->remote_appl, req->dif_name, req->port_id);
 
     return 0;
 }
