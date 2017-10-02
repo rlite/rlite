@@ -334,7 +334,7 @@ struct uipcp_rib {
     /* For A-DATA messages. */
     InvokeIdMgr invoke_id_mgr;
 
-    /* Supported flows. */
+    /* For supported flows. */
     struct flow_allocator *fa;
 
 #ifdef RL_USE_QOS_CUBES
@@ -361,6 +361,8 @@ struct uipcp_rib {
                                      NeighFlow **nfp);
     rlm_addr_t addr_allocate() { return addra->allocate(); };
     void neigh_flow_prune(NeighFlow *nf);
+
+    NeighborCandidate neighbor_cand_get() const;
 
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);

@@ -998,14 +998,11 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
 
     /* Synchronize neighbors. */
     {
-        NeighborCandidate cand;
+        NeighborCandidate cand = rib->neighbor_cand_get();
         string my_name = string(rib->uipcp->name);
 
-        /* Temporarily insert a neighbor representing myself. */
-        rina_components_from_string(my_name, cand.apn,
-                                    cand.api, cand.aen, cand.aei);
-        cand.address = rib->myaddr;
-        cand.lower_difs = rib->lower_difs;
+        /* Temporarily insert a neighbor representing myself,
+         * to simplify the loop below. */
         rib->neighbors_seen[my_name] = cand;
 
         /* Scan all the neighbors I know about. */
@@ -1024,6 +1021,7 @@ int Neighbor::neigh_sync_rib(NeighFlow *nf) const
                                    obj_name::neighbors, &ncl);
         }
 
+        /* Remove myself. */
         rib->neighbors_seen.erase(my_name);
     }
 
@@ -1275,6 +1273,20 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id,
     }
 
     return -1;
+}
+
+NeighborCandidate
+uipcp_rib::neighbor_cand_get() const
+{
+    NeighborCandidate cand;
+    string my_name = string(uipcp->name);
+
+    rina_components_from_string(my_name, cand.apn, cand.api,
+                                cand.aen, cand.aei);
+    cand.address = myaddr;
+    cand.lower_difs = lower_difs;
+
+    return cand;
 }
 
 static int
