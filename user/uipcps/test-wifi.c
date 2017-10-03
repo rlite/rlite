@@ -52,20 +52,23 @@ create_ctrl_path(char *ctrl_dir, char *inf)
 }
 
 /* sends a command to the control interface */
-/* no checking done */
-void
+int
 send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     size_t len = 4096;
     char buf[len];
     len--;
 
-    wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL);
+    if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
+        return -1;
+    }
     buf[len] = '\0';
 
     printf("%s", buf);
     if (len > 0 && buf[len - 1] != '\n')
         printf("\n");
+
+    return 0;
 }
 
 char *
@@ -79,7 +82,10 @@ send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
     }
     len--;
 
-    wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL);
+    if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
+        free(buf);
+        return NULL;
+    }
     buf[len] = '\0';
 
     printf("%s", buf);
@@ -94,7 +100,9 @@ size_t
 recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
 {
     len--;
-    wpa_ctrl_recv(ctrl_conn, buf, &len);
+    if (wpa_ctrl_recv(ctrl_conn, buf, &len)) {
+        return 0;
+    }
     buf[len] = '\0';
 
     printf("%s", buf);
@@ -138,7 +146,7 @@ parse_networks(struct list_head *list, char *networks)
     return 0;
 }
 
-void
+int
 scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 {
     static const int len = 4096;
@@ -153,7 +161,10 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 
     list_init(list);
 
-    send_cmd(ctrl_conn, "SCAN");
+    if (send_cmd(ctrl_conn, "SCAN")) {
+        fprintf(stderr, "Failed to send \"SCAN\" command\n.");
+        return -1;
+    }
 
     /* loop until we get a 'scanning done' message */
     do {
@@ -161,22 +172,28 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
         ret                = poll(&ctrl_pollfd, 1, 5000);
         if (ret == -1) {
             perror("poll()");
-            return;
+            return -1;
         }
         if (ctrl_pollfd.revents & POLLIN) {
-            recv_msg(ctrl_conn, buf, len);
+            if (!recv_msg(ctrl_conn, buf, len)) {
+                fprintf(stderr, "Failed to read messages from wpa_supplicant\n.");
+                return -1;
+            };
         }
     } while (strncmp(buf, "<3>CTRL-EVENT-SCAN-RESULTS", 26));
 
     networks = send_cmd_get_resp(ctrl_conn, "SCAN_RESULTS");
     if (!networks) {
-        return;
+        fprintf(stderr, "Failed to send \"SCAN_RESULTS\" command\n.");
+        return -1;
     }
 
     if (parse_networks(list, networks)) {
         fprintf(stderr, "Failed parsing networks\n.");
     }
     free(networks);
+
+    return 0;
 }
 
 void
@@ -227,6 +244,8 @@ main(int argc, char **argv)
     struct list_head networks;
     bool debug = false;
 
+    int ret;
+
     while ((opt = getopt(argc, argv, "i:c:C:hd")) != -1) {
         switch (opt) {
         case 'i':
@@ -249,7 +268,7 @@ main(int argc, char **argv)
 
     if (!inf || !config || !ctrl_dir) {
         usage();
-        return 1;
+        return -1;
     }
 
     /* start wpa_supplicant */
@@ -257,13 +276,13 @@ main(int argc, char **argv)
 
     if (pid <= -1) {
         fprintf(stderr, "Forking failed.\n");
-        return 1;
+        return -1;
     } else if (pid == 0) {
         printf("Launching wpa_supplicant\n");
         execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
                NULL);
         fprintf(stderr, "Launching wpa_supplicant failed\n");
-        return 1;
+        return -1;
     }
 
     /* delay to make sure it's started */
@@ -274,7 +293,7 @@ main(int argc, char **argv)
         fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
         kill(pid, SIGTERM);
         waitpid(pid, &status, 0);
-        return 1;
+        return -1;
     }
 
     /* get the control handle */
@@ -283,7 +302,7 @@ main(int argc, char **argv)
         fprintf(stderr, "Failed to connect to the control interface.\n");
         kill(pid, SIGTERM);
         waitpid(pid, &status, 0);
-        return 1;
+        return -1;
     }
 
     free(ctrl_path);
@@ -291,8 +310,8 @@ main(int argc, char **argv)
     /* attach so we can send control messages */
     wpa_ctrl_attach(ctrl_conn);
 
-    scan(ctrl_conn, &networks);
-    if (debug) {
+    ret = scan(ctrl_conn, &networks);
+    if (debug && ret) {
         wifi_networks_print(&networks);
     }
 
@@ -302,5 +321,5 @@ main(int argc, char **argv)
     wpa_ctrl_close(ctrl_conn);
     kill(pid, SIGTERM);
     waitpid(pid, &status, 0);
-    return 0;
+    return ret;
 }
