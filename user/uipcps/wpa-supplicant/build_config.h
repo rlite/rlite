@@ -17,6 +17,9 @@
 
 /* Insert configuration defines, e.g., #define EAP_MD5, here, if needed. */
 
+#define CONFIG_CTRL_IFACE
+#define CONFIG_CTRL_IFACE_UNIX
+
 #ifdef CONFIG_WIN32_DEFAULTS
 #define CONFIG_NATIVE_WINDOWS
 #define CONFIG_ANSI_C_EXTRA
