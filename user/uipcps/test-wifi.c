@@ -18,7 +18,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #define _GNU_SOURCE
@@ -33,11 +34,12 @@
 
 #include "../uipcps/wpa-supplicant/wpa_ctrl.h"
 
-char *create_ctrl_path(char *ctrl_dir, char *inf)
+char *
+create_ctrl_path(char *ctrl_dir, char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
-    size_t len_dir = strlen(ctrl_dir);
-    size_t len_inf = strlen(inf);
+    size_t len_dir  = strlen(ctrl_dir);
+    size_t len_inf  = strlen(inf);
     char *ctrl_path = malloc(len_dir + len_inf + 2);
     if (!ctrl_path) {
         return NULL;
@@ -50,13 +52,13 @@ char *create_ctrl_path(char *ctrl_dir, char *inf)
 
 /* sends a command to the control interface */
 /* no checking done */
-void send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
+void
+send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     char buf[4096];
     size_t len = sizeof(buf) - 1;
 
-    wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd),
-            buf, &len, NULL);
+    wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL);
     buf[len] = '\0';
 
     printf("%s", buf);
@@ -66,7 +68,8 @@ void send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 
 /* reads a message from the control interface */
 /* no checking done */
-size_t recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
+size_t
+recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
 {
     len--;
     wpa_ctrl_recv(ctrl_conn, buf, &len);
@@ -79,14 +82,15 @@ size_t recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
     return len;
 }
 
-void scan(struct wpa_ctrl *ctrl_conn)
+void
+scan(struct wpa_ctrl *ctrl_conn)
 {
     static const int len = 4096;
     char buf[len];
     int ret;
 
     struct pollfd ctrl_pollfd;
-    ctrl_pollfd.fd = wpa_ctrl_get_fd(ctrl_conn);
+    ctrl_pollfd.fd     = wpa_ctrl_get_fd(ctrl_conn);
     ctrl_pollfd.events = POLLIN;
 
     send_cmd(ctrl_conn, "SCAN");
@@ -94,7 +98,7 @@ void scan(struct wpa_ctrl *ctrl_conn)
     /* loop until we get a 'scanning done' message */
     do {
         ctrl_pollfd.events = POLLIN;
-        ret = poll(&ctrl_pollfd, 1, 5000);
+        ret                = poll(&ctrl_pollfd, 1, 5000);
         if (ret == -1) {
             perror("poll()");
             return;
@@ -107,30 +111,31 @@ void scan(struct wpa_ctrl *ctrl_conn)
     send_cmd(ctrl_conn, "SCAN_RESULTS");
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     int opt;
     char *inf = NULL, *config = NULL, *ctrl_dir = NULL;
-    char *driver = "nl80211";
+    char *driver          = "nl80211";
     bool start_supplicant = true;
 
     while ((opt = getopt(argc, argv, "i:D:c:C:n")) != -1) {
         switch (opt) {
-            case 'i':
-                inf = optarg;
-                break;
-            case 'D':
-                driver = optarg;
-                break;
-            case 'c':
-                config = optarg;
-                break;
-            case 'C':
-                ctrl_dir = optarg;
-                break;
-            case 'n':
-                start_supplicant = false;
-                break;
+        case 'i':
+            inf = optarg;
+            break;
+        case 'D':
+            driver = optarg;
+            break;
+        case 'c':
+            config = optarg;
+            break;
+        case 'C':
+            ctrl_dir = optarg;
+            break;
+        case 'n':
+            start_supplicant = false;
+            break;
         }
     }
 
@@ -152,7 +157,8 @@ int main(int argc, char **argv)
             return 1;
         } else if (pid == 0) {
             printf("Launching wpa_supplicant\n");
-            execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config, NULL);
+            execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
+                   NULL);
             fprintf(stderr, "Launching wpa_supplicant failed\n");
             return 1;
         }
