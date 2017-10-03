@@ -25,7 +25,6 @@
 #define _GNU_SOURCE
 
 #include <poll.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,13 +111,76 @@ recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
     return len;
 }
 
-void
-wifi_network_free(struct wifi_network *elem)
+char *
+parse_wpa_flags(u_int32_t *flags, char *flagstr)
 {
-    if (elem->flags) {
-        free(elem->flags);
+    char *p = flagstr;
+    int len = index(flagstr, ']') - flagstr;
+
+    while (*p != ']') {
+        if (*p == '-' || *p == '+') {
+            p++;
+            len--;
+        } else if ((len >= 3) && (!strncmp(p, "PSK", 3))) {
+            *flags |= RL_WPA_F_PSK;
+            p += 3;
+            len -= 3;
+        } else if ((len >= 4) && (!strncmp(p, "CCMP", 4))) {
+            *flags |= RL_WPA_F_CCMP;
+            p += 4;
+            len -=4;
+        } else if ((len >= 4) && (!strncmp(p, "TKIP", 4))) {
+            *flags |= RL_WPA_F_TKIP;
+            p += 4;
+            len -=4;
+        } else if ((len >= 7) && (!strncmp(p, "preauth", 7))) {
+            *flags |= RL_WPA_F_PREAUTH;
+            p += 7;
+            len -=7;
+        }
     }
-    free(elem);
+    return p;
+}
+
+void
+parse_wifi_flags(struct wifi_network *elem, char *flagstr)
+{
+    char *p = flagstr;
+    int len;
+
+    elem->wifi_flags = 0;
+    elem->wpa1_flags = 0;
+    elem->wpa2_flags = 0;
+
+    while (*p != '\0') {
+        len = index(p, ']') - p;
+        if (*p == ']') {
+            p++;
+            continue;
+        }
+        if (len < 4) {
+            p += len;
+        } else if (len == 4) {
+            if (!strncmp(p, "[WPS]", 5)) {
+                elem->wifi_flags |= RL_WIFI_F_WPS;
+            } else if (!strncmp(p, "[WEP]", 5)) {
+                elem->wifi_flags |= RL_WIFI_F_WEP;
+            } else if (!strncmp(p, "[ESS]", 5)) {
+                elem->wifi_flags |= RL_WIFI_F_ESS;
+            };
+            p += 5;
+        } else {
+            if (!strncmp(p, "[WPA2", 5)) {
+                p += 5;
+                elem->wpa2_flags |= RL_WPA_F_ACTIVE;
+                p = parse_wpa_flags(&elem->wpa2_flags, p);
+            } else if (!strncmp(p, "[WPA", 4)) {
+                p += 4;
+                elem->wpa1_flags |= RL_WPA_F_ACTIVE;
+                p = parse_wpa_flags(&elem->wpa1_flags, p);
+            }
+        }
+    }
 }
 
 int
@@ -126,6 +188,7 @@ parse_networks(struct list_head *list, char *networks)
 {
     char *p = networks;
     struct wifi_network *elem;
+    char flagstr[100];
 
     /* skip header */
     while (*p != '\0' && *(p++) != '\n');
@@ -135,11 +198,12 @@ parse_networks(struct list_head *list, char *networks)
         if (!elem) {
             return -1;
         }
-        if (sscanf(p, "%17c %u %d %ms %128[^\n]c\n", elem->bssid, &elem->freq,
-                    &elem->signal, &elem->flags, elem->ssid) == EOF) {
-            wifi_network_free(elem);
+        if (sscanf(p, "%17c %u %d %s %128[^\n]c\n", elem->bssid, &elem->freq,
+                    &elem->signal, flagstr, elem->ssid) == EOF) {
+            free(elem);
             return -1;
         }
+        parse_wifi_flags(elem, flagstr);
         list_add_tail(&elem->list, list);
         while (*p != '\0' && *(p++) != '\n');
     }
@@ -162,7 +226,7 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
     list_init(list);
 
     if (send_cmd(ctrl_conn, "SCAN")) {
-        fprintf(stderr, "Failed to send \"SCAN\" command\n.");
+        fprintf(stderr, "Failed to send \"SCAN\" command.\n");
         return -1;
     }
 
@@ -202,7 +266,24 @@ destroy_net_list(struct list_head *list)
     struct wifi_network *cur, *tmp;
     list_for_each_entry_safe(cur, tmp, list, list) {
         list_del_init(&cur->list);
-        wifi_network_free(cur);
+        free(cur);
+    }
+}
+
+void
+wpa_flags_print(u_int32_t flags)
+{
+    if (flags & RL_WPA_F_PSK) {
+        fprintf(stderr, "-PSK");
+    }
+    if (flags & RL_WPA_F_CCMP) {
+        fprintf(stderr, "-CCMP");
+    }
+    if (flags & RL_WPA_F_TKIP) {
+        fprintf(stderr, "+TKIP");
+    }
+    if (flags & RL_WPA_F_PREAUTH) {
+        fprintf(stderr, "-preauth");
     }
 }
 
@@ -212,8 +293,27 @@ wifi_networks_print(struct list_head *networks)
     struct wifi_network *cur;
     fprintf(stderr, "bssid / frequency / signal level / flags / ssid\n");
     list_for_each_entry(cur, networks, list) {
-        fprintf(stderr, "%s\t%u\t%d\t%s\t%s\n", cur->bssid, cur->freq,
-                cur->signal, cur->flags, cur->ssid);
+        fprintf(stderr, "%s\t%u\t%d\t", cur->bssid, cur->freq, cur->signal);
+        if (cur->wpa1_flags & RL_WPA_F_ACTIVE) {
+            fprintf(stderr, "[WPA");
+            wpa_flags_print(cur->wpa1_flags);
+            fprintf(stderr, "]");
+        }
+        if (cur->wpa2_flags & RL_WPA_F_ACTIVE) {
+            fprintf(stderr, "[WPA2");
+            wpa_flags_print(cur->wpa2_flags);
+            fprintf(stderr, "]");
+        }
+        if (cur->wifi_flags & RL_WIFI_F_WPS) {
+            fprintf(stderr, "[WPS]");
+        }
+        if (cur->wifi_flags & RL_WIFI_F_WEP) {
+            fprintf(stderr, "[WEP]");
+        }
+        if (cur->wifi_flags & RL_WIFI_F_ESS) {
+            fprintf(stderr, "[ESS]");
+        }
+        fprintf(stderr, "\t%s\n", cur->ssid);
     }
 }
 
@@ -242,7 +342,7 @@ main(int argc, char **argv)
     char *ctrl_path;
     struct wpa_ctrl *ctrl_conn = NULL;
     struct list_head networks;
-    bool debug = false;
+    int debug = 0;
 
     int ret;
 
@@ -261,7 +361,7 @@ main(int argc, char **argv)
             usage();
             return 0;
         case 'd':
-            debug = true;
+            debug = 1;
             break;
         }
     }
@@ -311,7 +411,7 @@ main(int argc, char **argv)
     wpa_ctrl_attach(ctrl_conn);
 
     ret = scan(ctrl_conn, &networks);
-    if (debug && ret) {
+    if (debug && !ret) {
         wifi_networks_print(&networks);
     }
 
