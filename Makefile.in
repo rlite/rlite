@@ -43,4 +43,4 @@ depmod:
 	depmod -b @INSTALL_MOD_PATH@ -a
 
 format:
-	clang-format -i -style=file $(shell git ls-files *.c *.h *.cpp *.hpp)
+	clang-format -i -style=file $(shell git ls-files *.c *.h *.cpp *.hpp | grep -v wpa-supplicant)
