@@ -111,21 +111,29 @@ scan(struct wpa_ctrl *ctrl_conn)
     send_cmd(ctrl_conn, "SCAN_RESULTS");
 }
 
+static void
+usage()
+{
+    printf(
+            "test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR\n"
+            "   -i INF  : name of interface to use\n"
+            "   -c PATH : path to the wpa_supplicant.conf to be used "
+            "(see 'man wpa_supplicant')\n"
+            "   -C PATH : 'ctrl_interface' from wpa_supplicant.conf"
+            );
+}
+
 int
 main(int argc, char **argv)
 {
     int opt;
     char *inf = NULL, *config = NULL, *ctrl_dir = NULL;
-    char *driver          = "nl80211";
-    bool start_supplicant = true;
+    char *driver = "nl80211";
 
-    while ((opt = getopt(argc, argv, "i:D:c:C:n")) != -1) {
+    while ((opt = getopt(argc, argv, "i:c:C:h")) != -1) {
         switch (opt) {
         case 'i':
             inf = optarg;
-            break;
-        case 'D':
-            driver = optarg;
             break;
         case 'c':
             config = optarg;
@@ -133,15 +141,14 @@ main(int argc, char **argv)
         case 'C':
             ctrl_dir = optarg;
             break;
-        case 'n':
-            start_supplicant = false;
-            break;
+        case 'h':
+            usage();
+            return 0;
         }
     }
 
     if (!inf || !config || !ctrl_dir) {
-        fprintf(stderr, "Specify interface with -i and config with -c"
-                        " and control dir with -C.\n");
+        usage();
         return 1;
     }
 
@@ -149,19 +156,17 @@ main(int argc, char **argv)
     pid_t pid;
 
     /* start wpa_supplicant */
-    if (start_supplicant) {
-        pid = fork();
+    pid = fork();
 
-        if (pid <= -1) {
-            fprintf(stderr, "Forking failed.\n");
-            return 1;
-        } else if (pid == 0) {
-            printf("Launching wpa_supplicant\n");
-            execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
-                   NULL);
-            fprintf(stderr, "Launching wpa_supplicant failed\n");
-            return 1;
-        }
+    if (pid <= -1) {
+        fprintf(stderr, "Forking failed.\n");
+        return 1;
+    } else if (pid == 0) {
+        printf("Launching wpa_supplicant\n");
+        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
+               NULL);
+        fprintf(stderr, "Launching wpa_supplicant failed\n");
+        return 1;
     }
 
     struct wpa_ctrl *ctrl_conn = NULL;
@@ -171,10 +176,9 @@ main(int argc, char **argv)
 
     char *ctrl_path = create_ctrl_path(ctrl_dir, inf);
     if (!ctrl_path) {
-        if (start_supplicant) {
-            kill(pid, SIGTERM);
-            waitpid(pid, &status, 0);
-        }
+        fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
+        kill(pid, SIGTERM);
+        waitpid(pid, &status, 0);
         return 1;
     }
 
@@ -182,10 +186,8 @@ main(int argc, char **argv)
     ctrl_conn = wpa_ctrl_open(ctrl_path);
     if (!ctrl_conn) {
         fprintf(stderr, "Failed to connect to the control interface.\n");
-        if (start_supplicant) {
-            kill(pid, SIGTERM);
-            waitpid(pid, &status, 0);
-        }
+        kill(pid, SIGTERM);
+        waitpid(pid, &status, 0);
         return 1;
     }
 
@@ -199,9 +201,7 @@ main(int argc, char **argv)
     /* cleanup */
     wpa_ctrl_detach(ctrl_conn);
     wpa_ctrl_close(ctrl_conn);
-    if (start_supplicant) {
-        kill(pid, SIGTERM);
-        waitpid(pid, &status, 0);
-    }
+    kill(pid, SIGTERM);
+    waitpid(pid, &status, 0);
     return 0;
 }
