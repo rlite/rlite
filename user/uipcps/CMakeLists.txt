@@ -27,3 +27,4 @@ if (USE_QOS_CUBES)
     install(FILES uipcp-qoscubes.qos DESTINATION etc/rina)
 endif()
 
+add_subdirectory(wpa-supplicant)
