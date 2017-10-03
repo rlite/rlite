@@ -189,15 +189,26 @@ destroy_net_list(struct list_head *list)
     }
 }
 
+void
+wifi_networks_print(struct list_head *networks)
+{
+    struct wifi_network *cur;
+    fprintf(stderr, "bssid / frequency / signal level / flags / ssid\n");
+    list_for_each_entry(cur, networks, list) {
+        fprintf(stderr, "%s\t%u\t%d\t%s\t%s\n", cur->bssid, cur->freq,
+                cur->signal, cur->flags, cur->ssid);
+    }
+}
+
 static void
 usage()
 {
-    printf(
-            "test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR\n"
+    printf( "test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR [-d]\n"
             "   -i INF  : name of interface to use\n"
             "   -c PATH : path to the wpa_supplicant.conf to be used "
             "(see 'man wpa_supplicant')\n"
-            "   -C PATH : 'ctrl_interface' from wpa_supplicant.conf"
+            "   -C PATH : 'ctrl_interface' from wpa_supplicant.conf\n"
+            "   -d      : print debug messages\n"
             );
 }
 
@@ -214,8 +225,9 @@ main(int argc, char **argv)
     char *ctrl_path;
     struct wpa_ctrl *ctrl_conn = NULL;
     struct list_head networks;
+    bool debug = false;
 
-    while ((opt = getopt(argc, argv, "i:c:C:h")) != -1) {
+    while ((opt = getopt(argc, argv, "i:c:C:hd")) != -1) {
         switch (opt) {
         case 'i':
             inf = optarg;
@@ -229,6 +241,9 @@ main(int argc, char **argv)
         case 'h':
             usage();
             return 0;
+        case 'd':
+            debug = true;
+            break;
         }
     }
 
@@ -277,6 +292,9 @@ main(int argc, char **argv)
     wpa_ctrl_attach(ctrl_conn);
 
     scan(ctrl_conn, &networks);
+    if (debug) {
+        wifi_networks_print(&networks);
+    }
 
     /* cleanup */
     destroy_net_list(&networks);
