@@ -25,14 +25,26 @@
 #ifndef __RLITE_TEST_WIFI_H__
 #define __RLITE_TEST_WIFI_H__
 
+#include <stdint.h>
 #include <rlite/list.h>
+
+#define RL_WIFI_F_WEP  0x1
+#define RL_WIFI_F_WPS  0x2
+#define RL_WIFI_F_ESS  0x4
+#define RL_WPA_F_ACTIVE 0x1
+#define RL_WPA_F_PSK 0x2
+#define RL_WPA_F_CCMP 0x4
+#define RL_WPA_F_TKIP 0x8
+#define RL_WPA_F_PREAUTH 0x10
 
 struct wifi_network {
     struct list_head list;
     char bssid[18];
     unsigned int freq;
     int signal;
-    char *flags;
+    uint32_t wifi_flags;
+    uint32_t wpa1_flags;
+    uint32_t wpa2_flags;
     char ssid[129];
 };
 
