@@ -1575,6 +1575,8 @@ normal_fini(struct uipcp *uipcp)
 int
 uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 {
+    bool self_reg_pending;
+    int self_reg;
     int ret;
 
     if (enroller_enabled || !reg) {
@@ -1583,35 +1585,28 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 
     pthread_mutex_lock(&lock);
     ret = update_lower_difs(reg, string(dif_name));
-    if (ret) {
-        pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock);
+    if (ret ||
+        !get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
         return ret;
     }
 
-    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
-        pthread_mutex_unlock(&lock);
-    } else {
-        bool self_reg_pending;
-        int self_reg;
+    self_reg_pending = (self_registered != self_registration_needed);
+    self_reg         = self_registration_needed;
+    pthread_mutex_unlock(&lock);
 
-        self_reg_pending = (self_registered != self_registration_needed);
-        self_reg         = self_registration_needed;
-        pthread_mutex_unlock(&lock);
+    if (self_reg_pending) {
+        /* Perform (un)registration out of the lock. */
+        ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name, self_reg);
 
-        if (self_reg_pending) {
-            /* Perform (un)registration out of the lock. */
-            ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name,
-                                    self_reg);
-
-            if (ret) {
-                UPE(uipcp, "self-(un)registration failed\n");
-            } else {
-                pthread_mutex_lock(&lock);
-                self_registered = self_reg;
-                pthread_mutex_unlock(&lock);
-                UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
-                    self_reg ? "" : "un", uipcp->dif_name);
-            }
+        if (ret) {
+            UPE(uipcp, "self-(un)registration failed\n");
+        } else {
+            pthread_mutex_lock(&lock);
+            self_registered = self_reg;
+            pthread_mutex_unlock(&lock);
+            UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
+                self_reg ? "" : "un", uipcp->dif_name);
         }
     }
 
