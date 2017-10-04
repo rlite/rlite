@@ -37,6 +37,8 @@
 #define RL_WPA_F_TKIP 0x8
 #define RL_WPA_F_PREAUTH 0x10
 
+#define RL_WIFI_SSID_LEN 129
+
 struct wifi_network {
     struct list_head list;
     char bssid[18];
@@ -45,7 +47,7 @@ struct wifi_network {
     uint32_t wifi_flags;
     uint32_t wpa1_flags;
     uint32_t wpa2_flags;
-    char ssid[129];
+    char ssid[RL_WIFI_SSID_LEN];
 };
 
 #endif /* __RLITE_TEST_WIFI_H__ */

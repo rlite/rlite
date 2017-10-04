@@ -34,7 +34,7 @@
 #include "../uipcps/wpa-supplicant/wpa_ctrl.h"
 #include "test-wifi.h"
 
-char *
+static char *
 create_ctrl_path(char *ctrl_dir, char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
@@ -51,7 +51,7 @@ create_ctrl_path(char *ctrl_dir, char *inf)
 }
 
 /* sends a command to the control interface */
-int
+static int
 send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     size_t len = 4096;
@@ -70,7 +70,7 @@ send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
     return 0;
 }
 
-char *
+static char *
 send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     size_t len = 4096;
@@ -83,6 +83,7 @@ send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 
     if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
         free(buf);
+        fprintf(stderr, "send_cmd_get_resp() : failed wpa_ctrl_request().\n");
         return NULL;
     }
     buf[len] = '\0';
@@ -94,8 +95,7 @@ send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 }
 
 /* reads a message from the control interface */
-/* no checking done */
-size_t
+static size_t
 recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
 {
     len--;
@@ -111,7 +111,7 @@ recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
     return len;
 }
 
-char *
+static char *
 parse_wpa_flags(u_int32_t *flags, char *flagstr)
 {
     char *p = flagstr;
@@ -142,7 +142,7 @@ parse_wpa_flags(u_int32_t *flags, char *flagstr)
     return p;
 }
 
-void
+static void
 parse_wifi_flags(struct wifi_network *elem, char *flagstr)
 {
     char *p = flagstr;
@@ -183,7 +183,7 @@ parse_wifi_flags(struct wifi_network *elem, char *flagstr)
     }
 }
 
-int
+static int
 parse_networks(struct list_head *list, char *networks)
 {
     char *p = networks;
@@ -210,27 +210,19 @@ parse_networks(struct list_head *list, char *networks)
     return 0;
 }
 
-int
-scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
+static int
+wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
 {
     static const int len = 4096;
     char buf[len];
     int ret;
 
     struct pollfd ctrl_pollfd;
-    char *networks;
+    int msg_len = strlen(msg);
 
     ctrl_pollfd.fd     = wpa_ctrl_get_fd(ctrl_conn);
     ctrl_pollfd.events = POLLIN;
 
-    list_init(list);
-
-    if (send_cmd(ctrl_conn, "SCAN")) {
-        fprintf(stderr, "Failed to send \"SCAN\" command.\n");
-        return -1;
-    }
-
-    /* loop until we get a 'scanning done' message */
     do {
         ctrl_pollfd.events = POLLIN;
         ret                = poll(&ctrl_pollfd, 1, 5000);
@@ -244,7 +236,27 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
                 return -1;
             };
         }
-    } while (strncmp(buf, "<3>CTRL-EVENT-SCAN-RESULTS", 26));
+    } while (strncmp(buf + 3, msg, msg_len));
+
+    return 0;
+}
+
+static int
+scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
+{
+    char *networks;
+
+    list_init(list);
+
+    if (send_cmd(ctrl_conn, "SCAN")) {
+        fprintf(stderr, "Failed to send \"SCAN\" command.\n");
+        return -1;
+    }
+
+    /* loop until we get a 'scanning done' message */
+    if (wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS)) {
+        return -1;
+    }
 
     networks = send_cmd_get_resp(ctrl_conn, "SCAN_RESULTS");
     if (!networks) {
@@ -260,7 +272,7 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
     return 0;
 }
 
-void
+static void
 destroy_net_list(struct list_head *list)
 {
     struct wifi_network *cur, *tmp;
@@ -270,7 +282,7 @@ destroy_net_list(struct list_head *list)
     }
 }
 
-void
+static void
 wpa_flags_print(u_int32_t flags)
 {
     if (flags & RL_WPA_F_PSK) {
@@ -287,7 +299,7 @@ wpa_flags_print(u_int32_t flags)
     }
 }
 
-void
+static void
 wifi_networks_print(struct list_head *networks)
 {
     struct wifi_network *cur;
@@ -317,15 +329,207 @@ wifi_networks_print(struct list_head *networks)
     }
 }
 
+static struct wifi_network*
+find_network_by_ssid(struct list_head* networks, const char *ssid)
+{
+    struct wifi_network *cur;
+    int len;
+
+    len = strlen(ssid);
+
+    list_for_each_entry(cur, networks, list) {
+        if (!strncmp(cur->ssid, ssid, len)) {
+            return cur;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+requires_psk(struct list_head *networks, const char *ssid)
+{
+    struct wifi_network *network;
+
+    network = find_network_by_ssid(networks, ssid);
+    if (!network) {
+        return -1;
+    }
+
+    return ((network->wifi_flags & RL_WIFI_F_WEP) ||
+            (network->wpa1_flags & RL_WPA_F_ACTIVE) ||
+            (network->wpa2_flags & RL_WPA_F_ACTIVE)) ? 1 : 0;
+}
+
+/*
+ * A wrapper function for the SET_NETWORK wpa_supplicant command.
+ * The format of the command is "SET_NETWORK <ID> <VARIABLE> <VALUE>".
+ * This function takes <ID>, <VARIABLE> and <VALUE> as string parameters,
+ * creates the command string to send and sends it to the control connection.
+ */
+static int
+set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var, const char* val)
+{
+    int len, id_len, var_len, val_len;
+    char *msg;
+    static const char cmd[] = "SET_NETWORK";
+    static const int cmd_len = 11;
+    int msg_offset = 0;
+
+    id_len = strlen(id);
+    var_len = strlen(var);
+    val_len = strlen(val);
+
+    /* three spaces + quotes for value + null terminator */
+    len = cmd_len + id_len + var_len + val_len + 6;
+
+    msg = malloc(len);
+    if (!msg) {
+        fprintf(stderr, "set_network() : failed malloc().\n");
+        return -1;
+    }
+
+    strncpy(msg + msg_offset, cmd, cmd_len);
+    msg_offset += cmd_len;
+    msg[msg_offset++] = ' ';
+
+    strncpy(msg + msg_offset, id, id_len);
+    msg_offset += id_len;
+    msg[msg_offset++] = ' ';
+
+    strncpy(msg + msg_offset, var, var_len);
+    msg_offset += var_len;
+    msg[msg_offset++] = ' ';
+
+    msg[msg_offset++] = '"';
+    strncpy(msg + msg_offset, val, val_len);
+    msg_offset += val_len;
+    msg[msg_offset++] = '"';
+    msg[msg_offset++] = '\0';
+
+    send_cmd(ctrl_conn, msg);
+
+    free(msg);
+}
+
+/*
+ * A wrapper function for the ENABLE_NETWORK wpa_supplicant command.
+ * The format of the command is "ENABLE_NETWORK <ID>".
+ * This function takes <ID> as a string parameter, creates the command string
+ * to send and sends it to the control connection.
+ */
+static int
+enable_network(struct wpa_ctrl *ctrl_conn, const char *id) {
+    int len, id_len;
+    char *msg;
+    static const char cmd[] = "ENABLE_NETWORK";
+    static const int cmd_len = 14;
+    int msg_offset = 0;
+
+    id_len = strlen(id);
+
+    /* a space + null terminator */
+    len = cmd_len + id_len + 2;
+
+    msg = malloc(len);
+    if (!msg) {
+        fprintf(stderr, "set_network() : failed malloc().\n");
+        return -1;
+    }
+
+    strncpy(msg + msg_offset, cmd, cmd_len);
+    msg_offset += cmd_len;
+    msg[msg_offset++] = ' ';
+
+    strncpy(msg + msg_offset, id, id_len);
+    msg_offset += id_len;
+    msg[msg_offset++] = '\0';
+
+    send_cmd(ctrl_conn, msg);
+
+    free(msg);
+}
+
+/*
+ * Creates a new network configuration in wpa_supplicant.
+ * @id   : output parameter, the id of the newly created network configuration
+ * @ssid : ssid of the network to add
+ * @psk  : psk of network to add, NULL if network is open (without psk)
+ * Sends the "ADD_NETWORK" command to create the configuration, then sets
+ * ssid (and possibly psk) using the "SET_NETWORK" command.
+ */
+static int
+add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid, const char *psk)
+{
+    char *resp;
+
+    resp = send_cmd_get_resp(ctrl_conn, "ADD_NETWORK");
+    if (!resp) {
+        return -1;
+    }
+    sscanf(resp, "%8[^\n]c\n", id);
+
+    if (set_network(ctrl_conn, id, "ssid", ssid)) {
+        return -1;
+    }
+    if (psk) {
+        if (set_network(ctrl_conn, id, "psk", psk)) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+wifi_associate(struct wpa_ctrl *ctrl_conn, const char *id)
+{
+    if (enable_network(ctrl_conn, id)) {
+        return -1;
+    }
+    return wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+}
+
+static int
+add_and_connect(struct wpa_ctrl *ctrl_conn, struct list_head *networks, const char *ssid, const char *psk)
+{
+    int has_psk;
+    char id[8];
+    int ret = 0;
+
+    has_psk = requires_psk(networks, ssid);
+    if (has_psk == -1) {
+        fprintf(stderr, "No network with such SSID known.\n");
+        return -1;
+    }
+
+    if (has_psk) {
+        if (psk == NULL) {
+            fprintf(stderr, "Network requires PSK.\n");
+            return -1;
+        }
+        ret = add_network(ctrl_conn, id, ssid, psk);
+    } else {
+        ret = add_network(ctrl_conn, id, ssid, NULL);
+    }
+
+    if (ret) {
+        return -1;
+    }
+    return wifi_associate(ctrl_conn, id);
+}
+
 static void
 usage()
 {
-    printf( "test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR [-d]\n"
+    printf( "test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR [-d] [-a SSID] [-p PSK]\n"
             "   -i INF  : name of interface to use\n"
             "   -c PATH : path to the wpa_supplicant.conf to be used "
             "(see 'man wpa_supplicant')\n"
             "   -C PATH : 'ctrl_interface' from wpa_supplicant.conf\n"
             "   -d      : print debug messages\n"
+            "   -a SSID : associate to network with given SSID\n"
+            "   -p PSK  : use given PSK when associating\n"
             );
 }
 
@@ -344,9 +548,12 @@ main(int argc, char **argv)
     struct list_head networks;
     int debug = 0;
 
+    char *ssid = NULL;
+    char *psk = NULL;
+
     int ret;
 
-    while ((opt = getopt(argc, argv, "i:c:C:hd")) != -1) {
+    while ((opt = getopt(argc, argv, "i:c:C:hda:p:")) != -1) {
         switch (opt) {
         case 'i':
             inf = optarg;
@@ -363,10 +570,16 @@ main(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
+        case 'a':
+            ssid = optarg;
+            break;
+        case 'p':
+            psk = optarg;
+            break;
         }
     }
 
-    if (!inf || !config || !ctrl_dir) {
+    if (!inf || !config || !ctrl_dir || (!ssid && psk)) {
         usage();
         return -1;
     }
@@ -413,6 +626,10 @@ main(int argc, char **argv)
     ret = scan(ctrl_conn, &networks);
     if (debug && !ret) {
         wifi_networks_print(&networks);
+    }
+
+    if (!ret && ssid) {
+        ret = add_and_connect(ctrl_conn, &networks, ssid, psk);
     }
 
     /* cleanup */
