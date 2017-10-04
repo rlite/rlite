@@ -222,6 +222,7 @@ Available commands:
 * ipcp-register: Register an IPCP into a DIF
 * ipcp-unregister: Unregister an IPCP from a DIF
 * ipcp-enroll: Enroll an IPCP into a DIF
+* ipcp-reset: Remove all the IPCPs in the system
 * ipcps-show: Show the list of IPCPs that are currently running in the system
 * dif-rib-show: Show the RIB of a DIF in the system
 * flows-show: Show the allocated flows that have a local IPCP as one of the
@@ -232,7 +233,7 @@ Available commands:
 * dif-policy-param-mod: Modify a policy parameter for a DIF running in the
   system
 
-To show all the available command and the corresponding usage, use
+To show the available commands and the corresponding usage, run
 
     $ rlite-ctl -h
 
@@ -336,13 +337,13 @@ Enter the demo directory in the repository and run
 
     $ ./demo.py -h
 
-to see available options.
+to see the available options and features.
 
 The *rlite* demonstrator is compatible with the one
 available at https://github.com/IRATI/demonstrator, which means that the
 configuration files are interchangeable. The documentation contained
-in the README.md file of the latter repository is still valid, with the
-following differences:
+in the README.md file of the latter repository is still valid, with some
+differences:
 
 1. The **policy** and **appmap** directives are not supported
 2. The name of **eth** instances does not need to be a valid VLAN id
