@@ -52,7 +52,7 @@ uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
     }
 
     if (pfd.fd < 0) {
-        UPE(uipcp, "rina_register() failed [%s]\n", strerror(errno));
+        UPW(uipcp, "rina_register() failed [%s]\n", strerror(errno));
         return -1;
     }
 
