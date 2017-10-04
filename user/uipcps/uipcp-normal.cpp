@@ -1588,7 +1588,9 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     int ret;
 
     pthread_mutex_lock(&lock);
-    ret = update_lower_difs(reg, string(dif_name));
+    ret              = update_lower_difs(reg, string(dif_name));
+    self_reg_pending = (self_registered != self_registration_needed);
+    self_reg         = self_registration_needed;
     pthread_mutex_unlock(&lock);
     if (ret) {
         return ret;
@@ -1608,10 +1610,6 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
         return 0;
     }
-
-    self_reg_pending = (self_registered != self_registration_needed);
-    self_reg         = self_registration_needed;
-    pthread_mutex_unlock(&lock);
 
     if (self_reg_pending) {
         /* Perform (un)registration out of the lock. */
