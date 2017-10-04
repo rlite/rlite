@@ -1579,16 +1579,26 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     int self_reg;
     int ret;
 
-    if (enroller_enabled || !reg) {
-        register_to_lower_one(uipcp, dif_name, reg);
-    }
-
     pthread_mutex_lock(&lock);
     ret = update_lower_difs(reg, string(dif_name));
     pthread_mutex_unlock(&lock);
-    if (ret ||
-        !get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+    if (ret) {
         return ret;
+    }
+
+    /* We allow the registration now only if this IPCP is enabled as
+     * enroller. Otherwise the registration will be performed by
+     * realize_registrations() when the enroller is enabled. */
+    if (enroller_enabled || !reg) {
+        register_to_lower_one(uipcp, dif_name, reg);
+    } else {
+        UPD(uipcp,
+            "Registration of %s in DIF %s deferred on enroller enabled\n",
+            uipcp->name, dif_name);
+    }
+
+    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+        return 0;
     }
 
     self_reg_pending = (self_registered != self_registration_needed);
