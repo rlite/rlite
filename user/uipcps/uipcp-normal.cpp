@@ -666,6 +666,9 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
         return ret;
     }
 
+    UPD(uipcp, "IPCP name %s registered into DIF %s\n", uipcp->dif_name,
+        lower_dif);
+
     /* Also register the N-DIF name, i.e. the name of the DIF that
      * this IPCP is part of. If this fails broadcast enrollment won't work.
      * However it is not an hard failure, as unicast enrollment is still
@@ -675,6 +678,9 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
             uipcp->dif_name, lower_dif);
         return ret;
     }
+
+    UPD(uipcp, "DAF name %s registered into DIF %s for broadcast enrollment\n",
+        uipcp->dif_name, lower_dif);
 
     return 0;
 }
