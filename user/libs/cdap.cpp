@@ -28,7 +28,6 @@
 #include <errno.h>
 #include <time.h>
 
-#include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rina/cdap.hpp"
 #include "rlite/cpputils.hpp"
