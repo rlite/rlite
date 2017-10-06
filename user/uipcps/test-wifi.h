@@ -28,9 +28,9 @@
 #include <stdint.h>
 #include <rlite/list.h>
 
-#define RL_WIFI_F_WEP  0x1
-#define RL_WIFI_F_WPS  0x2
-#define RL_WIFI_F_ESS  0x4
+#define RL_WIFI_F_WEP 0x1
+#define RL_WIFI_F_WPS 0x2
+#define RL_WIFI_F_ESS 0x4
 #define RL_WPA_F_ACTIVE 0x1
 #define RL_WPA_F_PSK 0x2
 #define RL_WPA_F_CCMP 0x4
