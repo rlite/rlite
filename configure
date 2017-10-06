@@ -335,9 +335,20 @@ which cmake || no_cmake
 
 rm -f config.log
 
+REVISION=$(git rev-parse HEAD)
+if [ "$?" != "0" ]; then
+    REVISION="(unknown)"
+    REVISION_DATE="$REVISION"
+else
+    REVISION_DATE=$(git show -s --format=%cd $REVISION)
+fi
+
 cat >> config.log <<EOF
 ##############################################################################
-# CONFIGURING RLITE FOR BUILD on $(date)
+# CONFIGURING RLITE FOR BUILD
+#     build date:    $(date)
+#     revision id:   $REVISION
+#     revision date: ${REVISION_DATE}
 ##############################################################################
 EOF
 
