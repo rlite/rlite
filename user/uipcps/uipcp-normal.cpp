@@ -666,13 +666,21 @@ register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
         return ret;
     }
 
+    UPD(uipcp, "IPCP name %s registered into DIF %s\n", uipcp->dif_name,
+        lower_dif);
+
     /* Also register the N-DIF name, i.e. the name of the DIF that
-     * this IPCP is part of. */
+     * this IPCP is part of. If this fails broadcast enrollment won't work.
+     * However it is not an hard failure, as unicast enrollment is still
+     * possible. */
     if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
-        UPE(uipcp, "Registration of DAF name %s into DIF %s failed\n",
+        UPW(uipcp, "Registration of DAF name %s into DIF %s failed\n",
             uipcp->dif_name, lower_dif);
         return ret;
     }
+
+    UPD(uipcp, "DAF name %s registered into DIF %s for broadcast enrollment\n",
+        uipcp->dif_name, lower_dif);
 
     return 0;
 }
@@ -1575,43 +1583,46 @@ normal_fini(struct uipcp *uipcp)
 int
 uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 {
+    bool self_reg_pending;
+    int self_reg;
     int ret;
 
-    if (enroller_enabled || !reg) {
-        register_to_lower_one(uipcp, dif_name, reg);
-    }
-
     pthread_mutex_lock(&lock);
-    ret = update_lower_difs(reg, string(dif_name));
+    ret              = update_lower_difs(reg, string(dif_name));
+    self_reg_pending = (self_registered != self_registration_needed);
+    self_reg         = self_registration_needed;
+    pthread_mutex_unlock(&lock);
     if (ret) {
-        pthread_mutex_unlock(&lock);
         return ret;
     }
 
-    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
-        pthread_mutex_unlock(&lock);
+    /* We allow the registration now only if this IPCP is enabled as
+     * enroller. Otherwise the registration will be performed by
+     * realize_registrations() when the enroller is enabled. */
+    if (enroller_enabled || !reg) {
+        register_to_lower_one(uipcp, dif_name, reg);
     } else {
-        bool self_reg_pending;
-        int self_reg;
+        UPD(uipcp,
+            "Registration of %s in DIF %s deferred on enroller enabled\n",
+            uipcp->name, dif_name);
+    }
 
-        self_reg_pending = (self_registered != self_registration_needed);
-        self_reg         = self_registration_needed;
-        pthread_mutex_unlock(&lock);
+    if (!get_param_value<bool>("resource-allocator", "reliable-n-flows")) {
+        return 0;
+    }
 
-        if (self_reg_pending) {
-            /* Perform (un)registration out of the lock. */
-            ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name,
-                                    self_reg);
+    if (self_reg_pending) {
+        /* Perform (un)registration out of the lock. */
+        ret = uipcp_do_register(uipcp, uipcp->dif_name, uipcp->name, self_reg);
 
-            if (ret) {
-                UPE(uipcp, "self-(un)registration failed\n");
-            } else {
-                pthread_mutex_lock(&lock);
-                self_registered = self_reg;
-                pthread_mutex_unlock(&lock);
-                UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
-                    self_reg ? "" : "un", uipcp->dif_name);
-            }
+        if (ret) {
+            UPE(uipcp, "self-(un)registration failed\n");
+        } else {
+            pthread_mutex_lock(&lock);
+            self_registered = self_reg;
+            pthread_mutex_unlock(&lock);
+            UPI(uipcp, "%s self-%sregistered to DIF %s\n", uipcp->name,
+                self_reg ? "" : "un", uipcp->dif_name);
         }
     }
 

@@ -26,8 +26,8 @@
 
 #include <string>
 #include <unordered_set>
+#include <ctime>
 
-#include "rlite/common.h"
 #include "CDAP.pb.h"
 
 struct CDAPAuthValue {
