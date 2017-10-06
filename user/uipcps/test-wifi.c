@@ -424,10 +424,11 @@ set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
  * A wrapper function for the ENABLE_NETWORK wpa_supplicant command.
  * The format of the command is "ENABLE_NETWORK <ID>".
  * This function takes <ID> as a string parameter, creates the command string
- * to send and sends it to the control connection.
+ * and sends it to the control connection. It then waits for a positive
+ * response.
  */
 static int
-enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
+wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
 {
     int len, id_len;
     char *msg;
@@ -458,7 +459,7 @@ enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
 
     free(msg);
 
-    return 0;
+    return wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
 }
 
 /*
@@ -470,8 +471,8 @@ enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
  * ssid (and possibly psk) using the "SET_NETWORK" command.
  */
 static int
-add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
-            const char *psk)
+wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
+                 const char *psk)
 {
     char *resp;
 
@@ -494,18 +495,9 @@ add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
 }
 
 static int
-wifi_associate(struct wpa_ctrl *ctrl_conn, const char *id)
-{
-    if (enable_network(ctrl_conn, id)) {
-        return -1;
-    }
-
-    return wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
-}
-
-static int
-add_and_connect(struct wpa_ctrl *ctrl_conn, struct list_head *networks,
-                const char *ssid, const char *psk)
+wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
+                          struct list_head *networks, const char *ssid,
+                          const char *psk)
 {
     int has_psk;
     char id[8];
@@ -522,16 +514,16 @@ add_and_connect(struct wpa_ctrl *ctrl_conn, struct list_head *networks,
             fprintf(stderr, "Network requires PSK.\n");
             return -1;
         }
-        ret = add_network(ctrl_conn, id, ssid, psk);
+        ret = wifi_add_network(ctrl_conn, id, ssid, psk);
     } else {
-        ret = add_network(ctrl_conn, id, ssid, NULL);
+        ret = wifi_add_network(ctrl_conn, id, ssid, NULL);
     }
 
     if (ret) {
         return -1;
     }
 
-    return wifi_associate(ctrl_conn, id);
+    return wifi_enable_network(ctrl_conn, id);
 }
 
 static void
@@ -645,7 +637,7 @@ main(int argc, char **argv)
 
     if (!ret && ssid) {
         /* We were asked to associate to a WiFi network. */
-        ret = add_and_connect(ctrl_conn, &networks, ssid, psk);
+        ret = wifi_associate_to_network(ctrl_conn, &networks, ssid, psk);
     }
 
     /* Cleanup. */
