@@ -67,11 +67,9 @@ finally, **rina-gw** (section 7.1) allows to deploy RINA next to IP.
 ## 2. Software requirements
 
 This section lists the software packages required to build and run *rlite* on
-Linux-based operating systems. Only Ubuntu 14.04 and Archlinux are explicitly
-indicated here, but using other distributions should be equally
+GNU/Linux operating systems. Only Ubuntu, Debian, Archlinux and CentOS are
+explicitly indicated here, but using other distributions should be equally
 straightforward.
-
-List of required packages:
 
 The software has been developed and tested on Linux (vanilla) kernels starting
 from the 4.1 series up to the most recent ones. Using older Linux versions is
@@ -80,7 +78,7 @@ some of the differences in the internal API that change across Linux versions.
 The 3.10 kernels and older ones are not supported. In any case it is
 recommended to use recent versions (e.g. from 4.1 onward) where possible.
 
-### Ubuntu 14.04 and Debian 8
+### Ubuntu 14.04/16.04 and Debian 8
 
 List of required packages:
 
@@ -119,7 +117,6 @@ List of required packages:
 * kernel-devel
 * cmake
 * python, swig [optional, for python bindings]
-
 
 
 
