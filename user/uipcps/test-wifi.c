@@ -34,15 +34,26 @@
 #include "../uipcps/wpa-supplicant/wpa_ctrl.h"
 #include "test-wifi.h"
 
+/* clang-format off */
 /*
- * EXAMPLES
+ * Usage examples:
+ *
  * How to scan available networks:
- * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf
- *               -C /run/wpa_supplicant
+ * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf -C /run/wpa_supplicant
  * How to connect to a WPA2 network:
- * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf
- *               -C /run/wpa_supplicant -a network_ssid -p network_password
+ * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf -C /run/wpa_supplicant -a network_ssid -p network_password
+ *
+ * Example of wpa_supplicant configuration
+ *
+ctrl_interface=/var/run/wpa_supplicant
+#ctrl_interface_group=wheel
+eapol_version=1
+ap_scan=1
+fast_reauth=1
+update_config=1
+ *
  */
+/* clang-format on */
 
 static char *
 create_ctrl_path(char *ctrl_dir, char *inf)
