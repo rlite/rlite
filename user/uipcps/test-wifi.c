@@ -34,6 +34,16 @@
 #include "../uipcps/wpa-supplicant/wpa_ctrl.h"
 #include "test-wifi.h"
 
+/*
+ * EXAMPLES
+ * How to scan available networks:
+ * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf
+ *               -C /run/wpa_supplicant
+ * How to connect to a WPA2 network:
+ * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf
+ *               -C /run/wpa_supplicant -a network_ssid -p network_password
+ */
+
 static char *
 create_ctrl_path(char *ctrl_dir, char *inf)
 {
@@ -380,7 +390,6 @@ set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
     char *msg;
     static const char cmd[]  = "SET_NETWORK";
     static const int cmd_len = 11;
-    int msg_offset           = 0;
 
     id_len  = strlen(id);
     var_len = strlen(var);
@@ -395,24 +404,7 @@ set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
         return -1;
     }
 
-    strncpy(msg + msg_offset, cmd, cmd_len);
-    msg_offset += cmd_len;
-    msg[msg_offset++] = ' ';
-
-    strncpy(msg + msg_offset, id, id_len);
-    msg_offset += id_len;
-    msg[msg_offset++] = ' ';
-
-    strncpy(msg + msg_offset, var, var_len);
-    msg_offset += var_len;
-    msg[msg_offset++] = ' ';
-
-    msg[msg_offset++] = '"';
-    strncpy(msg + msg_offset, val, val_len);
-    msg_offset += val_len;
-    msg[msg_offset++] = '"';
-    msg[msg_offset++] = '\0';
-
+    snprintf(msg, len, "%s %s %s \"%s\"", cmd, id, var, val);
     send_cmd(ctrl_conn, msg);
 
     free(msg);
@@ -434,7 +426,6 @@ wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
     char *msg;
     static const char cmd[]  = "ENABLE_NETWORK";
     static const int cmd_len = 14;
-    int msg_offset           = 0;
 
     id_len = strlen(id);
 
@@ -447,14 +438,7 @@ wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
         return -1;
     }
 
-    strncpy(msg + msg_offset, cmd, cmd_len);
-    msg_offset += cmd_len;
-    msg[msg_offset++] = ' ';
-
-    strncpy(msg + msg_offset, id, id_len);
-    msg_offset += id_len;
-    msg[msg_offset++] = '\0';
-
+    snprintf(msg, len, "%s %s", cmd, id);
     send_cmd(ctrl_conn, msg);
 
     free(msg);
