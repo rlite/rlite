@@ -78,7 +78,7 @@ some of the differences in the internal API that change across Linux versions.
 The 3.10 kernels and older ones are not supported. In any case it is
 recommended to use recent versions (e.g. from 4.1 onward) where possible.
 
-### Ubuntu 14.04/16.04 and Debian 8
+### Ubuntu 14.04 (or higher) and Debian 8 (or higher)
 
 List of required packages:
 
@@ -1050,7 +1050,7 @@ clone of buildroot, modified with rlite support, changing the last
 line of `update.sh` (before running it), as indicated by the comments
 inside the script itself:
 
-    $ git clone -b rlite https://github.com/vmaffione/buildroot
+    $ git clone https://github.com/vmaffione/buildroot
     $ cd buildroot
     $ vi update.sh  # change the last line to specify the path of your local rlite repo
     $ ./update.sh   # step 8 (make buildroot image)
