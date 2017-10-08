@@ -39,6 +39,10 @@
 
 #define RL_WIFI_SSID_LEN 129
 
+#define RL_WPA_SUPPLICANT_CONF_PATH "/etc/wpa_supplicant/rlite.conf"
+#define RL_WPA_SUPPLICANT_PID_PATH "/run/wpa_supplicant.pid"
+#define RL_WIFI_DRIVER "nl80211"
+
 struct wifi_network {
     struct list_head list;
     char bssid[18];
