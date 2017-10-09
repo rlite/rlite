@@ -63,9 +63,9 @@ static char *
 create_ctrl_path(const char *ctrl_dir, const char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
-    size_t len_dir  = strlen(ctrl_dir);
-    size_t len_inf  = strlen(inf);
-    size_t len = len_dir + len_inf + 2;
+    const size_t len_dir  = strlen(ctrl_dir);
+    const size_t len_inf  = strlen(inf);
+    const size_t len = len_dir + len_inf + 2;
     char *ctrl_path = malloc(len);
     if (!ctrl_path) {
         fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
@@ -109,7 +109,7 @@ get_ctrl_dir_from_config(const char *config)
 int
 start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, char **ctrl_path)
 {
-    char *driver = RL_WIFI_DRIVER;
+    const char *driver = RL_WIFI_DRIVER;
     char *ctrl_dir;
     int pid;
 
@@ -145,12 +145,14 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, 
     return 0;
 }
 
+#define RL_WPA_SUPPLICANT_MAX_MSG_LEN   4096
+
 /* sends a command to the control interface */
 static int
 send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
-    size_t len = 4096;
-    char buf[len];
+    char buf[RL_WPA_SUPPLICANT_MAX_MSG_LEN];
+    size_t len = sizeof(buf);
     len--;
 
     if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
@@ -168,7 +170,7 @@ send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 static char *
 send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
-    size_t len = 4096;
+    size_t len = RL_WPA_SUPPLICANT_MAX_MSG_LEN;
     char *buf  = malloc(len);
     if (!buf) {
         fprintf(stderr, "send_cmd_get_resp() : failed malloc().\n");
@@ -206,10 +208,10 @@ recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
     return len;
 }
 
-static char *
-parse_wpa_flags(u_int32_t *flags, char *flagstr)
+static const char *
+parse_wpa_flags(u_int32_t *flags, const char *flagstr)
 {
-    char *p = flagstr;
+    const char *p = flagstr;
     int len = index(flagstr, ']') - flagstr;
 
     while (*p != ']') {
@@ -234,13 +236,14 @@ parse_wpa_flags(u_int32_t *flags, char *flagstr)
             len -= 7;
         }
     }
+
     return p;
 }
 
 static void
 parse_wifi_flags(struct wifi_network *elem, char *flagstr)
 {
-    char *p = flagstr;
+    const char *p = flagstr;
     int len;
 
     elem->wifi_flags = 0;
@@ -279,9 +282,9 @@ parse_wifi_flags(struct wifi_network *elem, char *flagstr)
 }
 
 static int
-parse_networks(struct list_head *list, char *networks)
+parse_networks(struct list_head *list, const char *networks)
 {
-    char *p = networks;
+    const char *p = networks;
     struct wifi_network *elem;
     char flagstr[100];
 
@@ -310,8 +313,8 @@ parse_networks(struct list_head *list, char *networks)
 static int
 wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
 {
-    static const int len = 4096;
-    char buf[len];
+    char buf[RL_WPA_SUPPLICANT_MAX_MSG_LEN];
+    const int len = sizeof(buf);
     int ret;
 
     struct pollfd ctrl_pollfd;
@@ -398,7 +401,7 @@ wpa_flags_print(u_int32_t flags)
 }
 
 static void
-wifi_networks_print(struct list_head *networks)
+wifi_networks_print(const struct list_head *networks)
 {
     struct wifi_network *cur;
     fprintf(stderr, "bssid / frequency / signal level / flags / ssid\n");
@@ -428,7 +431,7 @@ wifi_networks_print(struct list_head *networks)
 }
 
 static struct wifi_network *
-find_network_by_ssid(struct list_head *networks, const char *ssid)
+find_network_by_ssid(const struct list_head *networks, const char *ssid)
 {
     struct wifi_network *cur;
     int len;
@@ -445,9 +448,9 @@ find_network_by_ssid(struct list_head *networks, const char *ssid)
 }
 
 static int
-requires_psk(struct list_head *networks, const char *ssid)
+requires_psk(const struct list_head *networks, const char *ssid)
 {
-    struct wifi_network *network;
+    const struct wifi_network *network;
 
     network = find_network_by_ssid(networks, ssid);
     if (!network) {
@@ -471,10 +474,10 @@ static int
 set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
             const char *val)
 {
+    const char cmd[]  = "SET_NETWORK";
+    const int cmd_len = 11;
     int len, id_len, var_len, val_len;
     char *msg;
-    static const char cmd[]  = "SET_NETWORK";
-    static const int cmd_len = 11;
 
     id_len  = strlen(id);
     var_len = strlen(var);
@@ -507,10 +510,10 @@ set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
 static int
 wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
 {
+    const char cmd[]  = "ENABLE_NETWORK";
+    const int cmd_len = 14;
     int len, id_len;
     char *msg;
-    static const char cmd[]  = "ENABLE_NETWORK";
-    static const int cmd_len = 14;
 
     id_len = strlen(id);
 
@@ -543,7 +546,7 @@ static int
 wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
                  const char *psk)
 {
-    char *resp;
+    const char *resp;
 
     resp = send_cmd_get_resp(ctrl_conn, "ADD_NETWORK");
     if (!resp) {
@@ -565,7 +568,7 @@ wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
 
 static int
 wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
-                          struct list_head *networks, const char *ssid,
+                          const struct list_head *networks, const char *ssid,
                           const char *psk)
 {
     int has_psk;
@@ -604,8 +607,8 @@ usage()
            "   -t      : terminate wpa_supplicant before exiting\n"
            "   -a SSID : associate to network with given SSID\n"
            "   -p PSK  : use given PSK when associating\n"
-           "There is expected to be a working wpa_supplicant.conf located at %s\n"
-           "(See 'man 5 wpa_supplicant.conf' for details)",
+           "A minimal wpa_supplicant.conf is expected at %s\n"
+           "(See 'man 5 wpa_supplicant.conf' for details)\n",
            RL_WPA_SUPPLICANT_CONF_PATH);
 }
 
