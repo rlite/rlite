@@ -31,10 +31,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdint.h>
 
+#include "rlite/list.h"
 #include "rlite/utils.h"
 #include "wpa-supplicant/wpa_ctrl.h"
-#include "test-wifi.h"
 
 /* clang-format off */
 /*
@@ -59,6 +60,32 @@ update_config=1
  *
  */
 /* clang-format on */
+
+#define RL_WIFI_F_WEP 0x1
+#define RL_WIFI_F_WPS 0x2
+#define RL_WIFI_F_ESS 0x4
+#define RL_WPA_F_ACTIVE 0x1
+#define RL_WPA_F_PSK 0x2
+#define RL_WPA_F_CCMP 0x4
+#define RL_WPA_F_TKIP 0x8
+#define RL_WPA_F_PREAUTH 0x10
+
+#define RL_WIFI_SSID_LEN 129
+
+#define RL_WPA_SUPPLICANT_CONF_PATH "/etc/wpa_supplicant/rlite.conf"
+#define RL_WPA_SUPPLICANT_PID_PATH "/run/wpa_supplicant.pid"
+#define RL_WIFI_DRIVER "nl80211"
+
+struct wifi_network {
+    struct list_head list;
+    char bssid[18];
+    unsigned int freq;
+    int signal;
+    uint32_t wifi_flags;
+    uint32_t wpa1_flags;
+    uint32_t wpa2_flags;
+    char ssid[RL_WIFI_SSID_LEN];
+};
 
 static char *
 create_ctrl_path(const char *ctrl_dir, const char *inf)
