@@ -88,7 +88,7 @@ struct wifi_network {
 };
 
 static char *
-create_ctrl_path(const char *ctrl_dir, const char *inf)
+wpasup_create_ctrl_path(const char *ctrl_dir, const char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
     const size_t len_dir = strlen(ctrl_dir);
@@ -104,7 +104,7 @@ create_ctrl_path(const char *ctrl_dir, const char *inf)
 }
 
 static char *
-get_ctrl_dir_from_config(const char *config)
+wpasup_get_ctrl_dir_from_config(const char *config)
 {
     const int buf_size = 128;
     char buffer[buf_size];
@@ -123,7 +123,7 @@ get_ctrl_dir_from_config(const char *config)
     while (fgets(buffer, buf_size, config_fd)) {
         if (!strncmp("ctrl_interface", buffer, 14)) {
             if (!sscanf(buffer, "ctrl_interface=%m[^\n]", &ctrl_dir)) {
-                PE("get_ctrl_dir_from_config: sscanf() failed\n");
+                perror("sscanf()");
             }
             break;
         }
@@ -135,14 +135,14 @@ get_ctrl_dir_from_config(const char *config)
 }
 
 static int
-start_wpa_supplicant(const char *config, const char *pid_file, const char *inf,
-                     char **ctrl_path)
+wpasup_start_daemon(const char *config, const char *pid_file, const char *inf,
+                    char **ctrl_path)
 {
     const char *driver = RL_WIFI_DRIVER;
     char *ctrl_dir;
     int pid;
 
-    ctrl_dir = get_ctrl_dir_from_config(config);
+    ctrl_dir = wpasup_get_ctrl_dir_from_config(config);
 
     if (!ctrl_dir) {
         PE("Could not get ctrl_interface from the config file\n");
@@ -166,7 +166,7 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf,
     /* Wait a bit to make sure it started. */
     sleep(2);
 
-    *ctrl_path = create_ctrl_path(ctrl_dir, inf);
+    *ctrl_path = wpasup_create_ctrl_path(ctrl_dir, inf);
     free(ctrl_dir);
     if (!*ctrl_path) {
         return -1;
@@ -178,7 +178,7 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf,
 
 /* sends a command to the control interface */
 static int
-send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
+wpasup_send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     char buf[RL_WPA_SUPPLICANT_MAX_MSG_LEN];
     size_t len = sizeof(buf);
@@ -197,7 +197,7 @@ send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
 }
 
 static char *
-send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
+wpasup_send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 {
     size_t len = RL_WPA_SUPPLICANT_MAX_MSG_LEN;
     char *buf  = malloc(len);
@@ -222,7 +222,7 @@ send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
 
 /* reads a message from the control interface */
 static size_t
-recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
+wpasup_recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
 {
     len--;
     if (wpa_ctrl_recv(ctrl_conn, buf, &len)) {
@@ -340,7 +340,7 @@ parse_networks(struct list_head *list, const char *networks)
 }
 
 static int
-wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
+wpasup_wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
 {
     char buf[RL_WPA_SUPPLICANT_MAX_MSG_LEN];
     const int len = sizeof(buf);
@@ -360,7 +360,7 @@ wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
             return -1;
         }
         if (ctrl_pollfd.revents & POLLIN) {
-            if (!recv_msg(ctrl_conn, buf, len)) {
+            if (!wpasup_recv_msg(ctrl_conn, buf, len)) {
                 perror("Failed to read messages from wpa_supplicant");
                 return -1;
             };
@@ -377,17 +377,17 @@ wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 
     list_init(list);
 
-    if (send_cmd(ctrl_conn, "SCAN")) {
+    if (wpasup_send_cmd(ctrl_conn, "SCAN")) {
         perror("Failed to send \"SCAN\" command");
         return -1;
     }
 
     /* loop until we get a 'scanning done' message */
-    if (wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS)) {
+    if (wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS)) {
         return -1;
     }
 
-    networks = send_cmd_get_resp(ctrl_conn, "SCAN_RESULTS");
+    networks = wpasup_send_cmd_get_resp(ctrl_conn, "SCAN_RESULTS");
     if (!networks) {
         perror("Failed to send \"SCAN_RESULTS\" command");
         return -1;
@@ -521,7 +521,7 @@ wifi_set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
     }
 
     snprintf(msg, len, "%s %s %s \"%s\"", cmd, id, var, val);
-    send_cmd(ctrl_conn, msg);
+    wpasup_send_cmd(ctrl_conn, msg);
 
     free(msg);
 
@@ -555,11 +555,11 @@ wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
     }
 
     snprintf(msg, len, "%s %s", cmd, id);
-    send_cmd(ctrl_conn, msg);
+    wpasup_send_cmd(ctrl_conn, msg);
 
     free(msg);
 
-    return wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+    return wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
 }
 
 /*
@@ -576,7 +576,7 @@ wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
 {
     const char *resp;
 
-    resp = send_cmd_get_resp(ctrl_conn, "ADD_NETWORK");
+    resp = wpasup_send_cmd_get_resp(ctrl_conn, "ADD_NETWORK");
     if (!resp) {
         return -1;
     }
@@ -694,7 +694,7 @@ main(int argc, char **argv)
         case ENOENT:
             /* Couldn't find a pidifle. We assume there is no process,
              * let's start a wpa_supplicant instance. */
-            if (start_wpa_supplicant(config, pid_file, inf, &ctrl_path)) {
+            if (wpasup_start_daemon(config, pid_file, inf, &ctrl_path)) {
                 return -1;
             }
             break;
@@ -706,12 +706,12 @@ main(int argc, char **argv)
         /* A pidfile was found, so a wpa_supplicant process is already running.
          * We just need to recover the control directory from its configuration
          * file. */
-        ctrl_dir = get_ctrl_dir_from_config(config);
+        ctrl_dir = wpasup_get_ctrl_dir_from_config(config);
         if (!ctrl_dir) {
             PE("Could not get ctrl_interface from the config file\n");
             return -1;
         }
-        ctrl_path = create_ctrl_path(ctrl_dir, inf);
+        ctrl_path = wpasup_create_ctrl_path(ctrl_dir, inf);
         free(ctrl_dir);
         if (!ctrl_path) {
             return -1;
@@ -744,7 +744,7 @@ main(int argc, char **argv)
     wifi_destroy_network_list(&networks);
     if (terminate) {
         PD("Terminating wpa_supplicant\n");
-        send_cmd(ctrl_conn, "TERMINATE");
+        wpasup_send_cmd(ctrl_conn, "TERMINATE");
     }
     wpa_ctrl_detach(ctrl_conn);
     wpa_ctrl_close(ctrl_conn);
