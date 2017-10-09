@@ -91,10 +91,10 @@ static char *
 create_ctrl_path(const char *ctrl_dir, const char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
-    const size_t len_dir  = strlen(ctrl_dir);
-    const size_t len_inf  = strlen(inf);
-    const size_t len = len_dir + len_inf + 2;
-    char *ctrl_path = malloc(len);
+    const size_t len_dir = strlen(ctrl_dir);
+    const size_t len_inf = strlen(inf);
+    const size_t len     = len_dir + len_inf + 2;
+    char *ctrl_path      = malloc(len);
     if (!ctrl_path) {
         PE("Out of memory\n");
         return NULL;
@@ -114,9 +114,9 @@ get_ctrl_dir_from_config(const char *config)
     config_fd = fopen(config, "r");
     if (!config_fd) {
         PE("Could not open config file\n"
-                        "Please make sure there is a config file located at %s"
-                        " and that it is accessible\n",
-                        RL_WPA_SUPPLICANT_CONF_PATH);
+           "Please make sure there is a config file located at %s"
+           " and that it is accessible\n",
+           RL_WPA_SUPPLICANT_CONF_PATH);
         return NULL;
     }
 
@@ -135,7 +135,8 @@ get_ctrl_dir_from_config(const char *config)
 }
 
 static int
-start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, char **ctrl_path)
+start_wpa_supplicant(const char *config, const char *pid_file, const char *inf,
+                     char **ctrl_path)
 {
     const char *driver = RL_WIFI_DRIVER;
     char *ctrl_dir;
@@ -156,8 +157,8 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, 
         return -1;
     } else if (pid == 0) {
         PD("Executing wpa_supplicant\n");
-        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
-               "-P", pid_file, "-B", NULL);
+        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config, "-P",
+               pid_file, "-B", NULL);
         perror("execlp(wpa_supplicant)");
         return -1;
     }
@@ -173,7 +174,7 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, 
     return 0;
 }
 
-#define RL_WPA_SUPPLICANT_MAX_MSG_LEN   4096
+#define RL_WPA_SUPPLICANT_MAX_MSG_LEN 4096
 
 /* sends a command to the control interface */
 static int
@@ -240,7 +241,7 @@ static const char *
 parse_wpa_flags(u_int32_t *flags, const char *flagstr)
 {
     const char *p = flagstr;
-    int len = index(flagstr, ']') - flagstr;
+    int len       = index(flagstr, ']') - flagstr;
 
     while (*p != ']') {
         if (*p == '-' || *p == '+') {
@@ -499,7 +500,7 @@ requires_psk(const struct list_head *networks, const char *ssid)
  */
 static int
 wifi_set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
-            const char *val)
+                 const char *val)
 {
     const char cmd[]  = "SET_NETWORK";
     const int cmd_len = 11;
@@ -690,16 +691,16 @@ main(int argc, char **argv)
     ret = access(pid_file, R_OK);
     if (ret) {
         switch (errno) {
-            case ENOENT:
-                /* Couldn't find a pidifle. We assume there is no process,
-                 * let's start a wpa_supplicant instance. */
-                if (start_wpa_supplicant(config, pid_file, inf, &ctrl_path)) {
-                    return -1;
-                }
-                break;
-            default:
-                perror("Failed to access the PID file");
+        case ENOENT:
+            /* Couldn't find a pidifle. We assume there is no process,
+             * let's start a wpa_supplicant instance. */
+            if (start_wpa_supplicant(config, pid_file, inf, &ctrl_path)) {
                 return -1;
+            }
+            break;
+        default:
+            perror("Failed to access the PID file");
+            return -1;
         }
     } else {
         /* A pidfile was found, so a wpa_supplicant process is already running.
