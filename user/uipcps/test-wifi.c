@@ -134,7 +134,7 @@ get_ctrl_dir_from_config(const char *config)
     return ctrl_dir;
 }
 
-int
+static int
 start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, char **ctrl_path)
 {
     const char *driver = RL_WIFI_DRIVER;
@@ -370,7 +370,7 @@ wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
 }
 
 static int
-scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
+wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 {
     char *networks;
 
@@ -401,7 +401,7 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 }
 
 static void
-destroy_net_list(struct list_head *list)
+wifi_destroy_network_list(struct list_head *list)
 {
     struct wifi_network *cur, *tmp;
     list_for_each_entry_safe (cur, tmp, list, list) {
@@ -458,7 +458,7 @@ wifi_networks_print(const struct list_head *networks)
 }
 
 static struct wifi_network *
-find_network_by_ssid(const struct list_head *networks, const char *ssid)
+wifi_find_network_by_ssid(const struct list_head *networks, const char *ssid)
 {
     struct wifi_network *cur;
     int len;
@@ -479,7 +479,7 @@ requires_psk(const struct list_head *networks, const char *ssid)
 {
     const struct wifi_network *network;
 
-    network = find_network_by_ssid(networks, ssid);
+    network = wifi_find_network_by_ssid(networks, ssid);
     if (!network) {
         return -1;
     }
@@ -498,7 +498,7 @@ requires_psk(const struct list_head *networks, const char *ssid)
  * creates the command string to send and sends it to the control connection.
  */
 static int
-set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
+wifi_set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
             const char *val)
 {
     const char cmd[]  = "SET_NETWORK";
@@ -581,11 +581,11 @@ wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
     }
     sscanf(resp, "%8[^\n]c\n", id);
 
-    if (set_network(ctrl_conn, id, "ssid", ssid)) {
+    if (wifi_set_network(ctrl_conn, id, "ssid", ssid)) {
         return -1;
     }
     if (psk) {
-        if (set_network(ctrl_conn, id, "psk", psk)) {
+        if (wifi_set_network(ctrl_conn, id, "psk", psk)) {
             return -1;
         }
     }
@@ -729,7 +729,7 @@ main(int argc, char **argv)
     /* Attach to the child so that we can send control messages. */
     wpa_ctrl_attach(ctrl_conn);
 
-    ret = scan(ctrl_conn, &networks);
+    ret = wifi_scan(ctrl_conn, &networks);
     if (debug && !ret) {
         wifi_networks_print(&networks);
     }
@@ -740,7 +740,7 @@ main(int argc, char **argv)
     }
 
     /* Cleanup. */
-    destroy_net_list(&networks);
+    wifi_destroy_network_list(&networks);
     if (terminate) {
         PD("Terminating wpa_supplicant\n");
         send_cmd(ctrl_conn, "TERMINATE");
