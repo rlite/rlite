@@ -24,6 +24,7 @@
 
 #define _GNU_SOURCE
 
+#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,10 +40,13 @@
  * Usage examples:
  *
  * How to scan available networks:
- * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf -C /run/wpa_supplicant
+ * $ ./test-wifi -i wlp3s0
  * How to connect to a WPA2 network:
- * $ ./test-wifi -i wlp3s0 -c /etc/wpa_supplicant/wpa_supplicant.conf -C /run/wpa_supplicant -a network_ssid -p network_password
+ * $ ./test-wifi -i wlp3s0 -a network_ssid -p network_password
+ * How to terminate wpa_supplicant before exiting:
+ * $ ./test-wifi -i wlp3s0 -t
  *
+ * test-wifi expects a config file to be located at /etc/wpa_supplicant/rlite.conf
  * Example of wpa_supplicant configuration
  *
 ctrl_interface=/var/run/wpa_supplicant
@@ -56,19 +60,89 @@ update_config=1
 /* clang-format on */
 
 static char *
-create_ctrl_path(char *ctrl_dir, char *inf)
+create_ctrl_path(const char *ctrl_dir, const char *inf)
 {
     /* parameter to wpa_ctrl_open needs to be path in config + interface */
     size_t len_dir  = strlen(ctrl_dir);
     size_t len_inf  = strlen(inf);
-    char *ctrl_path = malloc(len_dir + len_inf + 2);
+    size_t len = len_dir + len_inf + 2;
+    char *ctrl_path = malloc(len);
     if (!ctrl_path) {
+        fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
         return NULL;
     }
-    strncpy(ctrl_path, ctrl_dir, len_dir);
-    ctrl_path[len_dir] = '/';
-    strncpy(ctrl_path + len_dir + 1, inf, len_inf);
+    snprintf(ctrl_path, len, "%s/%s", ctrl_dir, inf);
     return ctrl_path;
+}
+
+static char *
+get_ctrl_dir_from_config(const char *config)
+{
+    const int buf_size = 128;
+    char buffer[buf_size];
+    char *ctrl_dir = NULL;
+    FILE *config_fd;
+
+    config_fd = fopen(config, "r");
+    if (!config_fd) {
+        fprintf(stderr, "Could not open config file\n"
+                        "Please make sure there is a config file located at %s"
+                        " and that it is accessible\n",
+                        RL_WPA_SUPPLICANT_CONF_PATH);
+        return NULL;
+    }
+
+    while (fgets(buffer, buf_size, config_fd)) {
+        if (!strncmp("ctrl_interface", buffer, 14)) {
+            if (!sscanf(buffer, "ctrl_interface=%m[^\n]", &ctrl_dir)) {
+                fprintf(stderr, "get_ctrl_dir_from_config: sscanf() failed\n");
+            }
+            break;
+        }
+    }
+
+    fclose(config_fd);
+
+    return ctrl_dir;
+}
+
+int
+start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, char **ctrl_path)
+{
+    char *driver = RL_WIFI_DRIVER;
+    char *ctrl_dir;
+    int pid;
+
+    ctrl_dir = get_ctrl_dir_from_config(config);
+
+    if (!ctrl_dir) {
+        fprintf(stderr, "Could not get ctrl_interface from the config file\n");
+        return -1;
+    }
+
+    /* Start wpa_supplicant as a child process. */
+    pid = fork();
+
+    if (pid <= -1) {
+        fprintf(stderr, "Forking failed.\n");
+        return -1;
+    } else if (pid == 0) {
+        printf("Launching wpa_supplicant\n");
+        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
+               "-P", pid_file, "-B", NULL);
+        fprintf(stderr, "Launching wpa_supplicant failed\n");
+        return -1;
+    }
+
+    /* Wait a bit to make sure it started. */
+    sleep(2);
+
+    *ctrl_path = create_ctrl_path(ctrl_dir, inf);
+    free(ctrl_dir);
+    if (!*ctrl_path) {
+        return -1;
+    }
+    return 0;
 }
 
 /* sends a command to the control interface */
@@ -524,47 +598,39 @@ wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
 static void
 usage()
 {
-    printf("test-wifi -i INF -c PATH_TO_CONFIG -C PATH_TO_WPA_CTRL_DIR [-d] "
-           "[-a SSID] [-p PSK]\n"
+    printf("test-wifi -i INF [-d] [-t] [-a SSID] [-p PSK]\n"
            "   -i INF  : name of interface to use\n"
-           "   -c PATH : path to the wpa_supplicant.conf to be used "
-           "(see 'man wpa_supplicant')\n"
-           "   -C PATH : 'ctrl_interface' from wpa_supplicant.conf\n"
            "   -d      : print debug messages\n"
+           "   -t      : terminate wpa_supplicant before exiting\n"
            "   -a SSID : associate to network with given SSID\n"
-           "   -p PSK  : use given PSK when associating\n");
+           "   -p PSK  : use given PSK when associating\n"
+           "There is expected to be a working wpa_supplicant.conf located at %s\n"
+           "(See 'man 5 wpa_supplicant.conf' for details)",
+           RL_WPA_SUPPLICANT_CONF_PATH);
 }
 
 int
 main(int argc, char **argv)
 {
     int opt;
-    char *inf = NULL, *config = NULL, *ctrl_dir = NULL;
-    char *driver = "nl80211";
+    char *inf = NULL, *config = RL_WPA_SUPPLICANT_CONF_PATH;
+    char *pid_file = RL_WPA_SUPPLICANT_PID_PATH;
 
-    int status;
-    pid_t pid;
-
-    char *ctrl_path;
+    char *ctrl_dir, *ctrl_path;
     struct wpa_ctrl *ctrl_conn = NULL;
     struct list_head networks;
-    int debug = 0;
+    int debug     = 0;
+    int terminate = 0;
 
     char *ssid = NULL;
     char *psk  = NULL;
 
     int ret;
 
-    while ((opt = getopt(argc, argv, "i:c:C:hda:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:hda:p:t")) != -1) {
         switch (opt) {
         case 'i':
             inf = optarg;
-            break;
-        case 'c':
-            config = optarg;
-            break;
-        case 'C':
-            ctrl_dir = optarg;
             break;
         case 'h':
             usage();
@@ -578,45 +644,50 @@ main(int argc, char **argv)
         case 'p':
             psk = optarg;
             break;
+        case 't':
+            terminate = 1;
+            break;
         }
     }
 
-    if (!inf || !config || !ctrl_dir || (!ssid && psk)) {
+    if (!inf || (!ssid && psk)) {
         fprintf(stderr, "Invalid arguments\n\n");
         usage();
         return -1;
     }
 
-    /* Start wpa_supplicant as a child process. */
-    pid = fork();
-
-    if (pid <= -1) {
-        fprintf(stderr, "Forking failed.\n");
-        return -1;
-    } else if (pid == 0) {
-        printf("Launching wpa_supplicant\n");
-        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config, NULL);
-        fprintf(stderr, "Launching wpa_supplicant failed\n");
-        return -1;
-    }
-
-    /* Wait a bit to make sure it started. */
-    sleep(2);
-
-    ctrl_path = create_ctrl_path(ctrl_dir, inf);
-    if (!ctrl_path) {
-        fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
-        kill(pid, SIGTERM);
-        waitpid(pid, &status, 0);
-        return -1;
+    ret = access(pid_file, R_OK);
+    if (ret) {
+        switch (errno) {
+            case EACCES:
+                fprintf(stderr, "Cannot access the PID file\n");
+                return -1;
+            case ENOENT:
+                if (start_wpa_supplicant(config, pid_file, inf, &ctrl_path)) {
+                    return -1;
+                }
+                break;
+            default:
+                fprintf(stderr, "access() failed on PID file\n");
+                return -1;
+        }
+    } else {
+        ctrl_dir = get_ctrl_dir_from_config(config);
+        if (!ctrl_dir) {
+            fprintf(stderr, "Could not get ctrl_interface from the config file\n");
+            return -1;
+        }
+        ctrl_path = create_ctrl_path(ctrl_dir, inf);
+        free(ctrl_dir);
+        if (!ctrl_path) {
+            return -1;
+        }
     }
 
     /* Create a control connection with the child and get the handle. */
     ctrl_conn = wpa_ctrl_open(ctrl_path);
     if (!ctrl_conn) {
         fprintf(stderr, "Failed to connect to the control interface.\n");
-        kill(pid, SIGTERM);
-        waitpid(pid, &status, 0);
         return -1;
     }
 
@@ -637,10 +708,12 @@ main(int argc, char **argv)
 
     /* Cleanup. */
     destroy_net_list(&networks);
+    if (terminate) {
+        printf("Terminating wpa_supplicant\n");
+        send_cmd(ctrl_conn, "TERMINATE");
+    }
     wpa_ctrl_detach(ctrl_conn);
     wpa_ctrl_close(ctrl_conn);
-    kill(pid, SIGTERM);
-    waitpid(pid, &status, 0);
 
     return ret;
 }
