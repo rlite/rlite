@@ -32,7 +32,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#include "../uipcps/wpa-supplicant/wpa_ctrl.h"
+#include "rlite/utils.h"
+#include "wpa-supplicant/wpa_ctrl.h"
 #include "test-wifi.h"
 
 /* clang-format off */
@@ -68,7 +69,7 @@ create_ctrl_path(const char *ctrl_dir, const char *inf)
     const size_t len = len_dir + len_inf + 2;
     char *ctrl_path = malloc(len);
     if (!ctrl_path) {
-        fprintf(stderr, "create_ctrl_path() : failed malloc().\n");
+        PE("Out of memory\n");
         return NULL;
     }
     snprintf(ctrl_path, len, "%s/%s", ctrl_dir, inf);
@@ -85,7 +86,7 @@ get_ctrl_dir_from_config(const char *config)
 
     config_fd = fopen(config, "r");
     if (!config_fd) {
-        fprintf(stderr, "Could not open config file\n"
+        PE("Could not open config file\n"
                         "Please make sure there is a config file located at %s"
                         " and that it is accessible\n",
                         RL_WPA_SUPPLICANT_CONF_PATH);
@@ -95,7 +96,7 @@ get_ctrl_dir_from_config(const char *config)
     while (fgets(buffer, buf_size, config_fd)) {
         if (!strncmp("ctrl_interface", buffer, 14)) {
             if (!sscanf(buffer, "ctrl_interface=%m[^\n]", &ctrl_dir)) {
-                fprintf(stderr, "get_ctrl_dir_from_config: sscanf() failed\n");
+                PE("get_ctrl_dir_from_config: sscanf() failed\n");
             }
             break;
         }
@@ -116,7 +117,7 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, 
     ctrl_dir = get_ctrl_dir_from_config(config);
 
     if (!ctrl_dir) {
-        fprintf(stderr, "Could not get ctrl_interface from the config file\n");
+        PE("Could not get ctrl_interface from the config file\n");
         return -1;
     }
 
@@ -124,13 +125,13 @@ start_wpa_supplicant(const char *config, const char *pid_file, const char *inf, 
     pid = fork();
 
     if (pid <= -1) {
-        fprintf(stderr, "Forking failed.\n");
+        perror("fork()");
         return -1;
     } else if (pid == 0) {
-        printf("Launching wpa_supplicant\n");
+        PD("Executing wpa_supplicant\n");
         execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config,
                "-P", pid_file, "-B", NULL);
-        fprintf(stderr, "Launching wpa_supplicant failed\n");
+        perror("execlp(wpa_supplicant)");
         return -1;
     }
 
@@ -160,9 +161,9 @@ send_cmd(struct wpa_ctrl *ctrl_conn, const char *cmd)
     }
     buf[len] = '\0';
 
-    printf("%s", buf);
+    PD_S("%s", buf);
     if (len > 0 && buf[len - 1] != '\n')
-        printf("\n");
+        PD_S("\n");
 
     return 0;
 }
@@ -173,21 +174,21 @@ send_cmd_get_resp(struct wpa_ctrl *ctrl_conn, const char *cmd)
     size_t len = RL_WPA_SUPPLICANT_MAX_MSG_LEN;
     char *buf  = malloc(len);
     if (!buf) {
-        fprintf(stderr, "send_cmd_get_resp() : failed malloc().\n");
+        PE("Out of memory\n");
         return NULL;
     }
     len--;
 
     if (wpa_ctrl_request(ctrl_conn, cmd, strlen(cmd), buf, &len, NULL)) {
         free(buf);
-        fprintf(stderr, "send_cmd_get_resp() : failed wpa_ctrl_request().\n");
+        PE("wpa_ctrl_request() failed: %s.\n", strerror(errno));
         return NULL;
     }
     buf[len] = '\0';
 
-    printf("%s", buf);
+    PD_S("%s", buf);
     if (len > 0 && buf[len - 1] != '\n')
-        printf("\n");
+        PD_S("\n");
     return buf;
 }
 
@@ -201,9 +202,9 @@ recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
     }
     buf[len] = '\0';
 
-    printf("%s", buf);
+    PD_S("%s", buf);
     if (len > 0 && buf[len - 1] != '\n') {
-        printf("\n");
+        PD_S("\n");
     }
     return len;
 }
@@ -332,8 +333,7 @@ wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
         }
         if (ctrl_pollfd.revents & POLLIN) {
             if (!recv_msg(ctrl_conn, buf, len)) {
-                fprintf(stderr,
-                        "Failed to read messages from wpa_supplicant\n.");
+                perror("Failed to read messages from wpa_supplicant");
                 return -1;
             };
         }
@@ -350,7 +350,7 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
     list_init(list);
 
     if (send_cmd(ctrl_conn, "SCAN")) {
-        fprintf(stderr, "Failed to send \"SCAN\" command.\n");
+        perror("Failed to send \"SCAN\" command");
         return -1;
     }
 
@@ -361,12 +361,12 @@ scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 
     networks = send_cmd_get_resp(ctrl_conn, "SCAN_RESULTS");
     if (!networks) {
-        fprintf(stderr, "Failed to send \"SCAN_RESULTS\" command\n.");
+        perror("Failed to send \"SCAN_RESULTS\" command");
         return -1;
     }
 
     if (parse_networks(list, networks)) {
-        fprintf(stderr, "Failed parsing networks\n.");
+        perror("Failed to parse networks");
     }
     free(networks);
 
@@ -387,16 +387,16 @@ static void
 wpa_flags_print(u_int32_t flags)
 {
     if (flags & RL_WPA_F_PSK) {
-        fprintf(stderr, "-PSK");
+        PD_S("-PSK");
     }
     if (flags & RL_WPA_F_CCMP) {
-        fprintf(stderr, "-CCMP");
+        PD_S("-CCMP");
     }
     if (flags & RL_WPA_F_TKIP) {
-        fprintf(stderr, "+TKIP");
+        PD_S("+TKIP");
     }
     if (flags & RL_WPA_F_PREAUTH) {
-        fprintf(stderr, "-preauth");
+        PD_S("-preauth");
     }
 }
 
@@ -404,29 +404,29 @@ static void
 wifi_networks_print(const struct list_head *networks)
 {
     struct wifi_network *cur;
-    fprintf(stderr, "bssid / frequency / signal level / flags / ssid\n");
+    PD_S("bssid / frequency / signal level / flags / ssid\n");
     list_for_each_entry (cur, networks, list) {
-        fprintf(stderr, "%s\t%u\t%d\t", cur->bssid, cur->freq, cur->signal);
+        PD_S("%s\t%u\t%d\t", cur->bssid, cur->freq, cur->signal);
         if (cur->wpa1_flags & RL_WPA_F_ACTIVE) {
-            fprintf(stderr, "[WPA");
+            PD_S("[WPA");
             wpa_flags_print(cur->wpa1_flags);
-            fprintf(stderr, "]");
+            PD_S("]");
         }
         if (cur->wpa2_flags & RL_WPA_F_ACTIVE) {
-            fprintf(stderr, "[WPA2");
+            PD_S("[WPA2");
             wpa_flags_print(cur->wpa2_flags);
-            fprintf(stderr, "]");
+            PD_S("]");
         }
         if (cur->wifi_flags & RL_WIFI_F_WPS) {
-            fprintf(stderr, "[WPS]");
+            PD_S("[WPS]");
         }
         if (cur->wifi_flags & RL_WIFI_F_WEP) {
-            fprintf(stderr, "[WEP]");
+            PD_S("[WEP]");
         }
         if (cur->wifi_flags & RL_WIFI_F_ESS) {
-            fprintf(stderr, "[ESS]");
+            PD_S("[ESS]");
         }
-        fprintf(stderr, "\t%s\n", cur->ssid);
+        PD_S("\t%s\n", cur->ssid);
     }
 }
 
@@ -488,7 +488,7 @@ set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
 
     msg = malloc(len);
     if (!msg) {
-        fprintf(stderr, "set_network() : failed malloc().\n");
+        PE("Out of memory\n");
         return -1;
     }
 
@@ -522,7 +522,7 @@ wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
 
     msg = malloc(len);
     if (!msg) {
-        fprintf(stderr, "set_network() : failed malloc().\n");
+        PE("Out of memory\n");
         return -1;
     }
 
@@ -577,13 +577,13 @@ wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
 
     has_psk = requires_psk(networks, ssid);
     if (has_psk == -1) {
-        fprintf(stderr, "No network with such SSID known.\n");
+        PE("Cannot find network with SSID %s.\n", ssid);
         return -1;
     }
 
     if (has_psk) {
         if (psk == NULL) {
-            fprintf(stderr, "Network requires PSK.\n");
+            PE("Network with SSID %s requires PSK.\n", ssid);
             return -1;
         }
         ret = wifi_add_network(ctrl_conn, id, ssid, psk);
@@ -654,30 +654,33 @@ main(int argc, char **argv)
     }
 
     if (!inf || (!ssid && psk)) {
-        fprintf(stderr, "Invalid arguments\n\n");
+        PE("Invalid arguments\n\n");
         usage();
         return -1;
     }
 
+    /* Try to access the pidfile of a running wpa_supplicant process. */
     ret = access(pid_file, R_OK);
     if (ret) {
         switch (errno) {
-            case EACCES:
-                fprintf(stderr, "Cannot access the PID file\n");
-                return -1;
             case ENOENT:
+                /* Couldn't find a pidifle. We assume there is no process,
+                 * let's start a wpa_supplicant instance. */
                 if (start_wpa_supplicant(config, pid_file, inf, &ctrl_path)) {
                     return -1;
                 }
                 break;
             default:
-                fprintf(stderr, "access() failed on PID file\n");
+                perror("Failed to access the PID file");
                 return -1;
         }
     } else {
+        /* A pidfile was found, so a wpa_supplicant process is already running.
+         * We just need to recover the control directory from its configuration
+         * file. */
         ctrl_dir = get_ctrl_dir_from_config(config);
         if (!ctrl_dir) {
-            fprintf(stderr, "Could not get ctrl_interface from the config file\n");
+            PE("Could not get ctrl_interface from the config file\n");
             return -1;
         }
         ctrl_path = create_ctrl_path(ctrl_dir, inf);
@@ -690,7 +693,7 @@ main(int argc, char **argv)
     /* Create a control connection with the child and get the handle. */
     ctrl_conn = wpa_ctrl_open(ctrl_path);
     if (!ctrl_conn) {
-        fprintf(stderr, "Failed to connect to the control interface.\n");
+        perror("Failed to connect to the wpa_supplicant control interface");
         return -1;
     }
 
@@ -712,7 +715,7 @@ main(int argc, char **argv)
     /* Cleanup. */
     destroy_net_list(&networks);
     if (terminate) {
-        printf("Terminating wpa_supplicant\n");
+        PD("Terminating wpa_supplicant\n");
         send_cmd(ctrl_conn, "TERMINATE");
     }
     wpa_ctrl_detach(ctrl_conn);
