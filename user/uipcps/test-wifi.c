@@ -101,7 +101,7 @@ struct cmd_descriptor {
     unsigned int num_args;
     int (*func)(int argc, char **argv, struct cmd_descriptor *cd, int debug,
             struct wpa_ctrl *ctrl_conn, struct list_head *networks);
-    int action;
+    const char *desc;
 };
 
 static char *
@@ -726,68 +726,68 @@ wifi_cmd_terminate(int argc, char **argv, struct cmd_descriptor *cd, int debug,
 }
 
 static struct cmd_descriptor cmd_descriptors[] = {
-    /* Scan for available networks. */
     {
         .name     = "scan",
         .usage    = "",
         .num_args = 0,
         .func     = wifi_cmd_scan,
+        .desc     = "Scan for available networks.",
     },
-    /* Add a new network to the configuration. */
     {
         .name     = "add-network",
         .usage    = "SSID [PSK]",
         .num_args = 1,
         .func     = wifi_cmd_net_add,
+        .desc     = "Add a new network to the configuration.",
     },
-    /* Enable a configured network. */
     {
         .name     = "enable-network",
         .usage    = "ID",
         .num_args = 1,
         .func     = wifi_cmd_net_enable,
+        .desc     = "Enable a configured network.",
     },
-    /* Disable a configured network. */
     {
         .name     = "disable-network",
         .usage    = "ID",
         .num_args = 1,
         .func     = wifi_cmd_net_disable,
+        .desc     = "Disable a configured network.",
     },
-    /* Remove a network from the configuration. */
     {
         .name     = "remove-network",
         .usage    = "ID",
         .num_args = 1,
         .func     = wifi_cmd_net_remove,
+        .desc     = "Remove a network from the configuration.",
     },
-    /* List available network configurations. */
     {
         .name     = "list-networks",
         .usage    = "",
         .num_args = 0,
         .func     = wifi_cmd_net_list,
+        .desc     = "Remove a network from the configuration.",
     },
-    /* Associate with a network, only if not connected already. */
     {
         .name     = "assoc",
         .usage    = "ID",
         .num_args = 0,
         .func     = wifi_cmd_assoc,
+        .desc     = "Associate with a network, only if not connected already.",
     },
-    /* Deassociate from a network. */
     {
         .name     = "deassoc",
         .usage    = "",
         .num_args = 0,
         .func     = wifi_cmd_deassoc,
+        .desc     = "Deassociate from a network.",
     },
-    /* Terminate the wpa_supplicant daemon. */
     {
         .name     = "terminate",
         .usage    = "",
         .num_args = 0,
         .func     = wifi_cmd_terminate,
+        .desc     = "Terminate the wpa_supplicant daemon.",
     }
 };
 
@@ -808,8 +808,8 @@ usage()
     printf("\nAvailable commands:\n");
 
     for (i = 0; i < NUM_COMMANDS; i++) {
-        printf("    %s %s\n", cmd_descriptors[i].name,
-               cmd_descriptors[i].usage);
+        printf("    %s %s\n\t%s\n", cmd_descriptors[i].name,
+               cmd_descriptors[i].usage, cmd_descriptors[i].desc);
     }
 }
 
