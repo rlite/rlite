@@ -1,7 +1,7 @@
 /*
- * Command-line tool to manage and monitor the rlite stack.
+ * A tool to test interactions with wpa_supplicant deamon.
  *
- * Copyright (C) 2015-2016 Nextworks
+ * Copyright (C) 2017 Nextworks
  * Author: Michal Koutenský <koutak.m@gmail.com>
  *
  * This file is part of rlite.
