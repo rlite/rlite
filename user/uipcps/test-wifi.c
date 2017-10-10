@@ -42,11 +42,15 @@
  * Usage examples:
  *
  * How to scan available networks:
- * $ ./test-wifi -i wlp3s0
+ * $ ./test-wifi -i wlp3s0 scan
  * How to connect to a WPA2 network:
- * $ ./test-wifi -i wlp3s0 -a network_ssid -p network_password
- * How to terminate wpa_supplicant before exiting:
- * $ ./test-wifi -i wlp3s0 -t
+ * $ ./test-wifi -i wlp3s0 add-network SSID [PSK]
+ * $ ./test-wifi -i wlp3s0 list-networks
+ * $ ./test-wifi -i wlp3s0 enable-network ID
+ * How to terminate the wpa_supplicant daemon:
+ * $ ./test-wifi -i wlp3s0 terminate
+ * To check the success of network operations, see output of:
+ * $ ./test-wifi -i wlp3s0 list-networks
  *
  * test-wifi expects a config file to be located at /etc/wpa_supplicant/rlite.conf
  * Example of wpa_supplicant configuration
@@ -76,6 +80,10 @@ update_config=1
 #define RL_WPA_SUPPLICANT_PID_PATH "/run/wpa_supplicant.pid"
 #define RL_WIFI_DRIVER "nl80211"
 
+#define RL_WIFI_NET_ENABLE "ENABLE_NETWORK"
+#define RL_WIFI_NET_DISABLE "DISABLE_NETWORK"
+#define RL_WIFI_NET_REMOVE "REMOVE_NETWORK"
+
 struct wifi_network {
     struct list_head list;
     char bssid[18];
@@ -85,6 +93,13 @@ struct wifi_network {
     uint32_t wpa1_flags;
     uint32_t wpa2_flags;
     char ssid[RL_WIFI_SSID_LEN];
+};
+
+struct cmd_descriptor {
+    const char *name;
+    const char *usage;
+    unsigned int num_args;
+    int action;
 };
 
 static char *
@@ -375,8 +390,6 @@ wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *list)
 {
     char *networks;
 
-    list_init(list);
-
     if (wpasup_send_cmd(ctrl_conn, "SCAN")) {
         perror("Failed to send \"SCAN\" command");
         return -1;
@@ -536,10 +549,9 @@ wifi_set_network(struct wpa_ctrl *ctrl_conn, const char *id, const char *var,
  * response.
  */
 static int
-wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
+wifi_mod_network(struct wpa_ctrl *ctrl_conn, const char *cmd, const char *id)
 {
-    const char cmd[]  = "ENABLE_NETWORK";
-    const int cmd_len = 14;
+    const int cmd_len = strlen(cmd);
     int len, id_len;
     char *msg;
 
@@ -559,7 +571,7 @@ wifi_enable_network(struct wpa_ctrl *ctrl_conn, const char *id)
 
     free(msg);
 
-    return wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+    return 0;
 }
 
 /*
@@ -595,7 +607,7 @@ wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
 }
 
 static int
-wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
+wifi_add_network_to_config(struct wpa_ctrl *ctrl_conn,
                           const struct list_head *networks, const char *ssid,
                           const char *psk)
 {
@@ -623,21 +635,99 @@ wifi_associate_to_network(struct wpa_ctrl *ctrl_conn,
         return -1;
     }
 
-    return wifi_enable_network(ctrl_conn, id);
+    return ret;
 }
+
+static struct cmd_descriptor cmd_descriptors[] = {
+    {
+        .name     = "scan",
+        .usage    = "",
+        .num_args = 0,
+        .action   = 1,
+    },
+    {
+        .name     = "add-network",
+        .usage    = "SSID [PSK]",
+        .num_args = 1,
+        .action   = 0,
+    },
+    {
+        .name     = "enable-network",
+        .usage    = "ID",
+        .num_args = 1,
+        .action   = 0,
+    },
+    {
+        .name     = "disable-network",
+        .usage    = "ID",
+        .num_args = 1,
+        .action   = 0,
+    },
+    {
+        .name     = "remove-network",
+        .usage    = "ID",
+        .num_args = 1,
+        .action   = 0,
+    },
+    {
+        .name     = "list-networks",
+        .usage    = "",
+        .num_args = 0,
+        .action   = 0,
+    },
+    {
+        .name     = "assoc",
+        .usage    = "ID",
+        .num_args = 0,
+        .action   = 0,
+    },
+    {
+        .name     = "deassoc",
+        .usage    = "",
+        .num_args = 0,
+        .action   = 0,
+    },
+    {
+        .name     = "terminate",
+        .usage    = "",
+        .num_args = 0,
+        .action   = 0,
+    }
+};
+
+static enum {
+    RL_CMD_SCAN = 0,
+    RL_CMD_NET_ADD,
+    RL_CMD_NET_ENABLE,
+    RL_CMD_NET_DISABLE,
+    RL_CMD_NET_REMOVE,
+    RL_CMD_NET_LIST,
+    RL_CMD_ASSOC,
+    RL_CMD_DEASSOC,
+    RL_CMD_TERM,
+} cmd_descriptor_id;
+
+
+#define NUM_COMMANDS (sizeof(cmd_descriptors) / sizeof(struct cmd_descriptor))
 
 static void
 usage()
 {
-    printf("test-wifi -i INF [-d] [-t] [-a SSID] [-p PSK]\n"
+    int i = 0;
+
+    printf("test-wifi -i INF [-d] CMD \n"
            "   -i INF  : name of interface to use\n"
            "   -d      : print debug messages\n"
-           "   -t      : terminate wpa_supplicant before exiting\n"
-           "   -a SSID : associate to network with given SSID\n"
-           "   -p PSK  : use given PSK when associating\n"
            "A minimal wpa_supplicant.conf is expected at %s\n"
            "(See 'man 5 wpa_supplicant.conf' for details)\n",
            RL_WPA_SUPPLICANT_CONF_PATH);
+
+    printf("\nAvailable commands:\n");
+
+    for (i = 0; i < NUM_COMMANDS; i++) {
+        printf("    %s %s\n", cmd_descriptors[i].name,
+               cmd_descriptors[i].usage);
+    }
 }
 
 int
@@ -651,14 +741,16 @@ main(int argc, char **argv)
     struct wpa_ctrl *ctrl_conn = NULL;
     struct list_head networks;
     int debug     = 0;
-    int terminate = 0;
 
-    char *ssid = NULL;
-    char *psk  = NULL;
+    char *cmd     = NULL;
+    int cmd_arg   = 0;
+    char *ssid    = NULL;
+    char *psk     = NULL;
 
+    int i;
     int ret;
 
-    while ((opt = getopt(argc, argv, "i:hda:p:t")) != -1) {
+    while ((opt = getopt(argc, argv, "i:hd")) != -1) {
         switch (opt) {
         case 'i':
             inf = optarg;
@@ -669,22 +761,43 @@ main(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
-        case 'a':
-            ssid = optarg;
-            break;
-        case 'p':
-            psk = optarg;
-            break;
-        case 't':
-            terminate = 1;
-            break;
         }
     }
 
-    if (!inf || (!ssid && psk)) {
+    if (!inf) {
         PE("Invalid arguments\n\n");
         usage();
         return -1;
+    }
+
+    if (optind != argc) {
+        cmd = argv[optind];
+        for (i = 0; i < NUM_COMMANDS; i++) {
+            if (strcmp(cmd, cmd_descriptors[i].name) == 0) {
+
+                if (argc - optind - 1 < cmd_descriptors[i].num_args) {
+                    /* Not enough arguments. */
+                    PE("Not enough arguments\n");
+                    usage(i);
+                    return -1;
+                } else if (cmd_descriptors[i].num_args) {
+                    cmd_arg = optind + 1;
+                }
+
+                if (i > 0) {
+                    /* Disable default action */
+                    cmd_descriptors[RL_CMD_SCAN].action = 0;
+                }
+                cmd_descriptors[i].action = 1;
+                break;
+            }
+        }
+
+        if (i == NUM_COMMANDS) {
+            PE("Unknown command '%s'\n", cmd);
+            usage();
+            return -1;
+        }
     }
 
     /* Try to access the pidfile of a running wpa_supplicant process. */
@@ -730,19 +843,50 @@ main(int argc, char **argv)
     /* Attach to the child so that we can send control messages. */
     wpa_ctrl_attach(ctrl_conn);
 
-    ret = wifi_scan(ctrl_conn, &networks);
-    if (debug && !ret) {
-        wifi_networks_print(&networks);
-    }
+    list_init(&networks);
 
-    if (!ret && ssid) {
-        /* We were asked to associate to a WiFi network. */
-        ret = wifi_associate_to_network(ctrl_conn, &networks, ssid, psk);
+    if (cmd_descriptors[RL_CMD_SCAN].action) {
+        /* Scan for available networks. */
+        ret = wifi_scan(ctrl_conn, &networks);
+        if (debug && !ret) {
+            wifi_networks_print(&networks);
+        }
+    } else if (cmd_descriptors[RL_CMD_NET_ADD].action) {
+        /* Add a new network to the configuration. */
+        ssid = argv[cmd_arg];
+        if (cmd_arg + 1 <= argc) {
+            psk = argv[cmd_arg + 1];
+        }
+        ret = wifi_scan(ctrl_conn, &networks);
+        if (!ret) {
+            ret = wifi_add_network_to_config(ctrl_conn, &networks, ssid, psk);
+        }
+    } else if (cmd_descriptors[RL_CMD_NET_ENABLE].action) {
+        /* Enable a configured network. */
+        ret = wifi_mod_network(ctrl_conn, RL_WIFI_NET_ENABLE, argv[cmd_arg]);
+    } else if (cmd_descriptors[RL_CMD_NET_DISABLE].action) {
+        /* Disable a configured network. */
+        ret = wifi_mod_network(ctrl_conn, RL_WIFI_NET_DISABLE, argv[cmd_arg]);
+    } else if (cmd_descriptors[RL_CMD_NET_REMOVE].action) {
+        /* Remove a network from the configuration. */
+        ret = wifi_mod_network(ctrl_conn, RL_WIFI_NET_REMOVE, argv[cmd_arg]);
+    } else if (cmd_descriptors[RL_CMD_NET_LIST].action) {
+        /* List available network configurations. */
+        ret = wpasup_send_cmd(ctrl_conn, "LIST_NETWORKS");
+    } else if (cmd_descriptors[RL_CMD_ASSOC].action) {
+        /* Associate with a network, only if not connected already. */
+        ret = wpasup_send_cmd(ctrl_conn, "RECONNECT");
+        if (ret) {
+            wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+        }
+    } else if (cmd_descriptors[RL_CMD_DEASSOC].action) {
+        /* Deassociate from a network. */
+        ret = wpasup_send_cmd(ctrl_conn, "DISCONNECT");
     }
 
     /* Cleanup. */
     wifi_destroy_network_list(&networks);
-    if (terminate) {
+    if (cmd_descriptors[RL_CMD_TERM].action) {
         PD("Terminating wpa_supplicant\n");
         wpasup_send_cmd(ctrl_conn, "TERMINATE");
     }
