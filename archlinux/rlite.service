@@ -8,7 +8,7 @@ After=systemd-modules-load.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/rlite-uipcps -k0
+ExecStart=/usr/bin/rlite-uipcps
 #WorkingDirectory=
 #Restart=on-failure
 
