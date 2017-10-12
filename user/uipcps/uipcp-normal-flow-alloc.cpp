@@ -133,8 +133,8 @@ flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
         /* This is temporary used to test flow control */
         cfg->dtcp_present                 = 1;
         cfg->dtcp.flow_control            = 1;
-        cfg->dtcp.fc.cfg.w.max_cwq_len    = 100;
-        cfg->dtcp.fc.cfg.w.initial_credit = 60;
+        cfg->dtcp.fc.cfg.w.max_cwq_len    = RL_FC_WIN_MAX_CWQ_LEN;
+        cfg->dtcp.fc.cfg.w.initial_credit = RL_FC_WIN_INITIAL_CREDIT;
         cfg->dtcp.fc.fc_type              = RLITE_FC_T_WIN;
         cfg->dtcp.initial_a               = RL_A_MSECS_DFLT;
     }

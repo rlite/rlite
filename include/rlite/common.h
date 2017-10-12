@@ -225,6 +225,8 @@ struct rl_flow_config {
 #define RL_RTX_MSECS_DFLT 1000
 #define RL_A_MSECS_DFLT 20
 #define RL_DATA_RXMS_MAX_DFLT 10
+#define RL_FC_WIN_INITIAL_CREDIT 60
+#define RL_FC_WIN_MAX_CWQ_LEN 100
 
 /* We don't currently have a good way to understand what flow specs
  * should result into DTCP flow control to be enabled or disabled,
