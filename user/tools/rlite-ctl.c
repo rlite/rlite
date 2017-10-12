@@ -193,7 +193,8 @@ read_response(int sfd, response_handler_t handler)
 
     free(serbuf);
     if (ret) {
-        PE("error while deserializing response [%d]\n", ret);
+        errno = EPROTO;
+        PE("error while deserializing response [%s]\n", strerror(errno));
         return -1;
     }
 
