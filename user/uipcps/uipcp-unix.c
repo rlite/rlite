@@ -328,7 +328,8 @@ worker_fn(void *opaque)
     ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX, serbuf,
                                 ret, msgbuf, sizeof(msgbuf));
     if (ret) {
-        PE("deserialization error [%d]\n", ret);
+        errno = EPROTO;
+        PE("deserialization error [%s]\n", strerror(errno));
         goto out;
     }
 

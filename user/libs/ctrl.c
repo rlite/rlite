@@ -76,9 +76,9 @@ rl_read_next_msg(int rfd, int quiet)
     ret = deserialize_rlite_msg(rl_ker_numtables, RLITE_KER_MSG_MAX, serbuf,
                                 ret, (void *)resp, max_resp_size);
     if (ret) {
-        PE("Problems during deserialization [%d]\n", ret);
+        errno = EPROTO;
+        PE("Problems during deserialization [%s]\n", strerror(errno));
         rl_free(resp, RL_MT_MSG);
-        errno = ENOMEM;
         return NULL;
     }
 
