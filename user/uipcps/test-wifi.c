@@ -100,7 +100,7 @@ struct cmd_descriptor {
     const char *usage;
     unsigned int num_args;
     int (*func)(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-            struct wpa_ctrl *ctrl_conn, struct list_head *networks);
+                struct wpa_ctrl *ctrl_conn, struct list_head *networks);
     const char *desc;
 };
 
@@ -335,7 +335,8 @@ parse_networks(struct list_head *list, const char *networks)
     char flagstr[100];
 
     /* skip header */
-    while (*p != '\0' && *(p++) != '\n') {};
+    while (*p != '\0' && *(p++) != '\n') {
+    }
 
     while (*p != '\0') {
         elem = malloc(sizeof(struct wifi_network));
@@ -349,7 +350,8 @@ parse_networks(struct list_head *list, const char *networks)
         }
         parse_wifi_flags(elem, flagstr);
         list_add_tail(&elem->list, list);
-        while (*p != '\0' && *(p++) != '\n') {};
+        while (*p != '\0' && *(p++) != '\n') {
+        }
     }
     return 0;
 }
@@ -608,8 +610,8 @@ wifi_add_network(struct wpa_ctrl *ctrl_conn, char id[8], const char *ssid,
 
 static int
 wifi_add_network_to_config(struct wpa_ctrl *ctrl_conn,
-                          const struct list_head *networks, const char *ssid,
-                          const char *psk)
+                           const struct list_head *networks, const char *ssid,
+                           const char *psk)
 {
     int has_psk;
     char id[8];
@@ -647,13 +649,15 @@ wifi_ssid_to_id(struct wpa_ctrl *ctrl_conn, const char *ssid)
     char *id = NULL;
 
     res = wpasup_send_cmd_get_resp(ctrl_conn, "LIST_NETWORKS");
-    p = res;
+    p   = res;
 
     /* skip header */
-    while (*p != '\0' && *(p++) != '\n') {};
+    while (*p != '\0' && *(p++) != '\n') {
+    }
 
     while (*p != '\0') {
-        if (sscanf(p, "%s\t%128[^\t]c\t%*s\t%*s\n", id_conf, ssid_conf) == EOF) {
+        if (sscanf(p, "%s\t%128[^\t]c\t%*s\t%*s\n", id_conf, ssid_conf) ==
+            EOF) {
             return NULL;
         }
         if (!strncmp(ssid, ssid_conf, RL_WIFI_SSID_LEN)) {
@@ -664,7 +668,8 @@ wifi_ssid_to_id(struct wpa_ctrl *ctrl_conn, const char *ssid)
             }
             return id;
         };
-        while (*p != '\0' && *(p++) != '\n') {};
+        while (*p != '\0' && *(p++) != '\n') {
+        }
     }
     return NULL;
 }
@@ -683,7 +688,7 @@ wifi_cmd_scan(int argc, char **argv, struct cmd_descriptor *cd, int debug,
 
 int
 wifi_cmd_net_add(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                 struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     char *ssid, *psk;
     int ret;
@@ -701,42 +706,43 @@ wifi_cmd_net_add(int argc, char **argv, struct cmd_descriptor *cd, int debug,
 
 int
 wifi_cmd_net_enable(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                    struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     return wifi_mod_network(ctrl_conn, RL_WIFI_NET_ENABLE, argv[0]);
 }
 
 int
-wifi_cmd_net_disable(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+wifi_cmd_net_disable(int argc, char **argv, struct cmd_descriptor *cd,
+                     int debug, struct wpa_ctrl *ctrl_conn,
+                     struct list_head *networks)
 {
     return wifi_mod_network(ctrl_conn, RL_WIFI_NET_DISABLE, argv[0]);
 }
 
 int
 wifi_cmd_net_remove(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                    struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     return wifi_mod_network(ctrl_conn, RL_WIFI_NET_REMOVE, argv[0]);
 }
 
 int
 wifi_cmd_net_list(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                  struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     return wpasup_send_cmd(ctrl_conn, "LIST_NETWORKS");
 }
 
 int
 wifi_cmd_assoc(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+               struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     char *ssid;
     char *id;
     int ret;
 
     ssid = argv[0];
-    id = wifi_ssid_to_id(ctrl_conn, ssid);
+    id   = wifi_ssid_to_id(ctrl_conn, ssid);
     if (!id) {
         PE("Did not find ID for network with SSID %s\n", ssid);
         return -1;
@@ -759,14 +765,14 @@ wifi_cmd_assoc(int argc, char **argv, struct cmd_descriptor *cd, int debug,
 
 int
 wifi_cmd_deassoc(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                 struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     return wpasup_send_cmd(ctrl_conn, "DISCONNECT");
 }
 
 int
 wifi_cmd_terminate(int argc, char **argv, struct cmd_descriptor *cd, int debug,
-              struct wpa_ctrl *ctrl_conn, struct list_head *networks)
+                   struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
     PD("Terminating wpa_supplicant\n");
     return wpasup_send_cmd(ctrl_conn, "TERMINATE");
@@ -835,8 +841,7 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .num_args = 0,
         .func     = wifi_cmd_terminate,
         .desc     = "Terminate the wpa_supplicant daemon.",
-    }
-};
+    }};
 
 #define NUM_COMMANDS (sizeof(cmd_descriptors) / sizeof(struct cmd_descriptor))
 
@@ -870,7 +875,7 @@ main(int argc, char **argv)
     char *ctrl_dir, *ctrl_path;
     struct wpa_ctrl *ctrl_conn = NULL;
     struct list_head networks;
-    int debug     = 0;
+    int debug = 0;
 
     int i;
     int ret;
@@ -944,7 +949,6 @@ main(int argc, char **argv)
     if (optind != argc) {
         for (i = 0; i < NUM_COMMANDS; i++) {
             if (strcmp(argv[optind], cmd_descriptors[i].name) == 0) {
-
                 if (argc - optind - 1 < cmd_descriptors[i].num_args) {
                     /* Not enough arguments. */
                     PE("Not enough arguments\n");
@@ -952,9 +956,9 @@ main(int argc, char **argv)
                     return -1;
                 }
 
-                ret = cmd_descriptors[i].func(argc - optind - 1,
-                        argv + optind + 1, cmd_descriptors + i,
-                        debug, ctrl_conn, &networks);
+                ret = cmd_descriptors[i].func(
+                    argc - optind - 1, argv + optind + 1, cmd_descriptors + i,
+                    debug, ctrl_conn, &networks);
                 break;
             }
         }
@@ -967,7 +971,8 @@ main(int argc, char **argv)
     } else {
         /* No command specified, run scan. */
         ret = cmd_descriptors[0].func(argc - optind - 1, argv + optind + 1,
-                        cmd_descriptors, debug, ctrl_conn, &networks);
+                                      cmd_descriptors, debug, ctrl_conn,
+                                      &networks);
     }
 
     /* Cleanup. */
