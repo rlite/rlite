@@ -335,8 +335,7 @@ parse_networks(struct list_head *list, const char *networks)
     char flagstr[100];
 
     /* skip header */
-    while (*p != '\0' && *(p++) != '\n')
-        ;
+    while (*p != '\0' && *(p++) != '\n') {};
 
     while (*p != '\0') {
         elem = malloc(sizeof(struct wifi_network));
@@ -350,8 +349,7 @@ parse_networks(struct list_head *list, const char *networks)
         }
         parse_wifi_flags(elem, flagstr);
         list_add_tail(&elem->list, list);
-        while (*p != '\0' && *(p++) != '\n')
-            ;
+        while (*p != '\0' && *(p++) != '\n') {};
     }
     return 0;
 }
@@ -640,6 +638,37 @@ wifi_add_network_to_config(struct wpa_ctrl *ctrl_conn,
     return ret;
 }
 
+char *
+wifi_ssid_to_id(struct wpa_ctrl *ctrl_conn, const char *ssid)
+{
+    char *res, *p;
+    char ssid_conf[RL_WIFI_SSID_LEN];
+    char id_conf[8];
+    char *id = NULL;
+
+    res = wpasup_send_cmd_get_resp(ctrl_conn, "LIST_NETWORKS");
+    p = res;
+
+    /* skip header */
+    while (*p != '\0' && *(p++) != '\n') {};
+
+    while (*p != '\0') {
+        if (sscanf(p, "%s\t%128[^\t]c\t%*s\t%*s\n", id_conf, ssid_conf) == EOF) {
+            return NULL;
+        }
+        if (!strncmp(ssid, ssid_conf, RL_WIFI_SSID_LEN)) {
+            id = strdup(id_conf);
+            if (!id) {
+                PE("Out of memory\n");
+                return NULL;
+            }
+            return id;
+        };
+        while (*p != '\0' && *(p++) != '\n') {};
+    }
+    return NULL;
+}
+
 int
 wifi_cmd_scan(int argc, char **argv, struct cmd_descriptor *cd, int debug,
               struct wpa_ctrl *ctrl_conn, struct list_head *networks)
@@ -702,11 +731,29 @@ int
 wifi_cmd_assoc(int argc, char **argv, struct cmd_descriptor *cd, int debug,
               struct wpa_ctrl *ctrl_conn, struct list_head *networks)
 {
+    char *ssid;
+    char *id;
     int ret;
-    ret = wpasup_send_cmd(ctrl_conn, "RECONNECT");
-    if (ret) {
-        wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+
+    ssid = argv[0];
+    id = wifi_ssid_to_id(ctrl_conn, ssid);
+    if (!id) {
+        PE("Did not find ID for network with SSID %s\n", ssid);
+        return -1;
     }
+
+    ret = wifi_mod_network(ctrl_conn, RL_WIFI_NET_DISABLE, "all");
+    if (!ret) {
+        ret = wifi_mod_network(ctrl_conn, RL_WIFI_NET_ENABLE, id);
+    }
+    if (!ret) {
+        ret = wpasup_send_cmd(ctrl_conn, "RECONNECT");
+    }
+    if (!ret) {
+        ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+    }
+
+    free(id);
     return ret;
 }
 
@@ -770,10 +817,10 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name     = "assoc",
-        .usage    = "ID",
-        .num_args = 0,
+        .usage    = "SSID",
+        .num_args = 1,
         .func     = wifi_cmd_assoc,
-        .desc     = "Associate with a network, only if not connected already.",
+        .desc     = "Associate with a network.",
     },
     {
         .name     = "deassoc",
