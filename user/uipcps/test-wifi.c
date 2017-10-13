@@ -62,6 +62,45 @@ ap_scan=1
 fast_reauth=1
 update_config=1
  *
+ *
+ * shmi-wifi interface documentation:
+ * 
+ * $ ./test-wifi -i wlp3s0 list-networks
+ *    Lists the known network configurations. Networks can be configured
+ *    either in wpa_supplicant.conf or by sending commands to the daemon.
+ *    (see wifi_add_network_to_config)
+ *
+ * $ ./test-wifi -i wlp3s0 assoc SSID
+ *    Associates with a network with the given SSID. Assumes such a network
+ *    configuration exists already and that it is valid (e.g. has the correct
+ *    password if required). Parses the output of list-networks to get the
+ *    internal ID of the network configuration. Disables all network
+ *    configurations to make sure it can only connect to the requested network,
+ *    then enables the requested one. Issues a RECONNECT to wpa_supplicant
+ *    to make sure it starts connecting (not strictly needed). Waits for
+ *    a confirmation message from the daemon.
+ *
+ * $ ./test-wifi -i wlp3s0 deassoc
+ *    Disconnects from the currently connected network. Does not change the
+ *    state of the network configurations. The last used configuration stays
+ *    enabled.
+ *
+ * Example wpa_supplicant.conf with some networks configured:
+ *
+ctrl_interface=/var/run/wpa_supplicant
+eapol_version=1
+ap_scan=1
+fast_reauth=1
+update_config=1
+
+network={
+    ssid="OpenNetwork"
+}
+network={
+    ssid="WPA2Network"
+    psk="passphrase"
+}
+ *
  */
 /* clang-format on */
 
