@@ -816,32 +816,35 @@ ipcps_load()
         }
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
-        attrs = malloc(sizeof(*attrs));
-        if (!attrs) {
-            PE("Out of memory\n");
-            ret = -1;
-            break;
-        }
-
-        attrs->id           = upd->ipcp_id;
-        attrs->name         = upd->ipcp_name;
-        upd->ipcp_name      = NULL;
-        attrs->dif_type     = upd->dif_type;
-        upd->dif_type       = NULL;
-        attrs->dif_name     = upd->dif_name;
-        upd->dif_name       = NULL;
-        attrs->addr         = upd->ipcp_addr;
-        attrs->hdroom       = upd->hdroom;
-        attrs->tailroom     = upd->tailroom;
-        attrs->max_sdu_size = upd->max_sdu_size;
-        rl_free(upd, RL_MT_MSG);
-
-        list_for_each_entry (scan, &ipcps, node) {
-            if (attrs->id < scan->id) {
+        if (upd->update_type == RLITE_UPDATE_ADD) {
+            attrs = malloc(sizeof(*attrs));
+            if (!attrs) {
+                PE("Out of memory\n");
+                ret = -1;
                 break;
             }
+
+            attrs->id           = upd->ipcp_id;
+            attrs->name         = upd->ipcp_name;
+            upd->ipcp_name      = NULL;
+            attrs->dif_type     = upd->dif_type;
+            upd->dif_type       = NULL;
+            attrs->dif_name     = upd->dif_name;
+            upd->dif_name       = NULL;
+            attrs->addr         = upd->ipcp_addr;
+            attrs->hdroom       = upd->hdroom;
+            attrs->tailroom     = upd->tailroom;
+            attrs->max_sdu_size = upd->max_sdu_size;
+
+            list_for_each_entry (scan, &ipcps, node) {
+                if (attrs->id < scan->id) {
+                    break;
+                }
+            }
+            list_add_tail(&attrs->node, &scan->node);
         }
-        list_add_tail(&attrs->node, &scan->node);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
     }
     close(fd);
 
