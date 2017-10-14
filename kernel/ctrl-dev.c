@@ -846,7 +846,8 @@ application_del_by_rc(struct rl_ctrl *rc)
         PD("Application %s will be automatically unregistered\n", app->name);
 
         /* Notify userspace IPCP if needed. */
-        if (app->state == APPL_REG_COMPLETE && app->ipcp->uipcp) {
+        if (app->state == APPL_REG_COMPLETE && !app->ipcp->ops.appl_register &&
+            app->ipcp->uipcp) {
             struct rl_kmsg_appl_register ntfy;
 
             ntfy.msg_type  = RLITE_KER_APPL_REGISTER;
@@ -1105,6 +1106,7 @@ flow_del(struct flow_entry *entry)
     upper_ipcp = entry->upper.ipcp;
 
     if (ipcp->ops.flow_deallocated) {
+        /* Kernel-space IPCP, handle the flow deallocation here. */
         ipcp->ops.flow_deallocated(ipcp, entry);
     }
 
@@ -1156,8 +1158,8 @@ flow_del(struct flow_entry *entry)
         FUNLOCK();
     }
 
-    if (ipcp->uipcp) {
-        /* Prepare a flow deallocation message. */
+    if (!ipcp->ops.flow_deallocated) {
+        /* Prepare a flow deallocation message for the uipcp. */
         memset(&ntfy, 0, sizeof(ntfy));
         ntfy.msg_type       = RLITE_KER_FLOW_DEALLOCATED;
         ntfy.event_id       = 0;
@@ -1167,6 +1169,7 @@ flow_del(struct flow_entry *entry)
         ntfy.remote_addr    = entry->remote_addr;
         ntfy.initiator      = !!(entry->flags & RL_FLOW_INITIATOR);
     }
+
     if (entry->upper.rc) {
         struct rl_ctrl *rc = entry->upper.rc;
 
@@ -1179,15 +1182,19 @@ flow_del(struct flow_entry *entry)
     PD("flow entry %u removed\n", entry->local_port);
     rl_free(entry, RL_MT_FLOW);
 
-    if (ipcp->uipcp) {
-        /* Notify the uipcp about flow deallocation, if it makes sense. */
-        if (ntfy.local_port_id != RL_PORT_ID_NONE &&
-            ntfy.remote_port_id != RL_PORT_ID_NONE &&
-            ntfy.remote_addr != RL_ADDR_NULL) {
-            rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)&ntfy,
-                              true);
+    if (!ipcp->ops.flow_deallocated) {
+        if (!ipcp->uipcp) {
+            PW("No uipcp to notify\n");
+        } else {
+            /* Notify the uipcp about flow deallocation, if it makes sense. */
+            if (ntfy.local_port_id != RL_PORT_ID_NONE &&
+                ntfy.remote_port_id != RL_PORT_ID_NONE &&
+                ntfy.remote_addr != RL_ADDR_NULL) {
+                rl_upqueue_append(ipcp->uipcp,
+                                  (const struct rl_msg_base *)&ntfy, true);
+            }
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&ntfy));
         }
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&ntfy));
     }
 
     /* We are in process context here, so we can safely do the
@@ -2058,7 +2065,7 @@ rl_ipcp_uipcp_wait(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     add_wait_queue(&entry->uipcp_wqh, &wait);
 
-    while (1) {
+    for (;;) {
         struct rl_ctrl *uipcp;
 
         current->state = TASK_INTERRUPTIBLE;
@@ -2299,6 +2306,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)bmsg;
     uint32_t event_id                 = req->event_id;
+    struct rl_ctrl *uipcp             = NULL;
     struct ipcp_entry *ipcp;
     int ret = 0;
 
@@ -2308,21 +2316,32 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         return -ENXIO;
     }
 
+    if (!ipcp->ops.appl_register) {
+        /* If appl_register and uipcp are both non-NULL we give priority
+         * to the kernel-space path (useful for shim-wifi). */
+        uipcp = ipcp->uipcp;
+        if (!uipcp) {
+            /* This IPCP handles the registration in user-space, but no uipcp
+             * is associated to it. */
+            return -ENXIO;
+        }
+    }
+
     if (req->reg) {
         ret = ipcp_application_add(ipcp, req->appl_name, rc, event_id,
-                                   ipcp->uipcp != NULL);
+                                   uipcp != NULL);
     } else {
         ret = ipcp_application_del(ipcp, req->appl_name);
     }
 
-    if (!ret && ipcp->uipcp) {
+    if (!ret && uipcp) {
         /* Reflect to userspace this (un)registration, so that
          * userspace IPCP can take appropriate actions. */
         req->event_id = 0; /* clear it, not needed */
-        rl_upqueue_append(ipcp->uipcp, (const struct rl_msg_base *)req, true);
+        rl_upqueue_append(uipcp, (const struct rl_msg_base *)req, true);
     }
 
-    if (ret || !ipcp->uipcp || !req->reg) {
+    if (ret || !uipcp || !req->reg) {
         /* Complete the (un)registration immediately notifying the
          * requesting application. */
         struct rl_kmsg_appl_register_resp resp;
@@ -2368,7 +2387,7 @@ rl_appl_register_resp(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     ipcp = ipcp_get(resp->ipcp_id);
 
-    if (!ipcp || !ipcp->uipcp || !resp->reg) {
+    if (!ipcp || (!ipcp->ops.appl_register && !ipcp->uipcp) || !resp->reg) {
         PE("Spurious/malicious application register response to "
            "IPCP %u\n",
            resp->ipcp_id);

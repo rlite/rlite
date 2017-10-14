@@ -79,6 +79,8 @@ extern int verbosity;
     if (verbosity >= RL_VERB_INFO)                                             \
     DOPRINT(KERN_INFO, "INF", FMT, ##__VA_ARGS__)
 
+#define PW(FMT, ...) DOPRINT(KERN_WARNING, "WRN", FMT, ##__VA_ARGS__)
+
 #define PE(FMT, ...) DOPRINT(KERN_ERR, "ERR", FMT, ##__VA_ARGS__)
 
 /* Rate-limited version, LPS indicate how many per second. */
