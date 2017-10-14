@@ -42,17 +42,21 @@
  * Usage examples:
  *
  * How to scan available networks:
- * $ ./test-wifi -i wlp3s0 scan
- * How to connect to a WPA2 network:
- * $ ./test-wifi -i wlp3s0 add-network SSID [PSK]
- * $ ./test-wifi -i wlp3s0 list-networks
- * $ ./test-wifi -i wlp3s0 enable-network ID
- * How to terminate the wpa_supplicant daemon:
- * $ ./test-wifi -i wlp3s0 terminate
- * To check the success of network operations, see output of:
- * $ ./test-wifi -i wlp3s0 list-networks
+ * # ./test-wifi -i wlp3s0 scan
  *
- * test-wifi expects a config file to be located at /etc/wpa_supplicant/rlite.conf
+ * How to connect to a WPA2 network:
+ * # ./test-wifi -i wlp3s0 add-network SSID [PSK]
+ * # ./test-wifi -i wlp3s0 list-networks
+ * # ./test-wifi -i wlp3s0 enable-network ID
+ *
+ * How to terminate the wpa_supplicant daemon:
+ * # ./test-wifi -i wlp3s0 terminate
+ *
+ * To check for success of operations, look at the output of:
+ * # ./test-wifi -i wlp3s0 list-networks
+ *
+ * The test-wifi tool expects a config file to be located at
+ * /etc/wpa_supplicant/rlite.conf.
  * Example of wpa_supplicant configuration
  *
 ctrl_interface=/var/run/wpa_supplicant
@@ -63,27 +67,27 @@ fast_reauth=1
 update_config=1
  *
  *
- * shmi-wifi interface documentation:
+ * Documentation useful to the shmi-wifi:
  * 
- * $ ./test-wifi -i wlp3s0 list-networks
- *    Lists the known network configurations. Networks can be configured
+ * # ./test-wifi -i wlp3s0 list-networks
+ *    Lists the known network configurations. Configurations are specified
  *    either in wpa_supplicant.conf or by sending commands to the daemon.
- *    (see wifi_add_network_to_config)
+ *    (see wifi_add_network_to_config()).
  *
- * $ ./test-wifi -i wlp3s0 assoc SSID
- *    Associates with a network with the given SSID. Assumes such a network
- *    configuration exists already and that it is valid (e.g. has the correct
- *    password if required). Parses the output of list-networks to get the
- *    internal ID of the network configuration. Disables all network
- *    configurations to make sure it can only connect to the requested network,
- *    then enables the requested one. Issues a RECONNECT to wpa_supplicant
- *    to make sure it starts connecting (not strictly needed). Waits for
- *    a confirmation message from the daemon.
+ * # ./test-wifi -i wlp3s0 assoc SSID
+ *    Associates with a network with the given SSID. It assumes that such a
+ *    network configuration already exists and is valid (e.g. it has the correct
+ *    password if required). This command parses the output of list-networks
+ *    to get the internal ID of the network configuration; disables all network
+ *    configurations to make sure it can only connect to the requested network;
+ *    enables the requested one; issues a RECONNECT to wpa_supplicant
+ *    to make sure it actually starts the association procedure (we could skip
+ *    this); waits for a confirmation message from the daemon.
  *
- * $ ./test-wifi -i wlp3s0 deassoc
- *    Disconnects from the currently connected network. Does not change the
- *    state of the network configurations. The last used configuration stays
- *    enabled.
+ * # ./test-wifi -i wlp3s0 deassoc
+ *    Deassociates from the currently associated network. Does not change the
+ *    state of the network configurations. The most recently used configuration
+ *    is left enabled.
  *
  * Example wpa_supplicant.conf with some networks configured:
  *
