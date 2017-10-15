@@ -565,6 +565,7 @@ uipcps_loop(void *opaque)
             break;
         }
 
+        ret = 0;
         switch (upd->update_type) {
         case RL_IPCP_UPDATE_ADD:
             ret = uipcp_add(uipcps, upd);
