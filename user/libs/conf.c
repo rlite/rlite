@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <poll.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "rlite/conf.h"
 
@@ -124,7 +125,7 @@ rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id)
 
 /* Destroy an IPC process. */
 int
-rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
+rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync)
 {
     struct rl_kmsg_ipcp_destroy msg;
     int ret;
@@ -135,6 +136,14 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
         return fd;
     }
 
+    if (sync) {
+        ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
+        if (ret < 0) {
+            perror("ioctl()");
+            return ret;
+        }
+    }
+
     memset(&msg, 0, sizeof(msg));
     msg.msg_type = RLITE_KER_IPCP_DESTROY;
     msg.event_id = 1;
@@ -142,6 +151,28 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id)
 
     ret = rl_write_msg(fd, RLITE_MB(&msg), 0);
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&msg));
+
+    /* Possibly wait for the kernel to notify us about the IPCP being
+     * removed by the kernel (once all the references are gone) . */
+    while (sync) {
+        struct rl_kmsg_ipcp_update *upd;
+
+        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
+        if (!upd) {
+            if (errno) {
+                perror("rl_read_next_msg()");
+            }
+            break;
+        }
+        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+
+        if (upd->update_type == RL_IPCP_UPDATE_DEL && upd->ipcp_id == ipcp_id) {
+            break;
+        }
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
+    }
+
     close(fd);
 
     return ret;
