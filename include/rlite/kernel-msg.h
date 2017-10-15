@@ -140,10 +140,10 @@ struct rl_kmsg_reg_fetch_resp {
     char *appl_name;
 } __attribute__((packed));
 
-#define RLITE_UPDATE_ADD 0x01
-#define RLITE_UPDATE_UPD 0x02
-#define RLITE_UPDATE_DELETING 0x03
-#define RLITE_UPDATE_DELETED 0x04
+#define RL_IPCP_UPDATE_ADD 0x01
+#define RL_IPCP_UPDATE_UPD 0x02
+#define RL_IPCP_UPDATE_DELETING 0x03
+#define RL_IPCP_UPDATE_DELETED 0x04
 
 /* application <-- kernel message to report updated IPCP information. */
 struct rl_kmsg_ipcp_update {

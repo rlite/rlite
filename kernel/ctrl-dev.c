@@ -1474,7 +1474,7 @@ __ipcp_put(struct ipcp_entry *entry)
 
         memset(&upd, 0, sizeof(upd));
         upd.msg_type    = RLITE_KER_IPCP_UPDATE;
-        upd.update_type = RLITE_UPDATE_DELETED;
+        upd.update_type = RL_IPCP_UPDATE_DELETED;
         upd.ipcp_id     = entry->id;
         /* All the other fields are zeroed, since they are
          * not useful to userspace. */
@@ -1676,7 +1676,7 @@ rl_ipcp_create(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 
     /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
      * opened ctrl device. */
-    ipcp_update_all(ipcp_id, RLITE_UPDATE_ADD);
+    ipcp_update_all(ipcp_id, RL_IPCP_UPDATE_ADD);
 
     return 0;
 
@@ -1707,7 +1707,7 @@ rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
      * opened ctrl device. */
     memset(&upd, 0, sizeof(upd));
     upd.msg_type    = RLITE_KER_IPCP_UPDATE;
-    upd.update_type = RLITE_UPDATE_DELETING;
+    upd.update_type = RL_IPCP_UPDATE_DELETING;
     upd.ipcp_id     = req->ipcp_id;
     /* All the other fields are zeroed, since they are
      * not useful to userspace. */
@@ -1948,7 +1948,7 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         if (notify) {
             /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
              * opened ctrl device. */
-            ipcp_update_all(req->ipcp_id, RLITE_UPDATE_UPD);
+            ipcp_update_all(req->ipcp_id, RL_IPCP_UPDATE_UPD);
         }
     }
 
@@ -3033,7 +3033,7 @@ initial_ipcp_update(struct rl_ctrl *rc)
     {
         struct rl_kmsg_ipcp_update upd;
 
-        ret = ipcp_update_fill(entry, &upd, RLITE_UPDATE_ADD);
+        ret = ipcp_update_fill(entry, &upd, RL_IPCP_UPDATE_ADD);
 
         rl_upqueue_append(rc, (const struct rl_msg_base *)&upd, false);
 
