@@ -1466,6 +1466,30 @@ __ipcp_put(struct ipcp_entry *entry)
 
     ipcp_probe_references(entry);
 
+    {
+        /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+         * opened ctrl device. */
+        struct rl_kmsg_ipcp_update upd;
+        struct rl_ctrl *rcur;
+
+        memset(&upd, 0, sizeof(upd));
+        upd.msg_type    = RLITE_KER_IPCP_UPDATE;
+        upd.update_type = RLITE_UPDATE_DELETED;
+        upd.ipcp_id     = entry->id;
+        /* All the other fields are zeroed, since they are
+         * not useful to userspace. */
+
+        mutex_lock(&rl_dm.general_lock);
+        list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
+            if (rcur->flags & RL_F_IPCPS) {
+                rl_upqueue_append(rcur, RLITE_MB(&upd), false);
+            }
+        }
+        mutex_unlock(&rl_dm.general_lock);
+
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
+    }
+
     rl_free(entry, RL_MT_IPCP);
 
     return 0;
@@ -1666,38 +1690,37 @@ static int
 rl_ipcp_destroy(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
 {
     struct rl_kmsg_ipcp_destroy *req = (struct rl_kmsg_ipcp_destroy *)bmsg;
+    struct rl_kmsg_ipcp_update upd;
+    struct rl_ctrl *rcur;
     int ret;
 
-    /* Release the IPC process ID. */
+    /* Release the IPC process with the given ID. */
     ret = ipcp_del(req->ipcp_id);
+    if (ret) {
+        PE("Failed to remove IPC process %u\n", req->ipcp_id);
+        return ret;
+    }
 
-    if (ret == 0) {
-        PI("IPC process %u is going to be removed\n", req->ipcp_id);
+    PI("IPC process %u is going to be removed\n", req->ipcp_id);
 
-        {
-            /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
-             * opened ctrl device. */
-            struct rl_kmsg_ipcp_update upd;
-            struct rl_ctrl *rcur;
+    /* Upqueue an RLITE_KER_IPCP_UPDATE message to each
+     * opened ctrl device. */
+    memset(&upd, 0, sizeof(upd));
+    upd.msg_type    = RLITE_KER_IPCP_UPDATE;
+    upd.update_type = RLITE_UPDATE_DELETING;
+    upd.ipcp_id     = req->ipcp_id;
+    /* All the other fields are zeroed, since they are
+     * not useful to userspace. */
 
-            memset(&upd, 0, sizeof(upd));
-            upd.msg_type    = RLITE_KER_IPCP_UPDATE;
-            upd.update_type = RLITE_UPDATE_DEL;
-            upd.ipcp_id     = req->ipcp_id;
-            /* All the other fields are zeroed, since they are
-             * not useful to userspace. */
-
-            mutex_lock(&rl_dm.general_lock);
-            list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
-                if (rcur->flags & RL_F_IPCPS) {
-                    rl_upqueue_append(rcur, RLITE_MB(&upd), false);
-                }
-            }
-            mutex_unlock(&rl_dm.general_lock);
-
-            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
+    mutex_lock(&rl_dm.general_lock);
+    list_for_each_entry (rcur, &rl_dm.ctrl_devs, node) {
+        if (rcur->flags & RL_F_IPCPS) {
+            rl_upqueue_append(rcur, RLITE_MB(&upd), false);
         }
     }
+    mutex_unlock(&rl_dm.general_lock);
+
+    rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&upd));
 
     return ret;
 }

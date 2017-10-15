@@ -142,7 +142,8 @@ struct rl_kmsg_reg_fetch_resp {
 
 #define RLITE_UPDATE_ADD 0x01
 #define RLITE_UPDATE_UPD 0x02
-#define RLITE_UPDATE_DEL 0x03
+#define RLITE_UPDATE_DELETING 0x03
+#define RLITE_UPDATE_DELETED 0x04
 
 /* application <-- kernel message to report updated IPCP information. */
 struct rl_kmsg_ipcp_update {
