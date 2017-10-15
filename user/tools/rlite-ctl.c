@@ -816,7 +816,7 @@ ipcps_load()
         }
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
-        if (upd->update_type == RLITE_UPDATE_ADD) {
+        if (upd->update_type == RL_IPCP_UPDATE_ADD) {
             attrs = malloc(sizeof(*attrs));
             if (!attrs) {
                 PE("Out of memory\n");

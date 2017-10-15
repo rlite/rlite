@@ -556,8 +556,8 @@ uipcps_loop(void *opaque)
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
         switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
-        case RLITE_UPDATE_UPD:
+        case RL_IPCP_UPDATE_ADD:
+        case RL_IPCP_UPDATE_UPD:
             if (!upd->dif_type || !upd->dif_name ||
                 !rina_sername_valid(upd->ipcp_name)) {
                 PE("Invalid ipcp update\n");
@@ -566,16 +566,16 @@ uipcps_loop(void *opaque)
         }
 
         switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
+        case RL_IPCP_UPDATE_ADD:
             ret = uipcp_add(uipcps, upd);
             break;
 
-        case RLITE_UPDATE_DELETING:
+        case RL_IPCP_UPDATE_DELETING:
             /* This can be an IPCP with no userspace implementation. */
             ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
             break;
 
-        case RLITE_UPDATE_UPD:
+        case RL_IPCP_UPDATE_UPD:
             ret = uipcp_update(uipcps, upd);
             break;
         }
