@@ -570,7 +570,7 @@ uipcps_loop(void *opaque)
             ret = uipcp_add(uipcps, upd);
             break;
 
-        case RLITE_UPDATE_DEL:
+        case RLITE_UPDATE_DELETING:
             /* This can be an IPCP with no userspace implementation. */
             ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
             break;
