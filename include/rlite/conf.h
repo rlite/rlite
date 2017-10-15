@@ -56,7 +56,7 @@ long int rl_conf_ipcp_create(const char *name, const char *dif_type,
 
 int rl_conf_ipcp_uipcp_wait(rl_ipcp_id_t ipcp_id);
 
-int rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id);
+int rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync);
 
 int rl_conf_ipcp_config(rl_ipcp_id_t ipcp_id, const char *param_name,
                         const char *param_value);
