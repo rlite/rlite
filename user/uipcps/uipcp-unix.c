@@ -571,7 +571,7 @@ uipcps_loop(void *opaque)
             ret = uipcp_add(uipcps, upd);
             break;
 
-        case RL_IPCP_UPDATE_DELETING:
+        case RL_IPCP_UPDATE_UIPCP_DEL:
             /* This can be an IPCP with no userspace implementation. */
             ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
             break;
@@ -635,7 +635,7 @@ sigint_handler(int signum)
             rl_ipcp_id_t uid = uipcp->id;
 
             uipcp_del(uipcp);
-            rl_conf_ipcp_destroy(uid);
+            rl_conf_ipcp_destroy(uid, /*sync=*/0);
         }
     }
 
