@@ -53,6 +53,7 @@ struct ipcp_attrs {
     unsigned int max_sdu_size;
     char *dif_type;
     char *dif_name;
+    int wait_for_delete;
 
     struct list_head node;
 };
@@ -193,7 +194,8 @@ read_response(int sfd, response_handler_t handler)
 
     free(serbuf);
     if (ret) {
-        PE("error while deserializing response [%d]\n", ret);
+        errno = EPROTO;
+        PE("error while deserializing response [%s]\n", strerror(errno));
         return -1;
     }
 
@@ -259,7 +261,7 @@ ipcp_create(int argc, char **argv, struct cmd_descriptor *cd)
             ret = rl_conf_ipcp_uipcp_wait((unsigned int)ipcp_id);
             if (ret) {
                 PE("Cannot wait for uIPCP %u\n", (unsigned int)ipcp_id);
-                rl_conf_ipcp_destroy((unsigned int)ipcp_id);
+                rl_conf_ipcp_destroy((unsigned int)ipcp_id, /*sync=*/0);
 
             } else {
                 PI("uIPCP %u showed up\n", (unsigned int)ipcp_id);
@@ -288,7 +290,7 @@ ipcp_destroy(int argc, char **argv, struct cmd_descriptor *cd)
     }
 
     /* Valid IPCP id. Forward the request to the kernel. */
-    ret = rl_conf_ipcp_destroy(attrs->id);
+    ret = rl_conf_ipcp_destroy(attrs->id, /*sync=*/1);
     if (!ret) {
         PI("IPCP %u destroyed\n", attrs->id);
     }
@@ -301,17 +303,75 @@ reset(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct ipcp_attrs *attrs;
     int ret = 0;
+    int fd;
 
+    /* Open a control device to receive kernel notifications about IPCP
+     * removal events. */
+    fd = rina_open();
+    if (fd < 0) {
+        return fd;
+    }
+
+    ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
+    if (ret < 0) {
+        perror("ioctl()");
+        return ret;
+    }
+
+    /* Scan the list of IPCPs and issue asynchronous IPCP destroy
+     * commands. */
     list_for_each_entry (attrs, &ipcps, node) {
         int r;
 
-        r = rl_conf_ipcp_destroy(attrs->id);
+        r = rl_conf_ipcp_destroy(attrs->id, /*sync=*/0);
         if (r) {
             PE("Failed to destroy IPCP %u\n", attrs->id);
+        } else {
+            attrs->wait_for_delete = 1;
         }
 
         ret |= r;
     }
+
+    /* Wait for all the IPCPs to be deleted by the kernel. */
+    for (;;) {
+        struct rl_kmsg_ipcp_update *upd;
+        int stop = 1;
+
+        list_for_each_entry (attrs, &ipcps, node) {
+            if (attrs->wait_for_delete) {
+                stop = 0;
+            }
+        }
+
+        if (stop) {
+            /* We don't have more IPCPs to wait for. We can stop. */
+            break;
+        }
+
+        /* Read the next update message and check if it reports the
+         * deletion of an IPCP we are waiting for. */
+        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
+        if (!upd) {
+            if (errno) {
+                perror("rl_read_next_msg()");
+            }
+            break;
+        }
+        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+
+        list_for_each_entry (attrs, &ipcps, node) {
+            if (upd->update_type == RL_IPCP_UPDATE_DEL &&
+                upd->ipcp_id == attrs->id) {
+                attrs->wait_for_delete = 0;
+                break;
+            }
+        }
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
+    }
+
+    close(fd);
 
     return ret;
 }
@@ -815,32 +875,35 @@ ipcps_load()
         }
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
-        attrs = malloc(sizeof(*attrs));
-        if (!attrs) {
-            PE("Out of memory\n");
-            ret = -1;
-            break;
-        }
-
-        attrs->id           = upd->ipcp_id;
-        attrs->name         = upd->ipcp_name;
-        upd->ipcp_name      = NULL;
-        attrs->dif_type     = upd->dif_type;
-        upd->dif_type       = NULL;
-        attrs->dif_name     = upd->dif_name;
-        upd->dif_name       = NULL;
-        attrs->addr         = upd->ipcp_addr;
-        attrs->hdroom       = upd->hdroom;
-        attrs->tailroom     = upd->tailroom;
-        attrs->max_sdu_size = upd->max_sdu_size;
-        rl_free(upd, RL_MT_MSG);
-
-        list_for_each_entry (scan, &ipcps, node) {
-            if (attrs->id < scan->id) {
+        if (upd->update_type == RL_IPCP_UPDATE_ADD) {
+            attrs = malloc(sizeof(*attrs));
+            if (!attrs) {
+                PE("Out of memory\n");
+                ret = -1;
                 break;
             }
+
+            attrs->id           = upd->ipcp_id;
+            attrs->name         = upd->ipcp_name;
+            upd->ipcp_name      = NULL;
+            attrs->dif_type     = upd->dif_type;
+            upd->dif_type       = NULL;
+            attrs->dif_name     = upd->dif_name;
+            upd->dif_name       = NULL;
+            attrs->addr         = upd->ipcp_addr;
+            attrs->hdroom       = upd->hdroom;
+            attrs->tailroom     = upd->tailroom;
+            attrs->max_sdu_size = upd->max_sdu_size;
+
+            list_for_each_entry (scan, &ipcps, node) {
+                if (attrs->id < scan->id) {
+                    break;
+                }
+            }
+            list_add_tail(&attrs->node, &scan->node);
         }
-        list_add_tail(&attrs->node, &scan->node);
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
     }
     close(fd);
 

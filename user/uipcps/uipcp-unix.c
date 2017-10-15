@@ -328,7 +328,8 @@ worker_fn(void *opaque)
     ret = deserialize_rlite_msg(rl_uipcps_numtables, RLITE_U_MSG_MAX, serbuf,
                                 ret, msgbuf, sizeof(msgbuf));
     if (ret) {
-        PE("deserialization error [%d]\n", ret);
+        errno = EPROTO;
+        PE("deserialization error [%s]\n", strerror(errno));
         goto out;
     }
 
@@ -555,8 +556,8 @@ uipcps_loop(void *opaque)
         assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
 
         switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
-        case RLITE_UPDATE_UPD:
+        case RL_IPCP_UPDATE_ADD:
+        case RL_IPCP_UPDATE_UPD:
             if (!upd->dif_type || !upd->dif_name ||
                 !rina_sername_valid(upd->ipcp_name)) {
                 PE("Invalid ipcp update\n");
@@ -564,17 +565,18 @@ uipcps_loop(void *opaque)
             break;
         }
 
+        ret = 0;
         switch (upd->update_type) {
-        case RLITE_UPDATE_ADD:
+        case RL_IPCP_UPDATE_ADD:
             ret = uipcp_add(uipcps, upd);
             break;
 
-        case RLITE_UPDATE_DEL:
+        case RL_IPCP_UPDATE_UIPCP_DEL:
             /* This can be an IPCP with no userspace implementation. */
             ret = uipcp_put_by_id(uipcps, upd->ipcp_id);
             break;
 
-        case RLITE_UPDATE_UPD:
+        case RL_IPCP_UPDATE_UPD:
             ret = uipcp_update(uipcps, upd);
             break;
         }
@@ -633,7 +635,7 @@ sigint_handler(int signum)
             rl_ipcp_id_t uid = uipcp->id;
 
             uipcp_del(uipcp);
-            rl_conf_ipcp_destroy(uid);
+            rl_conf_ipcp_destroy(uid, /*sync=*/0);
         }
     }
 
