@@ -151,11 +151,18 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
     }
 
     try {
+        bool is_connect_attempt;
+        string src_appl;
+
         m = msg_deser_stateless(serbuf, serlen);
         if (m == nullptr) {
             return -1;
         }
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
+
+        is_connect_attempt =
+            m->op_code == gpb::M_CONNECT && m->dst_appl == rib->myname;
+        src_appl = m->src_appl;
 
         if (m->obj_class == obj_class::adata &&
             m->obj_name == obj_name::adata) {
@@ -205,11 +212,25 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
             UPE(rib->uipcp, "Received message from unknown port id\n");
             return -1;
         }
-
         neigh = nf->neigh;
 
         if (!nf->conn) {
             nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
+        }
+
+        if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
+            !neigh->initiator && is_connect_attempt &&
+            src_appl == neigh->ipcp_name) {
+            /* We thought we were already enrolled to this neighbor, but
+             * he is trying to start again the enrollment procedure on the
+             * same flow (likely the N-1-flow is provided by shim-eth). We
+             * therefore assume that the neighbor crashed before we could
+             * detect it, and reset the CDAP connection. */
+            UPI(rib->uipcp,
+                "Neighbor %s is trying to re-enroll on the same flow\n",
+                neigh->ipcp_name.c_str());
+            nf->conn->reset();
+            nf->enroll_state_set(EnrollState::NEIGH_NONE);
         }
 
         /* Deserialize the received CDAP message. */

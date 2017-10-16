@@ -1035,7 +1035,16 @@ EnrollmentResources::EnrollmentResources(struct NeighFlow *f, bool initiator)
 
 EnrollmentResources::~EnrollmentResources()
 {
-    assert(msgs.empty());
+    if (!msgs.empty()) {
+        UPW(nf->neigh->rib->uipcp,
+            "Discarding %u CDAP messages from neighbor %s\n",
+            static_cast<unsigned int>(msgs.size()),
+            nf->neigh->ipcp_name.c_str());
+    }
+    while (!msgs.empty()) {
+        rl_delete(msgs.front(), RL_MT_CDAP);
+        msgs.pop_front();
+    }
     pthread_join(th, nullptr);
     pthread_cond_destroy(&msgs_avail);
     pthread_cond_destroy(&stopped);
