@@ -1,5 +1,5 @@
 [Unit]
-Description=create and configures IPCPs
+Description=startup utility to create and configure IPCPs
 ConditionPathExists=/etc/rina/initscript
 Requires=rlite.service
 After=rlite.service
