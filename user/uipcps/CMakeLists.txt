@@ -19,7 +19,7 @@ target_include_directories(uipcp-normal PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 add_executable(rlite-uipcps uipcp-container.c uipcp-unix.c uipcp-shim-tcp4.c uipcp-shim-udp4.c uipcp-shim-wifi.c)
 target_link_libraries(rlite-uipcps rina-api rlite-conf uipcp-normal wpa-supplicant)
 add_executable(test-wifi test-wifi.c)
-target_link_libraries(test-wifi wpa-supplicant rina-api)
+target_link_libraries(test-wifi rina-api rlite-wifi)
 
 # Installation directives
 install(TARGETS rlite-uipcps DESTINATION usr/bin)
@@ -28,5 +28,3 @@ install(FILES shim-tcp4-dir DESTINATION etc/rina)
 if (USE_QOS_CUBES)
     install(FILES uipcp-qoscubes.qos DESTINATION etc/rina)
 endif()
-
-add_subdirectory(wpa-supplicant)

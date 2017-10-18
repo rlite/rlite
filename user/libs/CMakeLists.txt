@@ -5,9 +5,11 @@ protobuf_generate_cpp(CDAP_GPB_SRC CDAP_GPB_HDR CDAP.proto)
 add_library(rina-api SHARED utils.c ker-numtables.c uipcps-numtables.c ctrl.c memtrack.c)
 add_library(cdap SHARED cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 add_library(rlite-conf SHARED conf.c)
+add_library(rlite-wifi STATIC wifi.c)
 
 target_link_libraries(cdap rina-api ${PROTOBUF_LIBRARY})
 target_link_libraries(rlite-conf rina-api)
+target_link_libraries(rlite-wifi wpa-supplicant)
 
 message(STATUS "Adding include dir ${CMAKE_CURRENT_BINARY_DIR} to cdap target")
 target_include_directories(cdap PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
@@ -22,3 +24,4 @@ install(TARGETS rina-api cdap rlite-conf DESTINATION usr/lib)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/CDAP.pb.h DESTINATION usr/include/rlite)
 
 add_subdirectory(swig)
+add_subdirectory(wpa-supplicant)
