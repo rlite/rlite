@@ -30,10 +30,12 @@
 #include <sys/socket.h>
 
 #include "rlite/list.h"
+#include "rlite/wifi.h"
 #include "uipcp-container.h"
 
 struct shim_wifi {
     struct uipcp *uipcp;
+    const char *ifname;
 };
 
 #define SHIM(_u) ((struct shim_wifi *)((_u)->priv))
@@ -51,8 +53,34 @@ shim_wifi_init(struct uipcp *uipcp)
 
     uipcp->priv = shim;
     shim->uipcp = uipcp;
+    shim->ifname = "wlp3s0";
 
     return 0;
+}
+
+static int
+shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
+                 int wait_for_completion)
+{
+    struct shim_wifi *shim = SHIM(uipcp);
+    struct wpa_ctrl *ctrl_conn;
+    int ret;
+
+    if (!shim->ifname) {
+        PE("No interface name\n");
+        return -1;
+    }
+    ctrl_conn = wifi_init(shim->ifname);
+    if (!ctrl_conn) {
+        return -1;
+    }
+
+    wifi_deassoc(ctrl_conn);
+    ret = wifi_assoc(ctrl_conn, cmsg->dif_name);
+
+    wifi_close(ctrl_conn);
+
+    return ret;
 }
 
 static int
@@ -67,5 +95,6 @@ shim_wifi_fini(struct uipcp *uipcp)
 
 struct uipcp_ops shim_wifi_ops = {
     .init = shim_wifi_init,
+    .enroll = shim_wifi_enroll,
     .fini = shim_wifi_fini,
 };
