@@ -16,6 +16,7 @@ add_executable(iporinad iporinad.cpp ${IPORINA_GPB_SRC} ${IPORINA_GPB_HDR})
 if (MAC2IFNAME)
 add_executable(mac2ifname mac2ifname.c)
 endif()
+add_executable(test-wifi test-wifi.c)
 
 target_include_directories(iporinad PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -24,6 +25,7 @@ target_link_libraries(rina-echo-async rina-api)
 target_link_libraries(rlite-ctl rina-api rlite-conf)
 target_link_libraries(rina-gw rina-api fdfwd)
 target_link_libraries(iporinad rina-api cdap fdfwd ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(test-wifi rina-api rlite-wifi)
 
  # Installation directives
 install(TARGETS rinaperf rlite-ctl rina-gw rina-echo-async iporinad DESTINATION usr/bin)
