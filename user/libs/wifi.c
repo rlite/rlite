@@ -41,6 +41,9 @@
 #define RL_WIFI_NET_DISABLE "DISABLE_NETWORK"
 #define RL_WIFI_NET_REMOVE "REMOVE_NETWORK"
 
+#define RL_WIFI_TIMEOUT_ASSOC 2000
+#define RL_WIFI_TIMEOUT_SCAN 10000
+
 static char *
 wpasup_create_ctrl_path(const char *ctrl_dir, const char *inf)
 {
@@ -190,7 +193,7 @@ wpasup_recv_msg(struct wpa_ctrl *ctrl_conn, char *buf, size_t len)
 }
 
 static int
-wpasup_wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
+wpasup_wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg, int timeout)
 {
     char buf[RL_WPA_SUPPLICANT_MAX_MSG_LEN];
     const int len = sizeof(buf);
@@ -204,8 +207,11 @@ wpasup_wait_for_msg(struct wpa_ctrl *ctrl_conn, const char *msg)
 
     do {
         ctrl_pollfd.events = POLLIN;
-        ret                = poll(&ctrl_pollfd, 1, 5000);
-        if (ret == -1) {
+        ret                = poll(&ctrl_pollfd, 1, timeout);
+        if (ret == 0) {
+            PE("poll() timed out\n");
+            return -1;
+        } else if (ret == -1) {
             perror("poll()");
             return -1;
         }
@@ -469,7 +475,8 @@ wifi_scan(struct wpa_ctrl *ctrl_conn, struct list_head *result)
     }
 
     /* loop until we get a 'scanning done' message */
-    if (wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS)) {
+    if (wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS,
+                            RL_WIFI_TIMEOUT_SCAN)) {
         return -1;
     }
 
@@ -513,7 +520,12 @@ wifi_assoc(struct wpa_ctrl *ctrl_conn, const char *ssid)
         ret = wpasup_send_cmd(ctrl_conn, "RECONNECT");
     }
     if (!ret) {
-        ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED);
+        ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS,
+                                  RL_WIFI_TIMEOUT_SCAN);
+    }
+    if (!ret) {
+        ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED,
+                                  RL_WIFI_TIMEOUT_ASSOC);
     }
 
     free(id);
