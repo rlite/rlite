@@ -902,8 +902,8 @@ for vmname in sorted(vms):
                     '$SUDO chmod -R a+rw /run/rlite\n'\
                     '$SUDO dmesg -n8\n'\
                     '\n'\
-                    '$SUDO nohup %(valgrind)s rlite-uipcps -v %(verb)s '\
-                                        '&> uipcp.log &\n sleep 0.2\n'\
+                    '$SUDO %(valgrind)s rlite-uipcps -d -v %(verb)s '\
+                                        '&> uipcp.log\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'flsuf': flavour_suffix,
