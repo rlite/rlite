@@ -710,6 +710,7 @@ uipcp_loop_fdh_del(struct uipcp *uipcp, int fd)
 extern struct uipcp_ops normal_ops;
 extern struct uipcp_ops shim_tcp4_ops;
 extern struct uipcp_ops shim_udp4_ops;
+extern struct uipcp_ops shim_wifi_ops;
 
 static const struct uipcp_ops *
 select_uipcp_ops(const char *dif_type)
@@ -724,6 +725,10 @@ select_uipcp_ops(const char *dif_type)
 
     if (strcmp(dif_type, "shim-udp4") == 0) {
         return &shim_udp4_ops;
+    }
+
+    if (strcmp(dif_type, "shim-wifi") == 0) {
+        return &shim_wifi_ops;
     }
 
     return NULL;

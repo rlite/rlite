@@ -109,7 +109,8 @@ shim_wifi_config(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *cmsg)
         if (!shim->ifname) {
             return ENOMEM;
         }
-        UPD(uipcp, "Shim wifi IPCP configured with ifname '%s'\n", shim->ifname);
+        UPD(uipcp, "Shim wifi IPCP configured with ifname '%s'\n",
+            shim->ifname);
 
         /* Pretend we didn't handle it, so that it will be forwarded
          * to kernel-space. */

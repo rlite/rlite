@@ -68,7 +68,8 @@ type_has_uipcp(const char *dif_type)
 {
     return type_is_normal_ipcp(dif_type) ||
            strcmp(dif_type, "shim-tcp4") == 0 ||
-           strcmp(dif_type, "shim-udp4") == 0;
+           strcmp(dif_type, "shim-udp4") == 0 ||
+           strcmp(dif_type, "shim-wifi") == 0;
 }
 
 #endif /* __RLITE_HELPERS_H__ */
