@@ -680,13 +680,40 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 usage(void)
 {
     printf("rlite-uipcps [OPTIONS]\n"
            "   -h : show this help\n"
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
-           "DBG (default), VERY\n");
+           "DBG (default), VERY\n"
+           "   -d : start as a daemon process\n");
 }
 
 int
@@ -696,9 +723,10 @@ main(int argc, char **argv)
     struct sockaddr_un server_address;
     struct sigaction sa;
     const char *verbosity = "DBG";
+    int daemon = 0;
     int ret, opt;
 
-    while ((opt = getopt(argc, argv, "hv:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:d")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -706,6 +734,10 @@ main(int argc, char **argv)
 
         case 'v':
             verbosity = optarg;
+            break;
+
+        case 'd':
+            daemon = 1;
             break;
 
         default:
@@ -850,6 +882,11 @@ main(int argc, char **argv)
     pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcp_nodes);
     uipcps->n_uipcps = 0;
+
+    if (daemon) {
+        /* The daemonizing function must be called before catching signals. */
+        daemonize();
+    }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the uipcp server. */
