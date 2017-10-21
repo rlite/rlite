@@ -7,8 +7,9 @@ After=systemd-modules-load.service
 #After=network.target
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/rlite-uipcps
+Type=forking
+ExecStart=/usr/bin/rlite-uipcps -d
+PIDFile=/run/rlite/uipcps.pid
 #WorkingDirectory=
 #Restart=on-failure
 
