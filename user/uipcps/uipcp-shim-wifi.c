@@ -35,7 +35,7 @@
 
 struct shim_wifi {
     struct uipcp *uipcp;
-    const char *ifname;
+    char *ifname;
 };
 
 #define SHIM(_u) ((struct shim_wifi *)((_u)->priv))
@@ -51,9 +51,22 @@ shim_wifi_init(struct uipcp *uipcp)
         return -1;
     }
 
-    uipcp->priv = shim;
-    shim->uipcp = uipcp;
-    shim->ifname = "wlp3s0";
+    uipcp->priv  = shim;
+    shim->uipcp  = uipcp;
+    shim->ifname = NULL;
+
+    return 0;
+}
+
+static int
+shim_wifi_fini(struct uipcp *uipcp)
+{
+    struct shim_wifi *shim = SHIM(uipcp);
+
+    if (shim->ifname) {
+        rl_free(shim->ifname, RL_MT_SHIM);
+    }
+    rl_free(shim, RL_MT_SHIM);
 
     return 0;
 }
@@ -67,7 +80,7 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
     int ret;
 
     if (!shim->ifname) {
-        PE("No interface name\n");
+        UPE(uipcp, "No interface name\n");
         return -1;
     }
     ctrl_conn = wifi_init(shim->ifname);
@@ -84,17 +97,32 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
 }
 
 static int
-shim_wifi_fini(struct uipcp *uipcp)
+shim_wifi_config(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *cmsg)
 {
     struct shim_wifi *shim = SHIM(uipcp);
 
-    rl_free(shim, RL_MT_SHIM);
+    if (strcmp(cmsg->name, "netdev") == 0) {
+        if (shim->ifname) {
+            rl_free(shim->ifname, RL_MT_SHIM);
+        }
+        shim->ifname = rl_strdup(cmsg->value, RL_MT_SHIM);
+        if (!shim->ifname) {
+            return ENOMEM;
+        }
+        UPD(uipcp, "Shim wifi IPCP configured with ifname '%s'\n", shim->ifname);
 
-    return 0;
+        /* Pretend we didn't handle it, so that it will be forwarded
+         * to kernel-space. */
+        return ENOSYS;
+    }
+
+    /* We don't know how to handle this request. */
+    return ENOSYS;
 }
 
 struct uipcp_ops shim_wifi_ops = {
-    .init = shim_wifi_init,
+    .init   = shim_wifi_init,
     .enroll = shim_wifi_enroll,
-    .fini = shim_wifi_fini,
+    .fini   = shim_wifi_fini,
+    .config = shim_wifi_config,
 };

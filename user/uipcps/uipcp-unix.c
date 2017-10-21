@@ -723,7 +723,7 @@ main(int argc, char **argv)
     struct sockaddr_un server_address;
     struct sigaction sa;
     const char *verbosity = "DBG";
-    int daemon = 0;
+    int daemon            = 0;
     int ret, opt;
 
     while ((opt = getopt(argc, argv, "hv:d")) != -1) {
