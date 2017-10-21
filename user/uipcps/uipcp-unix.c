@@ -266,6 +266,35 @@ rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
 
+static int
+rl_u_ipcp_config(struct uipcps *uipcps, int sfd,
+                 const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_config *req = (struct rl_cmsg_ipcp_config *)b_req;
+    struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
+    int ret = ENOSYS;
+
+    /* Try to grab the corresponding userspace IPCP. If there is one,
+     * check if the uipcp can satisfy this request. */
+    uipcp = uipcp_get_by_id(uipcps, req->ipcp_id);
+    if (uipcp && uipcp->ops.config) {
+        ret = uipcp->ops.config(uipcp, req);
+    }
+
+    if (ret == ENOSYS) {
+        /* Request could not be satisfied by the uipcp (or there is no
+         * uipcp). Let's forward it to the kernel. */
+        ret = rl_conf_ipcp_config(req->ipcp_id, req->name, req->value);
+    }
+
+    uipcp_put(uipcp);
+
+    resp.result = ret ? RLITE_ERR : 0;
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
 #ifdef RL_MEMTRACK
 static int
 rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
@@ -293,6 +322,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
     [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
+    [RLITE_U_IPCP_CONFIG]           = rl_u_ipcp_config,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
@@ -336,6 +366,7 @@ worker_fn(void *opaque)
     /* Lookup the message type. */
     req = RLITE_MB(msgbuf);
     if (rl_config_handlers[req->msg_type] == NULL) {
+        PE("No handler for message of type [%d]\n", req->msg_type);
         ret = -1;
         goto out;
     }
@@ -349,8 +380,6 @@ out:
     if (ret) {
         struct rl_msg_base_resp resp;
 
-        PE("Invalid message received [type=%d]\n",
-           req ? req->msg_type : RLITE_U_MSG_MAX);
         resp.msg_type = RLITE_U_BASE_RESP;
         resp.event_id = req ? req->event_id : 0;
         resp.result   = RLITE_ERR;
