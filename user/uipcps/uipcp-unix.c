@@ -783,47 +783,6 @@ main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    /* Create pidfile and check for uniqueness. */
-    {
-        char strbuf[128];
-        int pfd;
-        int n;
-
-        pfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
-        if (pfd < 0) {
-            perror("open(pidfile)");
-            return -1;
-        }
-
-        ret = flock(pfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
-        if (ret) {
-            if (errno == EAGAIN) {
-                PE("An instance of rlite-uipcps is already running\n");
-            } else {
-                perror("flock(pidfile)");
-            }
-
-            return -1;
-        }
-
-        n = snprintf(strbuf, sizeof(strbuf), "%u", getpid());
-        if (n < 0) {
-            perror("snprintf(pid)");
-            return -1;
-        }
-
-        if (write(pfd, strbuf, n) != n) {
-            perror("write(pidfile)");
-            return -1;
-        }
-
-        if (syncfs(pfd)) {
-            perror("sync(pidfile)");
-        }
-
-        /* Keep the file open, it will be closed when the daemon exits. */
-    }
-
     normal_lib_init();
 
     /* Open a Unix domain socket to listen to. */
@@ -886,6 +845,47 @@ main(int argc, char **argv)
     if (daemon) {
         /* The daemonizing function must be called before catching signals. */
         daemonize();
+    }
+
+    /* Create pidfile and check for uniqueness. */
+    {
+        char strbuf[128];
+        int pfd;
+        int n;
+
+        pfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
+        if (pfd < 0) {
+            perror("open(pidfile)");
+            return -1;
+        }
+
+        ret = flock(pfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
+        if (ret) {
+            if (errno == EAGAIN) {
+                PE("An instance of rlite-uipcps is already running\n");
+            } else {
+                perror("flock(pidfile)");
+            }
+
+            return -1;
+        }
+
+        n = snprintf(strbuf, sizeof(strbuf), "%u", getpid());
+        if (n < 0) {
+            perror("snprintf(pid)");
+            return -1;
+        }
+
+        if (write(pfd, strbuf, n) != n) {
+            perror("write(pidfile)");
+            return -1;
+        }
+
+        if (syncfs(pfd)) {
+            perror("sync(pidfile)");
+        }
+
+        /* Keep the file open, it will be closed when the daemon exits. */
     }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
