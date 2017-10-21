@@ -259,7 +259,6 @@ wifi_mod_network(struct wpa_ctrl *ctrl_conn, const char *cmd, const char *id)
     return 0;
 }
 
-
 static char *
 wifi_ssid_to_id(struct wpa_ctrl *ctrl_conn, const char *ssid)
 {
@@ -408,7 +407,7 @@ parse_networks(struct list_head *list, const char *networks)
 struct wpa_ctrl *
 wifi_init(const char *inf)
 {
-    char *config = RL_WPA_SUPPLICANT_CONF_PATH;
+    char *config   = RL_WPA_SUPPLICANT_CONF_PATH;
     char *pid_file = RL_WPA_SUPPLICANT_PID_PATH;
 
     char *ctrl_dir, *ctrl_path;

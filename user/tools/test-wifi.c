@@ -260,9 +260,8 @@ main(int argc, char **argv)
                     return -1;
                 }
 
-                ret = cmd_descriptors[i].func(argc - optind - 1,
-                                              argv + optind + 1, ctrl_conn,
-                                              &networks);
+                ret = cmd_descriptors[i].func(
+                    argc - optind - 1, argv + optind + 1, ctrl_conn, &networks);
                 break;
             }
         }
