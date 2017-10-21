@@ -145,6 +145,10 @@ struct uipcp_ops {
     /* User wants to change a policy param of this uipcp. */
     int (*policy_param_mod)(struct uipcp *uipcp,
                             const struct rl_cmsg_ipcp_policy_param_mod *req);
+
+    /* User wnats to change a configuration parameter of this uipcp.
+     * This request may be forwarded to kernel-space. */
+    int (*config)(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *req);
 };
 
 struct ipcp_node {
@@ -225,6 +229,9 @@ int uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd);
 struct uipcp *uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id);
 
 struct uipcp *uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name);
+
+struct uipcp *uipcp_get_by_id(struct uipcps *uipcps,
+                              const rl_ipcp_id_t ipcp_id);
 
 int uipcp_lookup_id_by_dif(struct uipcps *uipcps, const char *dif_name,
                            rl_ipcp_id_t *ipcp_id);

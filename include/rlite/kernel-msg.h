@@ -268,7 +268,7 @@ struct rl_kmsg_fa_resp {
     uint32_t cep_id; /* Filled by kernel before reflecting to userspace. */
 } __attribute__((packed));
 
-/* application --> kernel to configure and IPC process. */
+/* application --> kernel to configure an IPC process. */
 struct rl_kmsg_ipcp_config {
     rl_msg_t msg_type;
     uint32_t event_id;

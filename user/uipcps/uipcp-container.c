@@ -746,7 +746,7 @@ uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
         if (rina_sername_valid(uipcp->name) &&
             strcmp(uipcp->name, ipcp_name) == 0) {
             kernelspace = uipcp_is_kernelspace(uipcp);
-            if (!uipcp_is_kernelspace(uipcp)) {
+            if (!kernelspace) {
                 uipcp->refcnt++;
                 pthread_mutex_unlock(&uipcps->lock);
 
@@ -763,8 +763,28 @@ uipcp_get_by_name(struct uipcps *uipcps, const char *ipcp_name)
     return NULL;
 }
 
-/* Called under uipcps lock. This function does not take into account
- * kernel-space IPCPs*/
+/* This function takes the uipcps lock and does not take into
+ * account kernel-space IPCPs. */
+struct uipcp *
+uipcp_get_by_id(struct uipcps *uipcps, const rl_ipcp_id_t ipcp_id)
+{
+    struct uipcp *uipcp;
+
+    pthread_mutex_lock(&uipcps->lock);
+    list_for_each_entry (uipcp, &uipcps->uipcps, node) {
+        if (uipcp->id == ipcp_id && !uipcp_is_kernelspace(uipcp)) {
+            uipcp->refcnt++;
+            pthread_mutex_unlock(&uipcps->lock);
+
+            return uipcp;
+        }
+    }
+    pthread_mutex_unlock(&uipcps->lock);
+
+    return NULL;
+}
+
+/* Called under uipcps lock. */
 struct uipcp *
 uipcp_lookup(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id)
 {

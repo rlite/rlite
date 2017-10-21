@@ -126,6 +126,13 @@ struct rl_msg_base_resp {
 #define RLITE_MB(m) (struct rl_msg_base *)(m)
 #define RLITE_MBR(m) (struct rl_msg_base_resp *)(m)
 
+/*
+ * Flags valid for the control device. They can be
+ * changed using an ioctl(fd, RLITE_IOCTL_CHFLAGS, flags).
+ */
+
+/* The control device wants to be notified about creation, removal or
+ * update of IPCPs. */
 #define RL_F_IPCPS (1 << 0)
 #define RL_F_ALL RL_F_IPCPS
 

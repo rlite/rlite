@@ -379,11 +379,11 @@ reset(int argc, char **argv, struct cmd_descriptor *cd)
 static int
 ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
 {
+    struct rl_cmsg_ipcp_config req;
     const char *ipcp_name;
     const char *param_name;
     const char *param_value;
     struct ipcp_attrs *attrs;
-    int ret = -1; /* Report failure by default. */
 
     assert(argc >= 3);
     ipcp_name   = argv[0];
@@ -394,16 +394,16 @@ ipcp_config(int argc, char **argv, struct cmd_descriptor *cd)
     attrs = lookup_ipcp_by_name(ipcp_name);
     if (!attrs) {
         PE("Could not find a suitable IPC process\n");
-    } else {
-        /* Forward the request to the kernel. */
-        ret = rl_conf_ipcp_config(attrs->id, param_name, param_value);
-        if (!ret) {
-            PI("IPCP %u configured correctly: %s <== %s\n", attrs->id,
-               param_name, param_value);
-        }
+        return -1;
     }
 
-    return ret;
+    req.msg_type = RLITE_U_IPCP_CONFIG;
+    req.event_id = 0;
+    req.ipcp_id  = attrs->id;
+    req.name     = strdup(param_name);
+    req.value    = strdup(param_value);
+
+    return request_response(RLITE_MB(&req), NULL);
 }
 
 static int
