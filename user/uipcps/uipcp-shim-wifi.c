@@ -97,6 +97,19 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
 }
 
 static int
+shim_wifi_enroller_enable(struct uipcp *uicpp,
+                          const struct rl_cmsg_ipcp_enroller_enable *cmsg)
+{
+    if (cmsg->enable) {
+        /* TODO Start hostapd daemon if not already started. */
+    } else {
+        /* TODO Stop hostapd daemon if running. */
+    }
+
+    return ENOSYS; /* TODO not implemented */
+}
+
+static int
 shim_wifi_config(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *cmsg)
 {
     struct shim_wifi *shim = SHIM(uipcp);
@@ -122,8 +135,9 @@ shim_wifi_config(struct uipcp *uipcp, const struct rl_cmsg_ipcp_config *cmsg)
 }
 
 struct uipcp_ops shim_wifi_ops = {
-    .init   = shim_wifi_init,
-    .enroll = shim_wifi_enroll,
-    .fini   = shim_wifi_fini,
-    .config = shim_wifi_config,
+    .init            = shim_wifi_init,
+    .enroll          = shim_wifi_enroll,
+    .enroller_enable = shim_wifi_enroller_enable,
+    .fini            = shim_wifi_fini,
+    .config          = shim_wifi_config,
 };
