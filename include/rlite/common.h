@@ -235,32 +235,12 @@ struct rl_flow_config {
 #define RL_FC_WIN_INITIAL_CREDIT 60
 #define RL_FC_WIN_MAX_CWQ_LEN 100
 
-/* We don't currently have a good way to understand what flow specs
- * should result into DTCP flow control to be enabled or disabled,
- * although it could be argued that flow control is always needed.
- * As a temporary solution, we let the user directly specify for flow
- * control to be enabled, using the last reserved byte. This is going
- * to change, for instance adding a 'nofc' field in the flowspec.
- * These two accessors are intended to hide this hack. */
-static inline int
-rina_flow_spec_fc_get(const struct rina_flow_spec *spec)
-{
-    return spec->spare3 != 0;
-}
-
-static inline void
-rina_flow_spec_fc_set(struct rina_flow_spec *spec, uint8_t value)
-{
-    spec->spare3 = value;
-}
-
 /* Does a flow specification correspond to best effort QoS? */
 static inline int
 rina_flow_spec_best_effort(struct rina_flow_spec *spec)
 {
     return spec->max_sdu_gap == ((rlm_seq_t)-1) && !spec->avg_bandwidth &&
-           !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery &&
-           !rina_flow_spec_fc_get(spec);
+           !spec->max_delay && !spec->max_jitter && !spec->in_order_delivery;
 }
 
 struct rl_flow_stats {

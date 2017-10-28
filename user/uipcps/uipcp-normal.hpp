@@ -579,14 +579,12 @@ reliable_spec(struct rina_flow_spec *spec)
     rl_flow_spec_default(spec);
     spec->max_sdu_gap       = 0;
     spec->in_order_delivery = 1;
-    rina_flow_spec_fc_set(spec, 1);
 }
 
 static inline bool
 is_reliable_spec(const struct rina_flow_spec *spec)
 {
-    return spec->max_sdu_gap == 0 && spec->in_order_delivery == 1 &&
-           rina_flow_spec_fc_get(spec);
+    return spec->max_sdu_gap == 0 && spec->in_order_delivery == 1;
 }
 
 int normal_ipcp_enroll(struct uipcp *uipcp,
@@ -653,6 +651,10 @@ struct flow_allocator_default : public flow_allocator {
     int flows_handler_create(const CDAPMessage *rm) override;
     int flows_handler_create_r(const CDAPMessage *rm) override;
     int flows_handler_delete(const CDAPMessage *rm) override;
+
+private:
+    void flowspec2flowcfg(const struct rina_flow_spec *spec,
+                          struct rl_flow_config *cfg) const;
 };
 
 class RoutingEngine {

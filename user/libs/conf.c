@@ -237,12 +237,13 @@ flow_fetch_append(struct list_head *flows,
         return -1;
     }
 
-    rl_flow->ipcp_id     = resp->ipcp_id;
-    rl_flow->local_port  = resp->local_port;
-    rl_flow->remote_port = resp->remote_port;
-    rl_flow->local_addr  = resp->local_addr;
-    rl_flow->remote_addr = resp->remote_addr;
-    rl_flow->spec        = resp->spec;
+    rl_flow->ipcp_id      = resp->ipcp_id;
+    rl_flow->local_port   = resp->local_port;
+    rl_flow->remote_port  = resp->remote_port;
+    rl_flow->local_addr   = resp->local_addr;
+    rl_flow->remote_addr  = resp->remote_addr;
+    rl_flow->spec         = resp->spec;
+    rl_flow->flow_control = resp->flow_control;
 
     /* Insert the flow into the list sorting by IPCP id first
      * and then by local port id. */
@@ -402,7 +403,7 @@ rl_conf_flows_print(struct list_head *flows)
         }
 
         memset(specinfo, '\0', sizeof(specinfo));
-        if (rl_flow->spec.spare3) {
+        if (rl_flow->flow_control) {
             ofs += snprintf(specinfo + ofs, sizeof(specinfo) - ofs, "fc");
         }
         if (rl_flow->spec.max_sdu_gap == 0) {

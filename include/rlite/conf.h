@@ -39,6 +39,7 @@ struct rl_flow {
     rlm_addr_t local_addr;
     rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
+    uint8_t flow_control;
 
     struct list_head node;
 };

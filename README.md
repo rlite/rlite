@@ -799,16 +799,17 @@ DIF
 The following table reports parameters that can be changed for the components
 of a normal IPCP process:
 
-| Component           | Policy            | Parameter        | Description     |
-| --------------------| ------------------|------------------|-----------------|
-| address-allocator   | distributed       | nack-wait-secs   | Time to wait for a NACK before deciding that the address is good                  |
-| enrollment          | *                 | timeout          | Enrollment timeout in milliseconds                                                |
-| enrollment          | *                 | keepalive        | Neighbor keepalive timeout in seconds (0 to disable)                              |
-| enrollment          | *                 | keepalive-thresh | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |
-| resource-allocator  | *                 | reliable-flows   | Use reliable N-flows if reliable N-1-flows are not available (boolean)            |
-| resource-allocator  | *                 | reliable-n-flows | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean) |
-| routing             | *                 | age-incr-intval  | Time interval (in seconds) between two consecutive increments of the age of LFDB entries |
-| rib-daemon          | *                 | refresh-intval   | Time interval (in seconds) between two consecutive periodic RIB synchronizations         |
+| Component           | Policy            | Parameter          | Description     |
+| --------------------| ------------------|--------------------|-----------------|
+| address-allocator   | distributed       | nack-wait-secs     | Time to wait for a NACK before deciding that the address is good. |
+| enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
+| enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
+| enrollment          | *                 | keepalive-thresh   | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |
+| flow-allocator      | default           | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| resource-allocator  | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
+| resource-allocator  | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
+| rib-daemon          | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
+| routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
 
 This is an example of how to change the nack-wait-secs parameter of the
 distributed address allocation policy of a normal IPCP process

@@ -375,16 +375,17 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     }
 #endif /* RL_USE_QOS_CUBES */
 
+    params_map["address-allocator"]       = {};
     params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
+    params_map["flow-allocator"]["force-flow-control"]   = PolicyParam(false);
     params_map["resource-allocator"]["reliable-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
+    params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
-    params_map["address-allocator"]            = {};
-    params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
 
     dft  = new dft_default(this);
     fa   = new flow_allocator_default(this);
@@ -647,7 +648,6 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
         rl_flow_spec_default(&relspec);
         relspec.max_sdu_gap       = 0;
         relspec.in_order_delivery = 1;
-        rina_flow_spec_fc_set(&relspec, 1);
 
         self_registration_needed = false;
         /* Scan all the (updated) lower DIFs. */
