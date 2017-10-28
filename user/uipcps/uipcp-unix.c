@@ -266,6 +266,35 @@ rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
 
+static int
+rl_u_ipcp_config(struct uipcps *uipcps, int sfd,
+                 const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_config *req = (struct rl_cmsg_ipcp_config *)b_req;
+    struct rl_msg_base_resp resp;
+    struct uipcp *uipcp;
+    int ret = ENOSYS;
+
+    /* Try to grab the corresponding userspace IPCP. If there is one,
+     * check if the uipcp can satisfy this request. */
+    uipcp = uipcp_get_by_id(uipcps, req->ipcp_id);
+    if (uipcp && uipcp->ops.config) {
+        ret = uipcp->ops.config(uipcp, req);
+    }
+
+    if (ret == ENOSYS) {
+        /* Request could not be satisfied by the uipcp (or there is no
+         * uipcp). Let's forward it to the kernel. */
+        ret = rl_conf_ipcp_config(req->ipcp_id, req->name, req->value);
+    }
+
+    uipcp_put(uipcp);
+
+    resp.result = ret ? RLITE_ERR : 0;
+
+    return rl_u_response(sfd, RLITE_MB(req), &resp);
+}
+
 #ifdef RL_MEMTRACK
 static int
 rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
@@ -293,6 +322,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
     [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
+    [RLITE_U_IPCP_CONFIG]           = rl_u_ipcp_config,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
@@ -336,6 +366,7 @@ worker_fn(void *opaque)
     /* Lookup the message type. */
     req = RLITE_MB(msgbuf);
     if (rl_config_handlers[req->msg_type] == NULL) {
+        PE("No handler for message of type [%d]\n", req->msg_type);
         ret = -1;
         goto out;
     }
@@ -349,8 +380,6 @@ out:
     if (ret) {
         struct rl_msg_base_resp resp;
 
-        PE("Invalid message received [type=%d]\n",
-           req ? req->msg_type : RLITE_U_MSG_MAX);
         resp.msg_type = RLITE_U_BASE_RESP;
         resp.event_id = req ? req->event_id : 0;
         resp.result   = RLITE_ERR;
@@ -651,13 +680,40 @@ char_device_exists(const char *path)
     return stat(path, &s) == 0 && S_ISCHR(s.st_mode);
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 usage(void)
 {
     printf("rlite-uipcps [OPTIONS]\n"
            "   -h : show this help\n"
            "   -v VERB_LEVEL : set verbosity LEVEL: QUIET, WARN, INFO, "
-           "DBG (default), VERY\n");
+           "DBG (default), VERY\n"
+           "   -d : start as a daemon process\n");
 }
 
 int
@@ -667,9 +723,10 @@ main(int argc, char **argv)
     struct sockaddr_un server_address;
     struct sigaction sa;
     const char *verbosity = "DBG";
+    int daemon            = 0;
     int ret, opt;
 
-    while ((opt = getopt(argc, argv, "hv:")) != -1) {
+    while ((opt = getopt(argc, argv, "hv:d")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -677,6 +734,10 @@ main(int argc, char **argv)
 
         case 'v':
             verbosity = optarg;
+            break;
+
+        case 'd':
+            daemon = 1;
             break;
 
         default:
@@ -720,47 +781,6 @@ main(int argc, char **argv)
         fprintf(stderr, "warning: mkdir(%s) failed: %s\n", RLITE_UIPCPS_VAR,
                 strerror(errno));
         exit(EXIT_FAILURE);
-    }
-
-    /* Create pidfile and check for uniqueness. */
-    {
-        char strbuf[128];
-        int pfd;
-        int n;
-
-        pfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
-        if (pfd < 0) {
-            perror("open(pidfile)");
-            return -1;
-        }
-
-        ret = flock(pfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
-        if (ret) {
-            if (errno == EAGAIN) {
-                PE("An instance of rlite-uipcps is already running\n");
-            } else {
-                perror("flock(pidfile)");
-            }
-
-            return -1;
-        }
-
-        n = snprintf(strbuf, sizeof(strbuf), "%u", getpid());
-        if (n < 0) {
-            perror("snprintf(pid)");
-            return -1;
-        }
-
-        if (write(pfd, strbuf, n) != n) {
-            perror("write(pidfile)");
-            return -1;
-        }
-
-        if (syncfs(pfd)) {
-            perror("sync(pidfile)");
-        }
-
-        /* Keep the file open, it will be closed when the daemon exits. */
     }
 
     normal_lib_init();
@@ -821,6 +841,52 @@ main(int argc, char **argv)
     pthread_mutex_init(&uipcps->lock, NULL);
     list_init(&uipcps->ipcp_nodes);
     uipcps->n_uipcps = 0;
+
+    if (daemon) {
+        /* The daemonizing function must be called before catching signals. */
+        daemonize();
+    }
+
+    /* Create pidfile and check for uniqueness. */
+    {
+        char strbuf[128];
+        int pfd;
+        int n;
+
+        pfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
+        if (pfd < 0) {
+            perror("open(pidfile)");
+            return -1;
+        }
+
+        ret = flock(pfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
+        if (ret) {
+            if (errno == EAGAIN) {
+                PE("An instance of rlite-uipcps is already running\n");
+            } else {
+                perror("flock(pidfile)");
+            }
+
+            return -1;
+        }
+
+        n = snprintf(strbuf, sizeof(strbuf), "%u", getpid());
+        if (n < 0) {
+            perror("snprintf(pid)");
+            return -1;
+        }
+
+        if (write(pfd, strbuf, n) != n) {
+            perror("write(pidfile)");
+            return -1;
+        }
+
+        if (syncfs(pfd)) {
+            perror("sync(pidfile)");
+        }
+
+        /* Keep the file open, it will be closed when the daemon exits. */
+    }
 
     /* Set an handler for SIGINT and SIGTERM so that we can remove
      * the Unix domain socket used to access the uipcp server. */

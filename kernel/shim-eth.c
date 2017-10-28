@@ -1148,6 +1148,7 @@ shim_eth_netdev_notify(struct notifier_block *nb, unsigned long event,
 }
 
 #define SHIM_DIF_TYPE "shim-eth"
+#define SHIM_DIF_TYPE_WIFI "shim-wifi"
 
 static struct ipcp_factory shim_eth_factory = {
     .owner                  = THIS_MODULE,
@@ -1165,13 +1166,28 @@ static struct ipcp_factory shim_eth_factory = {
     .ops.flow_writeable     = rl_shim_eth_flow_writeable,
 };
 
+/* A clone of shim_eth_factory that is used to register the same factory
+ * with a different name, in order to support shim-wifi in addition to
+ * shim-eth. */
+static struct ipcp_factory shim_wifi_factory;
+
 static struct notifier_block shim_eth_notifier_block;
+
+static void __exit
+rl_shim_eth_fini(void)
+{
+    rl_ipcp_factory_unregister(SHIM_DIF_TYPE_WIFI);
+    rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
+    unregister_netdevice_notifier(&shim_eth_notifier_block);
+}
 
 static int __init
 rl_shim_eth_init(void)
 {
     int ret;
 
+    /* Register a notifier callback, to be notified about ethernet
+     * interfaces going up and down or configuration changes. */
     memset(&shim_eth_notifier_block, 0, sizeof(shim_eth_notifier_block));
     shim_eth_notifier_block.notifier_call = shim_eth_netdev_notify;
     ret = register_netdevice_notifier(&shim_eth_notifier_block);
@@ -1180,14 +1196,23 @@ rl_shim_eth_init(void)
         return ret;
     }
 
-    return rl_ipcp_factory_register(&shim_eth_factory);
-}
+    /* Register the shim-eth IPCP factory. */
+    ret = rl_ipcp_factory_register(&shim_eth_factory);
+    if (ret) {
+        rl_shim_eth_fini();
+        return ret;
+    }
 
-static void __exit
-rl_shim_eth_fini(void)
-{
-    rl_ipcp_factory_unregister(SHIM_DIF_TYPE);
-    unregister_netdevice_notifier(&shim_eth_notifier_block);
+    /* Also register the same factory under the name "shim-wifi". */
+    shim_wifi_factory          = shim_eth_factory;
+    shim_wifi_factory.dif_type = SHIM_DIF_TYPE_WIFI;
+    ret                        = rl_ipcp_factory_register(&shim_wifi_factory);
+    if (ret) {
+        rl_shim_eth_fini();
+        return ret;
+    }
+
+    return 0;
 }
 
 module_init(rl_shim_eth_init);
