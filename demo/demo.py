@@ -903,7 +903,7 @@ for vmname in sorted(vms):
                     '$SUDO dmesg -n8\n'\
                     '\n'\
                     '$SUDO %(valgrind)s rlite-uipcps -d -v %(verb)s '\
-                                        '&> uipcp.log\n'\
+                                        '> uipcp.log 2>&1\n'\
                         % {'verb': args.verbosity,
                            'verbidx': verbmap[args.verbosity],
                            'flsuf': flavour_suffix,
@@ -987,9 +987,9 @@ for vmname in sorted(vms):
         vars_dict = {'echoname': 'rina-echo-async.%s' % vm['name'],
                        'dif': dif, 'perfname': 'rinaperf.%s' % vm['name']}
         if args.register:
-            outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF  &> rina-echo-async-%(dif)s.log &\n' % vars_dict
+            outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF > rina-echo-async-%(dif)s.log 2>&1 &\n' % vars_dict
         if args.simulate:
-            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF  &> rinaperf-%(dif)s.log &\n' % vars_dict
+            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF > rinaperf-%(dif)s.log 2>&1 &\n' % vars_dict
         del vars_dict
 
         enrollments_list = enrollments[dif] + lowerflowallocs[dif]
@@ -1021,12 +1021,12 @@ for vmname in sorted(vms):
             '$SUDO cp .initscript /etc/rina/initscript\n'\
             'rm .initscript\n'
     if args.enrollment_order == 'parallel':
-        outs += 'nohup rlite-node-config -v --no-reset &> rlite-node-config.log &\n'
+        outs += 'nohup rlite-node-config -v --no-reset > rlite-node-config.log 2>&1 &\n'
 
     # Run rlite-rand clients
     if args.simulate:
         outs += 'nohup rlite-rand-clients -T %(randperiod)s -D %(randdur)s -M %(randmax)s -I %(randintv)s '\
-                    ' &> rlite-rand-clients.log &\n' % \
+                    ' > rlite-rand-clients.log 2>&1 &\n' % \
                     {'randperiod': args.rand_period,
                      'randdur': args.rand_duration,
                      'randmax': args.rand_max,
