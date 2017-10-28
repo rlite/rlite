@@ -44,6 +44,7 @@ enum {
     RLITE_U_IPCP_ROUTING_SHOW_REQ,  /* 10 */
     RLITE_U_IPCP_ROUTING_SHOW_RESP, /* 11 */
     RLITE_U_IPCP_POLICY_PARAM_MOD,  /* 12 */
+    RLITE_U_IPCP_CONFIG,            /* 13 */
 
     RLITE_U_MSG_MAX,
 };
@@ -132,5 +133,15 @@ struct rl_cmsg_ipcp_enroller_enable {
 
 /* rlite-ctl <-- uipcps message to report a routing table dump */
 #define rl_cmsg_ipcp_routing_show_resp rl_cmsg_ipcp_rib_show_resp
+
+/* rlite-ctl --> uipcps message to configure an IPC process. */
+struct rl_cmsg_ipcp_config {
+    rl_msg_t msg_type;
+    uint32_t event_id;
+
+    rl_ipcp_id_t ipcp_id;
+    char *name;
+    char *value;
+} __attribute__((packed));
 
 #endif /* __RLITE_U_MSG_H__ */
