@@ -97,16 +97,19 @@ shim_wifi_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *cmsg,
 }
 
 static int
-shim_wifi_enroller_enable(struct uipcp *uicpp,
+shim_wifi_enroller_enable(struct uipcp *uipcp,
                           const struct rl_cmsg_ipcp_enroller_enable *cmsg)
 {
+    int ret = ENOSYS;
+
     if (cmsg->enable) {
-        /* TODO Start hostapd daemon if not already started. */
+        ret = wifi_access_point_init();
     } else {
-        /* TODO Stop hostapd daemon if running. */
+        /* Stop hostapd daemon if running, not implemented yet. */
+        UPE(uipcp, "Could not stop hostapd: operation not supported\n");
     }
 
-    return ENOSYS; /* TODO not implemented */
+    return ret;
 }
 
 static int
