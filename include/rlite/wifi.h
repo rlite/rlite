@@ -50,6 +50,12 @@
 /* The network driver to be used by wpa_supplicant. */
 #define RL_WIFI_DRIVER "nl80211"
 
+/* Path to the hostapd.conf used by the library. */
+#define RL_HOSTAPD_CONF_PATH "/etc/hostapd/rlite.conf"
+
+/* Path to the pid file used by hostapd. */
+#define RL_HOSTAPD_PID_PATH "/run/hostapd.pid"
+
 /*
  * The maximum length of an SSID.
  * 32 bytes (IEEE 802.11 - 7.3.2.1) * 4 (to handle unprintable characters)
@@ -97,10 +103,16 @@ struct wifi_network {
 void wifi_destroy_network_list(struct list_head *list);
 
 /*
- * Initializes a connection to the daemon on interface "inf".
+ * Initializes a connection to the wpa_supplicant daemon on interface "inf",
+ * spawning the daemon if necessary.
  * Returns a valid pointer to a wpa_ctrl struct or NULL on error.
  */
 struct wpa_ctrl *wifi_init(const char *inf);
+
+/*
+ * Spawns an instance of the hostapd daemon (if necessary).
+ */
+int wifi_access_point_init(void);
 
 /*
  * Scans for available networks and stores information about them in the

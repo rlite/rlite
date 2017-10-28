@@ -97,7 +97,7 @@ wpasup_start_daemon(const char *config, const char *pid_file, const char *inf,
 {
     const char *driver = RL_WIFI_DRIVER;
     char *ctrl_dir;
-    int pid;
+    pid_t pid;
 
     ctrl_dir = wpasup_get_ctrl_dir_from_config(config);
 
@@ -459,6 +459,62 @@ wifi_init(const char *inf)
     wpa_ctrl_attach(ctrl_conn);
 
     return ctrl_conn;
+}
+
+int
+wifi_access_point_init(void)
+{
+    char *conf_file = RL_HOSTAPD_CONF_PATH;
+    char *pid_file  = RL_HOSTAPD_PID_PATH;
+    pid_t pid, check_result;
+    int status;
+    int ret;
+
+    /* Try to access the pidfile of a running hostapd process. */
+    ret = access(pid_file, R_OK);
+    if (ret == 0) {
+        /* A process is already running. Nothing to do. */
+        return 0;
+    }
+
+    if (errno != ENOENT) {
+        perror("Failed to access the PID file");
+        return -1;
+    }
+
+    /* Couldn't find a pidifle. We assume there is no process,
+     * let's start a hostapd instance. */
+    pid = fork();
+    if (pid <= -1) {
+        perror("fork()");
+        return -1;
+    }
+
+    if (pid == 0) {
+        /* Child process. */
+        PD("Executing hostapd\n");
+        execlp("hostapd", "-P", pid_file, conf_file, NULL);
+        perror("execlp(hostapd)");
+        return -1;
+    }
+
+    /* Wait a bit and check if the child is still alive. */
+    sleep(2);
+
+    check_result = waitpid(pid, &status, WNOHANG);
+    if (check_result == 0) {
+        /* Child still alive. */
+        return 0;
+    }
+    if (check_result == -1) {
+        perror("waitpid(child)");
+        return -1;
+    }
+
+    /* Child exited. */
+    PE("hostapd failed to start\n");
+
+    return -1;
 }
 
 int
