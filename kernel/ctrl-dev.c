@@ -1777,14 +1777,15 @@ rl_flow_fetch(struct rl_ctrl *rc, struct rl_msg_base *b_req)
             memset(fqe, 0, sizeof(*fqe));
             list_add_tail(&fqe->node, &rc->flows_fetch_q);
 
-            fqe->resp.msg_type    = RLITE_KER_FLOW_FETCH_RESP;
-            fqe->resp.end         = 0;
-            fqe->resp.ipcp_id     = entry->txrx.ipcp->id;
-            fqe->resp.local_port  = entry->local_port;
-            fqe->resp.remote_port = entry->remote_port;
-            fqe->resp.local_addr  = entry->txrx.ipcp->addr;
-            fqe->resp.remote_addr = entry->remote_addr;
-            fqe->resp.spec        = entry->spec;
+            fqe->resp.msg_type     = RLITE_KER_FLOW_FETCH_RESP;
+            fqe->resp.end          = 0;
+            fqe->resp.ipcp_id      = entry->txrx.ipcp->id;
+            fqe->resp.local_port   = entry->local_port;
+            fqe->resp.remote_port  = entry->remote_port;
+            fqe->resp.local_addr   = entry->txrx.ipcp->addr;
+            fqe->resp.remote_addr  = entry->remote_addr;
+            fqe->resp.spec         = entry->spec;
+            fqe->resp.flow_control = entry->cfg.dtcp.flow_control;
         }
 
         fqe = rl_alloc(sizeof(*fqe), GFP_ATOMIC, RL_MT_FFETCH);

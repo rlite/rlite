@@ -126,6 +126,7 @@ struct rl_kmsg_flow_fetch_resp {
     rlm_addr_t local_addr;
     rlm_addr_t remote_addr;
     struct rina_flow_spec spec;
+    uint8_t flow_control;
 } __attribute__((packed));
 
 #define rl_kmsg_reg_fetch rl_kmsg_flow_fetch

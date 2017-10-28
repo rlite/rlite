@@ -170,10 +170,6 @@ flowcfg2flowspec(struct rina_flow_spec *spec, const struct rl_flow_config *cfg)
     spec->in_order_delivery = cfg->in_order_delivery;
     spec->msg_boundaries    = cfg->msg_boundaries;
     spec->avg_bandwidth     = cfg->dtcp.bandwidth;
-
-    if (cfg->dtcp.flow_control) {
-        rina_flow_spec_fc_set(spec, 1);
-    }
 }
 
 int

@@ -103,9 +103,13 @@ policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
 #ifndef RL_USE_QOS_CUBES
 /* Any modification to this function must be also reported in the inverse
  * function flowcfg2flowspec(). */
-static void
-flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
+void
+flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
+                                         struct rl_flow_config *cfg) const
 {
+    bool force_flow_control =
+        rib->get_param_value<bool>("flow-allocator", "force-flow-control");
+
     memset(cfg, 0, sizeof(*cfg));
 
     cfg->max_sdu_gap       = spec->max_sdu_gap;
@@ -129,8 +133,9 @@ flowspec2flowcfg(const struct rina_flow_spec *spec, struct rl_flow_config *cfg)
     (void)spec->max_loss;
     (void)spec->max_jitter;
 
-    if (rina_flow_spec_fc_get(spec)) {
-        /* This is temporary used to test flow control */
+    if (force_flow_control || spec->max_sdu_gap == 0) {
+        /* We enable flow control if forced by policy or if also
+         * retransmission control is needed. */
         cfg->dtcp_present                 = 1;
         cfg->dtcp.flow_control            = 1;
         cfg->dtcp.fc.cfg.w.max_cwq_len    = RL_FC_WIN_MAX_CWQ_LEN;

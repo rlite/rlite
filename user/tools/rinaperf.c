@@ -1228,7 +1228,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:fb:a:z:p:D:v")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:v")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1279,10 +1279,6 @@ main(int argc, char **argv)
 
         case 'B': /* Set the average bandwidth parameter. */
             parse_bandwidth(&rp->flowspec, optarg);
-            break;
-
-        case 'f': /* Enable flow control. */
-            rp->flowspec.spare3 = 1;
             break;
 
         case 'b':

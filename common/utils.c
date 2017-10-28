@@ -750,6 +750,5 @@ rl_flow_spec_default(struct rina_flow_spec *spec)
     spec->max_jitter        = 0;             /* don't care about jitter */
     spec->in_order_delivery = 0;             /* don't require that */
     spec->msg_boundaries    = 1;             /* UDP-like */
-    rina_flow_spec_fc_set(spec, 0);          /* no flow control */
 }
 COMMON_EXPORT(rl_flow_spec_default);

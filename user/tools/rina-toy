@@ -155,7 +155,6 @@ try:
         rr.flow_spec.max_sdu_gap = 0
         rr.flow_spec.in_order_delivery = 1
         rr.flow_spec.msg_boundaries = 0
-        rr.flow_spec.spare3 = 1
 
     if args.server_mode:
         rr.server(args)
