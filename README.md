@@ -89,6 +89,7 @@ List of required packages:
 * cmake
 * linux-headers-$(uname -r)
 * python, swig [optional, for python bindings]
+* wpa_supplicant, hostapd [optional, for shim-wifi]
 
 ### Archlinux
 
@@ -99,6 +100,7 @@ List of required packages:
 * protobuf
 * linux-headers
 * python, swig [optional, for python bindings]
+* wpa_supplicant, hostapd [optional, for shim-wifi]
 
 On Archlinux *rlite* is available from the AUR repository. It can be installed
 using yaourt:
@@ -117,6 +119,7 @@ List of required packages:
 * kernel-devel
 * cmake
 * python, swig [optional, for python bindings]
+* wpa_supplicant, hostapd [optional, for shim-wifi]
 
 
 
@@ -154,15 +157,16 @@ A main kernel module **rlite** which implements core functionalities:
 
 A separate module for each type of IPCP:
 
-* **rlite-normal**: implements the kernel-space part of the regular IPCPs.
+* **rlite-normal**: Implements the kernel-space part of the regular IPCPs.
                     Includes EFCP and RMT.
-* **rlite-shim-eth**: implements the shim IPCP over Ethernet.
-* **rlite-shim-udp4**: implements the kernel-space part of the shim IPCP
+* **rlite-shim-eth**: Implements the shim IPCP over Ethernet. The same datapath
+                      is also used by the shim-wifi.
+* **rlite-shim-udp4**: Implements the kernel-space part of the shim IPCP
                        over UDP and IPv4.
-* **rlite-shim-tcp4**: implements the kernel-space part of the shim IPCP
+* **rlite-shim-tcp4**: Implements the kernel-space part of the shim IPCP
                        over TCP and IPv4. This follows an older specification
                        and it is deprecated in favour of the UDP shim IPCP.
-* **rlite-shim-loopback**: implements a loopback shim IPCP.
+* **rlite-shim-loopback**: Implements a loopback shim IPCP.
 
 
 ### 4.2. Userspace IPCPs daemon
@@ -199,10 +203,10 @@ The following libraries are available:
                 to provide the RINA POSIX-like API.
                 This is the library used by applications to register names
                 and allocate flows.
+* **cdap**, a C++ implementation of the CDAP protocol.
 * **rlite-conf**: implements the management and monitoring functionalities
                      of *rlite*, such as IPCP creation, removal and
                      configuration, flow monitoring, etc.
-* **cdap**, a C++ implementation of the CDAP protocol.
 
 
 ### 4.4. Administration tools
@@ -212,22 +216,25 @@ The **rlite-ctl** command line tool is used for the administration of the
 the Linux TCP/IP stack.
 
 Available commands:
-* ipcp-create: Create a new IPCP in the system
-* ipcp-destroy: Destroy an IPCP currently running in the system
-* ipcp-config: Configure an IPCP
-* ipcp-register: Register an IPCP into a DIF
-* ipcp-unregister: Unregister an IPCP from a DIF
-* ipcp-enroll: Enroll an IPCP into a DIF
-* ipcp-reset: Remove all the IPCPs in the system
-* ipcps-show: Show the list of IPCPs that are currently running in the system
-* dif-rib-show: Show the RIB of a DIF in the system
-* flows-show: Show the allocated flows that have a local IPCP as one of the
-              endpoints
-* flows-dump: Show the detailed DTP/DTCP state of a given flow
-* regs-show: Show all the names registered to any of the local IPCPs
-* dif-policy-mod: Modify a policy for a DIF running in the system
+* ipcp-create: Create a new IPCP in the system.
+* ipcp-destroy: Destroy an existing IPCP.
+* ipcp-config: Configure an IPCP.
+* ipcp-register: Register an N-IPCP into an N-1-DIF.
+* ipcp-unregister: Unregister an N-IPCP from an N-1-DIF.
+* ipcp-enroller-enable: Enable an IPCP to act as enroller for its DIF.
+                        This is needed for the first IPCP of a DIF, that
+                        does not enroll to another IPCP.
+* ipcp-enroll: Enroll an N-IPCP into an N-DIF.
+* ipcp-reset: Destroy all the IPCPs of the system.
+* ipcps-show: Show the list of IPCPs that are currently running in the system.
+* dif-rib-show: Show the RIB of a DIF running in the system.
+* flows-show: Show the allocated N-flows that have a local N-IPCP as one of the
+              endpoints.
+* flows-dump: Show the detailed DTP/DTCP state of a given flow.
+* regs-show: Show all the (N+1)names registered to any of the local N-IPCPs.
+* dif-policy-mod: Modify a policy for a DIF running in the system.
 * dif-policy-param-mod: Modify a policy parameter for a DIF running in the
-  system
+                        system.
 
 To show the available commands and the corresponding usage, run
 
