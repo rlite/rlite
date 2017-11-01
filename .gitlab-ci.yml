@@ -1,0 +1,18 @@
+stages:
+  - build_stage
+
+build_script:
+  stage: build_stage
+  script:
+    - apt-get update -qq && apt-get install -y -qq gcc g++ libprotobuf-dev protobuf-compiler cmake bc python swig
+    - wget https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.13.10.tar.gz
+    - tar zxf linux-4.13.10.tar.gz
+    - pushd .
+    - cd linux-4.13.10
+    - make defconfig
+    - make modules_prepare
+    - popd
+    - uname -a
+    - ./configure --kernbuilddir $(pwd)/linux-4.13.10
+    - make
+    - make install
