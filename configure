@@ -213,6 +213,8 @@ configure options:
     --without-skbuffs           Use custom packet representation for PDU data/metadata
     --verbose-kernel            Compile (conditional) verbose kernel logs (may slow down a bit)
     --debug                     Compile in debug mode
+    --no-kernel                 Don't build kernel code
+    --no-user                   Don't build userspace code
 EOF
 }
 
@@ -228,6 +230,8 @@ INSTALL_PREFIX="/"
 LIBMODPREFIX=""
 KERNBUILDDIR="/lib/modules/`uname -r`/build"
 DEBUG="n"
+BUILD_KERNEL="y"
+BUILD_USER="y"
 
 # Option parsing
 while [[ $# > 0 ]]
@@ -310,6 +314,14 @@ do
         WITH_VMPI="n"
         ;;
 
+        "--no-kernel")
+        BUILD_KERNEL="n"
+        ;;
+
+        "--no-user")
+        BUILD_USER="n"
+        ;;
+
         "--debug")
         DEBUG="y"
         ;;
@@ -323,15 +335,19 @@ do
     shift
 done
 
-# Check if kernel headers are there for out-of-tree build
-if [ ! -d $KERNBUILDDIR ]; then
-    printmsg "Cannot find '$KERNBUILDDIR' kernel build directory"
-    printmsg "Make sure headers for the running kernel are installed"
-    exit 255
+if [ ${BUILD_KERNEL} == "y" ]; then
+    # Check if kernel headers are there for out-of-tree build
+    if [ ! -d $KERNBUILDDIR ]; then
+        printmsg "Cannot find '$KERNBUILDDIR' kernel build directory"
+        printmsg "Make sure headers for the running kernel are installed"
+        exit 255
+    fi
 fi
 
-# Make sure CMake is installed
-which cmake || no_cmake
+if [ ${BUILD_USER} == "y" ]; then
+    # Make sure CMake is installed
+    which cmake || no_cmake
+fi
 
 rm -f config.log
 
@@ -349,6 +365,8 @@ cat >> config.log <<EOF
 #     build date:    $(date)
 #     revision id:   $REVISION
 #     revision date: ${REVISION_DATE}
+#     build kernel:  ${BUILD_KERNEL}
+#     build user:    ${BUILD_USER}
 ##############################################################################
 EOF
 
@@ -365,14 +383,17 @@ ln -sf ../../common/ker-numtables.c ker-numtables.c
 ln -sf ../../common/utils.c utils.c
 )
 
-# Configure CMake for out-of-tree build
-rm -rf build &> /dev/null
-mkdir build || exit 255
 
-(
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG}
-) | tee -a config.log
+if [ ${BUILD_USER} == "y" ]; then
+    # Configure CMake for out-of-tree build
+    rm -rf build &> /dev/null
+    mkdir build || exit 255
+
+    (
+    cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Debug -DDEBUG=${DEBUG}
+    ) | tee -a config.log
+fi
 
 # Generate the main Makefile
 cp Makefile.in Makefile
@@ -383,50 +404,53 @@ sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
 sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
 sed -i "s|@WITH_VMPI@|${WITH_VMPI}|g" Makefile
 
+if [ ${BUILD_KERNEL} == "y" ]; then
 # Prepare VMPI
-if [ $WITH_VMPI == "y" ]; then
-    cd kernel/vmpi
-    git clean -fdx .
-    tar -zxvf vmpi-*.tar.gz
-    rm vmpi/vmpi-bufs.c vmpi/vmpi-bufs.h
-    mv vmpi/* .
-    rm -rf vmpi
-    # Delete the vmpi-bufs module line
-    sed -i '/vmpi-bufs/d' Makefile
-    # Insert a line to set include directives
-    sed -i '1 i \
-    EXTRA_CFLAGS := -I$(PWD)/../include' Makefile
-    cd ../..
-fi
+    if [ $WITH_VMPI == "y" ]; then
+        cd kernel/vmpi
+        git clean -fdx .
+        tar -zxvf vmpi-*.tar.gz
+        rm vmpi/vmpi-bufs.c vmpi/vmpi-bufs.h
+        mv vmpi/* .
+        rm -rf vmpi
+        # Delete the vmpi-bufs module line
+        sed -i '/vmpi-bufs/d' Makefile
+        # Insert a line to set include directives
+        sed -i '1 i \
+        EXTRA_CFLAGS := -I$(PWD)/../include' Makefile
+        cd ../..
+    fi
 
-# Generate kernel Makefile
-cp kernel/Makefile.in kernel/Makefile
-generate_flavours
+    # Generate kernel Makefile
+    cp kernel/Makefile.in kernel/Makefile
+    generate_flavours
 
-# Generate kerconfig.h file
-KCF=kernel/kerconfig.h
-cat > $KCF <<EOF
+    # Generate kerconfig.h file
+    KCF=kernel/kerconfig.h
+    cat > $KCF <<EOF
 #ifndef __RLITE_KERCONFIG_H__
 #define __RLITE_KERCONFIG_H__
 EOF
 
-if [ $WITH_SKBUFFS == "y" ]; then
-    echo '#define RL_SKB /* Use native Linux sk_buff */' >> $KCF
+    if [ $WITH_SKBUFFS == "y" ]; then
+        echo '#define RL_SKB /* Use native Linux sk_buff */' >> $KCF
+    fi
+
+    if [ $VERB_KERN_LOGS == "y" ]; then
+        echo '#define RL_PV_ENABLE /* Compile PV() conditional logs */' >> $KCF
+    fi
+
+    if [ $DEBUG == "y" ]; then
+        echo '#define RL_MEMTRACK /* Track memory alloc/dealloc */' >> $KCF
+    fi
+
+    probe_kernel_features
+
+    echo '#endif' >> $KCF
 fi
-
-if [ $VERB_KERN_LOGS == "y" ]; then
-    echo '#define RL_PV_ENABLE /* Compile PV() conditional logs */' >> $KCF
-fi
-
-if [ $DEBUG == "y" ]; then
-    echo '#define RL_MEMTRACK /* Track memory alloc/dealloc */' >> $KCF
-fi
-
-probe_kernel_features
-
-echo '#endif' >> $KCF
 
 sed "s|WITH_VMPI|${WITH_VMPI}|g" in.prepare.sh > prepare.sh
 sed "s|WITH_VMPI|${WITH_VMPI}|g" in.unprepare.sh > unprepare.sh
+
 chmod +x prepare.sh
 chmod +x unprepare.sh
