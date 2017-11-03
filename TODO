@@ -1,16 +1,22 @@
 Open tasks, in decreasing order of priority:
 
-* add support for shim DIF over WiFi
+* implement a simple handover procedure to handle mobility
+  over shim-wifi
+    * the handover manager should periodically scan the available
+      SSIDs and switch to the SSID that has the strongest signal
+      (with hysteresis)
 
-* add kernel support for network namespaces
-    * it is enough to assign namespaces at IPCP creation time
-    * the assigned namespace is the one of the current process
+* implement the Bully algorithm for fault-tolerant leader election
+    * the leader can then support centralized address allocation:
+      the address allocation table may still be replicated, but
+      only the leader decides for new allocations
+    * another use case is centralized bandwidth allocation
 
-* implement support for tailroom (needed by shim-eth)
+* implement a distributed and fault-tolerant DFT by means of a
+  Kademlia DHT
 
-* implement a policy for distributed bandwidth allocation
-
-* generic RIB synchronization where needed (e.g. DFT, LFDB, neighbors)
+* generic code for RIB synchronization where needed (e.g. DFT, LFDB,
+  neighbors, address allocation table)
    * a smart implementation would use some kind of hash on the RIB
      subtrees to understand when the neighbor has different (and newer)
      version of a fully-replicated subtree (e.g. DFT or Lower Flow
@@ -18,6 +24,12 @@ Open tasks, in decreasing order of priority:
    * avoid exchanging the same data again and again when not needed,
      just periodically exchange hashes (and do the full update only when
      needed)
+
+* add kernel support for network namespaces
+    * it is enough to assign namespaces at IPCP creation time
+    * the assigned namespace is the one of the current process
+
+* implement support for tailroom (needed by shim-eth)
 
 * extend demonstrator to support multiple physical machines
 
