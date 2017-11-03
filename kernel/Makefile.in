@@ -20,7 +20,7 @@ endif
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include
 
-EXTRA_CFLAGS += -g
+EXTRA_CFLAGS += -g -Werror
 
 ifeq ($(WITH_VMPI),y)
 obj-m += rlite-shim-hv.o
