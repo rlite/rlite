@@ -30,7 +30,7 @@ message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 message(STATUS "INCLUDE_DIR: ${INCLUDE_DIR}")
 message(STATUS "RLITE HEADERS: ${RLITE_HEADERS}")
 
-add_definitions("-Wall -g")
+add_definitions("-Wall -g -Werror")
 if(DEBUG STREQUAL "y")
     add_definitions("-DRL_DEBUG")
     message(STATUS "Configuring for debug mode")
