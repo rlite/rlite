@@ -9,6 +9,7 @@ before_install:
   - sudo apt-get install -y protobuf-compiler
   - sudo apt-get install -y cmake
   - sudo apt-get install -y python
+  - sudo apt-get install -y swig
   - sudo apt-get install -y bc
   - sudo apt-get install -y kmod
   - sudo apt-get install -y linux-headers-$(uname -r)
