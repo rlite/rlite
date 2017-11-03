@@ -92,12 +92,14 @@ class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
     unsigned int discard_secs;
 
+#ifndef SWIG
     enum class ConnState {
         NONE = 1,
         AWAITCON,
         CONNECTED,
         AWAITCLOSE,
     } state;
+#endif /* SWIG */
 
     const char *conn_state_repr(ConnState st);
     int conn_fsm_run(struct CDAPMessage *m, bool sender);
@@ -160,18 +162,6 @@ struct CDAPMessage {
     int scope;
     long version;
 
-    enum class ObjValType {
-        NONE,
-        I32,
-        I64,
-        BYTES,
-        FLOAT,
-        DOUBLE,
-        BOOL,
-        STRING,
-    };
-
-    bool is_type(ObjValType tt) const;
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
 
@@ -284,6 +274,20 @@ private:
     void copy(const CDAPMessage &o);
     void destroy();
 
+#ifndef SWIG
+    enum class ObjValType {
+        NONE,
+        I32,
+        I64,
+        BYTES,
+        FLOAT,
+        DOUBLE,
+        BOOL,
+        STRING,
+    };
+#endif /* SWIG */
+
+    bool is_type(ObjValType tt) const;
     /* Representation of the object value. */
     struct {
         ObjValType ty;
