@@ -11,10 +11,11 @@ before_install:
   - sudo apt-get install -y python
   - sudo apt-get install -y bc
   - sudo apt-get install -y kmod
+  - sudo apt-get install -y linux-headers-$(uname -r)
 
 script:
-  - ./configure --no-kernel
-  - make usr
-  - sudo make usr_install
+  - ./configure
+  - make
+  - sudo make install
   - uname -a
   - ls -l /lib/modules || true
