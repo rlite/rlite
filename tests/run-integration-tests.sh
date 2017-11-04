@@ -10,8 +10,14 @@ function abort_cleanup() {
     exit 1
 }
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+ORANGE='\033[0;33m'
+NOC='\033[0m' # No Color
+
 for t in $(ls tests/integration/*); do
-    echo ">>> Running integration test \"${t}\""
+    echo -e "${ORANGE}>>> Running integration test ${CYAN}\"${t}\"${NOC}"
     # Prepare test environment
     sudo modprobe rlite || abort_prepare
     sudo modprobe rlite-normal || abort_prepare
@@ -24,8 +30,8 @@ for t in $(ls tests/integration/*); do
     sudo rmmod rlite-shim-loopback || abort_cleanup
     sudo rmmod rlite || abort_cleanup
     if [ "$retcode" != "0" ]; then
-        echo ">>> FAILED"
+        echo -e "${RED}>>> TEST FAILED${NOC}"
         exit 1
     fi
-    echo ">>> OK"
+    echo -e "${GREEN}>>> TEST PASSED${NOC}"
 done
