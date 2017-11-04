@@ -724,6 +724,7 @@ main(int argc, char **argv)
     struct sigaction sa;
     const char *verbosity = "DBG";
     int daemon            = 0;
+    int pidfd             = -1;
     int ret, opt;
 
     while ((opt = getopt(argc, argv, "hv:d")) != -1) {
@@ -781,6 +782,27 @@ main(int argc, char **argv)
         fprintf(stderr, "warning: mkdir(%s) failed: %s\n", RLITE_UIPCPS_VAR,
                 strerror(errno));
         exit(EXIT_FAILURE);
+    }
+
+    /* Create pidfile and check for uniqueness. */
+    {
+        pidfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
+        if (pidfd < 0) {
+            perror("open(pidfile)");
+            return -1;
+        }
+
+        ret =
+            flock(pidfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
+        if (ret) {
+            if (errno == EAGAIN) {
+                PE("An instance of rlite-uipcps is already running\n");
+            } else {
+                perror("flock(pidfile)");
+            }
+
+            return -1;
+        }
     }
 
     normal_lib_init();
@@ -847,28 +869,11 @@ main(int argc, char **argv)
         daemonize();
     }
 
-    /* Create pidfile and check for uniqueness. */
+    /* Write our PID to the pidfile. Note that this must happen after the
+     * fork() that happens in daemonize(). */
     {
         char strbuf[128];
-        int pfd;
         int n;
-
-        pfd = open(RLITE_UIPCPS_PIDFILE, O_RDWR | O_CREAT, 0644);
-        if (pfd < 0) {
-            perror("open(pidfile)");
-            return -1;
-        }
-
-        ret = flock(pfd, LOCK_EX /* exclusive lock */ | LOCK_NB /* trylock */);
-        if (ret) {
-            if (errno == EAGAIN) {
-                PE("An instance of rlite-uipcps is already running\n");
-            } else {
-                perror("flock(pidfile)");
-            }
-
-            return -1;
-        }
 
         n = snprintf(strbuf, sizeof(strbuf), "%u", getpid());
         if (n < 0) {
@@ -876,12 +881,12 @@ main(int argc, char **argv)
             return -1;
         }
 
-        if (write(pfd, strbuf, n) != n) {
+        if (write(pidfd, strbuf, n) != n) {
             perror("write(pidfile)");
             return -1;
         }
 
-        if (syncfs(pfd)) {
+        if (syncfs(pidfd)) {
             perror("sync(pidfile)");
         }
 
