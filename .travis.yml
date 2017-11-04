@@ -19,7 +19,4 @@ script:
   - make
   - sudo make install
   - sudo make depmod
-  - sudo modprobe rlite
-  - sudo modprobe rlite-shim-eth
-  - sudo modprobe rlite-normal
-  - sudo modprobe rlite-shim-loopback
+  - tests/run-integration-tests.sh
