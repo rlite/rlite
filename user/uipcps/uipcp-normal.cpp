@@ -380,9 +380,10 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
-    params_map["flow-allocator"]["force-flow-control"]   = PolicyParam(false);
-    params_map["resource-allocator"]["reliable-flows"]   = PolicyParam(false);
-    params_map["resource-allocator"]["reliable-n-flows"] = PolicyParam(false);
+    params_map["flow-allocator"]["force-flow-control"]     = PolicyParam(false);
+    params_map["resource-allocator"]["reliable-flows"]     = PolicyParam(false);
+    params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
+    params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);
     params_map["rib-daemon"]["refresh-intval"] = PolicyParam(kRIBRefreshIntval);
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
@@ -690,18 +691,20 @@ uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
     UPD(uipcp, "IPCP name %s registered into DIF %s\n", uipcp->dif_name,
         lower_dif);
 
-    /* Also register the N-DIF name, i.e. the name of the DIF that
-     * this IPCP is part of. If this fails broadcast enrollment won't work.
-     * However it is not an hard failure, as unicast enrollment is still
-     * possible. */
-    if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
-        UPW(uipcp, "Registration of DAF name %s into DIF %s failed\n",
+    if (get_param_value<bool>("resource-allocator", "broadcast-enroller")) {
+        /* Also register the N-DIF name, i.e. the name of the DIF that
+         * this IPCP is part of. If this fails broadcast enrollment won't work.
+         * However it is not an hard failure, as unicast enrollment is still
+         * possible. */
+        if ((ret = uipcp_do_register(uipcp, lower_dif, uipcp->dif_name, reg))) {
+            UPW(uipcp, "Registration of DAF name %s into DIF %s failed\n",
+                uipcp->dif_name, lower_dif);
+            return ret;
+        }
+        UPD(uipcp,
+            "DAF name %s registered into DIF %s for broadcast enrollment\n",
             uipcp->dif_name, lower_dif);
-        return ret;
     }
-
-    UPD(uipcp, "DAF name %s registered into DIF %s for broadcast enrollment\n",
-        uipcp->dif_name, lower_dif);
 
     return 0;
 }
