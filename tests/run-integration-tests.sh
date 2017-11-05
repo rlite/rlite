@@ -1,12 +1,12 @@
 #!/bin/bash
 
 function abort_prepare() {
-    echo ">>> FAILED TO PREPARE TEST ENVIRONMENT"
+    echo "${RED}>>> FAILED TO PREPARE TEST ENVIRONMENT${NOC}"
     exit 1
 }
 
 function abort_cleanup() {
-    echo ">>> FAILED TO CLEANUP TEST ENVIRONMENT"
+    echo "${RED}>>> FAILED TO CLEANUP TEST ENVIRONMENT${NOC}"
     exit 1
 }
 
