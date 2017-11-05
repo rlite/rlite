@@ -707,7 +707,7 @@ sigint_handler(int signum)
 
     print_backtrace();
 
-    PI("Signal %d received, terminating...\n", signum);
+    PD("%s signal received, daemon is going to exit ...\n", strsignal(signum));
 
     /* Spawn a thread to destroy all the IPCPs. */
     ret = pthread_create(&th, NULL, uipcps_reset, NULL);
