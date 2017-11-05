@@ -600,10 +600,10 @@ ipcp_add(struct rl_kmsg_ipcp_create *req, rl_ipcp_id_t *ipcp_id)
     *ipcp_id = entry->id;
 
 out:
+    mutex_unlock(&rl_dm.general_lock);
     if (ret) {
         ipcp_put(entry);
     }
-    mutex_unlock(&rl_dm.general_lock);
 
     return ret;
 }
