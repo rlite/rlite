@@ -16,18 +16,27 @@ CYAN='\033[0;36m'
 ORANGE='\033[0;33m'
 NOC='\033[0m' # No Color
 
+modules="rlite-normal rlite-shim-loopback rlite-shim-eth rlite-shim-udp4 rlite-shim-tcp4"
+# Start from a clean state
+sudo pkill rlite-uipcps > /dev/null 2>&1
+for m in ${modules}; do
+    sudo rmmod ${m} > /dev/null 2>&1
+done
+sudo rmmod rlite
+
 for t in $(ls tests/integration/*); do
     echo -e "${ORANGE}>>> Running integration test ${CYAN}\"${t}\"${NOC}"
     # Prepare test environment
-    sudo modprobe rlite || abort_prepare
-    sudo modprobe rlite-normal || abort_prepare
-    sudo modprobe rlite-shim-loopback || abort_prepare
+    for m in ${modules}; do
+        sudo modprobe ${m} || abort_prepare
+    done
     sudo rlite-uipcps -d || abort_prepare
     sudo ${t}
     retcode="$?"
     sudo kill $(cat /run/rlite/uipcps.pid) || abort_cleanup
-    sudo rmmod rlite-normal || abort_cleanup
-    sudo rmmod rlite-shim-loopback || abort_cleanup
+    for m in ${modules}; do
+        sudo rmmod ${m} || abort_cleanup
+    done
     sudo rmmod rlite || abort_cleanup
     if [ "$retcode" != "0" ]; then
         echo -e "${RED}>>> TEST FAILED${NOC}"
