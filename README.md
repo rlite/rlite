@@ -808,6 +808,7 @@ of a normal IPCP process:
 | flow-allocator      | default           | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
 | resource-allocator  | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resource-allocator  | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
+| resource-allocator  | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
 | rib-daemon          | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
 | routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
 
