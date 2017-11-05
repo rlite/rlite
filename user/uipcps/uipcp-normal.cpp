@@ -675,8 +675,8 @@ uipcp_rib::update_lower_difs(int reg, string lower_dif)
     return 0;
 }
 
-static int
-register_to_lower_one(struct uipcp *uipcp, const char *lower_dif, bool reg)
+int
+uipcp_rib::register_to_lower_one(const char *lower_dif, bool reg)
 {
     int ret;
 
@@ -718,7 +718,7 @@ uipcp_rib::realize_registrations(bool reg)
     }
 
     for (const string &lower : snapshot) {
-        register_to_lower_one(uipcp, lower.c_str(), reg);
+        register_to_lower_one(lower.c_str(), reg);
     }
 
     return 0;
@@ -1621,7 +1621,7 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
      * enroller. Otherwise the registration will be performed by
      * realize_registrations() when the enroller is enabled. */
     if (enroller_enabled || !reg) {
-        register_to_lower_one(uipcp, dif_name, reg);
+        register_to_lower_one(dif_name, reg);
     } else {
         UPD(uipcp,
             "Registration of %s in DIF %s deferred on enroller enabled\n",
