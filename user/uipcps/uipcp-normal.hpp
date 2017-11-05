@@ -494,6 +494,7 @@ struct uipcp_rib {
 
     int update_lower_difs(int reg, std::string lower_dif);
     int register_to_lower(const char *dif_name, bool reg);
+    int register_to_lower_one(const char *lower_dif, bool reg);
     int realize_registrations(bool reg);
     int enroller_enable(bool enable);
 
