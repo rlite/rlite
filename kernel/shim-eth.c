@@ -1173,7 +1173,7 @@ static struct ipcp_factory shim_wifi_factory;
 
 static struct notifier_block shim_eth_notifier_block;
 
-static void __exit
+static void
 rl_shim_eth_fini(void)
 {
     rl_ipcp_factory_unregister(SHIM_DIF_TYPE_WIFI);
