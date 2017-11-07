@@ -1099,6 +1099,32 @@ server(struct rinaperf *rp)
     return 0;
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 stop_clients(struct rinaperf *rp)
 {
@@ -1186,6 +1212,7 @@ usage(void)
         "   -z APNAME : application process name and instance of the rinaperf "
         "server\n"
         "   -p NUM : clients run NUM parallel instances, using NUM threads\n"
+        "   -w : server runs in background\n"
         "   -v : be verbose\n");
 }
 
@@ -1202,6 +1229,7 @@ main(int argc, char **argv)
     int size               = sizeof(uint16_t);
     int interval           = 0;
     int burst              = 1;
+    int background         = 0;
     struct worker wt; /* template */
     int ret;
     int opt;
@@ -1228,7 +1256,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rp->flowspec);
 
-    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:v")) != -1) {
+    while ((opt = getopt(argc, argv, "hlt:d:c:s:i:B:g:b:a:z:p:D:wv")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -1311,6 +1339,10 @@ main(int argc, char **argv)
                 printf("    Invalid 'duration' %d\n", rp->duration);
             }
             duration_specified = 1;
+            break;
+
+        case 'w':
+            background = 1;
             break;
 
         case 'v':
@@ -1408,6 +1440,9 @@ main(int argc, char **argv)
     }
 
     if (listen) {
+        if (background) {
+            daemonize();
+        }
         server(rp);
     } else {
         struct worker *workers = calloc(rp->parallel, sizeof(*workers));
