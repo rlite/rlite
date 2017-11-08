@@ -36,7 +36,7 @@ sudo pkill rlite-uipcps > /dev/null 2>&1
 for m in ${modules}; do
     sudo rmmod ${m} > /dev/null 2>&1
 done
-sudo rmmod rlite
+sudo rmmod rlite > /dev/null 2>&1
 
 testcnt="0"
 for t in $(ls tests/integration/*); do
