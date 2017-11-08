@@ -369,6 +369,32 @@ server(struct echo_async *rea)
     return 0;
 }
 
+/* Turn this program into a daemon process. */
+static void
+daemonize(void)
+{
+    pid_t pid = fork();
+    pid_t sid;
+
+    if (pid < 0) {
+        perror("fork(daemonize)");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* This is the parent. We can terminate it. */
+        exit(0);
+    }
+
+    /* Execution continues only in the child's context. */
+    sid = setsid();
+    if (sid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    chdir("/");
+}
+
 static void
 sigint_handler(int signum)
 {
@@ -388,7 +414,8 @@ usage(void)
         "   -z APNAME : application process name/instance of the echo_async "
         "server\n"
         "   -g NUM : max SDU gap to use for the data flow\n"
-        "   -p NUM : open NUM parallel flows\n");
+        "   -p NUM : open NUM parallel flows\n"
+        "   -w : server runs in background\n");
 }
 
 int
@@ -398,6 +425,7 @@ main(int argc, char **argv)
     struct echo_async rea;
     const char *dif_name = NULL;
     int listen           = 0;
+    int background       = 0;
     int ret;
     int opt;
 
@@ -410,7 +438,7 @@ main(int argc, char **argv)
     /* Start with a default flow configuration (unreliable flow). */
     rina_flow_spec_unreliable(&rea.flowspec);
 
-    while ((opt = getopt(argc, argv, "hld:a:z:g:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "hld:a:z:g:p:w")) != -1) {
         switch (opt) {
         case 'h':
             usage();
@@ -442,6 +470,10 @@ main(int argc, char **argv)
                 printf("Invalid -p argument '%d'\n", rea.p);
                 return -1;
             }
+            break;
+
+        case 'w':
+            background = 1;
             break;
 
         default:
@@ -476,8 +508,10 @@ main(int argc, char **argv)
     rea.dif_name = dif_name ? strdup(dif_name) : NULL;
 
     if (listen) {
+        if (background) {
+            daemonize();
+        }
         server(&rea);
-
     } else {
         client(&rea);
     }
