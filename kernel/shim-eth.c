@@ -851,8 +851,8 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     struct rl_shim_eth *priv  = ipcp->priv;
     struct net_device *netdev = priv->netdev;
-    struct sk_buff *skb      = NULL;
-    struct arpt_entry *entry = flow->priv;
+    struct sk_buff *skb       = NULL;
+    struct arpt_entry *entry  = flow->priv;
     int hhlen;
     int ret;
 

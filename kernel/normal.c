@@ -97,8 +97,11 @@ rl_buf_pci_push(struct rl_buf *rb)
     rb->len += sizeof(struct rina_pci);
 #else  /* RL_SKB */
     if (unlikely(skb_headroom(rb) < sizeof(struct rina_pci))) {
-        RPD(2, "No space to push another PCI\n");
-        return -1;
+        if (pskb_expand_head(rb, /*nhead=*/sizeof(struct rina_pci), /*ntail=*/0,
+                             GFP_ATOMIC)) {
+            PE("Out of memory\n");
+            return -1;
+        }
     }
     skb_push(rb, sizeof(struct rina_pci));
 #endif /* RL_SKB */
