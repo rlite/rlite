@@ -9,19 +9,6 @@ sudo insmod kernel/rlite-normal.ko
 sudo insmod kernel/rlite-shim-tcp4.ko
 sudo insmod kernel/rlite-shim-udp4.ko
 
-if [ WITH_VMPI == "y" ]; then
-    # prepare VMPI-KVM
-    pushd .
-    cd kernel/vmpi
-    ./prepare-host-kvm.sh
-    ./prepare-guest-kvm.sh
-    popd
-fi
-
-if [ WITH_VMPI == "y" ]; then
-    sudo insmod kernel/rlite-shim-hv.ko
-fi
-
 sudo chmod a+rwx /dev/rlite
 sudo chmod a+rwx /dev/rlite-io
 

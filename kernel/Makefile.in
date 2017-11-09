@@ -7,29 +7,9 @@ rlite-shim-loopback-y := shim-loopback.o
 obj-m += rlite-shim-eth.o
 rlite-shim-eth-y := shim-eth.o
 
-ifeq ($(WITH_SHIM_TCP4),y)
-obj-m += rlite-shim-tcp4.o
-rlite-shim-tcp4-y := shim-tcp4.o
-endif
-
-ifeq ($(WITH_SHIM_UDP4),y)
-obj-m += rlite-shim-udp4.o
-rlite-shim-udp4-y := shim-udp4.o
-endif
-
 # PWD must be the kernel/ directory
 EXTRA_CFLAGS := -I$(PWD)/../include
-
 EXTRA_CFLAGS += -g -Werror
-
-ifeq ($(WITH_VMPI),y)
-obj-m += rlite-shim-hv.o
-rlite-shim-hv-y := shim-hv.o shim-hv-numtables.o
-
-EXTRA_CFLAGS += -I\$(PWD)/vmpi
-
-obj-y += vmpi/
-endif
 
 obj-m += rlite-normal.o
 rlite-normal-y := normal.o
