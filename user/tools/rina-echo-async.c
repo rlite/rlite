@@ -511,10 +511,8 @@ main(int argc, char **argv)
         if (background) {
             daemonize();
         }
-        server(&rea);
-    } else {
-        client(&rea);
+        return server(&rea);
     }
 
-    return close(rea.cfd);
+    return client(&rea);
 }
