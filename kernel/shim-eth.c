@@ -851,17 +851,19 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
 {
     struct rl_shim_eth *priv  = ipcp->priv;
     struct net_device *netdev = priv->netdev;
-    int hhlen;
     struct sk_buff *skb      = NULL;
     struct arpt_entry *entry = flow->priv;
+    int hhlen;
     int ret;
 
     if (unlikely(!entry)) {
+        rl_buf_free(rb);
         RPD(2, "called on deallocated entry\n");
         return -ENXIO;
     }
 
     if (unlikely(rb->len > ETH_DATA_LEN)) {
+        rl_buf_free(rb);
         RPD(2, "Exceeding maximum ethernet payload (%d)\n", ETH_DATA_LEN);
         return -EMSGSIZE;
     }
@@ -889,6 +891,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     hhlen = LL_RESERVED_SPACE(netdev); /* Hardware header length. */
     skb   = alloc_skb(hhlen + rb->len + netdev->needed_tailroom, GFP_KERNEL);
     if (!skb) {
+        rl_buf_free(rb);
         PD("Out of memory\n");
         return -ENOMEM;
     }
@@ -907,6 +910,7 @@ rl_shim_eth_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
     ret = dev_hard_header(skb, skb->dev, ETH_P_RLITE, entry->tha,
                           netdev->dev_addr, skb->len);
     if (unlikely(ret < 0)) {
+        rl_buf_free(rb);
         kfree_skb(skb);
 
         return ret;
