@@ -11,7 +11,6 @@ ker:
 	$(MAKE) -C $(KERNBUILDDIR) M=$(KERNMODDIR) PWD=$(PWD)/kernel \
 			WITH_SHIM_UDP4=@WITH_SHIM_UDP4@ \
 			WITH_SHIM_TCP4=@WITH_SHIM_TCP4@ \
-			WITH_VMPI=@WITH_VMPI@ \
 			modules
 
 usr_count:

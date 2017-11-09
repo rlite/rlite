@@ -221,7 +221,6 @@ EOF
 
 # Default parameter values
 
-WITH_VMPI="n"
 WITH_SHIM_TCP4="y"
 WITH_SHIM_UDP4="y"
 WITH_SKBUFFS="n"
@@ -304,14 +303,6 @@ do
 
         "--verbose-kernel")
         VERB_KERN_LOGS="y"
-        ;;
-
-        "--with-vmpi")
-        WITH_VMPI="y"
-        ;;
-
-        "--without-vmpi")
-        WITH_VMPI="n"
         ;;
 
         "--no-kernel")
@@ -402,27 +393,24 @@ sed -i "s|@ROOTDIR@|$PWD|g" Makefile
 sed -i "s|@KERNBUILDDIR@|$KERNBUILDDIR|g" Makefile
 sed -i "s|@WITH_SHIM_UDP4@|${WITH_SHIM_UDP4}|g" Makefile
 sed -i "s|@WITH_SHIM_TCP4@|${WITH_SHIM_TCP4}|g" Makefile
-sed -i "s|@WITH_VMPI@|${WITH_VMPI}|g" Makefile
 
 if [ ${BUILD_KERNEL} == "y" ]; then
-# Prepare VMPI
-    if [ $WITH_VMPI == "y" ]; then
-        cd kernel/vmpi
-        git clean -fdx .
-        tar -zxvf vmpi-*.tar.gz
-        rm vmpi/vmpi-bufs.c vmpi/vmpi-bufs.h
-        mv vmpi/* .
-        rm -rf vmpi
-        # Delete the vmpi-bufs module line
-        sed -i '/vmpi-bufs/d' Makefile
-        # Insert a line to set include directives
-        sed -i '1 i \
-        EXTRA_CFLAGS := -I$(PWD)/../include' Makefile
-        cd ../..
-    fi
-
     # Generate kernel Makefile
     cp kernel/Makefile.in kernel/Makefile
+    if [ $WITH_SHIM_UDP4 == "y" ]; then
+        cat >> kernel/Makefile <<EOF
+
+obj-m += rlite-shim-udp4.o
+rlite-shim-udp4-y := shim-udp4.o
+EOF
+    fi
+    if [ $WITH_SHIM_TCP4 == "y" ]; then
+        cat >> kernel/Makefile <<EOF
+
+obj-m += rlite-shim-tcp4.o
+rlite-shim-tcp4-y := shim-tcp4.o
+EOF
+    fi
     generate_flavours
 
     # Generate kerconfig.h file
@@ -448,9 +436,6 @@ EOF
 
     echo '#endif' >> $KCF
 fi
-
-sed "s|WITH_VMPI|${WITH_VMPI}|g" in.prepare.sh > prepare.sh
-sed "s|WITH_VMPI|${WITH_VMPI}|g" in.unprepare.sh > unprepare.sh
 
 chmod +x prepare.sh
 chmod +x unprepare.sh
