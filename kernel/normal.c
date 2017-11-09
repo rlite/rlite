@@ -155,8 +155,9 @@ rl_normal_create(struct ipcp_entry *ipcp)
     ipcp->pcisizes.qosid  = sizeof(rl_qosid_t);
 
     /* Default hdroom and max sdu size. */
-    ipcp->hdroom       = RL_PCI_LEN;
-    ipcp->max_sdu_size = (1 << 16) - 1 - ipcp->hdroom;
+    ipcp->txhdroom     = RL_PCI_LEN;
+    ipcp->rxhdroom     = 0;
+    ipcp->max_sdu_size = (1 << 16) - 1 - ipcp->txhdroom;
 
     priv->ipcp = ipcp;
     hash_init(priv->pdu_ft);
@@ -1005,8 +1006,9 @@ static struct rl_buf *
 ctrl_pdu_alloc(struct ipcp_entry *ipcp, struct flow_entry *flow,
                uint8_t pdu_type, rl_seq_t ack_nack_seq_num)
 {
-    struct rl_buf *rb = rl_buf_alloc(sizeof(struct rina_pci_ctrl), ipcp->hdroom,
-                                     ipcp->tailroom, GFP_ATOMIC);
+    struct rl_buf *rb =
+        rl_buf_alloc(sizeof(struct rina_pci_ctrl), ipcp->txhdroom,
+                     ipcp->tailroom, GFP_ATOMIC);
     struct rina_pci_ctrl *pcic;
 
     if (likely(rb)) {

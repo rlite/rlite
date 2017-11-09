@@ -111,7 +111,7 @@ rl_shim_eth_create(struct ipcp_entry *ipcp)
     priv->arp_resolver_tmr.function = arp_resolver_cb;
     priv->arp_resolver_tmr.data     = (unsigned long)priv;
     priv->arp_tmr_shutdown          = false;
-    ipcp->hdroom                    = 0;
+    ipcp->txhdroom                  = 0;
     ipcp->tailroom                  = 0;
 
     mutex_lock(&shims_lock);
@@ -659,7 +659,7 @@ shim_eth_pdu_rx(struct rl_shim_eth *priv, struct sk_buff *skb)
         hh->h_source[4], hh->h_source[5], skb->len);
 
 #ifndef RL_SKB
-    rb = rl_buf_alloc(skb->len, ipcp->hdroom, ipcp->tailroom, GFP_ATOMIC);
+    rb = rl_buf_alloc(skb->len, ipcp->rxhdroom, ipcp->tailroom, GFP_ATOMIC);
     if (unlikely(!rb)) {
         PD("Out of memory\n");
         return;
@@ -1004,14 +1004,16 @@ rl_shim_eth_config(struct ipcp_entry *ipcp, const char *param_name,
         ipcp->tailroom     = netdev->needed_tailroom;
 #ifdef RL_SKB
         /* Report the headroom needed for Ethernet header. */
-        if (ipcp->hdroom != LL_RESERVED_SPACE(netdev)) {
+        if (ipcp->txhdroom != LL_RESERVED_SPACE(netdev)) {
             *notify = 1;
         }
-        ipcp->hdroom = LL_RESERVED_SPACE(netdev);
+        ipcp->txhdroom = LL_RESERVED_SPACE(netdev);
 #endif /* RL_SKB */
 
-        PD("netdev set to %p [max_sdu_size=%u, hdroom=%u, troom=%u]\n", netdev,
-           (unsigned)ipcp->max_sdu_size, ipcp->hdroom, ipcp->tailroom);
+        PD("netdev set to %p [max_sdu_size=%u, txhdroom=%u, rxhdroom=%u, "
+           "troom=%u]\n",
+           netdev, (unsigned)ipcp->max_sdu_size, ipcp->txhdroom, ipcp->rxhdroom,
+           ipcp->tailroom);
 
     } else if (strcmp(param_name, "mss") == 0) {
         /* Deny changes to max_sdu_size (and update). */

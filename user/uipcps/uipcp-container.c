@@ -843,7 +843,8 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->id           = upd->ipcp_id;
     uipcp->dif_type     = upd->dif_type;
     upd->dif_type       = NULL;
-    uipcp->hdroom       = upd->hdroom;
+    uipcp->txhdroom     = upd->txhdroom;
+    uipcp->rxhdroom     = upd->rxhdroom;
     uipcp->tailroom     = upd->tailroom;
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name         = upd->ipcp_name;
@@ -1067,9 +1068,10 @@ uipcps_print(struct uipcps *uipcps)
 
     list_for_each_entry (uipcp, &uipcps->uipcps, node) {
         PD_S("    id = %d, name = '%s', dif_type ='%s', dif_name = '%s',"
-             " hdroom = %u, troom = %u, mss = %u\n",
+             " txhdroom = %u, rxhdroom = %u, troom = %u, mss = %u\n",
              uipcp->id, uipcp->name, uipcp->dif_type, uipcp->dif_name,
-             uipcp->hdroom, uipcp->tailroom, uipcp->max_sdu_size);
+             uipcp->txhdroom, uipcp->rxhdroom, uipcp->tailroom,
+             uipcp->max_sdu_size);
     }
     pthread_mutex_unlock(&uipcps->lock);
 
@@ -1103,15 +1105,18 @@ topo_visit(struct uipcps *uipcps)
     struct ipcp_node *ipn;
     struct flow_edge *e;
 
+    /*
+     * Stage 1: compute txhdroom and mss.
+     */
     pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
         /* Start from safe values. */
-        ipn->marked       = 0;
-        ipn->update_kern  = 0;
-        ipn->hdroom       = 0;
-        ipn->max_sdu_size = 65536;
+        ipn->marked         = 0;
+        ipn->update_kern_tx = 0;
+        ipn->txhdroom       = 0;
+        ipn->max_sdu_size   = 65536;
 
         if (!uipcp) {
             continue; /* This should not ever happen. */
@@ -1121,14 +1126,14 @@ topo_visit(struct uipcps *uipcps)
         if (list_empty(&ipn->lowers)) {
             /* No lowers, it can be a shim or a normal without
              * lowers. We need to start from the kernel-provided
-             * MSS and hdroom. */
+             * MSS and txhdroom. */
             ipn->max_sdu_size = uipcp->max_sdu_size;
-            ipn->hdroom       = uipcp->hdroom;
+            ipn->txhdroom     = uipcp->txhdroom;
         } else {
             /* There are some lowers, so we start from the maximum
              * value, which will be overridden during the minimization
              * process. */
-            ipn->update_kern = 1;
+            ipn->update_kern_tx = 1;
         }
     }
     pthread_mutex_unlock(&uipcps->lock);
@@ -1166,13 +1171,13 @@ topo_visit(struct uipcps *uipcps)
             break;
         }
 
-        /* Mark (visit) the node, appling the relaxation rule to
-         * maximize hdroom and minimize max_sdu_size. */
+        /* Mark (visit) the node, applying the relaxation rule to
+         * maximize txhdroom and minimize max_sdu_size. */
         ipn->marked = 1;
 
         list_for_each_entry (e, nexts, node) {
-            if (e->ipcp->hdroom < ipn->hdroom + e->ipcp->hdrsize) {
-                e->ipcp->hdroom = ipn->hdroom + e->ipcp->hdrsize;
+            if (e->ipcp->txhdroom < ipn->txhdroom + e->ipcp->hdrsize) {
+                e->ipcp->txhdroom = ipn->txhdroom + e->ipcp->hdrsize;
             }
             if (e->ipcp->max_sdu_size > ipn->max_sdu_size - e->ipcp->hdrsize) {
                 e->ipcp->max_sdu_size = ipn->max_sdu_size - e->ipcp->hdrsize;
@@ -1182,9 +1187,78 @@ topo_visit(struct uipcps *uipcps)
             }
         }
     }
+
+    /*
+     *  Stage 2: compute rxhdroom.
+     */
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+        /* Start from safe values. */
+        ipn->marked         = 0;
+        ipn->rxhdroom       = 0;
+        ipn->rxcredit       = 0;
+        ipn->update_kern_rx = 0;
+
+        if (list_empty(&ipn->uppers)) {
+            /* No uppers, we can initialize the rxcredit to the txhdroom. The
+             * rxcredit will be consumed during the visit. */
+            ipn->rxcredit = ipn->txhdroom;
+        } else {
+            /* Some uppers, ww potentially need to update the kernel. */
+            ipn->update_kern_rx = 1;
+        }
+    }
+
+    for (;;) {
+        struct ipcp_node *next = NULL;
+        struct list_head *prevs, *nexts;
+
+        /* Scan all the nodes that have not been marked (visited) yet,
+         * looking for a node that has no unmarked "uppers".  */
+        list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+            int no_prevs = 1;
+
+            if (ipn->marked) {
+                continue;
+            }
+
+            prevs = &ipn->uppers;
+            nexts = &ipn->lowers;
+
+            list_for_each_entry (e, prevs, node) {
+                if (!e->ipcp->marked) {
+                    no_prevs = 0;
+                    break;
+                }
+            }
+
+            if (no_prevs) { /* found one */
+                next = ipn;
+                break;
+            }
+        }
+
+        if (!next) { /* none were found */
+            break;
+        }
+
+        /* Mark (visit) the node, applying the relaxation rule to maximize
+         * rxcredit and compute the rxhdroom. */
+        ipn->marked = 1;
+
+        list_for_each_entry (e, nexts, node) {
+            int rxcredit = (int)ipn->rxcredit - ipn->hdrsize;
+
+            assert(rxcredit >= 0);
+            if (rxcredit > e->ipcp->rxcredit) {
+                e->ipcp->rxcredit = rxcredit;
+                assert(e->ipcp->rxcredit >= e->ipcp->txhdroom);
+                e->ipcp->rxhdroom = e->ipcp->rxcredit - e->ipcp->txhdroom;
+            }
+        }
+    }
 }
 
-/* Update kernelspace hdroom and mss. */
+/* Update kernelspace hdrooms and mss. */
 static int
 topo_update_kern(struct uipcps *uipcps)
 {
@@ -1193,19 +1267,19 @@ topo_update_kern(struct uipcps *uipcps)
     int ret;
 
     list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
-        if (!ipn->update_kern) {
+        if (!ipn->update_kern_tx) {
             continue; /* nothing to do */
         }
 
-        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->hdroom);
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->txhdroom);
         if (ret <= 0 || ret >= sizeof(strbuf)) {
-            PE("Impossible hdroom %u\n", ipn->hdroom);
+            PE("Impossible txhdroom %u\n", ipn->txhdroom);
             continue;
         }
 
-        ret = rl_conf_ipcp_config(ipn->id, "hdroom", strbuf);
+        ret = rl_conf_ipcp_config(ipn->id, "txhdroom", strbuf);
         if (ret) {
-            PE("'ipcp-config %u hdroom %u' failed\n", ipn->id, ipn->hdroom);
+            PE("'ipcp-config %u txhdroom %u' failed\n", ipn->id, ipn->txhdroom);
         }
 
         ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->max_sdu_size);
@@ -1217,6 +1291,23 @@ topo_update_kern(struct uipcps *uipcps)
         ret = rl_conf_ipcp_config(ipn->id, "mss", strbuf);
         if (ret) {
             PE("'ipcp-config %u mss %u' failed\n", ipn->id, ipn->max_sdu_size);
+        }
+    }
+
+    list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
+        if (!ipn->update_kern_rx) {
+            continue; /* nothing to do */
+        }
+
+        ret = snprintf(strbuf, sizeof(strbuf), "%u", ipn->rxhdroom);
+        if (ret <= 0 || ret >= sizeof(strbuf)) {
+            PE("Impossible rxhdroom %u\n", ipn->rxhdroom);
+            continue;
+        }
+
+        ret = rl_conf_ipcp_config(ipn->id, "rxhdroom", strbuf);
+        if (ret) {
+            PE("'ipcp-config %u rxhdroom %u' failed\n", ipn->id, ipn->rxhdroom);
         }
     }
 
@@ -1433,7 +1524,8 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     uipcp->id           = upd->ipcp_id;
     uipcp->dif_type     = upd->dif_type;
     upd->dif_type       = NULL;
-    uipcp->hdroom       = upd->hdroom;
+    uipcp->txhdroom     = upd->txhdroom;
+    uipcp->rxhdroom     = upd->rxhdroom;
     mss_changed         = (uipcp->max_sdu_size != upd->max_sdu_size);
     uipcp->max_sdu_size = upd->max_sdu_size;
     uipcp->name         = upd->ipcp_name;
