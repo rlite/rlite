@@ -32,7 +32,7 @@ rina-echo-async -lw -z rpinstance5 -d d0 || abort
 rina-echo-async -z rpinstance5 -d d1 || abort
 # Register an application that has no mapping in /etc/hosts, to check
 # it fails.
-#rina-echo-async -lw -z rpinstance6 -d d0 && abort
+rina-echo-async -l -z rpinstance6 -d d0 && abort
 # Another client
 rina-echo-async -z rpinstance5 -d d1 || abort
 
