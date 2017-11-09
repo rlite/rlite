@@ -315,7 +315,7 @@ rl_io_write_iter(struct kiocb *iocb,
     while (left) {
         size_t copylen = min(left, ipcp->max_sdu_size);
 
-        rb = rl_buf_alloc(copylen, ipcp->hdroom, ipcp->tailroom, GFP_KERNEL);
+        rb = rl_buf_alloc(copylen, ipcp->txhdroom, ipcp->tailroom, GFP_KERNEL);
         if (unlikely(!rb)) {
             ret = -ENOMEM;
             break;

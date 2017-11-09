@@ -458,7 +458,7 @@ ipcp_select_by_dif(const char *dif_name)
              * giving priority to higher ranked normal DIFs. */
             if (!selected || (strcmp(entry->dif->ty, "normal") == 0 &&
                               (strcmp(selected->dif->ty, "normal") != 0 ||
-                               entry->hdroom > selected->hdroom))) {
+                               entry->txhdroom > selected->txhdroom))) {
                 selected = entry;
             }
         } else if (strcmp(entry->dif->name, dif_name) == 0) {
@@ -527,7 +527,8 @@ ipcp_add_entry(struct rl_kmsg_ipcp_create *req, struct ipcp_entry **pentry)
         entry->dif          = dif;
         entry->addr         = RL_ADDR_NULL;
         entry->refcnt       = 1;
-        entry->hdroom       = 0;
+        entry->txhdroom     = 0;
+        entry->rxhdroom     = 0;
         entry->tailroom     = 0;
         entry->max_sdu_size = (1 << 16) - 1;
         INIT_LIST_HEAD(&entry->registered_appls);
@@ -1592,7 +1593,8 @@ ipcp_update_fill(struct ipcp_entry *ipcp, struct rl_kmsg_ipcp_update *upd,
     upd->update_type  = update_type;
     upd->ipcp_id      = ipcp->id;
     upd->ipcp_addr    = ipcp->addr;
-    upd->hdroom       = ipcp->hdroom;
+    upd->txhdroom     = ipcp->txhdroom;
+    upd->rxhdroom     = ipcp->rxhdroom;
     upd->tailroom     = ipcp->tailroom;
     upd->max_sdu_size = ipcp->max_sdu_size;
     memcpy(&upd->pcisizes, &ipcp->pcisizes, sizeof(upd->pcisizes));
@@ -1926,12 +1928,20 @@ rl_ipcp_config(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     if (ret == -ENOSYS) {
         /* This operation was not managed by ops.config, let's see if
          *  we can manage it here. */
-        if (strcmp(req->name, "hdroom") == 0) {
+        if (strcmp(req->name, "txhdroom") == 0) {
             uint8_t hdroom;
 
             ret = kstrtou8(req->value, 10, &hdroom);
             if (ret == 0) {
-                entry->hdroom = hdroom;
+                entry->txhdroom = hdroom;
+            }
+
+        } else if (strcmp(req->name, "rxhdroom") == 0) {
+            uint8_t hdroom;
+
+            ret = kstrtou8(req->value, 10, &hdroom);
+            if (ret == 0) {
+                entry->rxhdroom = hdroom;
             }
 
         } else if (strcmp(req->name, "mss") == 0) {

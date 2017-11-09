@@ -155,10 +155,13 @@ struct ipcp_node {
     rl_ipcp_id_t id;
     unsigned int marked; /* used to visit the graph */
     unsigned int refcnt;
-    unsigned int update_kern; /* should we push MSS and hdroom to kernel ? */
-    unsigned int hdroom;
+    unsigned int update_kern_tx; /* should we push MSS/txhdroom to kernel ? */
+    unsigned int update_kern_rx; /* should we push rxhdroom to kernel ? */
+    unsigned int txhdroom;
+    unsigned int rxhdroom;
     unsigned int max_sdu_size;
     unsigned int hdrsize;
+    unsigned int rxcredit; /* used to compute rxhdroom */
 
     struct list_head lowers;
     struct list_head uppers;
@@ -192,7 +195,8 @@ struct uipcp {
     /* IPCP kernel attributes. */
     rl_ipcp_id_t id;
     char *name;
-    unsigned int hdroom;
+    unsigned int txhdroom;
+    unsigned int rxhdroom;
     unsigned int tailroom;
     unsigned int max_sdu_size;
     char *dif_type;

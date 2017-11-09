@@ -157,7 +157,7 @@ udp4_drain_socket_rxq(struct shim_udp4_flow *priv)
             break;
         }
 
-        rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->hdroom,
+        rb = rl_buf_alloc(ret, priv->flow->txrx.ipcp->rxhdroom,
                           priv->flow->txrx.ipcp->tailroom, GFP_ATOMIC);
         if (unlikely(!rb)) {
             flow->stats.rx_err++;

@@ -154,7 +154,8 @@ struct rl_kmsg_ipcp_update {
     uint8_t update_type;
     rl_ipcp_id_t ipcp_id;
     rlm_addr_t ipcp_addr;
-    uint16_t hdroom;
+    uint16_t txhdroom;
+    uint16_t rxhdroom;
     uint16_t tailroom;
     uint32_t max_sdu_size;
     struct pci_sizes pcisizes;
