@@ -172,6 +172,14 @@ flow_allocate_req_work(struct work_struct *w)
 }
 
 static int
+rl_shim_loopback_register(struct ipcp_entry *ipcp, char *appl_name, int reg)
+{
+    /* Do nothing, but callback must be not NULL, otherwise uipcp is
+     * is assumed. */
+    return 0;
+}
+
+static int
 rl_shim_loopback_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
                         struct rina_flow_spec *spec)
 {
@@ -411,6 +419,7 @@ static struct ipcp_factory shim_loopback_factory = {
     .dif_type               = SHIM_DIF_TYPE,
     .create                 = rl_shim_loopback_create,
     .ops.destroy            = rl_shim_loopback_destroy,
+    .ops.appl_register      = rl_shim_loopback_register,
     .ops.flow_allocate_req  = rl_shim_loopback_fa_req,
     .ops.flow_allocate_resp = rl_shim_loopback_fa_resp,
     .ops.flow_deallocated   = rl_shim_loopback_flow_deallocated,
