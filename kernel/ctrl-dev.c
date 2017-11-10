@@ -2357,7 +2357,8 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
         if (!uipcp) {
             /* This IPCP handles the registration in user-space, but no uipcp
              * is associated to it. */
-            return -ENXIO;
+            ret = -ENXIO;
+            goto out;
         }
     }
 
@@ -2405,7 +2406,7 @@ rl_appl_register(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
          * code for the system call can be reset. */
         ret = 0;
     }
-
+out:
     ipcp_put(ipcp);
 
     return ret;
