@@ -2,7 +2,6 @@
 
 # Create two normal IPCPs
 rlite-ctl ipcp-create x normal xx || exit 1
-#rlite-ctl ipcp-create y shim-loopback yy || exit 1  # TODO
 rlite-ctl ipcp-create y normal yy || exit 1
 # Enable a normal IPCP as enroller and register it into the other
 rlite-ctl ipcp-enroller-enable x || exit 1
