@@ -179,6 +179,14 @@ rl_shim_hv_destroy(struct ipcp_entry *ipcp)
 }
 
 static int
+rl_shim_hv_appl_register(struct ipcp_entry *ipcp, char *appl_name, int reg)
+{
+    /* Do nothing, but callback must be not NULL, otherwise uipcp is
+     * is assumed. */
+    return 0;
+}
+
+static int
 rl_shim_hv_fa_req(struct ipcp_entry *ipcp, struct flow_entry *flow,
                   struct rina_flow_spec *spec)
 {
@@ -283,6 +291,7 @@ static struct ipcp_factory shim_hv_factory = {
     .use_cep_ids            = false,
     .create                 = rl_shim_hv_create,
     .ops.destroy            = rl_shim_hv_destroy,
+    .ops.appl_register      = rl_shim_hv_appl_register,
     .ops.flow_allocate_req  = rl_shim_hv_fa_req,
     .ops.flow_allocate_resp = rl_shim_hv_fa_resp,
     .ops.sdu_write          = rl_shim_hv_sdu_write,

@@ -501,6 +501,7 @@ static struct ipcp_factory shim_tcp4_factory = {
     .use_cep_ids            = false,
     .create                 = rl_shim_tcp4_create,
     .ops.destroy            = rl_shim_tcp4_destroy,
+    .ops.appl_register      = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_req  = NULL, /* Reflect to userspace. */
     .ops.flow_allocate_resp = NULL, /* Reflect to userspace. */
     .ops.flow_init          = rl_shim_tcp4_flow_init,
