@@ -295,6 +295,16 @@ rl_u_ipcp_config(struct uipcps *uipcps, int sfd,
     return rl_u_response(sfd, RLITE_MB(req), &resp);
 }
 
+static int
+rl_u_probe(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
+{
+    struct rl_msg_base_resp resp = {
+        .result = 0,
+    };
+
+    return rl_u_response(sfd, RLITE_MB(b_req), &resp);
+}
+
 #ifdef RL_MEMTRACK
 static int
 rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
@@ -323,6 +333,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
     [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
     [RLITE_U_IPCP_CONFIG]           = rl_u_ipcp_config,
+    [RLITE_U_PROBE]                 = rl_u_probe,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */

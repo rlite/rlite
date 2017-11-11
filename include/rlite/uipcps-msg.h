@@ -45,6 +45,7 @@ enum {
     RLITE_U_IPCP_ROUTING_SHOW_RESP, /* 11 */
     RLITE_U_IPCP_POLICY_PARAM_MOD,  /* 12 */
     RLITE_U_IPCP_CONFIG,            /* 13 */
+    RLITE_U_PROBE,                  /* 14 */
 
     RLITE_U_MSG_MAX,
 };
