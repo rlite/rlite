@@ -37,77 +37,104 @@ argparser.add_argument('-v', '--verbose',
 
 args = argparser.parse_args()
 
-try:
-    o = subprocess.check_output(['rlite-ctl', 'probe'], stderr = subprocess.STDOUT)
-except Exception as e:
-    print("Error: Failed to probe rlite-uipcps daemon")
-    quit()
+configured = False
 
-try:
-    fin = open(args.script, "r")
-except:
-    print("Failed to open script file %s" % args.script)
-    quit()
-
-cmds = []
-if args.reset:
-    cmds.append((0, ['reset'])) # reset to remove all the IPCPs
-enrolls = []
-
-linecnt = 0
-while 1:
-    line = fin.readline()
-    if line == "":
-        break
-    linecnt += 1
-
-    line = line.replace('\n', '').strip()
-    if line.startswith("#"):
+while True:
+    # Check if rlite-uipcps it still there.
+    try:
+        o = subprocess.check_output(['rlite-ctl', 'probe'], stderr = subprocess.STDOUT)
+    except Exception as e:
+        # Not there, we need to respawn it and force reconfiguration.
+        print("Could not probe rlite-uipcps daemon, spawning ...")
+        subprocess.call(['pkill', 'rlite-uipcps'])
+        try:
+            configured = False
+            subprocess.check_call(['rlite-uipcps', '-d'])
+        except Exception as ee:
+            print("Error: Failed to start rlite-uipcps")
+            quit()
+        # Probe again to make sure the daemon is up and running.
         continue
 
-    splitted = line.split()
-    if splitted[0] == 'ipcp-enroll':
-        enrolls.append((linecnt, splitted))
-    else:
-        cmds.append((linecnt, splitted))
+    # The daemon is up and running. If it's not already configured
+    # we can go ahead and execute the initscript. Otherwise we wait
+    # for a while and probe again.
+    if configured:
+        time.sleep(5)
+        continue
 
-fin.close()
+    print(">>> Running initscript ...")
 
-for cmd in cmds:
-    cmdargs = ['rlite-ctl'] + cmd[1]
     try:
-        o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
-    except Exception as e:
-        o = strclean(e.output)
-        print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
+        fin = open(args.script, "r")
+    except:
+        print("Failed to open script file %s" % args.script)
         quit()
-    o = strclean(o)
-    if args.verbose:
-        print('executed %s' % ' '.join(cmdargs))
-        if len(o) > 0:
-            print(o)
 
-sys.stdout.flush()
+    cmds = []
+    if args.reset:
+        cmds.append((0, ['reset'])) # reset to remove all the IPCPs
+    args.reset = True  # --no-reset has effect only for the first time
+    enrolls = []
 
-i = 1
-n = len(enrolls)
-for cmd in enrolls:
-    cmdargs = ['rlite-ctl'] + cmd[1]
+    linecnt = 0
     while 1:
+        line = fin.readline()
+        if line == "":
+            break
+        linecnt += 1
+
+        line = line.replace('\n', '').strip()
+        if line.startswith("#"):
+            continue
+
+        splitted = line.split()
+        if splitted[0] == 'ipcp-enroll':
+            enrolls.append((linecnt, splitted))
+        else:
+            cmds.append((linecnt, splitted))
+
+    fin.close()
+
+    for cmd in cmds:
+        cmdargs = ['rlite-ctl'] + cmd[1]
         try:
             o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
-            break
         except Exception as e:
             o = strclean(e.output)
-            print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
-            sys.stdout.flush()
-            time.sleep(3)
-    o = strclean(o)
-    if args.verbose and len(o) > 0:
-        print('executed %s' % ' '.join(cmdargs))
-        if len(o) > 0:
-            print(o)
+            print("Failure at %s:%s --> %s" % (args.script, cmd[0], o))
+            quit()
+        o = strclean(o)
+        if args.verbose:
+            print('executed %s' % ' '.join(cmdargs))
+            if len(o) > 0:
+                print(o)
 
-    print('Enrollment %d/%d successfully completed' % (i, n))
     sys.stdout.flush()
-    i += 1
+
+    i = 1
+    n = len(enrolls)
+    for cmd in enrolls:
+        cmdargs = ['rlite-ctl'] + cmd[1]
+        while 1:
+            try:
+                o = subprocess.check_output(cmdargs, stderr = subprocess.STDOUT)
+                break
+            except Exception as e:
+                o = strclean(e.output)
+                print("Enrollment at %s:%s failed (%d/%d) --> %s" % (args.script, cmd[0], i, n, o))
+                sys.stdout.flush()
+                time.sleep(3)
+        o = strclean(o)
+        if args.verbose and len(o) > 0:
+            print('executed %s' % ' '.join(cmdargs))
+            if len(o) > 0:
+                print(o)
+
+        print('Enrollment %d/%d successfully completed' % (i, n))
+        sys.stdout.flush()
+        i += 1
+
+    # Configuration is complete.
+    configured = True
+    print(">>> Initscript completed.")

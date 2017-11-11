@@ -5,9 +5,8 @@ Requires=rlite.service
 After=rlite.service
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/bin/rlite-node-config -v
-RemainAfterExit=yes
 #WorkingDirectory=
 
 [Install]
