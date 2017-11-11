@@ -37,9 +37,10 @@ argparser.add_argument('-v', '--verbose',
 
 args = argparser.parse_args()
 
-usock = '/var/run/rlite/uipcps-server'
-if not os.path.exists(usock):
-    print("Cannot stat %s: please check that rlite-uipcps is running" % (usock,))
+try:
+    o = subprocess.check_output(['rlite-ctl', 'probe'], stderr = subprocess.STDOUT)
+except Exception as e:
+    print("Error: Failed to probe rlite-uipcps daemon")
     quit()
 
 try:
