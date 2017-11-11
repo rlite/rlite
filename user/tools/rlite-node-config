@@ -20,6 +20,21 @@ def strclean(s):
         s = s[:-1]
     return s
 
+def daemonize():
+    try:
+        pid = os.fork()
+        if pid > 0:
+            # Exit parent
+            sys.exit(0)
+    except OSError as e:
+        printf("Fork failed: %d (%s)\n" % (e.errno, e.strerror))
+        quit()
+        sys.exit(1)
+
+    # Decouple from parent environment
+    os.chdir("/")
+    os.setsid()
+
 
 description = "Simple configuration tool for rlite"
 epilog = "2017 Vincenzo Maffione <v.maffione@gmail.com>"
@@ -31,6 +46,8 @@ argparser.add_argument('-s', '--script',
                        type = str, default = '/etc/rina/initscript')
 argparser.add_argument('--no-reset', dest = 'reset', action = 'store_false',
                        help = "Don't issue reset command at startup")
+argparser.add_argument('-d', '--daemon', action = 'store_true',
+                       help = "Run in daemon mode")
 argparser.add_argument('-v', '--verbose',
                        help = "Be verbose",
                        action = 'store_true')
@@ -38,6 +55,7 @@ argparser.add_argument('-v', '--verbose',
 args = argparser.parse_args()
 
 configured = False
+daemonized = False
 
 while True:
     # Check if rlite-uipcps it still there.
@@ -111,6 +129,10 @@ while True:
                 print(o)
 
     sys.stdout.flush()
+
+    if args.daemon and not daemonized:
+        daemonize()
+        daemonized = True
 
     i = 1
     n = len(enrolls)
