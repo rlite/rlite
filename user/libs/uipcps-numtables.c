@@ -96,6 +96,30 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
         {
             .copylen = sizeof(struct rl_msg_base),
         },
+    [RLITE_U_IPCP_POLICY_LIST_REQ] =
+        {
+            .copylen = sizeof(struct rl_cmsg_ipcp_policy_list_req) -
+                       2 * sizeof(char *),
+            .strings = 2,
+        },
+    [RLITE_U_IPCP_POLICY_LIST_RESP] =
+        {
+            .copylen = sizeof(struct rl_cmsg_ipcp_policy_list_resp) -
+                       1 * sizeof(struct rl_buf_field),
+            .buffers = 1,
+        },
+    [RLITE_U_IPCP_POLICY_PARAM_LIST_REQ] =
+        {
+            .copylen = sizeof(struct rl_cmsg_ipcp_policy_param_list_req) -
+                       3 * sizeof(char *),
+            .strings = 3,
+        },
+    [RLITE_U_IPCP_POLICY_PARAM_LIST_RESP] =
+        {
+            .copylen = sizeof(struct rl_cmsg_ipcp_policy_param_list_resp) -
+                       1 * sizeof(struct rl_buf_field),
+            .buffers = 1,
+        },
     [RLITE_U_MEMTRACK_DUMP] =
         {
             .copylen = sizeof(struct rl_msg_base),

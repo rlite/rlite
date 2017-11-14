@@ -1729,6 +1729,60 @@ normal_policy_mod(struct uipcp *uipcp,
 }
 
 static int
+normal_policy_list(struct uipcp *uipcp,
+                   const struct rl_cmsg_ipcp_policy_list_req *req,
+                   char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->lock);
+    stringstream msg;
+    int ret = 0;
+
+    auto add_policies = [&] (const string &component) -> string {
+        unsigned int policy_count = 0;
+        stringstream msg;
+        if (!available_policies.count(component)) {
+            UPE(uipcp, "Unknown component %s\n", component.c_str());
+            msg << "Unknown component " << component;
+            ret = -1;
+        } else {
+            for (const auto &policy : available_policies[component]) {
+                policy_count++;
+                if (rib->policies[component] == policy) {
+                    msg << "[" << policy << "]";
+                } else {
+                    msg << policy;
+                }
+                if (policy_count < available_policies[component].size()) {
+                    msg << " ";
+                }
+            }
+        }
+        return msg.str();
+    };
+
+    if (req->comp_name) {
+        const string component = req->comp_name;
+        msg << add_policies(component);
+    } else {
+        unsigned int comp_count = 0;
+        for (const auto &i : available_policies) {
+            const string &component = i.first;
+            comp_count++;
+            msg << component << "\n\t";
+
+            msg << add_policies(component);
+            if (comp_count < available_policies.size()) {
+                msg << "\n";
+            }
+        }
+    }
+
+    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    return ret;
+}
+
+static int
 normal_policy_param_mod(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_policy_param_mod *req)
 {
@@ -1739,6 +1793,89 @@ normal_policy_param_mod(struct uipcp *uipcp,
     const string param_value = req->param_value;
 
     return rib->policy_param_mod(comp_name, param_name, param_value);
+}
+
+static int
+normal_policy_param_list(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_policy_param_list_req *req,
+                         char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->lock);
+    stringstream msg;
+    const auto &params_map = rib->params_map;
+    int ret = 0;
+
+    auto add_parameter = [&] (const string &component, const string &parameter)
+        -> string {
+        stringstream msg;
+        const PolicyParam &param = params_map.at(component).at(parameter);
+        msg << component << "." << parameter << " = " << param;
+        return msg.str();
+    };
+
+    auto add_component = [&] (const string &component) -> string {
+        stringstream msg;
+        unsigned int param_count = 0;
+        for (const auto &i : params_map.at(component)) {
+            const string parameter = i.first;
+            param_count++;
+
+            if (param_count > 1) {
+                msg << endl;
+            }
+            msg << add_parameter(component, parameter);
+        }
+        return msg.str();
+    };
+
+    if (req->param_name) {
+        if (!req->comp_name) {
+            UPE(uipcp, "Parameter name is set but component name is not\n");
+            msg << "Parameter name is set but component name is not";
+            ret = -1;
+        } else {
+            const string parameter = req->param_name;
+            const string component = req->comp_name;
+
+            if (!params_map.count(component)) {
+                UPE(uipcp, "Unknown component %s\n", component.c_str());
+                msg << "Unknown component " + component;
+                ret = -1;
+            } else if (!params_map.at(component).count(parameter)) {
+                UPE(uipcp, "Unknown parameter %s\n", parameter.c_str());
+                msg << "Unknown parameter " + parameter;
+                ret = -1;
+            } else {
+                msg << add_parameter(component, parameter);
+            }
+        }
+    } else if (req->comp_name) {
+        const string component = req->comp_name;
+
+        if (!params_map.count(component)) {
+            UPE(uipcp, "Unknown component %s\n", component.c_str());
+            msg << "Unknown component " << component;
+            ret = -1;
+        } else {
+            msg << add_component(component);
+        }
+    } else {
+        unsigned int comp_count = 0;
+        for (const auto &i : params_map) {
+            const string &component = i.first;
+            comp_count++;
+            if (params_map.at(component).size() > 0) {
+                if (comp_count > 1) {
+                    msg << endl;
+                }
+                msg << add_component(component);
+            }
+        }
+    }
+
+    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    return ret;
 }
 
 static int
@@ -1808,6 +1945,27 @@ PolicyParam::get_bool_value() const
     return value.b;
 }
 
+ostream&
+operator<<(ostream &os, const PolicyParam &param)
+{
+    switch(param.type) {
+        case PolicyParamType::INT:
+            os << param.get_int_value();
+            break;
+        case PolicyParamType::BOOL:
+            if (param.get_bool_value()) {
+                os << "true";
+            } else {
+                os << "false";
+            }
+            break;
+        case PolicyParamType::UNDEFINED:
+            os << "UNDEFINED";
+            break;
+    }
+    return os;
+}
+
 extern "C" void
 normal_lib_init(void)
 {
@@ -1837,5 +1995,7 @@ struct uipcp_ops normal_ops = {
     .flow_state_update    = normal_flow_state_update,
     .trigger_tasks        = normal_trigger_tasks,
     .policy_mod           = normal_policy_mod,
+    .policy_list          = normal_policy_list,
     .policy_param_mod     = normal_policy_param_mod,
+    .policy_param_list    = normal_policy_param_list,
 };
