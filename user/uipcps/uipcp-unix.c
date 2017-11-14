@@ -242,6 +242,62 @@ rl_u_ipcp_policy_mod(struct uipcps *uipcps, int sfd,
 }
 
 static int
+rl_u_ipcp_policy_list(struct uipcps *uipcps, int sfd,
+                      const struct rl_msg_base *b_req)
+{
+    struct rl_cmsg_ipcp_policy_list_req *req =
+        (struct rl_cmsg_ipcp_policy_list_req *)b_req;
+    struct rl_cmsg_ipcp_policy_param_list_req *preq =
+        (struct rl_cmsg_ipcp_policy_param_list_req *)b_req;
+    struct rl_cmsg_ipcp_policy_list_resp resp;
+    struct uipcp *uipcp = NULL;
+    char *msg = NULL;
+    int ret = 0;
+
+    resp.result   = RLITE_ERR; /* Report failure by default. */
+    resp.dump.buf = NULL;
+    resp.dump.len = 0;
+
+    if (req->ipcp_name) {
+        uipcp = uipcp_get_by_name(uipcps, req->ipcp_name);
+    }
+
+    if (!uipcp) {
+        goto out;
+    }
+
+    switch (req->msg_type) {
+    case RLITE_U_IPCP_POLICY_LIST_REQ:
+        ret = uipcp->ops.policy_list(uipcp, req, &msg);
+        break;
+
+    case RLITE_U_IPCP_POLICY_PARAM_LIST_REQ:
+        ret = uipcp->ops.policy_param_list(uipcp, preq, &msg);
+        break;
+    }
+
+    if (msg) {
+        resp.result   = ret ? RLITE_ERR : RLITE_SUCC;
+        resp.dump.buf = msg;
+        resp.dump.len = strlen(msg) + 1; /* include terminator */
+    }
+
+    uipcp_put(uipcp);
+
+out:
+    resp.msg_type = req->msg_type + 1;
+    resp.event_id = req->event_id;
+
+    ret = rl_msg_write_fd(sfd, RLITE_MB(&resp));
+
+    if (msg) {
+        rl_free(msg, RL_MT_UTILS);
+    }
+
+    return ret;
+}
+
+static int
 rl_u_ipcp_policy_param_mod(struct uipcps *uipcps, int sfd,
                            const struct rl_msg_base *b_req)
 {
@@ -324,16 +380,18 @@ typedef int (*rl_req_handler_t)(struct uipcps *uipcps, int sfd,
 
 /* The table containing all application request handlers. */
 static rl_req_handler_t rl_config_handlers[] = {
-    [RLITE_U_IPCP_REGISTER]         = rl_u_ipcp_register,
-    [RLITE_U_IPCP_ENROLL]           = rl_u_ipcp_enroll,
-    [RLITE_U_IPCP_LOWER_FLOW_ALLOC] = rl_u_ipcp_lower_flow_alloc,
-    [RLITE_U_IPCP_RIB_SHOW_REQ]     = rl_u_ipcp_rib_show,
-    [RLITE_U_IPCP_POLICY_MOD]       = rl_u_ipcp_policy_mod,
-    [RLITE_U_IPCP_ENROLLER_ENABLE]  = rl_u_ipcp_enroller_enable,
-    [RLITE_U_IPCP_ROUTING_SHOW_REQ] = rl_u_ipcp_rib_show,
-    [RLITE_U_IPCP_POLICY_PARAM_MOD] = rl_u_ipcp_policy_param_mod,
-    [RLITE_U_IPCP_CONFIG]           = rl_u_ipcp_config,
-    [RLITE_U_PROBE]                 = rl_u_probe,
+    [RLITE_U_IPCP_REGISTER]              = rl_u_ipcp_register,
+    [RLITE_U_IPCP_ENROLL]                = rl_u_ipcp_enroll,
+    [RLITE_U_IPCP_LOWER_FLOW_ALLOC]      = rl_u_ipcp_lower_flow_alloc,
+    [RLITE_U_IPCP_RIB_SHOW_REQ]          = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_POLICY_MOD]            = rl_u_ipcp_policy_mod,
+    [RLITE_U_IPCP_ENROLLER_ENABLE]       = rl_u_ipcp_enroller_enable,
+    [RLITE_U_IPCP_ROUTING_SHOW_REQ]      = rl_u_ipcp_rib_show,
+    [RLITE_U_IPCP_POLICY_PARAM_MOD]      = rl_u_ipcp_policy_param_mod,
+    [RLITE_U_IPCP_CONFIG]                = rl_u_ipcp_config,
+    [RLITE_U_PROBE]                      = rl_u_probe,
+    [RLITE_U_IPCP_POLICY_LIST_REQ]       = rl_u_ipcp_policy_list,
+    [RLITE_U_IPCP_POLICY_PARAM_LIST_REQ] = rl_u_ipcp_policy_list,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
