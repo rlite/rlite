@@ -277,6 +277,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string &name)
     mgmt_only = n_flow = nullptr;
     ipcp_name          = name;
     unheard_since      = time(nullptr);
+    flow_alloc_enabled = true;
 }
 
 Neighbor::~Neighbor()
@@ -1402,7 +1403,7 @@ extern "C" int __rina_flow_alloc(const char *dif_name, const char *local_appl,
 extern "C" int __rina_flow_alloc_wait(int wfd, rl_port_t *port_id);
 
 static int
-uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
+uipcp_bound_flow_alloc(const struct uipcp *uipcp, const char *dif_name,
                        const char *local_appl, const char *remote_appl,
                        const struct rina_flow_spec *flowspec,
                        rl_ipcp_id_t upper_ipcp_id, rl_port_t *port_id)
@@ -1421,7 +1422,7 @@ uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
     /* Wait for the response and get it. */
     pfd.fd     = wfd;
     pfd.events = POLLIN;
-    ret        = poll(&pfd, 1, 2000);
+    ret        = poll(&pfd, 1, 3000);
     if (ret <= 0) {
         if (ret == 0) {
             UPD(uipcp, "poll() timed out\n");
@@ -1438,6 +1439,10 @@ uipcp_bound_flow_alloc(struct uipcp *uipcp, const char *dif_name,
     return __rina_flow_alloc_wait(wfd, port_id);
 }
 
+/* To be called outside the RIB lock. It takes the RIB lock to update the
+ * list of N-1-flows and other RIB data structures. The caller must serialize
+ * calls to this function (this is achieved through the 'flow_alloc_enabled'
+ * flag. */
 int
 Neighbor::flow_alloc(const char *supp_dif)
 {
@@ -1447,10 +1452,6 @@ Neighbor::flow_alloc(const char *supp_dif)
     rl_port_t port_id_;
     int flow_fd_;
     int ret;
-
-    if (has_flows()) {
-        UPI(rib->uipcp, "Trying to allocate additional N-1 flow\n");
-    }
 
     /* Lookup the id of the lower IPCP towards the neighbor. */
     ret = uipcp_lookup_id_by_dif(rib->uipcp->uipcps, supp_dif, &lower_ipcp_id_);
@@ -1482,6 +1483,10 @@ Neighbor::flow_alloc(const char *supp_dif)
         return -1;
     }
 
+    /* Take the lock to update the RIB. The flow allocation above was done
+     * out of the lock. */
+    pthread_mutex_lock(&rib->lock);
+    assert(flow_alloc_enabled == false);
     flows[port_id_] = rl_new(
         NeighFlow(this, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_),
         RL_MT_NEIGHFLOW);
@@ -1497,11 +1502,17 @@ Neighbor::flow_alloc(const char *supp_dif)
     rib->lfdb->update_local(ipcp_name);
 
     if (mgmt_only == nullptr && use_reliable_flow) {
-        /* Try to allocate a management-only reliable flow. */
         int mgmt_fd;
+
+        /* Try to allocate a management-only reliable flow outside the RIB
+         * lock. */
+        pthread_mutex_unlock(&rib->lock);
 
         mgmt_fd = rina_flow_alloc(supp_dif, rib->uipcp->name, ipcp_name.c_str(),
                                   &relspec, 0);
+
+        pthread_mutex_lock(&rib->lock);
+        assert(flow_alloc_enabled == false);
         if (mgmt_fd < 0) {
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
         } else {
@@ -1515,6 +1526,7 @@ Neighbor::flow_alloc(const char *supp_dif)
             mgmt_only_set(nf);
         }
     }
+    pthread_mutex_unlock(&rib->lock);
 
     return 0;
 }
@@ -1529,45 +1541,36 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     int ret;
 
     pthread_mutex_lock(&lock);
-
-    neigh            = get_neighbor(string(neigh_name), true);
-    neigh->initiator = true;
+    neigh = get_neighbor(string(neigh_name), true);
 
     /* Create an N-1 flow, if needed. */
     if (!neigh->has_flows()) {
-#if 0
-        bool n_dif_unreg;
-
-        /* Temporarily unregister the N-DIF (broadcast) name, to avoid that
-         * DFT resolves it */
-        n_dif_unreg = (uipcp_do_register(uipcp, supp_dif_name,
-                                          uipcp->dif_name, 0) == 0);
-        if (n_dif_unreg) {
-            UPV(uipcp, "N-DIF name %s temporarily unregistered from N-1-DIF "
-                       "%s\n", uipcp->dif_name, supp_dif_name);
+        if (!neigh->flow_alloc_enabled) {
+            pthread_mutex_unlock(&lock);
+            UPW(uipcp, "Allocation of N-1-flow is not available right now\n");
+            return -1;
         }
-#endif
+
+        /* Disable further N-1-flow allocations towards this neighbor,
+         * and perform flow allocation out of the RIB lock. */
+        neigh->flow_alloc_enabled = false;
+        pthread_mutex_unlock(&lock);
+
         ret = neigh->flow_alloc(supp_dif_name);
+
+        pthread_mutex_lock(&lock);
+        /* Enable N-1-flow allocation again. */
+        neigh->flow_alloc_enabled = true;
         if (ret) {
             pthread_mutex_unlock(&lock);
             return ret;
         }
-#if 0
-        if (n_dif_unreg) {
-            /* Register the N-DIF name again. */
-            ret = uipcp_do_register(uipcp, supp_dif_name, uipcp->dif_name, 1);
-            if (ret == 0) {
-                UPV(uipcp, "N-DIF name %s registered again to N-1-DIF %s\n",
-                           uipcp->dif_name, supp_dif_name);
-            }
-        }
-#endif
     }
 
+    neigh->initiator = true;
+
     assert(neigh->has_flows());
-
     nf = neigh->mgmt_conn();
-
     if (nf->enroll_state != EnrollState::NEIGH_NONE) {
         UPI(uipcp, "Enrollment already in progress [state=%s]\n",
             Neighbor::enroll_state_repr(nf->enroll_state));
