@@ -210,7 +210,7 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
     NeighFlow *nf   = static_cast<NeighFlow *>(arg);
     uipcp_rib *rib  = nf->neigh->rib;
     Neighbor *neigh = nf->neigh;
-    ScopeLock lock_(rib->lock);
+    ScopeLock lock_(rib->mutex);
     CDAPMessage m;
     int ret;
 
@@ -428,7 +428,7 @@ NeighFlow::next_enroll_msg()
             neigh->rib->get_param_value<int>("enrollment", "timeout") / 1000;
 
         ret = pthread_cond_timedwait(&enrollment_rsrc->msgs_avail,
-                                     &neigh->rib->lock, &to);
+                                     &neigh->rib->mutex, &to);
         if (ret) {
             if (ret != ETIMEDOUT) {
                 UPE(neigh->rib->uipcp, "pthread_cond_timedwait(): %s\n",
@@ -616,7 +616,7 @@ enrollee_thread(void *opaque)
     uipcp_rib *rib        = neigh->rib;
     const CDAPMessage *rm = nullptr;
 
-    pthread_mutex_lock(&rib->lock);
+    rib->lock();
 
     {
         /* (1) I --> S: M_CONNECT */
@@ -734,7 +734,7 @@ finish:
     }
     nf->enrollment_commit();
     nf->enrollment_rsrc_put();
-    pthread_mutex_unlock(&rib->lock);
+    rib->unlock();
     rib->enroller_enable(true);
 
     /* Trigger periodic tasks to possibly allocate
@@ -749,7 +749,7 @@ err:
     }
     nf->enrollment_abort();
     nf->enrollment_rsrc_put();
-    pthread_mutex_unlock(&rib->lock);
+    rib->unlock();
     return nullptr;
 }
 
@@ -887,7 +887,7 @@ enroller_thread(void *opaque)
     uipcp_rib *rib        = neigh->rib;
     const CDAPMessage *rm = nullptr;
 
-    pthread_mutex_lock(&rib->lock);
+    rib->lock();
 
     rm = nf->next_enroll_msg();
     if (!rm) {
@@ -979,7 +979,7 @@ finish:
     }
     nf->enrollment_commit();
     nf->enrollment_rsrc_put();
-    pthread_mutex_unlock(&rib->lock);
+    rib->unlock();
     rib->enroller_enable(true);
     uipcps_loop_signal(rib->uipcp->uipcps);
 
@@ -991,7 +991,7 @@ err:
     }
     nf->enrollment_abort();
     nf->enrollment_rsrc_put();
-    pthread_mutex_unlock(&rib->lock);
+    rib->unlock();
     return nullptr;
 }
 
@@ -1143,7 +1143,7 @@ void
 neighs_refresh_cb(struct uipcp *uipcp, void *arg)
 {
     uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
-    ScopeLock lock_(rib->lock);
+    ScopeLock lock_(rib->mutex);
     size_t limit = 10;
 
     UPV(rib->uipcp, "Refreshing neighbors RIB\n");
@@ -1485,7 +1485,7 @@ Neighbor::flow_alloc(const char *supp_dif)
 
     /* Take the lock to update the RIB. The flow allocation above was done
      * out of the lock. */
-    pthread_mutex_lock(&rib->lock);
+    rib->lock();
     assert(flow_alloc_enabled == false);
     flows[port_id_] = rl_new(
         NeighFlow(this, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_),
@@ -1506,12 +1506,12 @@ Neighbor::flow_alloc(const char *supp_dif)
 
         /* Try to allocate a management-only reliable flow outside the RIB
          * lock. */
-        pthread_mutex_unlock(&rib->lock);
+        rib->unlock();
 
         mgmt_fd = rina_flow_alloc(supp_dif, rib->uipcp->name, ipcp_name.c_str(),
                                   &relspec, 0);
 
-        pthread_mutex_lock(&rib->lock);
+        rib->lock();
         assert(flow_alloc_enabled == false);
         if (mgmt_fd < 0) {
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
@@ -1526,7 +1526,7 @@ Neighbor::flow_alloc(const char *supp_dif)
             mgmt_only_set(nf);
         }
     }
-    pthread_mutex_unlock(&rib->lock);
+    rib->unlock();
 
     return 0;
 }
@@ -1540,13 +1540,13 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     NeighFlow *nf;
     int ret;
 
-    pthread_mutex_lock(&lock);
+    lock();
     neigh = get_neighbor(string(neigh_name), true);
 
     /* Create an N-1 flow, if needed. */
     if (!neigh->has_flows()) {
         if (!neigh->flow_alloc_enabled) {
-            pthread_mutex_unlock(&lock);
+            unlock();
             UPW(uipcp, "Allocation of N-1-flow is not available right now\n");
             return -1;
         }
@@ -1554,15 +1554,15 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
         /* Disable further N-1-flow allocations towards this neighbor,
          * and perform flow allocation out of the RIB lock. */
         neigh->flow_alloc_enabled = false;
-        pthread_mutex_unlock(&lock);
+        unlock();
 
         ret = neigh->flow_alloc(supp_dif_name);
 
-        pthread_mutex_lock(&lock);
+        lock();
         /* Enable N-1-flow allocation again. */
         neigh->flow_alloc_enabled = true;
         if (ret) {
-            pthread_mutex_unlock(&lock);
+            unlock();
             return ret;
         }
     }
@@ -1586,7 +1586,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
          * (NEIGH_NONE).
          */
         while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {
-            pthread_cond_wait(&rsrc->stopped, &lock);
+            pthread_cond_wait(&rsrc->stopped, &mutex);
         }
 
         ret = nf->enroll_state == EnrollState::NEIGH_ENROLLED ? 0 : -1;
@@ -1597,7 +1597,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     if (rsrc) {
         nf->enrollment_rsrc_put();
     }
-    pthread_mutex_unlock(&lock);
+    unlock();
 
     return ret;
 }
@@ -1628,7 +1628,7 @@ int
 uipcp_rib::enroller_enable(bool enable)
 {
     {
-        ScopeLock lock_(this->lock);
+        ScopeLock lock_(this->mutex);
 
         if (enroller_enabled == enable) {
             return 0; /* nothing to do */
@@ -1657,7 +1657,7 @@ uipcp_rib::trigger_re_enrollments()
         return;
     }
 
-    pthread_mutex_lock(&lock);
+    lock();
 
     /* Scan all the neighbor candidates. */
     for (const string &nc : neighbors_cand) {
@@ -1714,7 +1714,7 @@ uipcp_rib::trigger_re_enrollments()
         re_enrollments.push_back(make_pair(nc, common_dif));
     }
 
-    pthread_mutex_unlock(&lock);
+    unlock();
 
     /* Start asynchronous re-enrollments outside of the lock. */
     for (const pair<string, string> &p : re_enrollments) {
@@ -1732,7 +1732,7 @@ uipcp_rib::allocate_n_flows()
         return;
     }
 
-    pthread_mutex_lock(&lock);
+    lock();
     /* Scan all the enrolled neighbors. */
     for (const string &nc : neighbors_cand) {
         auto neigh = neighbors.find(nc);
@@ -1756,7 +1756,7 @@ uipcp_rib::allocate_n_flows()
             " because N-1-flow is unreliable\n",
             nc.c_str());
     }
-    pthread_mutex_unlock(&lock);
+    unlock();
 
     /* Carry out allocations of N-flows. */
     struct rina_flow_spec relspec;
@@ -1798,7 +1798,7 @@ uipcp_rib::allocate_n_flows()
 
         UPI(uipcp, "N-flow allocated [fd=%d]\n", pfd.fd);
 
-        pthread_mutex_lock(&lock);
+        lock();
         auto neigh = neighbors.find(re);
         if (neigh != neighbors.end()) {
             NeighFlow *nf;
@@ -1812,7 +1812,7 @@ uipcp_rib::allocate_n_flows()
             UPE(uipcp, "Neighbor disappeared, closing N-flow %d\n", pfd.fd);
             close(pfd.fd);
         }
-        pthread_mutex_unlock(&lock);
+        unlock();
     }
 }
 
@@ -1822,10 +1822,10 @@ uipcp_rib::clean_enrollment_resources()
 {
     list<EnrollmentResources *> snapshot;
 
-    pthread_mutex_lock(&lock);
+    lock();
     snapshot = used_enrollment_resources;
     used_enrollment_resources.clear();
-    pthread_mutex_unlock(&lock);
+    unlock();
 
     for (const EnrollmentResources *er : snapshot) {
         rl_delete(er, RL_MT_NEIGHFLOW);
@@ -1835,7 +1835,7 @@ uipcp_rib::clean_enrollment_resources()
 void
 uipcp_rib::check_for_address_conflicts()
 {
-    ScopeLock lock_(lock);
+    ScopeLock lock_(mutex);
     NeighborCandidate cand = neighbor_cand_get();
     bool need_to_change    = false;
     map<rlm_addr_t, string> m;

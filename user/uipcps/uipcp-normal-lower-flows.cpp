@@ -300,7 +300,7 @@ void
 age_incr_cb(struct uipcp *uipcp, void *arg)
 {
     struct uipcp_rib *rib = (struct uipcp_rib *)arg;
-    ScopeLock lock_(rib->lock);
+    ScopeLock lock_(rib->mutex);
     bool discarded = false;
 
     lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb);

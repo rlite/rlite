@@ -392,7 +392,7 @@ struct uipcp_rib {
     int mgmtfd;
 
     /* RIB lock. */
-    pthread_mutex_t lock;
+    pthread_mutex_t mutex;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             NeighFlow *nf);
@@ -564,6 +564,9 @@ struct uipcp_rib {
     template <class T>
     T get_param_value(const std::string &component,
                       const std::string &param_name);
+
+    void lock() { pthread_mutex_lock(&mutex); }
+    void unlock() { pthread_mutex_unlock(&mutex); }
 
 private:
 #ifdef RL_USE_QOS_CUBES
