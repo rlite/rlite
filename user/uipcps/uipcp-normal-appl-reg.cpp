@@ -117,6 +117,17 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
             return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_ERR, req);
         }
 
+        if (req->reg) {
+            /* Registration requires a response, while unregistrations doesn't.
+             * Respond to the client before committing to the RIB, because the
+             * response may fail. */
+            int ret =
+                uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_SUCC, req);
+            if (ret) {
+                return ret;
+            }
+        }
+
         /* Insert the object into the RIB. */
         dft_table.insert(make_pair(appl_name, dft_entry));
     } else {
@@ -137,11 +148,6 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 
     rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
                              &dft_slice);
-
-    if (req->reg) {
-        /* Registration requires a response, while unregistrations doesn't. */
-        return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_SUCC, req);
-    }
 
     return 0;
 }
