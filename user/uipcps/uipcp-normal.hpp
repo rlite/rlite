@@ -211,6 +211,11 @@ struct Neighbor {
      * towards the neighbor do not support reliable flows. */
     NeighFlow *n_flow;
 
+    /* A flag used as a lock to prevent flow_alloc from being called
+     * concurrently, while at the same time performinc the flow allocation
+     * outside the RIB lock. */
+    bool flow_alloc_enabled;
+
     /* Last time we received a keepalive response from this neighbor.
      * We don't consider requests, as timeout on responses. */
     time_t unheard_since;
