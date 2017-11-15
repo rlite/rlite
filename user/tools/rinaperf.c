@@ -130,6 +130,12 @@ struct rinaperf {
     sem_t workers_free;
 };
 
+#define PRINTF(FMT, ...)                                                       \
+    do {                                                                       \
+        printf(FMT, ##__VA_ARGS__);                                            \
+        fflush(stdout);                                                        \
+    } while (0)
+
 static struct rinaperf _rp;
 
 static void
@@ -210,7 +216,7 @@ ping_client(struct worker *w)
             if (ret < 0) {
                 perror("write(buf)");
             } else {
-                printf("Partial write %d/%d\n", ret, size);
+                PRINTF("Partial write %d/%d\n", ret, size);
             }
             break;
         }
@@ -221,9 +227,9 @@ ping_client(struct worker *w)
         }
 
         if (ret == 0) {
-            printf("Timeout: %d bytes lost\n", size);
+            PRINTF("Timeout: %d bytes lost\n", size);
             if (++timeouts > 8) {
-                printf("Stopping after %u consecutive timeouts\n", timeouts);
+                PRINTF("Stopping after %u consecutive timeouts\n", timeouts);
                 break;
             }
         } else if (pfd[1].revents & POLLIN) {
@@ -244,10 +250,10 @@ ping_client(struct worker *w)
                     clock_gettime(CLOCK_MONOTONIC, &t2);
                     ns = 1000000000 * (t2.tv_sec - t1.tv_sec) +
                          (t2.tv_nsec - t1.tv_nsec);
-                    printf("%d bytes from server: rtt = %.3f ms\n", ret,
+                    PRINTF("%d bytes from server: rtt = %.3f ms\n", ret,
                            ((float)ns) / 1000000.0);
                 } else {
-                    printf("Packet lost or out of order: got %u, "
+                    PRINTF("Packet lost or out of order: got %u, "
                            "expected %u\n",
                            *seqnum, expected);
                     if (*seqnum < expected) {
@@ -297,7 +303,7 @@ ping_server(struct worker *w)
         } else if (n == 0) {
             /* Timeout */
             if (w->rp->verbose) {
-                printf("Timeout occurred\n");
+                PRINTF("Timeout occurred\n");
             }
             break;
         }
@@ -305,7 +311,7 @@ ping_server(struct worker *w)
         if (pfd[1].revents & POLLIN) {
             /* Stop signal received. */
             if (w->rp->verbose) {
-                printf("Stopped remotely\n");
+                PRINTF("Stopped remotely\n");
             }
             break;
         }
@@ -316,7 +322,7 @@ ping_server(struct worker *w)
             perror("read(flow)");
             return -1;
         } else if (n == 0) {
-            printf("Flow deallocated remotely\n");
+            PRINTF("Flow deallocated remotely\n");
             break;
         }
 
@@ -325,7 +331,7 @@ ping_server(struct worker *w)
             if (ret < 0) {
                 perror("write(flow)");
             } else {
-                printf("Partial write");
+                PRINTF("Partial write");
             }
             return -1;
         }
@@ -334,7 +340,7 @@ ping_server(struct worker *w)
     w->result.cnt = i;
 
     if (w->rp->verbose) {
-        printf("received %u PDUs out of %u\n", i, limit);
+        PRINTF("received %u PDUs out of %u\n", i, limit);
     }
 
     return 0;
@@ -343,13 +349,13 @@ ping_server(struct worker *w)
 static void
 ping_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
-    printf("%10s %15s %10s %10s %15s\n", "", "Transactions", "Kpps", "Mbps",
+    PRINTF("%10s %15s %10s %10s %15s\n", "", "Transactions", "Kpps", "Mbps",
            "Latency (ns)");
-    printf("%-10s %15lu %10.3f %10.3f %15lu\n", "Sender", snd->cnt,
+    PRINTF("%-10s %15lu %10.3f %10.3f %15lu\n", "Sender", snd->cnt,
            (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0,
            snd->latency);
 #if 0
-    printf("%-10s %15lu %10.3f %10.3f %15lu\n",
+    PRINTF("%-10s %15lu %10.3f %10.3f %15lu\n",
             "Receiver", rcv->cnt, (double)rcv->pps/1000.0,
                 (double)rcv->bps/1000000.0, rcv->latency);
 #endif
@@ -381,7 +387,7 @@ perf_client(struct worker *w)
             if (ret < 0) {
                 perror("write(buf)");
             } else {
-                printf("Partial write %d/%d\n", ret, size);
+                PRINTF("Partial write %d/%d\n", ret, size);
             }
             break;
         }
@@ -439,7 +445,7 @@ rate_print(unsigned long long *bytes, unsigned long long *cnt,
 
     /* We don't want to prints which are too close. */
     if (elapsed_ns > 500000000U) {
-        printf("rate: %f Kpss, %f Mbps\n", kpps, mbps);
+        PRINTF("rate: %f Kpss, %f Mbps\n", kpps, mbps);
     }
 
     rmsg->pps = (1000000000ULL * *cnt) / elapsed_ns;
@@ -510,7 +516,7 @@ perf_server(struct worker *w)
                 /* Timeout */
                 timeout = 1;
                 if (verb) {
-                    printf("Timeout occurred\n");
+                    PRINTF("Timeout occurred\n");
                 }
                 break;
             }
@@ -518,7 +524,7 @@ perf_server(struct worker *w)
             if (pfd[1].revents & POLLIN) {
                 /* Stop signal received. */
                 if (verb) {
-                    printf("Stopped remotely\n");
+                    PRINTF("Stopped remotely\n");
                 }
                 break;
             }
@@ -531,7 +537,7 @@ perf_server(struct worker *w)
             return -1;
 
         } else if (n == 0) {
-            printf("Flow deallocated remotely\n");
+            PRINTF("Flow deallocated remotely\n");
             break;
         }
 
@@ -563,7 +569,7 @@ perf_server(struct worker *w)
     w->result.cnt = i;
 
     if (verb) {
-        printf("Received %u PDUs out of %u\n", i, limit);
+        PRINTF("Received %u PDUs out of %u\n", i, limit);
     }
 
     return 0;
@@ -572,10 +578,10 @@ perf_server(struct worker *w)
 static void
 perf_report(struct rp_result_msg *snd, struct rp_result_msg *rcv)
 {
-    printf("%10s %12s %10s %10s\n", "", "Packets", "Kpps", "Mbps");
-    printf("%-10s %12lu %10.3f %10.3f\n", "Sender", snd->cnt,
+    PRINTF("%10s %12s %10s %10s\n", "", "Packets", "Kpps", "Mbps");
+    PRINTF("%-10s %12lu %10.3f %10.3f\n", "Sender", snd->cnt,
            (double)snd->pps / 1000.0, (double)snd->bps / 1000000.0);
-    printf("%-10s %12lu %10.3f %10.3f\n", "Receiver", rcv->cnt,
+    PRINTF("%-10s %12lu %10.3f %10.3f\n", "Receiver", rcv->cnt,
            (double)rcv->pps / 1000.0, (double)rcv->bps / 1000000.0);
 }
 
@@ -640,7 +646,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(cfd)");
         } else {
-            printf("Flow allocation timed out for control flow\n");
+            PRINTF("Flow allocation timed out for control flow\n");
         }
         close(pfd.fd);
         goto out;
@@ -671,7 +677,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("write(cfg)");
         } else {
-            printf("Partial write %d/%lu\n", ret,
+            PRINTF("Partial write %d/%lu\n", ret,
                    (unsigned long int)sizeof(cfg));
         }
         goto out;
@@ -685,7 +691,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(ticket)");
         } else {
-            printf("Timeout while waiting for ticket message\n");
+            PRINTF("Timeout while waiting for ticket message\n");
         }
         goto out;
     }
@@ -695,7 +701,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("read(ticket)");
         } else {
-            printf("Error reading ticket message: wrong length %d "
+            PRINTF("Error reading ticket message: wrong length %d "
                    "(should be %lu)\n",
                    ret, (unsigned long int)sizeof(tmsg));
         }
@@ -715,7 +721,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(dfd)");
         } else {
-            printf("Flow allocation timed out for data flow\n");
+            PRINTF("Flow allocation timed out for data flow\n");
         }
         close(pfd.fd);
         goto out;
@@ -736,14 +742,14 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("write(identify)");
         } else {
-            printf("Partial write %d/%lu\n", ret,
+            PRINTF("Partial write %d/%lu\n", ret,
                    (unsigned long int)sizeof(cfg));
         }
         goto out;
     }
 
     if (w->test_config.size > SDU_SIZE_MAX) {
-        printf("Warning: size truncated to %u\n", SDU_SIZE_MAX);
+        PRINTF("Warning: size truncated to %u\n", SDU_SIZE_MAX);
         w->test_config.size = SDU_SIZE_MAX;
     }
 
@@ -763,7 +769,7 @@ client_worker_function(void *opaque)
             strncpy(durbuf, "inf", sizeof(durbuf));
         }
 
-        printf("Starting %s; message size: %u, number of messages: %s,"
+        PRINTF("Starting %s; message size: %u, number of messages: %s,"
                " duration: %s\n",
                w->desc->description, w->test_config.size, countbuf, durbuf);
     }
@@ -786,7 +792,7 @@ client_worker_function(void *opaque)
         if (ret < 0) {
             perror("write(stop)");
         } else {
-            printf("Partial write %d/%lu\n", ret,
+            PRINTF("Partial write %d/%lu\n", ret,
                    (unsigned long int)sizeof(cfg));
         }
         goto out;
@@ -801,7 +807,7 @@ client_worker_function(void *opaque)
             if (ret < 0) {
                 perror("poll(result)");
             } else {
-                printf("Timeout while waiting for result message\n");
+                PRINTF("Timeout while waiting for result message\n");
             }
             goto out;
         }
@@ -811,7 +817,7 @@ client_worker_function(void *opaque)
             if (ret < 0) {
                 perror("read(result)");
             } else {
-                printf("Error reading result message: wrong length %d "
+                PRINTF("Error reading result message: wrong length %d "
                        "(should be %lu)\n",
                        ret, (unsigned long int)sizeof(rmsg));
             }
@@ -856,7 +862,7 @@ server_worker_function(void *opaque)
         if (ret < 0) {
             perror("poll(cfg)");
         } else {
-            printf("Timeout while waiting for configuration message\n");
+            PRINTF("Timeout while waiting for configuration message\n");
         }
         goto out;
     }
@@ -866,7 +872,7 @@ server_worker_function(void *opaque)
         if (ret < 0) {
             perror("read(cfg)");
         } else {
-            printf("Error reading test configuration: wrong length %d "
+            PRINTF("Error reading test configuration: wrong length %d "
                    "(should be %lu)\n",
                    ret, (unsigned long int)sizeof(cfg));
         }
@@ -879,7 +885,7 @@ server_worker_function(void *opaque)
     cfg.size   = le32toh(cfg.size);
 
     if (cfg.opcode >= RP_OPCODE_STOP) {
-        printf("Invalid test configuration: test type %u is invalid\n",
+        PRINTF("Invalid test configuration: test type %u is invalid\n",
                cfg.opcode);
         goto out;
     }
@@ -890,13 +896,13 @@ server_worker_function(void *opaque)
 
         pthread_mutex_lock(&rp->ticket_lock);
         if (cfg.ticket >= RP_MAX_WORKERS || !rp->ticket_table[cfg.ticket]) {
-            printf("Invalid ticket request: ticket %u is invalid\n",
+            PRINTF("Invalid ticket request: ticket %u is invalid\n",
                    cfg.ticket);
         } else {
             struct worker *tw = rp->ticket_table[cfg.ticket];
 
 #if 0
-            printf("TicketTable: data flow for ticket %u\n", cfg.ticket);
+            PRINTF("TicketTable: data flow for ticket %u\n", cfg.ticket);
 #endif
             tw->dfd = w->cfd;
             w->cfd  = -1;
@@ -906,7 +912,7 @@ server_worker_function(void *opaque)
     } else {
         /* This is a control flow. */
         if (cfg.size < sizeof(uint16_t)) {
-            printf("Invalid test configuration: size %u is invalid\n",
+            PRINTF("Invalid test configuration: size %u is invalid\n",
                    cfg.size);
             goto out;
         }
@@ -922,7 +928,7 @@ server_worker_function(void *opaque)
             }
             sem_init(&w->data_flow_ready, 0, 0);
 #if 0
-            printf("TicketTable: allocated ticket %u\n", ticket);
+            PRINTF("TicketTable: allocated ticket %u\n", ticket);
 #endif
             pthread_mutex_unlock(&rp->ticket_lock);
             assert(ticket < RP_MAX_WORKERS);
@@ -935,7 +941,7 @@ server_worker_function(void *opaque)
             if (ret < 0) {
                 perror("write(ticket)");
             } else {
-                printf("Error writing ticket: wrong length %d "
+                PRINTF("Error writing ticket: wrong length %d "
                        "(should be %lu)\n",
                        ret, (unsigned long int)sizeof(tmsg));
             }
@@ -943,7 +949,7 @@ server_worker_function(void *opaque)
         }
 
         if (rp->verbose) {
-            printf("Configuring test type %u, SDU count %lu, SDU size %u, "
+            PRINTF("Configuring test type %u, SDU count %lu, SDU size %u, "
                    "ticket %u\n",
                    cfg.opcode, cfg.cnt, cfg.size, ticket);
         }
@@ -959,14 +965,14 @@ server_worker_function(void *opaque)
         pthread_mutex_unlock(&rp->ticket_lock);
         if (ret) {
             if (saved_errno == ETIMEDOUT) {
-                printf("Timed out waiting for data flow [ticket %u]\n", ticket);
+                PRINTF("Timed out waiting for data flow [ticket %u]\n", ticket);
             } else {
                 perror("sem_timedwait() failed");
             }
             goto out;
         }
 #if 0
-        printf("TicketTable: got data flow for ticket %u\n", ticket);
+        PRINTF("TicketTable: got data flow for ticket %u\n", ticket);
 #endif
 
         /* Serve the client on the flow file descriptor. */
@@ -987,7 +993,7 @@ server_worker_function(void *opaque)
             if (ret < 0) {
                 perror("write(result)");
             } else {
-                printf("Error writing result: wrong length %d "
+                PRINTF("Error writing result: wrong length %d "
                        "(should be %lu)\n",
                        ret, (unsigned long int)sizeof(rmsg));
             }
@@ -1045,7 +1051,7 @@ server(struct rinaperf *rp)
 
             } else {
                 if (ret != EBUSY) {
-                    printf("Failed to tryjoin() pthread: %s\n", strerror(ret));
+                    PRINTF("Failed to tryjoin() pthread: %s\n", strerror(ret));
                 }
                 p = w;
                 w = w->next;
@@ -1068,7 +1074,7 @@ server(struct rinaperf *rp)
         /* Allocate new worker and accept a new flow. */
         w = malloc(sizeof(*w));
         if (!w) {
-            printf("Out of memory\n");
+            PRINTF("Out of memory\n");
             return -1;
         }
         memset(w, 0, sizeof(*w));
@@ -1077,7 +1083,7 @@ server(struct rinaperf *rp)
 
         ret = pthread_create(&w->th, NULL, server_worker_function, w);
         if (ret) {
-            printf("pthread_create() failed: %s\n", strerror(ret));
+            PRINTF("pthread_create() failed: %s\n", strerror(ret));
             break;
         }
 
@@ -1146,7 +1152,7 @@ sigint_handler_client(int signum)
         exit(EXIT_SUCCESS);
     }
 
-    printf("\n"); /* to prevent the printed "^C" from messing up output */
+    PRINTF("\n"); /* to prevent the printed "^C" from messing up output */
     stop_clients(&_rp);
 }
 
@@ -1182,17 +1188,17 @@ parse_bandwidth(struct rina_flow_spec *spec, const char *arg)
     }
 
     spec->avg_bandwidth *= strtoul(arg, NULL, 10);
-    printf("Parsed bandwidth %llu\n", (long long unsigned)spec->avg_bandwidth);
+    PRINTF("Parsed bandwidth %llu\n", (long long unsigned)spec->avg_bandwidth);
 
     return;
 err:
-    printf("Invalid bandwidth format '%s'\n", arg);
+    PRINTF("Invalid bandwidth format '%s'\n", arg);
 }
 
 static void
 usage(void)
 {
-    printf(
+    PRINTF(
         "rinaperf [OPTIONS]\n"
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
@@ -1277,7 +1283,7 @@ main(int argc, char **argv)
         case 'c':
             cnt = atoi(optarg);
             if (cnt < 0) {
-                printf("    Invalid 'cnt' %d\n", cnt);
+                PRINTF("    Invalid 'cnt' %d\n", cnt);
                 return -1;
             }
             break;
@@ -1285,7 +1291,7 @@ main(int argc, char **argv)
         case 's':
             size = atoi(optarg);
             if (size < sizeof(uint16_t)) {
-                printf("    Invalid 'size' %d\n", size);
+                PRINTF("    Invalid 'size' %d\n", size);
                 return -1;
             }
             /* Explicit size was specified, so we don't override it. */
@@ -1295,7 +1301,7 @@ main(int argc, char **argv)
         case 'i':
             interval = atoi(optarg);
             if (interval < 0) {
-                printf("    Invalid 'interval' %d\n", interval);
+                PRINTF("    Invalid 'interval' %d\n", interval);
                 return -1;
             }
             interval_specified = 1;
@@ -1312,7 +1318,7 @@ main(int argc, char **argv)
         case 'b':
             burst = atoi(optarg);
             if (burst <= 0) {
-                printf("    Invalid 'burst' %d\n", burst);
+                PRINTF("    Invalid 'burst' %d\n", burst);
                 return -1;
             }
             break;
@@ -1328,7 +1334,7 @@ main(int argc, char **argv)
         case 'p':
             rp->parallel = atoi(optarg);
             if (rp->parallel <= 0) {
-                printf("    Invalid 'parallel' %d\n", rp->parallel);
+                PRINTF("    Invalid 'parallel' %d\n", rp->parallel);
                 return -1;
             }
             break;
@@ -1336,7 +1342,7 @@ main(int argc, char **argv)
         case 'D':
             rp->duration = atoi(optarg);
             if (rp->duration < 0) {
-                printf("    Invalid 'duration' %d\n", rp->duration);
+                PRINTF("    Invalid 'duration' %d\n", rp->duration);
             }
             duration_specified = 1;
             break;
@@ -1350,7 +1356,7 @@ main(int argc, char **argv)
             break;
 
         default:
-            printf("    Unrecognized option %c\n", opt);
+            PRINTF("    Unrecognized option %c\n", opt);
             usage();
             return -1;
         }
@@ -1408,7 +1414,7 @@ main(int argc, char **argv)
         }
 
         if (wt.desc == NULL) {
-            printf("    Unknown test type '%s'\n", type);
+            PRINTF("    Unknown test type '%s'\n", type);
             usage();
             return -1;
         }
@@ -1448,7 +1454,7 @@ main(int argc, char **argv)
         struct worker *workers = calloc(rp->parallel, sizeof(*workers));
 
         if (workers == NULL) {
-            printf("Failed to allocate client workers\n");
+            PRINTF("Failed to allocate client workers\n");
             return -1;
         }
 
@@ -1458,7 +1464,7 @@ main(int argc, char **argv)
             ret = pthread_create(&workers[i].th, NULL, client_worker_function,
                                  workers + i);
             if (ret) {
-                printf("pthread_create(#%d) failed: %s\n", i, strerror(ret));
+                PRINTF("pthread_create(#%d) failed: %s\n", i, strerror(ret));
                 break;
             }
         }
@@ -1476,7 +1482,7 @@ main(int argc, char **argv)
                 if (ret) {
                     if (errno == ETIMEDOUT) {
                         if (rp->verbose) {
-                            printf("Stopping clients, %d seconds elapsed\n",
+                            PRINTF("Stopping clients, %d seconds elapsed\n",
                                    rp->duration);
                         }
                     } else {
@@ -1497,7 +1503,7 @@ main(int argc, char **argv)
         for (i = 0; i < rp->parallel; i++) {
             ret = pthread_join(workers[i].th, NULL);
             if (ret) {
-                printf("pthread_join(#%d) failed: %s\n", i, strerror(ret));
+                PRINTF("pthread_join(#%d) failed: %s\n", i, strerror(ret));
             }
         }
         free(workers);
