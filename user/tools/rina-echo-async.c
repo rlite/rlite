@@ -75,6 +75,12 @@ struct fdfsm {
     time_t last_activity;
 };
 
+#define PRINTF(FMT, ...)                                                       \
+    do {                                                                       \
+        printf(FMT, ##__VA_ARGS__);                                            \
+        fflush(stdout);                                                        \
+    } while (0)
+
 static void
 shutdown_flow(struct fdfsm *fsm)
 {
@@ -97,7 +103,7 @@ client(struct echo_async *rea)
 
     fsms = calloc(rea->p, sizeof(*fsms));
     if (fsms == NULL) {
-        printf("Failed to allocate memory for %d parallel flows\n", rea->p);
+        PRINTF("Failed to allocate memory for %d parallel flows\n", rea->p);
         return -1;
     }
 
@@ -161,11 +167,11 @@ client(struct echo_async *rea)
                     /* Complete flow allocation, replacing the fd. */
                     fsms[i].fd = rina_flow_alloc_wait(fsms[i].fd);
                     if (fsms[i].fd < 0) {
-                        printf("rina_flow_alloc_wait(): flow %d denied\n", i);
+                        PRINTF("rina_flow_alloc_wait(): flow %d denied\n", i);
                         shutdown_flow(fsms + i);
                     } else {
                         fsms[i].state = SELFD_S_WRITE;
-                        printf("Flow %d allocated\n", i);
+                        PRINTF("Flow %d allocated\n", i);
                     }
                 }
                 break;
@@ -192,8 +198,8 @@ client(struct echo_async *rea)
                     ret = read(fsms[i].fd, fsms[i].buf, sizeof(fsms[i].buf));
                     if (ret > 0) {
                         fsms[i].buf[ret] = '\0';
-                        printf("Response: '%s'\n", fsms[i].buf);
-                        printf("Flow %d deallocated\n", i);
+                        PRINTF("Response: '%s'\n", fsms[i].buf);
+                        PRINTF("Flow %d deallocated\n", i);
                     }
                     shutdown_flow(fsms + i);
                 }
@@ -201,7 +207,7 @@ client(struct echo_async *rea)
             }
 
             if (time(NULL) - fsms[i].last_activity >= TIMEOUT_SECS) {
-                printf("Flow %d timed out\n", i);
+                PRINTF("Flow %d timed out\n", i);
                 shutdown_flow(fsms + i);
             }
         }
@@ -321,7 +327,7 @@ server(struct echo_async *rea)
 
                     if (j <= MAX_CLIENTS) {
                         fsms[j].state = SELFD_S_READ;
-                        printf("Accept client %d\n", j);
+                        PRINTF("Accept client %d\n", j);
                     }
                 }
                 break;
@@ -334,10 +340,10 @@ server(struct echo_async *rea)
                         read(fsms[i].fd, fsms[i].buf, sizeof(fsms[i].buf));
                     if (fsms[i].buflen < 0) {
                         shutdown_flow(fsms + i);
-                        printf("Shutdown client %d\n", i);
+                        PRINTF("Shutdown client %d\n", i);
                     } else {
                         fsms[i].buf[fsms[i].buflen] = '\0';
-                        printf("Request: '%s'\n", fsms[i].buf);
+                        PRINTF("Request: '%s'\n", fsms[i].buf);
                         fsms[i].state = SELFD_S_WRITE;
                     }
                 }
@@ -348,10 +354,10 @@ server(struct echo_async *rea)
                     fsms[i].last_activity = time(NULL);
                     ret = write(fsms[i].fd, fsms[i].buf, fsms[i].buflen);
                     if (ret == fsms[i].buflen) {
-                        printf("Response sent back\n");
-                        printf("Close client %d\n", i);
+                        PRINTF("Response sent back\n");
+                        PRINTF("Close client %d\n", i);
                     } else {
-                        printf("Shutdown client %d\n", i);
+                        PRINTF("Shutdown client %d\n", i);
                     }
                     shutdown_flow(fsms + i);
                 }
@@ -360,7 +366,7 @@ server(struct echo_async *rea)
             if (fsms[i].state != SELFD_S_ACCEPT &&
                 fsms[i].state != SELFD_S_NONE &&
                 (time(NULL) - fsms[i].last_activity) >= TIMEOUT_SECS) {
-                printf("Client %d timed out\n", i);
+                PRINTF("Client %d timed out\n", i);
                 shutdown_flow(fsms + i);
             }
         }
@@ -404,7 +410,7 @@ sigint_handler(int signum)
 static void
 usage(void)
 {
-    printf(
+    PRINTF(
         "rina-echo-async [OPTIONS]\n"
         "   -h : show this help\n"
         "   -l : run in server mode (listen)\n"
@@ -467,7 +473,7 @@ main(int argc, char **argv)
         case 'p':
             rea.p = atoll(optarg);
             if (rea.p <= 0) {
-                printf("Invalid -p argument '%d'\n", rea.p);
+                PRINTF("Invalid -p argument '%d'\n", rea.p);
                 return -1;
             }
             break;
@@ -477,7 +483,7 @@ main(int argc, char **argv)
             break;
 
         default:
-            printf("    Unrecognized option %c\n", opt);
+            PRINTF("    Unrecognized option %c\n", opt);
             usage();
             return -1;
         }
