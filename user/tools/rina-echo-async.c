@@ -45,7 +45,7 @@
 
 #define SDU_SIZE_MAX 64
 #define MAX_CLIENTS 128
-#define TIMEOUT_SECS 2
+#define TIMEOUT_SECS 3
 #if TIMEOUT_SECS < 2
 #error "TIMEOUT_SECS must be >= 2"
 #endif
@@ -366,8 +366,13 @@ server(struct echo_async *rea)
             if (fsms[i].state != SELFD_S_ACCEPT &&
                 fsms[i].state != SELFD_S_NONE &&
                 (time(NULL) - fsms[i].last_activity) >= TIMEOUT_SECS) {
-                PRINTF("Client %d timed out\n", i);
-                shutdown_flow(fsms + i);
+                if (fsms[i].state == SELFD_S_REGISTER) {
+                    PRINTF("Server timed out on rina_register()\n");
+                    return -1;
+                } else {
+                    PRINTF("Client %d timed out\n", i);
+                    shutdown_flow(fsms + i);
+                }
             }
         }
     }
