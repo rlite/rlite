@@ -46,6 +46,7 @@
 #define SDU_SIZE_MAX 64
 #define MAX_CLIENTS 128
 #define TIMEOUT_SECS 3
+#define REGISTER_TIMEOUT_SECS 10
 #if TIMEOUT_SECS < 2
 #error "TIMEOUT_SECS must be >= 2"
 #endif
@@ -237,12 +238,14 @@ server(struct echo_async *rea)
         return wfd;
     }
 
-    fsms[0].state = SELFD_S_REGISTER;
-    fsms[0].fd    = wfd;
+    fsms[0].state         = SELFD_S_REGISTER;
+    fsms[0].fd            = wfd;
+    fsms[0].last_activity = time(NULL);
 
     for (i = 1; i <= MAX_CLIENTS; i++) {
-        fsms[i].state = SELFD_S_NONE;
-        fsms[i].fd    = -1;
+        fsms[i].state         = SELFD_S_NONE;
+        fsms[i].fd            = -1;
+        fsms[i].last_activity = time(NULL);
     }
 
     for (;;) {
@@ -282,9 +285,12 @@ server(struct echo_async *rea)
         }
 
         for (i = 0; i <= MAX_CLIENTS; i++) {
+            time_t inactivity;
+
             switch (fsms[i].state) {
             case SELFD_S_REGISTER:
                 if (FD_ISSET(fsms[i].fd, &rdfs)) {
+                    fsms[i].last_activity = time(NULL);
                     ret = rina_register_wait(rea->cfd, fsms[i].fd);
                     if (ret < 0) {
                         perror("rina_register_wait()");
@@ -363,16 +369,22 @@ server(struct echo_async *rea)
                 }
             }
 
-            if (fsms[i].state != SELFD_S_ACCEPT &&
-                fsms[i].state != SELFD_S_NONE &&
-                (time(NULL) - fsms[i].last_activity) >= TIMEOUT_SECS) {
-                if (fsms[i].state == SELFD_S_REGISTER) {
-                    PRINTF("Server timed out on rina_register()\n");
-                    return -1;
-                } else {
+            inactivity = time(NULL) - fsms[i].last_activity;
+            switch (fsms[i].state) {
+            case SELFD_S_READ:
+            case SELFD_S_WRITE:
+                if (inactivity > TIMEOUT_SECS) {
                     PRINTF("Client %d timed out\n", i);
                     shutdown_flow(fsms + i);
                 }
+                break;
+
+            case SELFD_S_REGISTER:
+                if (inactivity > REGISTER_TIMEOUT_SECS) {
+                    PRINTF("Server timed out on rina_register()\n");
+                    return -1;
+                }
+                break;
             }
         }
     }
