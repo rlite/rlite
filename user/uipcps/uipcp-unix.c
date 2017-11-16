@@ -251,8 +251,8 @@ rl_u_ipcp_policy_list(struct uipcps *uipcps, int sfd,
         (struct rl_cmsg_ipcp_policy_param_list_req *)b_req;
     struct rl_cmsg_ipcp_policy_list_resp resp;
     struct uipcp *uipcp = NULL;
-    char *msg = NULL;
-    int ret = 0;
+    char *msg           = NULL;
+    int ret             = 0;
 
     resp.result   = RLITE_ERR; /* Report failure by default. */
     resp.dump.buf = NULL;

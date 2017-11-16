@@ -32,24 +32,24 @@
 /* Message types. They **must** be listed alternating requests with
  * the corresponding responses. */
 enum {
-    RLITE_U_IPCP_REGISTER = 1,            /* 1 */
-    RLITE_U_IPCP_ENROLL,                  /* 2 */
-    RLITE_U_BASE_RESP,                    /* 3 */
-    RLITE_U_IPCP_RIB_SHOW_REQ,            /* 4 */
-    RLITE_U_IPCP_RIB_SHOW_RESP,           /* 5 */
-    RLITE_U_IPCP_LOWER_FLOW_ALLOC,        /* 6 */
-    RLITE_U_MEMTRACK_DUMP,                /* 7 */
-    RLITE_U_IPCP_POLICY_MOD,              /* 8 */
-    RLITE_U_IPCP_ENROLLER_ENABLE,         /* 9 */
-    RLITE_U_IPCP_ROUTING_SHOW_REQ,        /* 10 */
-    RLITE_U_IPCP_ROUTING_SHOW_RESP,       /* 11 */
-    RLITE_U_IPCP_POLICY_PARAM_MOD,        /* 12 */
-    RLITE_U_IPCP_CONFIG,                  /* 13 */
-    RLITE_U_PROBE,                        /* 14 */
-    RLITE_U_IPCP_POLICY_LIST_REQ,         /* 15 */
-    RLITE_U_IPCP_POLICY_LIST_RESP,        /* 16 */
-    RLITE_U_IPCP_POLICY_PARAM_LIST_REQ,   /* 17 */
-    RLITE_U_IPCP_POLICY_PARAM_LIST_RESP,  /* 18 */
+    RLITE_U_IPCP_REGISTER = 1,           /* 1 */
+    RLITE_U_IPCP_ENROLL,                 /* 2 */
+    RLITE_U_BASE_RESP,                   /* 3 */
+    RLITE_U_IPCP_RIB_SHOW_REQ,           /* 4 */
+    RLITE_U_IPCP_RIB_SHOW_RESP,          /* 5 */
+    RLITE_U_IPCP_LOWER_FLOW_ALLOC,       /* 6 */
+    RLITE_U_MEMTRACK_DUMP,               /* 7 */
+    RLITE_U_IPCP_POLICY_MOD,             /* 8 */
+    RLITE_U_IPCP_ENROLLER_ENABLE,        /* 9 */
+    RLITE_U_IPCP_ROUTING_SHOW_REQ,       /* 10 */
+    RLITE_U_IPCP_ROUTING_SHOW_RESP,      /* 11 */
+    RLITE_U_IPCP_POLICY_PARAM_MOD,       /* 12 */
+    RLITE_U_IPCP_CONFIG,                 /* 13 */
+    RLITE_U_PROBE,                       /* 14 */
+    RLITE_U_IPCP_POLICY_LIST_REQ,        /* 15 */
+    RLITE_U_IPCP_POLICY_LIST_RESP,       /* 16 */
+    RLITE_U_IPCP_POLICY_PARAM_LIST_REQ,  /* 17 */
+    RLITE_U_IPCP_POLICY_PARAM_LIST_RESP, /* 18 */
 
     RLITE_U_MSG_MAX,
 };

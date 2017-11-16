@@ -103,7 +103,7 @@ struct PolicyParam {
     PolicyParam(bool param_value);
     PolicyParam(int param_value);
 
-    friend std::ostream& operator<<(std::ostream &os, const PolicyParam &param);
+    friend std::ostream &operator<<(std::ostream &os, const PolicyParam &param);
 
     int set_value(const std::string &param_value);
     bool get_bool_value() const;

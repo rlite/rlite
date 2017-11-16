@@ -1738,7 +1738,7 @@ normal_policy_list(struct uipcp *uipcp,
     stringstream msg;
     int ret = 0;
 
-    auto add_policies = [&] (const string &component) -> string {
+    auto add_policies = [&](const string &component) -> string {
         unsigned int policy_count = 0;
         stringstream msg;
         if (!available_policies.count(component)) {
@@ -1804,17 +1804,17 @@ normal_policy_param_list(struct uipcp *uipcp,
     ScopeLock lock_(rib->lock);
     stringstream msg;
     const auto &params_map = rib->params_map;
-    int ret = 0;
+    int ret                = 0;
 
-    auto add_parameter = [&] (const string &component, const string &parameter)
-        -> string {
+    auto add_parameter = [&](const string &component,
+                             const string &parameter) -> string {
         stringstream msg;
         const PolicyParam &param = params_map.at(component).at(parameter);
         msg << component << "." << parameter << " = " << param;
         return msg.str();
     };
 
-    auto add_component = [&] (const string &component) -> string {
+    auto add_component = [&](const string &component) -> string {
         stringstream msg;
         unsigned int param_count = 0;
         for (const auto &i : params_map.at(component)) {
@@ -1945,23 +1945,23 @@ PolicyParam::get_bool_value() const
     return value.b;
 }
 
-ostream&
+ostream &
 operator<<(ostream &os, const PolicyParam &param)
 {
-    switch(param.type) {
-        case PolicyParamType::INT:
-            os << param.get_int_value();
-            break;
-        case PolicyParamType::BOOL:
-            if (param.get_bool_value()) {
-                os << "true";
-            } else {
-                os << "false";
-            }
-            break;
-        case PolicyParamType::UNDEFINED:
-            os << "UNDEFINED";
-            break;
+    switch (param.type) {
+    case PolicyParamType::INT:
+        os << param.get_int_value();
+        break;
+    case PolicyParamType::BOOL:
+        if (param.get_bool_value()) {
+            os << "true";
+        } else {
+            os << "false";
+        }
+        break;
+    case PolicyParamType::UNDEFINED:
+        os << "UNDEFINED";
+        break;
     }
     return os;
 }
