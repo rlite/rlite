@@ -1742,7 +1742,6 @@ normal_policy_list(struct uipcp *uipcp,
         unsigned int policy_count = 0;
         stringstream msg;
         if (!available_policies.count(component)) {
-            UPE(uipcp, "Unknown component %s\n", component.c_str());
             msg << "Unknown component " << component;
             ret = -1;
         } else {
@@ -1831,20 +1830,18 @@ normal_policy_param_list(struct uipcp *uipcp,
 
     if (req->param_name) {
         if (!req->comp_name) {
-            UPE(uipcp, "Parameter name is set but component name is not\n");
             msg << "Parameter name is set but component name is not";
+            UPE(uipcp, "%s\n", msg.str().c_str());
             ret = -1;
         } else {
             const string parameter = req->param_name;
             const string component = req->comp_name;
 
             if (!params_map.count(component)) {
-                UPE(uipcp, "Unknown component %s\n", component.c_str());
-                msg << "Unknown component " + component;
+                msg << "Unknown component " << component;
                 ret = -1;
             } else if (!params_map.at(component).count(parameter)) {
-                UPE(uipcp, "Unknown parameter %s\n", parameter.c_str());
-                msg << "Unknown parameter " + parameter;
+                msg << "Unknown parameter " << parameter;
                 ret = -1;
             } else {
                 msg << add_parameter(component, parameter);
@@ -1854,7 +1851,6 @@ normal_policy_param_list(struct uipcp *uipcp,
         const string component = req->comp_name;
 
         if (!params_map.count(component)) {
-            UPE(uipcp, "Unknown component %s\n", component.c_str());
             msg << "Unknown component " << component;
             ret = -1;
         } else {
