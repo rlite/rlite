@@ -17,5 +17,5 @@ for i in $(seq 1 10); do
     rlite-ctl ipcp-register n.2.$i $NM1DIF || abort
     rlite-ctl ipcp-enroller-enable n.2.$i || abort
     #rlite-ctl ipcp-enroll n.1.$i n.${i}.DIF $NM1DIF n.2.$i || abort # TODO
-    NM1DIF="n.${i}.DIF" || abort
+    NM1DIF="n.${i}.DIF"
 done
