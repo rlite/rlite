@@ -207,8 +207,8 @@ read_response(int sfd, response_handler_t handler)
         PE("Operation failed\n");
     }
 
-    if (!ret && handler) {
-        ret = handler(resp);
+    if (handler) {
+        handler(resp);
     }
 
     return ret;
@@ -231,11 +231,9 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
     }
 
     ret = read_response(fd, handler);
-    if (ret) {
-        return ret;
-    }
+    uipcps_disconnect(fd);
 
-    return uipcps_disconnect(fd);
+    return ret;
 }
 
 static int
