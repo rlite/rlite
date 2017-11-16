@@ -880,10 +880,7 @@ ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
 
     req.msg_type  = RLITE_U_IPCP_POLICY_LIST_REQ;
     req.event_id  = 0;
-    req.comp_name = NULL;
-    if (comp_name) {
-        req.comp_name = strdup(comp_name);
-    }
+    req.comp_name = comp_name ? strdup(comp_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
@@ -926,15 +923,10 @@ ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
         }
     }
 
-    req.msg_type  = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
-    req.event_id  = 0;
-    req.comp_name = NULL;
-    if (comp_name) {
-        req.comp_name = strdup(comp_name);
-    }
-    if (param_name) {
-        req.param_name = strdup(param_name);
-    }
+    req.msg_type   = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
+    req.event_id   = 0;
+    req.comp_name  = comp_name ? strdup(comp_name) : NULL;
+    req.param_name = param_name ? strdup(param_name) : NULL;
 
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
