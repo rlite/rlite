@@ -152,9 +152,9 @@ struct uipcp_ops {
                             const struct rl_cmsg_ipcp_policy_param_mod *req);
 
     /* User wants to list policy parameters of this uipcp. */
-    int (*policy_param_list)(struct uipcp *uipcp,
-                             const struct rl_cmsg_ipcp_policy_param_list_req *req,
-                             char **resp_msg);
+    int (*policy_param_list)(
+        struct uipcp *uipcp,
+        const struct rl_cmsg_ipcp_policy_param_list_req *req, char **resp_msg);
 
     /* User wnats to change a configuration parameter of this uipcp.
      * This request may be forwarded to kernel-space. */
