@@ -1805,27 +1805,25 @@ normal_policy_param_list(struct uipcp *uipcp,
     const auto &params_map = rib->params_map;
     int ret                = 0;
 
-    auto add_parameter = [&](const string &component,
-                             const string &parameter) -> string {
-        stringstream msg;
+    auto add_parameter = [&params_map](stringstream &ss,
+                                       const string &component,
+                                       const string &parameter) {
         const PolicyParam &param = params_map.at(component).at(parameter);
-        msg << component << "." << parameter << " = " << param;
-        return msg.str();
+        ss << component << "." << parameter << " = " << param;
     };
 
-    auto add_component = [&](const string &component) -> string {
-        stringstream msg;
+    auto add_component = [&params_map, add_parameter](stringstream &ss,
+                                                      const string &component) {
         unsigned int param_count = 0;
         for (const auto &i : params_map.at(component)) {
             const string parameter = i.first;
             param_count++;
 
             if (param_count > 1) {
-                msg << endl;
+                ss << endl;
             }
-            msg << add_parameter(component, parameter);
+            add_parameter(ss, component, parameter);
         }
-        return msg.str();
     };
 
     if (req->param_name) {
@@ -1844,7 +1842,7 @@ normal_policy_param_list(struct uipcp *uipcp,
                 msg << "Unknown parameter " << parameter;
                 ret = -1;
             } else {
-                msg << add_parameter(component, parameter);
+                add_parameter(msg, component, parameter);
             }
         }
     } else if (req->comp_name) {
@@ -1854,7 +1852,7 @@ normal_policy_param_list(struct uipcp *uipcp,
             msg << "Unknown component " << component;
             ret = -1;
         } else {
-            msg << add_component(component);
+            add_component(msg, component);
         }
     } else {
         unsigned int comp_count = 0;
@@ -1865,12 +1863,16 @@ normal_policy_param_list(struct uipcp *uipcp,
                 if (comp_count > 1) {
                     msg << endl;
                 }
-                msg << add_component(component);
+                add_component(msg, component);
             }
         }
     }
 
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    if (*resp_msg == NULL) {
+        UPE(uipcp, "Out of memory\n");
+        ret = -1;
+    }
     return ret;
 }
 
