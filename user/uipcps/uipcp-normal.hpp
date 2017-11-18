@@ -482,18 +482,23 @@ struct uipcp_rib {
     static constexpr int kKeepaliveThresh = 3;
     static constexpr int kEnrollTimeout   = 7000;
 
-    /* Default value for the A timer. */
+    /* Default value for the A timer in milliseconds. */
     static constexpr int kATimerMsecsDflt = 20;
 
-    /* Default value for the R timer. */
+    /* Default value for the R timer in milliseconds. */
     static constexpr int kRtxTimerMsecsDflt = 1000;
 
-    /* Default value for the flow control initial credit (windows size). */
-    static constexpr int kFlowControlInitialCredit = 120;
+    /* Default value for the maximum length of the retransmission queue
+     * (in PDUs). */
+    static constexpr int kRtxQueueMaxLen = 512;
+
+    /* Default value for the flow control initial credit (windows size in terms
+       of PDUs). */
+    static constexpr int kFlowControlInitialCredit = 512;
 
     /* Default value for the maximum length of the flow control closed window
-     * queue. */
-    static constexpr int kFlowControlMaxCwqLen = 100;
+     * queue (in terms of PDUs). */
+    static constexpr int kFlowControlMaxCwqLen = 128;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
@@ -671,6 +676,8 @@ struct flow_allocator_default : public flow_allocator {
 private:
     void flowspec2flowcfg(const struct rina_flow_spec *spec,
                           struct rl_flow_config *cfg) const;
+    void policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
+                          const ConnPolicies &p);
 };
 
 class RoutingEngine {

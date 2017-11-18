@@ -388,6 +388,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["flow-allocator"]["initial-a"] = PolicyParam(kATimerMsecsDflt);
     params_map["flow-allocator"]["initial-tr"] =
         PolicyParam(kRtxTimerMsecsDflt);
+    params_map["flow-allocator"]["max-rtxq-len"] = PolicyParam(kRtxQueueMaxLen);
     params_map["resource-allocator"]["reliable-flows"]     = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);

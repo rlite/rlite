@@ -66,9 +66,10 @@ flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
 
 /* Translate a standard flow policies specification from FlowRequest
  * CDAP message into a local flow configuration. */
-static void
-policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
-                 const ConnPolicies &p)
+void
+flow_allocator_default::policies2flowcfg(struct rl_flow_config *cfg,
+                                         const QosSpec &q,
+                                         const ConnPolicies &p)
 {
     cfg->msg_boundaries    = !q.partial_delivery;
     cfg->in_order_delivery = q.in_order_delivery;
@@ -98,6 +99,8 @@ policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
     cfg->dtcp.rtx.max_time_to_retry = p.dtcp_cfg.rtx_ctrl_cfg.max_time_to_retry;
     cfg->dtcp.rtx.data_rxms_max     = p.dtcp_cfg.rtx_ctrl_cfg.data_rxmsn_max;
     cfg->dtcp.rtx.initial_tr        = p.dtcp_cfg.rtx_ctrl_cfg.initial_tr;
+    cfg->dtcp.rtx.max_rtxq_len =
+        rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
 }
 
 #ifndef RL_USE_QOS_CUBES
@@ -128,6 +131,8 @@ flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
         cfg->dtcp.rtx.initial_tr =
             rib->get_param_value<int>("flow-allocator", "initial-tr");
+        cfg->dtcp.rtx.max_rtxq_len =
+            rib->get_param_value<int>("flow-allocator", "max-rtxq-len");
         cfg->dtcp.initial_a = initial_a;
     }
 

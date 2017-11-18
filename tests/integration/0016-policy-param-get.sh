@@ -6,9 +6,9 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 
 # List per-component parameters, checking that the number of lines is correct
 rlite-ctl dif-policy-param-list dd
-rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<14\>" || exit 1
+rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<15\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<3\>" || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<5\>" || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<6\>" || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator | wc -l | grep -q "\<3\>" || exit 1
 rlite-ctl dif-policy-param-list dd routing | wc -l | grep -q "\<2\>" || exit 1
 rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 1
@@ -32,7 +32,9 @@ rlite-ctl dif-policy-param-list dd flow-allocator initial-credit | grep 184 || e
 rlite-ctl dif-policy-param-mod dd flow-allocator initial-tr 1791 || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator initial-tr | grep 1791 || exit 1
 rlite-ctl dif-policy-param-mod dd flow-allocator max-cwq-len 2961 || exit 1
+rlite-ctl dif-policy-param-mod dd flow-allocator max-rtxq-len 915 || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator max-cwq-len | grep 2961 || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator max-rtxq-len | grep 915 || exit 1
 rlite-ctl dif-policy-param-mod dd resource-allocator reliable-flows true || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator reliable-flows | grep true || exit 1
 rlite-ctl dif-policy-param-mod dd resource-allocator reliable-n-flows true || exit 1
