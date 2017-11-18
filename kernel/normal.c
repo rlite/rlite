@@ -325,11 +325,13 @@ a_tmr_cb(long unsigned arg)
  * the sender will incur into unnecessary retransmits.
  */
 static inline unsigned long
-rtt_to_rtx(struct dtp *dtp)
+rtt_to_rtx(struct flow_entry *flow)
 {
-    unsigned long x = dtp->rtt + (dtp->rtt_stddev << 1);
+    struct dtp *dtp    = &flow->dtp;
+    unsigned long x    = dtp->rtt + (dtp->rtt_stddev << 1);
+    unsigned int two_a = flow->cfg.dtcp.initial_a << 1;
 
-    return x > (RL_A_MSECS_DFLT << 1) ? x : (RL_A_MSECS_DFLT << 1);
+    return x > (two_a) ? x : (two_a);
 }
 
 static void
@@ -359,7 +361,7 @@ rtx_tmr_cb(long unsigned arg)
             /* This rb should be retransmitted. We also invalidate
              * RL_BUF_RTX(rb).jiffies, so that RTT is not updated on
              * retransmitted packets. */
-            RL_BUF_RTX(rb).rtx_jiffies += rtt_to_rtx(dtp);
+            RL_BUF_RTX(rb).rtx_jiffies += rtt_to_rtx(flow);
             RL_BUF_RTX(rb).jiffies = 0;
 
             crb = rl_buf_clone(rb, GFP_ATOMIC);
@@ -422,13 +424,15 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     }
 
     if (flow->cfg.dtcp.rtx_control && !flow->cfg.dtcp.rtx.initial_tr) {
-        PI("fixing initial_tr parameter to %u ms\n", RL_RTX_MSECS_DFLT);
-        flow->cfg.dtcp.rtx.initial_tr = RL_RTX_MSECS_DFLT;
+        PE("Invalid initial_tr parameter (%u)\n",
+           flow->cfg.dtcp.rtx.initial_tr);
+        return -EINVAL;
     }
 
     if (flow->cfg.dtcp.rtx_control && !flow->cfg.dtcp.rtx.data_rxms_max) {
-        PI("fixing data_rxms_max parameter to %u\n", RL_DATA_RXMS_MAX_DFLT);
-        flow->cfg.dtcp.rtx.data_rxms_max = RL_DATA_RXMS_MAX_DFLT;
+        PI("Invalid data_rxms_max parameter (%u)\n",
+           flow->cfg.dtcp.rtx.data_rxms_max);
+        return -EINVAL;
     }
 
     r = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr) *
@@ -462,7 +466,6 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
         flow->sdu_rx_consumed = rl_normal_sdu_rx_consumed;
-        NPD("flow->sdu_rx_consumed set\n");
     }
 
     if (flow->cfg.dtcp.bandwidth) {
@@ -615,9 +618,10 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
 
 /* Called under DTP lock */
 static int
-rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
+rl_rtxq_push(struct flow_entry *flow, struct rl_buf *rb)
 {
     struct rl_buf *crb = rl_buf_clone(rb, GFP_ATOMIC);
+    struct dtp *dtp    = &flow->dtp;
 
     if (unlikely(!crb)) {
         RPD(1, "OOM\n");
@@ -626,7 +630,7 @@ rl_rtxq_push(struct dtp *dtp, struct rl_buf *rb)
 
     /* Record the rtx expiration time and current time. */
     RL_BUF_RTX(crb).jiffies     = jiffies;
-    RL_BUF_RTX(crb).rtx_jiffies = RL_BUF_RTX(crb).jiffies + rtt_to_rtx(dtp);
+    RL_BUF_RTX(crb).rtx_jiffies = RL_BUF_RTX(crb).jiffies + rtt_to_rtx(flow);
 
     /* Add to the rtx queue and start the rtx timer if not already
      * started. */
@@ -768,7 +772,7 @@ rl_normal_sdu_write(struct ipcp_entry *ipcp, struct flow_entry *flow,
         }
 
         if (rb && flow->cfg.dtcp.rtx_control) {
-            int ret = rl_rtxq_push(dtp, rb);
+            int ret = rl_rtxq_push(flow, rb);
 
             if (unlikely(ret)) {
                 flow->stats.tx_pkt--;
@@ -1234,7 +1238,7 @@ sdu_rx_ctrl(struct ipcp_entry *ipcp, struct flow_entry *flow, struct rl_buf *rb)
                 dtp->last_seq_num_sent = dtp->snd_lwe++;
 
                 if (flow->cfg.dtcp.rtx_control) {
-                    rl_rtxq_push(dtp, qrb);
+                    rl_rtxq_push(flow, qrb);
                 }
             }
         }
