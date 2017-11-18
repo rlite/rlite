@@ -26,8 +26,8 @@ argparser.add_argument('--size-step', type = int, default = 10,
 argparser.add_argument('--trials', type = int, default = 3,
                        help = "Number of trials for each combination "
                               "of parameters")
-argparser.add_argument('-c', '--count', type = int, default = 100000,
-                       help = "Packet/transaction count for each test")
+argparser.add_argument('-D', '--duration', type = int, default = 10,
+                       help = "Duration of each test (in seconds)")
 argparser.add_argument('-g', '--max-sdu-gap', type = int, default = -1,
                        help = "Max SDU gap")
 argparser.add_argument('-t', '--test-type', type = str, default = "perf",
@@ -70,8 +70,8 @@ if args.dif:
 
 try:
     for sz in range(args.size_min, args.size_max, args.size_step):
-        cmd = ("rinaperf -s %s -t %s -c %s %s %s"
-                % (sz, args.test_type, args.count, qosarg, difarg))
+        cmd = ("rinaperf -s %s -t %s -D %s %s %s"
+                % (sz, args.test_type, args.duration, qosarg, difarg))
         print("Running: %s" % cmd)
         for t in range(args.trials):
             out = subprocess.check_output(cmd.split())
