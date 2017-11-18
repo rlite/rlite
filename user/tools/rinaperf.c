@@ -101,6 +101,7 @@ struct worker {
     struct rp_test_desc *desc;
     int cfd; /* control file descriptor */
     int dfd; /* data file descriptor */
+    int retcode;
 };
 
 struct rinaperf {
@@ -631,6 +632,8 @@ client_worker_function(void *opaque)
     struct pollfd pfd;
     int ret;
 
+    w->retcode = -1; /* set to 0 only if everything goes well */
+
     /* Allocate the control flow to be used for test configuration and
      * to receive test result.
      * We should always use reliable flows. */
@@ -832,6 +835,7 @@ client_worker_function(void *opaque)
         w->desc->report_fn(&w->result, &rmsg);
     }
 
+    w->retcode = 0;
 out:
     worker_fini(w);
 
@@ -1445,13 +1449,10 @@ main(int argc, char **argv)
         return rp->cfd;
     }
 
-    if (listen) {
-        if (background) {
-            daemonize();
-        }
-        server(rp);
-    } else {
+    if (!listen) {
+        /* Client mode. */
         struct worker *workers = calloc(rp->parallel, sizeof(*workers));
+        int retcode            = 0;
 
         if (workers == NULL) {
             PRINTF("Failed to allocate client workers\n");
@@ -1505,9 +1506,16 @@ main(int argc, char **argv)
             if (ret) {
                 PRINTF("pthread_join(#%d) failed: %s\n", i, strerror(ret));
             }
+            retcode |= workers[i].retcode;
         }
         free(workers);
+        return retcode;
     }
 
-    return close(rp->cfd);
+    /* Server mode. */
+    if (background) {
+        daemonize();
+    }
+
+    return server(rp);
 }
