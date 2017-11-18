@@ -207,8 +207,8 @@ read_response(int sfd, response_handler_t handler)
         PE("Operation failed\n");
     }
 
-    if (!ret && handler) {
-        ret = handler(resp);
+    if (handler) {
+        handler(resp);
     }
 
     return ret;
@@ -231,11 +231,9 @@ request_response(struct rl_msg_base *req, response_handler_t handler)
     }
 
     ret = read_response(fd, handler);
-    if (ret) {
-        return ret;
-    }
+    uipcps_disconnect(fd);
 
-    return uipcps_disconnect(fd);
+    return ret;
 }
 
 static int
@@ -848,6 +846,91 @@ ipcp_rib_show(int argc, char **argv, struct cmd_descriptor *cd)
     return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
 }
 
+static int
+ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_policy_list_req req;
+    const char *name;
+    const char *comp_name = NULL;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 1);
+    name = argv[0];
+
+    comp_name = NULL;
+    if (argc >= 2) {
+        comp_name = argv[1];
+    }
+
+    if (strcmp(cd->name, "dif-policy-list") == 0) {
+        attrs = ipcp_by_dif(name);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", name);
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else {
+        req.ipcp_name = strdup(name);
+        attrs         = lookup_ipcp_by_name(req.ipcp_name);
+        if (!attrs) {
+            PE("Could not find IPC process %s\n", name);
+            return -1;
+        }
+    }
+
+    req.msg_type  = RLITE_U_IPCP_POLICY_LIST_REQ;
+    req.event_id  = 0;
+    req.comp_name = comp_name ? strdup(comp_name) : NULL;
+
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
+}
+
+static int
+ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_cmsg_ipcp_policy_param_list_req req;
+    const char *name;
+    const char *comp_name;
+    const char *param_name;
+    struct ipcp_attrs *attrs;
+
+    assert(argc >= 1);
+    name = argv[0];
+
+    comp_name = NULL;
+    if (argc >= 2) {
+        comp_name = argv[1];
+    }
+
+    param_name = NULL;
+    if (argc >= 3) {
+        param_name = argv[2];
+    }
+
+    if (strcmp(cd->name, "dif-policy-param-list") == 0) {
+        attrs = ipcp_by_dif(name);
+        if (!attrs) {
+            PE("Could not find any IPCP in DIF %s\n", name);
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else {
+        req.ipcp_name = strdup(name);
+        attrs         = lookup_ipcp_by_name(req.ipcp_name);
+        if (!attrs) {
+            PE("Could not find IPC process %s\n", name);
+            return -1;
+        }
+    }
+
+    req.msg_type   = RLITE_U_IPCP_POLICY_PARAM_LIST_REQ;
+    req.event_id   = 0;
+    req.comp_name  = comp_name ? strdup(comp_name) : NULL;
+    req.param_name = param_name ? strdup(param_name) : NULL;
+
+    return request_response(RLITE_MB(&req), ipcp_rib_show_handler);
+}
+
 /* Build the list of IPCPs running in the system, ordered by id. */
 static int
 ipcps_load()
@@ -1022,10 +1105,22 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .func     = ipcp_policy_mod,
     },
     {
+        .name     = "dif-policy-list",
+        .usage    = "DIF_NAME [COMPONENT_NAME]",
+        .num_args = 1,
+        .func     = ipcp_policy_list,
+    },
+    {
         .name     = "dif-policy-param-mod",
         .usage    = "DIF_NAME COMPONENT_NAME PARAM_NAME PARAM_VALUE",
         .num_args = 4,
         .func     = ipcp_policy_param_mod,
+    },
+    {
+        .name     = "dif-policy-param-list",
+        .usage    = "DIF_NAME [COMPONENT_NAME] [PARAM_NAME]",
+        .num_args = 1,
+        .func     = ipcp_policy_param_list,
     },
     {
         .name     = "ipcp-enroller-enable",
