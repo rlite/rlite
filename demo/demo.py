@@ -909,49 +909,48 @@ for vmname in sorted(vms):
                            'flsuf': flavour_suffix,
                            'valgrind': 'valgrind' if args.valgrind else ''}
 
+    ctrl_cmds = []
     # Create and configure shim IPCPs
     for port in vm['ports']:
         shim = shims[port['shim']]
         vars_dict = {'mac': port['mac'], 'idx': port['idx'],
                      'shim': port['shim'], 'id': vm['id'],
                      'shimtype': shim['type']}
-        outs +=     'PORT=$(mac2ifname %(mac)s)\n'\
-                    '$SUDO ip link set $PORT up\n'\
-                    '$SUDO rlite-ctl ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n'\
-                    % vars_dict
+        outs +=     'PORT%(idx)s=$(mac2ifname %(mac)s)\n'\
+                    '$SUDO ip link set $PORT%(idx)s up\n' % vars_dict
+        ctrl_cmds.append('ipcp-create %(shim)s.%(id)s.IPCP shim-%(shimtype)s %(shim)s.DIF\n' % vars_dict)
         if shim['type'] == 'eth':
-                outs += '$SUDO rlite-ctl ipcp-config %(shim)s.%(id)s.IPCP netdev $PORT\n'\
-                % vars_dict
+                ctrl_cmds.append('ipcp-config %(shim)s.%(id)s.IPCP netdev $PORT%(idx)s\n' % vars_dict)
         elif shim['type'] == 'udp4':
-                outs += '$SUDO ip addr add %s dev $PORT\n' % (port['ip'])
+                outs += '$SUDO ip addr add %s dev $PORT%s\n' % (port['ip'], port['idx'])
         del vars_dict
 
     # Create normal IPCPs (it's handy to do it in topological DIF order)
     for dif in dif_ordering:
         if dif not in shims and vmname in difs[dif]:
-            outs += '$SUDO rlite-ctl ipcp-create %(dif)s.%(id)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'\
+            ctrl_cmds.append('ipcp-create %(dif)s.%(id)s.IPCP normal%(flsuf)s %(dif)s.DIF\n'\
                                                                 % {'dif': dif, 'id': vm['id'],
-                                                                   'flsuf': flavour_suffix}
+                                                                   'flsuf': flavour_suffix})
             if args.addr_alloc_policy == "manual":
-                outs += '$SUDO rlite-ctl ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n'\
-                                                                % {'dif': dif, 'id': vm['id']}
+                ctrl_cmds.append('ipcp-config %(dif)s.%(id)s.IPCP address %(id)d\n'\
+                                                                % {'dif': dif, 'id': vm['id']})
             elif args.addr_alloc_policy == "distributed":
                 nack_wait_secs = 5 if args.enrollment_order == 'parallel' and len(vms) > 30 else 1
-                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
-                                                    % {'dif': dif, 'nws': nack_wait_secs}
+                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF address-allocator nack-wait-secs %(nws)d\n'\
+                                                    % {'dif': dif, 'nws': nack_wait_secs})
             if args.reliable_flows:
-                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-flows true\n'\
-                        % {'dif': dif}
+                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-flows true\n'\
+                        % {'dif': dif})
             if args.reliable_n_flows:
-                outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-n-flows true\n'\
-                        % {'dif': dif}
-            outs += '$SUDO rlite-ctl dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'\
-                        % {'dif': dif, 'keepalive': args.keepalive}
+                ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF resource-allocator reliable-n-flows true\n'\
+                        % {'dif': dif})
+            ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF enrollment keepalive %(keepalive)s\n'\
+                        % {'dif': dif, 'keepalive': args.keepalive})
 
             for p in dif_policies[dif]:
                 if len(p['nodes']) == 0 or vmname in p.nodes:
-                    outs += '$SUDO rlite-ctl dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
-                                % {'dif': dif, 'comp': p['path'], 'policy': p['ps']}
+                    ctrl_cmds.append('dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
+                                % {'dif': dif, 'comp': p['path'], 'policy': p['ps']})
 
     # Update /etc/hosts file with DIF mappings
     for sh in dns_mappings:
@@ -961,6 +960,7 @@ for vmname in sorted(vms):
 
     # Carry out registrations following the DIF ordering,
     enroll_cmds = []
+    appl_cmds = []
     for dif in dif_ordering:
         if dif in shims:
             # Shims don't register to other IPCPs
@@ -973,23 +973,23 @@ for vmname in sorted(vms):
         # Scan all the lower DIFs of the current DIF, for the current node
         for lower_dif in sorted(difs[dif][vmname]):
             vars_dict = {'dif': dif, 'id': vm['id'], 'lodif': lower_dif}
-            outs += '$SUDO rlite-ctl ipcp-register %(dif)s.%(id)s.IPCP %(lodif)s.DIF\n'\
-                        % vars_dict
+            ctrl_cmds.append('ipcp-register %(dif)s.%(id)s.IPCP %(lodif)s.DIF\n'\
+                        % vars_dict)
             del vars_dict
 
         if dif not in vm['enrolling']:
             vars_dict = {'dif': dif, 'id': vm['id']}
-            outs += '$SUDO rlite-ctl ipcp-enroller-enable %(dif)s.%(id)s.IPCP\n'\
-                        % vars_dict
+            ctrl_cmds.append('ipcp-enroller-enable %(dif)s.%(id)s.IPCP\n'\
+                        % vars_dict)
             print("Node %s is the enrollment master for DIF %s" % (vmname, dif))
             del vars_dict
 
         vars_dict = {'echoname': 'rina-echo-async.%s' % vm['name'],
                        'dif': dif, 'perfname': 'rinaperf.%s' % vm['name']}
         if args.register:
-            outs += 'nohup rina-echo-async -z %(echoname)s -l -d %(dif)s.DIF > rina-echo-async-%(dif)s.log 2>&1 &\n' % vars_dict
+            appl_cmds.append('rina-echo-async -z %(echoname)s -lw -d %(dif)s.DIF > rina-echo-async-%(dif)s.log 2>&1\n' % vars_dict)
         if args.simulate:
-            outs += 'nohup rinaperf -z %(perfname)s -l -d %(dif)s.DIF > rinaperf-%(dif)s.log 2>&1 &\n' % vars_dict
+            appl_cmds.append('rinaperf -z %(perfname)s -lw -d %(dif)s.DIF > rinaperf-%(dif)s.log 2>&1\n' % vars_dict)
         del vars_dict
 
         enrollments_list = enrollments[dif] + lowerflowallocs[dif]
@@ -1014,14 +1014,28 @@ for vmname in sorted(vms):
             enroll_cmds.append(cmd)
 
     # Generate /etc/rina/initscript
-    outs += 'cat > .initscript << EOF\n'
-    for cmd in enroll_cmds:
+    outs += 'cat > .initscript <<EOF\n'
+    for cmd in ctrl_cmds:
         outs += cmd
-    outs += 'EOF\n'\
-            '$SUDO cp .initscript /etc/rina/initscript\n'\
-            'rm .initscript\n'
+    outs += 'EOF\n'
+
     if args.enrollment_order == 'parallel':
-        outs += 'nohup rlite-node-config -v --no-reset > rlite-node-config.log 2>&1 &\n'
+        # Add enrollments to the initscript only when parallel enrollment
+        # is used.
+        outs += 'cat >> .initscript <<EOF\n'
+        for cmd in enroll_cmds:
+            outs += cmd
+        outs += 'EOF\n'
+
+    # Run rlite-node-config
+    outs += '$SUDO cp .initscript /etc/rina/initscript\n'\
+            'rm .initscript\n'
+    outs += 'nohup rlite-node-config -v -d > rlite-node-config.log 2>&1\n'
+
+    # Run applications after rlite-node-config, so that we are sure the IPCPs
+    # are there (non-enrollment commands are run before turning into a daemon).
+    for cmd in appl_cmds:
+        outs += cmd
 
     # Run rlite-rand clients
     if args.simulate:
