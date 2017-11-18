@@ -380,7 +380,14 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
         PolicyParam(kKeepaliveThresh);
-    params_map["flow-allocator"]["force-flow-control"]     = PolicyParam(false);
+    params_map["flow-allocator"]["force-flow-control"] = PolicyParam(false);
+    params_map["flow-allocator"]["max-cwq-len"] =
+        PolicyParam(kFlowControlMaxCwqLen);
+    params_map["flow-allocator"]["initial-credit"] =
+        PolicyParam(kFlowControlInitialCredit);
+    params_map["flow-allocator"]["initial-a"] = PolicyParam(kATimerMsecsDflt);
+    params_map["flow-allocator"]["initial-tr"] =
+        PolicyParam(kRtxTimerMsecsDflt);
     params_map["resource-allocator"]["reliable-flows"]     = PolicyParam(false);
     params_map["resource-allocator"]["reliable-n-flows"]   = PolicyParam(false);
     params_map["resource-allocator"]["broadcast-enroller"] = PolicyParam(true);

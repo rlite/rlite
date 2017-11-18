@@ -109,6 +109,8 @@ flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
 {
     bool force_flow_control =
         rib->get_param_value<bool>("flow-allocator", "force-flow-control");
+    unsigned initial_a =
+        rib->get_param_value<int>("flow-allocator", "initial-a");
 
     memset(cfg, 0, sizeof(*cfg));
 
@@ -124,8 +126,9 @@ flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
         cfg->dtcp.rtx_control           = 1;
         cfg->dtcp.rtx.max_time_to_retry = 15; /* unused for now */
         cfg->dtcp.rtx.data_rxms_max     = RL_DATA_RXMS_MAX_DFLT;
-        cfg->dtcp.rtx.initial_tr        = RL_RTX_MSECS_DFLT;
-        cfg->dtcp.initial_a             = RL_A_MSECS_DFLT;
+        cfg->dtcp.rtx.initial_tr =
+            rib->get_param_value<int>("flow-allocator", "initial-tr");
+        cfg->dtcp.initial_a = initial_a;
     }
 
     /* Delay, loss and jitter ignored for now. */
@@ -136,12 +139,14 @@ flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
     if (force_flow_control || spec->max_sdu_gap == 0) {
         /* We enable flow control if forced by policy or if also
          * retransmission control is needed. */
-        cfg->dtcp_present                 = 1;
-        cfg->dtcp.flow_control            = 1;
-        cfg->dtcp.fc.cfg.w.max_cwq_len    = RL_FC_WIN_MAX_CWQ_LEN;
-        cfg->dtcp.fc.cfg.w.initial_credit = RL_FC_WIN_INITIAL_CREDIT;
-        cfg->dtcp.fc.fc_type              = RLITE_FC_T_WIN;
-        cfg->dtcp.initial_a               = RL_A_MSECS_DFLT;
+        cfg->dtcp_present      = 1;
+        cfg->dtcp.flow_control = 1;
+        cfg->dtcp.fc.cfg.w.max_cwq_len =
+            rib->get_param_value<int>("flow-allocator", "max-cwq-len");
+        cfg->dtcp.fc.cfg.w.initial_credit =
+            rib->get_param_value<int>("flow-allocator", "initial-credit");
+        cfg->dtcp.fc.fc_type = RLITE_FC_T_WIN;
+        cfg->dtcp.initial_a  = initial_a;
     }
 
     if (spec->avg_bandwidth) {
