@@ -202,6 +202,7 @@ struct fc_config {
 struct rtx_config {
     uint32_t max_time_to_retry; /* R div initial_tr */
     uint16_t data_rxms_max;
+    uint16_t max_rtxq_len;
     uint32_t initial_tr;
 } __attribute__((packed));
 

@@ -423,16 +423,23 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
         mpl = msecs_to_jiffies(RL_MPL_MSECS_DFLT);
     }
 
-    if (flow->cfg.dtcp.rtx_control && !flow->cfg.dtcp.rtx.initial_tr) {
-        PE("Invalid initial_tr parameter (%u)\n",
-           flow->cfg.dtcp.rtx.initial_tr);
-        return -EINVAL;
-    }
-
-    if (flow->cfg.dtcp.rtx_control && !flow->cfg.dtcp.rtx.data_rxms_max) {
-        PI("Invalid data_rxms_max parameter (%u)\n",
-           flow->cfg.dtcp.rtx.data_rxms_max);
-        return -EINVAL;
+    if (flow->cfg.dtcp.rtx_control) {
+        if (!flow->cfg.dtcp.rtx.initial_tr) {
+            PE("Invalid initial_tr parameter (%u)\n",
+               flow->cfg.dtcp.rtx.initial_tr);
+            return -EINVAL;
+        }
+        if (!flow->cfg.dtcp.rtx.data_rxms_max) {
+            PI("Invalid data_rxms_max parameter (%u)\n",
+               flow->cfg.dtcp.rtx.data_rxms_max);
+            return -EINVAL;
+        }
+        if (!flow->cfg.dtcp.rtx.max_rtxq_len) {
+            PI("Invalid max_rtxq_len parameter (%u)\n",
+               flow->cfg.dtcp.rtx.max_rtxq_len);
+            return -EINVAL;
+        }
+        dtp->max_rtxq_len = flow->cfg.dtcp.rtx.max_rtxq_len;
     }
 
     r = msecs_to_jiffies(flow->cfg.dtcp.rtx.initial_tr) *
@@ -458,10 +465,6 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
 
     if (fc->fc_type == RLITE_FC_T_WIN) {
         dtp->max_cwq_len = fc->cfg.w.max_cwq_len;
-    }
-
-    if (flow->cfg.dtcp.rtx_control) {
-        dtp->max_rtxq_len = 64; /* For now it's static. */
     }
 
     if (flow->cfg.dtcp.rtx_control || flow->cfg.dtcp.flow_control) {
