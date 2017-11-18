@@ -69,7 +69,7 @@ if args.dif:
     difarg = " -d %s" % args.dif
 
 try:
-    for sz in range(args.size_min, args.size_max, args.size_step):
+    for sz in range(args.size_min, args.size_max+1, args.size_step):
         cmd = ("rinaperf -s %s -t %s -D %s %s %s"
                 % (sz, args.test_type, args.duration, qosarg, difarg))
         print("Running: %s" % cmd)
