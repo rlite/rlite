@@ -5,9 +5,10 @@ rlite-ctl ipcp-create x normal dd || exit 1
 rlite-ctl ipcp-enroller-enable x || exit 1
 
 # List per-component parameters, checking that the number of lines is correct
-rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<10\>" || exit 1
+rlite-ctl dif-policy-param-list dd
+rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<14\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<3\>" || exit 1
-rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<1\>" || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<5\>" || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator | wc -l | grep -q "\<3\>" || exit 1
 rlite-ctl dif-policy-param-list dd routing | wc -l | grep -q "\<2\>" || exit 1
 rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 1
@@ -24,6 +25,14 @@ rlite-ctl dif-policy-param-mod dd enrollment keepalive-thresh 21 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment keepalive-thresh | grep 21 || exit 1
 rlite-ctl dif-policy-param-mod dd flow-allocator force-flow-control true || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator force-flow-control | grep true || exit 1
+rlite-ctl dif-policy-param-mod dd flow-allocator initial-a 41 || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator initial-a | grep 41 || exit 1
+rlite-ctl dif-policy-param-mod dd flow-allocator initial-credit 184 || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator initial-credit | grep 184 || exit 1
+rlite-ctl dif-policy-param-mod dd flow-allocator initial-tr 1791 || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator initial-tr | grep 1791 || exit 1
+rlite-ctl dif-policy-param-mod dd flow-allocator max-cwq-len 2961 || exit 1
+rlite-ctl dif-policy-param-list dd flow-allocator max-cwq-len | grep 2961 || exit 1
 rlite-ctl dif-policy-param-mod dd resource-allocator reliable-flows true || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator reliable-flows | grep true || exit 1
 rlite-ctl dif-policy-param-mod dd resource-allocator reliable-n-flows true || exit 1

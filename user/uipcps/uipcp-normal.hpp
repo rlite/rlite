@@ -482,6 +482,19 @@ struct uipcp_rib {
     static constexpr int kKeepaliveThresh = 3;
     static constexpr int kEnrollTimeout   = 7000;
 
+    /* Default value for the A timer. */
+    static constexpr int kATimerMsecsDflt = 20;
+
+    /* Default value for the R timer. */
+    static constexpr int kRtxTimerMsecsDflt = 1000;
+
+    /* Default value for the flow control initial credit (windows size). */
+    static constexpr int kFlowControlInitialCredit = 120;
+
+    /* Default value for the maximum length of the flow control closed window
+     * queue. */
+    static constexpr int kFlowControlMaxCwqLen = 100;
+
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
     ~uipcp_rib();

@@ -229,11 +229,7 @@ struct rl_flow_config {
 } __attribute__((packed));
 
 #define RL_MPL_MSECS_DFLT 1000
-#define RL_RTX_MSECS_DFLT 1000
-#define RL_A_MSECS_DFLT 20
 #define RL_DATA_RXMS_MAX_DFLT 10
-#define RL_FC_WIN_INITIAL_CREDIT 60
-#define RL_FC_WIN_MAX_CWQ_LEN 100
 
 /* Does a flow specification correspond to best effort QoS? */
 static inline int
