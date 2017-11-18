@@ -28,8 +28,6 @@ argparser.add_argument('--trials', type = int, default = 3,
                               "of parameters")
 argparser.add_argument('-c', '--count', type = int, default = 100000,
                        help = "Packet/transaction count for each test")
-argparser.add_argument('-f', '--flow-control', action='store_true',
-                       help = "Enable flow control")
 argparser.add_argument('-g', '--max-sdu-gap', type = int, default = -1,
                        help = "Max SDU gap")
 argparser.add_argument('-t', '--test-type', type = str, default = "perf",
@@ -63,8 +61,6 @@ else:
 
 # build QoS
 qosarg = ""
-if args.flow_control:
-    qosarg += " -f"
 if args.max_sdu_gap >= 0:
     qosarg += " -g %s" % args.max_sdu_gap
 
