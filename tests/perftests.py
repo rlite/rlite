@@ -6,10 +6,16 @@
 
 import multiprocessing
 import subprocess
+import statistics
 import argparse
 import re
 import os
-import pickle
+
+
+def to_avg_stdev(vlist, nsamples):
+    tup = (statistics.mean(vlist[-nsamples:]), statistics.stdev(vlist[-nsamples:]))
+    del vlist[-nsamples:]
+    vlist.append(tup)
 
 
 description = "Python script to perform automated tests based on rinaperf"
@@ -34,30 +40,27 @@ argparser.add_argument('-t', '--test-type', type = str, default = "perf",
                        help = "Test type", choices = ["perf", "rr"])
 argparser.add_argument('-d', '--dif', type = str,
                         help = "DIF to use for the tests")
-argparser.add_argument('--load', type = str, help = "Dump file to recover")
-argparser.add_argument('--dump', type = str, help = "Dump file to output",
-                        default = 'perftests.dump')
+argparser.add_argument('-o', '--output', type = str, help = "Output file for gnuplot data",
+                        default = 'output.txt')
 args = argparser.parse_args()
 
 
-if args.load:
-    fin = open(args.load, 'rb')
-    stats = pickle.load(fin)
-    fin.close()
-    print("Restarting from")
-    print(stats)
-else:
-    stats = dict()
-    stats['size'] = []
-    stats['snd_kpps'] =  []
-    stats['rcv_kpps'] =  []
-    stats['snd_mbps'] = []
-    stats['rcv_mbps'] = []
-    stats['snd_packets'] = []
-    stats['rcv_packets'] = []
-    stats['snd_transactions'] = []
-    stats['snd_latency'] = []
+stats = dict()
+stats['size'] = []
+stats['snd_kpps'] =  []
+stats['rcv_kpps'] =  []
+stats['snd_mbps'] = []
+stats['rcv_mbps'] = []
+stats['snd_packets'] = []
+stats['rcv_packets'] = []
+stats['snd_transactions'] = []
+stats['snd_latency'] = []
 
+plotcols = ['size', 'snd_kpps', 'snd_mbps']
+if args.test_type == 'perf':
+    plotcols += ['rcv_kpps', 'rcv_mbps']
+elif args.test_type == 'rr':
+    plotcols += ['snd_latency']
 
 # build QoS
 qosarg = ""
@@ -144,11 +147,35 @@ try:
             else:
                 assert(False)
 
+        # Transform the last args.trials element of the 'stats' vectors into
+        # a (avg, stddev) tuple.
+        to_avg_stdev(stats['snd_kpps'], args.trials)
+        to_avg_stdev(stats['snd_mbps'], args.trials)
+        to_avg_stdev(stats['size'], args.trials)
+        if args.test_type == 'perf':
+            to_avg_stdev(stats['snd_packets'], args.trials)
+            to_avg_stdev(stats['rcv_packets'], args.trials)
+            to_avg_stdev(stats['rcv_kpps'], args.trials)
+            to_avg_stdev(stats['rcv_mbps'], args.trials)
+        elif args.test_type == 'rr':
+            to_avg_stdev(stats['snd_transactions'], args.trials)
+            to_avg_stdev(stats['snd_latency'], args.trials)
+
+        else:
+            assert(False)
+
 except KeyboardInterrupt:
     pass
 
-# dump results
-fout = open(args.dump, 'wb')
-pickle.dump(stats, fout)
-pickle.dump(stats, fout)
-fout.close()
+
+# Dump statistics for gnuplot
+fout = open(args.output, 'w')
+s = '#'
+for k in plotcols:
+    s += '%19s ' % k
+fout.write("%s\n" % s)
+for i in range(len(stats['size'])):  # num samples
+    s = ' '
+    for k in plotcols:
+        s += '%9.1f %9.1f ' % stats[k][i]
+    fout.write("%s\n" % s)
