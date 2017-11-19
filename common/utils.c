@@ -734,9 +734,10 @@ flow_config_dump(const struct rl_flow_config *c)
 
     COMMON_PRINT("   dtcp.rtx.max_time_to_retry=%u\n"
                  "   dtcp.rtx.data_rxms_max=%u\n"
-                 "   dtcp.rtx.initial_tr=%u\n",
+                 "   dtcp.rtx.initial_tr=%u\n"
+                 "   dtcp.rtx.max_rtxq_len=%u\n",
                  c->dtcp.rtx.max_time_to_retry, c->dtcp.rtx.data_rxms_max,
-                 c->dtcp.rtx.initial_tr);
+                 c->dtcp.rtx.initial_tr, c->dtcp.rtx.max_rtxq_len);
 }
 COMMON_EXPORT(flow_config_dump);
 

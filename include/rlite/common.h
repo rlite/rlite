@@ -202,6 +202,7 @@ struct fc_config {
 struct rtx_config {
     uint32_t max_time_to_retry; /* R div initial_tr */
     uint16_t data_rxms_max;
+    uint16_t max_rtxq_len;
     uint32_t initial_tr;
 } __attribute__((packed));
 
@@ -229,11 +230,7 @@ struct rl_flow_config {
 } __attribute__((packed));
 
 #define RL_MPL_MSECS_DFLT 1000
-#define RL_RTX_MSECS_DFLT 1000
-#define RL_A_MSECS_DFLT 20
 #define RL_DATA_RXMS_MAX_DFLT 10
-#define RL_FC_WIN_INITIAL_CREDIT 60
-#define RL_FC_WIN_MAX_CWQ_LEN 100
 
 /* Does a flow specification correspond to best effort QoS? */
 static inline int
