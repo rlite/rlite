@@ -582,6 +582,12 @@ struct uipcp_rib {
                          const std::string &param_name,
                          const std::string &param_value);
 
+    int policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
+                    std::stringstream &msg);
+
+    int policy_param_list(const struct rl_cmsg_ipcp_policy_param_list_req *req,
+                          std::stringstream &msg);
+
     template <class T>
     T get_param_value(const std::string &component,
                       const std::string &param_name);

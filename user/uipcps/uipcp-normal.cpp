@@ -1734,41 +1734,36 @@ normal_policy_mod(struct uipcp *uipcp,
     return rib->policy_mod(comp_name, policy_name);
 }
 
-static int
-normal_policy_list(struct uipcp *uipcp,
-                   const struct rl_cmsg_ipcp_policy_list_req *req,
-                   char **resp_msg)
+int
+uipcp_rib::policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
+                       stringstream &msg)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    stringstream msg;
     int ret = 0;
 
-    auto add_policies = [&](const string &component) -> string {
+    auto add_policies = [this](stringstream &ss,
+                               const string &component) -> int {
         unsigned int policy_count = 0;
-        stringstream msg;
         if (!available_policies.count(component)) {
-            msg << "Unknown component " << component;
-            ret = -1;
-        } else {
-            for (const auto &policy : available_policies[component]) {
-                policy_count++;
-                if (rib->policies[component] == policy) {
-                    msg << "[" << policy << "]";
-                } else {
-                    msg << policy;
-                }
-                if (policy_count < available_policies[component].size()) {
-                    msg << " ";
-                }
+            ss << "Unknown component " << component;
+            return -1;
+        }
+        for (const auto &policy : available_policies[component]) {
+            policy_count++;
+            if (policies[component] == policy) {
+                ss << "[" << policy << "]";
+            } else {
+                ss << policy;
+            }
+            if (policy_count < available_policies[component].size()) {
+                ss << " ";
             }
         }
-        return msg.str();
+        return 0;
     };
 
     if (req->comp_name) {
         const string component = req->comp_name;
-        msg << add_policies(component);
+        ret                    = add_policies(msg, component);
     } else {
         unsigned int comp_count = 0;
         for (const auto &i : available_policies) {
@@ -1776,50 +1771,29 @@ normal_policy_list(struct uipcp *uipcp,
             comp_count++;
             msg << component << "\n\t";
 
-            msg << add_policies(component);
+            add_policies(msg, component);
             if (comp_count < available_policies.size()) {
                 msg << "\n";
             }
         }
     }
 
-    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
     return ret;
 }
 
-static int
-normal_policy_param_mod(struct uipcp *uipcp,
-                        const struct rl_cmsg_ipcp_policy_param_mod *req)
+int
+uipcp_rib::policy_param_list(
+    const struct rl_cmsg_ipcp_policy_param_list_req *req, stringstream &msg)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    const string comp_name   = req->comp_name;
-    const string param_name  = req->param_name;
-    const string param_value = req->param_value;
-
-    return rib->policy_param_mod(comp_name, param_name, param_value);
-}
-
-static int
-normal_policy_param_list(struct uipcp *uipcp,
-                         const struct rl_cmsg_ipcp_policy_param_list_req *req,
-                         char **resp_msg)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    stringstream msg;
-    const auto &params_map = rib->params_map;
-    int ret                = 0;
-
-    auto add_parameter = [&params_map](stringstream &ss,
-                                       const string &component,
-                                       const string &parameter) {
+    int ret            = 0;
+    auto add_parameter = [this](stringstream &ss, const string &component,
+                                const string &parameter) {
         const PolicyParam &param = params_map.at(component).at(parameter);
         ss << component << "." << parameter << " = " << param;
     };
 
-    auto add_component = [&params_map, add_parameter](stringstream &ss,
-                                                      const string &component) {
+    auto add_component = [this, add_parameter](stringstream &ss,
+                                               const string &component) {
         unsigned int param_count = 0;
         for (const auto &i : params_map.at(component)) {
             const string parameter = i.first;
@@ -1874,11 +1848,56 @@ normal_policy_param_list(struct uipcp *uipcp,
         }
     }
 
+    return ret;
+}
+static int
+normal_policy_list(struct uipcp *uipcp,
+                   const struct rl_cmsg_ipcp_policy_list_req *req,
+                   char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    stringstream msg;
+    int ret = rib->policy_list(req, msg);
+
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
     if (*resp_msg == NULL) {
         UPE(uipcp, "Out of memory\n");
         ret = -1;
     }
+
+    return ret;
+}
+
+static int
+normal_policy_param_mod(struct uipcp *uipcp,
+                        const struct rl_cmsg_ipcp_policy_param_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    const string comp_name   = req->comp_name;
+    const string param_name  = req->param_name;
+    const string param_value = req->param_value;
+
+    return rib->policy_param_mod(comp_name, param_name, param_value);
+}
+
+static int
+normal_policy_param_list(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_policy_param_list_req *req,
+                         char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    stringstream msg;
+    int ret = rib->policy_param_list(req, msg);
+
+    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    if (*resp_msg == NULL) {
+        UPE(uipcp, "Out of memory\n");
+        ret = -1;
+    }
+
     return ret;
 }
 
