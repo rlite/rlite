@@ -1332,30 +1332,6 @@ uipcp_rib::policy_param_mod(const std::string &component,
 
     return ret;
 }
-static int
-normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
-    uipcp_rib *rib                    = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-
-    rib->dft->appl_register(req);
-
-    return 0;
-}
-
-static int
-normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
-    uipcp_rib *rib             = UIPCP_RIB(uipcp);
-
-    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    ScopeLock lock_(rib->mutex);
-
-    return rib->fa->fa_req(req);
-}
 
 static int
 uipcp_fa_resp(struct uipcp *uipcp, uint32_t kevent_id, rl_ipcp_id_t ipcp_id,
@@ -1532,84 +1508,6 @@ err:
     return 0;
 }
 
-static int
-normal_neigh_fa_req_arrived(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    struct rl_kmsg_fa_req_arrived *req = (struct rl_kmsg_fa_req_arrived *)msg;
-    uipcp_rib *rib                     = UIPCP_RIB(uipcp);
-
-    return rib->neigh_fa_req_arrived(req);
-}
-
-static int
-normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
-    uipcp_rib *rib               = UIPCP_RIB(uipcp);
-
-    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
-
-    ScopeLock lock_(rib->mutex);
-
-    return rib->fa->fa_resp(resp);
-}
-
-static int
-normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    struct rl_kmsg_flow_deallocated *req =
-        (struct rl_kmsg_flow_deallocated *)msg;
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-
-    rib->fa->flow_deallocated(req);
-
-    return 0;
-}
-
-static void
-normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-
-    rib->update_address(new_addr);
-}
-
-static int
-normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
-{
-    uipcp_rib *rib                 = UIPCP_RIB(uipcp);
-    struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
-    ScopeLock lock_(rib->mutex);
-
-    return rib->lfdb->flow_state_update(upd);
-}
-
-static int
-normal_init(struct uipcp *uipcp)
-{
-    try {
-        uipcp->priv = rl_new(uipcp_rib(uipcp), RL_MT_SHIM);
-    } catch (std::bad_alloc) {
-        UPE(uipcp, "Out of memory\n");
-        return -1;
-    } catch (std::exception) {
-        UPE(uipcp, "RIB initialization failed\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-static int
-normal_fini(struct uipcp *uipcp)
-{
-    rl_delete(UIPCP_RIB(uipcp), RL_MT_SHIM);
-
-    return 0;
-}
-
 int
 uipcp_rib::register_to_lower(const char *dif_name, bool reg)
 {
@@ -1657,81 +1555,6 @@ uipcp_rib::register_to_lower(const char *dif_name, bool reg)
     }
 
     return ret;
-}
-
-template <class T>
-T
-uipcp_rib::get_param_value(const std::string &component,
-                           const std::string &param_name)
-{
-    assert(0);
-}
-
-template <>
-bool
-uipcp_rib::get_param_value<bool>(const std::string &component,
-                                 const std::string &param_name)
-{
-    assert(params_map.count(component) &&
-           params_map[component].count(param_name));
-    return params_map[component][param_name].get_bool_value();
-}
-
-template <>
-int
-uipcp_rib::get_param_value<int>(const std::string &component,
-                                const std::string &param_name)
-{
-    assert(params_map.count(component) &&
-           params_map[component].count(param_name));
-    return params_map[component][param_name].get_int_value();
-}
-
-static int
-normal_register_to_lower(struct uipcp *uipcp,
-                         const struct rl_cmsg_ipcp_register *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-
-    if (!req->dif_name) {
-        UPE(uipcp, "lower DIF name is not specified\n");
-        return -1;
-    }
-
-    return rib->register_to_lower(req->dif_name, req->reg);
-}
-
-static char *
-normal_ipcp_rib_show(struct uipcp *uipcp)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-
-    return rib->dump();
-}
-
-static char *
-normal_ipcp_routing_show(struct uipcp *uipcp)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    stringstream ss;
-
-    rib->lfdb->dump_routing(ss);
-
-    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
-}
-
-static int
-normal_policy_mod(struct uipcp *uipcp,
-                  const struct rl_cmsg_ipcp_policy_mod *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    const string comp_name   = req->comp_name;
-    const string policy_name = req->policy_name;
-
-    return rib->policy_mod(comp_name, policy_name);
 }
 
 int
@@ -1850,68 +1673,34 @@ uipcp_rib::policy_param_list(
 
     return ret;
 }
-static int
-normal_policy_list(struct uipcp *uipcp,
-                   const struct rl_cmsg_ipcp_policy_list_req *req,
-                   char **resp_msg)
+
+template <class T>
+T
+uipcp_rib::get_param_value(const std::string &component,
+                           const std::string &param_name)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    stringstream msg;
-    int ret = rib->policy_list(req, msg);
-
-    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
-        UPE(uipcp, "Out of memory\n");
-        ret = -1;
-    }
-
-    return ret;
+    assert(0);
 }
 
-static int
-normal_policy_param_mod(struct uipcp *uipcp,
-                        const struct rl_cmsg_ipcp_policy_param_mod *req)
+template <>
+bool
+uipcp_rib::get_param_value<bool>(const std::string &component,
+                                 const std::string &param_name)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    const string comp_name   = req->comp_name;
-    const string param_name  = req->param_name;
-    const string param_value = req->param_value;
-
-    return rib->policy_param_mod(comp_name, param_name, param_value);
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].get_bool_value();
 }
 
-static int
-normal_policy_param_list(struct uipcp *uipcp,
-                         const struct rl_cmsg_ipcp_policy_param_list_req *req,
-                         char **resp_msg)
+template <>
+int
+uipcp_rib::get_param_value<int>(const std::string &component,
+                                const std::string &param_name)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
-    stringstream msg;
-    int ret = rib->policy_param_list(req, msg);
-
-    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
-        UPE(uipcp, "Out of memory\n");
-        ret = -1;
-    }
-
-    return ret;
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].get_int_value();
 }
-
-static int
-normal_enroller_enable(struct uipcp *uipcp,
-                       const struct rl_cmsg_ipcp_enroller_enable *req)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-
-    return rib->enroller_enable(!!req->enable);
-}
-
-std::unordered_map<std::string, std::unordered_set<std::string> >
-    available_policies;
 
 PolicyParam::PolicyParam() { type = PolicyParamType::UNDEFINED; }
 
@@ -1988,6 +1777,254 @@ operator<<(ostream &os, const PolicyParam &param)
     }
     return os;
 }
+
+/* Callbacks for the normal IPCP. */
+
+static int
+normal_init(struct uipcp *uipcp)
+{
+    try {
+        uipcp->priv = rl_new(uipcp_rib(uipcp), RL_MT_SHIM);
+    } catch (std::bad_alloc) {
+        UPE(uipcp, "Out of memory\n");
+        return -1;
+    } catch (std::exception) {
+        UPE(uipcp, "RIB initialization failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+normal_fini(struct uipcp *uipcp)
+{
+    rl_delete(UIPCP_RIB(uipcp), RL_MT_SHIM);
+
+    return 0;
+}
+
+static int
+normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
+    uipcp_rib *rib                    = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+
+    rib->dft->appl_register(req);
+
+    return 0;
+}
+
+static int
+normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
+    uipcp_rib *rib             = UIPCP_RIB(uipcp);
+
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+
+    ScopeLock lock_(rib->mutex);
+
+    return rib->fa->fa_req(req);
+}
+
+static int
+normal_neigh_fa_req_arrived(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_fa_req_arrived *req = (struct rl_kmsg_fa_req_arrived *)msg;
+    uipcp_rib *rib                     = UIPCP_RIB(uipcp);
+
+    return rib->neigh_fa_req_arrived(req);
+}
+
+static int
+normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_fa_resp *resp = (struct rl_kmsg_fa_resp *)msg;
+    uipcp_rib *rib               = UIPCP_RIB(uipcp);
+
+    UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
+
+    ScopeLock lock_(rib->mutex);
+
+    return rib->fa->fa_resp(resp);
+}
+
+static int
+normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    struct rl_kmsg_flow_deallocated *req =
+        (struct rl_kmsg_flow_deallocated *)msg;
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+
+    rib->fa->flow_deallocated(req);
+
+    return 0;
+}
+
+static void
+normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+
+    rib->update_address(new_addr);
+}
+
+static int
+normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
+{
+    uipcp_rib *rib                 = UIPCP_RIB(uipcp);
+    struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
+    ScopeLock lock_(rib->mutex);
+
+    return rib->lfdb->flow_state_update(upd);
+}
+
+static int
+normal_register_to_lower(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_register *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    if (!req->dif_name) {
+        UPE(uipcp, "lower DIF name is not specified\n");
+        return -1;
+    }
+
+    return rib->register_to_lower(req->dif_name, req->reg);
+}
+
+static int
+normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
+                   int wait_for_completion)
+{
+    const char *dst_name = req->neigh_name;
+    uipcp_rib *rib       = UIPCP_RIB(uipcp);
+
+    if (!dst_name) {
+        /* If no neighbor name is specified, try to use the DIF name
+         * as a destination application. */
+        dst_name = req->dif_name;
+    }
+
+    if (!dst_name) {
+        UPE(uipcp, "No enrollment destination name specified\n");
+        return -1;
+    }
+
+    return rib->enroll(dst_name, req->supp_dif_name, wait_for_completion);
+}
+
+static char *
+normal_ipcp_rib_show(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+
+    return rib->dump();
+}
+
+static char *
+normal_ipcp_routing_show(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    stringstream ss;
+
+    rib->lfdb->dump_routing(ss);
+
+    return rl_strdup(ss.str().c_str(), RL_MT_UTILS);
+}
+
+static int
+normal_policy_mod(struct uipcp *uipcp,
+                  const struct rl_cmsg_ipcp_policy_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    const string comp_name   = req->comp_name;
+    const string policy_name = req->policy_name;
+
+    return rib->policy_mod(comp_name, policy_name);
+}
+
+static int
+normal_policy_list(struct uipcp *uipcp,
+                   const struct rl_cmsg_ipcp_policy_list_req *req,
+                   char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    stringstream msg;
+    int ret = rib->policy_list(req, msg);
+
+    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    if (*resp_msg == NULL) {
+        UPE(uipcp, "Out of memory\n");
+        ret = -1;
+    }
+
+    return ret;
+}
+
+static int
+normal_policy_param_mod(struct uipcp *uipcp,
+                        const struct rl_cmsg_ipcp_policy_param_mod *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    const string comp_name   = req->comp_name;
+    const string param_name  = req->param_name;
+    const string param_value = req->param_value;
+
+    return rib->policy_param_mod(comp_name, param_name, param_value);
+}
+
+static int
+normal_policy_param_list(struct uipcp *uipcp,
+                         const struct rl_cmsg_ipcp_policy_param_list_req *req,
+                         char **resp_msg)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+    ScopeLock lock_(rib->mutex);
+    stringstream msg;
+    int ret = rib->policy_param_list(req, msg);
+
+    *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
+    if (*resp_msg == NULL) {
+        UPE(uipcp, "Out of memory\n");
+        ret = -1;
+    }
+
+    return ret;
+}
+
+static int
+normal_enroller_enable(struct uipcp *uipcp,
+                       const struct rl_cmsg_ipcp_enroller_enable *req)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    return rib->enroller_enable(!!req->enable);
+}
+
+static void
+normal_trigger_tasks(struct uipcp *uipcp)
+{
+    uipcp_rib *rib = UIPCP_RIB(uipcp);
+
+    rib->trigger_re_enrollments();
+    rib->allocate_n_flows();
+    rib->clean_enrollment_resources();
+    rib->check_for_address_conflicts();
+}
+
+/* Global map of available policies. */
+std::unordered_map<std::string, std::unordered_set<std::string> >
+    available_policies;
 
 extern "C" void
 normal_lib_init(void)
