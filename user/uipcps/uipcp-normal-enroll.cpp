@@ -204,17 +204,15 @@ NeighFlow::enroll_state_set(EnrollState st)
     assert(neigh->rib->enrolled >= 0);
 }
 
-static void
-keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
+void
+NeighFlow::keepalive_timeout()
 {
-    NeighFlow *nf   = static_cast<NeighFlow *>(arg);
-    uipcp_rib *rib  = nf->neigh->rib;
-    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib = neigh->rib;
     ScopeLock lock_(rib->mutex);
     CDAPMessage m;
     int ret;
 
-    nf->keepalive_tmrid = 0;
+    keepalive_tmrid = 0;
 
     UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(neigh->ipcp_name).c_str());
@@ -222,26 +220,26 @@ keepalive_timeout_cb(struct uipcp *uipcp, void *arg)
     m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive, 0, 0,
              string());
 
-    ret = nf->send_to_port_id(&m, 0, nullptr);
+    ret = send_to_port_id(&m, 0, nullptr);
     if (ret) {
         UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
     }
-    nf->pending_keepalive_reqs++;
+    pending_keepalive_reqs++;
 
-    if (nf->pending_keepalive_reqs >
+    if (pending_keepalive_reqs >
         neigh->rib->get_param_value<int>("enrollment", "keepalive-thresh")) {
         /* We assume the neighbor is not alive on this flow, so
          * we prune the flow. */
         UPI(rib->uipcp,
             "Neighbor %s is not alive on N-1 flow %u "
             "and therefore will be pruned\n",
-            neigh->ipcp_name.c_str(), nf->port_id);
+            neigh->ipcp_name.c_str(), port_id);
 
-        rib->neigh_flow_prune(nf);
+        rib->neigh_flow_prune(this);
 
     } else {
         /* Schedule the next keepalive request. */
-        nf->keepalive_tmr_start();
+        keepalive_tmr_start();
     }
 }
 
@@ -258,7 +256,12 @@ NeighFlow::keepalive_tmr_start()
     }
 
     keepalive_tmrid = uipcp_loop_schedule(neigh->rib->uipcp, keepalive * 1000,
-                                          keepalive_timeout_cb, this);
+                                          [](struct uipcp *uipcp, void *arg) {
+                                              NeighFlow *nf =
+                                                  static_cast<NeighFlow *>(arg);
+                                              nf->keepalive_timeout();
+                                          },
+                                          this);
 }
 
 void
@@ -1140,27 +1143,35 @@ Neighbor::neigh_sync_rib(NeighFlow *nf) const
 }
 
 void
-neighs_refresh_cb(struct uipcp *uipcp, void *arg)
+uipcp_rib::neighs_refresh_tmr_restart()
 {
-    uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
-    ScopeLock lock_(rib->mutex);
+    sync_tmrid = uipcp_loop_schedule(
+        uipcp, get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
+        [](struct uipcp *uipcp, void *arg) {
+            uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
+            rib->neighs_refresh();
+        },
+        this);
+}
+
+void
+uipcp_rib::neighs_refresh()
+{
+    ScopeLock lock_(mutex);
     size_t limit = 10;
 
-    UPV(rib->uipcp, "Refreshing neighbors RIB\n");
+    UPV(uipcp, "Refreshing neighbors RIB\n");
 
-    rib->lfdb->neighs_refresh(limit);
-    rib->dft->neighs_refresh(limit);
+    lfdb->neighs_refresh(limit);
+    dft->neighs_refresh(limit);
     {
         NeighborCandidateList ncl;
 
-        ncl.candidates.push_back(rib->neighbor_cand_get());
-        rib->neighs_sync_obj_all(true, obj_class::neighbors,
-                                 obj_name::neighbors, &ncl);
+        ncl.candidates.push_back(neighbor_cand_get());
+        neighs_sync_obj_all(true, obj_class::neighbors, obj_name::neighbors,
+                            &ncl);
     }
-    rib->sync_tmrid = uipcp_loop_schedule(
-        rib->uipcp,
-        rib->get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
-        neighs_refresh_cb, rib);
+    neighs_refresh_tmr_restart();
 }
 
 Neighbor *

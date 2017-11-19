@@ -297,27 +297,38 @@ lfdb_default::neighs_refresh(size_t limit)
 }
 
 void
-age_incr_cb(struct uipcp *uipcp, void *arg)
+uipcp_rib::age_incr_tmr_restart()
 {
-    struct uipcp_rib *rib = (struct uipcp_rib *)arg;
-    ScopeLock lock_(rib->mutex);
+    age_incr_tmrid = uipcp_loop_schedule(
+        uipcp, get_param_value<int>("routing", "age-incr-intval") * 1000,
+        [](struct uipcp *uipcp, void *arg) {
+            struct uipcp_rib *rib = (struct uipcp_rib *)arg;
+            rib->age_incr();
+        },
+        this);
+}
+
+void
+uipcp_rib::age_incr()
+{
+    ScopeLock lock_(mutex);
     bool discarded = false;
 
-    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb);
+    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(this->lfdb);
     assert(lfdb);
 
     for (auto &kvi : lfdb->db) {
         list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
 
-        if (kvi.first == rib->myname) {
+        if (kvi.first == myname) {
             /* Don't age local entries, we pretend they
              * are always refreshed. */
             continue;
         }
 
         unsigned int age_inc_intval =
-            rib->get_param_value<int>("routing", "age-incr-intval");
-        unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
+            get_param_value<int>("routing", "age-incr-intval");
+        unsigned int age_max = get_param_value<int>("routing", "age-max");
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             jt->second.age += age_inc_intval;
 
@@ -329,7 +340,7 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
         }
 
         for (const auto &dit : discard_list) {
-            UPI(rib->uipcp, "Discarded lower-flow %s\n",
+            UPI(uipcp, "Discarded lower-flow %s\n",
                 static_cast<string>(dit->second).c_str());
             kvi.second.erase(dit);
         }
@@ -337,13 +348,11 @@ age_incr_cb(struct uipcp *uipcp, void *arg)
 
     if (discarded) {
         /* Update the routing table. */
-        lfdb->re.update_kernel_routing(rib->myname);
+        lfdb->re.update_kernel_routing(myname);
     }
 
     /* Reschedule */
-    rib->age_incr_tmrid = uipcp_loop_schedule(
-        uipcp, rib->get_param_value<int>("routing", "age-incr-intval") * 1000,
-        age_incr_cb, rib);
+    age_incr_tmr_restart();
 }
 
 void
