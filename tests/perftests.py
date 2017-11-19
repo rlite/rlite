@@ -8,6 +8,7 @@ import multiprocessing
 import subprocess
 import statistics
 import argparse
+import time
 import re
 import os
 
@@ -42,6 +43,8 @@ argparser.add_argument('-d', '--dif', type = str,
                         help = "DIF to use for the tests")
 argparser.add_argument('-o', '--output', type = str, help = "Output file for gnuplot data",
                         default = 'output.txt')
+argparser.add_argument('--sleep', type = int, default = 2,
+                       help = "How many seconds to sleep between two consecutive test runs")
 args = argparser.parse_args()
 
 
@@ -146,6 +149,8 @@ try:
 
             else:
                 assert(False)
+
+            time.sleep(args.sleep)
 
         # Transform the last args.trials element of the 'stats' vectors into
         # a (avg, stddev) tuple.
