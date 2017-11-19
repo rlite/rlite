@@ -140,7 +140,7 @@ Build both kernel-space and user-space software
 
 Install *rlite* on the system
 
-    # make install
+    # make install depmod
 
 
 ## 4. Overview of the software components
