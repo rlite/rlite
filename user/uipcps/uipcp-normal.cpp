@@ -139,8 +139,8 @@ mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr, void *buf,
     return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
-static int
-rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
+int
+uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 {
     CDAPMessage *m = nullptr;
     Neighbor *neigh;
@@ -161,7 +161,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         is_connect_attempt =
-            m->op_code == gpb::M_CONNECT && m->dst_appl == rib->myname;
+            m->op_code == gpb::M_CONNECT && m->dst_appl == myname;
         src_appl = m->src_appl;
 
         if (m->obj_class == obj_class::adata &&
@@ -173,8 +173,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
 
             m->get_obj_value(objbuf, objlen);
             if (!objbuf) {
-                UPE(rib->uipcp,
-                    "CDAP message does not contain a nested message\n");
+                UPE(uipcp, "CDAP message does not contain a nested message\n");
 
                 rl_delete(m, RL_MT_CDAP);
                 return 0;
@@ -184,13 +183,13 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
 
             rl_delete(m, RL_MT_CDAP); /* here it is safe to delete m */
             if (!adata.cdap) {
-                UPE(rib->uipcp, "A_DATA does not contain a valid "
-                                "encapsulated CDAP message\n");
+                UPE(uipcp, "A_DATA does not contain a valid "
+                           "encapsulated CDAP message\n");
 
                 return 0;
             }
 
-            rib->cdap_dispatch(adata.cdap, nullptr);
+            cdap_dispatch(adata.cdap, nullptr);
 
             return 0;
         }
@@ -209,7 +208,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
         m = nullptr;
 
         if (!nf) {
-            UPE(rib->uipcp, "Received message from unknown port id\n");
+            UPE(uipcp, "Received message from unknown port id\n");
             return -1;
         }
         neigh = nf->neigh;
@@ -226,8 +225,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
              * same flow (likely the N-1-flow is provided by shim-eth). We
              * therefore assume that the neighbor crashed before we could
              * detect it, and reset the CDAP connection. */
-            UPI(rib->uipcp,
-                "Neighbor %s is trying to re-enroll on the same flow\n",
+            UPI(uipcp, "Neighbor %s is trying to re-enroll on the same flow\n",
                 neigh->ipcp_name.c_str());
             nf->conn->reset();
             nf->enroll_state_set(EnrollState::NEIGH_NONE);
@@ -236,7 +234,7 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
         /* Deserialize the received CDAP message. */
         m = nf->conn->msg_deser(serbuf, serlen);
         if (!m) {
-            UPE(rib->uipcp, "msg_deser() failed\n");
+            UPE(uipcp, "msg_deser() failed\n");
             return -1;
         }
         rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
@@ -252,11 +250,11 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
              * different flow. We therefore assume that the neighbor
              * crashed before we could detect it, and select the new flow
              * as the management one. */
-            UPI(rib->uipcp,
+            UPI(uipcp,
                 "Switch management flow, port-id %u --> "
                 "port-id %u\n",
                 neigh->mgmt_conn()->port_id, nf->port_id);
-            rib->neigh_flow_prune(neigh->mgmt_conn());
+            neigh_flow_prune(neigh->mgmt_conn());
         }
 
         if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
@@ -272,11 +270,11 @@ rib_recv_msg(struct uipcp_rib *rib, char *serbuf, int serlen, NeighFlow *nf)
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = rib->cdap_dispatch(m, nf);
+            ret = cdap_dispatch(m, nf);
         }
 
     } catch (std::bad_alloc) {
-        UPE(rib->uipcp, "Out of memory\n");
+        UPE(uipcp, "Out of memory\n");
     }
 
     if (m) {
@@ -321,7 +319,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
 
     /* Hand off the message to the RIB. */
-    rib_recv_msg(rib, ((char *)(mhdr + 1)), n - sizeof(*mhdr), nf);
+    rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf);
 }
 
 void
@@ -340,7 +338,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     ScopeLock lock_(rib->lock);
 
-    rib_recv_msg(rib, mgmtbuf, n, nf);
+    rib->recv_msg(mgmtbuf, n, nf);
 }
 
 uipcp_rib::uipcp_rib(struct uipcp *_u)
