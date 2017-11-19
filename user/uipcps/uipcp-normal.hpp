@@ -361,6 +361,7 @@ struct lfdb {
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
     virtual int neighs_refresh(size_t limit)                        = 0;
+    virtual void age_incr()                                         = 0;
 };
 
 struct addr_allocator {
@@ -580,7 +581,6 @@ struct uipcp_rib {
     void neighs_refresh();
     void neighs_refresh_tmr_restart();
     void age_incr_tmr_restart();
-    void age_incr();
 
     int policy_mod(const std::string &component,
                    const std::string &policy_name);
@@ -781,6 +781,7 @@ struct lfdb_default : public lfdb {
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
+    void age_incr() override;
 };
 
 struct addr_allocator_distributed : public addr_allocator {
