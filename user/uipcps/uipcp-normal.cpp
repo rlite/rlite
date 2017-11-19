@@ -414,12 +414,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
                               &uipcp_rib::addr_alloc_table_handler));
 
     /* Start timers for periodic tasks. */
-    age_incr_tmrid = uipcp_loop_schedule(
-        uipcp, get_param_value<int>("routing", "age-incr-intval") * 1000,
-        age_incr_cb, this);
-    sync_tmrid = uipcp_loop_schedule(
-        uipcp, get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
-        neighs_refresh_cb, this);
+    age_incr_tmr_restart();
+    neighs_refresh_tmr_restart();
 
     /* Set a valid address, 0 is the null address. */
     set_address(1);

@@ -179,6 +179,7 @@ struct NeighFlow {
 
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
+    void keepalive_timeout();
 
     void enroll_state_set(EnrollState st);
     const CDAPMessage *next_enroll_msg();
@@ -576,6 +577,11 @@ struct uipcp_rib {
         return addra->rib_handler(rm, nf);
     }
 
+    void neighs_refresh();
+    void neighs_refresh_tmr_restart();
+    void age_incr_tmr_restart();
+    void age_incr();
+
     int policy_mod(const std::string &component,
                    const std::string &policy_name);
     int policy_param_mod(const std::string &component,
@@ -630,9 +636,6 @@ int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
                              void *buf, size_t buflen);
 
 void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
-
-void age_incr_cb(struct uipcp *uipcp, void *arg);
-void neighs_refresh_cb(struct uipcp *uipcp, void *arg);
 
 #define UIPCP_RIB(_u) static_cast<uipcp_rib *>((_u)->priv)
 
