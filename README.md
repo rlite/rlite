@@ -140,7 +140,7 @@ Build both kernel-space and user-space software
 
 Install *rlite* on the system
 
-    # make install
+    # make install depmod
 
 
 ## 4. Overview of the software components
@@ -184,7 +184,7 @@ For the normal IPCP, uipcps daemon implements the following components:
 * Routing, forwarding, and management of lower flows (i.e. N-1-flows) and
   neighbors.
 * Application registration and unregistration.
-* Flow allocation.
+* Flow allocation with support for QoS.
 * Address allocation for the DIF members.
 * Codecs for RIB objects.
 
@@ -205,8 +205,9 @@ The following libraries are available:
                 and allocate flows.
 * **cdap**, a C++ implementation of the CDAP protocol.
 * **rlite-conf**: implements the management and monitoring functionalities
-                     of *rlite*, such as IPCP creation, removal and
-                     configuration, flow monitoring, etc.
+                  of *rlite*, such as IPCP creation, removal and
+                  configuration, flow monitoring, etc. This library is the
+                  backend of the **rlite-ctl** tool.
 
 
 ### 4.4. Administration tools
@@ -233,8 +234,10 @@ Available commands:
 * `flows-dump`: Show the detailed DTP/DTCP state of a given flow.
 * `regs-show`: Show all the (N+1)names registered to any of the local N-IPCPs.
 * `dif-policy-mod`: Modify a policy for a DIF running in the system.
+* `dif-policy-list`: Show current and available policies for a DIF.
 * `dif-policy-param-mod`: Modify a policy parameter for a DIF running in the
                         system.
+* `dif-policy-param-list`: Show DIF parameters together with their current values.
 
 To show the available commands and the corresponding usage, run
 
@@ -806,11 +809,17 @@ of a normal IPCP process:
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |
 | flow-allocator      | default           | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| flow-allocator      | default           | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
+| flow-allocator      | default           | initial-tr         | Initial value for the DTCP retransmission timer (in milliseconds). |
+| flow-allocator      | default           | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
+| flow-allocator      | default           | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
+| flow-allocator      | default           | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
 | resource-allocator  | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resource-allocator  | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
 | resource-allocator  | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
 | rib-daemon          | *                 | refresh-intval     | Time interval (in seconds) between two consecutive periodic RIB synchronizations. |
 | routing             | *                 | age-incr-intval    | Time interval (in seconds) between two consecutive increments of the age of LFDB entries. |
+| routing             | *                 | age-incr-max       | Maximum age (in seconds) allowed for an LFDB entry before being discarded. |
 
 This is an example of how to change the nack-wait-secs parameter of the
 distributed address allocation policy of a normal IPCP process

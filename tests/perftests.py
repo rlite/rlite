@@ -6,10 +6,17 @@
 
 import multiprocessing
 import subprocess
+import statistics
 import argparse
+import time
 import re
 import os
-import pickle
+
+
+def to_avg_stdev(vlist, nsamples):
+    tup = (statistics.mean(vlist[-nsamples:]), statistics.stdev(vlist[-nsamples:]))
+    del vlist[-nsamples:]
+    vlist.append(tup)
 
 
 description = "Python script to perform automated tests based on rinaperf"
@@ -26,45 +33,40 @@ argparser.add_argument('--size-step', type = int, default = 10,
 argparser.add_argument('--trials', type = int, default = 3,
                        help = "Number of trials for each combination "
                               "of parameters")
-argparser.add_argument('-c', '--count', type = int, default = 100000,
-                       help = "Packet/transaction count for each test")
-argparser.add_argument('-f', '--flow-control', action='store_true',
-                       help = "Enable flow control")
+argparser.add_argument('-D', '--duration', type = int, default = 10,
+                       help = "Duration of each test (in seconds)")
 argparser.add_argument('-g', '--max-sdu-gap', type = int, default = -1,
                        help = "Max SDU gap")
 argparser.add_argument('-t', '--test-type', type = str, default = "perf",
                        help = "Test type", choices = ["perf", "rr"])
 argparser.add_argument('-d', '--dif', type = str,
                         help = "DIF to use for the tests")
-argparser.add_argument('--load', type = str, help = "Dump file to recover")
-argparser.add_argument('--dump', type = str, help = "Dump file to output",
-                        default = 'perftests.dump')
+argparser.add_argument('-o', '--output', type = str, help = "Output file for gnuplot data",
+                        default = 'output.txt')
+argparser.add_argument('--sleep', type = int, default = 2,
+                       help = "How many seconds to sleep between two consecutive test runs")
 args = argparser.parse_args()
 
 
-if args.load:
-    fin = open(args.load, 'rb')
-    stats = pickle.load(fin)
-    fin.close()
-    print("Restarting from")
-    print(stats)
-else:
-    stats = dict()
-    stats['size'] = []
-    stats['snd_kpps'] =  []
-    stats['rcv_kpps'] =  []
-    stats['snd_mbps'] = []
-    stats['rcv_mbps'] = []
-    stats['snd_packets'] = []
-    stats['rcv_packets'] = []
-    stats['snd_transactions'] = []
-    stats['snd_latency'] = []
+stats = dict()
+stats['size'] = []
+stats['snd_kpps'] =  []
+stats['rcv_kpps'] =  []
+stats['snd_mbps'] = []
+stats['rcv_mbps'] = []
+stats['snd_packets'] = []
+stats['rcv_packets'] = []
+stats['snd_transactions'] = []
+stats['snd_latency'] = []
 
+plotcols = ['size', 'snd_kpps', 'snd_mbps']
+if args.test_type == 'perf':
+    plotcols += ['rcv_kpps', 'rcv_mbps']
+elif args.test_type == 'rr':
+    plotcols += ['snd_latency']
 
 # build QoS
 qosarg = ""
-if args.flow_control:
-    qosarg += " -f"
 if args.max_sdu_gap >= 0:
     qosarg += " -g %s" % args.max_sdu_gap
 
@@ -73,9 +75,9 @@ if args.dif:
     difarg = " -d %s" % args.dif
 
 try:
-    for sz in range(args.size_min, args.size_max, args.size_step):
-        cmd = ("rinaperf -s %s -t %s -c %s %s %s"
-                % (sz, args.test_type, args.count, qosarg, difarg))
+    for sz in range(args.size_min, args.size_max+1, args.size_step):
+        cmd = ("rinaperf -s %s -t %s -D %s %s %s"
+                % (sz, args.test_type, args.duration, qosarg, difarg))
         print("Running: %s" % cmd)
         for t in range(args.trials):
             out = subprocess.check_output(cmd.split())
@@ -148,11 +150,37 @@ try:
             else:
                 assert(False)
 
+            time.sleep(args.sleep)
+
+        # Transform the last args.trials element of the 'stats' vectors into
+        # a (avg, stddev) tuple.
+        to_avg_stdev(stats['snd_kpps'], args.trials)
+        to_avg_stdev(stats['snd_mbps'], args.trials)
+        to_avg_stdev(stats['size'], args.trials)
+        if args.test_type == 'perf':
+            to_avg_stdev(stats['snd_packets'], args.trials)
+            to_avg_stdev(stats['rcv_packets'], args.trials)
+            to_avg_stdev(stats['rcv_kpps'], args.trials)
+            to_avg_stdev(stats['rcv_mbps'], args.trials)
+        elif args.test_type == 'rr':
+            to_avg_stdev(stats['snd_transactions'], args.trials)
+            to_avg_stdev(stats['snd_latency'], args.trials)
+
+        else:
+            assert(False)
+
 except KeyboardInterrupt:
     pass
 
-# dump results
-fout = open(args.dump, 'wb')
-pickle.dump(stats, fout)
-pickle.dump(stats, fout)
-fout.close()
+
+# Dump statistics for gnuplot
+fout = open(args.output, 'w')
+s = '#'
+for k in plotcols:
+    s += '%19s ' % k
+fout.write("%s\n" % s)
+for i in range(len(stats['size'])):  # num samples
+    s = ' '
+    for k in plotcols:
+        s += '%9.1f %9.1f ' % stats[k][i]
+    fout.write("%s\n" % s)
