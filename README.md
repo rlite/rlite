@@ -184,7 +184,7 @@ For the normal IPCP, uipcps daemon implements the following components:
 * Routing, forwarding, and management of lower flows (i.e. N-1-flows) and
   neighbors.
 * Application registration and unregistration.
-* Flow allocation.
+* Flow allocation with support for QoS.
 * Address allocation for the DIF members.
 * Codecs for RIB objects.
 
@@ -205,8 +205,9 @@ The following libraries are available:
                 and allocate flows.
 * **cdap**, a C++ implementation of the CDAP protocol.
 * **rlite-conf**: implements the management and monitoring functionalities
-                     of *rlite*, such as IPCP creation, removal and
-                     configuration, flow monitoring, etc.
+                  of *rlite*, such as IPCP creation, removal and
+                  configuration, flow monitoring, etc. This library is the
+                  backend of the **rlite-ctl** tool.
 
 
 ### 4.4. Administration tools
@@ -233,8 +234,10 @@ Available commands:
 * `flows-dump`: Show the detailed DTP/DTCP state of a given flow.
 * `regs-show`: Show all the (N+1)names registered to any of the local N-IPCPs.
 * `dif-policy-mod`: Modify a policy for a DIF running in the system.
+* `dif-policy-list`: Show current and available policies for a DIF.
 * `dif-policy-param-mod`: Modify a policy parameter for a DIF running in the
                         system.
+* `dif-policy-param-list`: Show DIF parameters together with their current values.
 
 To show the available commands and the corresponding usage, run
 
