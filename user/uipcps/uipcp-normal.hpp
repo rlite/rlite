@@ -533,6 +533,7 @@ struct uipcp_rib {
     void trigger_re_enrollments();
     void clean_enrollment_resources();
 
+    int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
     int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
