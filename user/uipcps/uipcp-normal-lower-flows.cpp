@@ -303,32 +303,29 @@ uipcp_rib::age_incr_tmr_restart()
         uipcp, get_param_value<int>("routing", "age-incr-intval") * 1000,
         [](struct uipcp *uipcp, void *arg) {
             struct uipcp_rib *rib = (struct uipcp_rib *)arg;
-            rib->age_incr();
+            rib->lfdb->age_incr();
         },
         this);
 }
 
 void
-uipcp_rib::age_incr()
+lfdb_default::age_incr()
 {
-    ScopeLock lock_(mutex);
+    ScopeLock lock_(rib->mutex);
     bool discarded = false;
 
-    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(this->lfdb);
-    assert(lfdb);
-
-    for (auto &kvi : lfdb->db) {
+    for (auto &kvi : db) {
         list<unordered_map<NodeId, LowerFlow>::iterator> discard_list;
 
-        if (kvi.first == myname) {
+        if (kvi.first == rib->myname) {
             /* Don't age local entries, we pretend they
              * are always refreshed. */
             continue;
         }
 
         unsigned int age_inc_intval =
-            get_param_value<int>("routing", "age-incr-intval");
-        unsigned int age_max = get_param_value<int>("routing", "age-max");
+            rib->get_param_value<int>("routing", "age-incr-intval");
+        unsigned int age_max = rib->get_param_value<int>("routing", "age-max");
         for (auto jt = kvi.second.begin(); jt != kvi.second.end(); jt++) {
             jt->second.age += age_inc_intval;
 
@@ -340,7 +337,7 @@ uipcp_rib::age_incr()
         }
 
         for (const auto &dit : discard_list) {
-            UPI(uipcp, "Discarded lower-flow %s\n",
+            UPI(rib->uipcp, "Discarded lower-flow %s\n",
                 static_cast<string>(dit->second).c_str());
             kvi.second.erase(dit);
         }
@@ -348,11 +345,11 @@ uipcp_rib::age_incr()
 
     if (discarded) {
         /* Update the routing table. */
-        lfdb->re.update_kernel_routing(myname);
+        re.update_kernel_routing(rib->myname);
     }
 
     /* Reschedule */
-    age_incr_tmr_restart();
+    rib->age_incr_tmr_restart();
 }
 
 void
