@@ -1602,27 +1602,6 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
     return ret;
 }
 
-int
-normal_ipcp_enroll(struct uipcp *uipcp, const struct rl_cmsg_ipcp_enroll *req,
-                   int wait_for_completion)
-{
-    const char *dst_name = req->neigh_name;
-    uipcp_rib *rib       = UIPCP_RIB(uipcp);
-
-    if (!dst_name) {
-        /* If no neighbor name is specified, try to use the DIF name
-         * as a destination application. */
-        dst_name = req->dif_name;
-    }
-
-    if (!dst_name) {
-        UPE(uipcp, "No enrollment destination name specified\n");
-        return -1;
-    }
-
-    return rib->enroll(dst_name, req->supp_dif_name, wait_for_completion);
-}
-
 /* To be called out of RIB lock. */
 int
 uipcp_rib::enroller_enable(bool enable)
@@ -1867,15 +1846,4 @@ uipcp_rib::check_for_address_conflicts()
             set_address(newaddr);
         }
     }
-}
-
-void
-normal_trigger_tasks(struct uipcp *uipcp)
-{
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
-
-    rib->trigger_re_enrollments();
-    rib->allocate_n_flows();
-    rib->clean_enrollment_resources();
-    rib->check_for_address_conflicts();
 }
