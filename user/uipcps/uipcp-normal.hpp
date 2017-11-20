@@ -392,7 +392,8 @@ struct uipcp_rib {
     /* std::string cache for uipcp->name. */
     std::string myname;
 
-    /* File descriptor used to receive and send mgmt PDUs. */
+    /* File descriptor used to receive and send mgmt PDUs through
+     * a kernel-bound flow. */
     int mgmtfd;
 
     /* RIB lock. */
@@ -541,6 +542,8 @@ struct uipcp_rib {
     void clean_enrollment_resources();
 
     int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
+    int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
+                              size_t buflen);
     int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
     int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
@@ -631,9 +634,6 @@ is_reliable_spec(const struct rina_flow_spec *spec)
 
 int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
                       const char *local_name, int reg);
-
-int mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port,
-                             void *buf, size_t buflen);
 
 void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 

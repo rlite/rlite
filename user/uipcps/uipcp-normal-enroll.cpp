@@ -113,6 +113,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     } else {
         /* Kernel-bound flow, we need to encapsulate the message in a
          * management PDU. */
+        struct rl_mgmt_hdr mhdr;
         char *serbuf  = nullptr;
         size_t serlen = 0;
 
@@ -131,8 +132,11 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
             return -1;
         }
 
-        ret = mgmt_write_to_local_port(neigh->rib->uipcp, port_id, serbuf,
-                                       serlen);
+        memset(&mhdr, 0, sizeof(mhdr));
+        mhdr.type       = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
+        mhdr.local_port = port_id;
+
+        ret = neigh->rib->mgmt_bound_flow_write(&mhdr, serbuf, serlen);
         if (ret == 0) {
             ret = serlen;
         }

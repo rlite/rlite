@@ -77,11 +77,10 @@ string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
 
 #define MGMTBUF_SIZE_MAX 8092
 
-static int
-mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr, void *buf,
-           size_t buflen)
+int
+uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
+                                 size_t buflen)
 {
-    uipcp_rib *rib = UIPCP_RIB(uipcp);
     char *mgmtbuf;
     int n;
     int ret = 0;
@@ -101,7 +100,7 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr, void *buf,
     memcpy(mgmtbuf + sizeof(*mhdr), buf, buflen);
     buflen += sizeof(*mhdr);
 
-    n = write(rib->mgmtfd, mgmtbuf, buflen);
+    n = write(mgmtfd, mgmtbuf, buflen);
     if (n < 0) {
         ret = n;
     } else {
@@ -111,32 +110,6 @@ mgmt_write(struct uipcp *uipcp, const struct rl_mgmt_hdr *mhdr, void *buf,
     rl_free(mgmtbuf, RL_MT_MISC);
 
     return ret;
-}
-
-int
-mgmt_write_to_local_port(struct uipcp *uipcp, rl_port_t local_port, void *buf,
-                         size_t buflen)
-{
-    struct rl_mgmt_hdr mhdr;
-
-    memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type       = RLITE_MGMT_HDR_T_OUT_LOCAL_PORT;
-    mhdr.local_port = local_port;
-
-    return mgmt_write(uipcp, &mhdr, buf, buflen);
-}
-
-int
-mgmt_write_to_dst_addr(struct uipcp *uipcp, rlm_addr_t dst_addr, void *buf,
-                       size_t buflen)
-{
-    struct rl_mgmt_hdr mhdr;
-
-    memset(&mhdr, 0, sizeof(mhdr));
-    mhdr.type        = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
-    mhdr.remote_addr = dst_addr;
-
-    return mgmt_write(uipcp, &mhdr, buf, buflen);
 }
 
 int
@@ -734,6 +707,7 @@ int
 uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
                             const UipcpObject *obj)
 {
+    struct rl_mgmt_hdr mhdr;
     AData adata;
     CDAPMessage am;
     char objbuf[4096]; /* Don't change the scope of this buffer. */
@@ -799,7 +773,11 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
         return -1;
     }
 
-    ret = mgmt_write_to_dst_addr(uipcp, dst_addr, serbuf, serlen);
+    memset(&mhdr, 0, sizeof(mhdr));
+    mhdr.type        = RLITE_MGMT_HDR_T_OUT_DST_ADDR;
+    mhdr.remote_addr = dst_addr;
+
+    ret = mgmt_bound_flow_write(&mhdr, serbuf, serlen);
     if (ret < 0) {
         UPE(uipcp, "mgmt_write(): %s\n", strerror(errno));
     }
