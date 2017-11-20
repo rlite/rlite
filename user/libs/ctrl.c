@@ -179,7 +179,7 @@ int
 rl_open_mgmt_port(rl_ipcp_id_t ipcp_id)
 {
     /* The port_id argument is not valid in this call, it will not
-     * be considered by the kernel. */
+     * be used by the kernel. */
     return open_port_common(RL_PORT_ID_NONE, RLITE_IO_MODE_IPCP_MGMT, ipcp_id);
 }
 
