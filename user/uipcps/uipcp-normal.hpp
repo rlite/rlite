@@ -378,10 +378,6 @@ struct addr_allocator {
     virtual rlm_addr_t allocate()                                   = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)   = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
-    virtual int param_mod(const std::string &name, const std::string &value)
-    {
-        return -1;
-    }
 };
 
 extern std::unordered_map<std::string, std::unordered_set<std::string>>
@@ -509,6 +505,16 @@ struct uipcp_rib {
     /* Default value for the maximum length of the flow control closed window
      * queue (in terms of PDUs). */
     static constexpr int kFlowControlMaxCwqLen = 128;
+
+    /* Default value for the NACK timer before considering the address
+     * allocation successful. */
+    static constexpr int kAddrAllocDistrNackWaitSecs = 4;
+
+    /* Lower bound for the addr_allocator NACK timer. */
+    static constexpr int kAddrAllocDistrNackWaitSecsMin = 0;
+
+    /* Upper bound for the addr_allocator NACK timer. */
+    static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
@@ -793,7 +799,7 @@ struct addr_allocator_distributed : public addr_allocator {
 
     RL_NODEFAULT_NONCOPIABLE(addr_allocator_distributed);
     addr_allocator_distributed(struct uipcp_rib *_ur)
-        : addr_allocator(_ur), nack_wait_secs(4)
+        : addr_allocator(_ur)
     {
     }
     ~addr_allocator_distributed() {}
@@ -802,11 +808,6 @@ struct addr_allocator_distributed : public addr_allocator {
     rlm_addr_t allocate() override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
-    int param_mod(const std::string &name, const std::string &value) override;
-
-    /* How many seconds to wait for NACKs before considering the address
-     * allocation successful. */
-    unsigned int nack_wait_secs;
 };
 
 struct addr_allocator_manual : public addr_allocator_distributed {
