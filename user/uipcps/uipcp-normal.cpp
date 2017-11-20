@@ -1286,7 +1286,16 @@ uipcp_rib::policy_param_mod(const std::string &component,
                    PolicyParamType::UNDEFINED);
             switch (params_map[component][param_name].type) {
             case PolicyParamType::INT:
-                UPE(uipcp, "Could not convert parameter value to a number.\n");
+                switch(ret) {
+                case -1:
+                    UPE(uipcp, "Could not convert parameter value to a number.\n");
+                    break;
+                case -2:
+                    UPE(uipcp, "New value out of range: (%d,%d).\n",
+                            params_map[component][param_name].min,
+                            params_map[component][param_name].max);
+                    break;
+                }
                 break;
             case PolicyParamType::BOOL:
                 UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
@@ -1684,10 +1693,12 @@ PolicyParam::PolicyParam(bool param_value)
     value.b = param_value;
 }
 
-PolicyParam::PolicyParam(int param_value)
+PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
 {
     type    = PolicyParamType::INT;
     value.i = param_value;
+    min     = range_min;
+    max     = range_max;
 }
 
 int
@@ -1700,6 +1711,9 @@ PolicyParam::set_value(const std::string &param_value)
     case PolicyParamType::INT:
         if (string2int(param_value, val)) {
             return -1;
+        }
+        if (!(min == 0 && max == 0) && (val < min || val > max)) {
+            return -2;
         }
         value.i = val;
         break;

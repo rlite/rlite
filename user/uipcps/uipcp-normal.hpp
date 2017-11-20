@@ -98,10 +98,12 @@ struct PolicyParam {
         bool b;
         int i;
     } value;
+    int min;
+    int max;
 
     PolicyParam();
     PolicyParam(bool param_value);
-    PolicyParam(int param_value);
+    PolicyParam(int param_value, int range_min = 0, int range_max = 0);
 
     friend std::ostream &operator<<(std::ostream &os, const PolicyParam &param);
 
