@@ -16,8 +16,8 @@ rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 
 
 # Run a list of set operations followed by a correspondent get, checking
 # that the value got stored in the RIB.
-rlite-ctl dif-policy-param-mod dd address-allocator nack-wait-secs 4 || exit 1
-rlite-ctl dif-policy-param-list dd address-allocator nack-wait-secs || exit 1
+rlite-ctl dif-policy-param-mod dd address-allocator nack-wait-secs 76 || exit 1
+rlite-ctl dif-policy-param-list dd address-allocator nack-wait-secs | grep 76 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 300 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment timeout | grep 300 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive 478 || exit 1
