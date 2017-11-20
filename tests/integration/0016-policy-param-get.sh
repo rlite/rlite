@@ -6,7 +6,8 @@ rlite-ctl ipcp-enroller-enable x || exit 1
 
 # List per-component parameters, checking that the number of lines is correct
 rlite-ctl dif-policy-param-list dd
-rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<15\>" || exit 1
+rlite-ctl dif-policy-param-list dd | wc -l | grep -q "\<16\>" || exit 1
+rlite-ctl dif-policy-param-list dd address-allocator | wc -l | grep -q "\<1\>" || exit 1
 rlite-ctl dif-policy-param-list dd enrollment | wc -l | grep -q "\<3\>" || exit 1
 rlite-ctl dif-policy-param-list dd flow-allocator | wc -l | grep -q "\<6\>" || exit 1
 rlite-ctl dif-policy-param-list dd resource-allocator | wc -l | grep -q "\<3\>" || exit 1
@@ -15,8 +16,8 @@ rlite-ctl dif-policy-param-list dd rib-daemon | wc -l | grep -q "\<1\>" || exit 
 
 # Run a list of set operations followed by a correspondent get, checking
 # that the value got stored in the RIB.
-#rlite-ctl dif-policy-param-mod dd address-allocator nack-wait-secs 4 || exit 1 # TODO
-#rlite-ctl dif-policy-param-list dd address-allocator nack-wait-secs || exit 1 # TODO
+rlite-ctl dif-policy-param-mod dd address-allocator nack-wait-secs 4 || exit 1
+rlite-ctl dif-policy-param-list dd address-allocator nack-wait-secs || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment timeout 300 || exit 1
 rlite-ctl dif-policy-param-list dd enrollment timeout | grep 300 || exit 1
 rlite-ctl dif-policy-param-mod dd enrollment keepalive 478 || exit 1
@@ -51,7 +52,4 @@ rlite-ctl dif-policy-param-list dd routing age-max | grep 771 || exit 1
 # Expect failure on the following ones
 rlite-ctl dif-policy-param-list dd wrong-component timeout 300 && exit 1
 rlite-ctl dif-policy-param-list dd enrollment wrong-parameter 300 && exit 1
-#rlite-ctl dif-policy-param-list dd enrollment timeout wrong-value && exit 1 # TODO
-#rlite-ctl dif-policy-param-list dd resource-allocator reliable-flows 1023 && exit 1 # TODO
-#rlite-ctl dif-policy-param-list dd rib-daemon refresh-intval false && exit 1 # TODO
 exit 0
