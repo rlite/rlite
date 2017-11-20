@@ -346,7 +346,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    params_map["address-allocator"]       = {};
+    params_map["address-allocator"]["nack-wait-secs"] =
+        PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
+                kAddrAllocDistrNackWaitSecsMax);
     params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
@@ -879,6 +881,7 @@ addr_allocator_distributed::allocate()
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
     rlm_addr_t addr   = RL_ADDR_NULL;
+    int nack_wait_secs = rib->get_param_value<int>("address-allocator", "nack-wait-secs");
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);
@@ -1117,24 +1120,6 @@ string2int(const string &s, int &ret)
 }
 
 int
-addr_allocator_distributed::param_mod(const string &name, const string &value)
-{
-    if (name == "nack-wait-secs") {
-        int val;
-
-        if (string2int(value, val) || val < 0 || val >= 100) {
-            return -1;
-        }
-
-        nack_wait_secs = static_cast<unsigned int>(val);
-
-        return 0;
-    }
-
-    return -1;
-}
-
-int
 uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
                                      const string &obj_class,
                                      const string &obj_name,
@@ -1264,48 +1249,43 @@ uipcp_rib::policy_param_mod(const std::string &component,
         return -1;
     }
 
-    if (component == "address-allocator") {
-        ret = addra->param_mod(param_name, param_value);
+    if (!params_map[component].count(param_name)) {
+        UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
+        return -1;
+    }
 
-    } else {
-        if (!params_map[component].count(param_name)) {
-            UPE(uipcp, "Unknown parameter %s\n", param_name.c_str());
-            return -1;
-        }
+    if (component == "resource-allocator" &&
+        param_name == "reliable-n-flows" && param_value == "true" &&
+        !get_param_value<bool>("resource-allocator", "reliable-flows")) {
+        UPE(uipcp, "Cannot enable reliable N-flows as reliable "
+                   "flows are disabled.\n");
+        return -1;
+    }
 
-        if (component == "resource-allocator" &&
-            param_name == "reliable-n-flows" && param_value == "true" &&
-            !get_param_value<bool>("resource-allocator", "reliable-flows")) {
-            UPE(uipcp, "Cannot enable reliable N-flows as reliable "
-                       "flows are disabled.\n");
-            return -1;
-        }
-
-        if ((ret = params_map[component][param_name].set_value(param_value))) {
-            assert(params_map[component][param_name].type !=
-                   PolicyParamType::UNDEFINED);
-            switch (params_map[component][param_name].type) {
-            case PolicyParamType::INT:
-                switch(ret) {
-                case -1:
-                    UPE(uipcp, "Could not convert parameter value to a number.\n");
-                    break;
-                case -2:
-                    UPE(uipcp, "New value out of range: (%d,%d).\n",
-                            params_map[component][param_name].min,
-                            params_map[component][param_name].max);
-                    break;
-                }
+    if ((ret = params_map[component][param_name].set_value(param_value))) {
+        assert(params_map[component][param_name].type !=
+               PolicyParamType::UNDEFINED);
+        switch (params_map[component][param_name].type) {
+        case PolicyParamType::INT:
+            switch(ret) {
+            case -1:
+                UPE(uipcp, "Could not convert parameter value to a number.\n");
                 break;
-            case PolicyParamType::BOOL:
-                UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
-                break;
-            default:
-                UPE(uipcp, "Unknown parameter type.\n");
+            case -2:
+                UPE(uipcp, "New value out of range: (%d,%d).\n",
+                        params_map[component][param_name].min,
+                        params_map[component][param_name].max);
                 break;
             }
-            return -1;
+            break;
+        case PolicyParamType::BOOL:
+            UPE(uipcp, "Invalid param value (not 'true' or 'false').\n");
+            break;
+        default:
+            UPE(uipcp, "Unknown parameter type.\n");
+            break;
         }
+        return -1;
     }
 
     if (!ret) {
