@@ -511,7 +511,7 @@ struct uipcp_rib {
     static constexpr int kAddrAllocDistrNackWaitSecs = 4;
 
     /* Lower bound for the addr_allocator NACK timer. */
-    static constexpr int kAddrAllocDistrNackWaitSecsMin = 0;
+    static constexpr int kAddrAllocDistrNackWaitSecsMin = 1;
 
     /* Upper bound for the addr_allocator NACK timer. */
     static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
