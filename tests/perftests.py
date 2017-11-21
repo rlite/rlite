@@ -80,7 +80,11 @@ try:
                 % (sz, args.test_type, args.duration, qosarg, difarg))
         print("Running: %s" % cmd)
         for t in range(args.trials):
-            out = subprocess.check_output(cmd.split())
+            try:
+                out = subprocess.check_output(cmd.split())
+            except subprocess.CalledProcessError:
+                print("Test run #%d failed" % t)
+                continue
             out = out.decode('ascii')
             outl = out.split('\n')
 
