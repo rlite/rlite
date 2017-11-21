@@ -79,7 +79,8 @@ try:
         cmd = ("rinaperf -s %s -t %s -D %s %s %s"
                 % (sz, args.test_type, args.duration, qosarg, difarg))
         print("Running: %s" % cmd)
-        for t in range(args.trials):
+        t = 1
+        while t <= args.trials:
             try:
                 out = subprocess.check_output(cmd.split())
             except subprocess.CalledProcessError:
@@ -154,6 +155,7 @@ try:
             else:
                 assert(False)
 
+            t += 1
             time.sleep(args.sleep)
 
         # Transform the last args.trials element of the 'stats' vectors into
