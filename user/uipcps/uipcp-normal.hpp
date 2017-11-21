@@ -798,10 +798,7 @@ struct addr_allocator_distributed : public addr_allocator {
     std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
     RL_NODEFAULT_NONCOPIABLE(addr_allocator_distributed);
-    addr_allocator_distributed(struct uipcp_rib *_ur)
-        : addr_allocator(_ur)
-    {
-    }
+    addr_allocator_distributed(struct uipcp_rib *_ur) : addr_allocator(_ur) {}
     ~addr_allocator_distributed() {}
 
     void dump(std::stringstream &ss) const override;

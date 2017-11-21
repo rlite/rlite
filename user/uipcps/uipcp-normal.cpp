@@ -348,7 +348,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
     params_map["address-allocator"]["nack-wait-secs"] =
         PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
-                kAddrAllocDistrNackWaitSecsMax);
+                    kAddrAllocDistrNackWaitSecsMax);
     params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
@@ -884,7 +884,8 @@ addr_allocator_distributed::allocate()
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
     rlm_addr_t addr   = RL_ADDR_NULL;
-    int nack_wait_secs = rib->get_param_value<int>("address-allocator", "nack-wait-secs");
+    int nack_wait_secs =
+        rib->get_param_value<int>("address-allocator", "nack-wait-secs");
 
     if ((modulo << inflate) <= modulo) { /* overflow */
         modulo = ~((rlm_addr_t)0);
@@ -1257,8 +1258,8 @@ uipcp_rib::policy_param_mod(const std::string &component,
         return -1;
     }
 
-    if (component == "resource-allocator" &&
-        param_name == "reliable-n-flows" && param_value == "true" &&
+    if (component == "resource-allocator" && param_name == "reliable-n-flows" &&
+        param_value == "true" &&
         !get_param_value<bool>("resource-allocator", "reliable-flows")) {
         UPE(uipcp, "Cannot enable reliable N-flows as reliable "
                    "flows are disabled.\n");
@@ -1270,14 +1271,14 @@ uipcp_rib::policy_param_mod(const std::string &component,
                PolicyParamType::UNDEFINED);
         switch (params_map[component][param_name].type) {
         case PolicyParamType::INT:
-            switch(ret) {
+            switch (ret) {
             case -1:
                 UPE(uipcp, "Could not convert parameter value to a number.\n");
                 break;
             case -2:
                 UPE(uipcp, "New value out of range: (%d,%d).\n",
-                        params_map[component][param_name].min,
-                        params_map[component][param_name].max);
+                    params_map[component][param_name].min,
+                    params_map[component][param_name].max);
                 break;
             }
             break;
