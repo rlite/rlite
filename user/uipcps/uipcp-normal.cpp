@@ -473,7 +473,10 @@ uipcp_rib::dump() const
     }
 #endif /* RL_USE_QOS_CUBES */
 
-    ss << "Address: " << myaddr << endl << endl;
+    ss << "IPCP name: " << myname << endl;
+    ss << "DIF      : " << uipcp->dif_name << endl;
+    ss << "Enroller : " << (enroller_enabled ? "enabled" : "disabled") << endl;
+    ss << "Address  : " << myaddr << endl;
 
     {
         bool first = true;
