@@ -27,9 +27,11 @@
 #include <cstdint>
 #include <string>
 #include <list>
+#include <map>
 
-using Term     = uint32_t;
-using LogIndex = uint32_t;
+using Term      = uint32_t;
+using LogIndex  = uint32_t;
+using ReplicaId = std::string;
 
 enum class RaftState {
     Follower = 0,
@@ -39,7 +41,51 @@ enum class RaftState {
 
 /* Raft state machine. */
 class RaftSM {
-    RaftState state;
+    /*
+     * Persistent state on all servers. Updated to stable storage before
+     * responding to RPCs. Here we keep shadow copies.
+     */
+
+    /* Latest term this replica has seen. Initialized to 0 on first
+     * boot (when there is no persistent file), then it increases
+     * monotonically. */
+    Term current_term = 0;
+
+    /* Identifier of the candidate that received vote in current
+     * term (or NULL if none). */
+    ReplicaId voted_for;
+
+    /* Log entries. Each entry containes a command for the replicated
+     * state machine and the term when entry was received by the
+     * leader. The first index in the log is 1 (and not 0). */
+
+    /*
+     * Volatile state common to all the replicas.
+     */
+
+    /* Current state for the Raft state machine. */
+    RaftState state = RaftState::Follower;
+
+    /* Index of the highest log entry known to be committed.
+     * Initialized to 0, increases monotonically. */
+    LogIndex commit_index = 0;
+
+    /* Index of the highest entry fed to the local replica of the state
+     * machine. Initialized to 0, increases monotonically. */
+    LogIndex last_applied = 0;
+
+    /*
+     * Volatile state for leaders.
+     */
+
+    /* For each replica, index of the next log entry to send to
+     * that server. Initialized to leader's last log index + 1. */
+    std::map<ReplicaId, LogIndex> next_index;
+
+    /* For each replica, index of highest log entry known to
+     * be replicated on that replica. Initialized to 0, increases
+     * monotonically. */
+    std::map<ReplicaId, LogIndex> match_index;
 
 public:
     RaftSM();
@@ -65,7 +111,7 @@ struct RaftRequestVote : public RaftMessage {
     /* RaftMessage::term is candidate's term. */
 
     /* Candidate requesting vote. */
-    std::string candidate_id;
+    ReplicaId candidate_id;
 
     /* Index of candidate's last log entry. */
     LogIndex last_log_index;
@@ -86,7 +132,7 @@ struct RaftAppendEntries : public RaftMessage {
     /* RaftMessage::term is the current term as known by the leader. */
 
     /* Id of the leader, so that followers can redirect clients. */
-    std::string leader_id;
+    ReplicaId leader_id;
 
     /* Index of the log entry immediately preceding new ones. */
     LogIndex prev_log_index;
