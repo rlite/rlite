@@ -23,4 +23,4 @@
 
 #include "rlite/raft.hpp"
 
-RaftSM::RaftSM() : state(RaftState::Follower) {}
+RaftSM::RaftSM() {}
