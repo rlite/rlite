@@ -281,6 +281,9 @@ argparser.add_argument('--enrollment-order',
                        help = "Sequential vs parallel enrollment",
                        type = str, choices = ['sequential', 'parallel'],
                        default = None)
+argparser.add_argument('--dump-initscripts',
+                       help = "Dump an initscript for each machine",
+                       action = "store_true", default = False);
 args = argparser.parse_args()
 
 
@@ -561,6 +564,8 @@ if args.backend == 'tap':
 
 if not args.enrollment_order:
     args.enrollment_order = 'sequential' if len(vms) <= VMTHRESH else 'parallel'
+if args.dump_initscripts:
+    args.enrollment_order = 'parallel'
 
 
 ############ Compute registration/enrollment order for DIFs ###############
@@ -1012,6 +1017,17 @@ for vmname in sorted(vms):
             cmd += '\n'
             del vars_dict
             enroll_cmds.append(cmd)
+
+    if args.dump_initscripts:
+        initscript_name = vm['name'] + '.initscript'
+        initscript = open(initscript_name, 'w')
+        initscript_outs = ''
+        for cmd in ctrl_cmds:
+            initscript_outs += cmd
+        for cmd in enroll_cmds:
+            initscript_outs += cmd
+        initscript.write(initscript_outs)
+        initscript.close()
 
     # Generate /etc/rina/initscript
     outs += 'cat > .initscript <<EOF\n'
