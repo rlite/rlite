@@ -22,6 +22,5 @@
  */
 
 #include "rlite/raft.hpp"
-#include "rlite/utils.h"
 
-RaftSM::RaftSM() { PD("Raft State Machine initialized\n"); }
+RaftSM::RaftSM() : state(RaftState::Follower) {}
