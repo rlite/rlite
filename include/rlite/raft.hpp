@@ -33,64 +33,6 @@ using Term      = uint32_t;
 using LogIndex  = uint32_t;
 using ReplicaId = std::string;
 
-enum class RaftState {
-    Follower = 0,
-    Candidate,
-    Leader,
-};
-
-/* Raft state machine. */
-class RaftSM {
-    /*
-     * Persistent state on all servers. Updated to stable storage before
-     * responding to RPCs. Here we keep shadow copies.
-     */
-
-    /* Latest term this replica has seen. Initialized to 0 on first
-     * boot (when there is no persistent file), then it increases
-     * monotonically. */
-    Term current_term = 0;
-
-    /* Identifier of the candidate that received vote in current
-     * term (or NULL if none). */
-    ReplicaId voted_for;
-
-    /* Log entries. Each entry containes a command for the replicated
-     * state machine and the term when entry was received by the
-     * leader. The first index in the log is 1 (and not 0). */
-
-    /*
-     * Volatile state common to all the replicas.
-     */
-
-    /* Current state for the Raft state machine. */
-    RaftState state = RaftState::Follower;
-
-    /* Index of the highest log entry known to be committed.
-     * Initialized to 0, increases monotonically. */
-    LogIndex commit_index = 0;
-
-    /* Index of the highest entry fed to the local replica of the state
-     * machine. Initialized to 0, increases monotonically. */
-    LogIndex last_applied = 0;
-
-    /*
-     * Volatile state for leaders.
-     */
-
-    /* For each replica, index of the next log entry to send to
-     * that server. Initialized to leader's last log index + 1. */
-    std::map<ReplicaId, LogIndex> next_index;
-
-    /* For each replica, index of highest log entry known to
-     * be replicated on that replica. Initialized to 0, increases
-     * monotonically. */
-    std::map<ReplicaId, LogIndex> match_index;
-
-public:
-    RaftSM();
-};
-
 /* Base class for log entries. Users must extend this class
  * by inheritance to associated a specific command for the
  * replicated state machine. */
@@ -156,6 +98,101 @@ struct RaftAppendEntriesResp : public RaftMessage {
      * and prev_log_term as specified in the request. If false
      * the leader should retry with an older log entry. */
     bool success;
+};
+
+enum class RaftTimerType {
+    Invalid = 0,
+    Election,
+    HeartBeat,
+    LogReplication,
+};
+
+enum class RaftTimerAction {
+    Invalid = 0,
+    Set,
+    Stop,
+};
+
+struct RaftTimerCmd {
+    RaftTimerType type     = RaftTimerType::Invalid;
+    RaftTimerAction action = RaftTimerAction::Invalid;
+    uint32_t milliseconds  = 0;
+};
+
+/* The output of an invocation of the Raft state machine. May contain
+ * some messages to send to the other replicas and command to start
+ * or stop some timers. */
+struct RaftSMOutput {
+    std::list<std::pair<ReplicaId, RaftMessage *> > output_messages;
+    std::list<RaftTimerCmd> timer_commands;
+};
+
+enum class RaftState {
+    Follower = 0,
+    Candidate,
+    Leader,
+};
+
+/* Raft state machine. */
+class RaftSM {
+    /*
+     * Persistent state on all servers. Updated to stable storage before
+     * responding to RPCs. Here we keep shadow copies.
+     */
+
+    /* Latest term this replica has seen. Initialized to 0 on first
+     * boot (when there is no persistent file), then it increases
+     * monotonically. */
+    Term current_term = 0;
+
+    /* Identifier of the candidate that received vote in current
+     * term (or NULL if none). */
+    ReplicaId voted_for;
+
+    /* Log entries. Each entry containes a command for the replicated
+     * state machine and the term when entry was received by the
+     * leader. The first index in the log is 1 (and not 0). */
+
+    /*
+     * Volatile state common to all the replicas.
+     */
+
+    /* Current state for the Raft state machine. */
+    RaftState state = RaftState::Follower;
+
+    /* Index of the highest log entry known to be committed.
+     * Initialized to 0, increases monotonically. */
+    LogIndex commit_index = 0;
+
+    /* Index of the highest entry fed to the local replica of the state
+     * machine. Initialized to 0, increases monotonically. */
+    LogIndex last_applied = 0;
+
+    /*
+     * Volatile state for leaders.
+     */
+
+    /* For each replica, index of the next log entry to send to
+     * that server. Initialized to leader's last log index + 1. */
+    std::map<ReplicaId, LogIndex> next_index;
+
+    /* For each replica, index of highest log entry known to
+     * be replicated on that replica. Initialized to 0, increases
+     * monotonically. */
+    std::map<ReplicaId, LogIndex> match_index;
+
+public:
+    RaftSM();
+
+    /* Called by the user when the corresponding message is
+     * received. Returns results in the 'out' argument. */
+    int RequestVoteInput(const RaftRequestVote &msg, RaftSMOutput *out);
+    int RequestVoteRespInput(const RaftRequestVote &msg, RaftSMOutput *out);
+    int AppendEntriesInput(const RaftAppendEntries &msg, RaftSMOutput *out);
+    int AppendEntriesRespInput(const RaftAppendEntries &msg, RaftSMOutput *out);
+
+    /* Called by the user when a timer requested by Raft expired. */
+    int TimerExpired(RaftTimerType, RaftSMOutput *out);
 };
 
 #endif /* __RAFT_H__ */

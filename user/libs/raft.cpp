@@ -22,5 +22,41 @@
  */
 
 #include "rlite/raft.hpp"
+#include <cassert>
 
 RaftSM::RaftSM() {}
+
+int
+RaftSM::RequestVoteInput(const RaftRequestVote &msg, RaftSMOutput *out)
+{
+    assert(out);
+    return 0;
+}
+
+int
+RaftSM::RequestVoteRespInput(const RaftRequestVote &msg, RaftSMOutput *out)
+{
+    assert(out);
+    return 0;
+}
+
+int
+RaftSM::AppendEntriesInput(const RaftAppendEntries &msg, RaftSMOutput *out)
+{
+    assert(out);
+    return 0;
+}
+
+int
+RaftSM::AppendEntriesRespInput(const RaftAppendEntries &msg, RaftSMOutput *out)
+{
+    assert(out);
+    return 0;
+}
+
+int
+RaftSM::TimerExpired(RaftTimerType, RaftSMOutput *out)
+{
+    assert(out);
+    return 0;
+}
