@@ -6,6 +6,7 @@ add_library(rina-api SHARED utils.c ker-numtables.c uipcps-numtables.c ctrl.c me
 add_library(cdap SHARED cdap.cpp ${CDAP_GPB_SRC} ${CDAP_GPB_HDR})
 add_library(rlite-conf SHARED conf.c)
 add_library(rlite-wifi STATIC wifi.c)
+add_library(rlite-raft STATIC raft.cpp)
 
 target_link_libraries(cdap rina-api ${PROTOBUF_LIBRARY})
 target_link_libraries(rlite-conf rina-api)
