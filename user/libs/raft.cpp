@@ -23,8 +23,36 @@
 
 #include "rlite/raft.hpp"
 #include <cassert>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-RaftSM::RaftSM() {}
+using namespace std;
+
+int
+RaftSM::Init(const string& logfilename)
+{
+    /* If logfile does not exists it means that this is the first time
+     * this replica boots. */
+    bool first_boot = !ifstream(logfilename).good();
+
+    logfile.open(logfilename, ios::in | ios::out | ios::binary);
+    if (logfile.fail()) {
+        return -1;
+    }
+    if (first_boot) {
+        /* Initialize the log header. Write an 8 byte magic
+         * number, an 8 bytes current_term and a NULL voted_for. */
+    }
+
+    return 0;
+}
+
+RaftSM::~RaftSM() {
+    if (logfile.is_open()) {
+        logfile.close();
+    }
+}
 
 int
 RaftSM::RequestVoteInput(const RaftRequestVote &msg, RaftSMOutput *out)

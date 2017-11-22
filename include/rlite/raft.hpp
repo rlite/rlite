@@ -28,6 +28,7 @@
 #include <string>
 #include <list>
 #include <map>
+#include <fstream>
 
 using Term      = uint32_t;
 using LogIndex  = uint32_t;
@@ -135,7 +136,7 @@ enum class RaftState {
 
 /* Raft state machine. */
 class RaftSM {
-    /*
+    /* =================================================================
      * Persistent state on all servers. Updated to stable storage before
      * responding to RPCs. Here we keep shadow copies.
      */
@@ -149,11 +150,24 @@ class RaftSM {
      * term (or NULL if none). */
     ReplicaId voted_for;
 
-    /* Log entries. Each entry containes a command for the replicated
-     * state machine and the term when entry was received by the
+    /* Log entries (only on disc). Each entry containes a command for the
+     * replicated state machine and the term when entry was received by the
      * leader. The first index in the log is 1 (and not 0). */
 
-    /*
+    /* =================================================================
+     * Volatile state for leaders.
+     */
+
+    /* For each replica, index of the next log entry to send to
+     * that server. Initialized to leader's last log index + 1. */
+    std::map<ReplicaId, LogIndex> next_index;
+
+    /* For each replica, index of highest log entry known to
+     * be replicated on that replica. Initialized to 0, increases
+     * monotonically. */
+    std::map<ReplicaId, LogIndex> match_index;
+
+    /* =================================================================
      * Volatile state common to all the replicas.
      */
 
@@ -168,21 +182,13 @@ class RaftSM {
      * machine. Initialized to 0, increases monotonically. */
     LogIndex last_applied = 0;
 
-    /*
-     * Volatile state for leaders.
-     */
-
-    /* For each replica, index of the next log entry to send to
-     * that server. Initialized to leader's last log index + 1. */
-    std::map<ReplicaId, LogIndex> next_index;
-
-    /* For each replica, index of highest log entry known to
-     * be replicated on that replica. Initialized to 0, increases
-     * monotonically. */
-    std::map<ReplicaId, LogIndex> match_index;
+    /* File descriptor for the log file. */
+    std::fstream logfile;
 
 public:
-    RaftSM();
+    RaftSM() = default;
+    ~RaftSM();
+    int Init(const std::string &logfilename);
 
     /* Called by the user when the corresponding message is
      * received. Returns results in the 'out' argument. */
