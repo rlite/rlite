@@ -24,12 +24,10 @@ def has_outliers(tuples):
 def to_avg_stdev(vlist, nsamples):
     # Sort by kpps or ktts
     tuples = sorted(vlist[-nsamples:], key=lambda x: x[1])
-    print(tuples)
     left = 0
     vals = []
     while left < len(tuples):
         if not has_outliers(tuples[left:]):
-            print("No outliers in [%d:]" % left)
             for t in range(len(tuples[0])):
                 avg = statistics.mean([x[t] for x in tuples[left:]])
                 stdev = statistics.stdev([x[t] for x in tuples[left:]])
