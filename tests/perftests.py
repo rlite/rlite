@@ -13,10 +13,32 @@ import re
 import os
 
 
+def has_outliers(tuples):
+    for t in range(len(tuples[0])):
+        avg = statistics.mean([x[t] for x in tuples])
+        stdev = statistics.stdev([x[t] for x in tuples])
+        if stdev > avg*0.05:
+            return True
+    return False
+
 def to_avg_stdev(vlist, nsamples):
-    tup = (statistics.mean(vlist[-nsamples:]), statistics.stdev(vlist[-nsamples:]))
+    # Sort by kpps or ktts
+    tuples = sorted(vlist[-nsamples:], key=lambda x: x[1])
+    print(tuples)
+    left = 0
+    vals = []
+    while left < len(tuples):
+        if not has_outliers(tuples[left:]):
+            print("No outliers in [%d:]" % left)
+            for t in range(len(tuples[0])):
+                avg = statistics.mean([x[t] for x in tuples[left:]])
+                stdev = statistics.stdev([x[t] for x in tuples[left:]])
+                vals.append(avg)
+                vals.append(stdev)
+            break
+        left += 1
     del vlist[-nsamples:]
-    vlist.append(tup)
+    vlist.append(tuple(vals))
 
 
 description = "Python script to perform automated tests based on rinaperf"
@@ -48,16 +70,7 @@ argparser.add_argument('--sleep', type = int, default = 2,
 args = argparser.parse_args()
 
 
-stats = dict()
-stats['size'] = []
-stats['snd_kpps'] =  []
-stats['rcv_kpps'] =  []
-stats['snd_mbps'] = []
-stats['rcv_mbps'] = []
-stats['snd_packets'] = []
-stats['rcv_packets'] = []
-stats['snd_transactions'] = []
-stats['snd_latency'] = []
+stats = []
 
 plotcols = ['size', 'snd_kpps', 'snd_mbps']
 if args.test_type == 'perf':
@@ -100,31 +113,23 @@ try:
                     print(out)
                     continue
 
-                packets = int(m.group(1))
-                kpps = float(m.group(2))
-                mbps = float(m.group(3))
-                stats['snd_packets'].append(packets)
-                stats['snd_kpps'].append(kpps)
-                stats['snd_mbps'].append(mbps)
+                tpackets = int(m.group(1))
+                tkpps = float(m.group(2))
+                tmbps = float(m.group(3))
 
                 m = re.match(r'^Receiver\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', outl[3])
                 if m is None:
                     print(out)
                     continue
 
-                packets = int(m.group(1))
-                kpps = float(m.group(2))
-                mbps = float(m.group(3))
-                stats['rcv_packets'].append(packets)
-                stats['rcv_kpps'].append(kpps)
-                stats['rcv_mbps'].append(mbps)
+                rpackets = int(m.group(1))
+                rkpps = float(m.group(2))
+                rmbps = float(m.group(3))
 
-                stats['size'].append(sz)
+                prtuple = (tpackets, rpackets, tkpps, rkpps, tmbps, rmbps)
+                stats.append((sz, tkpps, rkpps, tmbps, rmbps))
 
-                print("%d/%d pkts %.3f/%.3f Kpps %.3f/%.3f Mbps" %
-                        (stats['snd_packets'][-1], stats['rcv_packets'][-1],
-                            stats['snd_kpps'][-1], stats['rcv_kpps'][-1],
-                            stats['snd_mbps'][-1], stats['rcv_mbps'][-1]))
+                print("%d/%d pkts %.3f/%.3f Kpps %.3f/%.3f Mbps" % prtuple)
 
             elif args.test_type == 'rr':
 
@@ -138,19 +143,14 @@ try:
                     continue
 
                 transactions = int(m.group(1))
-                kpps = float(m.group(2))
+                ktps = float(m.group(2))
                 mbps = float(m.group(3))
                 latency = int(m.group(4))
-                stats['snd_transactions'].append(transactions)
-                stats['snd_kpps'].append(kpps)
-                stats['snd_mbps'].append(mbps)
-                stats['snd_latency'].append(latency)
 
-                stats['size'].append(sz)
+                prtuple = (transactions, ktps, mbps, latency)
+                stats.append((sz, ktps, mbps, latency))
 
-                print("%d transactions %.3f Kpps %.3f Mbps %d ns" %
-                        (stats['snd_transactions'][-1], stats['snd_kpps'][-1],
-                            stats['snd_mbps'][-1], stats['snd_latency'][-1]))
+                print("%d transactions %.3f Ktps %.3f Mbps %d ns" % prtuple)
 
             else:
                 assert(False)
@@ -160,20 +160,7 @@ try:
 
         # Transform the last args.trials element of the 'stats' vectors into
         # a (avg, stddev) tuple.
-        to_avg_stdev(stats['snd_kpps'], args.trials)
-        to_avg_stdev(stats['snd_mbps'], args.trials)
-        to_avg_stdev(stats['size'], args.trials)
-        if args.test_type == 'perf':
-            to_avg_stdev(stats['snd_packets'], args.trials)
-            to_avg_stdev(stats['rcv_packets'], args.trials)
-            to_avg_stdev(stats['rcv_kpps'], args.trials)
-            to_avg_stdev(stats['rcv_mbps'], args.trials)
-        elif args.test_type == 'rr':
-            to_avg_stdev(stats['snd_transactions'], args.trials)
-            to_avg_stdev(stats['snd_latency'], args.trials)
-
-        else:
-            assert(False)
+        to_avg_stdev(stats, args.trials)
 
 except KeyboardInterrupt:
     pass
@@ -185,8 +172,8 @@ s = '#'
 for k in plotcols:
     s += '%19s ' % k
 fout.write("%s\n" % s)
-for i in range(len(stats['size'])):  # num samples
+for i in range(len(stats)):  # num samples
     s = ' '
-    for k in plotcols:
-        s += '%9.1f %9.1f ' % stats[k][i]
+    for j in range(len(stats[i])):
+        s += '%9.1f ' % stats[i][j]
     fout.write("%s\n" % s)
