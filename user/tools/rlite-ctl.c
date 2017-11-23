@@ -110,7 +110,8 @@ select_ipcp()
     struct ipcp_attrs *attrs;
 
     list_for_each_entry (attrs, &ipcps, node) {
-        if (attrs->max_sdu_size < smaller_mss) {
+        if (type_is_normal_ipcp(attrs->dif_type) &&
+            attrs->max_sdu_size < smaller_mss) {
             smaller_mss = attrs->max_sdu_size;
             ret         = attrs;
         }
