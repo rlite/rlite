@@ -30,61 +30,146 @@
 using namespace std;
 
 int
-RaftSM::Init(const string& logfilename)
+RaftSM::init(const string &logfilename, RaftSMOutput *out)
 {
     /* If logfile does not exists it means that this is the first time
      * this replica boots. */
     bool first_boot = !ifstream(logfilename).good();
+    int ret;
 
     logfile.open(logfilename, ios::in | ios::out | ios::binary);
     if (logfile.fail()) {
         return -1;
     }
     if (first_boot) {
-        /* Initialize the log header. Write an 8 byte magic
-         * number, an 8 bytes current_term and a NULL voted_for. */
+        /* Initialize the log header. Write an 4 byte magic
+         * number, a 4 bytes current_term and a NULL voted_for. */
+        if ((ret = log_u32_write(kLogMagicOfs, kLogMagicNumber))) {
+            return ret;
+        }
+        if ((ret = log_u32_write(kLogCurrentTermOfs, 0U))) {
+            return ret;
+        }
+    } else {
+        /* Check the magic number and load current term and current
+         * voted candidate. */
+        if ((ret = magic_check())) {
+            return ret;
+        }
+        if ((ret = log_u32_read(kLogCurrentTermOfs, &current_term))) {
+            return ret;
+        }
     }
 
     return 0;
 }
 
-RaftSM::~RaftSM() {
+RaftSM::~RaftSM()
+{
     if (logfile.is_open()) {
         logfile.close();
     }
 }
 
 int
-RaftSM::RequestVoteInput(const RaftRequestVote &msg, RaftSMOutput *out)
+RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
     assert(out);
     return 0;
 }
 
 int
-RaftSM::RequestVoteRespInput(const RaftRequestVote &msg, RaftSMOutput *out)
+RaftSM::request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
     assert(out);
     return 0;
 }
 
 int
-RaftSM::AppendEntriesInput(const RaftAppendEntries &msg, RaftSMOutput *out)
+RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
     assert(out);
     return 0;
 }
 
 int
-RaftSM::AppendEntriesRespInput(const RaftAppendEntries &msg, RaftSMOutput *out)
+RaftSM::append_entries_resp_input(const RaftAppendEntries &msg,
+                                  RaftSMOutput *out)
 {
     assert(out);
     return 0;
 }
 
 int
-RaftSM::TimerExpired(RaftTimerType, RaftSMOutput *out)
+RaftSM::timer_expired(RaftTimerType, RaftSMOutput *out)
 {
     assert(out);
+    return 0;
+}
+
+int
+RaftSM::log_u32_write(unsigned long pos, uint32_t val)
+{
+    logfile.seekp(pos);
+    if (logfile.fail()) {
+        return -1;
+    }
+    logfile.write(reinterpret_cast<const char *>(&val), sizeof(val));
+    if (logfile.fail()) {
+        return -1;
+    }
+    return 0;
+}
+
+int
+RaftSM::log_u32_read(unsigned long pos, uint32_t *val)
+{
+    logfile.seekg(pos);
+    if (logfile.fail()) {
+        return -1;
+    }
+    logfile.read(reinterpret_cast<char *>(val), sizeof(*val));
+    if (logfile.fail()) {
+        return -1;
+    }
+    return 0;
+}
+
+int
+RaftSM::magic_check()
+{
+    uint32_t magic = 0;
+
+    if (log_u32_read(0, &magic)) {
+        return -1;
+    }
+    return (magic != kLogMagicNumber) ? -1 : 0;
+}
+
+int
+RaftSM::log_buf_write(unsigned long pos, const char *buf, size_t len)
+{
+    logfile.seekp(pos);
+    if (logfile.fail()) {
+        return -1;
+    }
+    logfile.write(buf, len);
+    if (logfile.fail()) {
+        return -1;
+    }
+    return 0;
+}
+
+int
+RaftSM::log_buf_read(unsigned long pos, char *buf, size_t len)
+{
+    logfile.seekg(pos);
+    if (logfile.fail()) {
+        return -1;
+    }
+    logfile.read(buf, len);
+    if (logfile.fail()) {
+        return -1;
+    }
     return 0;
 }

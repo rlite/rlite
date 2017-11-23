@@ -185,20 +185,35 @@ class RaftSM {
     /* File descriptor for the log file. */
     std::fstream logfile;
 
+    static constexpr uint32_t kLogMagicNumber = 0x89ae01caU;
+    static constexpr long kLogMagicOfs        = 0;
+    static constexpr long kLogCurrentTermOfs  = 4;
+    static constexpr long kLogVotedForOfs     = 8;
+    static constexpr long kLogVotedForSize    = 128;
+    static constexpr long kLogEntriesOfs = kLogVotedForOfs + kLogVotedForSize;
+
+    /* Getter/setters for replica persistent state. */
+    int log_u32_write(unsigned long pos, uint32_t val);
+    int log_u32_read(unsigned long pos, uint32_t *val);
+    int log_buf_write(unsigned long pos, const char *buf, size_t len);
+    int log_buf_read(unsigned long pos, char *buf, size_t len);
+    int magic_check();
+
 public:
     RaftSM() = default;
     ~RaftSM();
-    int Init(const std::string &logfilename);
+    int init(const std::string &logfilename, RaftSMOutput *out);
 
     /* Called by the user when the corresponding message is
      * received. Returns results in the 'out' argument. */
-    int RequestVoteInput(const RaftRequestVote &msg, RaftSMOutput *out);
-    int RequestVoteRespInput(const RaftRequestVote &msg, RaftSMOutput *out);
-    int AppendEntriesInput(const RaftAppendEntries &msg, RaftSMOutput *out);
-    int AppendEntriesRespInput(const RaftAppendEntries &msg, RaftSMOutput *out);
+    int request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out);
+    int request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out);
+    int append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out);
+    int append_entries_resp_input(const RaftAppendEntries &msg,
+                                  RaftSMOutput *out);
 
     /* Called by the user when a timer requested by Raft expired. */
-    int TimerExpired(RaftTimerType, RaftSMOutput *out);
+    int timer_expired(RaftTimerType, RaftSMOutput *out);
 };
 
 #endif /* __RAFT_H__ */
