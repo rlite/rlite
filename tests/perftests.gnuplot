@@ -9,5 +9,5 @@ set grid ytics lw 1 lt 0
 set xtics 0,100,1500
 set ytics 0,1,13
 set key left top
-plot unrelfile using 1:($5/1000) title 'Unreliable sender' with linespoints, unrelfile using 1:($9/1000) title 'Unreliable receiver' with linespoints, relfile using 1:($5/1000) title 'Reliable sender/receiver' with linespoints,
+plot unrelfile using 1:($7/1000) title 'Unreliable sender' with linespoints, unrelfile using 1:($9/1000) title 'Unreliable receiver' with linespoints, relfile using 1:($7/1000) title 'Reliable sender/receiver' with linespoints,
 pause -1
