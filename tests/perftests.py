@@ -70,11 +70,11 @@ args = argparser.parse_args()
 
 stats = []
 
-plotcols = ['size', 'snd_kpps', 'snd_mbps']
+plotcols = ['size']
 if args.test_type == 'perf':
-    plotcols += ['rcv_kpps', 'rcv_mbps']
+    plotcols += ['snd_kpps', 'rcv_kpps', 'snd_mbps', 'rcv_mbps']
 elif args.test_type == 'rr':
-    plotcols += ['snd_latency']
+    plotcols += ['ktps', 'snd_mbps', 'snd_latency']
 
 # build QoS
 qosarg = ""
