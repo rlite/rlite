@@ -64,6 +64,31 @@ in many different ways. The **shim-udp4** (section 6.2) enables RINA over IP;
 finally, **rina-gw** (section 7.1) allows to deploy RINA next to IP.
 
 
+### 1.1. Performance evaluation
+
+This section reports the results of some experiments to evaluate the
+performance of the current implementation.
+
+The following figure shows throughput experiments between two
+hosts directly connected through a 40Gbit cable. Both hosts are 8-core
+single-socket machines (4 physical cores, 8 hyperthreads in total) with
+i7 processors (i7-3770K CPU at 3.5 GHz) and 1.33 GHz DDR3 memory.
+The hosts run Linux 4.13. The NIC is an Intel XL710 (40 Gbit/s) with 8 PCIe-v3
+lanes at 8Gbit/s each.
+The plots show the throughput of a single (rinaperf) flow for different
+packet sizes, using reliable flows or unreliable flows. When using unreliable
+flows we show the throughput measured at the sender (first plot) and the
+goodput measured at the receiver (second plot), as there can be packet loss.
+For reliable flows throughput and goodput are the same, so we show a single
+plot.
+Each test combination is repeated 10 times, computing the average (shown
+in the plot) and the standard deviation (not shown as less than 3%).
+For reproducibility of the tests, rinaperf is pinned to a core and CPU
+frequency scaling is disabled.
+
+![Throughput performance between two hosts with 40Gbit NIC](https://bitbucket.org/vmaffione/rina-images/downloads/rlite-40g-l1.png)
+
+
 ## 2. Software requirements
 
 This section lists the software packages required to build and run *rlite* on
