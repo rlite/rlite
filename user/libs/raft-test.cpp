@@ -28,23 +28,36 @@ logfile(const string &replica)
     return string("/tmp/raft_test_") + replica + "_log";
 }
 
+struct TestReplica {
+    RaftSM *sm = nullptr;
+
+    TestReplica() = default;
+    TestReplica(RaftSM *_sm) : sm(_sm) {}
+    ~TestReplica()
+    {
+        if (sm) {
+            delete sm;
+        }
+    }
+};
+
 int
 main()
 {
-    list<string> replicas = {"r1", "r2", "r3", "r4", "r5"};
-    list<RaftSM *> sms;
+    list<string> names = {"r1", "r2", "r3", "r4", "r5"};
+    map<string, TestReplica> replicas;
 
     /* Clean up leftover logfiles, if any. */
-    for (const auto &local : replicas) {
+    for (const auto &local : names) {
         remove(logfile(local).c_str());
     }
 
-    for (const auto &local : replicas) {
+    for (const auto &local : names) {
         string logfilename = logfile(local);
         list<string> peers;
         RaftSM *sm;
 
-        for (const auto &peer : replicas) {
+        for (const auto &peer : names) {
             if (peer != local) {
                 peers.push_back(peer);
             }
@@ -55,7 +68,7 @@ main()
         if (sm->init(peers, NULL)) {
             goto out;
         }
-        sms.push_back(sm);
+        replicas[local] = TestReplica(sm);
     }
 
     {
@@ -64,10 +77,10 @@ main()
     }
 
 out:
-    for (auto sm : sms) {
-        sm->shutdown();
-        delete sm;
+    for (const auto &kv : replicas) {
+        kv.second.sm->shutdown();
     }
+    replicas.clear();
 
     return 0;
 }
