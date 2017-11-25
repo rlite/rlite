@@ -188,14 +188,17 @@ class RaftSM {
     /* My identifier. */
     ReplicaId local_id;
 
+    /* Size of a log entry. */
+    const size_t log_entry_size = sizeof(Term);
+
     /* Index of the last entry written in the local log. */
     LogIndex last_log_index = 0;
 
-    static constexpr uint32_t kLogMagicNumber = 0x89ae01caU;
-    static constexpr long kLogMagicOfs        = 0;
-    static constexpr long kLogCurrentTermOfs  = 4;
-    static constexpr long kLogVotedForOfs     = 8;
-    static constexpr long kLogEntriesOfs      = 128;
+    static constexpr uint32_t kLogMagicNumber         = 0x89ae01caU;
+    static constexpr unsigned long kLogMagicOfs       = 0;
+    static constexpr unsigned long kLogCurrentTermOfs = 4;
+    static constexpr unsigned long kLogVotedForOfs    = 8;
+    static constexpr unsigned long kLogEntriesOfs     = 128;
     static constexpr size_t kLogVotedForSize = kLogEntriesOfs - kLogVotedForOfs;
 
     /* Getter/setters for replica persistent state. */
@@ -206,7 +209,10 @@ class RaftSM {
     int magic_check();
 
 public:
-    RaftSM(const ReplicaId &myname) : local_id(myname) {}
+    RaftSM(const ReplicaId &myname, size_t entry_size)
+        : local_id(myname), log_entry_size(entry_size)
+    {
+    }
     ~RaftSM();
     int init(const std::string &logfilename, const std::list<ReplicaId> peers,
              RaftSMOutput *out);

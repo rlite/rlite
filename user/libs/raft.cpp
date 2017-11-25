@@ -39,7 +39,12 @@ RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
     bool first_boot = !ifstream(logfilename).good();
     int ret;
 
-    logfile.open(logfilename, ios::in | ios::out | ios::binary);
+    /* Check if log_entry_size was valid. */
+    if (log_entry_size <= sizeof(Term)) {
+        return -1;
+    }
+
+    logfile.open(logfilename, ios::in | ios::out | ios::binary | ios::ate);
     if (logfile.fail()) {
         return -1;
     }
@@ -51,16 +56,26 @@ RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
         if ((ret = log_u32_write(kLogMagicOfs, kLogMagicNumber))) {
             return ret;
         }
-        if ((ret = log_u32_write(kLogCurrentTermOfs, 0U))) {
+        if ((ret = log_u32_write(kLogCurrentTermOfs, static_cast<Term>(0)))) {
             return ret;
         }
         memset(null, 0, sizeof(null));
         if ((ret = log_buf_write(kLogVotedForOfs, null, kLogVotedForSize))) {
             return ret;
         }
+        last_log_index = 0;
 
     } else {
         char id_buf[kLogVotedForSize];
+        long log_size;
+
+        /* Get pointer is at the end because of ios::ate. We can then compute
+         * the last log entry. */
+        log_size = static_cast<long>(logfile.tellg()) - kLogEntriesOfs;
+        if (log_size < 0 || log_size % log_entry_size != 0) {
+            return -1;
+        }
+        last_log_index = log_size / log_entry_size;
 
         /* Check the magic number and load current term and current
          * voted candidate. */
@@ -90,7 +105,7 @@ RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
 
     for (const auto &rid : peers) {
         match_index[rid] = 0;
-        next_index[rid]  = 0; // TODO
+        next_index[rid]  = last_log_index + 1;
     }
 
     return 0;
