@@ -68,7 +68,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         char null[kLogVotedForSize];
 
         /* Initialize the log header. Write an 4 byte magic
-         * number, a 4 bytes current_term and a NULL voted_for. */
+         * number, a 4 bytes current_term and a null voted_for. */
         if ((ret = log_u32_write(kLogMagicOfs, kLogMagicNumber))) {
             return ret;
         }
@@ -289,8 +289,7 @@ RaftSM::switch_state(RaftState next)
 int
 RaftSM::check_output_arg(RaftSMOutput *out)
 {
-    if (out == nullptr || !out->output_messages.empty() ||
-        !out->timer_commands.empty()) {
+    if (out == nullptr) {
         IOS_ERR() << "Invalid output parameter" << endl;
         return -1;
     }
