@@ -36,7 +36,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 {
     /* If logfile does not exists it means that this is the first time
      * this replica boots. */
-    bool first_boot = !ifstream(logfilename).good();
+    bool first_boot              = !ifstream(logfilename).good();
+    std::ios_base::openmode mode = ios::in | ios::out | ios::binary;
     int ret;
 
     /* Check if log_entry_size was valid. */
@@ -46,7 +47,13 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         return -1;
     }
 
-    logfile.open(logfilename, ios::in | ios::out | ios::binary | ios::ate);
+    if (first_boot) {
+        mode |= ios::trunc;
+    } else {
+        mode |= ios::ate;
+    }
+
+    logfile.open(logfilename, mode);
     if (logfile.fail()) {
         ios_err << "Failed to open logfile '" << logfilename
                 << "': " << strerror(errno) << endl;
@@ -68,7 +75,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
             return ret;
         }
         last_log_index = 0;
-        ios_inf << "Raft log initialized." << endl;
+        ios_inf << "Raft log initialized on first boot." << endl;
 
     } else {
         char id_buf[kLogVotedForSize];

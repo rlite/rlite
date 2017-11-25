@@ -28,8 +28,6 @@ main()
     list<string> replicas = {"r1", "r2", "r3", "r4", "r5"};
     list<RaftSM *> sms;
 
-    cout << TestLogEntry::size() << endl;
-
     for (const auto &local : replicas) {
         string logfilename = string("/tmp/raft_test_") + local + "_log";
         list<string> peers;
