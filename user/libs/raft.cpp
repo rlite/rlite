@@ -148,10 +148,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         next_index[rid]  = last_log_index + 1;
     }
 
-    /* Initialization is complete, we can return the output events, just
-     * setting the election timer. */
-    out->output_messages.clear();
-    out->timer_commands.clear();
+    /* Initialization is complete, we can set the election timer and return to
+     * the caller. */
     out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
                                                RaftTimerAction::Set,
                                                rand_int_in_range(10, 50)));
@@ -314,6 +312,29 @@ RaftSM::vote_for_candidate(ReplicaId candidate)
     return 0;
 }
 
+/* Called on any input message to check if our term is outdated. */
+int
+RaftSM::catch_up_term(Term term, RaftSMOutput *out) {
+    int ret;
+
+    if (term <= current_term) {
+        return 0; /* nothing to do */
+    }
+
+    /* Our term is outdated. Updated it and become a follower. */
+    IOS_INF() << "Update current term " << current_term << " --> "
+              << term << endl;
+    current_term = term;
+    if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
+        return ret;
+    }
+    switch_state(RaftState::Follower);
+    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                                               RaftTimerAction::Set,
+                                               rand_int_in_range(10, 50)));
+    return 1;
+}
+
 int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
@@ -329,18 +350,11 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
               << ", last_log_term=" << msg.last_log_term
               << ", last_log_index=" << msg.last_log_index << ")" << endl;
 
-    if (msg.term > current_term) {
-        /* My term is outdated. Updated it and become a follower. */
-        IOS_INF() << "Update current term " << current_term << " --> "
-                  << msg.term << endl;
-        current_term = msg.term;
-        if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
-            return ret;
+    if ((ret = catch_up_term(msg.term, out))) {
+        if (ret < 0) {
+            return ret; /* error */
         }
-        switch_state(RaftState::Follower);
-        out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
-                                                   RaftTimerAction::Set,
-                                                   rand_int_in_range(10, 50)));
+        /* Current term has been updated, go ahead. */
     }
 
     resp       = new RaftRequestVoteResp();
@@ -432,7 +446,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         if ((ret = vote_for_candidate(local_id))) {
             return ret;
         }
-        /* Reset the election timer in case we fail as a candidate. */
+        votes_collected = 1;
+        /* Reset the election timer in case we lose the election. */
         out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
                                                    RaftTimerAction::Set,
                                                    rand_int_in_range(10, 50)));
