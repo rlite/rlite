@@ -185,12 +185,18 @@ class RaftSM {
     /* File descriptor for the log file. */
     std::fstream logfile;
 
+    /* My identifier. */
+    ReplicaId local_id;
+
+    /* Index of the last entry written in the local log. */
+    LogIndex last_log_index = 0;
+
     static constexpr uint32_t kLogMagicNumber = 0x89ae01caU;
     static constexpr long kLogMagicOfs        = 0;
     static constexpr long kLogCurrentTermOfs  = 4;
     static constexpr long kLogVotedForOfs     = 8;
-    static constexpr long kLogVotedForSize    = 128;
-    static constexpr long kLogEntriesOfs = kLogVotedForOfs + kLogVotedForSize;
+    static constexpr long kLogEntriesOfs      = 128;
+    static constexpr size_t kLogVotedForSize = kLogEntriesOfs - kLogVotedForOfs;
 
     /* Getter/setters for replica persistent state. */
     int log_u32_write(unsigned long pos, uint32_t val);
@@ -200,9 +206,10 @@ class RaftSM {
     int magic_check();
 
 public:
-    RaftSM() = default;
+    RaftSM(const ReplicaId &myname) : local_id(myname) {}
     ~RaftSM();
-    int init(const std::string &logfilename, RaftSMOutput *out);
+    int init(const std::string &logfilename, const std::list<ReplicaId> peers,
+             RaftSMOutput *out);
 
     /* Called by the user when the corresponding message is
      * received. Returns results in the 'out' argument. */
