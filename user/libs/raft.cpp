@@ -25,6 +25,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <cmath>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -152,7 +153,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
      * the caller. */
     out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
                                                RaftTimerAction::Set,
-                                               rand_int_in_range(10, 50)));
+                                               rand_int_in_range(200, 500)));
 
     return 0;
 }
@@ -316,6 +317,14 @@ RaftSM::vote_for_candidate(ReplicaId candidate)
     return 0;
 }
 
+unsigned int
+RaftSM::quorum() const
+{
+    double q = 0.5 * (next_index.size() + 1);
+    return static_cast<unsigned int>(ceil(q));
+}
+
+/* Switch back to follower state, resetting the voting state. */
 int
 RaftSM::back_to_follower(RaftSMOutput *out)
 {
@@ -328,7 +337,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
     }
     out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
                                                RaftTimerAction::Set,
-                                               rand_int_in_range(10, 50)));
+                                               rand_int_in_range(200, 500)));
     return 0;
 }
 
@@ -412,7 +421,8 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 }
 
 int
-RaftSM::request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out)
+RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
+                                RaftSMOutput *out)
 {
     int ret;
 
@@ -420,13 +430,46 @@ RaftSM::request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out)
         return -1;
     }
 
-    if ((ret = catch_up_term(msg.term, out))) {
+    IOS_INF() << "Received VoteRequestResp(term=" << resp.term
+              << ", vote_granted=" << resp.vote_granted << ")" << endl;
+
+    if ((ret = catch_up_term(resp.term, out))) {
         if (ret < 0) {
             return ret; /* error */
         }
 
+        /* We are not candidates anymore, so there's nothing left to do. */
         return 0;
     }
+
+    if (!resp.vote_granted) {
+        return 0; /* no vote, nothing to do */
+    }
+
+    if (++votes_collected < quorum()) {
+        return 0; /* quorum not reached yet */
+    }
+
+    IOS_INF() << "Collected " << votes_collected << " votes, becoming leader"
+              << endl;
+    switch_state(RaftState::Leader);
+
+    /* Prepare heartbeat messages for the other replicas and set the
+     * heartbeat timer. */
+    for (const auto &kv : next_index) {
+        auto *msg           = new RaftAppendEntries();
+        msg->leader_id      = local_id;
+        msg->prev_log_index = kv.second;    // TODO
+        msg->prev_log_term  = current_term; // TODO
+        msg->leader_commit  = commit_index;
+        /* No entries, this is an heartbeat message. */
+        out->output_messages.push_back(make_pair(kv.first, msg));
+    }
+    out->timer_commands.push_back(
+        RaftTimerCmd(RaftTimerType::HeartBeat, RaftTimerAction::Set, 100));
+    /* Also stop the election timer. */
+    out->timer_commands.push_back(
+        RaftTimerCmd(RaftTimerType::Election, RaftTimerAction::Stop));
 
     return 0;
 }
@@ -442,7 +485,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 }
 
 int
-RaftSM::append_entries_resp_input(const RaftAppendEntries &msg,
+RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &msg,
                                   RaftSMOutput *out)
 {
     if (check_output_arg(out)) {
@@ -479,9 +522,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         }
         votes_collected = 1;
         /* Reset the election timer in case we lose the election. */
-        out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
-                                                   RaftTimerAction::Set,
-                                                   rand_int_in_range(10, 50)));
+        out->timer_commands.push_back(
+            RaftTimerCmd(RaftTimerType::Election, RaftTimerAction::Set,
+                         rand_int_in_range(200, 500)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : next_index) {
             auto *msg           = new RaftRequestVote();
