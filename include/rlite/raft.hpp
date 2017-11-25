@@ -29,6 +29,7 @@
 #include <list>
 #include <map>
 #include <fstream>
+#include <iostream>
 
 using Term      = uint32_t;
 using LogIndex  = uint32_t;
@@ -182,8 +183,14 @@ class RaftSM {
      * machine. Initialized to 0, increases monotonically. */
     LogIndex last_applied = 0;
 
+    /* A name for this SM, just for logging purposes. */
+    std::string name;
+
     /* My identifier. */
     ReplicaId local_id;
+
+    /* Index of the last entry written in the local log. */
+    LogIndex last_log_index = 0;
 
     /* Name of the log file. */
     const std::string logfilename;
@@ -194,8 +201,9 @@ class RaftSM {
     /* Size of a log entry. */
     const size_t log_entry_size = sizeof(Term);
 
-    /* Index of the last entry written in the local log. */
-    LogIndex last_log_index = 0;
+    /* For logging of Raft internal operations. */
+    std::iostream &ios_err;
+    std::iostream &ios_inf;
 
     static constexpr uint32_t kLogMagicNumber         = 0x89ae01caU;
     static constexpr unsigned long kLogMagicOfs       = 0;
@@ -212,8 +220,15 @@ class RaftSM {
     int magic_check();
 
 public:
-    RaftSM(const ReplicaId &myname, std::string logname, size_t entry_size)
-        : local_id(myname), logfilename(logname), log_entry_size(entry_size)
+    RaftSM(const std::string &smname, const ReplicaId &myname,
+           std::string logname, size_t entry_size, std::iostream &ioe,
+           std::iostream &ioi)
+        : name(smname),
+          local_id(myname),
+          logfilename(logname),
+          log_entry_size(entry_size),
+          ios_err(ioe),
+          ios_inf(ioi)
     {
     }
     ~RaftSM();
