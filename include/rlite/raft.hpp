@@ -219,6 +219,10 @@ class RaftSM {
     int log_buf_read(unsigned long pos, char *buf, size_t len);
     int magic_check();
 
+    /* Logging helpers. */
+    std::ostream &IOS_ERR() { return ios_err << "(" << name << ") "; }
+    std::ostream &IOS_INF() { return ios_inf << "(" << name << ") "; }
+
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
            std::string logname, size_t entry_size, std::ostream &ioe,

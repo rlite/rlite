@@ -42,8 +42,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 
     /* Check if log_entry_size was valid. */
     if (log_entry_size <= sizeof(Term)) {
-        ios_err << "Log entry size " << log_entry_size << " is too short."
-                << endl;
+        IOS_ERR() << "Log entry size " << log_entry_size << " is too short"
+                  << endl;
         return -1;
     }
 
@@ -55,8 +55,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 
     logfile.open(logfilename, mode);
     if (logfile.fail()) {
-        ios_err << "Failed to open logfile '" << logfilename
-                << "': " << strerror(errno) << endl;
+        IOS_ERR() << "Failed to open logfile '" << logfilename
+                  << "': " << strerror(errno) << endl;
         return -1;
     }
     if (first_boot) {
@@ -75,7 +75,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
             return ret;
         }
         last_log_index = 0;
-        ios_inf << "Raft log initialized on first boot." << endl;
+        IOS_INF() << "Raft log initialized on first boot" << endl;
 
     } else {
         char id_buf[kLogVotedForSize];
@@ -85,7 +85,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
          * the last log entry. */
         log_size = static_cast<long>(logfile.tellg()) - kLogEntriesOfs;
         if (log_size < 0 || log_size % log_entry_size != 0) {
-            ios_err << "Log size " << log_size << " is invalid" << endl;
+            IOS_ERR() << "Log size " << log_size << " is invalid" << endl;
             return -1;
         }
         last_log_index = log_size / log_entry_size;
@@ -93,7 +93,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         /* Check the magic number and load current term and current
          * voted candidate. */
         if ((ret = magic_check())) {
-            ios_err << "Log content is corrupted or invalid" << endl;
+            IOS_ERR() << "Log content is corrupted or invalid" << endl;
             return ret;
         }
         if ((ret = log_u32_read(kLogCurrentTermOfs, &current_term))) {
@@ -112,7 +112,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
             return false;
         };
         if (!buf_is_null_terminated(id_buf, kLogVotedForSize)) {
-            ios_err << "Log contains an invalid voted_for field" << endl;
+            IOS_ERR() << "Log contains an invalid voted_for field" << endl;
             return -1;
         }
         voted_for               = string(id_buf);
@@ -131,12 +131,12 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
             return false;
         };
         if (!voted_for_is_valid()) {
-            ios_err << "Log contains a voted_for identifier that does not "
-                       "match any replica"
-                    << endl;
+            IOS_ERR() << "Log contains a voted_for identifier that does not "
+                         "match any replica"
+                      << endl;
             return -1;
         }
-        ios_inf << "Raft log recovered." << endl;
+        IOS_INF() << "Raft log recovered" << endl;
     }
 
     for (const auto &rid : peers) {
@@ -151,8 +151,8 @@ void
 RaftSM::shutdown()
 {
     if (remove(logfilename.c_str())) {
-        ios_err << "Failed to remove log file '" << logfilename
-                << "': " << strerror(errno) << endl;
+        IOS_ERR() << "Failed to remove log file '" << logfilename
+                  << "': " << strerror(errno) << endl;
     }
 }
 
@@ -168,12 +168,12 @@ RaftSM::log_u32_write(unsigned long pos, uint32_t val)
 {
     logfile.seekp(pos);
     if (logfile.fail()) {
-        ios_err << "Failed to seek log at position " << pos << endl;
+        IOS_ERR() << "Failed to seek log at position " << pos << endl;
         return -1;
     }
     logfile.write(reinterpret_cast<const char *>(&val), sizeof(val));
     if (logfile.fail()) {
-        ios_err << "Failed to write u32 at position " << pos << endl;
+        IOS_ERR() << "Failed to write u32 at position " << pos << endl;
         return -1;
     }
     return 0;
@@ -184,12 +184,12 @@ RaftSM::log_u32_read(unsigned long pos, uint32_t *val)
 {
     logfile.seekg(pos);
     if (logfile.fail() || logfile.eof()) {
-        ios_err << "Failed to seek log at position " << pos << endl;
+        IOS_ERR() << "Failed to seek log at position " << pos << endl;
         return -1;
     }
     logfile.read(reinterpret_cast<char *>(val), sizeof(*val));
     if (logfile.fail() || logfile.eof()) {
-        ios_err << "Failed to read u32 at position " << pos << endl;
+        IOS_ERR() << "Failed to read u32 at position " << pos << endl;
         return -1;
     }
     return 0;
@@ -211,13 +211,13 @@ RaftSM::log_buf_write(unsigned long pos, const char *buf, size_t len)
 {
     logfile.seekp(pos);
     if (logfile.fail()) {
-        ios_err << "Failed to seek log at position " << pos << endl;
+        IOS_ERR() << "Failed to seek log at position " << pos << endl;
         return -1;
     }
     logfile.write(buf, len);
     if (logfile.fail()) {
-        ios_err << "Failed to write " << len << " bytes at position " << pos
-                << endl;
+        IOS_ERR() << "Failed to write " << len << " bytes at position " << pos
+                  << endl;
         return -1;
     }
     return 0;
@@ -228,13 +228,13 @@ RaftSM::log_buf_read(unsigned long pos, char *buf, size_t len)
 {
     logfile.seekg(pos);
     if (logfile.fail() || logfile.eof()) {
-        ios_err << "Failed to seek log at position " << pos << endl;
+        IOS_ERR() << "Failed to seek log at position " << pos << endl;
         return -1;
     }
     logfile.read(buf, len);
     if (logfile.fail() || logfile.eof()) {
-        ios_err << "Failed to read " << len << " bytes at position " << pos
-                << endl;
+        IOS_ERR() << "Failed to read " << len << " bytes at position " << pos
+                  << endl;
         return -1;
     }
     return 0;
