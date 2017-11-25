@@ -182,11 +182,14 @@ class RaftSM {
      * machine. Initialized to 0, increases monotonically. */
     LogIndex last_applied = 0;
 
-    /* File descriptor for the log file. */
-    std::fstream logfile;
-
     /* My identifier. */
     ReplicaId local_id;
+
+    /* Name of the log file. */
+    const std::string logfilename;
+
+    /* File descriptor for the log file. */
+    std::fstream logfile;
 
     /* Size of a log entry. */
     const size_t log_entry_size = sizeof(Term);
@@ -209,13 +212,15 @@ class RaftSM {
     int magic_check();
 
 public:
-    RaftSM(const ReplicaId &myname, size_t entry_size)
-        : local_id(myname), log_entry_size(entry_size)
+    RaftSM(const ReplicaId &myname, std::string logname, size_t entry_size)
+        : local_id(myname), logfilename(logname), log_entry_size(entry_size)
     {
     }
     ~RaftSM();
-    int init(const std::string &logfilename, const std::list<ReplicaId> peers,
-             RaftSMOutput *out);
+    int init(const std::list<ReplicaId> peers, RaftSMOutput *out);
+
+    /* The user doesn't need this Raft SM anymore. Delete the log on disk. */
+    void shutdown();
 
     /* Called by the user when the corresponding message is
      * received. Returns results in the 'out' argument. */

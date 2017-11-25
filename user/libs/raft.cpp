@@ -24,6 +24,7 @@
 #include "rlite/raft.hpp"
 #include <cassert>
 #include <cstring>
+#include <cstdio>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -31,8 +32,7 @@
 using namespace std;
 
 int
-RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
-             RaftSMOutput *out)
+RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 {
     /* If logfile does not exists it means that this is the first time
      * this replica boots. */
@@ -126,6 +126,14 @@ RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
     }
 
     return 0;
+}
+
+void
+RaftSM::shutdown()
+{
+    if (remove(logfilename.c_str())) {
+        // TODO print err
+    }
 }
 
 RaftSM::~RaftSM()
