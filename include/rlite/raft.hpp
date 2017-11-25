@@ -43,7 +43,7 @@ struct RaftLogEntry {
     Term term;
 
     /* How this entry must be serialized. */
-    virtual char *serialize() const = 0;
+    virtual void serialize(char *serbuf) const = 0;
 };
 
 /* Base class for all the Raft messages. */
@@ -202,8 +202,8 @@ class RaftSM {
     const size_t log_entry_size = sizeof(Term);
 
     /* For logging of Raft internal operations. */
-    std::iostream &ios_err;
-    std::iostream &ios_inf;
+    std::ostream &ios_err;
+    std::ostream &ios_inf;
 
     static constexpr uint32_t kLogMagicNumber         = 0x89ae01caU;
     static constexpr unsigned long kLogMagicOfs       = 0;
@@ -221,8 +221,8 @@ class RaftSM {
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
-           std::string logname, size_t entry_size, std::iostream &ioe,
-           std::iostream &ioi)
+           std::string logname, size_t entry_size, std::ostream &ioe,
+           std::ostream &ioi)
         : name(smname),
           local_id(myname),
           logfilename(logname),
