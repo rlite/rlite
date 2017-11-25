@@ -297,24 +297,45 @@ RaftSM::check_output_arg(RaftSMOutput *out)
     return 0;
 }
 
+/* Updates 'voted_for' persistent data. May be called with an empty string
+ * to reset voting state. */
 int
 RaftSM::vote_for_candidate(ReplicaId candidate)
 {
-    char buf_id[kLogVotedForSize];
-    int ret;
+    if (voted_for != candidate) {
+        char buf_id[kLogVotedForSize];
+        int ret;
 
-    voted_for = local_id;
-    snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
-    if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
-        return ret;
+        voted_for = candidate;
+        snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
+        if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
+            return ret;
+        }
     }
 
     return 0;
 }
 
+int
+RaftSM::back_to_follower(RaftSMOutput *out)
+{
+    int ret;
+
+    switch_state(RaftState::Follower);
+    votes_collected = 0;
+    if ((ret = vote_for_candidate(string()))) {
+        return ret;
+    }
+    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                                               RaftTimerAction::Set,
+                                               rand_int_in_range(10, 50)));
+    return 0;
+}
+
 /* Called on any input message to check if our term is outdated. */
 int
-RaftSM::catch_up_term(Term term, RaftSMOutput *out) {
+RaftSM::catch_up_term(Term term, RaftSMOutput *out)
+{
     int ret;
 
     if (term <= current_term) {
@@ -322,16 +343,16 @@ RaftSM::catch_up_term(Term term, RaftSMOutput *out) {
     }
 
     /* Our term is outdated. Updated it and become a follower. */
-    IOS_INF() << "Update current term " << current_term << " --> "
-              << term << endl;
+    IOS_INF() << "Update current term " << current_term << " --> " << term
+              << endl;
     current_term = term;
     if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
         return ret;
     }
-    switch_state(RaftState::Follower);
-    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
-                                               RaftTimerAction::Set,
-                                               rand_int_in_range(10, 50)));
+    if ((ret = back_to_follower(out))) {
+        return ret;
+    }
+
     return 1;
 }
 
@@ -393,8 +414,18 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 int
 RaftSM::request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
+    int ret;
+
     if (check_output_arg(out)) {
         return -1;
+    }
+
+    if ((ret = catch_up_term(msg.term, out))) {
+        if (ret < 0) {
+            return ret; /* error */
+        }
+
+        return 0;
     }
 
     return 0;
