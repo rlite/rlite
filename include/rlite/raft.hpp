@@ -200,6 +200,9 @@ class RaftSM {
     /* Term of the last log entry. */
     Term last_log_term = 0;
 
+    /* How many votes we collected as a candidate. */
+    unsigned int votes_collected = 0;
+
     /* Name of the log file. */
     const std::string logfilename;
 
@@ -236,6 +239,7 @@ class RaftSM {
     void switch_state(RaftState next);
     std::string state_repr(RaftState st) const;
     int vote_for_candidate(ReplicaId candidate);
+    int catch_up_term(Term term, RaftSMOutput *out);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
