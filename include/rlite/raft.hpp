@@ -81,8 +81,8 @@ struct RaftAppendEntries : public RaftMessage {
     /* Index of the log entry immediately preceding new ones. */
     LogIndex prev_log_index;
 
-    /* Term of pref_log_index entry. */
-    Term perf_log_term;
+    /* Term of prev_log_index entry. */
+    Term prev_log_term;
 
     /* Leader's commit index. */
     LogIndex leader_commit;
@@ -120,7 +120,7 @@ struct RaftTimerCmd {
     RaftTimerAction action = RaftTimerAction::Invalid;
     uint32_t milliseconds  = 0;
 
-    RaftTimerCmd(RaftTimerType ty, RaftTimerAction act, uint32_t ms)
+    RaftTimerCmd(RaftTimerType ty, RaftTimerAction act, uint32_t ms = 0)
         : type(ty), action(act), milliseconds(ms)
     {
     }
@@ -241,6 +241,7 @@ class RaftSM {
     int vote_for_candidate(ReplicaId candidate);
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
+    unsigned int quorum() const;
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
@@ -263,9 +264,10 @@ public:
     /* Called by the user when the corresponding message is
      * received. Returns results in the 'out' argument. */
     int request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out);
-    int request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out);
+    int request_vote_resp_input(const RaftRequestVoteResp &msg,
+                                RaftSMOutput *out);
     int append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out);
-    int append_entries_resp_input(const RaftAppendEntries &msg,
+    int append_entries_resp_input(const RaftAppendEntriesResp &msg,
                                   RaftSMOutput *out);
 
     /* Called by the user when a timer requested by Raft expired. */
