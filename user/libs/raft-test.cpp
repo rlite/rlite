@@ -45,7 +45,8 @@ int
 main()
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
-    map<string, TestReplica> replicas;
+    map<string, TestReplica *> replicas;
+    RaftSMOutput output;
 
     /* Clean up leftover logfiles, if any. */
     for (const auto &local : names) {
@@ -65,10 +66,10 @@ main()
 
         sm = new RaftSM(local + "-sm", local, logfilename, TestLogEntry::size(),
                         std::cerr, std::cout);
-        if (sm->init(peers, NULL)) {
+        if (sm->init(peers, &output)) {
             goto out;
         }
-        replicas[local] = TestReplica(sm);
+        replicas[local] = new TestReplica(sm);
     }
 
     {
@@ -78,9 +79,9 @@ main()
 
 out:
     for (const auto &kv : replicas) {
-        kv.second.sm->shutdown();
+        kv.second->sm->shutdown();
+        delete kv.second;
     }
-    replicas.clear();
 
     return 0;
 }
