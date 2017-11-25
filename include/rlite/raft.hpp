@@ -240,6 +240,7 @@ class RaftSM {
     std::string state_repr(RaftState st) const;
     int vote_for_candidate(ReplicaId candidate);
     int catch_up_term(Term term, RaftSMOutput *out);
+    int back_to_follower(RaftSMOutput *out);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
