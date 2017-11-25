@@ -71,7 +71,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         if ((ret = log_u32_write(kLogMagicOfs, kLogMagicNumber))) {
             return ret;
         }
-        if ((ret = log_u32_write(kLogCurrentTermOfs, static_cast<Term>(0)))) {
+        if ((ret = log_u32_write(kLogCurrentTermOfs, 0))) {
             return ret;
         }
         memset(null, 0, sizeof(null));
@@ -300,11 +300,69 @@ RaftSM::check_output_arg(RaftSMOutput *out)
 }
 
 int
+RaftSM::vote_for_candidate(ReplicaId candidate)
+{
+    char buf_id[kLogVotedForSize];
+    int ret;
+
+    voted_for = local_id;
+    snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
+    if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
+        return ret;
+    }
+
+    return 0;
+}
+
+int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
+    RaftRequestVoteResp *resp = nullptr;
+    int ret;
+
     if (check_output_arg(out)) {
         return -1;
     }
+
+    if (msg.term > current_term) {
+        /* My term is outdated. Updated it and become a follower. */
+        current_term = msg.term;
+        if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
+            return ret;
+        }
+        switch_state(RaftState::Follower);
+        out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                                                   RaftTimerAction::Set,
+                                                   rand_int_in_range(10, 50)));
+    }
+
+    resp       = new RaftRequestVoteResp();
+    resp->term = current_term;
+
+    if (msg.term < current_term) {
+        /* Received message belonging to an outdated term. Reply with a
+         * nack and the updated term. */
+
+        resp->vote_granted = false;
+    } else {
+        /* We grant our vote if we haven't voted for anyone in this term (or
+         * we already voted for the candidate) and the candidate's log is at
+         * least as up-to-date as ours. */
+        resp->vote_granted =
+            (voted_for.empty() || voted_for == msg.candidate_id) &&
+            (msg.last_log_term > last_log_term ||
+             (msg.last_log_term == last_log_term &&
+              msg.last_log_index >= last_log_index));
+    }
+
+    if (resp->vote_granted && voted_for.empty()) {
+        /* Register the vote on peristent memory. */
+        if ((ret = vote_for_candidate(msg.candidate_id))) {
+            return ret;
+        }
+    }
+
+    out->output_messages.push_back(make_pair(msg.candidate_id, resp));
 
     return 0;
 }
@@ -361,14 +419,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             return ret;
         }
         /* Vote for myself. */
-        voted_for = local_id;
-        {
-            char buf_id[kLogVotedForSize];
-            snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
-            if ((ret =
-                     log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
-                return ret;
-            }
+        if ((ret = vote_for_candidate(local_id))) {
+            return ret;
         }
         /* Reset the election timer in case we fail as a candidate. */
         out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,

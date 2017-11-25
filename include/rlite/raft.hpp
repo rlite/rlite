@@ -235,6 +235,7 @@ class RaftSM {
     int rand_int_in_range(int left, int right);
     void switch_state(RaftState next);
     std::string state_repr(RaftState st) const;
+    int vote_for_candidate(ReplicaId candidate);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
