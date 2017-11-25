@@ -197,6 +197,9 @@ class RaftSM {
     /* Index of the last entry written in the local log. */
     LogIndex last_log_index = 0;
 
+    /* Term of the last log entry. */
+    Term last_log_term = 0;
+
     /* Name of the log file. */
     const std::string logfilename;
 

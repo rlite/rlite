@@ -149,7 +149,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         next_index[rid]  = last_log_index + 1;
     }
 
-    /* Initialization is complete, we can return the output events. */
+    /* Initialization is complete, we can return the output events, just
+     * setting the election timer. */
     out->output_messages.clear();
     out->timer_commands.clear();
     out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
@@ -317,6 +318,8 @@ RaftSM::append_entries_resp_input(const RaftAppendEntries &msg,
 int
 RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 {
+    int ret;
+
     if (out == nullptr) {
         IOS_ERR() << "Invalid output parameter (null)" << endl;
         return -1;
@@ -325,8 +328,34 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
     out->timer_commands.clear();
 
     if (type == RaftTimerType::Election) {
+        /* The election timer fired. */
         if (state == RaftState::Follower) {
+            /* Switch to candidate and increment current term. */
             switch_state(RaftState::Candidate);
+            if ((ret = log_u32_write(kLogCurrentTermOfs, ++current_term))) {
+                return ret;
+            }
+            /* Vote for myself. */
+            voted_for = local_id;
+            {
+                char buf_id[kLogVotedForSize];
+                snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
+                if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
+                    return ret;
+                }
+            }
+            /* Reset the election timer in case we fail as a candidate. */
+            out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                        RaftTimerAction::Set,
+                        rand_int_in_range(10, 50)));
+            /* Prepare RequestVote messages for the other servers. */
+            for (const auto &kv : next_index) {
+                auto *msg = new RaftRequestVote();
+                msg->candidate_id = local_id;
+                msg->last_log_index = last_log_index;
+                msg->last_log_term = last_log_term;
+                out->output_messages.push_back(make_pair(kv.first, msg));
+            }
         }
     }
 
