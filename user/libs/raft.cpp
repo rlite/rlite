@@ -324,8 +324,15 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
         return -1;
     }
 
+    IOS_INF() << "Received VoteRequest(term=" << msg.term
+              << ", cand=" << msg.candidate_id
+              << ", last_log_term=" << msg.last_log_term
+              << ", last_log_index=" << msg.last_log_index << ")" << endl;
+
     if (msg.term > current_term) {
         /* My term is outdated. Updated it and become a follower. */
+        IOS_INF() << "Update current term " << current_term << " --> "
+                  << msg.term << endl;
         current_term = msg.term;
         if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
             return ret;
@@ -361,6 +368,8 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
             return ret;
         }
     }
+    IOS_INF() << "Vote for " << msg.candidate_id
+              << (resp->vote_granted ? "" : " not") << " granted" << endl;
 
     out->output_messages.push_back(make_pair(msg.candidate_id, resp));
 
@@ -409,6 +418,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 
     if (type == RaftTimerType::Election) {
         /* The election timer fired. */
+        IOS_INF() << "Election timer expired" << endl;
         if (state == RaftState::Leader) {
             /* Nothing to do. */
             return 0;
