@@ -100,7 +100,24 @@ RaftSM::init(const string &logfilename, const list<ReplicaId> peers,
         if (!buf_is_null_terminated(id_buf, kLogVotedForSize)) {
             return -1;
         }
-        voted_for = string(id_buf);
+        voted_for               = string(id_buf);
+        auto voted_for_is_valid = [this, peers]() -> bool {
+            if (voted_for.empty()) {
+                return true;
+            }
+            if (voted_for == local_id) {
+                return true;
+            }
+            for (const auto &peer : peers) {
+                if (voted_for == peer) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (!voted_for_is_valid()) {
+            return -1;
+        }
     }
 
     for (const auto &rid : peers) {
