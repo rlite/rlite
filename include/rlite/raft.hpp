@@ -231,6 +231,7 @@ class RaftSM {
     std::ostream &IOS_ERR() { return ios_err << "(" << name << ") "; }
     std::ostream &IOS_INF() { return ios_inf << "(" << name << ") "; }
 
+    int check_output_arg(RaftSMOutput *out);
     int rand_int_in_range(int left, int right);
     void switch_state(RaftState next);
     std::string state_repr(RaftState st) const;

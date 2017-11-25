@@ -40,8 +40,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
     std::ios_base::openmode mode = ios::in | ios::out | ios::binary;
     int ret;
 
-    if (out == nullptr) {
-        IOS_ERR() << "Invalid output parameter (null)" << endl;
+    if (check_output_arg(out)) {
         return -1;
     }
 
@@ -260,15 +259,16 @@ RaftSM::rand_int_in_range(int left, int right)
     return left + (rand() % (right - left));
 }
 
-std::string RaftSM::state_repr(RaftState st) const
+std::string
+RaftSM::state_repr(RaftState st) const
 {
     switch (st) {
-        case RaftState::Follower:
-            return "Follower";
-        case RaftState::Candidate:
-            return "Candidate";
-        case RaftState::Leader:
-            return "Leader";
+    case RaftState::Follower:
+        return "Follower";
+    case RaftState::Candidate:
+        return "Candidate";
+    case RaftState::Leader:
+        return "Leader";
     }
 
     assert(false);
@@ -276,34 +276,56 @@ std::string RaftSM::state_repr(RaftState st) const
     return "Unknown";
 }
 
-void RaftSM::switch_state(RaftState next)
+void
+RaftSM::switch_state(RaftState next)
 {
-    string olds = state_repr(state);
-    string news = state_repr(next);
-
+    if (state == next) {
+        return; /* nothing to do */
+    }
+    IOS_INF() << "switching " << state_repr(state) << " --> "
+              << state_repr(next) << endl;
     state = next;
+}
 
-    IOS_INF() << "switching " << olds << " --> " << news << endl;
+int
+RaftSM::check_output_arg(RaftSMOutput *out)
+{
+    if (out == nullptr || !out->output_messages.empty() ||
+        !out->timer_commands.empty()) {
+        IOS_ERR() << "Invalid output parameter" << endl;
+        return -1;
+    }
+
+    return 0;
 }
 
 int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
-    assert(out);
+    if (check_output_arg(out)) {
+        return -1;
+    }
+
     return 0;
 }
 
 int
 RaftSM::request_vote_resp_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
-    assert(out);
+    if (check_output_arg(out)) {
+        return -1;
+    }
+
     return 0;
 }
 
 int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
-    assert(out);
+    if (check_output_arg(out)) {
+        return -1;
+    }
+
     return 0;
 }
 
@@ -311,7 +333,10 @@ int
 RaftSM::append_entries_resp_input(const RaftAppendEntries &msg,
                                   RaftSMOutput *out)
 {
-    assert(out);
+    if (check_output_arg(out)) {
+        return -1;
+    }
+
     return 0;
 }
 
@@ -320,42 +345,42 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 {
     int ret;
 
-    if (out == nullptr) {
-        IOS_ERR() << "Invalid output parameter (null)" << endl;
+    if (check_output_arg(out)) {
         return -1;
     }
-    out->output_messages.clear();
-    out->timer_commands.clear();
 
     if (type == RaftTimerType::Election) {
         /* The election timer fired. */
-        if (state == RaftState::Follower) {
-            /* Switch to candidate and increment current term. */
-            switch_state(RaftState::Candidate);
-            if ((ret = log_u32_write(kLogCurrentTermOfs, ++current_term))) {
+        if (state == RaftState::Leader) {
+            /* Nothing to do. */
+            return 0;
+        }
+        /* Switch to candidate and increment current term. */
+        switch_state(RaftState::Candidate);
+        if ((ret = log_u32_write(kLogCurrentTermOfs, ++current_term))) {
+            return ret;
+        }
+        /* Vote for myself. */
+        voted_for = local_id;
+        {
+            char buf_id[kLogVotedForSize];
+            snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
+            if ((ret =
+                     log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
                 return ret;
             }
-            /* Vote for myself. */
-            voted_for = local_id;
-            {
-                char buf_id[kLogVotedForSize];
-                snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
-                if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
-                    return ret;
-                }
-            }
-            /* Reset the election timer in case we fail as a candidate. */
-            out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
-                        RaftTimerAction::Set,
-                        rand_int_in_range(10, 50)));
-            /* Prepare RequestVote messages for the other servers. */
-            for (const auto &kv : next_index) {
-                auto *msg = new RaftRequestVote();
-                msg->candidate_id = local_id;
-                msg->last_log_index = last_log_index;
-                msg->last_log_term = last_log_term;
-                out->output_messages.push_back(make_pair(kv.first, msg));
-            }
+        }
+        /* Reset the election timer in case we fail as a candidate. */
+        out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                                                   RaftTimerAction::Set,
+                                                   rand_int_in_range(10, 50)));
+        /* Prepare RequestVote messages for the other servers. */
+        for (const auto &kv : next_index) {
+            auto *msg           = new RaftRequestVote();
+            msg->candidate_id   = local_id;
+            msg->last_log_index = last_log_index;
+            msg->last_log_term  = last_log_term;
+            out->output_messages.push_back(make_pair(kv.first, msg));
         }
     }
 
