@@ -119,6 +119,11 @@ struct RaftTimerCmd {
     RaftTimerType type     = RaftTimerType::Invalid;
     RaftTimerAction action = RaftTimerAction::Invalid;
     uint32_t milliseconds  = 0;
+
+    RaftTimerCmd(RaftTimerType ty, RaftTimerAction act, uint32_t ms)
+        : type(ty), action(act), milliseconds(ms)
+    {
+    }
 };
 
 /* The output of an invocation of the Raft state machine. May contain
@@ -222,6 +227,10 @@ class RaftSM {
     /* Logging helpers. */
     std::ostream &IOS_ERR() { return ios_err << "(" << name << ") "; }
     std::ostream &IOS_INF() { return ios_inf << "(" << name << ") "; }
+
+    int rand_int_in_range(int left, int right);
+    void switch_state(RaftState next);
+    std::string state_repr(RaftState st) const;
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
