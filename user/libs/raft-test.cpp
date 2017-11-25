@@ -22,14 +22,25 @@ struct TestLogEntry : public RaftLogEntry {
     static size_t size() { return sizeof(Term) + sizeof(uint32_t); }
 };
 
+static string
+logfile(const string &replica)
+{
+    return string("/tmp/raft_test_") + replica + "_log";
+}
+
 int
 main()
 {
     list<string> replicas = {"r1", "r2", "r3", "r4", "r5"};
     list<RaftSM *> sms;
 
+    /* Clean up leftover logfiles, if any. */
     for (const auto &local : replicas) {
-        string logfilename = string("/tmp/raft_test_") + local + "_log";
+        remove(logfile(local).c_str());
+    }
+
+    for (const auto &local : replicas) {
+        string logfilename = logfile(local);
         list<string> peers;
         RaftSM *sm;
 
@@ -39,12 +50,17 @@ main()
             }
         }
 
-        sm = new RaftSM(string("test-sm"), local, logfilename,
-                        TestLogEntry::size(), std::cerr, std::cout);
+        sm = new RaftSM(local + "-sm", local, logfilename, TestLogEntry::size(),
+                        std::cerr, std::cout);
         if (sm->init(peers, NULL)) {
             goto out;
         }
         sms.push_back(sm);
+    }
+
+    {
+        string input;
+        cin >> input;
     }
 
 out:

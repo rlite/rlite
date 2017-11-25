@@ -40,6 +40,11 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
     std::ios_base::openmode mode = ios::in | ios::out | ios::binary;
     int ret;
 
+    if (out == nullptr) {
+        IOS_ERR() << "Invalid output parameter (null)" << endl;
+        return -1;
+    }
+
     /* Check if log_entry_size was valid. */
     if (log_entry_size <= sizeof(Term)) {
         IOS_ERR() << "Log entry size " << log_entry_size << " is too short"
@@ -144,6 +149,13 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         next_index[rid]  = last_log_index + 1;
     }
 
+    /* Initialization is complete, we can return the output events. */
+    out->output_messages.clear();
+    out->timer_commands.clear();
+    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+                                               RaftTimerAction::Set,
+                                               rand_int_in_range(10, 50)));
+
     return 0;
 }
 
@@ -241,6 +253,39 @@ RaftSM::log_buf_read(unsigned long pos, char *buf, size_t len)
 }
 
 int
+RaftSM::rand_int_in_range(int left, int right)
+{
+    assert(right > left);
+    return left + (rand() % (right - left));
+}
+
+std::string RaftSM::state_repr(RaftState st) const
+{
+    switch (st) {
+        case RaftState::Follower:
+            return "Follower";
+        case RaftState::Candidate:
+            return "Candidate";
+        case RaftState::Leader:
+            return "Leader";
+    }
+
+    assert(false);
+
+    return "Unknown";
+}
+
+void RaftSM::switch_state(RaftState next)
+{
+    string olds = state_repr(state);
+    string news = state_repr(next);
+
+    state = next;
+
+    IOS_INF() << "switching " << olds << " --> " << news << endl;
+}
+
+int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
     assert(out);
@@ -270,8 +315,20 @@ RaftSM::append_entries_resp_input(const RaftAppendEntries &msg,
 }
 
 int
-RaftSM::timer_expired(RaftTimerType, RaftSMOutput *out)
+RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 {
-    assert(out);
+    if (out == nullptr) {
+        IOS_ERR() << "Invalid output parameter (null)" << endl;
+        return -1;
+    }
+    out->output_messages.clear();
+    out->timer_commands.clear();
+
+    if (type == RaftTimerType::Election) {
+        if (state == RaftState::Follower) {
+            switch_state(RaftState::Candidate);
+        }
+    }
+
     return 0;
 }
