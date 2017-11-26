@@ -115,13 +115,17 @@ enum class RaftTimerAction {
     Stop,
 };
 
+class RaftSM;
+
 struct RaftTimerCmd {
+    RaftSM *sm             = nullptr;
     RaftTimerType type     = RaftTimerType::Invalid;
     RaftTimerAction action = RaftTimerAction::Invalid;
     uint32_t milliseconds  = 0;
 
-    RaftTimerCmd(RaftTimerType ty, RaftTimerAction act, uint32_t ms = 0)
-        : type(ty), action(act), milliseconds(ms)
+    RaftTimerCmd(RaftSM *_sm, RaftTimerType ty, RaftTimerAction act,
+                 uint32_t ms = 0)
+        : sm(_sm), type(ty), action(act), milliseconds(ms)
     {
     }
 };

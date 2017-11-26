@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cassert>
 #include <cstring>
+#include <functional>
+#include <queue>
 
 #include "rlite/raft.hpp"
 
@@ -41,11 +43,23 @@ struct TestReplica {
     }
 };
 
+struct TestEvent {
+    unsigned int abstime;
+    RaftTimerType ttype;
+
+    TestEvent(unsigned int t, RaftTimerType ty) : abstime(t), ttype(ty) {}
+
+    bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
+    bool operator>=(const TestEvent &o) const { return !(*this < o); }
+};
+
 int
 main()
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, TestReplica *> replicas;
+    priority_queue<TestEvent> events;
+    unsigned int t = 0; /* time */
     RaftSMOutput output;
 
     /* Clean up leftover logfiles, if any. */
@@ -72,9 +86,18 @@ main()
         replicas[local] = new TestReplica(sm);
     }
 
-    {
-        string input;
-        cin >> input;
+    for (;;) {
+        /* Process timer commands. */
+        for (const RaftTimerCmd &cmd : output.timer_commands) {
+            if (cmd.action == RaftTimerAction::Set) {
+                events.push(TestEvent(t + cmd.milliseconds, cmd.type));
+            }
+        }
+        {
+            string input;
+            cin >> input;
+        }
+        break;
     }
 
 out:
