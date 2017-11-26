@@ -112,7 +112,7 @@ enum class RaftTimerType {
 
 enum class RaftTimerAction {
     Invalid = 0,
-    Set,
+    Restart,
     Stop,
 };
 
