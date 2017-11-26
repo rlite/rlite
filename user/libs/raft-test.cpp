@@ -125,6 +125,7 @@ main()
                 events.push(TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
             }
         }
+        output.timer_commands.clear();
 
         /* Process output messages. */
         for (const auto &p : output.output_messages) {
@@ -148,6 +149,7 @@ main()
 
             delete p.second;
         }
+        output.output_messages.clear();
 
         /* Extract next expired timer and update the associated
          * Raft state machine. */
