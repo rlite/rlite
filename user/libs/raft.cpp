@@ -1,5 +1,5 @@
 /*
- * An implementation of the RAFT protocol.
+ * An implementation of the Raft protocol.
  *
  * Copyright (C) 2017 Nextworks
  * Author: Vincenzo Maffione <v.maffione@gmail.com>
