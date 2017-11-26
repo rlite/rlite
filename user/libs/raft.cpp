@@ -151,7 +151,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 
     /* Initialization is complete, we can set the election timer and return to
      * the caller. */
-    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
                                                RaftTimerAction::Set,
                                                rand_int_in_range(200, 500)));
 
@@ -334,7 +334,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
     if ((ret = vote_for_candidate(string()))) {
         return ret;
     }
-    out->timer_commands.push_back(RaftTimerCmd(RaftTimerType::Election,
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
                                                RaftTimerAction::Set,
                                                rand_int_in_range(200, 500)));
     return 0;
@@ -464,11 +464,11 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         /* No entries, this is an heartbeat message. */
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
-    out->timer_commands.push_back(
-        RaftTimerCmd(RaftTimerType::HeartBeat, RaftTimerAction::Set, 100));
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Set, 100));
     /* Also stop the election timer. */
     out->timer_commands.push_back(
-        RaftTimerCmd(RaftTimerType::Election, RaftTimerAction::Stop));
+        RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
 
     return 0;
 }
@@ -522,7 +522,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         votes_collected = 1;
         /* Reset the election timer in case we lose the election. */
         out->timer_commands.push_back(
-            RaftTimerCmd(RaftTimerType::Election, RaftTimerAction::Set,
+            RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Set,
                          rand_int_in_range(200, 500)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : next_index) {
