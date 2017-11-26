@@ -329,14 +329,17 @@ RaftSM::back_to_follower(RaftSMOutput *out)
 {
     int ret;
 
-    switch_state(RaftState::Follower);
     votes_collected = 0;
     if ((ret = vote_for_candidate(string()))) {
         return ret;
     }
+    switch_state(RaftState::Follower);
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
                                                RaftTimerAction::Restart,
                                                rand_int_in_range(200, 500)));
+    /* Also stop the heartbeat timer, in case we were leader. */
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Stop));
     return 0;
 }
 
@@ -506,7 +509,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
             return ret; /* error */
         }
 
-        /* Go ahead, we may need to becaome again followers. */
+        /* Go ahead, we may need to become followers again. */
     }
 
     if ((ret = back_to_follower(out))) {
