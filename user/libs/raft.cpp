@@ -441,6 +441,10 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         return 0;
     }
 
+    if (state == RaftState::Leader) {
+        return 0; /* already leader, nothing to do */
+    }
+
     if (!resp.vote_granted) {
         return 0; /* no vote, nothing to do */
     }
