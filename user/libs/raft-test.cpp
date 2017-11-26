@@ -121,15 +121,18 @@ main()
         /* Process timer commands. */
         for (const RaftTimerCmd &cmd : output.timer_commands) {
             switch (cmd.action) {
-            case RaftTimerAction::Set:
+            case RaftTimerAction::Restart:
                 events.push_back(
                     TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
                 events.sort();
                 break;
             case RaftTimerAction::Stop:
+                cout << "Stop " << cmd.sm << " type "
+                     << ((unsigned int)cmd.type) << endl;
                 for (auto it = events.begin(); it != events.end(); it++) {
                     if (it->sm == cmd.sm && it->ttype == cmd.type) {
                         events.erase(it);
+                        cout << "Stopped" << endl;
                         break;
                     }
                 }

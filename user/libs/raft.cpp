@@ -152,7 +152,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
     /* Initialization is complete, we can set the election timer and return to
      * the caller. */
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
-                                               RaftTimerAction::Set,
+                                               RaftTimerAction::Restart,
                                                rand_int_in_range(200, 500)));
 
     return 0;
@@ -335,7 +335,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
         return ret;
     }
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
-                                               RaftTimerAction::Set,
+                                               RaftTimerAction::Restart,
                                                rand_int_in_range(200, 500)));
     return 0;
 }
@@ -470,7 +470,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Set, 100));
+                                               RaftTimerAction::Restart, 100));
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -481,8 +481,29 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
+    int ret;
+
     if (check_output_arg(out)) {
         return -1;
+    }
+
+    IOS_INF() << "AppendEntries(term=" << msg.term
+              << ", leader_id=" << msg.leader_id
+              << ", prev_log_index=" << msg.prev_log_index
+              << ", prev_log_term=" << msg.prev_log_term
+              << ", leader_commit=" << msg.leader_commit
+              << ", num_entries=" << msg.entries.size() << ")" << endl;
+
+    if ((ret = catch_up_term(msg.term, out))) {
+        if (ret < 0) {
+            return ret; /* error */
+        }
+
+        /* Go ahead, we may need to becaome again followers. */
+    }
+
+    if ((ret = back_to_follower(out))) {
+        return ret;
     }
 
     return 0;
@@ -526,9 +547,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         }
         votes_collected = 1;
         /* Reset the election timer in case we lose the election. */
-        out->timer_commands.push_back(
-            RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Set,
-                         rand_int_in_range(200, 500)));
+        out->timer_commands.push_back(RaftTimerCmd(
+            this, RaftTimerType::Election, RaftTimerAction::Restart,
+            rand_int_in_range(200, 500)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : next_index) {
             auto *msg           = new RaftRequestVote();
@@ -538,6 +559,10 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             msg->last_log_term  = last_log_term;
             out->output_messages.push_back(make_pair(kv.first, msg));
         }
+
+    } else if (type == RaftTimerType::HeartBeat) {
+        /* The heartbeat timer fired. */
+        IOS_INF() << "Hearbeat timer expired" << endl;
     }
 
     return 0;
