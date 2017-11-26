@@ -134,11 +134,13 @@ main()
             if (rv) {
                 replicas[p.first]->sm->request_vote_input(*rv, &output_next);
             } else if (rvr) {
-                replicas[p.first]->sm->request_vote_resp_input(*rvr, &output_next);
+                replicas[p.first]->sm->request_vote_resp_input(*rvr,
+                                                               &output_next);
             } else if (ae) {
                 replicas[p.first]->sm->append_entries_input(*ae, &output_next);
             } else if (aer) {
-                replicas[p.first]->sm->append_entries_resp_input(*aer, &output_next);
+                replicas[p.first]->sm->append_entries_resp_input(*aer,
+                                                                 &output_next);
             } else {
                 assert(false);
             }
@@ -168,8 +170,10 @@ main()
         while (!events.empty()) {
             const TestEvent &next = events.front();
             if (t < next.abstime) {
-                if (output_next.output_messages.empty() && output_next.timer_commands.empty()) {
-                    /* No need to go step by step, we can jump to the next event. */
+                if (output_next.output_messages.empty() &&
+                    output_next.timer_commands.empty()) {
+                    /* No need to go step by step, we can jump to the next
+                     * event. */
                     t_next = next.abstime;
                 }
                 break;
@@ -177,7 +181,7 @@ main()
             next.sm->timer_expired(next.ttype, &output_next);
             events.pop_front();
         }
-        t = t_next;
+        t      = t_next;
         output = output_next;
 
         {

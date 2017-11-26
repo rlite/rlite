@@ -364,6 +364,24 @@ RaftSM::catch_up_term(Term term, RaftSMOutput *out)
     return 1;
 }
 
+void
+RaftSM::prepare_heartbeat(RaftSMOutput *out)
+{
+    for (const auto &kv : next_index) {
+        auto *msg           = new RaftAppendEntries();
+        msg->term           = current_term;
+        msg->leader_id      = local_id;
+        msg->prev_log_index = kv.second;    // TODO
+        msg->prev_log_term  = current_term; // TODO
+        msg->leader_commit  = commit_index;
+        /* No entries, this is an heartbeat message. */
+        out->output_messages.push_back(make_pair(kv.first, msg));
+    }
+
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Restart, 100));
+}
+
 int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
@@ -459,18 +477,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
-    for (const auto &kv : next_index) {
-        auto *msg           = new RaftAppendEntries();
-        msg->term           = current_term;
-        msg->leader_id      = local_id;
-        msg->prev_log_index = kv.second;    // TODO
-        msg->prev_log_term  = current_term; // TODO
-        msg->leader_commit  = commit_index;
-        /* No entries, this is an heartbeat message. */
-        out->output_messages.push_back(make_pair(kv.first, msg));
-    }
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Restart, 100));
+    prepare_heartbeat(out);
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -563,6 +570,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
     } else if (type == RaftTimerType::HeartBeat) {
         /* The heartbeat timer fired. */
         IOS_INF() << "Hearbeat timer expired" << endl;
+        /* Send new heartbeat messages and rearm the timer. */
+        prepare_heartbeat(out);
     }
 
     return 0;
