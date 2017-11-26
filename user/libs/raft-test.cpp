@@ -6,6 +6,8 @@
 #include <cstring>
 #include <functional>
 #include <queue>
+#include <random>
+#include <ctime>
 
 #include "rlite/raft.hpp"
 
@@ -44,12 +46,17 @@ struct TestReplica {
 };
 
 struct TestEvent {
-    unsigned int abstime;
-    RaftTimerType ttype;
+    unsigned int abstime = 0;
+    RaftSM *sm           = nullptr;
+    RaftTimerType ttype  = RaftTimerType::Invalid;
 
-    TestEvent(unsigned int t, RaftTimerType ty) : abstime(t), ttype(ty) {}
+    TestEvent(unsigned int t, RaftSM *_sm, RaftTimerType ty)
+        : abstime(t), sm(_sm), ttype(ty)
+    {
+    }
 
-    bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
+    bool operator<(const TestEvent &o) const { /* Inverted logic. */
+        return abstime >= o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
 };
 
@@ -61,6 +68,8 @@ main()
     priority_queue<TestEvent> events;
     unsigned int t = 0; /* time */
     RaftSMOutput output;
+
+    srand(time(0));
 
     /* Clean up leftover logfiles, if any. */
     for (const auto &local : names) {
@@ -90,14 +99,45 @@ main()
         /* Process timer commands. */
         for (const RaftTimerCmd &cmd : output.timer_commands) {
             if (cmd.action == RaftTimerAction::Set) {
-                events.push(TestEvent(t + cmd.milliseconds, cmd.type));
+                events.push(TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
             }
         }
+
+        /* Process output messages. */
+        for (const auto &p : output.output_messages) {
+            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
+            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
+            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
+            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
+
+            assert(replicas.count(p.first));
+            if (rv) {
+                replicas[p.first]->sm->request_vote_input(*rv, &output);
+            } else if (rvr) {
+                replicas[p.first]->sm->request_vote_resp_input(*rvr, &output);
+            } else if (ae) {
+                replicas[p.first]->sm->append_entries_input(*ae, &output);
+            } else if (aer) {
+                replicas[p.first]->sm->append_entries_resp_input(*aer, &output);
+            } else {
+                assert(false);
+            }
+
+            delete p.second;
+        }
+
+        /* Extract next expired timer and update the associated
+         * Raft state machine. */
+        const TestEvent & next = events.top();
+        t = next.abstime;
+        cout << "| t = " << t << " |" << endl;
+        next.sm->timer_expired(next.ttype, &output);
+        events.pop();
+
         {
             string input;
             cin >> input;
         }
-        break;
     }
 
 out:

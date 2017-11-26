@@ -49,6 +49,7 @@ struct RaftLogEntry {
 /* Base class for all the Raft messages. */
 struct RaftMessage {
     Term term;
+    virtual ~RaftMessage() {} /* make it polymorphic */
 };
 
 struct RaftRequestVote : public RaftMessage {
