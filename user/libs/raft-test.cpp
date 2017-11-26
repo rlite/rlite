@@ -78,8 +78,7 @@ struct TestEvent {
     {
     }
 
-    bool operator<(const TestEvent &o) const { /* Inverted logic. */
-                                               return abstime >= o.abstime; }
+    bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
 };
 
@@ -88,7 +87,7 @@ main()
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, TestReplica *> replicas;
-    priority_queue<TestEvent> events;
+    list<TestEvent> events;
     unsigned int t = 0; /* time */
     RaftSMOutput output;
 
@@ -121,8 +120,22 @@ main()
     for (;;) {
         /* Process timer commands. */
         for (const RaftTimerCmd &cmd : output.timer_commands) {
-            if (cmd.action == RaftTimerAction::Set) {
-                events.push(TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
+            switch (cmd.action) {
+            case RaftTimerAction::Set:
+                events.push_back(
+                    TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
+                events.sort();
+                break;
+            case RaftTimerAction::Stop:
+                for (auto it = events.begin(); it != events.end(); it++) {
+                    if (it->sm == cmd.sm && it->ttype == cmd.type) {
+                        events.erase(it);
+                        break;
+                    }
+                }
+                break;
+            default:
+                assert(false);
             }
         }
         output.timer_commands.clear();
@@ -153,11 +166,11 @@ main()
 
         /* Extract next expired timer and update the associated
          * Raft state machine. */
-        const TestEvent &next = events.top();
+        const TestEvent &next = events.front();
         t                     = next.abstime;
         cout << "| t = " << t << " |" << endl;
         next.sm->timer_expired(next.ttype, &output);
-        events.pop();
+        events.pop_front();
 
         {
             string input;
