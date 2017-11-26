@@ -457,6 +457,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
      * heartbeat timer. */
     for (const auto &kv : next_index) {
         auto *msg           = new RaftAppendEntries();
+        msg->term           = current_term;
         msg->leader_id      = local_id;
         msg->prev_log_index = kv.second;    // TODO
         msg->prev_log_term  = current_term; // TODO
@@ -527,6 +528,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : next_index) {
             auto *msg           = new RaftRequestVote();
+            msg->term           = current_term;
             msg->candidate_id   = local_id;
             msg->last_log_index = last_log_index;
             msg->last_log_term  = last_log_term;
