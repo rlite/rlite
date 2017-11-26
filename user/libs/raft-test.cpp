@@ -79,7 +79,7 @@ struct TestEvent {
     }
 
     bool operator<(const TestEvent &o) const { /* Inverted logic. */
-        return abstime >= o.abstime; }
+                                               return abstime >= o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
 };
 
@@ -151,8 +151,8 @@ main()
 
         /* Extract next expired timer and update the associated
          * Raft state machine. */
-        const TestEvent & next = events.top();
-        t = next.abstime;
+        const TestEvent &next = events.top();
+        t                     = next.abstime;
         cout << "| t = " << t << " |" << endl;
         next.sm->timer_expired(next.ttype, &output);
         events.pop();
