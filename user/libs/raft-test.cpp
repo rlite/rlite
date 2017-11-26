@@ -118,12 +118,39 @@ main()
     }
 
     for (;;) {
-        /* Process timer commands. */
+        unsigned int t_next = t + 1;
+        RaftSMOutput output_next;
+
+        cout << "| t = " << t << " |" << endl;
+
+        /* Process current output messages. */
+        for (const auto &p : output.output_messages) {
+            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
+            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
+            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
+            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
+
+            assert(replicas.count(p.first));
+            if (rv) {
+                replicas[p.first]->sm->request_vote_input(*rv, &output_next);
+            } else if (rvr) {
+                replicas[p.first]->sm->request_vote_resp_input(*rvr, &output_next);
+            } else if (ae) {
+                replicas[p.first]->sm->append_entries_input(*ae, &output_next);
+            } else if (aer) {
+                replicas[p.first]->sm->append_entries_resp_input(*aer, &output_next);
+            } else {
+                assert(false);
+            }
+
+            delete p.second;
+        }
+
+        /* Process current timer commands. */
         for (const RaftTimerCmd &cmd : output.timer_commands) {
             for (auto it = events.begin(); it != events.end(); it++) {
                 if (it->sm == cmd.sm && it->ttype == cmd.type) {
                     events.erase(it);
-                    cout << "Stopped type" << ((unsigned int)cmd.type) << endl;
                     break;
                 }
             }
@@ -135,39 +162,23 @@ main()
                 assert(cmd.action == RaftTimerAction::Stop);
             }
         }
-        output.timer_commands.clear();
 
-        /* Process output messages. */
-        for (const auto &p : output.output_messages) {
-            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
-            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
-            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
-            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
-
-            assert(replicas.count(p.first));
-            if (rv) {
-                replicas[p.first]->sm->request_vote_input(*rv, &output);
-            } else if (rvr) {
-                replicas[p.first]->sm->request_vote_resp_input(*rvr, &output);
-            } else if (ae) {
-                replicas[p.first]->sm->append_entries_input(*ae, &output);
-            } else if (aer) {
-                replicas[p.first]->sm->append_entries_resp_input(*aer, &output);
-            } else {
-                assert(false);
-            }
-
-            delete p.second;
-        }
-        output.output_messages.clear();
-
-        /* Extract next expired timer and update the associated
+        /* Process all the timers expired so far, updating the associated
          * Raft state machine. */
-        const TestEvent &next = events.front();
-        t                     = next.abstime;
-        cout << "| t = " << t << " |" << endl;
-        next.sm->timer_expired(next.ttype, &output);
-        events.pop_front();
+        while (!events.empty()) {
+            const TestEvent &next = events.front();
+            if (t < next.abstime) {
+                if (output_next.output_messages.empty() && output_next.timer_commands.empty()) {
+                    /* No need to go step by step, we can jump to the next event. */
+                    t_next = next.abstime;
+                }
+                break;
+            }
+            next.sm->timer_expired(next.ttype, &output_next);
+            events.pop_front();
+        }
+        t = t_next;
+        output = output_next;
 
         {
             string input;
