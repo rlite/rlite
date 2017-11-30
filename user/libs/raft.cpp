@@ -597,3 +597,43 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 
     return 0;
 }
+
+int
+RaftSM::append_log_entry(const RaftLogEntry &entry)
+{
+    LogIndex new_index      = last_log_index + 1;
+    unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
+    const size_t serlen     = log_entry_size - sizeof(Term);
+    char *serbuf            = new char[serlen];
+    int ret;
+
+    /* First write the current term. */
+    if ((ret = log_u32_write(entry_pos, current_term))) {
+        return ret;
+    }
+
+    /* Second, serialize the log entry and write the serialized content. */
+    entry.serialize(serbuf);
+    if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
+        return ret;
+    }
+
+    /* Update our last log index and term. */
+    last_log_index = new_index;
+    last_log_term  = current_term;
+
+    return 0;
+}
+
+int
+RaftSM::submit(const RaftLogEntry &entry)
+{
+    int ret;
+
+    /* Append the entry to the local log. */
+    if ((ret = append_log_entry(entry))) {
+        return ret;
+    }
+
+    return 0;
+}
