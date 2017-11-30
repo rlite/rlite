@@ -377,8 +377,8 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
     return log_u32_read(kLogEntriesOfs + (index - 1) * log_entry_size, term);
 }
 
-/* Prepare a RaftAppendEntries message with the given 'entry.. If 'entry' is
- * nullptr, an heartbeat message is created instead. */
+/* Prepare a RaftAppendEntries message with the given 'entry. If 'entry' is
+ * nullptr we prepare an heartbeat message. */
 int
 RaftSM::prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out)
 {
@@ -392,9 +392,7 @@ RaftSM::prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out)
             delete msg;
             return -1;
         }
-        if (!entry) {
-            /* No entries, this is an heartbeat message. */
-        } else if (last_log_index >= kv.second.next_index) {
+        if (entry && last_log_index >= kv.second.next_index) {
             char *serbuf = new char[log_entry_size];
 
             *(reinterpret_cast<Term *>(serbuf)) = entry->term;
@@ -638,7 +636,8 @@ out:
 }
 
 int
-RaftSM::submit(const RaftLogEntry &entry)
+RaftSM::submit(const RaftLogEntry &entry, LogIndex *request_id,
+               RaftSMOutput *out)
 {
     int ret;
 
@@ -646,6 +645,14 @@ RaftSM::submit(const RaftLogEntry &entry)
     if ((ret = append_log_entry(entry))) {
         return ret;
     }
+
+    /* Prepare RaftAppendEntries messages to be sent to the other
+     * servers. */
+    if ((ret = prepare_append_entries(&entry, out))) {
+        return ret;
+    }
+
+    *request_id = last_log_index;
 
     return 0;
 }
