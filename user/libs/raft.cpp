@@ -323,15 +323,12 @@ RaftSM::quorum() const
     return static_cast<unsigned int>(ceil(q));
 }
 
-/* Switch back to follower state, resetting the voting state. */
+/* Switch back to follower state, resetting the voting state and
+ * restarting the election timer. */
 int
 RaftSM::back_to_follower(RaftSMOutput *out)
 {
     int ret;
-
-    if (state == RaftState::Follower) {
-        return 0; /* nothing to do */
-    }
 
     votes_collected = 0;
     if ((ret = vote_for_candidate(string()))) {
@@ -344,6 +341,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
     /* Also stop the heartbeat timer, in case we were leader. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::HeartBeat, RaftTimerAction::Stop));
+
     return 0;
 }
 
@@ -378,6 +376,11 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
         *term = 0;
         return 0;
     }
+
+    if (index > last_log_index) {
+        return 1; /* no such entry */
+    }
+
     return log_u32_read(kLogEntriesOfs + (index - 1) * log_entry_size, term);
 }
 
@@ -411,6 +414,34 @@ RaftSM::prepare_append_entries(const RaftLogEntry *const entry,
 }
 
 int
+RaftSM::append_log_entry(const Term term, const char *serbuf,
+                         const size_t serlen)
+{
+    LogIndex new_index      = last_log_index + 1;
+    unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
+    int ret                 = 0;
+
+    /* First write the current term. */
+    if ((ret = log_u32_write(entry_pos, term))) {
+        return ret;
+    }
+
+    /* Second, serialize the log entry and write the serialized content. */
+    if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
+        return ret;
+    }
+
+    /* Update our last log index and term. */
+    last_log_index = new_index;
+    last_log_term  = term;
+
+    IOS_INF() << "Append log entry term=" << last_log_term
+              << ", index=" << last_log_index << endl;
+
+    return ret;
+}
+
+int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
     RaftRequestVoteResp *resp = nullptr;
@@ -425,11 +456,8 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
               << ", last_log_term=" << msg.last_log_term
               << ", last_log_index=" << msg.last_log_index << ")" << endl;
 
-    if ((ret = catch_up_term(msg.term, out))) {
-        if (ret < 0) {
-            return ret; /* error */
-        }
-        /* Current term has been updated, go ahead. */
+    if ((ret = catch_up_term(msg.term, out)) < 0) {
+        return ret;
     }
 
     resp       = new RaftRequestVoteResp();
@@ -520,6 +548,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
+    RaftAppendEntriesResp *resp = nullptr;
+    Term prev_log_term          = 0;
     int ret;
 
     if (check_output_arg(out)) {
@@ -533,36 +563,56 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
               << ", leader_commit=" << msg.leader_commit
               << ", num_entries=" << msg.entries.size() << ")" << endl;
 
-    if ((ret = catch_up_term(msg.term, out))) {
-        if (ret < 0) {
-            return ret; /* error */
-        }
-
-        /* Go ahead, we may need to become followers again. */
+    if ((ret = catch_up_term(msg.term, out)) < 0) {
+        return ret;
     }
 
     if ((ret = back_to_follower(out))) {
         return ret;
     }
 
+    resp       = new RaftAppendEntriesResp();
+    resp->term = current_term;
+
+    if (msg.term < current_term) {
+        /* Sender is outdated. Just reply false. */
+        resp->success = false;
+        out->output_messages.push_back(make_pair(leader_id, resp));
+        return 0;
+    }
+
     if (msg.leader_commit > commit_index) {
         commit_index = msg.leader_commit;
         // TODO apply log entries
     }
-
     leader_id = msg.leader_id;
 
     if (msg.entries.empty()) {
-        return 0; /* nothing to do */
+        /* Heartbeat message, we don't need to reply. */
+        delete resp;
+        return 0;
     }
 
-    for (const char *serbuf : msg.entries) {
-        const Term term     = *(reinterpret_cast<const Term *>(serbuf));
-        const size_t serlen = log_entry_size - sizeof(Term);
-        if ((ret = append_log_entry(term, serbuf + sizeof(Term), serlen))) {
-            return ret;
+    /* Check if we can accept the entries. */
+    if ((ret = log_entry_get_term(msg.prev_log_index, &prev_log_term)) < 0) {
+        delete resp;
+        return ret;
+    }
+    resp->success = msg.prev_log_index <= last_log_index && ret == 0 &&
+                    msg.prev_log_term == prev_log_term;
+    if (resp->success) {
+        last_log_index = msg.prev_log_index;
+        // TODO truncate log at last_log_index
+        for (const char *serbuf : msg.entries) {
+            const Term term     = *(reinterpret_cast<const Term *>(serbuf));
+            const size_t serlen = log_entry_size - sizeof(Term);
+            if ((ret = append_log_entry(term, serbuf + sizeof(Term), serlen))) {
+                delete resp;
+                return ret;
+            }
         }
     }
+    out->output_messages.push_back(make_pair(leader_id, resp));
 
     return 0;
 }
@@ -630,34 +680,6 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
     }
 
     return 0;
-}
-
-int
-RaftSM::append_log_entry(const Term term, const char *serbuf,
-                         const size_t serlen)
-{
-    LogIndex new_index      = last_log_index + 1;
-    unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
-    int ret                 = 0;
-
-    /* First write the current term. */
-    if ((ret = log_u32_write(entry_pos, term))) {
-        return ret;
-    }
-
-    /* Second, serialize the log entry and write the serialized content. */
-    if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
-        return ret;
-    }
-
-    /* Update our last log index and term. */
-    last_log_index = new_index;
-    last_log_term  = term;
-
-    IOS_INF() << "Append log entry term=" << last_log_term
-              << ", index=" << last_log_index << endl;
-
-    return ret;
 }
 
 int
