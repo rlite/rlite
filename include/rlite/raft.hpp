@@ -200,10 +200,10 @@ class RaftSM {
     LogIndex last_applied = 0;
 
     /* A name for this SM, just for logging purposes. */
-    std::string name;
+    const std::string name;
 
     /* My identifier. */
-    ReplicaId local_id;
+    const ReplicaId local_id;
 
     /* Index of the last entry written in the local log. */
     LogIndex last_log_index = 0;
