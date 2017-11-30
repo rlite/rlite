@@ -377,20 +377,30 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
     return log_u32_read(kLogEntriesOfs + (index - 1) * log_entry_size, term);
 }
 
+/* Prepare a RaftAppendEntries message with the given 'entry.. If 'entry' is
+ * nullptr, an heartbeat message is created instead. */
 int
-RaftSM::prepare_heartbeat(RaftSMOutput *out)
+RaftSM::prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out)
 {
     for (const auto &kv : servers) {
         auto *msg           = new RaftAppendEntries();
         msg->term           = current_term;
         msg->leader_id      = local_id;
+        msg->leader_commit  = commit_index;
         msg->prev_log_index = kv.second.next_index - 1;
         if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
             delete msg;
             return -1;
         }
-        msg->leader_commit = commit_index;
-        /* No entries, this is an heartbeat message. */
+        if (!entry) {
+            /* No entries, this is an heartbeat message. */
+        } else if (last_log_index >= kv.second.next_index) {
+            char *serbuf = new char[log_entry_size];
+
+            *(reinterpret_cast<Term *>(serbuf)) = entry->term;
+            entry->serialize(serbuf + sizeof(Term));
+            msg->entries.push_back(serbuf);
+        }
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
 
@@ -494,7 +504,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
-    if ((ret = prepare_heartbeat(out))) {
+    if ((ret = prepare_append_entries(/*entry=*/nullptr, out))) {
         return ret;
     }
     /* Also stop the election timer. */
@@ -590,7 +600,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* The heartbeat timer fired. */
         IOS_INF() << "Hearbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
-        if ((ret = prepare_heartbeat(out))) {
+        if ((ret = prepare_append_entries(/*entry=*/nullptr, out))) {
             return ret;
         }
     }
@@ -605,24 +615,26 @@ RaftSM::append_log_entry(const RaftLogEntry &entry)
     unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
     const size_t serlen     = log_entry_size - sizeof(Term);
     char *serbuf            = new char[serlen];
-    int ret;
+    int ret                 = 0;
 
     /* First write the current term. */
     if ((ret = log_u32_write(entry_pos, current_term))) {
-        return ret;
+        goto out;
     }
 
     /* Second, serialize the log entry and write the serialized content. */
     entry.serialize(serbuf);
     if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
-        return ret;
+        goto out;
     }
 
     /* Update our last log index and term. */
     last_log_index = new_index;
     last_log_term  = current_term;
+out:
+    delete serbuf;
 
-    return 0;
+    return ret;
 }
 
 int

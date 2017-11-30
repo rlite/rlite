@@ -79,18 +79,18 @@ struct RaftAppendEntries : public RaftMessage {
     /* Id of the leader, so that followers can redirect clients. */
     ReplicaId leader_id;
 
+    /* Leader's commit index. */
+    LogIndex leader_commit;
+
     /* Index of the log entry immediately preceding new ones. */
     LogIndex prev_log_index;
 
     /* Term of prev_log_index entry. */
     Term prev_log_term;
 
-    /* Leader's commit index. */
-    LogIndex leader_commit;
-
     /* Log entries to store (empty for heartbeat). There may be
      * more than one for efficiency. */
-    std::list<RaftLogEntry *> entries;
+    std::list<char *> entries;
 };
 
 struct RaftAppendEntriesResp : public RaftMessage {
@@ -253,7 +253,7 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    int prepare_heartbeat(RaftSMOutput *out);
+    int prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
     int append_log_entry(const RaftLogEntry &entry);
 
