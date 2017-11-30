@@ -145,8 +145,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
     }
 
     for (const auto &rid : peers) {
-        match_index[rid] = 0;
-        next_index[rid]  = last_log_index + 1;
+        servers[rid].match_index = 0;
+        servers[rid].next_index  = last_log_index + 1;
     }
 
     /* Initialization is complete, we can set the election timer and return to
@@ -319,7 +319,7 @@ RaftSM::vote_for_candidate(ReplicaId candidate)
 unsigned int
 RaftSM::quorum() const
 {
-    double q = 0.5 * (next_index.size() + 1);
+    double q = 0.5 * (servers.size() + 1);
     return static_cast<unsigned int>(ceil(q));
 }
 
@@ -380,11 +380,11 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
 int
 RaftSM::prepare_heartbeat(RaftSMOutput *out)
 {
-    for (const auto &kv : next_index) {
+    for (const auto &kv : servers) {
         auto *msg           = new RaftAppendEntries();
         msg->term           = current_term;
         msg->leader_id      = local_id;
-        msg->prev_log_index = kv.second - 1;
+        msg->prev_log_index = kv.second.next_index - 1;
         if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
             delete msg;
             return -1;
@@ -577,7 +577,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             this, RaftTimerType::Election, RaftTimerAction::Restart,
             rand_int_in_range(200, 500)));
         /* Prepare RequestVote messages for the other servers. */
-        for (const auto &kv : next_index) {
+        for (const auto &kv : servers) {
             auto *msg           = new RaftRequestVote();
             msg->term           = current_term;
             msg->candidate_id   = local_id;

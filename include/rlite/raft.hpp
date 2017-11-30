@@ -169,14 +169,18 @@ class RaftSM {
      * Volatile state for leaders.
      */
 
-    /* For each replica, index of the next log entry to send to
-     * that server. Initialized to leader's last log index + 1. */
-    std::map<ReplicaId, LogIndex> next_index;
+    struct Server {
+        /* For each replica, index of the next log entry to send to
+         * that server. Initialized to leader's last log index + 1. */
+        LogIndex next_index;
 
-    /* For each replica, index of highest log entry known to
-     * be replicated on that replica. Initialized to 0, increases
-     * monotonically. */
-    std::map<ReplicaId, LogIndex> match_index;
+        /* For each replica, index of highest log entry known to
+         * be replicated on that replica. Initialized to 0, increases
+         * monotonically. */
+        LogIndex match_index;
+    };
+
+    std::map<ReplicaId, Server> servers;
 
     /* =================================================================
      * Volatile state common to all the replicas.
