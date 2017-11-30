@@ -636,19 +636,20 @@ out:
 }
 
 int
-RaftSM::submit(const RaftLogEntry &entry, LogIndex *request_id,
+RaftSM::submit(unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
                RaftSMOutput *out)
 {
+    const RaftLogEntry *pe = entry.get();
     int ret;
 
     /* Append the entry to the local log. */
-    if ((ret = append_log_entry(entry))) {
+    if ((ret = append_log_entry(*pe))) {
         return ret;
     }
 
     /* Prepare RaftAppendEntries messages to be sent to the other
      * servers. */
-    if ((ret = prepare_append_entries(&entry, out))) {
+    if ((ret = prepare_append_entries(pe, out))) {
         return ret;
     }
 
