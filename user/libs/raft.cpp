@@ -338,8 +338,8 @@ RaftSM::back_to_follower(RaftSMOutput *out)
                                                RaftTimerAction::Restart,
                                                rand_int_in_range(200, 500)));
     /* Also stop the heartbeat timer, in case we were leader. */
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Stop));
+    out->timer_commands.push_back(
+        RaftTimerCmd(this, RaftTimerType::HeartBeat, RaftTimerAction::Stop));
     return 0;
 }
 
@@ -367,22 +367,36 @@ RaftSM::catch_up_term(Term term, RaftSMOutput *out)
     return 1;
 }
 
-void
+int
+RaftSM::log_entry_get_term(LogIndex index, Term *term)
+{
+    if (index == 0) {
+        *term = 0;
+        return 0;
+    }
+    return log_u32_read(kLogEntriesOfs + (index - 1) * log_entry_size, term);
+}
+
+int
 RaftSM::prepare_heartbeat(RaftSMOutput *out)
 {
     for (const auto &kv : next_index) {
         auto *msg           = new RaftAppendEntries();
         msg->term           = current_term;
         msg->leader_id      = local_id;
-        msg->prev_log_index = kv.second;    // TODO
-        msg->prev_log_term  = current_term; // TODO
-        msg->leader_commit  = commit_index;
+        msg->prev_log_index = kv.second - 1;
+        if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
+            delete msg;
+            return -1;
+        }
+        msg->leader_commit = commit_index;
         /* No entries, this is an heartbeat message. */
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
 
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
                                                RaftTimerAction::Restart, 100));
+    return 0;
 }
 
 int
@@ -480,7 +494,9 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
-    prepare_heartbeat(out);
+    if ((ret = prepare_heartbeat(out))) {
+        return ret;
+    }
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -574,7 +590,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* The heartbeat timer fired. */
         IOS_INF() << "Hearbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
-        prepare_heartbeat(out);
+        if ((ret = prepare_heartbeat(out))) {
+            return ret;
+        }
     }
 
     return 0;

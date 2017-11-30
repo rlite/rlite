@@ -311,7 +311,7 @@ int uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
 int uipcp_loop_schedule_canc(struct uipcp *uipcp, int id);
 
 #define UPRINT(_u, LEV, FMT, ...)                                              \
-    DOPRINT("[%s:" LEV "][%s]%s: " FMT, hms_string(), (_u)->name, __func__,   \
+    DOPRINT("[%s:" LEV "][%s]%s: " FMT, hms_string(), (_u)->name, __func__,    \
             ##__VA_ARGS__)
 
 #define UPD(_u, FMT, ...)                                                      \

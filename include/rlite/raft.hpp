@@ -247,7 +247,8 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    void prepare_heartbeat(RaftSMOutput *out);
+    int prepare_heartbeat(RaftSMOutput *out);
+    int log_entry_get_term(LogIndex index, Term *term);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
