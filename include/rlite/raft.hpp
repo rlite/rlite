@@ -138,7 +138,7 @@ struct RaftTimerCmd {
 struct RaftSMOutput {
     std::list<std::pair<ReplicaId, RaftMessage *> > output_messages;
     std::list<RaftTimerCmd> timer_commands;
-    std::list<RaftLogEntry *> committed_entries;
+    std::list<LogIndex> committed_entries;
 };
 
 enum class RaftState {
@@ -288,8 +288,11 @@ public:
     int timer_expired(RaftTimerType, RaftSMOutput *out);
 
     /* Called by the user when it wants to submit a new log entry to
-     * the replicated state machine. */
-    int submit(const RaftLogEntry &entry);
+     * the replicated state machine. In addition to the 'out' argument,
+     * it returns the id assigned to this request, so that the caller
+     * can later know when the associated command has been committed. */
+    int submit(const RaftLogEntry &entry, LogIndex *request_id,
+               RaftSMOutput *out);
 };
 
 #endif /* __RAFT_H__ */
