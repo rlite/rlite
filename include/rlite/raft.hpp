@@ -132,11 +132,13 @@ struct RaftTimerCmd {
 };
 
 /* The output of an invocation of the Raft state machine. May contain
- * some messages to send to the other replicas and command to start
- * or stop some timers. */
+ * some messages to send to the other replicas, commands to start
+ * or stop some timers, and log entries that have been commited to
+ * the replicated state machine. */
 struct RaftSMOutput {
     std::list<std::pair<ReplicaId, RaftMessage *> > output_messages;
     std::list<RaftTimerCmd> timer_commands;
+    std::list<RaftLogEntry *> committed_entries;
 };
 
 enum class RaftState {
@@ -253,6 +255,7 @@ class RaftSM {
     unsigned int quorum() const;
     int prepare_heartbeat(RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
+    int append_log_entry(const RaftLogEntry &entry);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
@@ -283,6 +286,10 @@ public:
 
     /* Called by the user when a timer requested by Raft expired. */
     int timer_expired(RaftTimerType, RaftSMOutput *out);
+
+    /* Called by the user when it wants to submit a new log entry to
+     * the replicated state machine. */
+    int submit(const RaftLogEntry &entry);
 };
 
 #endif /* __RAFT_H__ */
