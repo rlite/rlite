@@ -530,6 +530,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
     IOS_INF() << "Collected " << votes_collected << " votes, becoming leader"
               << endl;
     switch_state(RaftState::Leader);
+    leader_id = local_id;
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
