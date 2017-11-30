@@ -72,11 +72,16 @@ struct TestEvent {
     unsigned int abstime = 0;
     RaftSM *sm           = nullptr;
     RaftTimerType ttype  = RaftTimerType::Invalid;
+    bool client          = false;
 
+    /* A Raft timer event. */
     TestEvent(unsigned int t, RaftSM *_sm, RaftTimerType ty)
         : abstime(t), sm(_sm), ttype(ty)
     {
     }
+
+    /* A client submission event. */
+    TestEvent(unsigned int t) : abstime(t), client(true) {}
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
@@ -97,6 +102,12 @@ main()
     for (const auto &local : names) {
         remove(logfile(local).c_str());
     }
+
+    /* Push some client submission. */
+    events.push_back(TestEvent(350));
+    events.push_back(TestEvent(400));
+    events.push_back(TestEvent(600));
+    events.sort();
 
     for (const auto &local : names) {
         string logfilename = logfile(local);
@@ -178,7 +189,11 @@ main()
                 }
                 break;
             }
-            next.sm->timer_expired(next.ttype, &output_next);
+            if (next.client) {
+                cout << "Submit" << endl;
+            } else {
+                next.sm->timer_expired(next.ttype, &output_next);
+            }
             events.pop_front();
         }
         t      = t_next;
