@@ -300,6 +300,12 @@ public:
      * can later know when the associated command has been committed. */
     int submit(std::unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
                RaftSMOutput *out);
+
+    /* True if this Raft SM is the current leader. */
+    bool leader() const { return state == RaftState::Leader; }
+
+    /* Name of the current leader (if we know it). */
+    ReplicaId leader_name() const { return leader_id; }
 };
 
 #endif /* __RAFT_H__ */
