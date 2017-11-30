@@ -45,6 +45,7 @@ struct RaftLogEntry {
 
     /* How this entry must be serialized. */
     virtual void serialize(char *serbuf) const = 0;
+    virtual ~RaftLogEntry() {}
 };
 
 /* Base class for all the Raft messages. */
@@ -206,6 +207,9 @@ class RaftSM {
     /* My identifier. */
     const ReplicaId local_id;
 
+    /* Id of the leader, useful to redirect clients. */
+    ReplicaId leader_id;
+
     /* Index of the last entry written in the local log. */
     LogIndex last_log_index = 0;
 
@@ -254,9 +258,11 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    int prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out);
+    int prepare_append_entries(const RaftLogEntry *const entry,
+                               RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
-    int append_log_entry(const RaftLogEntry &entry);
+    int append_log_entry(const Term term, const char *serbuf,
+                         const size_t serlen);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,

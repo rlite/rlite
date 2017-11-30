@@ -329,6 +329,10 @@ RaftSM::back_to_follower(RaftSMOutput *out)
 {
     int ret;
 
+    if (state == RaftState::Follower) {
+        return 0; /* nothing to do */
+    }
+
     votes_collected = 0;
     if ((ret = vote_for_candidate(string()))) {
         return ret;
@@ -380,7 +384,8 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
 /* Prepare a RaftAppendEntries message with the given 'entry. If 'entry' is
  * nullptr we prepare an heartbeat message. */
 int
-RaftSM::prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out)
+RaftSM::prepare_append_entries(const RaftLogEntry *const entry,
+                               RaftSMOutput *out)
 {
     for (const auto &kv : servers) {
         auto *msg           = new RaftAppendEntries();
@@ -540,6 +545,25 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return ret;
     }
 
+    if (msg.leader_commit > commit_index) {
+        commit_index = msg.leader_commit;
+        // TODO apply log entries
+    }
+
+    leader_id = msg.leader_id;
+
+    if (msg.entries.empty()) {
+        return 0; /* nothing to do */
+    }
+
+    for (const char *serbuf : msg.entries) {
+        const Term term     = *(reinterpret_cast<const Term *>(serbuf));
+        const size_t serlen = log_entry_size - sizeof(Term);
+        if ((ret = append_log_entry(term, serbuf + sizeof(Term), serlen))) {
+            return ret;
+        }
+    }
+
     return 0;
 }
 
@@ -609,30 +633,29 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 }
 
 int
-RaftSM::append_log_entry(const RaftLogEntry &entry)
+RaftSM::append_log_entry(const Term term, const char *serbuf,
+                         const size_t serlen)
 {
     LogIndex new_index      = last_log_index + 1;
     unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
-    const size_t serlen     = log_entry_size - sizeof(Term);
-    char *serbuf            = new char[serlen];
     int ret                 = 0;
 
     /* First write the current term. */
-    if ((ret = log_u32_write(entry_pos, current_term))) {
-        goto out;
+    if ((ret = log_u32_write(entry_pos, term))) {
+        return ret;
     }
 
     /* Second, serialize the log entry and write the serialized content. */
-    entry.serialize(serbuf);
     if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
-        goto out;
+        return ret;
     }
 
     /* Update our last log index and term. */
     last_log_index = new_index;
-    last_log_term  = current_term;
-out:
-    delete serbuf;
+    last_log_term  = term;
+
+    IOS_INF() << "Append log entry term=" << last_log_term
+              << ", index=" << last_log_index << endl;
 
     return ret;
 }
@@ -641,17 +664,21 @@ int
 RaftSM::submit(unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
                RaftSMOutput *out)
 {
-    const RaftLogEntry *pe = entry.get();
+    const size_t serlen = log_entry_size - sizeof(Term);
+    char *serbuf        = new char[serlen];
     int ret;
 
-    /* Append the entry to the local log. */
-    if ((ret = append_log_entry(*pe))) {
+    /* Serialize the new entry and append it to the local log. */
+    entry->serialize(serbuf);
+    if ((ret = append_log_entry(current_term, serbuf, serlen))) {
+        delete serbuf;
         return ret;
     }
+    delete serbuf;
 
     /* Prepare RaftAppendEntries messages to be sent to the other
      * servers. */
-    if ((ret = prepare_append_entries(pe, out))) {
+    if ((ret = prepare_append_entries(entry.get(), out))) {
         return ret;
     }
 
