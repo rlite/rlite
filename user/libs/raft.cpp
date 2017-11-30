@@ -402,8 +402,6 @@ RaftSM::prepare_append_entries(const RaftLogEntry *entry, RaftSMOutput *out)
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
 
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Restart, 100));
     return 0;
 }
 
@@ -505,6 +503,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
     if ((ret = prepare_append_entries(/*entry=*/nullptr, out))) {
         return ret;
     }
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Restart, 100));
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -601,6 +601,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         if ((ret = prepare_append_entries(/*entry=*/nullptr, out))) {
             return ret;
         }
+        out->timer_commands.push_back(RaftTimerCmd(
+            this, RaftTimerType::HeartBeat, RaftTimerAction::Restart, 100));
     }
 
     return 0;
