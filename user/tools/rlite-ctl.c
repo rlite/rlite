@@ -37,11 +37,10 @@
 #include <assert.h>
 #include <sys/ioctl.h>
 
-#include <rlite/list.h>
-#include <rlite/uipcps-msg.h>
-#include <rlite/conf.h>
-
-#include "../helpers.h"
+#include "rlite/list.h"
+#include "rlite/uipcps-msg.h"
+#include "rlite/conf.h"
+#include "rlite/uipcps-helpers.h"
 
 /* IPCP attributes. */
 struct ipcp_attrs {

@@ -48,8 +48,7 @@
 #include "rlite/utils.h"
 #include "rlite/list.h"
 #include "rlite/conf.h"
-
-#include "../helpers.h"
+#include "rlite/uipcps-helpers.h"
 #include "uipcp-container.h"
 
 struct registered_ipcp {

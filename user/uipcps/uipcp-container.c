@@ -30,11 +30,10 @@
 #include <fcntl.h>
 #include <poll.h>
 
-#include <rlite/conf.h>
-#include <rlite/utils.h>
-#include <rlite/uipcps-msg.h>
-
-#include "../helpers.h"
+#include "rlite/conf.h"
+#include "rlite/utils.h"
+#include "rlite/uipcps-msg.h"
+#include "rlite/uipcps-helpers.h"
 #include "uipcp-container.h"
 
 int
