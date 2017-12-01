@@ -45,13 +45,6 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         return -1;
     }
 
-    /* Check if log_entry_size was valid. */
-    if (log_entry_size <= sizeof(Term)) {
-        IOS_ERR() << "Log entry size " << log_entry_size << " is too short"
-                  << endl;
-        return -1;
-    }
-
     if (first_boot) {
         mode |= ios::trunc;
     } else {
@@ -425,12 +418,9 @@ RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
             return -1;
         }
         if (serbuf && last_log_index >= kv.second.next_index) {
-            char *entrybuf = new char[log_entry_size];
-
-            *(reinterpret_cast<Term *>(entrybuf)) = term;
-            memcpy(entrybuf + sizeof(Term), serbuf,
-                   log_entry_size - sizeof(Term));
-            msg->entries.push_back(entrybuf);
+            char *bufcopy = new char[log_command_size];
+            memcpy(bufcopy, serbuf, log_command_size);
+            msg->entries.push_back(std::make_pair(term, bufcopy));
         }
         out->output_messages.push_back(make_pair(kv.first, msg));
     }
@@ -441,7 +431,6 @@ RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
 int
 RaftSM::append_log_entry(const Term term, const char *serbuf)
 {
-    const size_t serlen     = log_entry_size - sizeof(Term);
     LogIndex new_index      = last_log_index + 1;
     unsigned long entry_pos = kLogEntriesOfs + (new_index - 1) * log_entry_size;
     int ret                 = 0;
@@ -452,7 +441,8 @@ RaftSM::append_log_entry(const Term term, const char *serbuf)
     }
 
     /* Second, serialize the log entry and write the serialized content. */
-    if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf, serlen))) {
+    if ((ret = log_buf_write(entry_pos + sizeof(Term), serbuf,
+                             log_command_size))) {
         return ret;
     }
 
@@ -627,9 +617,8 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
     if (resp->success) {
         last_log_index = msg.prev_log_index;
         // TODO truncate log at last_log_index
-        for (const char *serbuf : msg.entries) {
-            const Term term = *(reinterpret_cast<const Term *>(serbuf));
-            if ((ret = append_log_entry(term, serbuf + sizeof(Term)))) {
+        for (auto entry : msg.entries) {
+            if ((ret = append_log_entry(entry.first, entry.second))) {
                 delete resp;
                 return ret;
             }

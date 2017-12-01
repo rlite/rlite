@@ -112,9 +112,9 @@ main()
                 }
             }
 
-            sm = new RaftSM(local + "-sm", local, logfilename,
-                            sizeof(Term) + sizeof(uint32_t), std::cerr,
-                            std::cout);
+            sm = new RaftSM(
+                /*smname=*/local + "-sm", /*myname=*/local, logfilename,
+                /*cmd_size=*/sizeof(uint32_t), std::cerr, std::cout);
             if (sm->init(peers, &output)) {
                 throw 1;
             }
