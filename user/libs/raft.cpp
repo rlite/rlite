@@ -572,8 +572,10 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp       = new RaftAppendEntriesResp();
-    resp->term = current_term;
+    resp                 = new RaftAppendEntriesResp();
+    resp->term           = current_term;
+    resp->follower_id    = local_id;
+    resp->last_log_index = last_log_index;
 
     if (msg.term < current_term) {
         /* Sender is outdated. Just reply false. */
@@ -582,10 +584,6 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return 0;
     }
 
-    if (msg.leader_commit > commit_index) {
-        commit_index = msg.leader_commit;
-        // TODO apply log entries
-    }
     leader_id = msg.leader_id;
 
     if (msg.entries.empty()) {
@@ -612,18 +610,44 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
                 return ret;
             }
         }
+        resp->last_log_index = last_log_index;
     }
+
+    if (msg.leader_commit > commit_index) {
+        commit_index = std::min(msg.leader_commit, last_log_index);
+        // TODO apply log entries
+    }
+
     out->output_messages.push_back(make_pair(leader_id, resp));
 
     return 0;
 }
 
 int
-RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &msg,
+RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
                                   RaftSMOutput *out)
 {
     if (check_output_arg(out)) {
         return -1;
+    }
+
+    IOS_INF() << "Received AppendEntriesResp(term=" << resp.term
+              << ", follower_id=" << resp.follower_id
+              << ", last_log_index=" << resp.last_log_index
+              << ", success=" << resp.success << ")" << endl;
+
+    if (!servers.count(resp.follower_id)) {
+        IOS_ERR() << "Replica " << resp.follower_id << " does not exist"
+                  << endl;
+        return -1;
+    }
+
+    if (resp.success) {
+        servers[resp.follower_id].next_index  = resp.last_log_index + 1;
+        servers[resp.follower_id].match_index = resp.last_log_index;
+    } else {
+        assert(servers[resp.follower_id].next_index > 0);
+        servers[resp.follower_id].next_index--;
     }
 
     return 0;

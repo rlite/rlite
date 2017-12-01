@@ -99,6 +99,14 @@ struct RaftAppendEntriesResp : public RaftMessage {
     /* RaftMessage::term is the current term as known by
      * the peer, for the leader to update itself. */
 
+    /* Id of the responding follower. */
+    ReplicaId follower_id;
+
+    /* On success, the new last log index of the follower.
+     * Used by the leader to match AppendEntries requests
+     * to responses. */
+    LogIndex last_log_index;
+
     /* True if the follower's last entry matched prev_log_index
      * and prev_log_term as specified in the request. If false
      * the leader should retry with an older log entry. */
