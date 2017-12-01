@@ -31,13 +31,17 @@
 #include <queue>
 #include <random>
 #include <ctime>
+#include <memory>
 
+#include "rlite/cpputils.hpp"
 #include "rlite/raft.hpp"
 
 using namespace std;
 
 struct TestLogEntry : public RaftLogEntry {
     uint32_t command;
+
+    TestLogEntry(uint32_t cmd) : RaftLogEntry(), command(cmd) {}
 
     void serialize(char *serbuf) const override
     {
@@ -93,8 +97,10 @@ main()
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, TestReplica *> replicas;
     list<TestEvent> events;
-    unsigned int t = 0; /* time */
+    uint32_t counter = 18;
+    unsigned int t   = 0; /* time */
     RaftSMOutput output;
+    int ret = 0;
 
     srand(time(0));
 
@@ -109,107 +115,138 @@ main()
     events.push_back(TestEvent(600));
     events.sort();
 
-    for (const auto &local : names) {
-        string logfilename = logfile(local);
-        list<string> peers;
-        RaftSM *sm;
+    try {
+        for (const auto &local : names) {
+            string logfilename = logfile(local);
+            list<string> peers;
+            RaftSM *sm;
 
-        for (const auto &peer : names) {
-            if (peer != local) {
-                peers.push_back(peer);
-            }
-        }
-
-        sm = new RaftSM(local + "-sm", local, logfilename, TestLogEntry::size(),
-                        std::cerr, std::cout);
-        if (sm->init(peers, &output)) {
-            goto out;
-        }
-        replicas[local] = new TestReplica(sm);
-    }
-
-    for (;;) {
-        unsigned int t_next = t + 1;
-        RaftSMOutput output_next;
-
-        cout << "| t = " << t << " |" << endl;
-
-        /* Process current output messages. */
-        for (const auto &p : output.output_messages) {
-            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
-            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
-            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
-            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
-
-            assert(replicas.count(p.first));
-            if (rv) {
-                replicas[p.first]->sm->request_vote_input(*rv, &output_next);
-            } else if (rvr) {
-                replicas[p.first]->sm->request_vote_resp_input(*rvr,
-                                                               &output_next);
-            } else if (ae) {
-                replicas[p.first]->sm->append_entries_input(*ae, &output_next);
-            } else if (aer) {
-                replicas[p.first]->sm->append_entries_resp_input(*aer,
-                                                                 &output_next);
-            } else {
-                assert(false);
+            for (const auto &peer : names) {
+                if (peer != local) {
+                    peers.push_back(peer);
+                }
             }
 
-            delete p.second;
+            sm = new RaftSM(local + "-sm", local, logfilename,
+                            TestLogEntry::size(), std::cerr, std::cout);
+            if (sm->init(peers, &output)) {
+                throw 1;
+            }
+            replicas[local] = new TestReplica(sm);
         }
 
-        /* Process current timer commands. */
-        for (const RaftTimerCmd &cmd : output.timer_commands) {
-            for (auto it = events.begin(); it != events.end(); it++) {
-                if (it->sm == cmd.sm && it->ttype == cmd.type) {
-                    events.erase(it);
+        for (;;) {
+            unsigned int t_next = t + 1;
+            RaftSMOutput output_next;
+
+            cout << "| t = " << t << " |" << endl;
+
+            /* Process current output messages. */
+            for (const auto &p : output.output_messages) {
+                auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
+                auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
+                auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
+                auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
+                int r     = 0;
+
+                assert(replicas.count(p.first));
+                if (rv) {
+                    r = replicas[p.first]->sm->request_vote_input(*rv,
+                                                                  &output_next);
+                } else if (rvr) {
+                    r = replicas[p.first]->sm->request_vote_resp_input(
+                        *rvr, &output_next);
+                } else if (ae) {
+                    r = replicas[p.first]->sm->append_entries_input(
+                        *ae, &output_next);
+                } else if (aer) {
+                    r = replicas[p.first]->sm->append_entries_resp_input(
+                        *aer, &output_next);
+                } else {
+                    assert(false);
+                }
+
+                delete p.second;
+                if (r) {
+                    throw 4;
+                }
+            }
+
+            /* Process current timer commands. */
+            for (const RaftTimerCmd &cmd : output.timer_commands) {
+                for (auto it = events.begin(); it != events.end(); it++) {
+                    if (it->sm == cmd.sm && it->ttype == cmd.type) {
+                        events.erase(it);
+                        break;
+                    }
+                }
+                if (cmd.action == RaftTimerAction::Restart) {
+                    events.push_back(
+                        TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
+                    events.sort();
+                } else {
+                    assert(cmd.action == RaftTimerAction::Stop);
+                }
+            }
+
+            /* Process all the timers expired so far, updating the associated
+             * Raft state machine. */
+            while (!events.empty()) {
+                const TestEvent &next = events.front();
+                if (t < next.abstime) {
+                    if (output_next.output_messages.empty() &&
+                        output_next.timer_commands.empty()) {
+                        /* No need to go step by step, we can jump to the next
+                         * event. */
+                        t_next = next.abstime;
+                    }
                     break;
                 }
-            }
-            if (cmd.action == RaftTimerAction::Restart) {
-                events.push_back(
-                    TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
-                events.sort();
-            } else {
-                assert(cmd.action == RaftTimerAction::Stop);
-            }
-        }
-
-        /* Process all the timers expired so far, updating the associated
-         * Raft state machine. */
-        while (!events.empty()) {
-            const TestEvent &next = events.front();
-            if (t < next.abstime) {
-                if (output_next.output_messages.empty() &&
-                    output_next.timer_commands.empty()) {
-                    /* No need to go step by step, we can jump to the next
-                     * event. */
-                    t_next = next.abstime;
+                if (next.client) {
+                    /* This event is a client submission. */
+                    bool submitted = false;
+                    for (const auto &kv : replicas) {
+                        if (kv.second->sm->leader()) {
+                            std::unique_ptr<TestLogEntry> entry =
+                                make_unique<TestLogEntry>(++counter);
+                            LogIndex request_id;
+                            if (kv.second->sm->submit(std::move(entry),
+                                                      &request_id,
+                                                      &output_next)) {
+                                throw 2;
+                            }
+                            submitted = true;
+                            cout << "Command " << counter << " submitted"
+                                 << endl;
+                        }
+                    }
+                    if (!submitted) {
+                        cout << "Dropped client request (no leader)" << endl;
+                    }
+                } else {
+                    /* This event is a timer firing. */
+                    if (next.sm->timer_expired(next.ttype, &output_next)) {
+                        throw 3;
+                    }
                 }
-                break;
+                events.pop_front();
             }
-            if (next.client) {
-                cout << "Submit" << endl;
-            } else {
-                next.sm->timer_expired(next.ttype, &output_next);
-            }
-            events.pop_front();
-        }
-        t      = t_next;
-        output = output_next;
+            t      = t_next;
+            output = output_next;
 
-        {
-            string input;
-            cin >> input;
+            {
+                string input;
+                cin >> input;
+            }
         }
+    } catch (int) {
+        ret = -1;
     }
 
-out:
     for (const auto &kv : replicas) {
         kv.second->sm->shutdown();
         delete kv.second;
     }
 
-    return 0;
+    return ret;
 }
