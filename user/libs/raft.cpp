@@ -326,6 +326,7 @@ RaftSM::vote_for_candidate(ReplicaId candidate)
         int ret;
 
         voted_for = candidate;
+        memset(buf_id, 0, sizeof(buf_id));
         snprintf(buf_id, sizeof(buf_id), "%s", voted_for.c_str());
         if ((ret = log_buf_write(kLogVotedForOfs, buf_id, sizeof(buf_id)))) {
             return ret;
@@ -572,6 +573,11 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
               << endl;
     switch_state(RaftState::Leader);
     leader_id = local_id;
+
+    for (auto &kv : servers) {
+        kv.second.match_index = 0;
+        kv.second.next_index  = last_log_index + 1;
+    }
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
