@@ -627,6 +627,8 @@ int
 RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
                                   RaftSMOutput *out)
 {
+    int ret;
+
     if (check_output_arg(out)) {
         return -1;
     }
@@ -635,6 +637,15 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
               << ", follower_id=" << resp.follower_id
               << ", last_log_index=" << resp.last_log_index
               << ", success=" << resp.success << ")" << endl;
+
+    if ((ret = catch_up_term(resp.term, out))) {
+        if (ret < 0) {
+            return ret;
+        }
+
+        /* We are not the leader anymore. */
+        return 0;
+    }
 
     if (!servers.count(resp.follower_id)) {
         IOS_ERR() << "Replica " << resp.follower_id << " does not exist"
