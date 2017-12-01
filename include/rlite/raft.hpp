@@ -260,6 +260,7 @@ class RaftSM {
                                RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
     int append_log_entry(const Term term, const char *serbuf);
+    int apply_committed_entries();
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
