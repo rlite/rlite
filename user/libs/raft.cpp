@@ -30,6 +30,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "rlite/cpputils.hpp"
+
 using namespace std;
 
 int
@@ -408,21 +410,20 @@ RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
                                RaftSMOutput *out)
 {
     for (const auto &kv : servers) {
-        auto *msg           = new RaftAppendEntries();
+        auto msg            = make_unique<RaftAppendEntries>();
         msg->term           = current_term;
         msg->leader_id      = local_id;
         msg->leader_commit  = commit_index;
         msg->prev_log_index = kv.second.next_index - 1;
         if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
-            delete msg;
             return -1;
         }
         if (serbuf && last_log_index >= kv.second.next_index) {
-            char *bufcopy = new char[log_command_size];
-            memcpy(bufcopy, serbuf, log_command_size);
-            msg->entries.push_back(std::make_pair(term, bufcopy));
+            auto bufcopy = std::unique_ptr<char[]>(new char[log_command_size]);
+            memcpy(bufcopy.get(), serbuf, log_command_size);
+            msg->entries.push_back(std::make_pair(term, std::move(bufcopy)));
         }
-        out->output_messages.push_back(make_pair(kv.first, msg));
+        out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
     }
 
     return 0;
@@ -483,7 +484,7 @@ RaftSM::apply_committed_entries()
 int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
-    RaftRequestVoteResp *resp = nullptr;
+    std::unique_ptr<RaftRequestVoteResp> resp;
     int ret;
 
     if (check_output_arg(out)) {
@@ -499,7 +500,7 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp       = new RaftRequestVoteResp();
+    resp       = make_unique<RaftRequestVoteResp>();
     resp->term = current_term;
 
     if (msg.term < current_term) {
@@ -527,7 +528,8 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
     IOS_INF() << "Vote for " << msg.candidate_id
               << (resp->vote_granted ? "" : " not") << " granted" << endl;
 
-    out->output_messages.push_back(make_pair(msg.candidate_id, resp));
+    out->output_messages.push_back(
+        make_pair(msg.candidate_id, std::move(resp)));
 
     return 0;
 }
@@ -588,8 +590,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
-    RaftAppendEntriesResp *resp = nullptr;
-    Term prev_log_term          = 0;
+    std::unique_ptr<RaftAppendEntriesResp> resp;
+    Term prev_log_term = 0;
     int ret;
 
     if (check_output_arg(out)) {
@@ -611,7 +613,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp                 = new RaftAppendEntriesResp();
+    resp                 = make_unique<RaftAppendEntriesResp>();
     resp->term           = current_term;
     resp->follower_id    = local_id;
     resp->last_log_index = last_log_index;
@@ -619,7 +621,8 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
     if (msg.term < current_term) {
         /* Sender is outdated. Just reply false. */
         resp->success = false;
-        out->output_messages.push_back(make_pair(msg.leader_id, resp));
+        out->output_messages.push_back(
+            make_pair(msg.leader_id, std::move(resp)));
         return 0;
     }
 
@@ -627,13 +630,11 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 
     if (msg.entries.empty()) {
         /* Heartbeat message, we don't need to reply. */
-        delete resp;
         return 0;
     }
 
     /* Check if we can accept the entries. */
     if ((ret = log_entry_get_term(msg.prev_log_index, &prev_log_term)) < 0) {
-        delete resp;
         return ret;
     }
     resp->success = msg.prev_log_index <= last_log_index && ret == 0 &&
@@ -641,9 +642,11 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
     if (resp->success) {
         last_log_index = msg.prev_log_index;
         // TODO truncate log at last_log_index
-        for (auto entry : msg.entries) {
-            if ((ret = append_log_entry(entry.first, entry.second))) {
-                delete resp;
+        for (const auto &entry : msg.entries) {
+            Term term                = entry.first;
+            const char *const serbuf = entry.second.get();
+
+            if ((ret = append_log_entry(term, serbuf))) {
                 return ret;
             }
         }
@@ -657,7 +660,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         }
     }
 
-    out->output_messages.push_back(make_pair(leader_id, resp));
+    out->output_messages.push_back(make_pair(leader_id, std::move(resp)));
 
     return 0;
 }
@@ -779,12 +782,12 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             rand_int_in_range(200, 500)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : servers) {
-            auto *msg           = new RaftRequestVote();
+            auto msg            = make_unique<RaftRequestVote>();
             msg->term           = current_term;
             msg->candidate_id   = local_id;
             msg->last_log_index = last_log_index;
             msg->last_log_term  = last_log_term;
-            out->output_messages.push_back(make_pair(kv.first, msg));
+            out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
         }
 
     } else if (type == RaftTimerType::HeartBeat) {

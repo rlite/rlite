@@ -144,10 +144,10 @@ main()
 
         /* Process current output messages. */
         for (const auto &p : output.output_messages) {
-            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second);
-            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second);
-            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second);
-            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second);
+            auto *rv  = dynamic_cast<RaftRequestVote *>(p.second.get());
+            auto *rvr = dynamic_cast<RaftRequestVoteResp *>(p.second.get());
+            auto *ae  = dynamic_cast<RaftAppendEntries *>(p.second.get());
+            auto *aer = dynamic_cast<RaftAppendEntriesResp *>(p.second.get());
             int r     = 0;
 
             assert(replicas.count(p.first));
@@ -165,9 +165,8 @@ main()
                 assert(false);
             }
 
-            delete p.second;
             if (r) {
-                return -1;
+                return r;
             }
         }
 
@@ -229,7 +228,7 @@ main()
             events.pop_front();
         }
         t      = t_next;
-        output = output_next;
+        output = std::move(output_next);
 
         {
             string input;

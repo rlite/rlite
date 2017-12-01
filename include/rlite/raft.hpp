@@ -80,7 +80,7 @@ struct RaftAppendEntries : public RaftMessage {
 
     /* Log entries to store (empty for heartbeat). There may be
      * more than one for efficiency. */
-    std::list<std::pair<Term, char *> > entries;
+    std::list<std::pair<Term, std::unique_ptr<char[]>>> entries;
 };
 
 struct RaftAppendEntriesResp : public RaftMessage {
@@ -134,7 +134,14 @@ struct RaftTimerCmd {
  * or stop some timers, and log entries that have been commited to
  * the replicated state machine. */
 struct RaftSMOutput {
-    std::list<std::pair<ReplicaId, RaftMessage *> > output_messages;
+    RaftSMOutput()                     = default;
+    RaftSMOutput(const RaftSMOutput &) = delete;
+    RaftSMOutput &operator=(const RaftSMOutput &) = delete;
+    RaftSMOutput(RaftSMOutput &&)                 = default;
+    RaftSMOutput &operator=(RaftSMOutput &&) = default;
+
+    std::list<std::pair<ReplicaId, std::unique_ptr<RaftMessage>>>
+        output_messages;
     std::list<RaftTimerCmd> timer_commands;
     std::list<LogIndex> committed_entries;
 };
