@@ -46,6 +46,7 @@ logfile(const string &replica)
 
 class TestReplica : public RaftSM {
     uint32_t output_counter = 18;
+    bool failed             = false;
 
 public:
     TestReplica() = default;
@@ -57,6 +58,8 @@ public:
     {
     }
     ~TestReplica() { shutdown(); }
+
+    /* Apply a command to the replicated state machine. */
     virtual int apply(const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
@@ -67,6 +70,20 @@ public:
         }
         return 0;
     }
+
+    /* Called to emulate failure of a replica. The replica won't receive
+     * messages until respawn. */
+    void fail() { failed = true; }
+
+    /* Is this replica alive? */
+    bool up() const { return !failed; }
+
+    /* Called to emulate a replica trying to recover after failure. */
+    int respawn(const list<ReplicaId> peers, RaftSMOutput *out)
+    {
+        failed = false;
+        return init(peers, out);
+    };
 };
 
 enum class TestEventType {
@@ -79,7 +96,7 @@ enum class TestEventType {
 struct TestEvent {
     TestEventType event_type;
     unsigned int abstime = 0;
-    RaftSM *sm           = nullptr;
+    TestReplica *sm      = nullptr;
     RaftTimerType ttype  = RaftTimerType::Invalid;
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
@@ -87,7 +104,7 @@ struct TestEvent {
 
     static uint32_t get_next_command() { return ++input_counter; }
 
-    static TestEvent CreateTimerEvent(unsigned int t, RaftSM *_sm,
+    static TestEvent CreateTimerEvent(unsigned int t, TestReplica *_sm,
                                       RaftTimerType ty)
     {
         TestEvent e;
@@ -106,7 +123,7 @@ struct TestEvent {
         return e;
     }
 
-    static TestEvent CreateFailureEvent(unsigned int t, RaftSM *_sm)
+    static TestEvent CreateFailureEvent(unsigned int t, TestReplica *_sm)
     {
         TestEvent e;
         e.event_type = TestEventType::SMFailure;
@@ -115,7 +132,7 @@ struct TestEvent {
         return e;
     }
 
-    static TestEvent CreateRespawnEvent(unsigned int t, RaftSM *_sm)
+    static TestEvent CreateRespawnEvent(unsigned int t, TestReplica *_sm)
     {
         TestEvent e;
         e.event_type = TestEventType::SMRespawn;
@@ -134,7 +151,7 @@ int
 main()
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
-    map<string, std::unique_ptr<RaftSM>> replicas;
+    map<string, std::unique_ptr<TestReplica>> replicas;
     list<TestEvent> events;
     unsigned int t           = 0; /* time */
     const unsigned int t_max = 500;
@@ -156,7 +173,7 @@ main()
     for (const auto &local : names) {
         string logfilename = logfile(local);
         list<string> peers;
-        std::unique_ptr<RaftSM> sm;
+        std::unique_ptr<TestReplica> sm;
 
         for (const auto &peer : names) {
             if (peer != local) {
@@ -173,6 +190,7 @@ main()
     }
 
     while (t <= t_max) {
+        list<TestEvent> postponed;
         unsigned int t_next = t + 1;
         RaftSMOutput output_next;
 
@@ -187,7 +205,9 @@ main()
             int r     = 0;
 
             assert(replicas.count(p.first));
-            if (rv) {
+            if (!replicas[p.first]->up()) {
+                /* Replica is currently down, we just drop this message. */
+            } else if (rv) {
                 r = replicas[p.first]->request_vote_input(*rv, &output_next);
             } else if (rvr) {
                 r = replicas[p.first]->request_vote_resp_input(*rvr,
@@ -216,8 +236,8 @@ main()
             }
             if (cmd.action == RaftTimerAction::Restart) {
                 events.push_back(TestEvent::CreateTimerEvent(
-                    t + cmd.milliseconds, cmd.sm, cmd.type));
-                events.sort();
+                    t + cmd.milliseconds, dynamic_cast<TestReplica *>(cmd.sm),
+                    cmd.type));
             } else {
                 assert(cmd.action == RaftTimerAction::Stop);
             }
@@ -225,11 +245,12 @@ main()
 
         /* Process all the timers expired so far, updating the associated
          * Raft state machine. */
+        events.sort();
         while (!events.empty()) {
             const TestEvent &next = events.front();
             if (t < next.abstime) {
                 if (output_next.output_messages.empty() &&
-                    output_next.timer_commands.empty()) {
+                    output_next.timer_commands.empty() && postponed.empty()) {
                     /* No need to go step by step, we can jump to the next
                      * event. */
                     t_next = next.abstime;
@@ -239,7 +260,8 @@ main()
             switch (next.event_type) {
             case TestEventType::RaftTimer: {
                 /* This event is a timer firing. */
-                if (next.sm->timer_expired(next.ttype, &output_next)) {
+                if (next.sm->up() &&
+                    next.sm->timer_expired(next.ttype, &output_next)) {
                     return -1;
                 }
                 break;
@@ -249,9 +271,9 @@ main()
                 /* This event is a client submission. */
                 bool submitted = false;
                 for (const auto &kv : replicas) {
-                    if (kv.second->leader()) {
-                        LogIndex request_id;
+                    if (kv.second->leader() && kv.second->up()) {
                         uint32_t cmd = TestEvent::get_next_command();
+                        LogIndex request_id;
 
                         if (kv.second->submit(reinterpret_cast<char *>(&cmd),
                                               &request_id, &output_next)) {
@@ -259,21 +281,31 @@ main()
                         }
                         submitted = true;
                         cout << "Command " << cmd << " submitted" << endl;
+                        break;
                     }
                 }
                 if (!submitted) {
-                    cout << "Dropped client request (no leader)" << endl;
+                    /* This can happen because no leader is currently elected
+                     * or because the current leader is down. */
+                    postponed.push_back(TestEvent::CreateRequestEvent(t + 100));
+                    cout << "Client request postponed (no leader)" << endl;
                 }
             }
+
             case TestEventType::SMFailure: {
                 break;
             }
+
             case TestEventType::SMRespawn: {
                 break;
             }
             }
             events.pop_front();
         }
+        /* Append the 'postponed' list at the end of the events list. */
+        events.splice(events.end(), postponed);
+
+        /* Update time and Raft state machine output. */
         t      = t_next;
         output = std::move(output_next);
     }
