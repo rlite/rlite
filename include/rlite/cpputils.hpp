@@ -3,6 +3,7 @@
 
 #include <string>
 #include <sstream>
+#include <memory>
 
 static inline std::string
 rina_string_from_components(const std::string &apn, const std::string &api,
@@ -43,6 +44,13 @@ rina_components_from_string(const std::string &str, std::string &apn,
 
     for (int i = 0; i < 4 && std::getline(ss, *(vps[i]), '|'); i++) {
     }
+}
+
+template <typename T, typename... Args>
+std::unique_ptr<T>
+make_unique(Args &&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
 #endif /* __RL_CPP_UTILS_H__ */
