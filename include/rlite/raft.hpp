@@ -274,7 +274,6 @@ public:
           ios_inf(ioi)
     {
     }
-    ~RaftSM();
     int init(const std::list<ReplicaId> peers, RaftSMOutput *out);
 
     /* The user doesn't need this Raft SM anymore. Delete the log on disk. */
@@ -304,6 +303,11 @@ public:
 
     /* Name of the current leader (if we know it). */
     ReplicaId leader_name() const { return leader_id; }
+
+    /* Called by the Raft state machine when a log entry needs to
+     * be applied to the replicated state machine. */
+    virtual int apply(const char *const serbuf) = 0;
+    virtual ~RaftSM();
 };
 
 #endif /* __RAFT_H__ */
