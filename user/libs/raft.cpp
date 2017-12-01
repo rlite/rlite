@@ -175,6 +175,30 @@ RaftSM::~RaftSM()
 }
 
 int
+RaftSM::log_disk_flush()
+{
+    int ret;
+    int fd;
+
+    logfile << std::flush;
+
+    fd = open(logfilename.c_str(), O_APPEND);
+    if (fd < 0) {
+        IOS_ERR() << "Failed to open logfile for disk flush ["
+                  << strerror(errno) << "]" << endl;
+        return fd;
+    }
+
+    if ((ret = fdatasync(fd))) {
+        IOS_ERR() << "Failed to flush logfile contents to disk ["
+                  << strerror(errno) << "]" << endl;
+        return ret;
+    }
+
+    return 0;
+}
+
+int
 RaftSM::log_u32_write(unsigned long pos, uint32_t val)
 {
     logfile.seekp(pos);
@@ -187,7 +211,7 @@ RaftSM::log_u32_write(unsigned long pos, uint32_t val)
         IOS_ERR() << "Failed to write u32 at position " << pos << endl;
         return -1;
     }
-    return 0;
+    return log_disk_flush();
 }
 
 int
@@ -231,7 +255,7 @@ RaftSM::log_buf_write(unsigned long pos, const char *buf, size_t len)
                   << endl;
         return -1;
     }
-    return 0;
+    return log_disk_flush();
 }
 
 int
