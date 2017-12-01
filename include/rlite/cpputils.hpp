@@ -53,4 +53,24 @@ make_unique(Args &&... args)
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
+#define RL_NONCOPIABLE(_CLA)                                                   \
+    _CLA(const _CLA &) = delete;                                               \
+    _CLA &operator=(const _CLA &) = delete
+
+#define RL_NODEFAULT_NONCOPIABLE(_CLA)                                         \
+    _CLA() = delete;                                                           \
+    RL_NONCOPIABLE(_CLA)
+
+#define RL_COPIABLE(_CLA)                                                      \
+    _CLA(const _CLA &) = default;                                              \
+    _CLA &operator=(const _CLA &) = default
+
+#define RL_MOVABLE(_CLA)                                                       \
+    _CLA(_CLA &&) = default;                                                   \
+    _CLA &operator=(_CLA &&) = default
+
+#define RL_COPIABLE_MOVABLE(_CLA)                                              \
+    RL_COPIABLE(_CLA);                                                         \
+    RL_MOVABLE(_CLA)
+
 #endif /* __RL_CPP_UTILS_H__ */

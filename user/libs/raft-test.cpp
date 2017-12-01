@@ -44,17 +44,17 @@ logfile(const string &replica)
     return string("/tmp/raft_test_") + replica + "_log";
 }
 
-struct TestReplica {
-    RaftSM *sm = nullptr;
-
+struct TestReplica : public RaftSM {
     TestReplica() = default;
-    TestReplica(RaftSM *_sm) : sm(_sm) {}
-    ~TestReplica()
+    RL_NONCOPIABLE(TestReplica);
+    TestReplica(const std::string &smname, const ReplicaId &myname,
+                std::string logname)
+        : RaftSM(smname, myname, logname,
+                 /*cmd_size=*/sizeof(uint32_t), std::cerr, std::cout)
     {
-        if (sm) {
-            delete sm;
-        }
     }
+    ~TestReplica() { shutdown(); }
+    virtual int apply(const char *const serbuf) override { return 0; }
 };
 
 struct TestEvent {
@@ -80,7 +80,7 @@ int
 main()
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
-    map<string, TestReplica *> replicas;
+    map<string, std::unique_ptr<RaftSM>> replicas;
     list<TestEvent> events;
     uint32_t counter = 18;
     unsigned int t   = 0; /* time */
@@ -104,7 +104,7 @@ main()
         for (const auto &local : names) {
             string logfilename = logfile(local);
             list<string> peers;
-            RaftSM *sm;
+            std::unique_ptr<RaftSM> sm;
 
             for (const auto &peer : names) {
                 if (peer != local) {
@@ -112,13 +112,12 @@ main()
                 }
             }
 
-            sm = new RaftSM(
-                /*smname=*/local + "-sm", /*myname=*/local, logfilename,
-                /*cmd_size=*/sizeof(uint32_t), std::cerr, std::cout);
+            sm = make_unique<TestReplica>(
+                /*smname=*/local + "-sm", /*myname=*/local, logfilename);
             if (sm->init(peers, &output)) {
                 throw 1;
             }
-            replicas[local] = new TestReplica(sm);
+            replicas[local] = std::move(sm);
         }
 
         for (;;) {
@@ -137,16 +136,16 @@ main()
 
                 assert(replicas.count(p.first));
                 if (rv) {
-                    r = replicas[p.first]->sm->request_vote_input(*rv,
-                                                                  &output_next);
+                    r = replicas[p.first]->request_vote_input(*rv,
+                                                              &output_next);
                 } else if (rvr) {
-                    r = replicas[p.first]->sm->request_vote_resp_input(
+                    r = replicas[p.first]->request_vote_resp_input(
                         *rvr, &output_next);
                 } else if (ae) {
-                    r = replicas[p.first]->sm->append_entries_input(
-                        *ae, &output_next);
+                    r = replicas[p.first]->append_entries_input(*ae,
+                                                                &output_next);
                 } else if (aer) {
-                    r = replicas[p.first]->sm->append_entries_resp_input(
+                    r = replicas[p.first]->append_entries_resp_input(
                         *aer, &output_next);
                 } else {
                     assert(false);
@@ -192,10 +191,10 @@ main()
                     /* This event is a client submission. */
                     bool submitted = false;
                     for (const auto &kv : replicas) {
-                        if (kv.second->sm->leader()) {
+                        if (kv.second->leader()) {
                             LogIndex request_id;
                             ++counter;
-                            if (kv.second->sm->submit(
+                            if (kv.second->submit(
                                     reinterpret_cast<char *>(&counter),
                                     &request_id, &output_next)) {
                                 throw 2;
@@ -226,11 +225,6 @@ main()
         }
     } catch (int) {
         ret = -1;
-    }
-
-    for (const auto &kv : replicas) {
-        kv.second->sm->shutdown();
-        delete kv.second;
     }
 
     return ret;
