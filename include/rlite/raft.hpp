@@ -249,7 +249,9 @@ class RaftSM {
     int log_buf_write(unsigned long pos, const char *buf, size_t len);
     int log_buf_read(unsigned long pos, char *buf, size_t len);
     int magic_check();
+    int log_open(bool first_boot);
     int log_disk_flush();
+    int log_truncate(LogIndex index);
 
     /* Logging helpers. */
     std::ostream &IOS_ERR() { return ios_err << "(" << name << ") "; }

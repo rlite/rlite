@@ -35,17 +35,9 @@
 using namespace std;
 
 int
-RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
+RaftSM::log_open(bool first_boot)
 {
-    /* If logfile does not exists it means that this is the first time
-     * this replica boots. */
-    bool first_boot              = !ifstream(logfilename).good();
     std::ios_base::openmode mode = ios::in | ios::out | ios::binary;
-    int ret;
-
-    if (check_output_arg(out)) {
-        return -1;
-    }
 
     if (first_boot) {
         mode |= ios::trunc;
@@ -59,6 +51,26 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
                   << "': " << strerror(errno) << endl;
         return -1;
     }
+
+    return 0;
+}
+
+int
+RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
+{
+    /* If logfile does not exists it means that this is the first time
+     * this replica boots. */
+    bool first_boot = !ifstream(logfilename).good();
+    int ret;
+
+    if (check_output_arg(out)) {
+        return -1;
+    }
+
+    if ((ret = log_open(first_boot))) {
+        return ret;
+    }
+
     if (first_boot) {
         char null[kLogVotedForSize];
 
@@ -594,6 +606,29 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 }
 
 int
+RaftSM::log_truncate(LogIndex index)
+{
+    assert(index <= last_log_index);
+    if (index == last_log_index) {
+        return 0;
+    }
+    /* Close the log file, truncate it and reopen. */
+    logfile.close();
+    if (truncate(logfilename.c_str(),
+                 kLogEntriesOfs + log_entry_size * last_log_index)) {
+        IOS_ERR() << "Failed to truncate log from " << last_log_index
+                  << " entries to " << index << " entries" << endl;
+        return -1;
+    }
+
+    IOS_INF() << "Log truncated: " << last_log_index << " entries --> " << index
+              << " entries" << endl;
+    last_log_index = index;
+
+    return log_open(/*first_boot=*/false);
+}
+
+int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
     std::unique_ptr<RaftAppendEntriesResp> resp;
@@ -646,8 +681,9 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
     resp->success = msg.prev_log_index <= last_log_index && ret == 0 &&
                     msg.prev_log_term == prev_log_term;
     if (resp->success) {
-        last_log_index = msg.prev_log_index;
-        // TODO truncate log at last_log_index
+        if ((ret = log_truncate(msg.prev_log_index))) {
+            return ret;
+        }
         for (const auto &entry : msg.entries) {
             Term term                = entry.first;
             const char *const serbuf = entry.second.get();
