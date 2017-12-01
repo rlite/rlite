@@ -457,6 +457,29 @@ RaftSM::append_log_entry(const Term term, const char *serbuf)
 }
 
 int
+RaftSM::apply_committed_entries()
+{
+    std::unique_ptr<char[]> serbuf;
+
+    for (; last_applied < commit_index; last_applied++) {
+        int ret;
+
+        if (!serbuf) {
+            serbuf = std::unique_ptr<char[]>(new char[log_command_size]);
+        }
+        if ((ret = log_buf_read(kLogEntriesOfs +
+                                    ((last_applied + 1) - 1) * log_entry_size +
+                                    sizeof(Term),
+                                serbuf.get(), log_command_size))) {
+            return ret;
+        }
+        apply(serbuf.get());
+    }
+
+    return 0;
+}
+
+int
 RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
 {
     RaftRequestVoteResp *resp = nullptr;
