@@ -462,18 +462,19 @@ RaftSM::apply_committed_entries()
     std::unique_ptr<char[]> serbuf;
 
     for (; last_applied < commit_index; last_applied++) {
+        LogIndex next = last_applied + 1;
         int ret;
 
         if (!serbuf) {
             serbuf = std::unique_ptr<char[]>(new char[log_command_size]);
         }
-        if ((ret = log_buf_read(kLogEntriesOfs +
-                                    ((last_applied + 1) - 1) * log_entry_size +
-                                    sizeof(Term),
-                                serbuf.get(), log_command_size))) {
+        if ((ret = log_buf_read(
+                 kLogEntriesOfs + (next - 1) * log_entry_size + sizeof(Term),
+                 serbuf.get(), log_command_size))) {
             return ret;
         }
         apply(serbuf.get());
+        IOS_INF() << "Entry " << next << " applied" << endl;
     }
 
     return 0;
@@ -651,7 +652,9 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 
     if (msg.leader_commit > commit_index) {
         commit_index = std::min(msg.leader_commit, last_log_index);
-        // TODO apply log entries
+        if ((ret = apply_committed_entries())) {
+            return ret;
+        }
     }
 
     out->output_messages.push_back(make_pair(leader_id, resp));
@@ -723,12 +726,15 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
              * current_term, that is if the entry N was replicated by us. */
             Term term;
             if ((ret = log_entry_get_term(next_commit_index, &term))) {
-                return -1;
+                return ret;
             }
             if (term == current_term) {
                 IOS_INF() << "Leader commit index " << commit_index << " --> "
                           << next_commit_index << endl;
                 commit_index = next_commit_index;
+                if ((ret = apply_committed_entries())) {
+                    return ret;
+                }
             }
         }
     } else {
