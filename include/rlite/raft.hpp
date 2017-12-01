@@ -80,7 +80,7 @@ struct RaftAppendEntries : public RaftMessage {
 
     /* Log entries to store (empty for heartbeat). There may be
      * more than one for efficiency. */
-    std::list<char *> entries;
+    std::list<std::pair<Term, char *> > entries;
 };
 
 struct RaftAppendEntriesResp : public RaftMessage {
@@ -221,8 +221,9 @@ class RaftSM {
     /* File descriptor for the log file. */
     std::fstream logfile;
 
-    /* Size of a log entry. */
-    const size_t log_entry_size = sizeof(Term);
+    /* Size of a log entry (with and without term info). */
+    const size_t log_entry_size   = sizeof(Term);
+    const size_t log_command_size = 0;
 
     /* For logging of Raft internal operations. */
     std::ostream &ios_err;
@@ -262,12 +263,13 @@ class RaftSM {
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
-           std::string logname, size_t entry_size, std::ostream &ioe,
+           std::string logname, size_t cmd_size, std::ostream &ioe,
            std::ostream &ioi)
         : name(smname),
           local_id(myname),
           logfilename(logname),
-          log_entry_size(entry_size),
+          log_entry_size(sizeof(Term) + cmd_size),
+          log_command_size(cmd_size),
           ios_err(ioe),
           ios_inf(ioi)
     {
