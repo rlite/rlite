@@ -28,7 +28,7 @@
 #include <errno.h>
 
 #include "uipcp-normal.hpp"
-#include <rlite/conf.h>
+#include "rlite/conf.h"
 
 using namespace std;
 

@@ -38,8 +38,7 @@
 #include <pthread.h>
 #include <poll.h>
 
-#include <rlite/conf.h>
-
+#include "rlite/conf.h"
 #include "uipcp-normal.hpp"
 
 using namespace std;
