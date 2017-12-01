@@ -38,21 +38,6 @@
 
 using namespace std;
 
-struct TestLogEntry : public RaftLogEntry {
-    uint32_t command;
-
-    TestLogEntry(uint32_t cmd) : RaftLogEntry(), command(cmd) {}
-
-    void serialize(char *serbuf) const override
-    {
-        memcpy(serbuf, reinterpret_cast<const char *>(&term), sizeof(term));
-        memcpy(serbuf, reinterpret_cast<const char *>(&command),
-               sizeof(command));
-    }
-
-    static size_t size() { return sizeof(Term) + sizeof(uint32_t); }
-};
-
 static string
 logfile(const string &replica)
 {
@@ -128,7 +113,8 @@ main()
             }
 
             sm = new RaftSM(local + "-sm", local, logfilename,
-                            TestLogEntry::size(), std::cerr, std::cout);
+                            sizeof(Term) + sizeof(uint32_t), std::cerr,
+                            std::cout);
             if (sm->init(peers, &output)) {
                 throw 1;
             }
@@ -207,12 +193,11 @@ main()
                     bool submitted = false;
                     for (const auto &kv : replicas) {
                         if (kv.second->sm->leader()) {
-                            std::unique_ptr<TestLogEntry> entry =
-                                make_unique<TestLogEntry>(++counter);
                             LogIndex request_id;
-                            if (kv.second->sm->submit(std::move(entry),
-                                                      &request_id,
-                                                      &output_next)) {
+                            ++counter;
+                            if (kv.second->sm->submit(
+                                    reinterpret_cast<char *>(&counter),
+                                    &request_id, &output_next)) {
                                 throw 2;
                             }
                             submitted = true;

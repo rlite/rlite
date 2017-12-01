@@ -36,18 +36,6 @@ using Term      = uint32_t;
 using LogIndex  = uint32_t;
 using ReplicaId = std::string;
 
-/* Base class for log entries. Users must extend this class
- * by inheritance to associated a specific command for the
- * replicated state machine. */
-struct RaftLogEntry {
-    /* The term in which the entry was created. */
-    Term term;
-
-    /* How this entry must be serialized. */
-    virtual void serialize(char *serbuf) const = 0;
-    virtual ~RaftLogEntry() {}
-};
-
 /* Base class for all the Raft messages. */
 struct RaftMessage {
     Term term;
@@ -267,11 +255,10 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    int prepare_append_entries(const RaftLogEntry *const entry,
+    int prepare_append_entries(const Term term, const char *const serbuf,
                                RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
-    int append_log_entry(const Term term, const char *serbuf,
-                         const size_t serlen);
+    int append_log_entry(const Term term, const char *serbuf);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
@@ -307,7 +294,7 @@ public:
      * the replicated state machine. In addition to the 'out' argument,
      * it returns the id assigned to this request, so that the caller
      * can later know when the associated command has been committed. */
-    int submit(std::unique_ptr<RaftLogEntry> entry, LogIndex *request_id,
+    int submit(const char *const serbuf, LogIndex *request_id,
                RaftSMOutput *out);
 
     /* True if this Raft SM is the current leader. */
