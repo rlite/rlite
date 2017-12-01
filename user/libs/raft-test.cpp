@@ -44,7 +44,10 @@ logfile(const string &replica)
     return string("/tmp/raft_test_") + replica + "_log";
 }
 
-struct TestReplica : public RaftSM {
+class TestReplica : public RaftSM {
+    uint32_t output_counter = 18;
+
+public:
     TestReplica() = default;
     RL_NONCOPIABLE(TestReplica);
     TestReplica(const std::string &smname, const ReplicaId &myname,
@@ -54,7 +57,16 @@ struct TestReplica : public RaftSM {
     {
     }
     ~TestReplica() { shutdown(); }
-    virtual int apply(const char *const serbuf) override { return 0; }
+    virtual int apply(const char *const serbuf) override
+    {
+        uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
+        if (++output_counter != cmd) {
+            cout << "Mismatch: expected " << output_counter << ", got " << cmd
+                 << endl;
+            return -1;
+        }
+        return 0;
+    }
 };
 
 struct TestEvent {
@@ -74,7 +86,14 @@ struct TestEvent {
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
+
+    static uint32_t get_next_command() { return ++input_counter; }
+
+private:
+    static uint32_t input_counter;
 };
+
+uint32_t TestEvent::input_counter = 18;
 
 int
 main()
@@ -82,8 +101,7 @@ main()
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<RaftSM>> replicas;
     list<TestEvent> events;
-    uint32_t counter = 18;
-    unsigned int t   = 0; /* time */
+    unsigned int t = 0; /* time */
     RaftSMOutput output;
 
     srand(time(0));
@@ -189,14 +207,14 @@ main()
                 for (const auto &kv : replicas) {
                     if (kv.second->leader()) {
                         LogIndex request_id;
-                        ++counter;
-                        if (kv.second->submit(
-                                reinterpret_cast<char *>(&counter), &request_id,
-                                &output_next)) {
+                        uint32_t cmd = TestEvent::get_next_command();
+
+                        if (kv.second->submit(reinterpret_cast<char *>(&cmd),
+                                              &request_id, &output_next)) {
                             return -1;
                         }
                         submitted = true;
-                        cout << "Command " << counter << " submitted" << endl;
+                        cout << "Command " << cmd << " submitted" << endl;
                     }
                 }
                 if (!submitted) {
