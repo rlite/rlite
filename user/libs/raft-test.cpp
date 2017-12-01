@@ -111,8 +111,8 @@ main()
 
     /* Push some client submission. */
     events.push_back(TestEvent(350));
-    events.push_back(TestEvent(400));
-    events.push_back(TestEvent(600));
+    events.push_back(TestEvent(360));
+    events.push_back(TestEvent(370));
     events.sort();
 
     try {
