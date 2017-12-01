@@ -678,9 +678,50 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
     }
 
     if (resp.success) {
+        LogIndex next_commit_index = commit_index;
+
+        /* On success we update the next_index. */
+        assert(resp.last_log_index + 1 > servers[resp.follower_id].next_index);
         servers[resp.follower_id].next_index  = resp.last_log_index + 1;
         servers[resp.follower_id].match_index = resp.last_log_index;
+        /* Try to update the commit_index. We need to find the highest N
+         * such that N > commit_index and that match_index >= N for a majority
+         * of the replicas (we as a leader count as a replica that has
+         * match_index == last_log_index). */
+        while (next_commit_index <= last_log_index) {
+            auto match_indices_quorum = [this](LogIndex index) -> bool {
+                /* When computing the quorum we need to exclude ourselves
+                 * (hence the we subtract one). */
+                int needed = static_cast<int>(quorum()) - 1;
+                for (const auto &kv : servers) {
+                    if (kv.second.match_index >= index && --needed <= 0) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (match_indices_quorum(next_commit_index + 1)) {
+                next_commit_index++;
+            } else {
+                break;
+            }
+        }
+        if (next_commit_index != commit_index) {
+            /* We cannot update commit_index only if log[N].term ==
+             * current_term, that is if the entry N was replicated by us. */
+            Term term;
+            if ((ret = log_entry_get_term(next_commit_index, &term))) {
+                return -1;
+            }
+            if (term == current_term) {
+                IOS_INF() << "Leader commit index " << commit_index << " --> "
+                          << next_commit_index << endl;
+                commit_index = next_commit_index;
+            }
+        }
     } else {
+        /* Failure comes from log inconsistencies. We need to decrement
+         * next index and retry. */
         assert(servers[resp.follower_id].next_index > 0);
         servers[resp.follower_id].next_index--;
     }
