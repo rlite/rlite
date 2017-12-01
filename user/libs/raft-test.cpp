@@ -69,25 +69,60 @@ public:
     }
 };
 
+enum class TestEventType {
+    RaftTimer = 0,
+    ClientRequest,
+    SMFailure,
+    SMRespawn,
+};
+
 struct TestEvent {
+    TestEventType event_type;
     unsigned int abstime = 0;
     RaftSM *sm           = nullptr;
     RaftTimerType ttype  = RaftTimerType::Invalid;
-    bool client          = false;
-
-    /* A Raft timer event. */
-    TestEvent(unsigned int t, RaftSM *_sm, RaftTimerType ty)
-        : abstime(t), sm(_sm), ttype(ty)
-    {
-    }
-
-    /* A client submission event. */
-    TestEvent(unsigned int t) : abstime(t), client(true) {}
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
 
     static uint32_t get_next_command() { return ++input_counter; }
+
+    static TestEvent CreateTimerEvent(unsigned int t, RaftSM *_sm,
+                                      RaftTimerType ty)
+    {
+        TestEvent e;
+        e.event_type = TestEventType::RaftTimer;
+        e.abstime    = t;
+        e.sm         = _sm;
+        e.ttype      = ty;
+        return e;
+    }
+
+    static TestEvent CreateRequestEvent(unsigned int t)
+    {
+        TestEvent e;
+        e.event_type = TestEventType::ClientRequest;
+        e.abstime    = t;
+        return e;
+    }
+
+    static TestEvent CreateFailureEvent(unsigned int t, RaftSM *_sm)
+    {
+        TestEvent e;
+        e.event_type = TestEventType::SMFailure;
+        e.abstime    = t;
+        e.sm         = _sm;
+        return e;
+    }
+
+    static TestEvent CreateRespawnEvent(unsigned int t, RaftSM *_sm)
+    {
+        TestEvent e;
+        e.event_type = TestEventType::SMRespawn;
+        e.abstime    = t;
+        e.sm         = _sm;
+        return e;
+    }
 
 private:
     static uint32_t input_counter;
@@ -101,7 +136,8 @@ main()
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<RaftSM>> replicas;
     list<TestEvent> events;
-    unsigned int t = 0; /* time */
+    unsigned int t           = 0; /* time */
+    const unsigned int t_max = 500;
     RaftSMOutput output;
 
     srand(time(0));
@@ -112,9 +148,9 @@ main()
     }
 
     /* Push some client submission. */
-    events.push_back(TestEvent(350));
-    events.push_back(TestEvent(360));
-    events.push_back(TestEvent(370));
+    events.push_back(TestEvent::CreateRequestEvent(350));
+    events.push_back(TestEvent::CreateRequestEvent(360));
+    events.push_back(TestEvent::CreateRequestEvent(370));
     events.sort();
 
     for (const auto &local : names) {
@@ -136,7 +172,7 @@ main()
         replicas[local] = std::move(sm);
     }
 
-    for (;;) {
+    while (t <= t_max) {
         unsigned int t_next = t + 1;
         RaftSMOutput output_next;
 
@@ -179,8 +215,8 @@ main()
                 }
             }
             if (cmd.action == RaftTimerAction::Restart) {
-                events.push_back(
-                    TestEvent(t + cmd.milliseconds, cmd.sm, cmd.type));
+                events.push_back(TestEvent::CreateTimerEvent(
+                    t + cmd.milliseconds, cmd.sm, cmd.type));
                 events.sort();
             } else {
                 assert(cmd.action == RaftTimerAction::Stop);
@@ -200,7 +236,16 @@ main()
                 }
                 break;
             }
-            if (next.client) {
+            switch (next.event_type) {
+            case TestEventType::RaftTimer: {
+                /* This event is a timer firing. */
+                if (next.sm->timer_expired(next.ttype, &output_next)) {
+                    return -1;
+                }
+                break;
+            }
+
+            case TestEventType::ClientRequest: {
                 /* This event is a client submission. */
                 bool submitted = false;
                 for (const auto &kv : replicas) {
@@ -219,21 +264,18 @@ main()
                 if (!submitted) {
                     cout << "Dropped client request (no leader)" << endl;
                 }
-            } else {
-                /* This event is a timer firing. */
-                if (next.sm->timer_expired(next.ttype, &output_next)) {
-                    return -1;
-                }
+            }
+            case TestEventType::SMFailure: {
+                break;
+            }
+            case TestEventType::SMRespawn: {
+                break;
+            }
             }
             events.pop_front();
         }
         t      = t_next;
         output = std::move(output_next);
-
-        {
-            string input;
-            cin >> input;
-        }
     }
 
     return 0;
