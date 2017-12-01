@@ -604,7 +604,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
     if (msg.term < current_term) {
         /* Sender is outdated. Just reply false. */
         resp->success = false;
-        out->output_messages.push_back(make_pair(leader_id, resp));
+        out->output_messages.push_back(make_pair(msg.leader_id, resp));
         return 0;
     }
 
