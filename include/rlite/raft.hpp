@@ -298,7 +298,7 @@ public:
      * the replicated state machine. In addition to the 'out' argument,
      * it returns the id assigned to this request, so that the caller
      * can later know when the associated command has been committed. */
-    int submit(std::unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
+    int submit(std::unique_ptr<RaftLogEntry> entry, LogIndex *request_id,
                RaftSMOutput *out);
 
     /* True if this Raft SM is the current leader. */

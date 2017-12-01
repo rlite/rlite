@@ -684,7 +684,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 }
 
 int
-RaftSM::submit(unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
+RaftSM::submit(unique_ptr<RaftLogEntry> entry, LogIndex *request_id,
                RaftSMOutput *out)
 {
     const size_t serlen = log_entry_size - sizeof(Term);
@@ -692,6 +692,7 @@ RaftSM::submit(unique_ptr<const RaftLogEntry> entry, LogIndex *request_id,
     int ret;
 
     /* Serialize the new entry and append it to the local log. */
+    entry->term = current_term;
     entry->serialize(serbuf);
     if ((ret = append_log_entry(current_term, serbuf, serlen))) {
         delete serbuf;
