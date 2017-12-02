@@ -417,11 +417,24 @@ RaftSM::log_entry_get_term(LogIndex index, Term *term)
     return log_u32_read(kLogEntriesOfs + (index - 1) * log_entry_size, term);
 }
 
-/* Prepare a RaftAppendEntries message with the given 'entry. If 'entry' is
- * nullptr we prepare an heartbeat message. */
 int
-RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
-                               RaftSMOutput *out)
+RaftSM::log_entry_get_command(LogIndex index, char *const serbuf)
+{
+    if (index == 0 || index > last_log_index) {
+        return 1; /* no such entry */
+    }
+
+    return log_buf_read(
+        kLogEntriesOfs + (index - 1) * log_entry_size + sizeof(Term), serbuf,
+        log_command_size);
+}
+
+/* Prepare a RaftAppendEntries for each follower. If there are no log entries
+ * to be sent, an heartbeat message is prepared. Otherwise the message can
+ * contain multiple entries (all the unacked ones). As a result, this function
+ * is idempotent. */
+int
+RaftSM::prepare_append_entries(RaftSMOutput *out)
 {
     for (auto &kv : servers) {
         auto msg            = make_unique<RaftAppendEntries>();
@@ -432,12 +445,21 @@ RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
         if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
             return -1;
         }
-        if (serbuf && last_log_index >= kv.second.next_index_unacked) {
+        for (LogIndex i = kv.second.next_index_unacked; i <= last_log_index;
+             i++) {
             auto bufcopy = std::unique_ptr<char[]>(new char[log_command_size]);
-            memcpy(bufcopy.get(), serbuf, log_command_size);
+            Term term    = 0;
+            int ret;
+
+            if ((ret = log_entry_get_term(i, &term))) {
+                return ret;
+            }
+            if ((ret = log_entry_get_command(i, bufcopy.get()))) {
+                return ret;
+            }
             msg->entries.push_back(std::make_pair(term, std::move(bufcopy)));
-            kv.second.next_index_unacked++;
         }
+        kv.second.next_index_unacked = last_log_index + 1;
         out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
     }
 
@@ -621,7 +643,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
-    if ((ret = prepare_append_entries(0, /*entry=*/nullptr, out))) {
+    if ((ret = prepare_append_entries(out))) {
         return ret;
     }
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
@@ -844,7 +866,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* The heartbeat timer fired. */
         IOS_INF() << "Hearbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
-        if ((ret = prepare_append_entries(0, /*entry=*/nullptr, out))) {
+        if ((ret = prepare_append_entries(out))) {
             return ret;
         }
         out->timer_commands.push_back(RaftTimerCmd(
@@ -867,7 +889,7 @@ RaftSM::submit(const char *const serbuf, LogIndex *request_id,
 
     /* Prepare RaftAppendEntries messages to be sent to the other
      * servers. */
-    if ((ret = prepare_append_entries(current_term, serbuf, out))) {
+    if ((ret = prepare_append_entries(out))) {
         return ret;
     }
 

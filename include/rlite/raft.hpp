@@ -279,9 +279,9 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    int prepare_append_entries(const Term term, const char *const serbuf,
-                               RaftSMOutput *out);
+    int prepare_append_entries(RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
+    int log_entry_get_command(LogIndex index, char *const serbuf);
     int append_log_entry(const Term term, const char *serbuf);
     int apply_committed_entries();
 
