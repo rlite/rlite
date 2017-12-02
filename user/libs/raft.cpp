@@ -442,6 +442,7 @@ RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
     return 0;
 }
 
+/* Append a new entry to the end of our log, and updates last log index. */
 int
 RaftSM::append_log_entry(const Term term, const char *serbuf)
 {
@@ -492,6 +493,30 @@ RaftSM::apply_committed_entries()
     }
 
     return 0;
+}
+
+/* Truncate the log and update our last log index. */
+int
+RaftSM::log_truncate(LogIndex index)
+{
+    assert(index <= last_log_index);
+    if (index == last_log_index) {
+        return 0; /* nothing to do */
+    }
+    /* Close the log file, truncate it and reopen. */
+    logfile.close();
+    if (truncate(logfilename.c_str(),
+                 kLogEntriesOfs + log_entry_size * last_log_index)) {
+        IOS_ERR() << "Failed to truncate log from " << last_log_index
+                  << " entries to " << index << " entries" << endl;
+        return -1;
+    }
+
+    IOS_INF() << "Log truncated: " << last_log_index << " entries --> " << index
+              << " entries" << endl;
+    last_log_index = index;
+
+    return log_open(/*first_boot=*/false);
 }
 
 int
@@ -606,29 +631,6 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 }
 
 int
-RaftSM::log_truncate(LogIndex index)
-{
-    assert(index <= last_log_index);
-    if (index == last_log_index) {
-        return 0;
-    }
-    /* Close the log file, truncate it and reopen. */
-    logfile.close();
-    if (truncate(logfilename.c_str(),
-                 kLogEntriesOfs + log_entry_size * last_log_index)) {
-        IOS_ERR() << "Failed to truncate log from " << last_log_index
-                  << " entries to " << index << " entries" << endl;
-        return -1;
-    }
-
-    IOS_INF() << "Log truncated: " << last_log_index << " entries --> " << index
-              << " entries" << endl;
-    last_log_index = index;
-
-    return log_open(/*first_boot=*/false);
-}
-
-int
 RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 {
     std::unique_ptr<RaftAppendEntriesResp> resp;
@@ -669,30 +671,28 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
 
     leader_id = msg.leader_id;
 
-    if (msg.entries.empty()) {
-        /* Heartbeat message, we don't need to reply. */
-        return 0;
-    }
-
-    /* Check if we can accept the entries. */
-    if ((ret = log_entry_get_term(msg.prev_log_index, &prev_log_term)) < 0) {
-        return ret;
-    }
-    resp->success = msg.prev_log_index <= last_log_index && ret == 0 &&
-                    msg.prev_log_term == prev_log_term;
-    if (resp->success) {
-        if ((ret = log_truncate(msg.prev_log_index))) {
+    if (!msg.entries.empty()) {
+        /* Check if we can accept the received entries. */
+        if ((ret = log_entry_get_term(msg.prev_log_index, &prev_log_term)) <
+            0) {
             return ret;
         }
-        for (const auto &entry : msg.entries) {
-            Term term                = entry.first;
-            const char *const serbuf = entry.second.get();
-
-            if ((ret = append_log_entry(term, serbuf))) {
+        resp->success = msg.prev_log_index <= last_log_index && ret == 0 &&
+                        msg.prev_log_term == prev_log_term;
+        if (resp->success) {
+            if ((ret = log_truncate(msg.prev_log_index))) {
                 return ret;
             }
+            for (const auto &entry : msg.entries) {
+                Term term                = entry.first;
+                const char *const serbuf = entry.second.get();
+
+                if ((ret = append_log_entry(term, serbuf))) {
+                    return ret;
+                }
+            }
+            resp->last_log_index = last_log_index;
         }
-        resp->last_log_index = last_log_index;
     }
 
     if (msg.leader_commit > commit_index) {
@@ -702,7 +702,10 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         }
     }
 
-    out->output_messages.push_back(make_pair(leader_id, std::move(resp)));
+    /* We need to reply only if this is not an heartbeat message. */
+    if (!msg.entries.empty()) {
+        out->output_messages.push_back(make_pair(leader_id, std::move(resp)));
+    }
 
     return 0;
 }
