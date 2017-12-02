@@ -285,6 +285,10 @@ class RaftSM {
     int append_log_entry(const Term term, const char *serbuf);
     int apply_committed_entries();
 
+    unsigned int ElectionTimeoutMin = 200;
+    unsigned int ElectionTimeoutMax = 500;
+    unsigned int HeartbeatTimeout   = 100;
+
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
            std::string logname, size_t cmd_size, std::ostream &ioe,
@@ -322,6 +326,11 @@ public:
     int submit(const char *const serbuf, LogIndex *request_id,
                RaftSMOutput *out);
 
+    /* Called by the Raft state machine when a log entry needs to
+     * be applied to the replicated state machine. */
+    virtual int apply(const char *const serbuf) = 0;
+    virtual ~RaftSM();
+
     /* True if this Raft SM is the current leader. */
     bool leader() const { return state == RaftState::Leader; }
 
@@ -331,10 +340,27 @@ public:
     std::string local_name() const { return local_id; }
     std::string sm_name() const { return name; }
 
-    /* Called by the Raft state machine when a log entry needs to
-     * be applied to the replicated state machine. */
-    virtual int apply(const char *const serbuf) = 0;
-    virtual ~RaftSM();
+    int set_election_timeout(unsigned int tmin, unsigned int tmax)
+    {
+        if (tmin > tmax) {
+            return -1;
+        }
+
+        ElectionTimeoutMin = tmin;
+        ElectionTimeoutMax = tmax;
+
+        return 0;
+    }
+
+    unsigned int get_election_timeout_max() const { return ElectionTimeoutMax; }
+
+    int set_heartbeat_timeout(unsigned int t)
+    {
+        HeartbeatTimeout = t;
+        return 0;
+    }
+
+    unsigned int get_heartbeat_timeout() const { return HeartbeatTimeout; }
 };
 
 #endif /* __RAFT_H__ */
