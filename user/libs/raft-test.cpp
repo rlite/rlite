@@ -44,8 +44,10 @@ logfile(const string &replica)
     return string("/tmp/raft_test_") + replica + "_log";
 }
 
+static constexpr int kFirstCommand = 18;
+
 class TestReplica : public RaftSM {
-    uint32_t output_counter = 18;
+    uint32_t output_counter = kFirstCommand;
     bool failed             = false;
     list<string> peers;
 
@@ -147,7 +149,7 @@ private:
     static uint32_t input_counter;
 };
 
-uint32_t TestEvent::input_counter = 18;
+uint32_t TestEvent::input_counter = kFirstCommand;
 
 int
 main()
