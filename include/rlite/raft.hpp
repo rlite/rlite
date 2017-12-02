@@ -176,19 +176,23 @@ class RaftSM {
      */
 
     struct Server {
-        /* For each replica, index of the next log entry to send to
-         * that server. Initialized to leader's last log index + 1.
-         * We make a slight variation to allow to pipeline RaftAppendEntries
+        /* For each replica, next_index is the index of the next log entry to
+         * send to that server. Initialized to leader's last log index + 1. We
+         * make a slight variation to allow to pipeline RaftAppendEntries
          * messages towards the same replica:
          *   - on client submit or retransmission we send the log entry
          *     indexed by next_index_unacked and we increment it right away
+         *   - on positive/negative response we update next_index_acked as
+         * described by the algorithm (for next_index)
          *   - on negative response we also reset next_index_unacked to
-         *     next_index (after the latter has been decremented)
-         * In this way the meaning of next_index becomes simply "the first log
-         * entry still to be acked", while in the paper next_index is also
-         * the next log entry to be sent (preventing pipelining).
+         *     next_index_acked (after the latter has been decremented)
+         * In this way we split next_index into two separate variables: the
+         * meaning of next_index_acked is "the first log entry still to be
+         * acked"; the meaning of next_index_unacked is "the next log entry to
+         * be sent". In the paper next_index has both meanings, preventing
+         * pipelining.
          */
-        LogIndex next_index;
+        LogIndex next_index_acked;
         LogIndex next_index_unacked;
 
         /* For each replica, index of highest log entry known to
