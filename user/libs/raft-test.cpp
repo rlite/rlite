@@ -193,7 +193,30 @@ main()
     events.push_back(TestEvent::CreateRequestEvent(370));
     events.sort();
 
-    while (t <= t_max) {
+    /* Stop the simulation when we are over-time or when we run out
+     * of messages and events (except for the heartbeat timeouts). */
+    auto should_stop = [t, t_max, &output, &events]() -> bool {
+        auto only_timeouts = [&events]() -> bool {
+            for (const auto &e : events) {
+                if (e.event_type != TestEventType::RaftTimer) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        auto only_heartbeat_commands = [&output]() -> bool {
+            for (const auto &c : output.timer_commands) {
+                if (c.type != RaftTimerType::HeartBeat) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        return t > t_max || (output.output_messages.empty() &&
+                             only_heartbeat_commands() && only_timeouts());
+    };
+
+    while (!should_stop()) {
         list<TestEvent> postponed;
         unsigned int t_next = t + 1;
         RaftSMOutput output_next;
