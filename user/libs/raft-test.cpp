@@ -44,12 +44,10 @@ logfile(const string &replica)
     return string("/tmp/raft_test_") + replica + "_log";
 }
 
-static constexpr int kFirstCommand = 18;
-
 class TestReplica : public RaftSM {
-    uint32_t output_counter = kFirstCommand;
-    bool failed             = false;
+    list<uint32_t> committed_commands;
     list<string> peers;
+    bool failed = false;
 
 public:
     TestReplica() = default;
@@ -67,11 +65,7 @@ public:
     virtual int apply(const char *const serbuf) override
     {
         uint32_t cmd = *(reinterpret_cast<const uint32_t *>(serbuf));
-        if (++output_counter != cmd) {
-            cout << "Mismatch: expected " << output_counter << ", got " << cmd
-                 << endl;
-            return -1;
-        }
+        committed_commands.push_back(cmd);
         return 0;
     }
 
@@ -88,6 +82,22 @@ public:
         failed = false;
         return init(peers, out);
     };
+
+    bool check(uint32_t num_commands) const
+    {
+        uint32_t expected = 1;
+
+        if (committed_commands.size() != num_commands) {
+            return false;
+        }
+        for (auto cmd : committed_commands) {
+            if (cmd != expected++) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 enum class TestEventType {
@@ -105,8 +115,6 @@ struct TestEvent {
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
-
-    static uint32_t get_next_command() { return ++input_counter; }
 
     static TestEvent CreateTimerEvent(unsigned int t, TestReplica *_sm,
                                       RaftTimerType ty)
@@ -144,12 +152,7 @@ struct TestEvent {
         e.sm         = _sm;
         return e;
     }
-
-private:
-    static uint32_t input_counter;
 };
-
-uint32_t TestEvent::input_counter = kFirstCommand;
 
 int
 main()
@@ -159,6 +162,7 @@ main()
     list<TestEvent> events;
     unsigned int t           = 0; /* time */
     const unsigned int t_max = 800;
+    uint32_t input_counter   = 1;
     RaftSMOutput output;
 
     srand(time(0));
@@ -309,7 +313,7 @@ main()
                 bool submitted = false;
                 for (const auto &kv : replicas) {
                     if (kv.second->leader() && kv.second->up()) {
-                        uint32_t cmd = TestEvent::get_next_command();
+                        uint32_t cmd = input_counter++;
                         LogIndex request_id;
 
                         if (kv.second->submit(reinterpret_cast<char *>(&cmd),
@@ -352,6 +356,13 @@ main()
         /* Update time and Raft state machine output. */
         t      = t_next;
         output = std::move(output_next);
+    }
+
+    for (const auto &kv : replicas) {
+        if (kv.second->up()) {
+            cout << "Replica " << kv.first << " up, check " << std::boolalpha
+                 << kv.second->check(input_counter - 1) << endl;
+        }
     }
 
     return 0;
