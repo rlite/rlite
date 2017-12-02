@@ -166,12 +166,7 @@ main()
         remove(logfile(local).c_str());
     }
 
-    /* Push some client submission. */
-    events.push_back(TestEvent::CreateRequestEvent(350));
-    events.push_back(TestEvent::CreateRequestEvent(360));
-    events.push_back(TestEvent::CreateRequestEvent(370));
-    events.sort();
-
+    /* Create and initialize all the replicas. */
     for (const auto &local : names) {
         string logfilename = logfile(local);
         list<string> peers;
@@ -190,6 +185,13 @@ main()
         }
         replicas[local] = std::move(sm);
     }
+
+    /* Push some client submission, failures and respawn events. */
+    events.push_back(TestEvent::CreateRequestEvent(350));
+    events.push_back(TestEvent::CreateRequestEvent(360));
+    events.push_back(TestEvent::CreateFailureEvent(365, replicas["r3"].get()));
+    events.push_back(TestEvent::CreateRequestEvent(370));
+    events.sort();
 
     while (t <= t_max) {
         list<TestEvent> postponed;
@@ -297,11 +299,15 @@ main()
 
             case TestEventType::SMFailure: {
                 next.sm->fail();
+                cout << "Replica " << next.sm->local_name() << " failed"
+                     << endl;
                 break;
             }
 
             case TestEventType::SMRespawn: {
                 next.sm->respawn(&output_next);
+                cout << "Replica " << next.sm->local_name() << " respawn"
+                     << endl;
                 break;
             }
             }

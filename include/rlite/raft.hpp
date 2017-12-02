@@ -314,6 +314,9 @@ public:
     /* Name of the current leader (if we know it). */
     ReplicaId leader_name() const { return leader_id; }
 
+    std::string local_name() const { return local_id; }
+    std::string sm_name() const { return name; }
+
     /* Called by the Raft state machine when a log entry needs to
      * be applied to the replicated state machine. */
     virtual int apply(const char *const serbuf) = 0;
