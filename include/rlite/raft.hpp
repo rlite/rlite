@@ -143,7 +143,6 @@ struct RaftSMOutput {
     std::list<std::pair<ReplicaId, std::unique_ptr<RaftMessage>>>
         output_messages;
     std::list<RaftTimerCmd> timer_commands;
-    std::list<LogIndex> committed_entries;
 };
 
 enum class RaftState {
@@ -178,8 +177,19 @@ class RaftSM {
 
     struct Server {
         /* For each replica, index of the next log entry to send to
-         * that server. Initialized to leader's last log index + 1. */
+         * that server. Initialized to leader's last log index + 1.
+         * We make a slight variation to allow to pipeline RaftAppendEntries
+         * messages towards the same replica:
+         *   - on client submit or retransmission we send the log entry
+         *     indexed by next_index_unacked and we increment it right away
+         *   - on negative response we also reset next_index_unacked to
+         *     next_index (after the latter has been decremented)
+         * In this way the meaning of next_index becomes simply "the first log
+         * entry still to be acked", while in the paper next_index is also
+         * the next log entry to be sent (preventing pipelining).
+         */
         LogIndex next_index;
+        LogIndex next_index_unacked;
 
         /* For each replica, index of highest log entry known to
          * be replicated on that replica. Initialized to 0, increases

@@ -156,7 +156,7 @@ main()
     map<string, std::unique_ptr<TestReplica>> replicas;
     list<TestEvent> events;
     unsigned int t           = 0; /* time */
-    const unsigned int t_max = 500;
+    const unsigned int t_max = 800;
     RaftSMOutput output;
 
     srand(time(0));
@@ -191,6 +191,14 @@ main()
     events.push_back(TestEvent::CreateRequestEvent(360));
     events.push_back(TestEvent::CreateFailureEvent(365, replicas["r3"].get()));
     events.push_back(TestEvent::CreateRequestEvent(370));
+    events.push_back(TestEvent::CreateRequestEvent(450));
+    events.push_back(TestEvent::CreateFailureEvent(450, replicas["r4"].get()));
+    events.push_back(TestEvent::CreateRequestEvent(454));
+    events.push_back(TestEvent::CreateRequestEvent(455));
+    // events.push_back(TestEvent::CreateRespawnEvent(500,
+    // replicas["r3"].get()));
+    events.push_back(TestEvent::CreateRequestEvent(550));
+    events.push_back(TestEvent::CreateRequestEvent(560));
     events.sort();
 
     /* Stop the simulation when we are over-time or when we run out
