@@ -47,14 +47,16 @@ logfile(const string &replica)
 class TestReplica : public RaftSM {
     uint32_t output_counter = 18;
     bool failed             = false;
+    list<string> peers;
 
 public:
     TestReplica() = default;
     RL_NONCOPIABLE(TestReplica);
     TestReplica(const std::string &smname, const ReplicaId &myname,
-                std::string logname)
+                std::string logname, const list<string> &others)
         : RaftSM(smname, myname, logname,
-                 /*cmd_size=*/sizeof(uint32_t), std::cerr, std::cout)
+                 /*cmd_size=*/sizeof(uint32_t), std::cerr, std::cout),
+          peers(others)
     {
     }
     ~TestReplica() { shutdown(); }
@@ -79,7 +81,7 @@ public:
     bool up() const { return !failed; }
 
     /* Called to emulate a replica trying to recover after failure. */
-    int respawn(const list<ReplicaId> peers, RaftSMOutput *out)
+    int respawn(RaftSMOutput *out)
     {
         failed = false;
         return init(peers, out);
@@ -182,8 +184,8 @@ main()
         }
 
         sm = make_unique<TestReplica>(
-            /*smname=*/local + "-sm", /*myname=*/local, logfilename);
-        if (sm->init(peers, &output)) {
+            /*smname=*/local + "-sm", /*myname=*/local, logfilename, peers);
+        if (sm->respawn(&output)) {
             return -1;
         }
         replicas[local] = std::move(sm);
@@ -290,13 +292,16 @@ main()
                     postponed.push_back(TestEvent::CreateRequestEvent(t + 100));
                     cout << "Client request postponed (no leader)" << endl;
                 }
+                break;
             }
 
             case TestEventType::SMFailure: {
+                next.sm->fail();
                 break;
             }
 
             case TestEventType::SMRespawn: {
+                next.sm->respawn(&output_next);
                 break;
             }
             }
