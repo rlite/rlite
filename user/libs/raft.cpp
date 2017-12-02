@@ -159,9 +159,9 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 
     /* Initialization is complete, we can set the election timer and return to
      * the caller. */
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
-                                               RaftTimerAction::Restart,
-                                               rand_int_in_range(200, 500)));
+    out->timer_commands.push_back(RaftTimerCmd(
+        this, RaftTimerType::Election, RaftTimerAction::Restart,
+        rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
 
     return 0;
 }
@@ -368,9 +368,9 @@ RaftSM::back_to_follower(RaftSMOutput *out)
         return ret;
     }
     switch_state(RaftState::Follower);
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::Election,
-                                               RaftTimerAction::Restart,
-                                               rand_int_in_range(200, 500)));
+    out->timer_commands.push_back(RaftTimerCmd(
+        this, RaftTimerType::Election, RaftTimerAction::Restart,
+        rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
     /* Also stop the heartbeat timer, in case we were leader. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::HeartBeat, RaftTimerAction::Stop));
@@ -647,7 +647,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         return ret;
     }
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Restart, 100));
+                                               RaftTimerAction::Restart,
+                                               HeartbeatTimeout));
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -851,7 +852,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* Reset the election timer in case we lose the election. */
         out->timer_commands.push_back(RaftTimerCmd(
             this, RaftTimerType::Election, RaftTimerAction::Restart,
-            rand_int_in_range(200, 500)));
+            rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : servers) {
             auto msg            = make_unique<RaftRequestVote>();
@@ -869,8 +870,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         if ((ret = prepare_append_entries(out))) {
             return ret;
         }
-        out->timer_commands.push_back(RaftTimerCmd(
-            this, RaftTimerType::HeartBeat, RaftTimerAction::Restart, 100));
+        out->timer_commands.push_back(
+            RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                         RaftTimerAction::Restart, HeartbeatTimeout));
     }
 
     return 0;
