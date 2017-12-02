@@ -152,8 +152,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
     }
 
     for (const auto &rid : peers) {
-        servers[rid].match_index = 0;
-        servers[rid].next_index  = servers[rid].next_index_unacked =
+        servers[rid].match_index      = 0;
+        servers[rid].next_index_acked = servers[rid].next_index_unacked =
             last_log_index + 1;
     }
 
@@ -614,8 +614,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
     leader_id = local_id;
 
     for (auto &kv : servers) {
-        kv.second.match_index = 0;
-        kv.second.next_index  = kv.second.next_index_unacked =
+        kv.second.match_index      = 0;
+        kv.second.next_index_acked = kv.second.next_index_unacked =
             last_log_index + 1;
     }
 
@@ -746,10 +746,11 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
     if (resp.success) {
         LogIndex next_commit_index = commit_index;
 
-        /* On success we update the next_index. */
-        assert(resp.last_log_index + 1 > servers[resp.follower_id].next_index);
-        servers[resp.follower_id].next_index  = resp.last_log_index + 1;
-        servers[resp.follower_id].match_index = resp.last_log_index;
+        /* On success we update the next_index_acked. */
+        assert(resp.last_log_index + 1 >
+               servers[resp.follower_id].next_index_acked);
+        servers[resp.follower_id].next_index_acked = resp.last_log_index + 1;
+        servers[resp.follower_id].match_index      = resp.last_log_index;
         /* Try to update the commit_index. We need to find the highest N
          * such that N > commit_index and that match_index >= N for a majority
          * of the replicas (we as a leader count as a replica that has
@@ -791,8 +792,9 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
     } else {
         /* Failure comes from log inconsistencies. We need to decrement
          * next index and retry. */
-        assert(servers[resp.follower_id].next_index > 0);
-        servers[resp.follower_id].next_index--;
+        assert(servers[resp.follower_id].next_index_acked > 0);
+        servers[resp.follower_id].next_index_unacked =
+            --servers[resp.follower_id].next_index_acked;
     }
 
     return 0;
