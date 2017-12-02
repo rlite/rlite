@@ -153,7 +153,8 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
 
     for (const auto &rid : peers) {
         servers[rid].match_index = 0;
-        servers[rid].next_index  = last_log_index + 1;
+        servers[rid].next_index  = servers[rid].next_index_unacked =
+            last_log_index + 1;
     }
 
     /* Initialization is complete, we can set the election timer and return to
@@ -422,19 +423,20 @@ int
 RaftSM::prepare_append_entries(const Term term, const char *const serbuf,
                                RaftSMOutput *out)
 {
-    for (const auto &kv : servers) {
+    for (auto &kv : servers) {
         auto msg            = make_unique<RaftAppendEntries>();
         msg->term           = current_term;
         msg->leader_id      = local_id;
         msg->leader_commit  = commit_index;
-        msg->prev_log_index = kv.second.next_index - 1;
+        msg->prev_log_index = kv.second.next_index_unacked - 1;
         if (log_entry_get_term(msg->prev_log_index, &msg->prev_log_term)) {
             return -1;
         }
-        if (serbuf && last_log_index >= kv.second.next_index) {
+        if (serbuf && last_log_index >= kv.second.next_index_unacked) {
             auto bufcopy = std::unique_ptr<char[]>(new char[log_command_size]);
             memcpy(bufcopy.get(), serbuf, log_command_size);
             msg->entries.push_back(std::make_pair(term, std::move(bufcopy)));
+            kv.second.next_index_unacked++;
         }
         out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
     }
@@ -613,7 +615,8 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     for (auto &kv : servers) {
         kv.second.match_index = 0;
-        kv.second.next_index  = last_log_index + 1;
+        kv.second.next_index  = kv.second.next_index_unacked =
+            last_log_index + 1;
     }
 
     /* Prepare heartbeat messages for the other replicas and set the
