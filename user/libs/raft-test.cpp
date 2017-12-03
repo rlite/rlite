@@ -160,9 +160,9 @@ main()
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<TestReplica>> replicas;
     list<TestEvent> events;
-    unsigned int t           = 0; /* time */
-    const unsigned int t_max = 800;
-    uint32_t input_counter   = 1;
+    unsigned int t             = 0; /* time */
+    unsigned int t_last_ievent = t; /* time of last interesting event */
+    uint32_t input_counter     = 1;
     RaftSMOutput output;
 
     srand(time(0));
@@ -192,6 +192,15 @@ main()
         replicas[local] = std::move(sm);
     }
 
+    auto compute_grace_period = [&replicas]() -> unsigned int {
+        for (const auto &kv : replicas) {
+            return 2 * kv.second->get_heartbeat_timeout();
+        }
+        assert(false);
+        return 0;
+    };
+    const unsigned int grace_period = compute_grace_period();
+
     /* Push some client submission, failures and respawn events. */
     events.push_back(TestEvent::CreateRequestEvent(350));
     events.push_back(TestEvent::CreateRequestEvent(360));
@@ -207,9 +216,11 @@ main()
     events.push_back(TestEvent::CreateRequestEvent(560));
     events.sort();
 
-    /* Stop the simulation when we are over-time or when we run out
-     * of messages and events (except for the heartbeat timeouts). */
-    auto should_stop = [t, t_max, &output, &events]() -> bool {
+    /* Stop the simulation when there are no more interesting events scheduled
+     * (client submissions, replica failure, replica respawn or non-heartbeat
+     * message), a leader is up and running and nothing interesting happened
+     * for the last grace period (two heartbeat timeouts). */
+    auto should_stop = [&t, &replicas, &events](unsigned int t_max) -> bool {
         auto only_timeouts = [&events]() -> bool {
             for (const auto &e : events) {
                 if (e.event_type != TestEventType::RaftTimer) {
@@ -218,19 +229,18 @@ main()
             }
             return true;
         };
-        auto only_heartbeat_commands = [&output]() -> bool {
-            for (const auto &c : output.timer_commands) {
-                if (c.type != RaftTimerType::HeartBeat) {
-                    return false;
+        auto leader_is_up = [&replicas]() -> bool {
+            for (const auto &kv : replicas) {
+                if (kv.second->leader() && kv.second->up()) {
+                    return true;
                 }
             }
-            return true;
+            return false;
         };
-        return t > t_max || (output.output_messages.empty() &&
-                             only_heartbeat_commands() && only_timeouts());
+        return leader_is_up() && only_timeouts() && t > t_max;
     };
 
-    while (!should_stop()) {
+    while (!should_stop(t_last_ievent + grace_period)) {
         list<TestEvent> postponed;
         unsigned int t_next = t + 1;
         RaftSMOutput output_next;
@@ -260,6 +270,10 @@ main()
                                                                  &output_next);
             } else {
                 assert(false);
+            }
+
+            if (!ae || !ae->entries.empty()) {
+                t_last_ievent = t;
             }
 
             if (r) {
@@ -320,7 +334,8 @@ main()
                                               &request_id, &output_next)) {
                             return -1;
                         }
-                        submitted = true;
+                        t_last_ievent = t;
+                        submitted     = true;
                         cout << "Command " << cmd << " submitted" << endl;
                         break;
                     }
@@ -336,6 +351,7 @@ main()
 
             case TestEventType::SMFailure: {
                 next.sm->fail();
+                t_last_ievent = t;
                 cout << "Replica " << next.sm->local_name() << " failed"
                      << endl;
                 break;
@@ -343,6 +359,7 @@ main()
 
             case TestEventType::SMRespawn: {
                 next.sm->respawn(&output_next);
+                t_last_ievent = t;
                 cout << "Replica " << next.sm->local_name() << " respawn"
                      << endl;
                 break;
