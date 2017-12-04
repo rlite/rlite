@@ -865,7 +865,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 
     } else if (type == RaftTimerType::HeartBeat) {
         /* The heartbeat timer fired. */
-        IOS_INF() << "Hearbeat timer expired" << endl;
+        IOS_INF() << "Heartbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
         if ((ret = prepare_append_entries(out))) {
             return ret;

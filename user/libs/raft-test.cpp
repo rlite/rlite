@@ -111,7 +111,8 @@ struct TestEvent {
     TestEventType event_type;
     unsigned int abstime = 0;
     TestReplica *sm      = nullptr;
-    RaftTimerType ttype  = RaftTimerType::Invalid;
+    string smname;
+    RaftTimerType ttype = RaftTimerType::Invalid;
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
@@ -135,37 +136,36 @@ struct TestEvent {
         return e;
     }
 
-    static TestEvent CreateFailureEvent(unsigned int t, TestReplica *_sm)
+    static TestEvent CreateFailureEvent(unsigned int t, const string &name)
     {
         TestEvent e;
         e.event_type = TestEventType::SMFailure;
         e.abstime    = t;
-        e.sm         = _sm;
+        e.smname     = name;
         return e;
     }
 
-    static TestEvent CreateRespawnEvent(unsigned int t, TestReplica *_sm)
+    static TestEvent CreateRespawnEvent(unsigned int t, const string &name)
     {
         TestEvent e;
         e.event_type = TestEventType::SMRespawn;
         e.abstime    = t;
-        e.sm         = _sm;
+        e.smname     = name;
         return e;
     }
 };
 
+/* Returns 0 on test success, 1 on test failure, -1 on error. */
 int
-main()
+run_simulation(const list<TestEvent> &external_events)
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<TestReplica>> replicas;
-    list<TestEvent> events;
+    list<TestEvent> events     = external_events;
     unsigned int t             = 0; /* time */
     unsigned int t_last_ievent = t; /* time of last interesting event */
     uint32_t input_counter     = 1;
     RaftSMOutput output;
-
-    srand(time(0));
 
     /* Clean up leftover logfiles, if any. */
     for (const auto &local : names) {
@@ -201,19 +201,6 @@ main()
     };
     const unsigned int grace_period = compute_grace_period();
 
-    /* Push some client submission, failures and respawn events. */
-    events.push_back(TestEvent::CreateRequestEvent(350));
-    events.push_back(TestEvent::CreateRequestEvent(360));
-    events.push_back(TestEvent::CreateFailureEvent(365, replicas["r3"].get()));
-    events.push_back(TestEvent::CreateRequestEvent(370));
-    events.push_back(TestEvent::CreateRequestEvent(450));
-    events.push_back(TestEvent::CreateFailureEvent(450, replicas["r4"].get()));
-    events.push_back(TestEvent::CreateRequestEvent(454));
-    events.push_back(TestEvent::CreateRequestEvent(455));
-    // events.push_back(TestEvent::CreateRespawnEvent(500,
-    // replicas["r3"].get()));
-    events.push_back(TestEvent::CreateRequestEvent(550));
-    events.push_back(TestEvent::CreateRequestEvent(560));
     events.sort();
 
     /* Stop the simulation when there are no more interesting events scheduled
@@ -350,18 +337,18 @@ main()
             }
 
             case TestEventType::SMFailure: {
-                next.sm->fail();
+                assert(replicas.count(next.smname));
+                replicas[next.smname]->fail();
                 t_last_ievent = t;
-                cout << "Replica " << next.sm->local_name() << " failed"
-                     << endl;
+                cout << "Replica " << next.smname << " failed" << endl;
                 break;
             }
 
             case TestEventType::SMRespawn: {
-                next.sm->respawn(&output_next);
+                assert(replicas.count(next.smname));
+                replicas[next.smname]->respawn(&output_next);
                 t_last_ievent = t;
-                cout << "Replica " << next.sm->local_name() << " respawn"
-                     << endl;
+                cout << "Replica " << next.smname << " respawn" << endl;
                 break;
             }
             }
@@ -376,9 +363,50 @@ main()
     }
 
     for (const auto &kv : replicas) {
-        if (kv.second->up()) {
-            cout << "Replica " << kv.first << " up, check " << std::boolalpha
-                 << kv.second->check(input_counter - 1) << endl;
+        if (kv.second->up() && !kv.second->check(input_counter - 1)) {
+            cout << "Check failed for replica " << kv.first << endl;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int
+main()
+{
+    srand(time(0));
+
+    {
+        list<TestEvent> events;
+        int ret;
+
+        /* Push some client submission, failures and respawn events. */
+        events.push_back(TestEvent::CreateRequestEvent(350));
+        events.push_back(TestEvent::CreateRequestEvent(360));
+        events.push_back(TestEvent::CreateFailureEvent(365, "r3"));
+        events.push_back(TestEvent::CreateRequestEvent(370));
+        events.push_back(TestEvent::CreateRequestEvent(450));
+        events.push_back(TestEvent::CreateFailureEvent(450, "r4"));
+        events.push_back(TestEvent::CreateRequestEvent(454));
+        events.push_back(TestEvent::CreateRequestEvent(455));
+        // events.push_back(TestEvent::CreateRespawnEvent(500, "r3"));
+        events.push_back(TestEvent::CreateRequestEvent(550));
+        events.push_back(TestEvent::CreateRequestEvent(560));
+
+        ret = run_simulation(events);
+        switch (ret) {
+        case -1:
+            cout << "Error occurred during test run" << endl;
+            return -1;
+            break;
+        case 1:
+            cout << "Test failure" << endl;
+            return -1;
+            break;
+        case 0:
+            cout << "Test success" << endl;
+            break;
         }
     }
 
