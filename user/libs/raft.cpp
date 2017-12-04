@@ -45,6 +45,11 @@ RaftSM::log_open(bool first_boot)
         mode |= ios::ate;
     }
 
+    if (logfile.is_open()) {
+        /* The user could call init() multiple times in a raw, e.g. because
+         * of crashes or bugs. We need to close the logfile before reopen it. */
+        logfile.close();
+    }
     logfile.open(logfilename, mode);
     if (logfile.fail()) {
         IOS_ERR() << "Failed to open logfile '" << logfilename

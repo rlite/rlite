@@ -345,8 +345,11 @@ run_simulation(const list<TestEvent> &external_events)
             }
 
             case TestEventType::SMRespawn: {
+                int ret;
                 assert(replicas.count(next.smname));
-                replicas[next.smname]->respawn(&output_next);
+                if ((ret = replicas[next.smname]->respawn(&output_next))) {
+                    return ret;
+                }
                 t_last_ievent = t;
                 cout << "Replica " << next.smname << " respawn" << endl;
                 break;
@@ -376,12 +379,21 @@ int
 main()
 {
     /* Some function aliases useful to specify test vectors in a compact way. */
-    const auto &Req  = TestEvent::CreateRequestEvent;
-    const auto &Fail = TestEvent::CreateFailureEvent;
-    // const auto &Respawn = TestEvent::CreateRespawnEvent;
+    const auto &Req                    = TestEvent::CreateRequestEvent;
+    const auto &Fail                   = TestEvent::CreateFailureEvent;
+    const auto &Respawn                = TestEvent::CreateRespawnEvent;
     list<list<TestEvent>> test_vectors = {
+        /* No failures */
+        {Req(240), Req(411), Req(600), Req(600), Req(601), Req(602), Req(658),
+         Req(661), Req(721)},
+        /* Two failures, no respawn. */
         {Req(350), Req(360), Fail(365, "r3"), Req(450), Req(370),
-         Fail(450, "r4"), Req(454), Req(455), Req(550), Req(560)}};
+         Fail(450, "r4"), Req(454), Req(455), Req(550), Req(560)},
+        /* One failure with immediate respawn. */
+        {Req(301), Req(302), Fail(303, "r3"), Respawn(305, "r3"), Req(307),
+         Req(309), Req(313)}
+        /* One failure with respawn after some time. */
+    };
     int test_counter = 1;
 
     srand(time(0));
