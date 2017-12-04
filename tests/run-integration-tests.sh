@@ -36,6 +36,8 @@ sudo pkill rlite-uipcps > /dev/null 2>&1
 for m in ${modules}; do
     sudo rmmod ${m} > /dev/null 2>&1
 done
+sudo pkill rinaperf
+sudo pkill rina-echo-async
 sudo rmmod rlite > /dev/null 2>&1
 
 testcnt="0"
