@@ -375,39 +375,36 @@ run_simulation(const list<TestEvent> &external_events)
 int
 main()
 {
+    /* Some function aliases useful to specify test vectors in a compact way. */
+    const auto &Req  = TestEvent::CreateRequestEvent;
+    const auto &Fail = TestEvent::CreateFailureEvent;
+    // const auto &Respawn = TestEvent::CreateRespawnEvent;
+    list<list<TestEvent>> test_vectors = {
+        {Req(350), Req(360), Fail(365, "r3"), Req(450), Req(370),
+         Fail(450, "r4"), Req(454), Req(455), Req(550), Req(560)}};
+    int test_counter = 1;
+
     srand(time(0));
 
-    {
-        list<TestEvent> events;
+    for (const auto &vector : test_vectors) {
         int ret;
 
-        /* Push some client submission, failures and respawn events. */
-        events.push_back(TestEvent::CreateRequestEvent(350));
-        events.push_back(TestEvent::CreateRequestEvent(360));
-        events.push_back(TestEvent::CreateFailureEvent(365, "r3"));
-        events.push_back(TestEvent::CreateRequestEvent(370));
-        events.push_back(TestEvent::CreateRequestEvent(450));
-        events.push_back(TestEvent::CreateFailureEvent(450, "r4"));
-        events.push_back(TestEvent::CreateRequestEvent(454));
-        events.push_back(TestEvent::CreateRequestEvent(455));
-        // events.push_back(TestEvent::CreateRespawnEvent(500, "r3"));
-        events.push_back(TestEvent::CreateRequestEvent(550));
-        events.push_back(TestEvent::CreateRequestEvent(560));
-
-        ret = run_simulation(events);
+        ret = run_simulation(vector);
+        cout << "Test #: " << test_counter;
         switch (ret) {
         case -1:
-            cout << "Error occurred during test run" << endl;
+            cout << ": error occurred" << endl;
             return -1;
             break;
         case 1:
-            cout << "Test failure" << endl;
+            cout << ": test failed" << endl;
             return -1;
             break;
         case 0:
-            cout << "Test success" << endl;
+            cout << ": test ok" << endl;
             break;
         }
+        ++test_counter;
     }
 
     return 0;
