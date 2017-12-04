@@ -55,7 +55,7 @@ for t in $(ls tests/integration/*); do
     sudo ${t}
     retcode="$?"
     sudo rlite-ctl reset || abort_cleanup
-    sudo kill $(cat /run/rlite/uipcps.pid) || abort_cleanup
+    sudo pkill rlite-uipcps || abort_cleanup
     for m in ${modules}; do
         sudo rmmod ${m} || abort_cleanup
     done
