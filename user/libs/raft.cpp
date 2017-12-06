@@ -76,6 +76,18 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
         return ret;
     }
 
+    /* Reset state to default values (useful in case init() is
+     * called twice). */
+    current_term    = 0;
+    voted_for       = string();
+    state           = RaftState::Follower;
+    commit_index    = 0;
+    last_applied    = 0;
+    leader_id       = string();
+    last_log_index  = 0;
+    last_log_term   = 0;
+    votes_collected = 0;
+
     if (first_boot) {
         char null[kLogVotedForSize];
 
@@ -679,14 +691,6 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
               << ", leader_commit=" << msg.leader_commit
               << ", num_entries=" << msg.entries.size() << ")" << endl;
 
-    if ((ret = catch_up_term(msg.term, out)) < 0) {
-        return ret;
-    }
-
-    if ((ret = back_to_follower(out))) {
-        return ret;
-    }
-
     resp                 = make_unique<RaftAppendEntriesResp>();
     resp->term           = current_term;
     resp->follower_id    = local_id;
@@ -698,6 +702,14 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         out->output_messages.push_back(
             make_pair(msg.leader_id, std::move(resp)));
         return 0;
+    }
+
+    if ((ret = catch_up_term(msg.term, out)) < 0) {
+        return ret;
+    }
+
+    if ((ret = back_to_follower(out))) {
+        return ret;
     }
 
     leader_id = msg.leader_id;
