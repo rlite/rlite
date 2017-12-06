@@ -124,6 +124,11 @@ struct TestEvent {
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
 
+    bool is_interesting() const
+    {
+        return event_type != TestEventType::RaftTimer;
+    }
+
     static TestEvent CreateTimerEvent(unsigned int t, TestReplica *_sm,
                                       RaftTimerType ty)
     {
@@ -177,6 +182,9 @@ run_simulation(const list<TestEvent> &external_events)
     map<unsigned int, TestReplica *> failed_replicas;
     RaftSMOutput output;
 
+    /* Sort input events in case they are not. */
+    events.sort();
+
     /* Clean up leftover logfiles, if any. */
     for (const auto &local : names) {
         remove(logfile(local).c_str());
@@ -210,8 +218,6 @@ run_simulation(const list<TestEvent> &external_events)
         return 0;
     };
     const unsigned int grace_period = compute_grace_period();
-
-    events.sort();
 
     /* Stop the simulation when there are no more interesting events scheduled
      * (client submissions, replica failure, replica respawn or non-heartbeat
@@ -256,7 +262,6 @@ run_simulation(const list<TestEvent> &external_events)
     };
 
     while (!should_stop(t_last_ievent + grace_period)) {
-        list<TestEvent> postponed;
         unsigned int t_next = t + 1;
         RaftSMOutput output_next;
 
@@ -313,15 +318,19 @@ run_simulation(const list<TestEvent> &external_events)
                 assert(cmd.action == RaftTimerAction::Stop);
             }
         }
+        if (!output.timer_commands.empty()) {
+            events.sort();
+        }
 
         /* Process all the timers expired so far, updating the associated
          * Raft state machine. */
-        events.sort();
         while (!events.empty()) {
             const TestEvent &next = events.front();
+            bool consume_event    = true;
+
             if (t < next.abstime) {
                 if (output_next.output_messages.empty() &&
-                    output_next.timer_commands.empty() && postponed.empty()) {
+                    output_next.timer_commands.empty()) {
                     /* No need to go step by step, we can jump to the next
                      * event. */
                     t_next = next.abstime;
@@ -349,12 +358,11 @@ run_simulation(const list<TestEvent> &external_events)
                                        &request_id, &output_next)) {
                         return -1;
                     }
-                    t_last_ievent = t;
                     cout << "Command " << cmd << " submitted" << endl;
                 } else {
                     /* This can happen because no leader is currently elected
                      * or because the current leader is down. */
-                    postponed.push_back(TestEvent::CreateRequestEvent(t + 100));
+                    consume_event = false;
                     cout << "Client request postponed (no leader)" << endl;
                 }
                 break;
@@ -364,11 +372,15 @@ run_simulation(const list<TestEvent> &external_events)
                 TestReplica *r = next.failing_replica == FailingReplica::Leader
                                      ? get_leader()
                                      : get_follower();
-                assert(r);
-                r->fail();
-                failed_replicas[next.failing_id] = r;
-                t_last_ievent                    = t;
-                cout << "Replica " << r->local_name() << " failed" << endl;
+                if (r != nullptr) {
+                    r->fail();
+                    failed_replicas[next.failing_id] = r;
+                    cout << "Replica " << r->local_name() << " failed" << endl;
+                } else {
+                    /* This may happen if no leader or no followers. */
+                    consume_event = false;
+                    cout << "Replica failure postponed" << endl;
+                }
                 break;
             }
 
@@ -376,18 +388,31 @@ run_simulation(const list<TestEvent> &external_events)
                 TestReplica *r = failed_replicas[next.failing_id];
                 int ret;
                 assert(r != nullptr);
+                failed_replicas.erase(next.failing_id);
                 if ((ret = r->respawn(&output_next))) {
                     return ret;
                 }
-                t_last_ievent = t;
                 cout << "Replica " << r->local_name() << " respawn" << endl;
                 break;
             }
             }
-            events.pop_front();
+
+            if (consume_event) {
+                if (next.is_interesting()) {
+                    t_last_ievent = t;
+                }
+                events.pop_front();
+            } else {
+                /* This event cannot happen now (i.e. no leader). Let's just
+                 * postpone any significant event. */
+                for (auto &e : events) {
+                    if (e.is_interesting()) {
+                        e.abstime += 200;
+                    }
+                }
+                events.sort();
+            }
         }
-        /* Append the 'postponed' list at the end of the events list. */
-        events.splice(events.end(), postponed);
 
         /* Update time and Raft state machine output. */
         t      = t_next;
