@@ -626,6 +626,11 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
     IOS_INF() << "Received VoteRequestResp(term=" << resp.term
               << ", vote_granted=" << resp.vote_granted << ")" << endl;
 
+    if (resp.term < current_term) {
+        /* Outdated response, ignore. */
+        return 0;
+    }
+
     if ((ret = catch_up_term(resp.term, out))) {
         if (ret < 0) {
             return ret; /* error */
@@ -767,6 +772,11 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
               << ", follower_id=" << resp.follower_id
               << ", last_log_index=" << resp.last_log_index
               << ", success=" << resp.success << ")" << endl;
+
+    if (resp.term < current_term) {
+        /* Outdated response, ignore. */
+        return 0;
+    }
 
     if ((ret = catch_up_term(resp.term, out))) {
         if (ret < 0) {
