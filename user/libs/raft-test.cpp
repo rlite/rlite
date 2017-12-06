@@ -107,12 +107,19 @@ enum class TestEventType {
     SMRespawn,
 };
 
+enum class FailingReplica {
+    Invalid = 0,
+    Follower,
+    Leader,
+};
+
 struct TestEvent {
     TestEventType event_type;
-    unsigned int abstime = 0;
-    TestReplica *sm      = nullptr;
-    string smname;
-    RaftTimerType ttype = RaftTimerType::Invalid;
+    unsigned int abstime           = 0;
+    TestReplica *sm                = nullptr;
+    RaftTimerType ttype            = RaftTimerType::Invalid;
+    FailingReplica failing_replica = FailingReplica::Invalid;
+    unsigned int failing_id        = 0;
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
@@ -136,21 +143,23 @@ struct TestEvent {
         return e;
     }
 
-    static TestEvent CreateFailureEvent(unsigned int t, const string &name)
+    static TestEvent CreateFailureEvent(unsigned int t, FailingReplica fr,
+                                        unsigned int fid)
     {
         TestEvent e;
-        e.event_type = TestEventType::SMFailure;
-        e.abstime    = t;
-        e.smname     = name;
+        e.event_type      = TestEventType::SMFailure;
+        e.abstime         = t;
+        e.failing_replica = fr;
+        e.failing_id      = fid;
         return e;
     }
 
-    static TestEvent CreateRespawnEvent(unsigned int t, const string &name)
+    static TestEvent CreateRespawnEvent(unsigned int t, unsigned int fid)
     {
         TestEvent e;
         e.event_type = TestEventType::SMRespawn;
         e.abstime    = t;
-        e.smname     = name;
+        e.failing_id = fid;
         return e;
     }
 };
@@ -165,6 +174,7 @@ run_simulation(const list<TestEvent> &external_events)
     unsigned int t             = 0; /* time */
     unsigned int t_last_ievent = t; /* time of last interesting event */
     uint32_t input_counter     = 1;
+    map<unsigned int, TestReplica *> failed_replicas;
     RaftSMOutput output;
 
     /* Clean up leftover logfiles, if any. */
@@ -227,6 +237,24 @@ run_simulation(const list<TestEvent> &external_events)
         return leader_is_up() && only_timeouts() && t > t_max;
     };
 
+    /* Helpers to get the leader or any follower that is up. */
+    auto get_leader = [&replicas]() -> TestReplica * {
+        for (const auto &kv : replicas) {
+            if (kv.second->leader() && kv.second->up()) {
+                return kv.second.get();
+            }
+        }
+        return nullptr;
+    };
+    auto get_follower = [&replicas]() -> TestReplica * {
+        for (const auto &kv : replicas) {
+            if (kv.second->up() && !kv.second->leader()) {
+                return kv.second.get();
+            }
+        }
+        return nullptr;
+    };
+
     while (!should_stop(t_last_ievent + grace_period)) {
         list<TestEvent> postponed;
         unsigned int t_next = t + 1;
@@ -260,6 +288,7 @@ run_simulation(const list<TestEvent> &external_events)
             }
 
             if (!ae || !ae->entries.empty()) {
+                /* Don't count heartbeat messages as interesting events. */
                 t_last_ievent = t;
             }
 
@@ -311,23 +340,18 @@ run_simulation(const list<TestEvent> &external_events)
 
             case TestEventType::ClientRequest: {
                 /* This event is a client submission. */
-                bool submitted = false;
-                for (const auto &kv : replicas) {
-                    if (kv.second->leader() && kv.second->up()) {
-                        uint32_t cmd = input_counter++;
-                        LogIndex request_id;
+                TestReplica *leader = get_leader();
+                if (leader) {
+                    uint32_t cmd = input_counter++;
+                    LogIndex request_id;
 
-                        if (kv.second->submit(reinterpret_cast<char *>(&cmd),
-                                              &request_id, &output_next)) {
-                            return -1;
-                        }
-                        t_last_ievent = t;
-                        submitted     = true;
-                        cout << "Command " << cmd << " submitted" << endl;
-                        break;
+                    if (leader->submit(reinterpret_cast<char *>(&cmd),
+                                       &request_id, &output_next)) {
+                        return -1;
                     }
-                }
-                if (!submitted) {
+                    t_last_ievent = t;
+                    cout << "Command " << cmd << " submitted" << endl;
+                } else {
                     /* This can happen because no leader is currently elected
                      * or because the current leader is down. */
                     postponed.push_back(TestEvent::CreateRequestEvent(t + 100));
@@ -337,21 +361,26 @@ run_simulation(const list<TestEvent> &external_events)
             }
 
             case TestEventType::SMFailure: {
-                assert(replicas.count(next.smname));
-                replicas[next.smname]->fail();
-                t_last_ievent = t;
-                cout << "Replica " << next.smname << " failed" << endl;
+                TestReplica *r = next.failing_replica == FailingReplica::Leader
+                                     ? get_leader()
+                                     : get_follower();
+                assert(r);
+                r->fail();
+                failed_replicas[next.failing_id] = r;
+                t_last_ievent                    = t;
+                cout << "Replica " << r->local_name() << " failed" << endl;
                 break;
             }
 
             case TestEventType::SMRespawn: {
+                TestReplica *r = failed_replicas[next.failing_id];
                 int ret;
-                assert(replicas.count(next.smname));
-                if ((ret = replicas[next.smname]->respawn(&output_next))) {
+                assert(r != nullptr);
+                if ((ret = r->respawn(&output_next))) {
                     return ret;
                 }
                 t_last_ievent = t;
-                cout << "Replica " << next.smname << " respawn" << endl;
+                cout << "Replica " << r->local_name() << " respawn" << endl;
                 break;
             }
             }
@@ -382,15 +411,16 @@ main()
     const auto &Req                    = TestEvent::CreateRequestEvent;
     const auto &Fail                   = TestEvent::CreateFailureEvent;
     const auto &Respawn                = TestEvent::CreateRespawnEvent;
+    const auto F                       = FailingReplica::Follower;
     list<list<TestEvent>> test_vectors = {
         /* No failures */
         {Req(240), Req(411), Req(600), Req(600), Req(601), Req(602), Req(658),
          Req(661), Req(721)},
-        /* Two failures, no respawn. */
-        {Req(350), Req(360), Fail(365, "r3"), Req(450), Req(370),
-         Fail(450, "r4"), Req(454), Req(455), Req(550), Req(560)},
-        /* One failure with immediate respawn. */
-        {Req(301), Req(302), Fail(303, "r3"), Respawn(305, "r3"), Req(307),
+        /* Two follower failures, no respawn. */
+        {Req(350), Req(360), Fail(365, F, 0), Req(450), Req(370),
+         Fail(450, F, 1), Req(454), Req(455), Req(550), Req(560)},
+        /* One follower failure with immediate respawn. */
+        {Req(301), Req(302), Fail(303, F, 0), Respawn(305, 0), Req(307),
          Req(309), Req(313)}
         /* One failure with respawn after some time. */
     };
