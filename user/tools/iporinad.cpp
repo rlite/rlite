@@ -8,6 +8,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <memory>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -144,7 +145,7 @@ struct IPoRINA {
     list<Route> local_routes;
 
     /* Worker threads that forward traffic. */
-    vector<FwdWorker *> workers;
+    vector<std::unique_ptr<FwdWorker>> workers;
 
     IPoRINA();
     ~IPoRINA();
@@ -325,16 +326,12 @@ void
 IPoRINA::start_workers()
 {
     for (int i = 0; i < NUM_WORKERS; i++) {
-        workers.push_back(new FwdWorker(i, verbose));
+        workers.push_back(
+            std::unique_ptr<FwdWorker>(new FwdWorker(i, verbose)));
     }
 }
 
-IPoRINA::~IPoRINA()
-{
-    for (unsigned int i = 0; i < workers.size(); i++) {
-        delete workers[i];
-    }
-}
+IPoRINA::~IPoRINA() {}
 
 IPAddr::IPAddr(const string &_p) : repr(_p)
 {
@@ -1018,7 +1015,6 @@ int
 main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
-    struct pollfd pfd[1];
     pthread_t fa_th;
     int opt;
 
@@ -1079,6 +1075,7 @@ main(int argc, char **argv)
 
     /* Wait for incoming control/data connections from remote peers. */
     for (;;) {
+        struct pollfd pfd[1];
         int cfd;
         int ret;
 
