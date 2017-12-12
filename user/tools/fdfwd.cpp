@@ -51,16 +51,6 @@
 
 using namespace std;
 
-static void *
-worker_function(void *opaque)
-{
-    FwdWorker *w = (FwdWorker *)opaque;
-
-    w->run();
-
-    return NULL;
-}
-
 FwdWorker::FwdWorker(int idx_, int verb) : idx(idx_), nfds(0), verbose(verb)
 {
     syncfd = eventfd(0, 0);
@@ -68,6 +58,13 @@ FwdWorker::FwdWorker(int idx_, int verb) : idx(idx_), nfds(0), verbose(verb)
         perror("eventfd()");
         exit(EXIT_FAILURE);
     }
+
+    auto worker_function = [](void *opaque) -> void * {
+        FwdWorker *w = (FwdWorker *)opaque;
+        w->run();
+        return NULL;
+    };
+
     pthread_create(&th, NULL, worker_function, this);
     pthread_mutex_init(&lock, NULL);
 }
