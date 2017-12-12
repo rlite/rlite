@@ -33,6 +33,7 @@
 #include <sstream>
 #include <pthread.h>
 #include <utility>
+#include <memory>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -445,13 +446,13 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    struct addr_allocator *addra;
+    std::unique_ptr<struct addr_allocator> addra;
 
     /* Directory Forwarding Table. */
-    struct dft *dft;
+    std::unique_ptr<struct dft> dft;
 
     /* Lower Flow Database. */
-    struct lfdb *lfdb;
+    std::unique_ptr<struct lfdb> lfdb;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
@@ -460,7 +461,7 @@ struct uipcp_rib {
     InvokeIdMgr invoke_id_mgr;
 
     /* For supported flows. */
-    struct flow_allocator *fa;
+    std::unique_ptr<struct flow_allocator> fa;
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */

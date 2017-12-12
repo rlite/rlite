@@ -426,7 +426,7 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
-    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb);
+    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb.get());
 
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();
