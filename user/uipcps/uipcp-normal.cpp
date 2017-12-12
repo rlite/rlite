@@ -368,11 +368,10 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    dft  = new dft_default(this);
-    fa   = new flow_allocator_default(this);
-    lfdb = new lfdb_default(this);
+    dft  = make_unique<dft_default>(this);
+    fa   = make_unique<flow_allocator_default>(this);
+    lfdb = make_unique<lfdb_default>(this);
     policy_mod("routing", "link-state");
-    addra = nullptr;
     policy_mod("address-allocator", "distributed");
 
     /* Insert the handlers for the RIB objects. */
@@ -403,11 +402,6 @@ uipcp_rib::~uipcp_rib()
     for (const auto &kvn : neighbors) {
         rl_delete(kvn.second, RL_MT_NEIGH);
     }
-
-    delete addra;
-    delete lfdb;
-    delete fa;
-    delete dft;
 
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
@@ -1209,7 +1203,7 @@ uipcp_rib::policy_mod(const std::string &component,
     if (component == "routing") {
         /* Temporary solution to support LFA policies. No pointer switching is
          * carried out. */
-        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb);
+        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb.get());
 
         assert(lfdbd != nullptr);
 
@@ -1225,15 +1219,10 @@ uipcp_rib::policy_mod(const std::string &component,
             }
         }
     } else if (component == "address-allocator") {
-        struct addr_allocator *addra_old =
-            dynamic_cast<addr_allocator *>(addra);
         if (policy_name == "manual") {
-            addra = new addr_allocator_manual(this);
+            addra = make_unique<addr_allocator_manual>(this);
         } else if (policy_name == "distributed") {
-            addra = new addr_allocator_distributed(this);
-        }
-        if (addra_old != nullptr) {
-            delete addra_old;
+            addra = make_unique<addr_allocator_distributed>(this);
         }
     }
 
