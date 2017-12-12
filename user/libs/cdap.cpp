@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <time.h>
+#include <memory>
 
 #include "rlite/utils.h"
 #include "rina/cdap.hpp"
