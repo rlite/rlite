@@ -44,7 +44,7 @@ struct Fd {
     Fd() : fd(0), len(0), ofs(0), close(0) {}
 };
 
-struct FwdWorker {
+class FwdWorker {
     pthread_t th;
     pthread_mutex_t lock;
     int syncfd;
@@ -57,13 +57,15 @@ struct FwdWorker {
 
     int verbose;
 
+    int repoll();
+    int drain_syncfd();
+    void terminate(unsigned int i, int ret, int errcode);
+
+public:
     FwdWorker(int idx_, int verb);
     ~FwdWorker();
 
-    int repoll();
-    int drain_syncfd();
     void submit(int cfd, int rfd);
-    void terminate(unsigned int i, int ret, int errcode);
     void run();
 };
 
