@@ -53,8 +53,14 @@ using namespace std;
 
 FwdWorker::FwdWorker(int idx_, int verb) : idx(idx_), nfds(0), verbose(verb)
 {
-    syncfd = eventfd(0, 0);
-    if (syncfd < 0) {
+    repoll_syncfd = eventfd(0, 0);
+    if (repoll_syncfd < 0) {
+        perror("eventfd()");
+        exit(EXIT_FAILURE);
+    }
+
+    closed_syncfd = eventfd(0, 0);
+    if (closed_syncfd < 0) {
         perror("eventfd()");
         exit(EXIT_FAILURE);
     }
@@ -74,47 +80,38 @@ FwdWorker::~FwdWorker()
     if (pthread_join(th, NULL)) {
         perror("pthread_join");
     }
-    close(syncfd);
+    close(repoll_syncfd);
+    close(closed_syncfd);
 }
 
-int
-FwdWorker::repoll()
+void
+FwdWorker::eventfd_write(int fd)
 {
     uint64_t x = 1;
     int n;
 
-    n = write(syncfd, &x, sizeof(x));
+    n = write(fd, &x, sizeof(x));
     if (n != sizeof(x)) {
-        perror("write(syncfd)");
-        if (n < 0) {
-            return n;
-        }
-        return -1;
+        perror("write(eventfd)");
+        exit(EXIT_FAILURE);
     }
-
-    return 0;
 }
 
-int
-FwdWorker::drain_syncfd()
+void
+FwdWorker::eventfd_drain(int fd)
 {
     uint64_t x;
     int n;
 
-    n = read(syncfd, &x, sizeof(x));
+    n = read(fd, &x, sizeof(x));
     if (n != sizeof(x)) {
-        perror("read(syncfd)");
-        if (n < 0) {
-            return n;
-        }
-        return -1;
+        perror("read(eventfd)");
+        exit(EXIT_FAILURE);
     }
-
-    return 0;
 }
 
 void
-FwdWorker::submit(int cfd, int rfd)
+FwdWorker::submit(FwdToken token, int cfd, int rfd)
 {
     pthread_mutex_lock(&lock);
 
@@ -128,15 +125,33 @@ FwdWorker::submit(int cfd, int rfd)
 
     /* Append two entries in the fds array. Mapping is implicit
      * between two consecutive entries. */
-    fds[nfds++] = Fd(rfd);
-    fds[nfds++] = Fd(cfd);
-    repoll();
+    fds[nfds++] = Fd(rfd, token);
+    fds[nfds++] = Fd(cfd, token);
+    eventfd_write(repoll_syncfd); /* trigger repoll */
     pthread_mutex_unlock(&lock);
 
     if (verbose >= 1) {
         printf("New mapping created %d <--> %d [entries=%d,%d]\n", cfd, rfd,
                nfds - 2, nfds - 1);
     }
+}
+
+FwdToken
+FwdWorker::get_next_closed()
+{
+    FwdToken ret = 0;
+
+    pthread_mutex_lock(&lock);
+    if (!terminated.empty()) {
+        ret = terminated.front();
+        terminated.pop_front();
+        if (terminated.empty()) {
+            eventfd_drain(closed_syncfd);
+        }
+    }
+    pthread_mutex_unlock(&lock);
+
+    return ret;
 }
 
 /* Called under worker lock. */
@@ -151,7 +166,11 @@ FwdWorker::terminate(unsigned int i, int ret, int errcode)
 
     close(fds[i].fd);
     close(fds[j].fd);
-    fds[i].close = fds[j].close = 1;
+    fds[i].closed = fds[j].closed = true;
+    if (fds[i].token > 0) {
+        terminated.push_back(fds[i].token);
+        eventfd_write(closed_syncfd);
+    }
 
     if (verbose >= 1) {
         if (ret == 0 || errcode == EPIPE) {
@@ -181,7 +200,7 @@ FwdWorker::run()
     for (;;) {
         int nrdy;
 
-        pfds[-1].fd     = syncfd;
+        pfds[-1].fd     = repoll_syncfd;
         pfds[-1].events = POLLIN;
 
         /* Load the poll array with the active fd mappings, also recycling
@@ -190,7 +209,7 @@ FwdWorker::run()
         for (int i = 0; i < nfds;) {
             int j = i + 1; /* index of the mapped entry */
 
-            if (fds[i].close) {
+            if (fds[i].closed) {
                 nfds -= 2;
                 if (i < nfds) {
                     fds[i] = fds[nfds - 1];
@@ -249,11 +268,11 @@ FwdWorker::run()
                            idx);
                 }
                 pthread_mutex_lock(&lock);
-                drain_syncfd();
+                eventfd_drain(repoll_syncfd);
                 pthread_mutex_unlock(&lock);
 
             } else {
-                printf("w%d: Error event %d on syncfd\n", idx,
+                printf("w%d: Error event %d on repoll_syncfd\n", idx,
                        pfds[-1].revents);
             }
 
@@ -265,7 +284,7 @@ FwdWorker::run()
         for (int i = 0, n = 0; n < nrdy && i < nfds; i++) {
             int j;
 
-            if (!pfds[i].revents || fds[i].close) {
+            if (!pfds[i].revents || fds[i].closed) {
                 /* No events on this fd, or the session has
                  * been terminated by the mapped fd (in a previous
                  * iteration of this loop). Let's skip it. */
