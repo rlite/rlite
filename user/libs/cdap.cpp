@@ -948,7 +948,7 @@ CDAPMessage::dump() const
 }
 
 int
-CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
+CDAPConn::conn_fsm_run(CDAPMessage *m, bool sender)
 {
     const char *action  = sender ? "send" : "receive";
     ConnState old_state = state;
@@ -1029,7 +1029,7 @@ CDAPConn::conn_fsm_run(struct CDAPMessage *m, bool sender)
 }
 
 int
-msg_ser_stateless(struct CDAPMessage *m, char **buf, size_t *len)
+msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len)
 {
     gpb::CDAPMessage gm;
 
@@ -1047,7 +1047,7 @@ msg_ser_stateless(struct CDAPMessage *m, char **buf, size_t *len)
 }
 
 int
-CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id, char **buf, size_t *len)
+CDAPConn::msg_ser(CDAPMessage *m, int invoke_id, char **buf, size_t *len)
 {
     *buf = NULL;
     *len = 0;
@@ -1080,7 +1080,7 @@ CDAPConn::msg_ser(struct CDAPMessage *m, int invoke_id, char **buf, size_t *len)
 }
 
 int
-CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
+CDAPConn::msg_send(CDAPMessage *m, int invoke_id)
 {
     size_t serlen;
     char *serbuf;
@@ -1106,10 +1106,10 @@ CDAPConn::msg_send(struct CDAPMessage *m, int invoke_id)
     return n;
 }
 
-struct CDAPMessage *
+CDAPMessage *
 msg_deser_stateless(const char *serbuf, size_t serlen)
 {
-    struct CDAPMessage *m;
+    CDAPMessage *m;
     gpb::CDAPMessage gm;
 
     gm.ParseFromArray(serbuf, serlen);
@@ -1124,10 +1124,10 @@ msg_deser_stateless(const char *serbuf, size_t serlen)
     return m;
 }
 
-struct CDAPMessage *
+CDAPMessage *
 CDAPConn::msg_deser(const char *serbuf, size_t serlen)
 {
-    struct CDAPMessage *m = msg_deser_stateless(serbuf, serlen);
+    CDAPMessage *m = msg_deser_stateless(serbuf, serlen);
 
     if (!m) {
         return NULL;
@@ -1160,7 +1160,7 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
     return m;
 }
 
-struct CDAPMessage *
+CDAPMessage *
 CDAPConn::msg_recv()
 {
     char serbuf[4096];
@@ -1193,7 +1193,7 @@ CDAPMessage::m_connect(gpb::authTypes_t auth_mech_,
 }
 
 int
-CDAPMessage::m_connect_r(const struct CDAPMessage *req, int result_,
+CDAPMessage::m_connect_r(const CDAPMessage *req, int result_,
                          const std::string &result_reason_)
 {
     clear();
