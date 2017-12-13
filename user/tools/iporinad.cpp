@@ -156,6 +156,8 @@ struct IPoRINA {
     ~IPoRINA();
 
     void start_workers();
+    int setup();
+    int main_loop();
 };
 
 /*
@@ -821,34 +823,207 @@ Remote::mss_configure() const
     return 0;
 }
 
-static int
-setup(void)
+int
+IPoRINA::setup(void)
 {
-    g->rfd = rina_open();
-    if (g->rfd < 0) {
+    rfd = rina_open();
+    if (rfd < 0) {
         perror("rina_open()");
         return -1;
     }
 
     /* Register us to one or more local DIFs. */
-    for (const auto &dif_name : g->local.dif_names) {
+    for (const auto &dif_name : local.dif_names) {
         int ret;
 
-        ret = rina_register(g->rfd, dif_name.c_str(), g->local.app_name.c_str(),
-                            0);
+        ret = rina_register(rfd, dif_name.c_str(), local.app_name.c_str(), 0);
         if (ret) {
             perror("rina_register()");
-            cerr << "Failed to register " << g->local.app_name << " in DIF "
+            cerr << "Failed to register " << local.app_name << " in DIF "
                  << dif_name << endl;
             return -1;
         }
     }
 
     /* Create a TUN device for each remote. */
-    for (auto &kv : g->remotes) {
+    for (auto &kv : remotes) {
         if (kv.second.tun_alloc()) {
             return -1;
         }
+    }
+
+    return 0;
+}
+
+int
+IPoRINA::main_loop()
+{
+    /* Wait for incoming control/data connections from remote peers, and
+     * also for terminating sessions. */
+    for (;;) {
+        FwdWorker *const worker = workers[0].get();
+        struct pollfd pfd[2];
+        int cfd;
+        int ret;
+
+        pfd[0].fd     = rfd;
+        pfd[1].fd     = worker->closed_eventfd();
+        pfd[0].events = pfd[1].events = POLLIN;
+        ret = poll(pfd, sizeof(pfd) / sizeof(pfd[0]), -1);
+        if (ret < 0) {
+            perror("poll(lfd)");
+            return -1;
+        } else if (ret == 0) {
+            /* Timeout or spuriorus notification. */
+            continue;
+        }
+
+        if (pfd[1].revents & POLLIN) {
+            /* Some sessions terminated. */
+            FwdToken token;
+
+            while ((token = worker->get_next_closed()) != 0) {
+                if (!active_sessions.count(token)) {
+                    cerr << "Failed to match completed session (token=" << token
+                         << ")" << endl;
+                } else {
+                    cout << "Remote " << active_sessions[token]
+                         << " disconnected" << endl;
+                    active_sessions.erase(token);
+                }
+            }
+            continue;
+        }
+
+        /* New incoming connection. */
+        assert(pfd[0].revents & POLLIN);
+        cfd = rina_flow_accept(rfd, NULL, NULL, 0);
+        if (cfd < 0) {
+            if (errno == ENOSPC) {
+                continue;
+            }
+            perror("rina_flow_accept(lfd)");
+            return -1;
+        }
+
+        if (verbose > 1) {
+            cout << "Accepted new connection from remote peer" << endl;
+        }
+
+        CDAPConn conn(cfd);
+        CDAPMessage *rm;
+        CDAPMessage m;
+        const char *objbuf;
+        size_t objlen;
+        Hello hello;
+        string remote_name;
+
+        /* CDAP server-side connection setup. */
+        rm = conn.accept();
+        if (!rm) {
+            cerr << "Error while accepting CDAP connection" << endl;
+            goto abor;
+        }
+        remote_name = rm->src_appl;
+        delete rm;
+        rm = NULL;
+
+        /* Receive Hello or Data message. */
+        rm = conn.msg_recv();
+        if (rm->op_code != gpb::M_START) {
+            cerr << "M_START expected" << endl;
+            goto abor;
+        }
+
+        if (rm->obj_class == "data") {
+            /* This is a data flow. */
+            delete rm;
+            rm = NULL;
+            if (remotes.count(remote_name) == 0) {
+                cerr << "M_START(data) for unknown remote" << endl;
+                goto abor;
+            }
+            if (verbose) {
+                cout << "M_START(data) received from " << remote_name << endl;
+            }
+            remotes[remote_name].rfd                          = cfd;
+            remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
+            remotes[remote_name].mss_configure();
+            /* Submit the new fd mapping to a worker thread. */
+            workers[0]->submit(next_submit_token, remotes[remote_name].rfd,
+                               remotes[remote_name].tun_fd);
+            active_sessions[next_submit_token++] = remote_name;
+            continue;
+        }
+
+        /* This is a control connection, process the Hello message. */
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            cerr << "M_START(hello) does not contain a nested message" << endl;
+            goto abor;
+        }
+        hello = Hello(objbuf, objlen);
+        delete rm;
+        rm = NULL;
+
+        if (remotes.count(remote_name) == 0) {
+            remotes[remote_name] = Remote();
+
+            Remote &r = remotes[remote_name];
+
+            r.app_name = remote_name;
+            r.dif_name = string();
+            if (r.tun_alloc()) {
+                close(cfd);
+                goto abor;
+            }
+        }
+
+        remotes[remote_name].tun_local_addr  = IPAddr(hello.tun_dst_addr);
+        remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
+
+        cout << "Hello received from " << remote_name << ": "
+             << hello.num_routes << " routes, tun_subnet " << hello.tun_subnet
+             << ", local IP "
+             << static_cast<string>(remotes[remote_name].tun_local_addr)
+             << ", remote IP "
+             << static_cast<string>(remotes[remote_name].tun_remote_addr)
+             << endl;
+
+        /* Receive routes from peer. */
+        for (unsigned int i = 0; i < hello.num_routes; i++) {
+            RouteObj robj;
+            size_t prevlen;
+
+            rm = conn.msg_recv();
+            if (rm->op_code != gpb::M_WRITE) {
+                cerr << "M_WRITE expected" << endl;
+                goto abor;
+            }
+
+            rm->get_obj_value(objbuf, objlen);
+            if (!objbuf) {
+                cerr << "M_WRITE does not contain a nested message" << endl;
+                goto abor;
+            }
+            robj = RouteObj(objbuf, objlen);
+            delete rm;
+            rm = NULL;
+
+            /* Add the route in the set. */
+            prevlen = remotes[remote_name].routes.size();
+            remotes[remote_name].routes.insert(Route(robj.route));
+            if (remotes[remote_name].routes.size() > prevlen) {
+                /* Log only if the route was added to the set. */
+                cout << "Route " << robj.route << " reachable through "
+                     << remote_name << endl;
+            }
+        }
+
+        remotes[remote_name].ip_configure();
+
+    abor:
+        close(cfd);
     }
 
     return 0;
@@ -1066,7 +1241,7 @@ main(int argc, char **argv)
     }
 
     /* Name registration and creation of TUN devices. */
-    if (setup()) {
+    if (g->setup()) {
         return -1;
     }
 
@@ -1080,176 +1255,5 @@ main(int argc, char **argv)
         return -1;
     }
 
-    /* Wait for incoming control/data connections from remote peers, and
-     * also for terminating sessions. */
-    for (;;) {
-        FwdWorker *const worker = g->workers[0].get();
-        struct pollfd pfd[2];
-        int cfd;
-        int ret;
-
-        pfd[0].fd     = g->rfd;
-        pfd[1].fd     = worker->closed_eventfd();
-        pfd[0].events = pfd[1].events = POLLIN;
-        ret = poll(pfd, sizeof(pfd) / sizeof(pfd[0]), -1);
-        if (ret < 0) {
-            perror("poll(lfd)");
-            return -1;
-        } else if (ret == 0) {
-            /* Timeout or spuriorus notification. */
-            continue;
-        }
-
-        if (pfd[1].revents & POLLIN) {
-            /* Some sessions terminated. */
-            FwdToken token;
-
-            while ((token = worker->get_next_closed()) != 0) {
-                if (!g->active_sessions.count(token)) {
-                    cerr << "Failed to match completed session (token=" << token
-                         << ")" << endl;
-                } else {
-                    cout << "Remote " << g->active_sessions[token]
-                         << " disconnected" << endl;
-                    g->active_sessions.erase(token);
-                }
-            }
-            continue;
-        }
-
-        /* New incoming connection. */
-        assert(pfd[0].revents & POLLIN);
-        cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
-        if (cfd < 0) {
-            if (errno == ENOSPC) {
-                continue;
-            }
-            perror("rina_flow_accept(lfd)");
-            return -1;
-        }
-
-        if (g->verbose > 1) {
-            cout << "Accepted new connection from remote peer" << endl;
-        }
-
-        CDAPConn conn(cfd);
-        CDAPMessage *rm;
-        CDAPMessage m;
-        const char *objbuf;
-        size_t objlen;
-        Hello hello;
-        string remote_name;
-
-        /* CDAP server-side connection setup. */
-        rm = conn.accept();
-        if (!rm) {
-            cerr << "Error while accepting CDAP connection" << endl;
-            goto abor;
-        }
-        remote_name = rm->src_appl;
-        delete rm;
-        rm = NULL;
-
-        /* Receive Hello or Data message. */
-        rm = conn.msg_recv();
-        if (rm->op_code != gpb::M_START) {
-            cerr << "M_START expected" << endl;
-            goto abor;
-        }
-
-        if (rm->obj_class == "data") {
-            /* This is a data flow. */
-            delete rm;
-            rm = NULL;
-            if (g->remotes.count(remote_name) == 0) {
-                cerr << "M_START(data) for unknown remote" << endl;
-                goto abor;
-            }
-            if (g->verbose) {
-                cout << "M_START(data) received from " << remote_name << endl;
-            }
-            g->remotes[remote_name].rfd                          = cfd;
-            g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
-            g->remotes[remote_name].mss_configure();
-            /* Submit the new fd mapping to a worker thread. */
-            g->workers[0]->submit(g->next_submit_token,
-                                  g->remotes[remote_name].rfd,
-                                  g->remotes[remote_name].tun_fd);
-            g->active_sessions[g->next_submit_token++] = remote_name;
-            continue;
-        }
-
-        /* This is a control connection, process the Hello message. */
-        rm->get_obj_value(objbuf, objlen);
-        if (!objbuf) {
-            cerr << "M_START(hello) does not contain a nested message" << endl;
-            goto abor;
-        }
-        hello = Hello(objbuf, objlen);
-        delete rm;
-        rm = NULL;
-
-        if (g->remotes.count(remote_name) == 0) {
-            g->remotes[remote_name] = Remote();
-
-            Remote &r = g->remotes[remote_name];
-
-            r.app_name = remote_name;
-            r.dif_name = string();
-            if (r.tun_alloc()) {
-                close(cfd);
-                goto abor;
-            }
-        }
-
-        g->remotes[remote_name].tun_local_addr  = IPAddr(hello.tun_dst_addr);
-        g->remotes[remote_name].tun_remote_addr = IPAddr(hello.tun_src_addr);
-
-        cout << "Hello received from " << remote_name << ": "
-             << hello.num_routes << " routes, tun_subnet " << hello.tun_subnet
-             << ", local IP "
-             << static_cast<string>(g->remotes[remote_name].tun_local_addr)
-             << ", remote IP "
-             << static_cast<string>(g->remotes[remote_name].tun_remote_addr)
-             << endl;
-
-        /* Receive routes from peer. */
-        for (unsigned int i = 0; i < hello.num_routes; i++) {
-            RouteObj robj;
-            size_t prevlen;
-
-            rm = conn.msg_recv();
-            if (rm->op_code != gpb::M_WRITE) {
-                cerr << "M_WRITE expected" << endl;
-                goto abor;
-            }
-
-            rm->get_obj_value(objbuf, objlen);
-            if (!objbuf) {
-                cerr << "M_WRITE does not contain a nested message" << endl;
-                goto abor;
-            }
-            robj = RouteObj(objbuf, objlen);
-            delete rm;
-            rm = NULL;
-
-            /* Add the route in the set. */
-            prevlen = g->remotes[remote_name].routes.size();
-            g->remotes[remote_name].routes.insert(Route(robj.route));
-            if (g->remotes[remote_name].routes.size() > prevlen) {
-                /* Log only if the route was added to the set. */
-                cout << "Route " << robj.route << " reachable through "
-                     << remote_name << endl;
-            }
-        }
-
-        g->remotes[remote_name].ip_configure();
-
-    abor:
-        close(cfd);
-    }
-
-    pthread_exit(NULL);
-
-    return 0;
+    return g->main_loop();
 }
