@@ -942,7 +942,7 @@ connect_to_remotes(void *opaque)
                     kv.second.mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    g->workers[0]->submit(kv.second.rfd, kv.second.tun_fd);
+                    g->workers[0]->submit(0, kv.second.rfd, kv.second.tun_fd);
 
                 } else {
                     /* This is a control connection. */
@@ -1144,7 +1144,7 @@ main(int argc, char **argv)
             g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
             g->remotes[remote_name].mss_configure();
             /* Submit the new fd mapping to a worker thread. */
-            g->workers[0]->submit(g->remotes[remote_name].rfd,
+            g->workers[0]->submit(0, g->remotes[remote_name].rfd,
                                   g->remotes[remote_name].tun_fd);
             continue;
         }
