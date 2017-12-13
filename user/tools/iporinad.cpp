@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <memory>
+#include <thread>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -19,7 +20,6 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <poll.h>
-#include <pthread.h>
 #include <errno.h>
 #include <stdint.h>
 #include <rina/api.h>
@@ -1030,8 +1030,8 @@ IPoRINA::main_loop()
 }
 
 /* Try to connect to all the user-specified remotes. */
-static void *
-connect_to_remotes(void *opaque)
+static void
+connect_to_remotes()
 {
     string myname = g->local.app_name;
 
@@ -1179,8 +1179,6 @@ connect_to_remotes(void *opaque)
 
         sleep(3);
     }
-
-    pthread_exit(NULL);
 }
 
 static void
@@ -1197,7 +1195,6 @@ int
 main(int argc, char **argv)
 {
     const char *confpath = "/etc/rina/iporinad.conf";
-    pthread_t fa_th;
     int opt;
 
     while ((opt = getopt(argc, argv, "hc:v")) != -1) {
@@ -1250,10 +1247,7 @@ main(int argc, char **argv)
 
     /* Start a thread that periodically tries to connect to
      * the remote peers specified by the configuration. */
-    if (pthread_create(&fa_th, NULL, connect_to_remotes, NULL)) {
-        perror("pthread_create()");
-        return -1;
-    }
+    std::thread fa_th(connect_to_remotes);
 
     return g->main_loop();
 }
