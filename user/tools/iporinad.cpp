@@ -134,15 +134,20 @@ struct Remote {
 
 struct IPoRINA {
     /* Enable verbose mode */
-    int verbose;
+    int verbose = 0;
 
     /* Control device to listen for incoming connections. */
-    int rfd;
+    int rfd = -1;
 
     /* Daemon configuration. */
     Local local;
     map<string, Remote> remotes;
     list<Route> local_routes;
+
+    /* Map to keep track of active sessions. Used to react on
+     * session termination. */
+    map<FwdToken, string> active_sessions;
+    FwdToken next_submit_token = 1;
 
     /* Worker threads that forward traffic. */
     vector<std::unique_ptr<FwdWorker>> workers;
@@ -942,7 +947,9 @@ connect_to_remotes(void *opaque)
                     kv.second.mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    g->workers[0]->submit(0, kv.second.rfd, kv.second.tun_fd);
+                    g->workers[0]->submit(g->next_submit_token, kv.second.rfd,
+                                          kv.second.tun_fd);
+                    g->active_sessions[g->next_submit_token++] = kv.first;
 
                 } else {
                     /* This is a control connection. */
@@ -1073,24 +1080,45 @@ main(int argc, char **argv)
         return -1;
     }
 
-    /* Wait for incoming control/data connections from remote peers. */
+    /* Wait for incoming control/data connections from remote peers, and
+     * also for terminating sessions. */
     for (;;) {
-        struct pollfd pfd[1];
+        FwdWorker *const worker = g->workers[0].get();
+        struct pollfd pfd[2];
         int cfd;
         int ret;
 
         pfd[0].fd     = g->rfd;
-        pfd[0].events = POLLIN;
-        ret           = poll(pfd, 1, -1);
+        pfd[1].fd     = worker->closed_eventfd();
+        pfd[0].events = pfd[1].events = POLLIN;
+        ret = poll(pfd, sizeof(pfd) / sizeof(pfd[0]), -1);
         if (ret < 0) {
             perror("poll(lfd)");
             return -1;
-        }
-
-        if (!pfd[0].revents & POLLIN) {
+        } else if (ret == 0) {
+            /* Timeout or spuriorus notification. */
             continue;
         }
 
+        if (pfd[1].revents & POLLIN) {
+            /* Some sessions terminated. */
+            FwdToken token;
+
+            while ((token = worker->get_next_closed()) != 0) {
+                if (!g->active_sessions.count(token)) {
+                    cerr << "Failed to match completed session (token=" << token
+                         << ")" << endl;
+                } else {
+                    cout << "Remote " << g->active_sessions[token]
+                         << " disconnected" << endl;
+                    g->active_sessions.erase(token);
+                }
+            }
+            continue;
+        }
+
+        /* New incoming connection. */
+        assert(pfd[0].revents & POLLIN);
         cfd = rina_flow_accept(g->rfd, NULL, NULL, 0);
         if (cfd < 0) {
             if (errno == ENOSPC) {
@@ -1144,8 +1172,10 @@ main(int argc, char **argv)
             g->remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
             g->remotes[remote_name].mss_configure();
             /* Submit the new fd mapping to a worker thread. */
-            g->workers[0]->submit(0, g->remotes[remote_name].rfd,
+            g->workers[0]->submit(g->next_submit_token,
+                                  g->remotes[remote_name].rfd,
                                   g->remotes[remote_name].tun_fd);
+            g->active_sessions[g->next_submit_token++] = remote_name;
             continue;
         }
 
