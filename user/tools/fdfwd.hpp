@@ -34,6 +34,8 @@
 #define FDFWD_MAX_BUFSZ 16384
 
 #include <list>
+#include <thread>
+#include <mutex>
 
 using FwdToken = unsigned int;
 
@@ -52,8 +54,8 @@ struct Fd {
 };
 
 class FwdWorker {
-    pthread_t th;
-    pthread_mutex_t lock;
+    std::thread th;
+    std::mutex lock;
     int repoll_syncfd;
     int idx;
 

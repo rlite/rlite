@@ -36,12 +36,13 @@
 #include <cstdlib>
 #include <cerrno>
 #include <cassert>
-#include <unistd.h>
+#include <thread>
+#include <mutex>
 
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <sys/eventfd.h>
 #include <poll.h>
 #include <signal.h>
@@ -65,21 +66,14 @@ FwdWorker::FwdWorker(int idx_, int verb) : idx(idx_), nfds(0), verbose(verb)
         exit(EXIT_FAILURE);
     }
 
-    auto worker_function = [](void *opaque) -> void * {
-        FwdWorker *w = (FwdWorker *)opaque;
-        w->run();
-        return NULL;
-    };
+    auto worker_function = [](FwdWorker *w) { w->run(); };
 
-    pthread_create(&th, NULL, worker_function, this);
-    pthread_mutex_init(&lock, NULL);
+    th = std::thread(worker_function, this);
 }
 
 FwdWorker::~FwdWorker()
 {
-    if (pthread_join(th, NULL)) {
-        perror("pthread_join");
-    }
+    th.join();
     close(repoll_syncfd);
     close(closed_syncfd);
 }
@@ -113,10 +107,9 @@ FwdWorker::eventfd_drain(int fd)
 void
 FwdWorker::submit(FwdToken token, int cfd, int rfd)
 {
-    pthread_mutex_lock(&lock);
+    std::lock_guard<std::mutex> guard(lock);
 
     if (nfds >= 2 * MAX_SESSIONS) {
-        pthread_mutex_unlock(&lock);
         printf("too many sessions, shutting down %d <--> %d\n", cfd, rfd);
         close(cfd);
         close(rfd);
@@ -128,7 +121,6 @@ FwdWorker::submit(FwdToken token, int cfd, int rfd)
     fds[nfds++] = Fd(rfd, token);
     fds[nfds++] = Fd(cfd, token);
     eventfd_write(repoll_syncfd); /* trigger repoll */
-    pthread_mutex_unlock(&lock);
 
     if (verbose >= 1) {
         printf("New mapping created %d <--> %d [entries=%d,%d]\n", cfd, rfd,
@@ -139,9 +131,9 @@ FwdWorker::submit(FwdToken token, int cfd, int rfd)
 FwdToken
 FwdWorker::get_next_closed()
 {
+    std::lock_guard<std::mutex> guard(lock);
     FwdToken ret = 0;
 
-    pthread_mutex_lock(&lock);
     if (!terminated.empty()) {
         ret = terminated.front();
         terminated.pop_front();
@@ -149,7 +141,6 @@ FwdWorker::get_next_closed()
             eventfd_drain(closed_syncfd);
         }
     }
-    pthread_mutex_unlock(&lock);
 
     return ret;
 }
@@ -205,7 +196,7 @@ FwdWorker::run()
 
         /* Load the poll array with the active fd mappings, also recycling
          * the entries of closed sessions. */
-        pthread_mutex_lock(&lock);
+        lock.lock();
         for (int i = 0; i < nfds;) {
             int j = i + 1; /* index of the mapped entry */
 
@@ -244,7 +235,7 @@ FwdWorker::run()
 
             i += 2;
         }
-        pthread_mutex_unlock(&lock);
+        lock.unlock();
 
         if (verbose >= 2) {
             printf("w%d polls %d file descriptors\n", idx, nfds + 1);
@@ -267,9 +258,9 @@ FwdWorker::run()
                     printf("w%d: Mappings changed, rebuilding poll array\n",
                            idx);
                 }
-                pthread_mutex_lock(&lock);
+                lock.lock();
                 eventfd_drain(repoll_syncfd);
-                pthread_mutex_unlock(&lock);
+                lock.unlock();
 
             } else {
                 printf("w%d: Error event %d on repoll_syncfd\n", idx,
@@ -279,7 +270,7 @@ FwdWorker::run()
             continue;
         }
 
-        pthread_mutex_lock(&lock);
+        lock.lock();
 
         for (int i = 0, n = 0; n < nrdy && i < nfds; i++) {
             int j;
@@ -336,7 +327,7 @@ FwdWorker::run()
             }
         }
 
-        pthread_mutex_unlock(&lock);
+        lock.unlock();
     }
 
     if (verbose >= 1) {
