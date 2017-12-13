@@ -127,7 +127,6 @@ struct Remote {
     /* Configure tunnel device IP address and routes. */
     int ip_configure() const;
     int ip_cleanup() const;
-
     int mss_configure() const;
 };
 
@@ -932,10 +931,14 @@ IPoRINA::main_loop()
                     cerr << "Failed to match completed session (token=" << token
                          << ")" << endl;
                 } else {
+                    Remote &r = remotes[active_sessions[token]];
                     cout << "Remote " << active_sessions[token]
                          << " disconnected" << endl;
-                    remotes[active_sessions[token]].ip_cleanup();
                     active_sessions.erase(token);
+                    r.ip_cleanup();
+                    /* Trigger flow reallocation towards the peer. */
+                    r.flow_alloc_needed[IPOR_CTRL] =
+                        r.flow_alloc_needed[IPOR_DATA] = true;
                 }
             }
             continue;
@@ -1035,6 +1038,7 @@ IPoRINA::main_loop()
              << endl;
 
         /* Receive routes from peer. */
+        remotes[remote_name].routes.clear();
         for (unsigned int i = 0; i < hello.num_routes; i++) {
             RouteObj robj;
             size_t prevlen;
