@@ -132,10 +132,7 @@ struct Remote {
 
 #define NUM_WORKERS 1
 
-struct IPoRINA {
-    /* Enable verbose mode */
-    int verbose = 0;
-
+class IPoRINA {
     /* Control device to listen for incoming connections. */
     int rfd = -1;
 
@@ -152,12 +149,19 @@ struct IPoRINA {
     /* Worker threads that forward traffic. */
     vector<std::unique_ptr<FwdWorker>> workers;
 
+public:
     IPoRINA();
     ~IPoRINA();
+
+    /* Enable verbose mode */
+    int verbose = 0;
 
     void start_workers();
     int setup();
     int main_loop();
+    int parse_conf(const char *path);
+    void dump_conf();
+    void connect_to_remotes();
 };
 
 /*
@@ -327,7 +331,7 @@ string2int(const string &s, int &ret)
     return 0;
 }
 
-IPoRINA::IPoRINA() : verbose(0), rfd(-1) {}
+IPoRINA::IPoRINA() : rfd(-1), verbose(0) {}
 
 void
 IPoRINA::start_workers()
@@ -514,121 +518,6 @@ probe_mss(int fd)
 
     return lb;
 #undef BUFSIZE
-}
-
-static int
-parse_conf(const char *path)
-{
-    ifstream fin(path);
-
-    if (fin.fail()) {
-        cerr << "Cannot open configuration file " << path << endl;
-        return -1;
-    }
-
-    for (unsigned int lines_cnt = 1; !fin.eof(); lines_cnt++) {
-        string line;
-
-        getline(fin, line);
-
-        istringstream iss(line);
-        vector<string> tokens;
-        string token;
-
-        while (iss >> token) {
-            tokens.push_back(token);
-        }
-
-        if (tokens.size() <= 0 || tokens[0][0] == '#') {
-            /* Ignore comments and white spaces. */
-            continue;
-        }
-
-        if (tokens[0] == "local") {
-            if (tokens.size() < 3) {
-                cerr << "Invalid 'local' directive at line " << lines_cnt
-                     << endl;
-                return -1;
-            }
-
-            if (g->local.app_name.size()) {
-                cerr << "Duplicated 'local' directive at line " << lines_cnt
-                     << endl;
-                return -1;
-            }
-
-            g->local = Local(tokens[1]);
-            for (unsigned int i = 2; i < tokens.size(); i++) {
-                g->local.dif_names.push_back(tokens[i]);
-            }
-
-        } else if (tokens[0] == "remote") {
-            IPAddr subnet;
-
-            if (tokens.size() != 4) {
-                cerr << "Invalid 'remote' directive at line " << lines_cnt
-                     << endl;
-                return -1;
-            }
-
-            try {
-                subnet = IPAddr(tokens[3]);
-            } catch (...) {
-                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
-                return -1;
-            }
-
-            if (g->remotes.count(tokens[1])) {
-                cerr << "Duplicated 'remote' directive at line " << lines_cnt
-                     << endl;
-                return -1;
-            }
-            g->remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
-
-        } else if (tokens[0] == "route") {
-            IPAddr subnet;
-
-            if (tokens.size() != 2) {
-                cerr << "Invalid 'route' directive at line " << lines_cnt
-                     << endl;
-                return -1;
-            }
-
-            try {
-                subnet = IPAddr(tokens[1]);
-            } catch (...) {
-                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
-                return -1;
-            }
-
-            g->local_routes.push_back(Route(subnet));
-        }
-    }
-
-    fin.close();
-
-    return 0;
-}
-
-static void
-dump_conf(void)
-{
-    cout << "Local: " << g->local.app_name << " in DIFs";
-    for (const auto &dif_name : g->local.dif_names) {
-        cout << " " << dif_name;
-    }
-    cout << endl;
-
-    cout << "Remotes:" << endl;
-    for (const auto &kv : g->remotes) {
-        cout << "   " << kv.second.app_name << " in DIF " << kv.second.dif_name
-             << ", tunnel prefix " << kv.second.tun_subnet.repr << endl;
-    }
-
-    cout << "Advertised routes:" << endl;
-    for (const auto &route : g->local_routes) {
-        cout << "   " << route.subnet.repr << endl;
-    }
 }
 
 int
@@ -821,6 +710,121 @@ Remote::mss_configure() const
     }
 
     return 0;
+}
+
+int
+IPoRINA::parse_conf(const char *path)
+{
+    ifstream fin(path);
+
+    if (fin.fail()) {
+        cerr << "Cannot open configuration file " << path << endl;
+        return -1;
+    }
+
+    for (unsigned int lines_cnt = 1; !fin.eof(); lines_cnt++) {
+        string line;
+
+        getline(fin, line);
+
+        istringstream iss(line);
+        vector<string> tokens;
+        string token;
+
+        while (iss >> token) {
+            tokens.push_back(token);
+        }
+
+        if (tokens.size() <= 0 || tokens[0][0] == '#') {
+            /* Ignore comments and white spaces. */
+            continue;
+        }
+
+        if (tokens[0] == "local") {
+            if (tokens.size() < 3) {
+                cerr << "Invalid 'local' directive at line " << lines_cnt
+                     << endl;
+                return -1;
+            }
+
+            if (local.app_name.size()) {
+                cerr << "Duplicated 'local' directive at line " << lines_cnt
+                     << endl;
+                return -1;
+            }
+
+            local = Local(tokens[1]);
+            for (unsigned int i = 2; i < tokens.size(); i++) {
+                local.dif_names.push_back(tokens[i]);
+            }
+
+        } else if (tokens[0] == "remote") {
+            IPAddr subnet;
+
+            if (tokens.size() != 4) {
+                cerr << "Invalid 'remote' directive at line " << lines_cnt
+                     << endl;
+                return -1;
+            }
+
+            try {
+                subnet = IPAddr(tokens[3]);
+            } catch (...) {
+                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
+                return -1;
+            }
+
+            if (remotes.count(tokens[1])) {
+                cerr << "Duplicated 'remote' directive at line " << lines_cnt
+                     << endl;
+                return -1;
+            }
+            remotes[tokens[1]] = Remote(tokens[1], tokens[2], subnet);
+
+        } else if (tokens[0] == "route") {
+            IPAddr subnet;
+
+            if (tokens.size() != 2) {
+                cerr << "Invalid 'route' directive at line " << lines_cnt
+                     << endl;
+                return -1;
+            }
+
+            try {
+                subnet = IPAddr(tokens[1]);
+            } catch (...) {
+                cerr << "Invalid IP prefix at line " << lines_cnt << endl;
+                return -1;
+            }
+
+            local_routes.push_back(Route(subnet));
+        }
+    }
+
+    fin.close();
+
+    return 0;
+}
+
+void
+IPoRINA::dump_conf()
+{
+    cout << "Local: " << local.app_name << " in DIFs";
+    for (const auto &dif_name : local.dif_names) {
+        cout << " " << dif_name;
+    }
+    cout << endl;
+
+    cout << "Remotes:" << endl;
+    for (const auto &kv : remotes) {
+        cout << "   " << kv.second.app_name << " in DIF " << kv.second.dif_name
+             << ", tunnel prefix " << kv.second.tun_subnet.repr << endl;
+    }
+
+    cout << "Advertised routes:" << endl;
+    for (const auto &route : local_routes) {
+        cout << "   " << route.subnet.repr << endl;
+    }
 }
 
 int
@@ -1030,13 +1034,13 @@ IPoRINA::main_loop()
 }
 
 /* Try to connect to all the user-specified remotes. */
-static void
-connect_to_remotes()
+void
+IPoRINA::connect_to_remotes()
 {
-    string myname = g->local.app_name;
+    string myname = local.app_name;
 
     for (;;) {
-        for (auto &kv : g->remotes) {
+        for (auto &kv : remotes) {
             for (unsigned i = 0; i < IPOR_MAX; i++) {
                 struct rina_flow_spec spec;
                 struct pollfd pfd;
@@ -1072,7 +1076,7 @@ connect_to_remotes()
                 if (ret <= 0) {
                     if (ret < 0) {
                         perror("poll(wfd)");
-                    } else if (g->verbose) {
+                    } else if (verbose) {
                         cout << "Failed to connect to remote "
                              << kv.second.app_name << " through DIF "
                              << kv.second.dif_name << endl;
@@ -1083,7 +1087,7 @@ connect_to_remotes()
 
                 rfd = rina_flow_alloc_wait(wfd);
                 if (rfd < 0) {
-                    if (errno != EPERM || g->verbose > 1) {
+                    if (errno != EPERM || verbose > 1) {
                         if (errno != EPERM) {
                             perror("rina_flow_alloc_wait()");
                         }
@@ -1094,7 +1098,7 @@ connect_to_remotes()
                     continue;
                 }
 
-                if (g->verbose > 1) {
+                if (verbose > 1) {
                     cout << "Flow allocated to remote " << kv.second.app_name
                          << " through DIF " << kv.second.dif_name << endl;
                 }
@@ -1122,9 +1126,9 @@ connect_to_remotes()
                     kv.second.mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    g->workers[0]->submit(g->next_submit_token, kv.second.rfd,
-                                          kv.second.tun_fd);
-                    g->active_sessions[g->next_submit_token++] = kv.first;
+                    workers[0]->submit(next_submit_token, kv.second.rfd,
+                                       kv.second.tun_fd);
+                    active_sessions[next_submit_token++] = kv.first;
 
                 } else {
                     /* This is a control connection. */
@@ -1141,7 +1145,7 @@ connect_to_remotes()
                     /* Exchange routes. */
                     m.m_start(gpb::F_NO_FLAGS, "hello", "/hello", 0, 0,
                               string());
-                    hello.num_routes   = g->local_routes.size();
+                    hello.num_routes   = local_routes.size();
                     hello.tun_subnet   = kv.second.tun_subnet;
                     hello.tun_src_addr = kv.second.tun_local_addr;
                     hello.tun_dst_addr = kv.second.tun_remote_addr;
@@ -1150,7 +1154,7 @@ connect_to_remotes()
                         goto abor;
                     }
 
-                    for (const auto &route : g->local_routes) {
+                    for (const auto &route : local_routes) {
                         RouteObj robj(route.subnet);
 
                         m.m_write(gpb::F_NO_FLAGS, "route", "/routes", 0, 0,
@@ -1229,12 +1233,12 @@ main(int argc, char **argv)
     }
 
     /* Parse configuration file. */
-    if (parse_conf(confpath)) {
+    if (g->parse_conf(confpath)) {
         return -1;
     }
 
     if (g->verbose) {
-        dump_conf();
+        g->dump_conf();
     }
 
     /* Name registration and creation of TUN devices. */
@@ -1247,7 +1251,7 @@ main(int argc, char **argv)
 
     /* Start a thread that periodically tries to connect to
      * the remote peers specified by the configuration. */
-    std::thread fa_th(connect_to_remotes);
+    std::thread fa_th(&IPoRINA::connect_to_remotes, g);
 
     return g->main_loop();
 }
