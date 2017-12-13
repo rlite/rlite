@@ -126,6 +126,7 @@ struct Remote {
 
     /* Configure tunnel device IP address and routes. */
     int ip_configure() const;
+    int ip_cleanup() const;
 
     int mss_configure() const;
 };
@@ -625,17 +626,7 @@ execute_command(const string &cmds)
 int
 Remote::ip_configure() const
 {
-    {
-        /* Flush previous IP addresses, if any. */
-        stringstream cmdss;
-
-        cmdss << "ip addr flush dev " << tun_name;
-        if (execute_command(cmdss)) {
-            cerr << "Failed to flush address for interface " << tun_name
-                 << endl;
-            return -1;
-        }
-    }
+    ip_cleanup();
 
     {
         /* Disable TSO and GSO. */
@@ -680,6 +671,35 @@ Remote::ip_configure() const
         if (execute_command(cmdss)) {
             cerr << "Failed to add route for subnet "
                  << static_cast<string>(route.subnet) << endl;
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int
+Remote::ip_cleanup() const
+{
+    {
+        /* Flush previous routes, if any. */
+        stringstream cmdss;
+
+        cmdss << "ip route flush dev " << tun_name;
+        if (execute_command(cmdss)) {
+            cerr << "Failed to flush routes for interface " << tun_name << endl;
+            return -1;
+        }
+    }
+
+    {
+        /* Flush previous IP addresses, if any. */
+        stringstream cmdss;
+
+        cmdss << "ip addr flush dev " << tun_name;
+        if (execute_command(cmdss)) {
+            cerr << "Failed to flush address for interface " << tun_name
+                 << endl;
             return -1;
         }
     }
@@ -887,12 +907,14 @@ IPoRINA::main_loop()
             FwdToken token;
 
             while ((token = worker->get_next_closed()) != 0) {
-                if (!active_sessions.count(token)) {
+                if (!active_sessions.count(token) ||
+                    !remotes.count(active_sessions[token])) {
                     cerr << "Failed to match completed session (token=" << token
                          << ")" << endl;
                 } else {
                     cout << "Remote " << active_sessions[token]
                          << " disconnected" << endl;
+                    remotes[active_sessions[token]].ip_cleanup();
                     active_sessions.erase(token);
                 }
             }
