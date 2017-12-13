@@ -163,6 +163,7 @@ public:
     int parse_conf(const char *path);
     void dump_conf();
     void connect_to_remotes();
+    int submit(Remote *r);
 };
 
 /*
@@ -880,6 +881,25 @@ IPoRINA::setup(void)
 }
 
 int
+IPoRINA::submit(Remote *r)
+{
+    int dupfd;
+
+    dupfd = dup(r->tun_fd);
+    if (dupfd < 0) {
+        perror("dup(tun_fd)");
+        return dupfd;
+    }
+    /* Duplicate the tun_fd, since FwdWorker::submit() consumes it and
+     * we want the TUN device to survive. */
+    workers[0]->submit(next_submit_token, r->rfd, dupfd);
+    r->rfd = -1; /* ownership passing, we won't need this anymore */
+    active_sessions[next_submit_token++] = r->app_name;
+
+    return 0;
+}
+
+int
 IPoRINA::main_loop()
 {
     /* Wait for incoming control/data connections from remote peers, and
@@ -976,9 +996,7 @@ IPoRINA::main_loop()
             remotes[remote_name].flow_alloc_needed[IPOR_DATA] = false;
             remotes[remote_name].mss_configure();
             /* Submit the new fd mapping to a worker thread. */
-            workers[0]->submit(next_submit_token, remotes[remote_name].rfd,
-                               remotes[remote_name].tun_fd);
-            active_sessions[next_submit_token++] = remote_name;
+            submit(&remotes[remote_name]);
             continue;
         }
 
@@ -1148,9 +1166,7 @@ IPoRINA::connect_to_remotes()
                     kv.second.mss_configure();
 
                     /* Submit the new fd mapping to a worker thread. */
-                    workers[0]->submit(next_submit_token, kv.second.rfd,
-                                       kv.second.tun_fd);
-                    active_sessions[next_submit_token++] = kv.first;
+                    submit(&kv.second);
 
                 } else {
                     /* This is a control connection. */
@@ -1197,7 +1213,7 @@ IPoRINA::connect_to_remotes()
 
                 /* Don't close a data file descriptor which is going
                  * to be used. */
-                if (kv.second.rfd != rfd) {
+                if (i == IPOR_CTRL) {
                     close(rfd);
                 }
             }
