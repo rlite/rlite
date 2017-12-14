@@ -290,10 +290,7 @@ Neighbor::~Neighbor()
     }
 
     mgmt_only_set(nullptr);
-    if (n_flow) {
-        uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
-        rl_delete(n_flow, RL_MT_NEIGHFLOW);
-    }
+    n_flow_set(nullptr);
 }
 
 void
@@ -321,28 +318,36 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
 void
 Neighbor::n_flow_set(NeighFlow *nf)
 {
-    NeighFlow *kbnf;
+    if (nf == nullptr) {
+        if (n_flow != nullptr) {
+            uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
+            rl_delete(n_flow, RL_MT_NEIGHFLOW);
+            n_flow = nullptr;
+        }
+    } else {
+        NeighFlow *kbnf;
 
-    assert(n_flow == nullptr);
-    assert(nf != nullptr);
-    assert(has_flows());
+        assert(n_flow == nullptr);
+        assert(nf != nullptr);
+        assert(has_flows());
 
-    /* Inherit enrollment state and CDAP connection state, and switch
-     * keepalive timer. */
-    kbnf             = flows.begin()->second;
-    nf->enroll_state = kbnf->enroll_state;
-    nf->conn         = make_unique<CDAPConn>(nf->flow_fd);
-    if (kbnf->conn) {
-        nf->conn->state_set(kbnf->conn->state_get());
+        /* Inherit enrollment state and CDAP connection state, and switch
+         * keepalive timer. */
+        kbnf             = flows.begin()->second;
+        nf->enroll_state = kbnf->enroll_state;
+        nf->conn         = make_unique<CDAPConn>(nf->flow_fd);
+        if (kbnf->conn) {
+            nf->conn->state_set(kbnf->conn->state_get());
+        }
+        kbnf->keepalive_tmr_stop();
+        nf->keepalive_tmr_start();
+
+        UPD(rib->uipcp, "Set management-only N-flow for neigh %s (fd=%d)\n",
+            ipcp_name.c_str(), nf->flow_fd);
+        n_flow = nf;
+        uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
+                           nf);
     }
-    kbnf->keepalive_tmr_stop();
-    nf->keepalive_tmr_start();
-
-    UPD(rib->uipcp, "Set management-only N-flow for neigh %s (fd=%d)\n",
-        ipcp_name.c_str(), nf->flow_fd);
-    n_flow = nf;
-    uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
-                       nf);
 }
 
 const char *
