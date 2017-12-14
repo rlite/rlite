@@ -1136,22 +1136,23 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
     Neighbor *neigh = nf->neigh;
 
-    /* Remove the NeighFlow from the Neighbor and, if the
-     * NeighFlow is the current mgmt flow, elect
-     * another NeighFlow as mgmt flow, if possible. */
-    neigh->flows.erase(nf->port_id);
+    if (nf == neigh->mgmt_only) {
+        neigh->mgmt_only_set(nullptr);
+    } else if (nf == neigh->n_flow) {
+        neigh->n_flow_set(nullptr);
+    } else {
+        /* Remove the NeighFlow from the Neighbor and, if the
+         * NeighFlow is the current mgmt flow, elect
+         * another NeighFlow as mgmt flow, if possible. */
+        neigh->flows.erase(nf->port_id);
 
-    if (!neigh->flows.empty()) {
-        UPI(uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
-            static_cast<string>(neigh->ipcp_name).c_str(),
-            neigh->flows.begin()->second->port_id);
+        /* First delete the N-1 flow. */
+        rl_delete(nf, RL_MT_NEIGHFLOW);
     }
 
-    /* First delete the N-1 flow. */
-    rl_delete(nf, RL_MT_NEIGHFLOW);
-
     /* If there are no other N-1 flows, delete the neighbor. */
-    if (neigh->flows.size() == 0) {
+    if (neigh->flows.size() == 0 && neigh->mgmt_only == nullptr &&
+        neigh->n_flow == nullptr) {
         del_neighbor(neigh->ipcp_name);
     }
 }
