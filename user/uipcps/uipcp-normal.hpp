@@ -417,7 +417,7 @@ struct uipcp_rib {
      * is used to implement propagation of the CandidateNeighbors information,
      * so that all the IPCPs in the DIF know their potential candidate
      * neighbors.*/
-    std::unordered_map<std::string, Neighbor *> neighbors;
+    std::unordered_map<std::string, std::shared_ptr<Neighbor>> neighbors;
     std::unordered_map<std::string, NeighborCandidate> neighbors_seen;
     std::unordered_set<std::string> neighbors_cand;
     std::unordered_set<std::string> neighbors_deleted;
@@ -504,7 +504,8 @@ struct uipcp_rib {
 
     char *dump() const;
 
-    Neighbor *get_neighbor(const std::string &neigh_name, bool create);
+    std::shared_ptr<Neighbor> get_neighbor(const std::string &neigh_name,
+                                           bool create);
     int del_neighbor(const std::string &neigh_name);
     int neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
     int neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
