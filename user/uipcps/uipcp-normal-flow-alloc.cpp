@@ -196,7 +196,8 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     conn_id.src_cep = req->local_cep;
     conn_id.dst_cep = 0;
 
-    freq.src_app  = RinaName(req->local_appl); /* req->local_appl may be NULL */
+    freq.src_app =
+        RinaName(req->local_appl); /* req->local_appl may be nullptr */
     freq.dst_app  = RinaName(dest_appl);
     freq.src_port = req->local_port;
     freq.dst_port = 0;

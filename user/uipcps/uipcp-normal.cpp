@@ -1910,7 +1910,7 @@ normal_policy_list(struct uipcp *uipcp,
     int ret = rib->policy_list(req, msg);
 
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
+    if (*resp_msg == nullptr) {
         UPE(uipcp, "Out of memory\n");
         ret = -1;
     }
@@ -1942,7 +1942,7 @@ normal_policy_param_list(struct uipcp *uipcp,
     int ret = rib->policy_param_list(req, msg);
 
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
+    if (*resp_msg == nullptr) {
         UPE(uipcp, "Out of memory\n");
         ret = -1;
     }
