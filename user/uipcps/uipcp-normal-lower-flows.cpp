@@ -311,7 +311,7 @@ uipcp_rib::age_incr_tmr_restart()
 void
 lfdb_default::age_incr()
 {
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     bool discarded = false;
 
     for (auto &kvi : db) {
