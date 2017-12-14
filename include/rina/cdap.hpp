@@ -117,8 +117,8 @@ public:
     int msg_send(CDAPMessage *m, int invoke_id);
     int msg_ser(CDAPMessage *m, int invoke_id, char **buf, size_t *len);
 
-    CDAPMessage *msg_recv();
-    CDAPMessage *msg_deser(const char *serbuf, size_t serlen);
+    std::unique_ptr<CDAPMessage> msg_recv();
+    std::unique_ptr<CDAPMessage> msg_deser(const char *serbuf, size_t serlen);
 
     void reset();
     bool connected() const { return state == ConnState::CONNECTED; }
@@ -133,7 +133,7 @@ public:
 
     /* Helper function to wait for M_CONNECT and send the M_CONNECT_R
      * response. */
-    CDAPMessage *accept();
+    std::unique_ptr<CDAPMessage> accept();
 
     std::string local_appl;
     std::string remote_appl;
@@ -141,7 +141,8 @@ public:
     long version;
 };
 
-CDAPMessage *msg_deser_stateless(const char *serbuf, size_t serlen);
+std::unique_ptr<CDAPMessage> msg_deser_stateless(const char *serbuf,
+                                                 size_t serlen);
 
 int msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len);
 

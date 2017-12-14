@@ -114,7 +114,7 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 int
 uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 {
-    CDAPMessage *m = nullptr;
+    std::unique_ptr<CDAPMessage> m;
     Neighbor *neigh;
     int ret = 0;
 
@@ -130,7 +130,6 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         if (m == nullptr) {
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         is_connect_attempt =
             m->op_code == gpb::M_CONNECT && m->dst_appl == myname;
@@ -147,13 +146,11 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             if (!objbuf) {
                 UPE(uipcp, "CDAP message does not contain a nested message\n");
 
-                rl_delete(m, RL_MT_CDAP);
                 return 0;
             }
 
             AData adata(objbuf, objlen);
 
-            rl_delete(m, RL_MT_CDAP); /* here it is safe to delete m */
             if (!adata.cdap) {
                 UPE(uipcp, "A_DATA does not contain a valid "
                            "encapsulated CDAP message\n");
@@ -161,7 +158,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
                 return 0;
             }
 
-            cdap_dispatch(adata.cdap, nullptr);
+            cdap_dispatch(adata.cdap.get(), nullptr);
 
             return 0;
         }
@@ -176,8 +173,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
          * same message to be deserialized twice. The second
          * deserialization can be avoided extending the CDAP
          * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
-        rl_delete(m, RL_MT_CDAP);
-        m = nullptr;
+        m.reset();
 
         if (!nf) {
             UPE(uipcp, "Received message from unknown port id\n");
@@ -209,7 +205,6 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             UPE(uipcp, "msg_deser() failed\n");
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         nf->last_activity = time(nullptr);
 
@@ -235,22 +230,17 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            nf->enrollment_rsrc->msgs.push_back(m);
-            m = nullptr;
+            nf->enrollment_rsrc->msgs.push_back(std::move(m));
             pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
             nf->enrollment_rsrc_put();
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = cdap_dispatch(m, nf);
+            ret = cdap_dispatch(m.get(), nf);
         }
 
     } catch (std::bad_alloc) {
         UPE(uipcp, "Out of memory\n");
-    }
-
-    if (m) {
-        rl_delete(m, RL_MT_CDAP);
     }
 
     return ret;
@@ -702,7 +692,7 @@ uipcp_rib::realize_registrations(bool reg)
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
+uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                             const UipcpObject *obj)
 {
     struct rl_mgmt_hdr mhdr;
@@ -721,7 +711,6 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
-            rl_delete(m, RL_MT_CDAP);
 
             return -1;
         }
@@ -733,16 +722,14 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m, nullptr);
-
-        rl_delete(m, RL_MT_CDAP);
+        int ret = cdap_dispatch(m.get(), nullptr);
 
         return ret;
     }
 
     adata.src_addr = myaddr;
     adata.dst_addr = dst_addr;
-    adata.cdap     = m; /* Ownership passing */
+    adata.cdap     = std::move(m); /* Ownership passing */
 
     am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata, 0, 0,
                string());
@@ -787,9 +774,10 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_myself(CDAPMessage *m, const UipcpObject *obj)
+uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
+                          const UipcpObject *obj)
 {
-    return send_to_dst_addr(m, myaddr, obj);
+    return send_to_dst_addr(std::move(m), myaddr, obj);
 }
 
 /* To be called under RIB lock. This function does not take ownership
@@ -1002,7 +990,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
             } else if (cand_neigh_conflict ||
                        mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
-                CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
+                std::unique_ptr<CDAPMessage> m = make_unique<CDAPMessage>();
                 int ret;
 
                 UPI(rib->uipcp,
@@ -1011,7 +999,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                     (long unsigned)aar.address, (long unsigned)aar.requestor);
                 m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
-                ret = rib->send_to_dst_addr(m, aar.requestor, &aar);
+                ret = rib->send_to_dst_addr(std::move(m), aar.requestor, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",
                         (unsigned long)aar.requestor, strerror(errno));

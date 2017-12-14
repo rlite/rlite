@@ -960,7 +960,7 @@ IPoRINA::main_loop()
         }
 
         CDAPConn conn(cfd);
-        CDAPMessage *rm;
+        std::unique_ptr<CDAPMessage> rm;
         CDAPMessage m;
         const char *objbuf;
         size_t objlen;
@@ -974,8 +974,6 @@ IPoRINA::main_loop()
             goto abor;
         }
         remote_name = rm->src_appl;
-        delete rm;
-        rm = NULL;
 
         /* Receive Hello or Data message. */
         rm = conn.msg_recv();
@@ -986,7 +984,6 @@ IPoRINA::main_loop()
 
         if (rm->obj_class == "data") {
             /* This is a data flow. */
-            delete rm;
             rm = NULL;
             if (remotes.count(remote_name) == 0) {
                 cerr << "M_START(data) for unknown remote" << endl;
@@ -1010,8 +1007,6 @@ IPoRINA::main_loop()
             goto abor;
         }
         hello = Hello(objbuf, objlen);
-        delete rm;
-        rm = NULL;
 
         if (remotes.count(remote_name) == 0) {
             remotes[remote_name] = Remote();
@@ -1055,8 +1050,6 @@ IPoRINA::main_loop()
                 goto abor;
             }
             robj = RouteObj(objbuf, objlen);
-            delete rm;
-            rm = NULL;
 
             /* Add the route in the set. */
             prevlen = remotes[remote_name].routes.size();
@@ -1148,7 +1141,8 @@ IPoRINA::connect_to_remotes()
                 }
 
                 CDAPConn conn(rfd);
-                CDAPMessage m, *rm = NULL;
+                CDAPMessage m;
+                std::unique_ptr<CDAPMessage> rm;
                 Hello hello;
 
                 /* CDAP connection setup. */
@@ -1211,10 +1205,6 @@ IPoRINA::connect_to_remotes()
 
                 kv.second.flow_alloc_needed[i] = false;
             abor:
-                if (rm) {
-                    delete rm;
-                }
-
                 /* Don't close a data file descriptor which is going
                  * to be used. */
                 if (i == IPOR_CTRL) {
