@@ -640,9 +640,9 @@ NeighFlow::enrollee_thread()
              * to update our map. */
             UPI(rib->uipcp, "Neighbor name updated remotely %s --> %s\n",
                 neigh->ipcp_name.c_str(), rm->src_appl.c_str());
+            rib->neighbors[rm->src_appl] = rib->neighbors[neigh->ipcp_name];
             rib->neighbors.erase(neigh->ipcp_name);
-            neigh->ipcp_name                 = rm->src_appl;
-            rib->neighbors[neigh->ipcp_name] = neigh;
+            neigh->ipcp_name = rm->src_appl;
         }
 
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
@@ -1091,7 +1091,7 @@ uipcp_rib::neighs_refresh()
     neighs_refresh_tmr_restart();
 }
 
-Neighbor *
+std::shared_ptr<Neighbor>
 uipcp_rib::get_neighbor(const string &neigh_name, bool create)
 {
     string neigh_name_s(neigh_name);
@@ -1100,7 +1100,8 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
         if (!create) {
             return nullptr;
         }
-        neighbors[neigh_name] = rl_new(Neighbor(this, neigh_name), RL_MT_NEIGH);
+        neighbors[neigh_name] =
+            std::shared_ptr<Neighbor>(new Neighbor(this, neigh_name));
     }
 
     return neighbors[neigh_name];
@@ -1113,7 +1114,6 @@ uipcp_rib::del_neighbor(const std::string &neigh_name)
 
     assert(mit != neighbors.end());
 
-    rl_delete(mit->second, RL_MT_NEIGH);
     neighbors.erase(mit);
     neighbors_deleted.insert(neigh_name);
     UPI(uipcp, "Neighbor %s deleted\n", neigh_name.c_str());
@@ -1295,7 +1295,7 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id, NeighFlow **nfp)
     *nfp = nullptr;
 
     for (const auto &kvn : neighbors) {
-        Neighbor *neigh = kvn.second;
+        std::shared_ptr<Neighbor> neigh = kvn.second;
 
         if (neigh->flows.count(port_id)) {
             *nfp = neigh->flows[port_id];
@@ -1464,7 +1464,7 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
                   int wait_for_completion)
 {
     std::shared_ptr<EnrollmentResources> rsrc;
-    Neighbor *neigh;
+    std::shared_ptr<Neighbor> neigh;
     NeighFlow *nf;
     int ret;
 
@@ -1703,7 +1703,7 @@ uipcp_rib::allocate_n_flows()
         if (neigh != neighbors.end()) {
             NeighFlow *nf;
 
-            nf = rl_new(NeighFlow(neigh->second, string(uipcp->dif_name),
+            nf = rl_new(NeighFlow(neigh->second.get(), string(uipcp->dif_name),
                                   RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE),
                         RL_MT_NEIGHFLOW);
             nf->reliable = true;

@@ -386,11 +386,6 @@ uipcp_rib::~uipcp_rib()
 {
     uipcp_loop_schedule_canc(uipcp, sync_tmrid);
     uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
-
-    for (const auto &kvn : neighbors) {
-        rl_delete(kvn.second, RL_MT_NEIGH);
-    }
-
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
 }
@@ -1108,7 +1103,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
                                      const UipcpObject *obj_value) const
 {
     for (const auto &kvn : neighbors) {
-        if (exclude && kvn.second == exclude) {
+        if (exclude && kvn.second.get() == exclude) {
             continue;
         }
 
@@ -1295,7 +1290,7 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
     std::lock_guard<std::mutex> guard(mutex);
-    Neighbor *neigh;
+    std::shared_ptr<Neighbor> neigh;
     NeighFlow *nf;
     int mgmt_fd;
     int ret;
@@ -1347,8 +1342,8 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
         req->remote_appl, req->dif_name, req->port_id);
 
-    nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id, mgmt_fd,
-                          RL_IPCP_ID_NONE),
+    nf = rl_new(NeighFlow(neigh.get(), string(req->dif_name), req->port_id,
+                          mgmt_fd, RL_IPCP_ID_NONE),
                 RL_MT_NEIGHFLOW);
     nf->reliable = true;
     neigh->n_flow_set(nf);
@@ -1388,15 +1383,16 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to add the neighbor with the associated port_id. */
-    Neighbor *neigh = get_neighbor(string(req->remote_appl), true);
+    std::shared_ptr<Neighbor> neigh =
+        get_neighbor(string(req->remote_appl), true);
 
     neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf = rl_new(
-        NeighFlow(neigh, string(supp_dif), neigh_port_id, 0, lower_ipcp_id),
-        RL_MT_NEIGHFLOW);
+    nf = rl_new(NeighFlow(neigh.get(), string(supp_dif), neigh_port_id, 0,
+                          lower_ipcp_id),
+                RL_MT_NEIGHFLOW);
     nf->reliable = is_reliable_spec(&req->flowspec);
 
     /* If flow is reliable, we assume it is a management-only flow, and so
