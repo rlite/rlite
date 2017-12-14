@@ -31,9 +31,11 @@
 #include <list>
 #include <ctime>
 #include <sstream>
-#include <pthread.h>
 #include <utility>
 #include <memory>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -120,16 +122,16 @@ struct NeighFlow;
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(struct NeighFlow *f, bool initiator);
+    EnrollmentResources(struct NeighFlow *f, bool init);
     ~EnrollmentResources();
+    void start_worker(std::shared_ptr<EnrollmentResources> rsrc);
 
     struct NeighFlow *nf;
+    bool initiator;
     std::list<std::unique_ptr<const CDAPMessage>> msgs;
-    pthread_t th;
-    pthread_cond_t msgs_avail;
-    pthread_cond_t stopped;
-
-    int refcnt;
+    std::thread th;
+    std::condition_variable msgs_avail;
+    std::condition_variable stopped;
 };
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
@@ -159,12 +161,12 @@ struct NeighFlow {
     time_t last_activity;
 
     EnrollState enroll_state;
-    struct EnrollmentResources *enrollment_rsrc;
-    struct EnrollmentResources *enrollment_rsrc_get(bool initiator);
-    void enrollment_rsrc_put();
+    std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
+
+    std::shared_ptr<EnrollmentResources> er;
 
     /* Statistics about management traffic. */
     struct {
@@ -185,9 +187,10 @@ struct NeighFlow {
     void keepalive_timeout();
 
     void enroll_state_set(EnrollState st);
-    std::unique_ptr<const CDAPMessage> next_enroll_msg();
-    void enrollment_commit();
-    void enrollment_abort();
+    std::unique_ptr<const CDAPMessage> next_enroll_msg(
+        EnrollmentResources *enrollment_rsrc, std::unique_lock<std::mutex> &lk);
+    void enrollment_commit(EnrollmentResources *enrollment_rsrc);
+    void enrollment_abort(EnrollmentResources *enrollment_rsrc);
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
 };
@@ -256,37 +259,14 @@ private:
     const NeighFlow *_mgmt_conn() const;
 };
 
-class ScopeLock {
-public:
-    RL_NODEFAULT_NONCOPIABLE(ScopeLock);
-    ScopeLock(pthread_mutex_t &m, bool v = false) : mutex(m), verb(v)
-    {
-        pthread_mutex_lock(&mutex);
-        if (verb) {
-            PD("lock.acquire\n");
-        }
-    }
-    ~ScopeLock()
-    {
-        if (verb) {
-            PD("lock.release\n");
-        }
-        pthread_mutex_unlock(&mutex);
-    }
-
-private:
-    pthread_mutex_t &mutex;
-    bool verb;
-};
-
 #ifdef RL_DEBUG
 #define RL_LOCK_ASSERT(_lock, _locked)                                         \
     do {                                                                       \
-        int ret = pthread_mutex_trylock(_lock);                                \
-        assert(!(_locked && ret == 0));                                        \
-        assert(!(!_locked && ret == EBUSY));                                   \
-        if (!_locked) {                                                        \
-            pthread_mutex_unlock(_lock);                                       \
+        bool ret = _lock.try_lock();                                           \
+        assert(!ret || !_locked);                                              \
+        assert(ret || _locked);                                                \
+        if (ret) {                                                             \
+            _lock.unlock();                                                    \
         }                                                                      \
     } while (0)
 #else
@@ -396,7 +376,7 @@ struct uipcp_rib {
     int mgmtfd;
 
     /* RIB lock. */
-    pthread_mutex_t mutex;
+    std::mutex mutex;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             NeighFlow *nf);
@@ -410,9 +390,6 @@ struct uipcp_rib {
 
     /* True if this IPCP is allowed to act as enroller for other IPCPs. */
     bool enroller_enabled;
-
-    /* Enrollment resources that have been used and can be released. */
-    std::list<EnrollmentResources *> used_enrollment_resources;
 
     /* True if the name of this IPCP is registered to the IPCP itself.
      * Self-registration is used to receive N-flow allocation requests. */
@@ -548,7 +525,6 @@ struct uipcp_rib {
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
     void trigger_re_enrollments();
-    void clean_enrollment_resources();
 
     int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
@@ -610,8 +586,8 @@ struct uipcp_rib {
     T get_param_value(const std::string &component,
                       const std::string &param_name);
 
-    void lock() { pthread_mutex_lock(&mutex); }
-    void unlock() { pthread_mutex_unlock(&mutex); }
+    void lock() { mutex.lock(); }
+    void unlock() { mutex.unlock(); }
 
 private:
 #ifdef RL_USE_QOS_CUBES

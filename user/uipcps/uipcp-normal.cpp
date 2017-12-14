@@ -226,13 +226,13 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 
         if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
             /* Start the enrollment as a slave (enroller), if needed. */
-            nf->enrollment_rsrc_get(false);
+            std::shared_ptr<EnrollmentResources> enrollment_rsrc =
+                nf->enrollment_rsrc_get(false);
 
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            nf->enrollment_rsrc->msgs.push_back(std::move(m));
-            pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
-            nf->enrollment_rsrc_put();
+            enrollment_rsrc->msgs.push_back(std::move(m));
+            enrollment_rsrc->msgs_avail.notify_all();
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
@@ -274,7 +274,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     mhdr = (struct rl_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     /* Lookup neighbor by port id. If ADATA, it is not an error
      * if the lookup fails (nf == nullptr). */
@@ -298,7 +298,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
         return;
     }
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->recv_msg(mgmtbuf, n, nf);
 }
@@ -313,8 +313,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
       myaddr(RL_ADDR_NULL)
 {
     int ret;
-
-    pthread_mutex_init(&mutex, nullptr);
 
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
@@ -395,7 +393,6 @@ uipcp_rib::~uipcp_rib()
 
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
-    pthread_mutex_destroy(&mutex);
 }
 
 #ifdef RL_USE_QOS_CUBES
@@ -679,7 +676,7 @@ uipcp_rib::realize_registrations(bool reg)
     list<string> snapshot;
 
     {
-        ScopeLock lock_(this->mutex);
+        std::lock_guard<std::mutex> guard(this->mutex);
         snapshot = lower_difs;
     }
 
@@ -1297,7 +1294,7 @@ int
 uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
-    ScopeLock lock_(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     Neighbor *neigh;
     NeighFlow *nf;
     int mgmt_fd;
@@ -1384,7 +1381,7 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         "port_id = %u]\n",
         req->remote_appl, supp_dif, neigh_port_id);
 
-    ScopeLock lock_(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking uipcp_fa_resp,
@@ -1757,7 +1754,7 @@ normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
     uipcp_rib *rib                    = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->dft->appl_register(req);
 
@@ -1772,7 +1769,7 @@ normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->fa->fa_req(req);
 }
@@ -1794,7 +1791,7 @@ normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->fa->fa_resp(resp);
 }
@@ -1805,7 +1802,7 @@ normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
     struct rl_kmsg_flow_deallocated *req =
         (struct rl_kmsg_flow_deallocated *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->fa->flow_deallocated(req);
 
@@ -1816,7 +1813,7 @@ static void
 normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->update_address(new_addr);
 }
@@ -1826,7 +1823,7 @@ normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     uipcp_rib *rib                 = UIPCP_RIB(uipcp);
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->lfdb->flow_state_update(upd);
 }
@@ -1870,7 +1867,7 @@ static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->dump();
 }
@@ -1879,7 +1876,7 @@ static char *
 normal_ipcp_routing_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
     rib->lfdb->dump_routing(ss);
@@ -1892,7 +1889,7 @@ normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string policy_name = req->policy_name;
 
@@ -1905,7 +1902,7 @@ normal_policy_list(struct uipcp *uipcp,
                    char **resp_msg)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_list(req, msg);
 
@@ -1923,7 +1920,7 @@ normal_policy_param_mod(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_policy_param_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string param_name  = req->param_name;
     const string param_value = req->param_value;
@@ -1937,7 +1934,7 @@ normal_policy_param_list(struct uipcp *uipcp,
                          char **resp_msg)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_param_list(req, msg);
 
@@ -1966,7 +1963,6 @@ normal_trigger_tasks(struct uipcp *uipcp)
 
     rib->trigger_re_enrollments();
     rib->allocate_n_flows();
-    rib->clean_enrollment_resources();
     rib->check_for_address_conflicts();
 }
 
