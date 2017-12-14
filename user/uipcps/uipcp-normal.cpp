@@ -182,7 +182,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         neigh = nf->neigh;
 
         if (!nf->conn) {
-            nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
+            nf->conn = make_unique<CDAPConn>(nf->flow_fd);
         }
 
         if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&

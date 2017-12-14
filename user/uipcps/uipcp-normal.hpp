@@ -155,7 +155,7 @@ struct NeighFlow {
     bool reliable;
 
     /* CDAP connection associated to this flow, if any. */
-    CDAPConn *conn;
+    std::unique_ptr<CDAPConn> conn;
 
     time_t last_activity;
 

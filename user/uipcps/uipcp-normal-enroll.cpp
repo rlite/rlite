@@ -40,7 +40,6 @@ NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
       lower_ipcp_id(lid),
       flow_fd(ffd),
       reliable(false),
-      conn(nullptr),
       enroll_state(EnrollState::NEIGH_NONE),
       keepalive_tmrid(0),
       pending_keepalive_reqs(0)
@@ -66,10 +65,6 @@ NeighFlow::~NeighFlow()
     }
 
     keepalive_tmr_stop();
-
-    if (conn) {
-        rl_delete(conn, RL_MT_SHIMDATA);
-    }
 
     ret = close(flow_fd);
     if (ret) {
@@ -336,7 +331,7 @@ Neighbor::n_flow_set(NeighFlow *nf)
      * keepalive timer. */
     kbnf             = flows.begin()->second;
     nf->enroll_state = kbnf->enroll_state;
-    nf->conn         = new CDAPConn(nf->flow_fd);
+    nf->conn         = make_unique<CDAPConn>(nf->flow_fd);
     if (kbnf->conn) {
         nf->conn->state_set(kbnf->conn->state_get());
     }
@@ -612,10 +607,7 @@ NeighFlow::enrollee_thread()
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
-        if (conn) {
-            rl_delete(conn, RL_MT_SHIMDATA);
-        }
-        conn = rl_new(CDAPConn(flow_fd), RL_MT_SHIMDATA);
+        conn = make_unique<CDAPConn>(flow_fd);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->myname, neigh->ipcp_name);
 
