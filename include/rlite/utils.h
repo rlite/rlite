@@ -149,7 +149,6 @@ typedef enum {
     RL_MT_MISC,
     RL_MT_SHIM,
     RL_MT_SHIMDATA,
-    RL_MT_NEIGH,
     RL_MT_NEIGHFLOW,
     RL_MT_MAX
 } rl_memtrack_t;
