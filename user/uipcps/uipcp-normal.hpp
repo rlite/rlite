@@ -188,9 +188,9 @@ struct NeighFlow {
 
     void enroll_state_set(EnrollState st);
     std::unique_ptr<const CDAPMessage> next_enroll_msg(
-        EnrollmentResources *enrollment_rsrc, std::unique_lock<std::mutex> &lk);
-    void enrollment_commit(EnrollmentResources *enrollment_rsrc);
-    void enrollment_abort(EnrollmentResources *enrollment_rsrc);
+        std::unique_lock<std::mutex> &lk);
+    void enrollment_commit();
+    void enrollment_abort();
 
     int send_to_port_id(CDAPMessage *m, int invoke_id, const UipcpObject *obj);
 };
