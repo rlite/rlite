@@ -124,7 +124,6 @@ struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
     EnrollmentResources(struct NeighFlow *f, bool init);
     ~EnrollmentResources();
-    void start_worker(std::shared_ptr<EnrollmentResources> rsrc);
 
     struct NeighFlow *nf;
     bool initiator;
@@ -185,6 +184,11 @@ struct NeighFlow {
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
     void keepalive_timeout();
+
+    void enroller_thread();
+    int enroller_default(std::unique_lock<std::mutex> &lk);
+    void enrollee_thread();
+    int enrollee_default(std::unique_lock<std::mutex> &lk);
 
     void enroll_state_set(EnrollState st);
     std::unique_ptr<const CDAPMessage> next_enroll_msg(
