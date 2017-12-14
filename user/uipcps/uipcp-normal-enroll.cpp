@@ -157,7 +157,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
 }
 
 void
-NeighFlow::enrollment_abort(EnrollmentResources *enrollment_rsrc)
+NeighFlow::enrollment_abort()
 {
     UPW(neigh->rib->uipcp, "Aborting enrollment\n");
 
@@ -181,7 +181,7 @@ NeighFlow::enrollment_abort(EnrollmentResources *enrollment_rsrc)
     if (conn) {
         conn->reset();
     }
-    enrollment_rsrc->stopped.notify_all();
+    er->stopped.notify_all();
 
     /* Remove the stored shared pointer. */
     this->er.reset();
@@ -394,7 +394,7 @@ Neighbor::mgmt_conn()
 }
 
 void
-NeighFlow::enrollment_commit(EnrollmentResources *enrollment_rsrc)
+NeighFlow::enrollment_commit()
 {
     struct uipcp_rib *rib = neigh->rib;
 
@@ -402,14 +402,14 @@ NeighFlow::enrollment_commit(EnrollmentResources *enrollment_rsrc)
     enroll_state_set(EnrollState::NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
-    while (!enrollment_rsrc->msgs.empty()) {
-        rib->cdap_dispatch(enrollment_rsrc->msgs.front().get(), this);
-        enrollment_rsrc->msgs.pop_front();
+    while (!er->msgs.empty()) {
+        rib->cdap_dispatch(er->msgs.front().get(), this);
+        er->msgs.pop_front();
     }
 
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(this);
-    enrollment_rsrc->stopped.notify_all();
+    er->stopped.notify_all();
 
     if (neigh->initiator) {
         UPI(rib->uipcp, "Enrolled to DIF %s through neighbor %s\n",
@@ -425,33 +425,30 @@ NeighFlow::enrollment_commit(EnrollmentResources *enrollment_rsrc)
 
 /* To be called with RIB lock held. */
 std::unique_ptr<const CDAPMessage>
-NeighFlow::next_enroll_msg(EnrollmentResources *enrollment_rsrc,
-                           std::unique_lock<std::mutex> &lk)
+NeighFlow::next_enroll_msg(std::unique_lock<std::mutex> &lk)
 {
     std::unique_ptr<const CDAPMessage> msg;
 
-    while (enrollment_rsrc->msgs.empty()) {
+    while (er->msgs.empty()) {
         int to = neigh->rib->get_param_value<int>("enrollment", "timeout");
         std::cv_status cvst;
 
-        cvst = enrollment_rsrc->msgs_avail.wait_for(
-            lk, std::chrono::milliseconds(to));
+        cvst = er->msgs_avail.wait_for(lk, std::chrono::milliseconds(to));
         if (cvst == std::cv_status::timeout) {
             UPW(neigh->rib->uipcp, "Timed out\n");
             return nullptr;
         }
     }
 
-    msg = std::move(enrollment_rsrc->msgs.front());
-    enrollment_rsrc->msgs.pop_front();
+    msg = std::move(er->msgs.front());
+    er->msgs.pop_front();
 
     return msg;
 }
 
 /* Default policy for the enrollment initiator (enrollee). */
 static int
-enrollee_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
-                 std::unique_lock<std::mutex> &lk)
+enrollee_default(NeighFlow *nf, std::unique_lock<std::mutex> &lk)
 {
     Neighbor *neigh = nf->neigh;
     uipcp_rib *rib  = neigh->rib;
@@ -480,7 +477,7 @@ enrollee_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
         UPD(rib->uipcp, "I --> S M_START(enrollment)\n");
     }
 
-    rm = nf->next_enroll_msg(enrollment_rsrc, lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -532,7 +529,7 @@ enrollee_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
         CDAPMessage m;
         int ret;
 
-        rm = nf->next_enroll_msg(enrollment_rsrc, lk);
+        rm = nf->next_enroll_msg(lk);
         if (!rm) {
             return -1;
         }
@@ -602,8 +599,7 @@ enrollee_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
 }
 
 static void
-enrollee_thread(NeighFlow *nf,
-                std::shared_ptr<EnrollmentResources> enrollment_rsrc)
+enrollee_thread(NeighFlow *nf, std::shared_ptr<EnrollmentResources> er)
 {
     Neighbor *neigh = nf->neigh;
     uipcp_rib *rib  = neigh->rib;
@@ -633,7 +629,7 @@ enrollee_thread(NeighFlow *nf,
         UPD(rib->uipcp, "I --> S M_CONNECT\n");
     }
 
-    rm = nf->next_enroll_msg(enrollment_rsrc.get(), lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -680,7 +676,7 @@ enrollee_thread(NeighFlow *nf,
             }
             UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
 
-            rm = nf->next_enroll_msg(enrollment_rsrc.get(), lk);
+            rm = nf->next_enroll_msg(lk);
             if (!rm) {
                 goto err;
             }
@@ -711,7 +707,7 @@ enrollee_thread(NeighFlow *nf,
     }
 
     {
-        int ret = enrollee_default(nf, enrollment_rsrc.get(), lk);
+        int ret = enrollee_default(nf, lk);
 
         if (ret) {
             goto err;
@@ -719,7 +715,7 @@ enrollee_thread(NeighFlow *nf,
     }
 
 finish:
-    nf->enrollment_commit(enrollment_rsrc.get());
+    nf->enrollment_commit();
     lk.unlock();
     rib->enroller_enable(true);
 
@@ -730,20 +726,19 @@ finish:
     return;
 
 err:
-    nf->enrollment_abort(enrollment_rsrc.get());
+    nf->enrollment_abort();
     rib->unlock();
 }
 
 /* Default policy for the enrollment slave (enroller). */
 static int
-enroller_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
-                 std::unique_lock<std::mutex> &lk)
+enroller_default(NeighFlow *nf, std::unique_lock<std::mutex> &lk)
 {
     Neighbor *neigh = nf->neigh;
     uipcp_rib *rib  = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
 
-    rm = nf->next_enroll_msg(enrollment_rsrc, lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -810,7 +805,7 @@ enroller_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
         UPD(rib->uipcp, "S --> I M_STOP(enrollment)\n");
     }
 
-    rm = nf->next_enroll_msg(enrollment_rsrc, lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -851,15 +846,14 @@ enroller_default(NeighFlow *nf, EnrollmentResources *enrollment_rsrc,
 }
 
 static void
-enroller_thread(NeighFlow *nf,
-                std::shared_ptr<EnrollmentResources> enrollment_rsrc)
+enroller_thread(NeighFlow *nf, std::shared_ptr<EnrollmentResources> er)
 {
     Neighbor *neigh = nf->neigh;
     uipcp_rib *rib  = neigh->rib;
     std::unique_ptr<const CDAPMessage> rm;
     std::unique_lock<std::mutex> lk(rib->mutex);
 
-    rm = nf->next_enroll_msg(enrollment_rsrc.get(), lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -896,7 +890,7 @@ enroller_thread(NeighFlow *nf,
         UPD(rib->uipcp, "S --> I M_CONNECT_R\n");
     }
 
-    rm = nf->next_enroll_msg(enrollment_rsrc.get(), lk);
+    rm = nf->next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -931,11 +925,10 @@ enroller_thread(NeighFlow *nf,
         goto finish;
     }
 
-    enrollment_rsrc->msgs.push_front(
-        std::move(rm)); /* reinject, passing ownership */
+    er->msgs.push_front(std::move(rm)); /* reinject, passing ownership */
 
     {
-        int ret = enroller_default(nf, enrollment_rsrc.get(), lk);
+        int ret = enroller_default(nf, lk);
 
         if (ret) {
             goto err;
@@ -943,14 +936,14 @@ enroller_thread(NeighFlow *nf,
     }
 
 finish:
-    nf->enrollment_commit(enrollment_rsrc.get());
+    nf->enrollment_commit();
     lk.unlock();
     rib->enroller_enable(true);
     uipcps_loop_signal(rib->uipcp->uipcps);
     return;
 
 err:
-    nf->enrollment_abort(enrollment_rsrc.get());
+    nf->enrollment_abort();
     rib->unlock();
 }
 
