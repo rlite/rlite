@@ -1100,8 +1100,7 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
         if (!create) {
             return nullptr;
         }
-        neighbors[neigh_name] =
-            std::shared_ptr<Neighbor>(new Neighbor(this, neigh_name));
+        neighbors[neigh_name] = std::make_shared<Neighbor>(this, neigh_name);
     }
 
     return neighbors[neigh_name];
