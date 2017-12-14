@@ -165,7 +165,7 @@ int
 flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
 {
     rlm_addr_t remote_addr;
-    CDAPMessage *m;
+    std::unique_ptr<CDAPMessage> m;
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
@@ -240,7 +240,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     obj_name << obj_name::flows << "/" << freq.src_addr << "-"
              << req->local_port;
 
-    m = rl_new(CDAPMessage(), RL_MT_CDAP);
+    m = make_unique<CDAPMessage>();
     m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0, 0,
                 string());
 
@@ -248,7 +248,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
     freq.flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
     flow_reqs[obj_name.str() + string("L")] = freq;
 
-    return rib->send_to_dst_addr(m, freq.dst_addr, &freq);
+    return rib->send_to_dst_addr(std::move(m), freq.dst_addr, &freq);
 }
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
@@ -257,7 +257,7 @@ flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
     string reason;
-    CDAPMessage *m;
+    std::unique_ptr<CDAPMessage> m;
     int ret;
 
     /* Lookup the corresponding FlowRequest. */
@@ -287,11 +287,11 @@ flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
         flow_reqs[obj_name.str() + string("R")] = freq;
     }
 
-    m = rl_new(CDAPMessage(), RL_MT_CDAP);
+    m = make_unique<CDAPMessage>();
     m->m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
                   resp->response ? -1 : 0, reason);
 
-    ret = rib->send_to_dst_addr(m, freq.src_addr, &freq);
+    ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
 
     flow_reqs_tmp.erase(f);
 
@@ -322,40 +322,40 @@ flow_allocator_default::flows_handler_create(const CDAPMessage *rm)
     if (ret) {
         /* We don't know how where this application is registered,
          * reject the request. */
-        CDAPMessage *m;
+        std::unique_ptr<CDAPMessage> m;
 
         UPI(rib->uipcp, "Cannot find DFT entry for %s\n",
             static_cast<string>(freq.dst_app).c_str());
 
-        m = rl_new(CDAPMessage(), RL_MT_CDAP);
+        m = make_unique<CDAPMessage>();
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
                       "Cannot find DFT entry");
 
-        return rib->send_to_dst_addr(m, freq.src_addr, &freq);
+        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
     }
 
     if (dft_next_hop != rib->myaddr) {
         /* freq.dst_app is not registered with us, we have
          * to forward the request. TODO */
-        CDAPMessage *m;
+        std::unique_ptr<CDAPMessage> m;
 
         UPE(rib->uipcp, "Flow request forwarding not supported\n");
-        m = rl_new(CDAPMessage(), RL_MT_CDAP);
+        m = make_unique<CDAPMessage>();
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
                       "Flow request forwarding not supported");
 
-        return rib->send_to_dst_addr(m, freq.src_addr, &freq);
+        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
     }
 
     if (freq.connections.size() < 1) {
-        CDAPMessage *m;
+        std::unique_ptr<CDAPMessage> m;
 
         UPE(rib->uipcp, "No connections specified on this flow\n");
-        m = rl_new(CDAPMessage(), RL_MT_CDAP);
+        m = make_unique<CDAPMessage>();
         m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
                       "Cannot find DFT entry");
 
-        return rib->send_to_dst_addr(m, freq.src_addr, &freq);
+        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
     }
 
     /* freq.dst_app is registered with us, let's go ahead. */
@@ -419,7 +419,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     stringstream obj_name_ext;
     string obj_name;
     rlm_addr_t remote_addr;
-    CDAPMessage *m;
+    std::unique_ptr<CDAPMessage> m;
     bool send_del;
 
     /* Lookup the corresponding FlowRequest, depending on whether we were
@@ -458,10 +458,10 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
     }
 
     /* We should wait 2 MPL here before notifying the peer. */
-    m = rl_new(CDAPMessage(), RL_MT_CDAP);
+    m = make_unique<CDAPMessage>();
     m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name, 0, 0, string());
 
-    return rib->send_to_dst_addr(m, remote_addr, nullptr);
+    return rib->send_to_dst_addr(std::move(m), remote_addr, nullptr);
 }
 
 int

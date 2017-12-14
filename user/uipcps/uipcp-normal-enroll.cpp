@@ -402,8 +402,7 @@ NeighFlow::enrollment_commit()
 
     /* Dispatch queued messages. */
     while (!enrollment_rsrc->msgs.empty()) {
-        rib->cdap_dispatch(enrollment_rsrc->msgs.front(), this);
-        rl_delete(enrollment_rsrc->msgs.front(), RL_MT_CDAP);
+        rib->cdap_dispatch(enrollment_rsrc->msgs.front().get(), this);
         enrollment_rsrc->msgs.pop_front();
     }
 
@@ -421,10 +420,10 @@ NeighFlow::enrollment_commit()
 }
 
 /* To be called with RIB lock held. */
-const CDAPMessage *
+std::unique_ptr<const CDAPMessage>
 NeighFlow::next_enroll_msg()
 {
-    const CDAPMessage *msg = nullptr;
+    std::unique_ptr<const CDAPMessage> msg;
 
     while (enrollment_rsrc->msgs.empty()) {
         struct timespec to;
@@ -447,7 +446,7 @@ NeighFlow::next_enroll_msg()
         }
     }
 
-    msg = enrollment_rsrc->msgs.front();
+    msg = std::move(enrollment_rsrc->msgs.front());
     enrollment_rsrc->msgs.pop_front();
 
     return msg;
@@ -457,9 +456,9 @@ NeighFlow::next_enroll_msg()
 static int
 enrollee_default(NeighFlow *nf)
 {
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib  = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
     {
         /* (3) I --> S: M_START */
@@ -496,7 +495,6 @@ enrollee_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_START_R) {
             UPE(rib->uipcp, "M_START_R expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -504,7 +502,6 @@ enrollee_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -513,14 +510,12 @@ enrollee_default(NeighFlow *nf)
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_START_R does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -540,7 +535,6 @@ enrollee_default(NeighFlow *nf)
         CDAPMessage m;
         int ret;
 
-        rl_delete(rm, RL_MT_CDAP);
         rm = nf->next_enroll_msg();
         if (!rm) {
             return -1;
@@ -549,13 +543,12 @@ enrollee_default(NeighFlow *nf)
         /* Here M_CREATE messages from the slave are accepted and
          * dispatched to the RIB. */
         if (rm->op_code == gpb::M_CREATE) {
-            rib->cdap_dispatch(rm, nf);
+            rib->cdap_dispatch(rm.get(), nf);
             continue;
         }
 
         if (rm->op_code != gpb::M_STOP) {
             UPE(rib->uipcp, "M_STOP expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -563,14 +556,12 @@ enrollee_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -594,8 +585,6 @@ enrollee_default(NeighFlow *nf)
         m.obj_name  = obj_name::enrollment;
 
         ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
-        rl_delete(rm, RL_MT_CDAP);
-        rm = nullptr;
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -618,10 +607,10 @@ enrollee_default(NeighFlow *nf)
 static void *
 enrollee_thread(void *opaque)
 {
-    NeighFlow *nf         = (NeighFlow *)opaque;
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    NeighFlow *nf   = (NeighFlow *)opaque;
+    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib  = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
     rib->lock();
 
@@ -675,8 +664,6 @@ enrollee_thread(void *opaque)
         }
 
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
-        rl_delete(rm, RL_MT_CDAP);
-        rm = nullptr;
 
         if (rib->enrolled) {
             CDAPMessage m;
@@ -736,9 +723,6 @@ enrollee_thread(void *opaque)
     }
 
 finish:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
     nf->enrollment_commit();
     nf->enrollment_rsrc_put();
     rib->unlock();
@@ -751,9 +735,6 @@ finish:
     return nullptr;
 
 err:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
     nf->enrollment_abort();
     nf->enrollment_rsrc_put();
     rib->unlock();
@@ -764,9 +745,9 @@ err:
 static int
 enroller_default(NeighFlow *nf)
 {
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib  = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
     rm = nf->next_enroll_msg();
     if (!rm) {
@@ -784,7 +765,6 @@ enroller_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_START) {
             UPE(rib->uipcp, "M_START expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -792,7 +772,6 @@ enroller_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -801,7 +780,6 @@ enroller_default(NeighFlow *nf)
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_START does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -817,7 +795,6 @@ enroller_default(NeighFlow *nf)
         ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
@@ -834,13 +811,11 @@ enroller_default(NeighFlow *nf)
         ret = nf->send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_STOP(enrollment)\n");
     }
 
-    rl_delete(rm, RL_MT_CDAP);
     rm = nf->next_enroll_msg();
     if (!rm) {
         return -1;
@@ -854,14 +829,12 @@ enroller_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_STOP_R) {
             UPE(rib->uipcp, "M_START_R expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -875,13 +848,10 @@ enroller_default(NeighFlow *nf)
         ret = nf->send_to_port_id(&m, 0, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id failed\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_START(status)\n");
     }
-
-    rl_delete(rm, RL_MT_CDAP);
 
     return 0;
 }
@@ -889,10 +859,10 @@ enroller_default(NeighFlow *nf)
 static void *
 enroller_thread(void *opaque)
 {
-    NeighFlow *nf         = (NeighFlow *)opaque;
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    NeighFlow *nf   = (NeighFlow *)opaque;
+    Neighbor *neigh = nf->neigh;
+    uipcp_rib *rib  = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
     rib->lock();
 
@@ -909,7 +879,7 @@ enroller_thread(void *opaque)
 
         /* We are the enrollment slave, let's send an M_CONNECT_R message. */
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
-        ret = m.m_connect_r(rm, 0, string());
+        ret = m.m_connect_r(rm.get(), 0, string());
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
             goto err;
@@ -933,7 +903,6 @@ enroller_thread(void *opaque)
         UPD(rib->uipcp, "S --> I M_CONNECT_R\n");
     }
 
-    rl_delete(rm, RL_MT_CDAP);
     rm = nf->next_enroll_msg();
     if (!rm) {
         goto err;
@@ -969,8 +938,8 @@ enroller_thread(void *opaque)
         goto finish;
     }
 
-    nf->enrollment_rsrc->msgs.push_front(rm); /* reinject, passing ownership */
-    rm = nullptr;
+    nf->enrollment_rsrc->msgs.push_front(
+        std::move(rm)); /* reinject, passing ownership */
 
     {
         int ret = enroller_default(nf);
@@ -981,9 +950,6 @@ enroller_thread(void *opaque)
     }
 
 finish:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
     nf->enrollment_commit();
     nf->enrollment_rsrc_put();
     rib->unlock();
@@ -993,9 +959,6 @@ finish:
     return nullptr;
 
 err:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
     nf->enrollment_abort();
     nf->enrollment_rsrc_put();
     rib->unlock();
@@ -1050,7 +1013,6 @@ EnrollmentResources::~EnrollmentResources()
             nf->neigh->ipcp_name.c_str());
     }
     while (!msgs.empty()) {
-        rl_delete(msgs.front(), RL_MT_CDAP);
         msgs.pop_front();
     }
     pthread_join(th, nullptr);

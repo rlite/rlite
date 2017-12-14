@@ -116,7 +116,7 @@ lfdb_default::update_local(const string &node_name)
 {
     LowerFlowList lfl;
     LowerFlow lf;
-    CDAPMessage *sm;
+    std::unique_ptr<CDAPMessage> sm;
 
     if (rib->get_neighbor(node_name, false) == nullptr) {
         return; /* Not our neighbor. */
@@ -130,9 +130,9 @@ lfdb_default::update_local(const string &node_name)
     lf.age         = 0;
     lfl.flows.push_back(std::move(lf));
 
-    sm = rl_new(CDAPMessage(), RL_MT_CDAP);
+    sm = make_unique<CDAPMessage>();
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
-    rib->send_to_myself(sm, &lfl);
+    rib->send_to_myself(std::move(sm), &lfl);
 }
 
 int

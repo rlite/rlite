@@ -261,7 +261,7 @@ CDAPConn::connect(const std::string &src, const std::string &dst,
                   gpb::authTypes_t auth_mech,
                   const struct CDAPAuthValue *auth_value)
 {
-    CDAPMessage *rm;
+    std::unique_ptr<CDAPMessage> rm;
     CDAPMessage m;
 
     m.m_connect(auth_mech, auth_value, src, dst);
@@ -273,26 +273,23 @@ CDAPConn::connect(const std::string &src, const std::string &dst,
     if (rm->op_code != gpb::M_CONNECT_R) {
         return -1;
     }
-    delete rm;
 
     return 0;
 }
 
-CDAPMessage *
+std::unique_ptr<CDAPMessage>
 CDAPConn::accept()
 {
-    CDAPMessage *rm = msg_recv();
+    std::unique_ptr<CDAPMessage> rm = msg_recv();
     CDAPMessage m;
 
     if (rm->op_code != gpb::M_CONNECT) {
-        delete rm;
-        return NULL;
+        return nullptr;
     }
 
-    m.m_connect_r(rm, 0, string());
+    m.m_connect_r(rm.get(), 0, string());
     if (msg_send(&m, rm->invoke_id) < 0) {
-        delete rm;
-        return NULL;
+        return nullptr;
     }
 
     return rm;
@@ -316,7 +313,7 @@ CDAPConn::conn_state_repr(ConnState st)
     }
 
     assert(0);
-    return NULL;
+    return nullptr;
 }
 
 InvokeIdMgr::InvokeIdMgr(unsigned int ds)
@@ -330,7 +327,7 @@ void
 InvokeIdMgr::__discard(unordered_set<Id, IdHasher> &pending)
 {
     vector<unordered_set<Id, IdHasher>::iterator> torm;
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
 
     for (auto i = pending.begin(); i != pending.end(); i++) {
         if (now - i->created > discard_secs) {
@@ -378,7 +375,7 @@ InvokeIdMgr::get_invoke_id()
         invoke_id_next++;
     }
 
-    pending_invoke_ids.insert(Id(invoke_id_next, time(NULL)));
+    pending_invoke_ids.insert(Id(invoke_id_next, time(nullptr)));
 
     NPD("got %d\n", invoke_id_next);
 
@@ -400,7 +397,7 @@ InvokeIdMgr::get_invoke_id_remote(int invoke_id)
         return -1;
     }
 
-    pending_invoke_ids_remote.insert(Id(invoke_id, time(NULL)));
+    pending_invoke_ids_remote.insert(Id(invoke_id, time(nullptr)));
 
     NPD("got %d\n", invoke_id);
 
@@ -607,7 +604,7 @@ CDAPMessage::set_obj_value(const char *v)
 void
 CDAPMessage::get_obj_value(const char *&p, size_t &l) const
 {
-    p = NULL;
+    p = nullptr;
     l = 0;
     if (obj_value.ty == ObjValType::BYTES) {
         p = obj_value.u.buf.ptr;
@@ -1033,7 +1030,7 @@ msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len)
 {
     gpb::CDAPMessage gm;
 
-    *buf = NULL;
+    *buf = nullptr;
     *len = 0;
 
     gm = static_cast<gpb::CDAPMessage>(*m);
@@ -1049,7 +1046,7 @@ msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len)
 int
 CDAPConn::msg_ser(CDAPMessage *m, int invoke_id, char **buf, size_t *len)
 {
-    *buf = NULL;
+    *buf = nullptr;
     *len = 0;
 
     m->version = version;
@@ -1106,37 +1103,35 @@ CDAPConn::msg_send(CDAPMessage *m, int invoke_id)
     return n;
 }
 
-CDAPMessage *
+std::unique_ptr<CDAPMessage>
 msg_deser_stateless(const char *serbuf, size_t serlen)
 {
-    CDAPMessage *m;
+    std::unique_ptr<CDAPMessage> m;
     gpb::CDAPMessage gm;
 
     gm.ParseFromArray(serbuf, serlen);
 
-    m = new CDAPMessage(gm);
+    m = make_unique<CDAPMessage>(gm);
 
     if (!m->valid(true)) {
-        delete m;
-        return NULL;
+        return nullptr;
     }
 
     return m;
 }
 
-CDAPMessage *
+std::unique_ptr<CDAPMessage>
 CDAPConn::msg_deser(const char *serbuf, size_t serlen)
 {
-    CDAPMessage *m = msg_deser_stateless(serbuf, serlen);
+    std::unique_ptr<CDAPMessage> m = msg_deser_stateless(serbuf, serlen);
 
     if (!m) {
-        return NULL;
+        return nullptr;
     }
 
     /* Run CDAP connection state machine (receiver side). */
-    if (conn_fsm_run(m, false)) {
-        delete m;
-        return NULL;
+    if (conn_fsm_run(m.get(), false)) {
+        return nullptr;
     }
 
     if (m->is_response()) {
@@ -1144,23 +1139,21 @@ CDAPConn::msg_deser(const char *serbuf, size_t serlen)
         if (invoke_id_mgr.put_invoke_id(m->invoke_id)) {
             PE("Invoke id %d does not match any pending request\n",
                m->invoke_id);
-            delete m;
-            m = NULL;
+            return nullptr;
         }
 
     } else {
         /* CDAP request message (M_*). */
         if (invoke_id_mgr.get_invoke_id_remote(m->invoke_id)) {
             PE("Invoke id %d already used remotely\n", m->invoke_id);
-            delete m;
-            m = NULL;
+            return nullptr;
         }
     }
 
     return m;
 }
 
-CDAPMessage *
+std::unique_ptr<CDAPMessage>
 CDAPConn::msg_recv()
 {
     char serbuf[4096];
@@ -1169,7 +1162,7 @@ CDAPConn::msg_recv()
     n = read(fd, serbuf, sizeof(serbuf));
     if (n < 0) {
         perror("read(cdap_msg)");
-        return NULL;
+        return nullptr;
     }
 
     return msg_deser(serbuf, n);

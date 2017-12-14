@@ -124,7 +124,7 @@ struct EnrollmentResources {
     ~EnrollmentResources();
 
     struct NeighFlow *nf;
-    std::list<const CDAPMessage *> msgs;
+    std::list<std::unique_ptr<const CDAPMessage>> msgs;
     pthread_t th;
     pthread_cond_t msgs_avail;
     pthread_cond_t stopped;
@@ -185,7 +185,7 @@ struct NeighFlow {
     void keepalive_timeout();
 
     void enroll_state_set(EnrollState st);
-    const CDAPMessage *next_enroll_msg();
+    std::unique_ptr<const CDAPMessage> next_enroll_msg();
     void enrollment_commit();
     void enrollment_abort();
 
@@ -553,9 +553,9 @@ struct uipcp_rib {
     int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
-    int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
+    int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
-    int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
+    int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
     int neighs_sync_obj_excluding(const Neighbor *exclude, bool create,

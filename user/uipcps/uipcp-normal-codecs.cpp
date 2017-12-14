@@ -1082,11 +1082,8 @@ AData::AData(const char *buf, unsigned int size)
 
     src_addr = gm.sourceaddress();
     dst_addr = gm.destaddress();
-    cdap =
-        msg_deser_stateless(gm.cdapmessage().data(), gm.cdapmessage().size());
-    if (cdap) {
-        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
-    }
+    cdap     = std::move(
+        msg_deser_stateless(gm.cdapmessage().data(), gm.cdapmessage().size()));
 }
 
 int
@@ -1100,7 +1097,7 @@ AData::serialize(char *buf, unsigned int size) const
     gm.set_sourceaddress(src_addr);
     gm.set_destaddress(dst_addr);
     if (cdap) {
-        msg_ser_stateless(cdap, &serbuf, &serlen);
+        msg_ser_stateless(cdap.get(), &serbuf, &serlen);
         gm.set_cdapmessage(serbuf, serlen);
     }
 
