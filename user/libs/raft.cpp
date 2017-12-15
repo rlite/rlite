@@ -864,7 +864,12 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         return -1;
     }
 
-    if (type == RaftTimerType::Election) {
+    switch (type) {
+    default:
+        assert(false);
+        break;
+
+    case RaftTimerType::Election: {
         /* The election timer fired. */
         IOS_INF() << "Election timer expired" << endl;
         if (state == RaftState::Leader) {
@@ -894,8 +899,10 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
             msg->last_log_term  = last_log_term;
             out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
         }
+        break;
+    }
 
-    } else if (type == RaftTimerType::HeartBeat) {
+    case RaftTimerType::HeartBeat: {
         /* The heartbeat timer fired. */
         IOS_INF() << "Heartbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
@@ -903,6 +910,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
                  prepare_append_entries(LogReplicateStrategy::Unacked, out))) {
             return ret;
         }
+        break;
+    }
     }
 
     return 0;
