@@ -116,7 +116,7 @@ lfdb_default::update_local(const string &node_name)
 {
     LowerFlowList lfl;
     LowerFlow lf;
-    CDAPMessage *sm;
+    std::unique_ptr<CDAPMessage> sm;
 
     if (rib->get_neighbor(node_name, false) == nullptr) {
         return; /* Not our neighbor. */
@@ -130,9 +130,9 @@ lfdb_default::update_local(const string &node_name)
     lf.age         = 0;
     lfl.flows.push_back(std::move(lf));
 
-    sm = rl_new(CDAPMessage(), RL_MT_CDAP);
+    sm = make_unique<CDAPMessage>();
     sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
-    rib->send_to_myself(sm, &lfl);
+    rib->send_to_myself(std::move(sm), &lfl);
 }
 
 int
@@ -311,7 +311,7 @@ uipcp_rib::age_incr_tmr_restart()
 void
 lfdb_default::age_incr()
 {
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     bool discarded = false;
 
     for (auto &kvi : db) {
@@ -426,7 +426,7 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
-    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb);
+    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb.get());
 
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();

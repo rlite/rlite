@@ -41,8 +41,6 @@ static const char *mt_names[] = {
     [RL_MT_MISC]      = "MISC",
     [RL_MT_SHIM]      = "SHIM",
     [RL_MT_SHIMDATA]  = "SHIMDATA",
-    [RL_MT_CDAP]      = "CDAP",
-    [RL_MT_NEIGH]     = "NEIGH",
     [RL_MT_NEIGHFLOW] = "NEIGHFLOW",
 };
 

@@ -88,6 +88,8 @@ public:
     }
 };
 
+struct CDAPMessage;
+
 class CDAPConn {
     InvokeIdMgr invoke_id_mgr;
     unsigned int discard_secs;
@@ -102,7 +104,7 @@ class CDAPConn {
 #endif /* SWIG */
 
     const char *conn_state_repr(ConnState st);
-    int conn_fsm_run(struct CDAPMessage *m, bool sender);
+    int conn_fsm_run(CDAPMessage *m, bool sender);
 
     CDAPConn(const CDAPConn &o);
 
@@ -112,11 +114,11 @@ public:
     ~CDAPConn();
 
     /* @invoke_id is not meaningful for request messages. */
-    int msg_send(struct CDAPMessage *m, int invoke_id);
-    int msg_ser(struct CDAPMessage *m, int invoke_id, char **buf, size_t *len);
+    int msg_send(CDAPMessage *m, int invoke_id);
+    int msg_ser(CDAPMessage *m, int invoke_id, char **buf, size_t *len);
 
-    struct CDAPMessage *msg_recv();
-    struct CDAPMessage *msg_deser(const char *serbuf, size_t serlen);
+    std::unique_ptr<CDAPMessage> msg_recv();
+    std::unique_ptr<CDAPMessage> msg_deser(const char *serbuf, size_t serlen);
 
     void reset();
     bool connected() const { return state == ConnState::CONNECTED; }
@@ -131,7 +133,7 @@ public:
 
     /* Helper function to wait for M_CONNECT and send the M_CONNECT_R
      * response. */
-    CDAPMessage *accept();
+    std::unique_ptr<CDAPMessage> accept();
 
     std::string local_appl;
     std::string remote_appl;
@@ -139,9 +141,10 @@ public:
     long version;
 };
 
-struct CDAPMessage *msg_deser_stateless(const char *serbuf, size_t serlen);
+std::unique_ptr<CDAPMessage> msg_deser_stateless(const char *serbuf,
+                                                 size_t serlen);
 
-int msg_ser_stateless(struct CDAPMessage *m, char **buf, size_t *len);
+int msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len);
 
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
@@ -198,7 +201,7 @@ struct CDAPMessage {
                   const std::string &local_appl,
                   const std::string &remote_appl);
 
-    int m_connect_r(const struct CDAPMessage *req, int result,
+    int m_connect_r(const CDAPMessage *req, int result,
                     const std::string &result_reason);
 
     int m_release(gpb::flagValues_t flags);

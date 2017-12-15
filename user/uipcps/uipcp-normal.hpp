@@ -31,8 +31,11 @@
 #include <list>
 #include <ctime>
 #include <sstream>
-#include <pthread.h>
 #include <utility>
+#include <memory>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -119,16 +122,15 @@ struct NeighFlow;
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(struct NeighFlow *f, bool initiator);
+    EnrollmentResources(struct NeighFlow *f, bool init);
     ~EnrollmentResources();
 
     struct NeighFlow *nf;
-    std::list<const CDAPMessage *> msgs;
-    pthread_t th;
-    pthread_cond_t msgs_avail;
-    pthread_cond_t stopped;
-
-    int refcnt;
+    bool initiator;
+    std::list<std::unique_ptr<const CDAPMessage>> msgs;
+    std::thread th;
+    std::condition_variable msgs_avail;
+    std::condition_variable stopped;
 };
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
@@ -153,14 +155,13 @@ struct NeighFlow {
     bool reliable;
 
     /* CDAP connection associated to this flow, if any. */
-    CDAPConn *conn;
+    std::unique_ptr<CDAPConn> conn;
 
     time_t last_activity;
 
     EnrollState enroll_state;
-    struct EnrollmentResources *enrollment_rsrc;
-    struct EnrollmentResources *enrollment_rsrc_get(bool initiator);
-    void enrollment_rsrc_put();
+    std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
+    std::shared_ptr<EnrollmentResources> er;
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
@@ -183,8 +184,14 @@ struct NeighFlow {
     void keepalive_tmr_stop();
     void keepalive_timeout();
 
+    void enroller_thread();
+    int enroller_default(std::unique_lock<std::mutex> &lk);
+    void enrollee_thread();
+    int enrollee_default(std::unique_lock<std::mutex> &lk);
+
     void enroll_state_set(EnrollState st);
-    const CDAPMessage *next_enroll_msg();
+    std::unique_ptr<const CDAPMessage> next_enroll_msg(
+        std::unique_lock<std::mutex> &lk);
     void enrollment_commit();
     void enrollment_abort();
 
@@ -204,7 +211,9 @@ struct Neighbor {
     bool initiator;
 
     /* Kernel-bound N-1 flows used for data transfers and optionally
-     * management. */
+     * management. NeighFlow objects (including the ones below) are
+     * kept using raw pointers, as the RIB lock is never released while
+     * we have a reference to one of these objects. */
     std::unordered_map<rl_port_t, NeighFlow *> flows;
 
     /* If not nullptr, a regular (non-kernel-bound) N-1 flow used for
@@ -255,37 +264,14 @@ private:
     const NeighFlow *_mgmt_conn() const;
 };
 
-class ScopeLock {
-public:
-    RL_NODEFAULT_NONCOPIABLE(ScopeLock);
-    ScopeLock(pthread_mutex_t &m, bool v = false) : mutex(m), verb(v)
-    {
-        pthread_mutex_lock(&mutex);
-        if (verb) {
-            PD("lock.acquire\n");
-        }
-    }
-    ~ScopeLock()
-    {
-        if (verb) {
-            PD("lock.release\n");
-        }
-        pthread_mutex_unlock(&mutex);
-    }
-
-private:
-    pthread_mutex_t &mutex;
-    bool verb;
-};
-
 #ifdef RL_DEBUG
 #define RL_LOCK_ASSERT(_lock, _locked)                                         \
     do {                                                                       \
-        int ret = pthread_mutex_trylock(_lock);                                \
-        assert(!(_locked && ret == 0));                                        \
-        assert(!(!_locked && ret == EBUSY));                                   \
-        if (!_locked) {                                                        \
-            pthread_mutex_unlock(_lock);                                       \
+        bool ret = _lock.try_lock();                                           \
+        assert(!ret || !_locked);                                              \
+        assert(ret || _locked);                                                \
+        if (ret) {                                                             \
+            _lock.unlock();                                                    \
         }                                                                      \
     } while (0)
 #else
@@ -395,7 +381,7 @@ struct uipcp_rib {
     int mgmtfd;
 
     /* RIB lock. */
-    pthread_mutex_t mutex;
+    std::mutex mutex;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
                                             NeighFlow *nf);
@@ -409,9 +395,6 @@ struct uipcp_rib {
 
     /* True if this IPCP is allowed to act as enroller for other IPCPs. */
     bool enroller_enabled;
-
-    /* Enrollment resources that have been used and can be released. */
-    std::list<EnrollmentResources *> used_enrollment_resources;
 
     /* True if the name of this IPCP is registered to the IPCP itself.
      * Self-registration is used to receive N-flow allocation requests. */
@@ -434,8 +417,11 @@ struct uipcp_rib {
      * even for candidates that have no lower DIF in common with us. This
      * is used to implement propagation of the CandidateNeighbors information,
      * so that all the IPCPs in the DIF know their potential candidate
-     * neighbors.*/
-    std::unordered_map<std::string, Neighbor *> neighbors;
+     * neighbors.
+     * We use std::shared_ptr to hold the Neighbor objects, in such a way that
+     * we can temporarily release the RIB lock while keeping a reference
+     * to the object. */
+    std::unordered_map<std::string, std::shared_ptr<Neighbor>> neighbors;
     std::unordered_map<std::string, NeighborCandidate> neighbors_seen;
     std::unordered_set<std::string> neighbors_cand;
     std::unordered_set<std::string> neighbors_deleted;
@@ -445,13 +431,13 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    struct addr_allocator *addra;
+    std::unique_ptr<struct addr_allocator> addra;
 
     /* Directory Forwarding Table. */
-    struct dft *dft;
+    std::unique_ptr<struct dft> dft;
 
     /* Lower Flow Database. */
-    struct lfdb *lfdb;
+    std::unique_ptr<struct lfdb> lfdb;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
@@ -460,7 +446,7 @@ struct uipcp_rib {
     InvokeIdMgr invoke_id_mgr;
 
     /* For supported flows. */
-    struct flow_allocator *fa;
+    std::unique_ptr<struct flow_allocator> fa;
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */
@@ -522,7 +508,8 @@ struct uipcp_rib {
 
     char *dump() const;
 
-    Neighbor *get_neighbor(const std::string &neigh_name, bool create);
+    std::shared_ptr<Neighbor> get_neighbor(const std::string &neigh_name,
+                                           bool create);
     int del_neighbor(const std::string &neigh_name);
     int neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
     int neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req);
@@ -547,14 +534,13 @@ struct uipcp_rib {
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);
     void trigger_re_enrollments();
-    void clean_enrollment_resources();
 
     int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
-    int send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
+    int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                          const UipcpObject *obj);
-    int send_to_myself(CDAPMessage *m, const UipcpObject *obj);
+    int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
     int neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
@@ -609,8 +595,8 @@ struct uipcp_rib {
     T get_param_value(const std::string &component,
                       const std::string &param_name);
 
-    void lock() { pthread_mutex_lock(&mutex); }
-    void unlock() { pthread_mutex_unlock(&mutex); }
+    void lock() { mutex.lock(); }
+    void unlock() { mutex.unlock(); }
 
 private:
 #ifdef RL_USE_QOS_CUBES

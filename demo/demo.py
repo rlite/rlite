@@ -1046,7 +1046,7 @@ for vmname in sorted(vms):
     # Run rlite-node-config
     outs += '$SUDO cp .initscript /etc/rina/initscript\n'\
             'rm .initscript\n'
-    outs += 'nohup rlite-node-config -v -d > rlite-node-config.log 2>&1\n'
+    outs += '$SUDO nohup rlite-node-config -v -d > rlite-node-config.log 2>&1\n'
 
     # Run applications after rlite-node-config, so that we are sure the IPCPs
     # are there (non-enrollment commands are run before turning into a daemon).
