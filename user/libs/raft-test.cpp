@@ -71,7 +71,11 @@ public:
 
     /* Called to emulate failure of a replica. The replica won't receive
      * messages until respawn. */
-    void fail() { failed = true; }
+    void fail()
+    {
+        failed = true;
+        committed_commands.clear();
+    }
 
     /* Is this replica alive? */
     bool up() const { return !failed; }
