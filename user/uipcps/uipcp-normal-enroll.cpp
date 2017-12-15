@@ -1483,7 +1483,8 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
         }
 
         /* Disable further N-1-flow allocations towards this neighbor,
-         * and perform flow allocation out of the RIB lock. */
+         * and perform flow allocation out of the RIB lock. We can do that
+         * because we hold a shared_ptr reference to the neighbor. */
         neigh->flow_alloc_enabled = false;
         lk.unlock();
 

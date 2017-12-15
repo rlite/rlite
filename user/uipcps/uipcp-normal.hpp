@@ -161,11 +161,10 @@ struct NeighFlow {
 
     EnrollState enroll_state;
     std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
+    std::shared_ptr<EnrollmentResources> er;
 
     int keepalive_tmrid;
     int pending_keepalive_reqs;
-
-    std::shared_ptr<EnrollmentResources> er;
 
     /* Statistics about management traffic. */
     struct {
@@ -212,7 +211,9 @@ struct Neighbor {
     bool initiator;
 
     /* Kernel-bound N-1 flows used for data transfers and optionally
-     * management. */
+     * management. NeighFlow objects (including the ones below) are
+     * kept using raw pointers, as the RIB lock is never released while
+     * we have a reference to one of these objects. */
     std::unordered_map<rl_port_t, NeighFlow *> flows;
 
     /* If not nullptr, a regular (non-kernel-bound) N-1 flow used for
@@ -416,7 +417,10 @@ struct uipcp_rib {
      * even for candidates that have no lower DIF in common with us. This
      * is used to implement propagation of the CandidateNeighbors information,
      * so that all the IPCPs in the DIF know their potential candidate
-     * neighbors.*/
+     * neighbors.
+     * We use std::shared_ptr to hold the Neighbor objects, in such a way that
+     * we can temporarily release the RIB lock while keeping a reference
+     * to the object. */
     std::unordered_map<std::string, std::shared_ptr<Neighbor>> neighbors;
     std::unordered_map<std::string, NeighborCandidate> neighbors_seen;
     std::unordered_set<std::string> neighbors_cand;
