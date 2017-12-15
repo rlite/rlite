@@ -927,7 +927,10 @@ RaftSM::submit(const char *const serbuf, LogIndex *request_id,
         return ret;
     }
 
-    // TODO reset heartbeat timer
+    /* Reset the heartbeat timer since we just prepared a transmission. */
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Restart,
+                                               HeartbeatTimeout));
 
     *request_id = last_log_index;
 
