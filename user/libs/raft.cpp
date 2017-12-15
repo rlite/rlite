@@ -484,6 +484,9 @@ RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
         out->output_messages.push_back(make_pair(kv.first, std::move(msg)));
     }
 
+    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
+                                               RaftTimerAction::Restart,
+                                               HeartbeatTimeout));
     return 0;
 }
 
@@ -672,9 +675,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
     if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
     }
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Restart,
-                                               HeartbeatTimeout));
+
     /* Also stop the election timer. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::Election, RaftTimerAction::Stop));
@@ -902,9 +903,6 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
                  prepare_append_entries(LogReplicateStrategy::Unacked, out))) {
             return ret;
         }
-        out->timer_commands.push_back(
-            RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                         RaftTimerAction::Restart, HeartbeatTimeout));
     }
 
     return 0;
@@ -922,15 +920,10 @@ RaftSM::submit(const char *const serbuf, LogIndex *request_id,
     }
 
     /* Prepare RaftAppendEntries messages to be sent to the other
-     * servers. */
+     * servers (and restart the heartbeat timer). */
     if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
     }
-
-    /* Reset the heartbeat timer since we just prepared a transmission. */
-    out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
-                                               RaftTimerAction::Restart,
-                                               HeartbeatTimeout));
 
     *request_id = last_log_index;
 
