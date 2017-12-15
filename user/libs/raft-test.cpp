@@ -447,11 +447,11 @@ main(int argc, char **argv)
         {Req(240), Req(411), Req(600), Req(600), Req(601), Req(602), Req(658),
          Req(661), Req(721)},
         /* Two follower failures, no respawn. */
-        {Req(350), Req(360), Fail(365, F, 0), Req(450), Req(370),
+        {Req(350), Req(360), Fail(365, F, 0), Req(370), Req(450),
          Fail(450, F, 1), Req(454), Req(455), Req(550), Req(560)},
         /* One follower failure with immediate respawn. */
         {Req(301), Req(302), Fail(303, F, 0), Respawn(305, 0), Req(307),
-         Req(309), Req(313)},
+         Req(309)},
         /* One follower failure with respawn after some time. */
         {Req(301), Req(302), Fail(303, F, 0), Req(307), Req(309), Req(313),
          Respawn(500, 0), Req(600)},
@@ -461,6 +461,8 @@ main(int argc, char **argv)
         /* Leader failure with respawn. */
         {Req(350), Req(355), Fail(359, L, 0), Req(450), Req(370), Req(454),
          Req(455), Req(550), Respawn(570, 0), Req(601), Req(608)},
+        /* Late failure of a follower with respawn. */
+        {Req(376), Req(698), Fail(700, F, 0), Req(710), Respawn(750, 0)},
     };
     int test_counter  = 1;
     int test_selector = -1;
