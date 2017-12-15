@@ -547,7 +547,7 @@ RaftSM::log_truncate(LogIndex index)
     /* Close the log file, truncate it and reopen. */
     logfile.close();
     if (truncate(logfilename.c_str(),
-                 kLogEntriesOfs + log_entry_size * last_log_index)) {
+                 kLogEntriesOfs + log_entry_size * index)) {
         IOS_ERR() << "Failed to truncate log from " << last_log_index
                   << " entries to " << index << " entries" << endl;
         return -1;
@@ -824,7 +824,7 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
             }
         }
         if (next_commit_index != commit_index) {
-            /* We cannot update commit_index only if log[N].term ==
+            /* We can update commit_index only if log[N].term ==
              * current_term, that is if the entry N was replicated by us. */
             Term term;
             if ((ret = log_entry_get_term(next_commit_index, &term))) {
