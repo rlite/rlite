@@ -798,14 +798,15 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
         return -1;
     }
 
+    Server &follower = servers[resp.follower_id];
+
     if (resp.success) {
         LogIndex next_commit_index = commit_index;
 
         /* On success we update the next_index_acked. */
-        assert(resp.last_log_index + 1 >
-               servers[resp.follower_id].next_index_acked);
-        servers[resp.follower_id].next_index_acked = resp.last_log_index + 1;
-        servers[resp.follower_id].match_index      = resp.last_log_index;
+        assert(resp.last_log_index + 1 > follower.next_index_acked);
+        follower.next_index_acked = resp.last_log_index + 1;
+        follower.match_index      = resp.last_log_index;
         /* Try to update the commit_index. We need to find the highest N
          * such that N > commit_index and that match_index >= N for a majority
          * of the replicas (we as a leader count as a replica that has
@@ -847,9 +848,8 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
     } else {
         /* Failure comes from log inconsistencies. We need to decrement
          * next index and retry. */
-        assert(servers[resp.follower_id].next_index_acked > 0);
-        servers[resp.follower_id].next_index_unacked =
-            --servers[resp.follower_id].next_index_acked;
+        assert(follower.next_index_acked > 0);
+        follower.next_index_unacked = --follower.next_index_acked;
     }
 
     return 0;
