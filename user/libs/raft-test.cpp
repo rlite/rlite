@@ -430,7 +430,7 @@ run_simulation(const list<TestEvent> &external_events)
 }
 
 int
-main()
+main(int argc, char **argv)
 {
     /* Some function aliases useful to specify test vectors in a compact way. */
     const auto &Req                    = TestEvent::CreateRequestEvent;
@@ -458,27 +458,39 @@ main()
         {Req(350), Req(355), Fail(359, L, 0), Req(450), Req(370), Req(454),
          Req(455), Req(550), Respawn(570, 0), Req(601), Req(608)},
     };
-    int test_counter = 1;
+    int test_counter  = 1;
+    int test_selector = -1;
+
+    if (argc > 1) {
+        test_selector = std::stoi(argv[1]);
+        if (test_selector < 1 ||
+            test_selector > static_cast<int>(test_vectors.size())) {
+            cerr << "Invalid test selector " << test_selector << endl;
+            return -1;
+        }
+    }
 
     srand(time(0));
 
     for (const auto &vector : test_vectors) {
         int ret;
 
-        ret = run_simulation(vector);
-        cout << "Test #: " << test_counter;
-        switch (ret) {
-        case -1:
-            cout << ": error occurred" << endl;
-            return -1;
-            break;
-        case 1:
-            cout << ": test failed" << endl;
-            return -1;
-            break;
-        case 0:
-            cout << ": test ok" << endl;
-            break;
+        if (test_selector <= 0 || test_selector == test_counter) {
+            ret = run_simulation(vector);
+            cout << "Test #: " << test_counter;
+            switch (ret) {
+            case -1:
+                cout << ": error occurred" << endl;
+                return -1;
+                break;
+            case 1:
+                cout << ": test failed" << endl;
+                return -1;
+                break;
+            case 0:
+                cout << ": test ok" << endl;
+                break;
+            }
         }
         ++test_counter;
     }
