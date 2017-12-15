@@ -40,9 +40,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
       lower_ipcp_id(lid),
       flow_fd(ffd),
       reliable(false),
-      conn(nullptr),
       enroll_state(EnrollState::NEIGH_NONE),
-      enrollment_rsrc(nullptr),
       keepalive_tmrid(0),
       pending_keepalive_reqs(0)
 {
@@ -66,12 +64,7 @@ NeighFlow::~NeighFlow()
         flowlev = "N";
     }
 
-    assert(enrollment_rsrc == nullptr);
     keepalive_tmr_stop();
-
-    if (conn) {
-        rl_delete(conn, RL_MT_SHIMDATA);
-    }
 
     ret = close(flow_fd);
     if (ret) {
@@ -183,7 +176,10 @@ NeighFlow::enrollment_abort()
     if (conn) {
         conn->reset();
     }
-    pthread_cond_signal(&enrollment_rsrc->stopped);
+    er->stopped.notify_all();
+
+    /* Remove the stored shared pointer. */
+    this->er.reset();
 }
 
 void
@@ -212,7 +208,7 @@ void
 NeighFlow::keepalive_timeout()
 {
     uipcp_rib *rib = neigh->rib;
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     CDAPMessage m;
     int ret;
 
@@ -294,10 +290,7 @@ Neighbor::~Neighbor()
     }
 
     mgmt_only_set(nullptr);
-    if (n_flow) {
-        uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
-        rl_delete(n_flow, RL_MT_NEIGHFLOW);
-    }
+    n_flow_set(nullptr);
 }
 
 void
@@ -325,28 +318,36 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
 void
 Neighbor::n_flow_set(NeighFlow *nf)
 {
-    NeighFlow *kbnf;
+    if (nf == nullptr) {
+        if (n_flow != nullptr) {
+            uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
+            rl_delete(n_flow, RL_MT_NEIGHFLOW);
+            n_flow = nullptr;
+        }
+    } else {
+        NeighFlow *kbnf;
 
-    assert(n_flow == nullptr);
-    assert(nf != nullptr);
-    assert(has_flows());
+        assert(n_flow == nullptr);
+        assert(nf != nullptr);
+        assert(has_flows());
 
-    /* Inherit enrollment state and CDAP connection state, and switch
-     * keepalive timer. */
-    kbnf             = flows.begin()->second;
-    nf->enroll_state = kbnf->enroll_state;
-    nf->conn         = new CDAPConn(nf->flow_fd);
-    if (kbnf->conn) {
-        nf->conn->state_set(kbnf->conn->state_get());
+        /* Inherit enrollment state and CDAP connection state, and switch
+         * keepalive timer. */
+        kbnf             = flows.begin()->second;
+        nf->enroll_state = kbnf->enroll_state;
+        nf->conn         = make_unique<CDAPConn>(nf->flow_fd);
+        if (kbnf->conn) {
+            nf->conn->state_set(kbnf->conn->state_get());
+        }
+        kbnf->keepalive_tmr_stop();
+        nf->keepalive_tmr_start();
+
+        UPD(rib->uipcp, "Set management-only N-flow for neigh %s (fd=%d)\n",
+            ipcp_name.c_str(), nf->flow_fd);
+        n_flow = nf;
+        uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
+                           nf);
     }
-    kbnf->keepalive_tmr_stop();
-    nf->keepalive_tmr_start();
-
-    UPD(rib->uipcp, "Set management-only N-flow for neigh %s (fd=%d)\n",
-        ipcp_name.c_str(), nf->flow_fd);
-    n_flow = nf;
-    uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
-                       nf);
 }
 
 const char *
@@ -401,15 +402,14 @@ NeighFlow::enrollment_commit()
     enroll_state_set(EnrollState::NEIGH_ENROLLED);
 
     /* Dispatch queued messages. */
-    while (!enrollment_rsrc->msgs.empty()) {
-        rib->cdap_dispatch(enrollment_rsrc->msgs.front(), this);
-        rl_delete(enrollment_rsrc->msgs.front(), RL_MT_CDAP);
-        enrollment_rsrc->msgs.pop_front();
+    while (!er->msgs.empty()) {
+        rib->cdap_dispatch(er->msgs.front().get(), this);
+        er->msgs.pop_front();
     }
 
     /* Sync with the neighbor. */
     neigh->neigh_sync_rib(this);
-    pthread_cond_signal(&enrollment_rsrc->stopped);
+    er->stopped.notify_all();
 
     if (neigh->initiator) {
         UPI(rib->uipcp, "Enrolled to DIF %s through neighbor %s\n",
@@ -418,48 +418,40 @@ NeighFlow::enrollment_commit()
         UPI(rib->uipcp, "Neighbor %s joined the DIF %s\n",
             neigh->ipcp_name.c_str(), rib->uipcp->dif_name);
     }
+
+    /* Remove the stored shared pointer. */
+    this->er.reset();
 }
 
 /* To be called with RIB lock held. */
-const CDAPMessage *
-NeighFlow::next_enroll_msg()
+std::unique_ptr<const CDAPMessage>
+NeighFlow::next_enroll_msg(std::unique_lock<std::mutex> &lk)
 {
-    const CDAPMessage *msg = nullptr;
+    std::unique_ptr<const CDAPMessage> msg;
 
-    while (enrollment_rsrc->msgs.empty()) {
-        struct timespec to;
-        int ret;
+    while (er->msgs.empty()) {
+        int to = neigh->rib->get_param_value<int>("enrollment", "timeout");
+        std::cv_status cvst;
 
-        clock_gettime(CLOCK_REALTIME, &to);
-        to.tv_sec +=
-            neigh->rib->get_param_value<int>("enrollment", "timeout") / 1000;
-
-        ret = pthread_cond_timedwait(&enrollment_rsrc->msgs_avail,
-                                     &neigh->rib->mutex, &to);
-        if (ret) {
-            if (ret != ETIMEDOUT) {
-                UPE(neigh->rib->uipcp, "pthread_cond_timedwait(): %s\n",
-                    strerror(ret));
-            } else {
-                UPW(neigh->rib->uipcp, "Timed out\n");
-            }
+        cvst = er->msgs_avail.wait_for(lk, std::chrono::milliseconds(to));
+        if (cvst == std::cv_status::timeout) {
+            UPW(neigh->rib->uipcp, "Timed out\n");
             return nullptr;
         }
     }
 
-    msg = enrollment_rsrc->msgs.front();
-    enrollment_rsrc->msgs.pop_front();
+    msg = std::move(er->msgs.front());
+    er->msgs.pop_front();
 
     return msg;
 }
 
 /* Default policy for the enrollment initiator (enrollee). */
-static int
-enrollee_default(NeighFlow *nf)
+int
+NeighFlow::enrollee_default(std::unique_lock<std::mutex> &lk)
 {
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    uipcp_rib *rib = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
     {
         /* (3) I --> S: M_START */
@@ -476,7 +468,7 @@ enrollee_default(NeighFlow *nf)
 
         m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
                   0, 0, string());
-        ret = nf->send_to_port_id(&m, 0, obj);
+        ret = send_to_port_id(&m, 0, obj);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -484,7 +476,7 @@ enrollee_default(NeighFlow *nf)
         UPD(rib->uipcp, "I --> S M_START(enrollment)\n");
     }
 
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -496,7 +488,6 @@ enrollee_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_START_R) {
             UPE(rib->uipcp, "M_START_R expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -504,7 +495,6 @@ enrollee_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -513,14 +503,12 @@ enrollee_default(NeighFlow *nf)
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_START_R does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -540,8 +528,7 @@ enrollee_default(NeighFlow *nf)
         CDAPMessage m;
         int ret;
 
-        rl_delete(rm, RL_MT_CDAP);
-        rm = nf->next_enroll_msg();
+        rm = next_enroll_msg(lk);
         if (!rm) {
             return -1;
         }
@@ -549,13 +536,12 @@ enrollee_default(NeighFlow *nf)
         /* Here M_CREATE messages from the slave are accepted and
          * dispatched to the RIB. */
         if (rm->op_code == gpb::M_CREATE) {
-            rib->cdap_dispatch(rm, nf);
+            rib->cdap_dispatch(rm.get(), this);
             continue;
         }
 
         if (rm->op_code != gpb::M_STOP) {
             UPE(rib->uipcp, "M_STOP expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -563,14 +549,12 @@ enrollee_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_STOP does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -593,9 +577,7 @@ enrollee_default(NeighFlow *nf)
         m.obj_class = obj_class::enrollment;
         m.obj_name  = obj_name::enrollment;
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
-        rl_delete(rm, RL_MT_CDAP);
-        rm = nullptr;
+        ret = send_to_port_id(&m, rm->invoke_id, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             return -1;
@@ -615,15 +597,12 @@ enrollee_default(NeighFlow *nf)
     return 0;
 }
 
-static void *
-enrollee_thread(void *opaque)
+void
+NeighFlow::enrollee_thread()
 {
-    NeighFlow *nf         = (NeighFlow *)opaque;
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
-
-    rib->lock();
+    uipcp_rib *rib = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
+    std::unique_lock<std::mutex> lk(rib->mutex);
 
     {
         /* (1) I --> S: M_CONNECT */
@@ -633,14 +612,11 @@ enrollee_thread(void *opaque)
 
         /* We are the enrollment initiator, let's send an
          * M_CONNECT message. */
-        if (nf->conn) {
-            rl_delete(nf->conn, RL_MT_SHIMDATA);
-        }
-        nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
+        conn = make_unique<CDAPConn>(flow_fd);
 
         m.m_connect(gpb::AUTH_NONE, &av, rib->myname, neigh->ipcp_name);
 
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = send_to_port_id(&m, 0, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -648,7 +624,7 @@ enrollee_thread(void *opaque)
         UPD(rib->uipcp, "I --> S M_CONNECT\n");
     }
 
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -669,14 +645,12 @@ enrollee_thread(void *opaque)
              * to update our map. */
             UPI(rib->uipcp, "Neighbor name updated remotely %s --> %s\n",
                 neigh->ipcp_name.c_str(), rm->src_appl.c_str());
+            rib->neighbors[rm->src_appl] = rib->neighbors[neigh->ipcp_name];
             rib->neighbors.erase(neigh->ipcp_name);
-            neigh->ipcp_name                 = rm->src_appl;
-            rib->neighbors[neigh->ipcp_name] = neigh;
+            neigh->ipcp_name = rm->src_appl;
         }
 
         UPD(rib->uipcp, "I <-- S M_CONNECT_R\n");
-        rl_delete(rm, RL_MT_CDAP);
-        rm = nullptr;
 
         if (rib->enrolled) {
             CDAPMessage m;
@@ -689,7 +663,7 @@ enrollee_thread(void *opaque)
              * of a lower flow. */
             m.m_start(gpb::F_NO_FLAGS, obj_class::lowerflow,
                       obj_name::lowerflow, 0, 0, string());
-            ret = nf->send_to_port_id(&m, 0, nullptr);
+            ret = send_to_port_id(&m, 0, nullptr);
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
                     strerror(errno));
@@ -697,7 +671,7 @@ enrollee_thread(void *opaque)
             }
             UPD(rib->uipcp, "I --> S M_START(lowerflow)\n");
 
-            rm = nf->next_enroll_msg();
+            rm = next_enroll_msg(lk);
             if (!rm) {
                 goto err;
             }
@@ -728,7 +702,7 @@ enrollee_thread(void *opaque)
     }
 
     {
-        int ret = enrollee_default(nf);
+        int ret = enrollee_default(lk);
 
         if (ret) {
             goto err;
@@ -736,39 +710,29 @@ enrollee_thread(void *opaque)
     }
 
 finish:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
-    nf->enrollment_commit();
-    nf->enrollment_rsrc_put();
-    rib->unlock();
+    enrollment_commit();
+    lk.unlock();
     rib->enroller_enable(true);
 
     /* Trigger periodic tasks to possibly allocate
      * N-flows and free enrollment resources. */
     uipcps_loop_signal(rib->uipcp->uipcps);
 
-    return nullptr;
+    return;
 
 err:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
-    nf->enrollment_abort();
-    nf->enrollment_rsrc_put();
+    enrollment_abort();
     rib->unlock();
-    return nullptr;
 }
 
 /* Default policy for the enrollment slave (enroller). */
-static int
-enroller_default(NeighFlow *nf)
+int
+NeighFlow::enroller_default(std::unique_lock<std::mutex> &lk)
 {
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    uipcp_rib *rib = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
 
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -784,7 +748,6 @@ enroller_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_START) {
             UPE(rib->uipcp, "M_START expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -792,7 +755,6 @@ enroller_default(NeighFlow *nf)
             rm->obj_name != obj_name::enrollment) {
             UPE(rib->uipcp, "%s:%s object expected\n",
                 obj_name::enrollment.c_str(), obj_class::enrollment.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -801,7 +763,6 @@ enroller_default(NeighFlow *nf)
         rm->get_obj_value(objbuf, objlen);
         if (!objbuf) {
             UPE(rib->uipcp, "M_START does not contain a nested message\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -814,10 +775,9 @@ enroller_default(NeighFlow *nf)
         m.obj_class = obj_class::enrollment;
         m.obj_name  = obj_name::enrollment;
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, &enr_info);
+        ret = send_to_port_id(&m, rm->invoke_id, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_START_R(enrollment)\n");
@@ -831,17 +791,15 @@ enroller_default(NeighFlow *nf)
         m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment,
                  0, 0, string());
 
-        ret = nf->send_to_port_id(&m, 0, &enr_info);
+        ret = send_to_port_id(&m, 0, &enr_info);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_STOP(enrollment)\n");
     }
 
-    rl_delete(rm, RL_MT_CDAP);
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         return -1;
     }
@@ -854,14 +812,12 @@ enroller_default(NeighFlow *nf)
 
         if (rm->op_code != gpb::M_STOP_R) {
             UPE(rib->uipcp, "M_START_R expected\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
         if (rm->result) {
             UPE(rib->uipcp, "Neighbor returned negative response [%d], '%s'\n",
                 rm->result, rm->result_reason.c_str());
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
 
@@ -872,31 +828,25 @@ enroller_default(NeighFlow *nf)
         m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status, 0, 0,
                   string());
 
-        ret = nf->send_to_port_id(&m, 0, nullptr);
+        ret = send_to_port_id(&m, 0, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id failed\n");
-            rl_delete(rm, RL_MT_CDAP);
             return -1;
         }
         UPD(rib->uipcp, "S --> I M_START(status)\n");
     }
 
-    rl_delete(rm, RL_MT_CDAP);
-
     return 0;
 }
 
-static void *
-enroller_thread(void *opaque)
+void
+NeighFlow::enroller_thread()
 {
-    NeighFlow *nf         = (NeighFlow *)opaque;
-    Neighbor *neigh       = nf->neigh;
-    uipcp_rib *rib        = neigh->rib;
-    const CDAPMessage *rm = nullptr;
+    uipcp_rib *rib = neigh->rib;
+    std::unique_ptr<const CDAPMessage> rm;
+    std::unique_lock<std::mutex> lk(rib->mutex);
 
-    rib->lock();
-
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -909,7 +859,7 @@ enroller_thread(void *opaque)
 
         /* We are the enrollment slave, let's send an M_CONNECT_R message. */
         assert(rm->op_code == gpb::M_CONNECT); /* Rely on CDAP fsm. */
-        ret = m.m_connect_r(rm, 0, string());
+        ret = m.m_connect_r(rm.get(), 0, string());
         if (ret) {
             UPE(rib->uipcp, "M_CONNECT_R creation failed\n");
             goto err;
@@ -925,7 +875,7 @@ enroller_thread(void *opaque)
             m.src_appl = rib->myname;
         }
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = send_to_port_id(&m, rm->invoke_id, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -933,8 +883,7 @@ enroller_thread(void *opaque)
         UPD(rib->uipcp, "S --> I M_CONNECT_R\n");
     }
 
-    rl_delete(rm, RL_MT_CDAP);
-    rm = nf->next_enroll_msg();
+    rm = next_enroll_msg(lk);
     if (!rm) {
         goto err;
     }
@@ -959,7 +908,7 @@ enroller_thread(void *opaque)
         m.obj_class = obj_class::lowerflow;
         m.obj_name  = obj_name::lowerflow;
 
-        ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
+        ret = send_to_port_id(&m, rm->invoke_id, nullptr);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
             goto err;
@@ -969,11 +918,10 @@ enroller_thread(void *opaque)
         goto finish;
     }
 
-    nf->enrollment_rsrc->msgs.push_front(rm); /* reinject, passing ownership */
-    rm = nullptr;
+    er->msgs.push_front(std::move(rm)); /* reinject, passing ownership */
 
     {
-        int ret = enroller_default(nf);
+        int ret = enroller_default(lk);
 
         if (ret) {
             goto err;
@@ -981,81 +929,51 @@ enroller_thread(void *opaque)
     }
 
 finish:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
-    nf->enrollment_commit();
-    nf->enrollment_rsrc_put();
-    rib->unlock();
+    enrollment_commit();
+    lk.unlock();
     rib->enroller_enable(true);
     uipcps_loop_signal(rib->uipcp->uipcps);
-
-    return nullptr;
+    return;
 
 err:
-    if (rm) {
-        rl_delete(rm, RL_MT_CDAP);
-    }
-    nf->enrollment_abort();
-    nf->enrollment_rsrc_put();
+    enrollment_abort();
     rib->unlock();
-    return nullptr;
 }
 
-struct EnrollmentResources *
+std::shared_ptr<EnrollmentResources>
 NeighFlow::enrollment_rsrc_get(bool initiator)
 {
-    if (enrollment_rsrc != nullptr) {
-        enrollment_rsrc->refcnt++;
-        return enrollment_rsrc;
+    if (er == nullptr) {
+        UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
+            neigh->ipcp_name.c_str());
+        enroll_state_set(EnrollState::NEIGH_ENROLLING);
+        er = std::shared_ptr<EnrollmentResources>(
+            new EnrollmentResources(this, initiator));
     }
-    UPD(neigh->rib->uipcp, "setup enrollment data for neigh %s\n",
-        neigh->ipcp_name.c_str());
-    enroll_state_set(EnrollState::NEIGH_ENROLLING);
-    enrollment_rsrc =
-        rl_new(EnrollmentResources(this, initiator), RL_MT_NEIGHFLOW);
-    return enrollment_rsrc;
+
+    return er;
 }
 
-void
-NeighFlow::enrollment_rsrc_put()
+EnrollmentResources::EnrollmentResources(struct NeighFlow *f, bool init)
+    : nf(f), initiator(init)
 {
-    assert(enrollment_rsrc != nullptr);
-    if (--enrollment_rsrc->refcnt > 0) {
-        return;
-    }
-    UPD(neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
-        neigh->ipcp_name.c_str());
-    enrollment_rsrc->nf = nullptr;
-    neigh->rib->used_enrollment_resources.push_back(enrollment_rsrc);
-    enrollment_rsrc = nullptr;
-}
-
-EnrollmentResources::EnrollmentResources(struct NeighFlow *f, bool initiator)
-    : nf(f), refcnt(1)
-{
-    pthread_cond_init(&msgs_avail, nullptr);
-    pthread_cond_init(&stopped, nullptr);
-    pthread_create(&th, nullptr, initiator ? enrollee_thread : enroller_thread,
-                   nf);
-    refcnt++;
+    th = std::thread(
+        initiator ? &NeighFlow::enrollee_thread : &NeighFlow::enroller_thread,
+        nf);
+    th.detach();
 }
 
 EnrollmentResources::~EnrollmentResources()
 {
+    UPD(nf->neigh->rib->uipcp, "clean up enrollment data for neigh %s\n",
+        nf->neigh->ipcp_name.c_str());
     if (!msgs.empty()) {
         UPW(nf->neigh->rib->uipcp,
             "Discarding %u CDAP messages from neighbor %s\n",
             static_cast<unsigned int>(msgs.size()),
             nf->neigh->ipcp_name.c_str());
     }
-    while (!msgs.empty()) {
-        rl_delete(msgs.front(), RL_MT_CDAP);
-        msgs.pop_front();
-    }
-    pthread_join(th, nullptr);
-    pthread_cond_destroy(&msgs_avail);
-    pthread_cond_destroy(&stopped);
+    msgs.clear();
 }
 
 /* Did we complete the enrollment procedure with the neighbor? */
@@ -1161,7 +1079,7 @@ uipcp_rib::neighs_refresh_tmr_restart()
 void
 uipcp_rib::neighs_refresh()
 {
-    ScopeLock lock_(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     size_t limit = 10;
 
     UPV(uipcp, "Refreshing neighbors RIB\n");
@@ -1178,7 +1096,7 @@ uipcp_rib::neighs_refresh()
     neighs_refresh_tmr_restart();
 }
 
-Neighbor *
+std::shared_ptr<Neighbor>
 uipcp_rib::get_neighbor(const string &neigh_name, bool create)
 {
     string neigh_name_s(neigh_name);
@@ -1187,7 +1105,7 @@ uipcp_rib::get_neighbor(const string &neigh_name, bool create)
         if (!create) {
             return nullptr;
         }
-        neighbors[neigh_name] = rl_new(Neighbor(this, neigh_name), RL_MT_NEIGH);
+        neighbors[neigh_name] = std::make_shared<Neighbor>(this, neigh_name);
     }
 
     return neighbors[neigh_name];
@@ -1200,7 +1118,6 @@ uipcp_rib::del_neighbor(const std::string &neigh_name)
 
     assert(mit != neighbors.end());
 
-    rl_delete(mit->second, RL_MT_NEIGH);
     neighbors.erase(mit);
     neighbors_deleted.insert(neigh_name);
     UPI(uipcp, "Neighbor %s deleted\n", neigh_name.c_str());
@@ -1382,7 +1299,7 @@ uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id, NeighFlow **nfp)
     *nfp = nullptr;
 
     for (const auto &kvn : neighbors) {
-        Neighbor *neigh = kvn.second;
+        std::shared_ptr<Neighbor> neigh = kvn.second;
 
         if (neigh->flows.count(port_id)) {
             *nfp = neigh->flows[port_id];
@@ -1550,34 +1467,33 @@ int
 uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
                   int wait_for_completion)
 {
-    struct EnrollmentResources *rsrc = nullptr;
-    Neighbor *neigh;
+    std::shared_ptr<EnrollmentResources> rsrc;
+    std::shared_ptr<Neighbor> neigh;
     NeighFlow *nf;
     int ret;
 
-    lock();
+    std::unique_lock<std::mutex> lk(mutex);
     neigh = get_neighbor(string(neigh_name), true);
 
     /* Create an N-1 flow, if needed. */
     if (!neigh->has_flows()) {
         if (!neigh->flow_alloc_enabled) {
-            unlock();
             UPW(uipcp, "Allocation of N-1-flow is not available right now\n");
             return -1;
         }
 
         /* Disable further N-1-flow allocations towards this neighbor,
-         * and perform flow allocation out of the RIB lock. */
+         * and perform flow allocation out of the RIB lock. We can do that
+         * because we hold a shared_ptr reference to the neighbor. */
         neigh->flow_alloc_enabled = false;
-        unlock();
+        lk.unlock();
 
         ret = neigh->flow_alloc(supp_dif_name);
 
-        lock();
+        lk.lock();
         /* Enable N-1-flow allocation again. */
         neigh->flow_alloc_enabled = true;
         if (ret) {
-            unlock();
             return ret;
         }
     }
@@ -1593,26 +1509,21 @@ uipcp_rib::enroll(const char *neigh_name, const char *supp_dif_name,
 
     if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
         rsrc = nf->enrollment_rsrc_get(true);
-    }
+        if (wait_for_completion) {
+            /* Wait for the enrollment procedure to stop, either because of
+             * successful completion (NEIGH_ENROLLED), or because of an abort
+             * (NEIGH_NONE).
+             */
 
-    if (wait_for_completion) {
-        /* Wait for the enrollment procedure to stop, either because of
-         * successful completion (NEIGH_ENROLLED), or because of an abort
-         * (NEIGH_NONE).
-         */
-        while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {
-            pthread_cond_wait(&rsrc->stopped, &mutex);
+            while (nf->enroll_state == EnrollState::NEIGH_ENROLLING) {
+                rsrc->stopped.wait(lk);
+            }
+
+            ret = nf->enroll_state == EnrollState::NEIGH_ENROLLED ? 0 : -1;
+        } else {
+            ret = 0;
         }
-
-        ret = nf->enroll_state == EnrollState::NEIGH_ENROLLED ? 0 : -1;
-    } else {
-        ret = 0;
     }
-
-    if (rsrc) {
-        nf->enrollment_rsrc_put();
-    }
-    unlock();
 
     return ret;
 }
@@ -1622,7 +1533,7 @@ int
 uipcp_rib::enroller_enable(bool enable)
 {
     {
-        ScopeLock lock_(this->mutex);
+        std::lock_guard<std::mutex> guard(this->mutex);
 
         if (enroller_enabled == enable) {
             return 0; /* nothing to do */
@@ -1797,7 +1708,7 @@ uipcp_rib::allocate_n_flows()
         if (neigh != neighbors.end()) {
             NeighFlow *nf;
 
-            nf = rl_new(NeighFlow(neigh->second, string(uipcp->dif_name),
+            nf = rl_new(NeighFlow(neigh->second.get(), string(uipcp->dif_name),
                                   RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE),
                         RL_MT_NEIGHFLOW);
             nf->reliable = true;
@@ -1810,26 +1721,10 @@ uipcp_rib::allocate_n_flows()
     }
 }
 
-/* Clean up used enrollment resources. */
-void
-uipcp_rib::clean_enrollment_resources()
-{
-    list<EnrollmentResources *> snapshot;
-
-    lock();
-    snapshot = used_enrollment_resources;
-    used_enrollment_resources.clear();
-    unlock();
-
-    for (const EnrollmentResources *er : snapshot) {
-        rl_delete(er, RL_MT_NEIGHFLOW);
-    }
-}
-
 void
 uipcp_rib::check_for_address_conflicts()
 {
-    ScopeLock lock_(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
     NeighborCandidate cand = neighbor_cand_get();
     bool need_to_change    = false;
     map<rlm_addr_t, string> m;

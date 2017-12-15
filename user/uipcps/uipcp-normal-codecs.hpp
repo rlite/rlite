@@ -340,15 +340,11 @@ struct FlowRequest : public UipcpObject {
 struct AData : public UipcpObject {
     rlm_addr_t src_addr;
     rlm_addr_t dst_addr;
-    CDAPMessage *cdap = nullptr;
+    std::unique_ptr<CDAPMessage> cdap;
 
     AData() = default;
     AData(const char *buf, unsigned int size);
-    ~AData()
-    {
-        if (cdap)
-            rl_delete(cdap, RL_MT_CDAP);
-    }
+    ~AData() = default;
     int serialize(char *buf, unsigned int size) const override;
 };
 

@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <string>
+#include <memory>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -47,7 +48,7 @@ test_cdap_server(int port)
     socklen_t addrlen;
     char bufin[4096];
     struct sockaddr_in remote;
-    struct CDAPMessage *m;
+    std::unique_ptr<CDAPMessage> m;
     int pipefds[2];
     int one = 1;
     int ld;
@@ -128,7 +129,7 @@ test_cdap_server(int port)
 
         switch (m->op_code) {
         case gpb::M_CONNECT:
-            rm.m_connect_r(m, 0, string());
+            rm.m_connect_r(m.get(), 0, string());
             break;
 
         case gpb::M_RELEASE:
@@ -197,8 +198,8 @@ client_connect(CDAPConn *conn)
     struct CDAPAuthValue av;
     const char *local_appl;
     const char *remote_appl;
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     av.name     = "George";
     av.password = "Washington";
@@ -225,8 +226,8 @@ client_connect(CDAPConn *conn)
 static int
 client_create_some(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     if (req.m_create(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
@@ -247,8 +248,8 @@ client_create_some(CDAPConn *conn)
 static int
 client_write_some(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
     char buf[10];
 
     req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
@@ -288,8 +289,8 @@ client_write_some(CDAPConn *conn)
 static int
 client_read_some(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     if (req.m_read(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
@@ -310,8 +311,8 @@ client_read_some(CDAPConn *conn)
 static int
 client_startstop_some(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     if (req.m_start(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
@@ -345,8 +346,8 @@ client_startstop_some(CDAPConn *conn)
 static int
 client_delete_some(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     if (req.m_delete(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
@@ -367,8 +368,8 @@ client_delete_some(CDAPConn *conn)
 static int
 client_disconnect(CDAPConn *conn)
 {
-    struct CDAPMessage req;
-    struct CDAPMessage *m;
+    CDAPMessage req;
+    std::unique_ptr<CDAPMessage> m;
 
     if (req.m_release(gpb::F_NO_FLAGS) || conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");

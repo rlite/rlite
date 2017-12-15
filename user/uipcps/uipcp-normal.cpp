@@ -114,7 +114,7 @@ uipcp_rib::mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
 int
 uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 {
-    CDAPMessage *m = nullptr;
+    std::unique_ptr<CDAPMessage> m;
     Neighbor *neigh;
     int ret = 0;
 
@@ -130,7 +130,6 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         if (m == nullptr) {
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         is_connect_attempt =
             m->op_code == gpb::M_CONNECT && m->dst_appl == myname;
@@ -147,13 +146,11 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             if (!objbuf) {
                 UPE(uipcp, "CDAP message does not contain a nested message\n");
 
-                rl_delete(m, RL_MT_CDAP);
                 return 0;
             }
 
             AData adata(objbuf, objlen);
 
-            rl_delete(m, RL_MT_CDAP); /* here it is safe to delete m */
             if (!adata.cdap) {
                 UPE(uipcp, "A_DATA does not contain a valid "
                            "encapsulated CDAP message\n");
@@ -161,7 +158,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
                 return 0;
             }
 
-            cdap_dispatch(adata.cdap, nullptr);
+            cdap_dispatch(adata.cdap.get(), nullptr);
 
             return 0;
         }
@@ -176,8 +173,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
          * same message to be deserialized twice. The second
          * deserialization can be avoided extending the CDAP
          * library with a sort of CDAPConn::msg_rcv_feed_fsm(). */
-        rl_delete(m, RL_MT_CDAP);
-        m = nullptr;
+        m.reset();
 
         if (!nf) {
             UPE(uipcp, "Received message from unknown port id\n");
@@ -186,7 +182,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         neigh = nf->neigh;
 
         if (!nf->conn) {
-            nf->conn = rl_new(CDAPConn(nf->flow_fd), RL_MT_SHIMDATA);
+            nf->conn = make_unique<CDAPConn>(nf->flow_fd);
         }
 
         if (neigh->enrollment_complete() && nf == neigh->mgmt_conn() &&
@@ -209,7 +205,6 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             UPE(uipcp, "msg_deser() failed\n");
             return -1;
         }
-        rl_mt_adjust(1, RL_MT_CDAP); /* ugly, but memleaks are uglier */
 
         nf->last_activity = time(nullptr);
 
@@ -231,26 +226,21 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 
         if (nf->enroll_state != EnrollState::NEIGH_ENROLLED) {
             /* Start the enrollment as a slave (enroller), if needed. */
-            nf->enrollment_rsrc_get(false);
+            std::shared_ptr<EnrollmentResources> er =
+                nf->enrollment_rsrc_get(false);
 
             /* Enrollment is ongoing, we need to push this message to the
              * enrolling thread (also ownership is passed) and notify it. */
-            nf->enrollment_rsrc->msgs.push_back(m);
-            m = nullptr;
-            pthread_cond_signal(&nf->enrollment_rsrc->msgs_avail);
-            nf->enrollment_rsrc_put();
+            er->msgs.push_back(std::move(m));
+            er->msgs_avail.notify_all();
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = cdap_dispatch(m, nf);
+            ret = cdap_dispatch(m.get(), nf);
         }
 
     } catch (std::bad_alloc) {
         UPE(uipcp, "Out of memory\n");
-    }
-
-    if (m) {
-        rl_delete(m, RL_MT_CDAP);
     }
 
     return ret;
@@ -284,7 +274,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
     mhdr = (struct rl_mgmt_hdr *)mgmtbuf;
     assert(mhdr->type == RLITE_MGMT_HDR_T_IN);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     /* Lookup neighbor by port id. If ADATA, it is not an error
      * if the lookup fails (nf == nullptr). */
@@ -308,7 +298,7 @@ normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
         return;
     }
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->recv_msg(mgmtbuf, n, nf);
 }
@@ -323,8 +313,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
       myaddr(RL_ADDR_NULL)
 {
     int ret;
-
-    pthread_mutex_init(&mutex, nullptr);
 
     mgmtfd = rl_open_mgmt_port(uipcp->id);
     if (mgmtfd < 0) {
@@ -368,11 +356,10 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    dft  = new dft_default(this);
-    fa   = new flow_allocator_default(this);
-    lfdb = new lfdb_default(this);
+    dft  = make_unique<dft_default>(this);
+    fa   = make_unique<flow_allocator_default>(this);
+    lfdb = make_unique<lfdb_default>(this);
     policy_mod("routing", "link-state");
-    addra = nullptr;
     policy_mod("address-allocator", "distributed");
 
     /* Insert the handlers for the RIB objects. */
@@ -399,19 +386,8 @@ uipcp_rib::~uipcp_rib()
 {
     uipcp_loop_schedule_canc(uipcp, sync_tmrid);
     uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
-
-    for (const auto &kvn : neighbors) {
-        rl_delete(kvn.second, RL_MT_NEIGH);
-    }
-
-    delete addra;
-    delete lfdb;
-    delete fa;
-    delete dft;
-
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
-    pthread_mutex_destroy(&mutex);
 }
 
 #ifdef RL_USE_QOS_CUBES
@@ -695,7 +671,7 @@ uipcp_rib::realize_registrations(bool reg)
     list<string> snapshot;
 
     {
-        ScopeLock lock_(this->mutex);
+        std::lock_guard<std::mutex> guard(this->mutex);
         snapshot = lower_difs;
     }
 
@@ -708,7 +684,7 @@ uipcp_rib::realize_registrations(bool reg)
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
+uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                             const UipcpObject *obj)
 {
     struct rl_mgmt_hdr mhdr;
@@ -727,7 +703,6 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
         objlen = obj->serialize(objbuf, sizeof(objbuf));
         if (objlen < 0) {
             UPE(uipcp, "serialization failed\n");
-            rl_delete(m, RL_MT_CDAP);
 
             return -1;
         }
@@ -739,16 +714,14 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m, nullptr);
-
-        rl_delete(m, RL_MT_CDAP);
+        int ret = cdap_dispatch(m.get(), nullptr);
 
         return ret;
     }
 
     adata.src_addr = myaddr;
     adata.dst_addr = dst_addr;
-    adata.cdap     = m; /* Ownership passing */
+    adata.cdap     = std::move(m); /* Ownership passing */
 
     am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata, 0, 0,
                string());
@@ -793,9 +766,10 @@ uipcp_rib::send_to_dst_addr(CDAPMessage *m, rlm_addr_t dst_addr,
 
 /* Takes ownership of 'm'. */
 int
-uipcp_rib::send_to_myself(CDAPMessage *m, const UipcpObject *obj)
+uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
+                          const UipcpObject *obj)
 {
-    return send_to_dst_addr(m, myaddr, obj);
+    return send_to_dst_addr(std::move(m), myaddr, obj);
 }
 
 /* To be called under RIB lock. This function does not take ownership
@@ -1008,7 +982,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
             } else if (cand_neigh_conflict ||
                        mit->second.requestor != aar.requestor) {
                 /* New address allocation request, but there is a conflict. */
-                CDAPMessage *m = rl_new(CDAPMessage(), RL_MT_CDAP);
+                std::unique_ptr<CDAPMessage> m = make_unique<CDAPMessage>();
                 int ret;
 
                 UPI(rib->uipcp,
@@ -1017,7 +991,7 @@ addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                     (long unsigned)aar.address, (long unsigned)aar.requestor);
                 m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
                             obj_name::addr_alloc_table, 0, 0, "");
-                ret = rib->send_to_dst_addr(m, aar.requestor, &aar);
+                ret = rib->send_to_dst_addr(std::move(m), aar.requestor, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",
                         (unsigned long)aar.requestor, strerror(errno));
@@ -1129,7 +1103,7 @@ uipcp_rib::neighs_sync_obj_excluding(const Neighbor *exclude, bool create,
                                      const UipcpObject *obj_value) const
 {
     for (const auto &kvn : neighbors) {
-        if (exclude && kvn.second == exclude) {
+        if (exclude && kvn.second.get() == exclude) {
             continue;
         }
 
@@ -1162,22 +1136,23 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
     Neighbor *neigh = nf->neigh;
 
-    /* Remove the NeighFlow from the Neighbor and, if the
-     * NeighFlow is the current mgmt flow, elect
-     * another NeighFlow as mgmt flow, if possible. */
-    neigh->flows.erase(nf->port_id);
+    if (nf == neigh->mgmt_only) {
+        neigh->mgmt_only_set(nullptr);
+    } else if (nf == neigh->n_flow) {
+        neigh->n_flow_set(nullptr);
+    } else {
+        /* Remove the NeighFlow from the Neighbor and, if the
+         * NeighFlow is the current mgmt flow, elect
+         * another NeighFlow as mgmt flow, if possible. */
+        neigh->flows.erase(nf->port_id);
 
-    if (!neigh->flows.empty()) {
-        UPI(uipcp, "Mgmt flow for neigh %s switches to port id %u\n",
-            static_cast<string>(neigh->ipcp_name).c_str(),
-            neigh->flows.begin()->second->port_id);
+        /* First delete the N-1 flow. */
+        rl_delete(nf, RL_MT_NEIGHFLOW);
     }
 
-    /* First delete the N-1 flow. */
-    rl_delete(nf, RL_MT_NEIGHFLOW);
-
     /* If there are no other N-1 flows, delete the neighbor. */
-    if (neigh->flows.size() == 0) {
+    if (neigh->flows.size() == 0 && neigh->mgmt_only == nullptr &&
+        neigh->n_flow == nullptr) {
         del_neighbor(neigh->ipcp_name);
     }
 }
@@ -1209,7 +1184,7 @@ uipcp_rib::policy_mod(const std::string &component,
     if (component == "routing") {
         /* Temporary solution to support LFA policies. No pointer switching is
          * carried out. */
-        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb);
+        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb.get());
 
         assert(lfdbd != nullptr);
 
@@ -1225,15 +1200,10 @@ uipcp_rib::policy_mod(const std::string &component,
             }
         }
     } else if (component == "address-allocator") {
-        struct addr_allocator *addra_old =
-            dynamic_cast<addr_allocator *>(addra);
         if (policy_name == "manual") {
-            addra = new addr_allocator_manual(this);
+            addra = make_unique<addr_allocator_manual>(this);
         } else if (policy_name == "distributed") {
-            addra = new addr_allocator_distributed(this);
-        }
-        if (addra_old != nullptr) {
-            delete addra_old;
+            addra = make_unique<addr_allocator_distributed>(this);
         }
     }
 
@@ -1320,8 +1290,8 @@ int
 uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
 {
     uint8_t response = RLITE_ERR;
-    ScopeLock lock_(mutex);
-    Neighbor *neigh;
+    std::lock_guard<std::mutex> guard(mutex);
+    std::shared_ptr<Neighbor> neigh;
     NeighFlow *nf;
     int mgmt_fd;
     int ret;
@@ -1373,8 +1343,8 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
         req->remote_appl, req->dif_name, req->port_id);
 
-    nf = rl_new(NeighFlow(neigh, string(req->dif_name), req->port_id, mgmt_fd,
-                          RL_IPCP_ID_NONE),
+    nf = rl_new(NeighFlow(neigh.get(), string(req->dif_name), req->port_id,
+                          mgmt_fd, RL_IPCP_ID_NONE),
                 RL_MT_NEIGHFLOW);
     nf->reliable = true;
     neigh->n_flow_set(nf);
@@ -1407,22 +1377,23 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
         "port_id = %u]\n",
         req->remote_appl, supp_dif, neigh_port_id);
 
-    ScopeLock lock_(mutex);
+    std::lock_guard<std::mutex> guard(mutex);
 
     /* First of all we update the neighbors in the RIB. This
      * must be done before invoking uipcp_fa_resp,
      * otherwise a race condition would exist (us receiving
      * an M_CONNECT from the neighbor before having the
      * chance to add the neighbor with the associated port_id. */
-    Neighbor *neigh = get_neighbor(string(req->remote_appl), true);
+    std::shared_ptr<Neighbor> neigh =
+        get_neighbor(string(req->remote_appl), true);
 
     neigh->initiator = false;
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf = rl_new(
-        NeighFlow(neigh, string(supp_dif), neigh_port_id, 0, lower_ipcp_id),
-        RL_MT_NEIGHFLOW);
+    nf = rl_new(NeighFlow(neigh.get(), string(supp_dif), neigh_port_id, 0,
+                          lower_ipcp_id),
+                RL_MT_NEIGHFLOW);
     nf->reliable = is_reliable_spec(&req->flowspec);
 
     /* If flow is reliable, we assume it is a management-only flow, and so
@@ -1780,7 +1751,7 @@ normal_appl_register(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_appl_register *req = (struct rl_kmsg_appl_register *)msg;
     uipcp_rib *rib                    = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->dft->appl_register(req);
 
@@ -1795,7 +1766,7 @@ normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->fa->fa_req(req);
 }
@@ -1817,7 +1788,7 @@ normal_fa_resp(struct uipcp *uipcp, const struct rl_msg_base *msg)
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->fa->fa_resp(resp);
 }
@@ -1828,7 +1799,7 @@ normal_flow_deallocated(struct uipcp *uipcp, const struct rl_msg_base *msg)
     struct rl_kmsg_flow_deallocated *req =
         (struct rl_kmsg_flow_deallocated *)msg;
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->fa->flow_deallocated(req);
 
@@ -1839,7 +1810,7 @@ static void
 normal_update_address(struct uipcp *uipcp, rlm_addr_t new_addr)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     rib->update_address(new_addr);
 }
@@ -1849,7 +1820,7 @@ normal_flow_state_update(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     uipcp_rib *rib                 = UIPCP_RIB(uipcp);
     struct rl_kmsg_flow_state *upd = (struct rl_kmsg_flow_state *)msg;
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->lfdb->flow_state_update(upd);
 }
@@ -1893,7 +1864,7 @@ static char *
 normal_ipcp_rib_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
 
     return rib->dump();
 }
@@ -1902,7 +1873,7 @@ static char *
 normal_ipcp_routing_show(struct uipcp *uipcp)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream ss;
 
     rib->lfdb->dump_routing(ss);
@@ -1915,7 +1886,7 @@ normal_policy_mod(struct uipcp *uipcp,
                   const struct rl_cmsg_ipcp_policy_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string policy_name = req->policy_name;
 
@@ -1928,12 +1899,12 @@ normal_policy_list(struct uipcp *uipcp,
                    char **resp_msg)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_list(req, msg);
 
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
+    if (*resp_msg == nullptr) {
         UPE(uipcp, "Out of memory\n");
         ret = -1;
     }
@@ -1946,7 +1917,7 @@ normal_policy_param_mod(struct uipcp *uipcp,
                         const struct rl_cmsg_ipcp_policy_param_mod *req)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     const string comp_name   = req->comp_name;
     const string param_name  = req->param_name;
     const string param_value = req->param_value;
@@ -1960,12 +1931,12 @@ normal_policy_param_list(struct uipcp *uipcp,
                          char **resp_msg)
 {
     uipcp_rib *rib = UIPCP_RIB(uipcp);
-    ScopeLock lock_(rib->mutex);
+    std::lock_guard<std::mutex> guard(rib->mutex);
     stringstream msg;
     int ret = rib->policy_param_list(req, msg);
 
     *resp_msg = rl_strdup(msg.str().c_str(), RL_MT_UTILS);
-    if (*resp_msg == NULL) {
+    if (*resp_msg == nullptr) {
         UPE(uipcp, "Out of memory\n");
         ret = -1;
     }
@@ -1989,7 +1960,6 @@ normal_trigger_tasks(struct uipcp *uipcp)
 
     rib->trigger_re_enrollments();
     rib->allocate_n_flows();
-    rib->clean_enrollment_resources();
     rib->check_for_address_conflicts();
 }
 
