@@ -2321,7 +2321,7 @@ upper_ipcp_flow_bind(struct rl_ctrl *rc, rl_ipcp_id_t upper_ipcp_id,
     flow->upper.ipcp = upper_ipcp;
 
     mutex_lock(&ipcp->lock);
-    /* The ipcp->upper_ipcp field must be set only while there is one and
+    /* The ipcp->shortcut field must be set only while there is one and
      * only one upper IPCP. */
     if (ipcp->shortcut_flows == 0) {
         /* Reuse the reference, without increasing the reference counter. */
