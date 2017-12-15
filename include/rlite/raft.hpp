@@ -257,6 +257,14 @@ class RaftSM {
     static constexpr unsigned long kLogEntriesOfs     = 128;
     static constexpr size_t kLogVotedForSize = kLogEntriesOfs - kLogVotedForOfs;
 
+    /* Argument for RaftSM::prepare_append_entries() that specifies
+     * its behaviour (send all the unacked log entries or only the
+     * ones that have not been sent yet). */
+    enum class LogReplicateStrategy {
+        Unacked = 0,
+        Unsent,
+    };
+
     /* Getter/setters for replica persistent state. */
     int log_u32_write(unsigned long pos, uint32_t val);
     int log_u32_read(unsigned long pos, uint32_t *val);
@@ -279,7 +287,8 @@ class RaftSM {
     int catch_up_term(Term term, RaftSMOutput *out);
     int back_to_follower(RaftSMOutput *out);
     unsigned int quorum() const;
-    int prepare_append_entries(RaftSMOutput *out);
+    int prepare_append_entries(LogReplicateStrategy strategy,
+                               RaftSMOutput *out);
     int log_entry_get_term(LogIndex index, Term *term);
     int log_entry_get_command(LogIndex index, char *const serbuf);
     int append_log_entry(const Term term, const char *serbuf);

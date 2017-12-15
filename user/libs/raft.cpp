@@ -451,9 +451,13 @@ RaftSM::log_entry_get_command(LogIndex index, char *const serbuf)
  * contain multiple entries (all the unacked ones). As a result, this function
  * is idempotent. */
 int
-RaftSM::prepare_append_entries(RaftSMOutput *out)
+RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
 {
     for (auto &kv : servers) {
+        if (strategy == LogReplicateStrategy::Unacked) {
+            // TODO kv.second.next_index_unacked = kv.second.next_index_acked;
+        }
+
         auto msg            = make_unique<RaftAppendEntries>();
         msg->term           = current_term;
         msg->leader_id      = local_id;
@@ -665,7 +669,7 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
 
     /* Prepare heartbeat messages for the other replicas and set the
      * heartbeat timer. */
-    if ((ret = prepare_append_entries(out))) {
+    if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
     }
     out->timer_commands.push_back(RaftTimerCmd(this, RaftTimerType::HeartBeat,
@@ -894,7 +898,8 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* The heartbeat timer fired. */
         IOS_INF() << "Heartbeat timer expired" << endl;
         /* Send new heartbeat messages and rearm the timer. */
-        if ((ret = prepare_append_entries(out))) {
+        if ((ret =
+                 prepare_append_entries(LogReplicateStrategy::Unacked, out))) {
             return ret;
         }
         out->timer_commands.push_back(
@@ -918,9 +923,11 @@ RaftSM::submit(const char *const serbuf, LogIndex *request_id,
 
     /* Prepare RaftAppendEntries messages to be sent to the other
      * servers. */
-    if ((ret = prepare_append_entries(out))) {
+    if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
     }
+
+    // TODO reset heartbeat timer
 
     *request_id = last_log_index;
 
