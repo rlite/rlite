@@ -281,7 +281,13 @@ run_simulation(const list<TestEvent> &external_events)
 
             assert(replicas.count(p.first));
             if (!replicas[p.first]->up()) {
-                /* Replica is currently down, we just drop this message. */
+                /* Replica is currently down, we just drop this message.
+                 * In case of append entries message, we modify it to pretend
+                 * it's an heartbeat, so that it's not considered an
+                 * interesting event in the check below. */
+                if (ae) {
+                    ae->entries.clear();
+                }
             } else if (rv) {
                 r = replicas[p.first]->request_vote_input(*rv, &output_next);
             } else if (rvr) {
@@ -296,8 +302,8 @@ run_simulation(const list<TestEvent> &external_events)
                 assert(false);
             }
 
+            /* All messages are interesting events, except for heartbeats. */
             if (!ae || !ae->entries.empty()) {
-                /* Don't count heartbeat messages as interesting events. */
                 t_last_ievent = t;
             }
 
