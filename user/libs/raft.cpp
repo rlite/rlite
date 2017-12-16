@@ -448,14 +448,24 @@ RaftSM::log_entry_get_command(LogIndex index, char *const serbuf)
 
 /* Prepare a RaftAppendEntries for each follower. If there are no log entries
  * to be sent, an heartbeat message is prepared. Otherwise the message can
- * contain multiple entries (all the unacked ones). As a result, this function
- * is idempotent. */
+ * contain multiple entries. As a result, this function is idempotent.
+ * The 'strategy' argument defines which entries are sent to each peer:
+ *   - If LogReplicateStrategy::Unacked, all the log entries that are
+ *     currently unacked are selected (both the ones yet to be sent and the
+ *     ones already sent but yet unacked). This strategy is used to implement
+ *     retransmissions.
+ *   - If LogReplicateStrategy::Unsent, only the log entries that have
+ *     not been sent yet are selected. This enables pipelining of client
+ *     submissions.
+ *
+ *      <===Acked===><===Sent-but-unacked===><===Yet-to-be-sent===>
+ * */
 int
 RaftSM::prepare_append_entries(LogReplicateStrategy strategy, RaftSMOutput *out)
 {
     for (auto &kv : servers) {
         if (strategy == LogReplicateStrategy::Unacked) {
-            // TODO kv.second.next_index_unacked = kv.second.next_index_acked;
+            kv.second.next_index_unacked = kv.second.next_index_acked;
         }
 
         auto msg            = make_unique<RaftAppendEntries>();
