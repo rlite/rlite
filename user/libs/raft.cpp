@@ -715,10 +715,10 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return ret;
     }
 
-    resp                 = make_unique<RaftAppendEntriesResp>();
-    resp->term           = current_term;
-    resp->follower_id    = local_id;
-    resp->last_log_index = last_log_index;
+    resp              = make_unique<RaftAppendEntriesResp>();
+    resp->term        = current_term;
+    resp->follower_id = local_id;
+    resp->log_index   = msg.prev_log_index;
 
     if (msg.term < current_term) {
         /* Sender is outdated. Just reply false. */
@@ -754,7 +754,7 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
                     return ret;
                 }
             }
-            resp->last_log_index = last_log_index;
+            resp->log_index = last_log_index;
         }
     }
 
@@ -785,7 +785,7 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
 
     IOS_INF() << "Received AppendEntriesResp(term=" << resp.term
               << ", follower_id=" << resp.follower_id
-              << ", last_log_index=" << resp.last_log_index
+              << ", last_log_index=" << resp.log_index
               << ", success=" << resp.success << ")" << endl;
 
     if (resp.term < current_term) {
@@ -814,9 +814,9 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
         LogIndex next_commit_index = commit_index;
 
         /* On success we update the next_index_acked. */
-        assert(resp.last_log_index + 1 > follower.next_index_acked);
-        follower.next_index_acked = resp.last_log_index + 1;
-        follower.match_index      = resp.last_log_index;
+        assert(resp.log_index + 1 > follower.next_index_acked);
+        follower.next_index_acked = resp.log_index + 1;
+        follower.match_index      = resp.log_index;
         /* Try to update the commit_index. We need to find the highest N
          * such that N > commit_index and that match_index >= N for a majority
          * of the replicas (we as a leader count as a replica that has
@@ -857,9 +857,9 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
         }
     } else {
         /* Failure comes from log inconsistencies. We need to decrement
-         * next index and retry. */
-        assert(follower.next_index_acked > 0);
-        follower.next_index_unacked = --follower.next_index_acked;
+         * next_index_acked and next_index_unacked and retry. */
+        follower.next_index_acked = follower.next_index_unacked =
+            resp.log_index;
     }
 
     return 0;
