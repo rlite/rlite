@@ -711,6 +711,10 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
               << ", leader_commit=" << msg.leader_commit
               << ", num_entries=" << msg.entries.size() << ")" << endl;
 
+    if ((ret = catch_up_term(msg.term, out)) < 0) {
+        return ret;
+    }
+
     resp                 = make_unique<RaftAppendEntriesResp>();
     resp->term           = current_term;
     resp->follower_id    = local_id;
@@ -722,10 +726,6 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         out->output_messages.push_back(
             make_pair(msg.leader_id, std::move(resp)));
         return 0;
-    }
-
-    if ((ret = catch_up_term(msg.term, out)) < 0) {
-        return ret;
     }
 
     if ((ret = back_to_follower(out))) {
