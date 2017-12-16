@@ -91,9 +91,11 @@ struct RaftAppendEntriesResp : public RaftMessage {
     ReplicaId follower_id;
 
     /* On success, the new last log index of the follower.
-     * Used by the leader to match AppendEntries requests
-     * to responses. */
-    LogIndex last_log_index;
+     * On failure, it matches the prev_log_index field of
+     * the corresponding AppendEntries request.
+     * In both cases this field is used by the leader to
+     * update next_index_acked and next_index_unacked. */
+    LogIndex log_index;
 
     /* True if the follower's last entry matched prev_log_index
      * and prev_log_term as specified in the request. If false
