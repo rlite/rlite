@@ -451,7 +451,7 @@ main(int argc, char **argv)
     list<list<TestEvent>> test_vectors = {
         /* (1) No failures, one request. */
         {Req(400)},
-        /* (2) No failures */
+        /* (2) No failures. */
         {Req(240), Req(411), Req(600), Req(600), Req(601), Req(602), Req(658),
          Req(661), Req(721)},
         /* (3) Two follower failures, no respawn. */
