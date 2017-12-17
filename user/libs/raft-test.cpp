@@ -489,7 +489,14 @@ main(int argc, char **argv)
         {Req(500), Fail(500, L, 0), Req(1000), Fail(1000, L, 1), Req(1500),
          Fail(1501, L, 2), Req(2000), Req(2001), Respawn(2100, 0),
          Respawn(2100, 1), Respawn(2100, 2), Req(2500)},
-    };
+        /* (13) Loop where in each iteration a leader fails, the previously
+         * failed one respawns, and a new request arrives. */
+        {Req(300),         Fail(310, L, 0),  Fail(1000, L, 1), Respawn(1000, 0),
+         Req(1000),        Fail(2000, L, 2), Respawn(2000, 1), Req(2000),
+         Fail(3000, L, 3), Respawn(3000, 2), Req(3000),        Fail(4000, L, 4),
+         Respawn(4000, 3), Req(4000),        Fail(5000, L, 5), Respawn(5000, 4),
+         Req(5000),        Fail(6000, L, 6), Respawn(6000, 5), Req(6000),
+         Fail(7000, L, 7), Respawn(7000, 6), Req(7000)}};
     int test_counter  = 1;
     int test_selector = -1;
 
