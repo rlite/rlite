@@ -575,6 +575,7 @@ RaftSM::log_truncate(LogIndex index)
 
     IOS_INF() << "Log truncated: " << last_log_index << " entries --> " << index
               << " entries" << endl;
+    stats.discarded += last_log_index - index;
     last_log_index = index;
 
     return log_open(/*first_boot=*/false);

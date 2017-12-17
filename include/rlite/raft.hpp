@@ -372,6 +372,17 @@ public:
     }
 
     unsigned int get_heartbeat_timeout() const { return HeartbeatTimeout; }
+
+    /* Statistics. */
+    struct Stats {
+        /* Number of discarded log entries, due to partial replication. */
+        unsigned int discarded = 0;
+    };
+
+    Stats get_stats() { return stats; };
+
+private:
+    Stats stats;
 };
 
 #endif /* __RAFT_H__ */
