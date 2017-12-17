@@ -102,6 +102,11 @@ public:
 
         return true;
     }
+
+    bool cross_check(const TestReplica &o) const
+    {
+        return committed_commands == o.committed_commands;
+    }
 };
 
 enum class TestEventType {
@@ -431,10 +436,39 @@ run_simulation(const list<TestEvent> &external_events)
         output = std::move(output_next);
     }
 
-    for (const auto &kv : replicas) {
-        if (kv.second->up() && !kv.second->check(input_counter - 1)) {
-            cout << "Check failed for replica " << kv.first << endl;
-            return 1;
+    auto discarded_entries = [&replicas]() -> bool {
+        for (const auto &kv : replicas) {
+            RaftSM::Stats stats = kv.second->get_stats();
+            if (stats.discarded > 0) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (discarded_entries()) {
+        /* If some requests where discarded (e.g. because of log conflicts),
+         * we carry out a relaxed check. We only make sure that the list of
+         * committed commands is the same for all the replicas. */
+        const TestReplica *prev = nullptr;
+        cout << "Some requests where discarded" << endl;
+        assert(replicas.size() > 0);
+        for (const auto &kv : replicas) {
+            if (kv.second->up()) {
+                if (prev && !prev->cross_check(*kv.second.get())) {
+                    cout << "Check failed for replica " << kv.first << endl;
+                }
+                prev = kv.second.get();
+            }
+        }
+    } else {
+        /* If no requests where discarded, we also check that each list of
+         * committed commands contain all the entries (one for each client
+         * request. */
+        for (const auto &kv : replicas) {
+            if (kv.second->up() && !kv.second->check(input_counter - 1)) {
+                cout << "Check failed for replica " << kv.first << endl;
+                return 1;
+            }
         }
     }
 
