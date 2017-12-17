@@ -416,7 +416,9 @@ run_simulation(const list<TestEvent> &external_events)
                 /* This event cannot happen now (i.e. no leader). Let's just
                  * postpone any significant event. */
                 for (auto &e : events) {
-                    if (e.is_interesting()) {
+                    if (e.is_interesting() &&
+                        (next.event_type == TestEventType::SMFailure ||
+                         e.event_type == TestEventType::ClientRequest)) {
                         e.abstime += 200;
                     }
                 }
@@ -471,13 +473,22 @@ main(int argc, char **argv)
          Respawn(570, 0), Req(601), Req(608)},
         /* (8) Late failure of a follower with respawn. */
         {Req(376), Req(698), Fail(700, F, 0), Req(710), Respawn(750, 0)},
-        /* (9) Too many failures to commit, then respawn. */
+        /* (9) Too many failures to commit, then one respawn. */
         {Req(300), Req(300), Fail(350, F, 0), Req(351), Fail(600, F, 1),
          Req(610), Fail(611, F, 2), Req(640), Respawn(800, 1), Req(820)},
         /* (10) Same as (9), with everyone recoverying. */
         {Req(300), Req(300), Fail(350, F, 0), Req(351), Fail(600, F, 1),
          Req(610), Fail(611, F, 2), Req(640), Respawn(800, 1), Req(801),
          Respawn(802, 0), Respawn(804, 2), Req(810)},
+        /* (11) Three failing leaders in a row, then respawn of one
+         * of them. */
+        {Req(500), Fail(500, L, 0), Req(1000), Fail(1000, L, 1), Req(1500),
+         Fail(1501, L, 2), Req(2000), Req(2001), Respawn(2100, 2)},
+        /* (12) Three failing leaders in a row, then respawn of all of
+         * them. */
+        {Req(500), Fail(500, L, 0), Req(1000), Fail(1000, L, 1), Req(1500),
+         Fail(1501, L, 2), Req(2000), Req(2001), Respawn(2100, 0),
+         Respawn(2100, 1), Respawn(2100, 2), Req(2500)},
     };
     int test_counter  = 1;
     int test_selector = -1;
