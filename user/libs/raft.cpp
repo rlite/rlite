@@ -217,8 +217,11 @@ RaftSM::log_disk_flush()
     if ((ret = fdatasync(fd))) {
         IOS_ERR() << "Failed to flush logfile contents to disk ["
                   << strerror(errno) << "]" << endl;
+        close(fd);
         return ret;
     }
+
+    close(fd);
 
     return 0;
 }
