@@ -441,6 +441,12 @@ run_simulation(const list<TestEvent> &external_events)
     return 0;
 }
 
+/*
+ * Test vectors for the Raft implementation. A current limitation is that all
+ * tests are positive. Each test vector is crafted in such a way that a majority
+ * of the replicas is eventually available (although there can be periods with
+ * no majority, or even zero active replicas).
+ */
 int
 main(int argc, char **argv)
 {
@@ -496,7 +502,20 @@ main(int argc, char **argv)
          Fail(3000, L, 3), Respawn(3000, 2), Req(3000),        Fail(4000, L, 4),
          Respawn(4000, 3), Req(4000),        Fail(5000, L, 5), Respawn(5000, 4),
          Req(5000),        Fail(6000, L, 6), Respawn(6000, 5), Req(6000),
-         Fail(7000, L, 7), Respawn(7000, 6), Req(7000)}};
+         Fail(7000, L, 7), Respawn(7000, 6), Req(7000)},
+        /* (14) Two follower fail while request arrives, causing partial
+         * replication of an entry. Then the leader fails together with an
+         * additional follower and the previous two failing follower respawn. */
+        {Req(600), Fail(600, F, 0), Fail(600, F, 1), Fail(700, L, 2),
+         Fail(700, F, 3), Req(700), Respawn(700, 0), Respawn(700, 1)},
+        /* (15) Request arrives to the leader, and at the same time all the
+         * followers fail, so that only the leader has the request in its log.
+         * Then the leader fails and all the followers recover, electing a new
+         * leader and servicing a new request. When the first leader recovers
+         * later, there is a conflict between its log and the other logs. */
+        {Req(600), Fail(600, F, 0), Fail(600, F, 1), Fail(600, F, 2),
+         Fail(600, F, 3), Fail(650, L, 4), Respawn(700, 0), Respawn(700, 1),
+         Respawn(700, 2), Respawn(700, 3), Req(700), Respawn(1300, 4)}};
     int test_counter  = 1;
     int test_selector = -1;
 
