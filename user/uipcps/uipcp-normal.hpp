@@ -93,6 +93,7 @@ enum class EnrollState {
 enum class PolicyParamType {
     INT = 0,
     BOOL,
+    STRING,
     UNDEFINED,
 };
 
@@ -104,16 +105,19 @@ struct PolicyParam {
     } value;
     int min;
     int max;
+    std::string stringval;
 
     PolicyParam();
     PolicyParam(bool param_value);
     PolicyParam(int param_value, int range_min = 0, int range_max = 0);
+    PolicyParam(const std::string &s);
 
     friend std::ostream &operator<<(std::ostream &os, const PolicyParam &param);
 
     int set_value(const std::string &param_value);
     bool get_bool_value() const;
     int get_int_value() const;
+    std::string get_string_value() const;
 };
 
 struct Neighbor;

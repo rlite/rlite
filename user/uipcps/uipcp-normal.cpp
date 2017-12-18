@@ -336,6 +336,7 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["address-allocator"]["nack-wait-secs"] =
         PolicyParam(kAddrAllocDistrNackWaitSecs, kAddrAllocDistrNackWaitSecsMin,
                     kAddrAllocDistrNackWaitSecsMax);
+    params_map["dft"]["replicas"]         = PolicyParam(string());
     params_map["enrollment"]["timeout"]   = PolicyParam(kEnrollTimeout);
     params_map["enrollment"]["keepalive"] = PolicyParam(kKeepaliveTimeout);
     params_map["enrollment"]["keepalive-thresh"] =
@@ -1662,6 +1663,12 @@ PolicyParam::PolicyParam(int param_value, int range_min, int range_max)
     max     = range_max;
 }
 
+PolicyParam::PolicyParam(const std::string &param_value)
+{
+    type      = PolicyParamType::STRING;
+    stringval = param_value;
+}
+
 int
 PolicyParam::set_value(const std::string &param_value)
 {
@@ -1685,6 +1692,9 @@ PolicyParam::set_value(const std::string &param_value)
         }
         value.b = enable;
         break;
+    case PolicyParamType::STRING:
+        stringval = param_value;
+        break;
     default:
         return -1;
         break;
@@ -1706,6 +1716,13 @@ PolicyParam::get_bool_value() const
     return value.b;
 }
 
+std::string
+PolicyParam::get_string_value() const
+{
+    assert(type == PolicyParamType::STRING);
+    return stringval;
+};
+
 ostream &
 operator<<(ostream &os, const PolicyParam &param)
 {
@@ -1719,6 +1736,9 @@ operator<<(ostream &os, const PolicyParam &param)
         } else {
             os << "false";
         }
+        break;
+    case PolicyParamType::STRING:
+        os << param.get_string_value();
         break;
     case PolicyParamType::UNDEFINED:
         os << "UNDEFINED";
