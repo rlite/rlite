@@ -326,11 +326,22 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     return ret;
 }
 
-CentralizedFaultTolerantDFT::CentralizedFaultTolerantDFT(struct uipcp_rib *_ur)
-    : DFT(_ur),
-      RaftSM(std::string("ceft-dft-") + _ur->myname, _ur->myname,
-             std::string("/tmp/ceft-dft-") + std::to_string(_ur->uipcp->id) +
-                 std::string("-") + _ur->myname,
-             sizeof(Command), std::cerr, std::cout)
-{
-}
+class RaftDFT : public RaftSM {
+    /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
+    struct Command {
+        rlm_addr_t address;
+        char name[63];
+        uint8_t opcode;
+    } __attribute__((packed));
+
+    /* State machine implementation. */
+    std::multimap<std::string, DFTEntry> dft_table;
+
+public:
+    RaftDFT(uipcp_rib *rib)
+        : RaftSM(std::string("ceft-dft-") + rib->myname, rib->myname,
+                 std::string("/tmp/ceft-dft-") +
+                     std::to_string(rib->uipcp->id) + std::string("-") +
+                     rib->myname,
+                 sizeof(Command), std::cerr, std::cout){};
+};
