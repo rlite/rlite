@@ -32,6 +32,9 @@
 #include <random>
 #include <ctime>
 #include <memory>
+#include <set>
+#include <map>
+#include <unordered_map>
 
 #include "rlite/cpputils.hpp"
 #include "rlite/raft.hpp"
@@ -107,6 +110,25 @@ public:
     {
         return committed_commands == o.committed_commands;
     }
+
+    /* Go over the commands committed so far, and check if there
+     * are any missing numbers (adding them to the output argument). */
+    void get_lost_commands(set<uint32_t> *acc) const
+    {
+        set<uint32_t> got;
+        uint32_t M = 0;
+
+        assert(acc != nullptr);
+        for (auto cmd : committed_commands) {
+            got.insert(cmd);
+            M = std::max(M, cmd);
+        }
+        for (uint32_t cmd = 1; cmd < M; cmd++) {
+            if (got.count(cmd) == 0) {
+                acc->insert(cmd);
+            }
+        }
+    }
 };
 
 enum class TestEventType {
@@ -128,7 +150,8 @@ struct TestEvent {
     TestReplica *sm                = nullptr;
     RaftTimerType ttype            = RaftTimerType::Invalid;
     FailingReplica failing_replica = FailingReplica::Invalid;
-    unsigned int failing_id        = 0;
+    unsigned int failing_id        = 0; /* for failure and recovery */
+    uint32_t cmd                   = 0; /* for client requests */
 
     bool operator<(const TestEvent &o) const { return abstime < o.abstime; }
     bool operator>=(const TestEvent &o) const { return !(*this < o); }
@@ -189,10 +212,18 @@ run_simulation(const list<TestEvent> &external_events)
     unsigned int t_last_ievent = t; /* time of last interesting event */
     uint32_t input_counter     = 1;
     map<unsigned int, TestReplica *> failed_replicas;
+    bool retransmit_check = true;
     RaftSMOutput output;
 
     /* Sort input events in case they are not. */
     events.sort();
+
+    /* Assign a progressive command number to each client request. */
+    for (auto &e : events) {
+        if (e.event_type == TestEventType::ClientRequest) {
+            e.cmd = input_counter++;
+        }
+    }
 
     /* Clean up leftover logfiles, if any. */
     for (const auto &local : names) {
@@ -366,14 +397,14 @@ run_simulation(const list<TestEvent> &external_events)
                 /* This event is a client submission. */
                 TestReplica *leader = get_leader();
                 if (leader) {
-                    uint32_t cmd = input_counter++;
                     LogIndex request_id;
 
-                    if (leader->submit(reinterpret_cast<char *>(&cmd),
-                                       &request_id, &output_next)) {
+                    if (leader->submit(
+                            reinterpret_cast<const char *>(&next.cmd),
+                            &request_id, &output_next)) {
                         return -1;
                     }
-                    cout << "Command " << cmd << " submitted" << endl;
+                    cout << "Command " << next.cmd << " submitted" << endl;
                 } else {
                     /* This can happen because no leader is currently elected
                      * or because the current leader is down. */
@@ -428,6 +459,35 @@ run_simulation(const list<TestEvent> &external_events)
                     }
                 }
                 events.sort();
+            }
+        }
+
+        if (retransmit_check) {
+            auto failures_or_recoveries = [&events]() -> bool {
+                for (const auto &e : events) {
+                    if (e.event_type == TestEventType::SMFailure ||
+                        e.event_type == TestEventType::SMRespawn) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (!failures_or_recoveries()) {
+                /* No more failures or recoveries are scheduled.
+                 * We can then check if we need to retransmit something. */
+                set<uint32_t> lost_commands;
+                for (const auto &kv : replicas) {
+                    kv.second->get_lost_commands(&lost_commands);
+                }
+                for (const auto cmd : lost_commands) {
+                    TestEvent se = TestEvent::CreateRequestEvent(t_next + 1);
+                    se.cmd       = cmd;
+                    events.push_back(se);
+                    cout << "Retransmit client request " << cmd << endl;
+                }
+
+                /* No need to keep checking. */
+                retransmit_check = false;
             }
         }
 
