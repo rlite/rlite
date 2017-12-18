@@ -44,8 +44,10 @@ time64()
 }
 
 int
-dft_default::lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                          const rlm_addr_t preferred, uint32_t cookie) const
+FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
+                                 rlm_addr_t &dstaddr,
+                                 const rlm_addr_t preferred,
+                                 uint32_t cookie) const
 {
     /* Fetch all entries that hold 'appl_name'. */
     auto range = dft_table.equal_range(appl_name);
@@ -88,7 +90,7 @@ dft_default::lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
 }
 
 int
-dft_default::appl_register(const struct rl_kmsg_appl_register *req)
+FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 {
     multimap<string, DFTEntry>::iterator mit;
     string appl_name(req->appl_name);
@@ -153,7 +155,7 @@ dft_default::appl_register(const struct rl_kmsg_appl_register *req)
 }
 
 int
-dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
@@ -233,7 +235,7 @@ dft_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-dft_default::update_address(rlm_addr_t new_addr)
+FullyReplicatedDFT::update_address(rlm_addr_t new_addr)
 {
     DFTSlice prop_dft;
     DFTSlice del_dft;
@@ -264,7 +266,7 @@ dft_default::update_address(rlm_addr_t new_addr)
 }
 
 void
-dft_default::dump(stringstream &ss) const
+FullyReplicatedDFT::dump(stringstream &ss) const
 {
     ss << "Directory Forwarding Table:" << endl;
     for (const auto &kve : dft_table) {
@@ -279,7 +281,7 @@ dft_default::dump(stringstream &ss) const
 }
 
 int
-dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
+FullyReplicatedDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
@@ -301,7 +303,7 @@ dft_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 /* Propagate local entries (i.e. the ones corresponding to locally
  * registered applications) to all our neighbors. */
 int
-dft_default::neighs_refresh(size_t limit)
+FullyReplicatedDFT::neighs_refresh(size_t limit)
 {
     int ret = 0;
 

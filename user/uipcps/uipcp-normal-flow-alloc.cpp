@@ -67,9 +67,8 @@ flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
 /* Translate a standard flow policies specification from FlowRequest
  * CDAP message into a local flow configuration. */
 void
-flow_allocator_default::policies2flowcfg(struct rl_flow_config *cfg,
-                                         const QosSpec &q,
-                                         const ConnPolicies &p)
+DefaultFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
+                                       const QosSpec &q, const ConnPolicies &p)
 {
     cfg->msg_boundaries    = !q.partial_delivery;
     cfg->in_order_delivery = q.in_order_delivery;
@@ -107,8 +106,8 @@ flow_allocator_default::policies2flowcfg(struct rl_flow_config *cfg,
 /* Any modification to this function must be also reported in the inverse
  * function flowcfg2flowspec(). */
 void
-flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
-                                         struct rl_flow_config *cfg) const
+DefaultFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
+                                       struct rl_flow_config *cfg) const
 {
     bool force_flow_control =
         rib->get_param_value<bool>("flow-allocator", "force-flow-control");
@@ -162,7 +161,7 @@ flow_allocator_default::flowspec2flowcfg(const struct rina_flow_spec *spec,
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
+DefaultFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
 {
     rlm_addr_t remote_addr;
     std::unique_ptr<CDAPMessage> m;
@@ -254,7 +253,7 @@ flow_allocator_default::fa_req(struct rl_kmsg_fa_req *req)
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
 int
-flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
+DefaultFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
     string reason;
@@ -301,7 +300,7 @@ flow_allocator_default::fa_resp(struct rl_kmsg_fa_resp *resp)
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-flow_allocator_default::flows_handler_create(const CDAPMessage *rm)
+DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -381,7 +380,7 @@ flow_allocator_default::flows_handler_create(const CDAPMessage *rm)
 
 /* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
+DefaultFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -415,7 +414,7 @@ flow_allocator_default::flows_handler_create_r(const CDAPMessage *rm)
 }
 
 int
-flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
+DefaultFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     stringstream obj_name_ext;
     string obj_name;
@@ -466,7 +465,7 @@ flow_allocator_default::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 }
 
 int
-flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
+DefaultFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
 {
     rl_port_t local_port;
     stringstream decode;
@@ -511,7 +510,7 @@ flow_allocator_default::flows_handler_delete(const CDAPMessage *rm)
 }
 
 int
-flow_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FlowAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     switch (rm->op_code) {
     case gpb::M_CREATE:
@@ -538,7 +537,7 @@ flow_allocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-flow_allocator_default::dump(std::stringstream &ss) const
+DefaultFlowAllocator::dump(std::stringstream &ss) const
 {
     ss << "Supported flows:" << endl;
     for (const auto &kvf : flow_reqs) {
@@ -560,7 +559,7 @@ flow_allocator_default::dump(std::stringstream &ss) const
 }
 
 void
-flow_allocator_default::dump_memtrack(std::stringstream &ss) const
+DefaultFlowAllocator::dump_memtrack(std::stringstream &ss) const
 {
     ss << endl << "Temporary tables:" << endl;
     ss << "    " << flow_reqs_tmp.size()

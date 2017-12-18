@@ -31,14 +31,15 @@
 using namespace std;
 
 LowerFlow *
-lfdb_default::find(const NodeId &local_node, const NodeId &remote_node)
+FullyReplicatedLFDB::find(const NodeId &local_node, const NodeId &remote_node)
 {
     const LowerFlow *lf = _find(local_node, remote_node);
     return const_cast<LowerFlow *>(lf);
 }
 
 const LowerFlow *
-lfdb_default::_find(const NodeId &local_node, const NodeId &remote_node) const
+FullyReplicatedLFDB::_find(const NodeId &local_node,
+                           const NodeId &remote_node) const
 {
     const auto it = db.find(local_node);
     unordered_map<NodeId, LowerFlow>::const_iterator jt;
@@ -55,7 +56,7 @@ lfdb_default::_find(const NodeId &local_node, const NodeId &remote_node) const
 /* The add method has overwrite semantic, and possibly resets the age.
  * Returns true if something changed. */
 bool
-lfdb_default::add(const LowerFlow &lf)
+FullyReplicatedLFDB::add(const LowerFlow &lf)
 {
     auto it       = db.find(lf.local_node);
     string repr   = static_cast<string>(lf);
@@ -87,7 +88,7 @@ lfdb_default::add(const LowerFlow &lf)
 
 /* Returns true if something changed. */
 bool
-lfdb_default::del(const NodeId &local_node, const NodeId &remote_node)
+FullyReplicatedLFDB::del(const NodeId &local_node, const NodeId &remote_node)
 {
     auto it = db.find(local_node);
     unordered_map<NodeId, LowerFlow>::iterator jt;
@@ -112,7 +113,7 @@ lfdb_default::del(const NodeId &local_node, const NodeId &remote_node)
 }
 
 void
-lfdb_default::update_local(const string &node_name)
+FullyReplicatedLFDB::update_local(const string &node_name)
 {
     LowerFlowList lfl;
     LowerFlow lf;
@@ -136,7 +137,7 @@ lfdb_default::update_local(const string &node_name)
 }
 
 int
-lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     const char *objbuf;
     size_t objlen;
@@ -191,14 +192,14 @@ lfdb_default::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-lfdb_default::update_routing()
+FullyReplicatedLFDB::update_routing()
 {
     /* Update the routing table. */
     re.update_kernel_routing(rib->myname);
 }
 
 int
-lfdb_default::flow_state_update(struct rl_kmsg_flow_state *upd)
+FullyReplicatedLFDB::flow_state_update(struct rl_kmsg_flow_state *upd)
 {
     UPD(rib->uipcp, "Flow %u goes %s\n", upd->local_port,
         upd->flow_state == RL_FLOW_STATE_UP ? "up" : "down");
@@ -209,7 +210,7 @@ lfdb_default::flow_state_update(struct rl_kmsg_flow_state *upd)
 }
 
 void
-lfdb_default::dump(std::stringstream &ss) const
+FullyReplicatedLFDB::dump(std::stringstream &ss) const
 {
     ss << "Lower Flow Database:" << endl;
     for (const auto &kvi : db) {
@@ -227,13 +228,13 @@ lfdb_default::dump(std::stringstream &ss) const
 }
 
 void
-lfdb_default::dump_routing(std::stringstream &ss) const
+FullyReplicatedLFDB::dump_routing(std::stringstream &ss) const
 {
     re.dump(ss);
 }
 
 int
-lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
+FullyReplicatedLFDB::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     LowerFlowList lfl;
     int ret = 0;
@@ -266,7 +267,7 @@ lfdb_default::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 int
-lfdb_default::neighs_refresh(size_t limit)
+FullyReplicatedLFDB::neighs_refresh(size_t limit)
 {
     unordered_map<NodeId, LowerFlow>::iterator jt;
     int ret = 0;
@@ -309,7 +310,7 @@ uipcp_rib::age_incr_tmr_restart()
 }
 
 void
-lfdb_default::age_incr()
+FullyReplicatedLFDB::age_incr()
 {
     std::lock_guard<std::mutex> guard(rib->mutex);
     bool discarded = false;
@@ -426,7 +427,8 @@ RoutingEngine::compute_next_hops(const NodeId &local_node)
     /* Clean up state left from the previous run. */
     next_hops.clear();
 
-    lfdb_default *lfdb = dynamic_cast<lfdb_default *>(rib->lfdb.get());
+    FullyReplicatedLFDB *lfdb =
+        dynamic_cast<FullyReplicatedLFDB *>(rib->lfdb.get());
 
     /* Build the graph from the Lower Flow Database. */
     graph[local_node] = list<Edge>();
