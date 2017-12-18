@@ -40,8 +40,9 @@
 #include "rlite/common.h"
 #include "rlite/utils.h"
 #include "rlite/uipcps-msg.h"
-#include "rina/cdap.hpp"
 #include "rlite/cpputils.hpp"
+#include "rlite/raft.hpp"
+#include "rina/cdap.hpp"
 
 #include "uipcp-normal-codecs.hpp"
 #include "uipcp-container.h"
@@ -634,7 +635,7 @@ void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 #define UIPCP_RIB(_u) static_cast<uipcp_rib *>((_u)->priv)
 
 /*
- * Default implementation for IPCP components.
+ * Implementation of several IPCP components.
  */
 
 struct FullyReplicatedDFT : public DFT {
@@ -657,6 +658,18 @@ struct FullyReplicatedDFT : public DFT {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
+};
+
+class CentralizedFaultTolerantDFT : public DFT, public RaftSM {
+    struct Command {
+        rlm_addr_t address;
+        char name[63];
+        uint8_t opcode;
+    } __attribute__((packed));
+
+public:
+    RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
+    CentralizedFaultTolerantDFT(struct uipcp_rib *_ur);
 };
 
 struct DefaultFlowAllocator : public FlowAllocator {
