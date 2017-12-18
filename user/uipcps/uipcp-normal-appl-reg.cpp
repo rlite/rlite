@@ -325,3 +325,12 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
 
     return ret;
 }
+
+CentralizedFaultTolerantDFT::CentralizedFaultTolerantDFT(struct uipcp_rib *_ur)
+    : DFT(_ur),
+      RaftSM(std::string("ceft-dft-") + _ur->myname, _ur->myname,
+             std::string("/tmp/ceft-dft-") + std::to_string(_ur->uipcp->id) +
+                 std::string("-") + _ur->myname,
+             sizeof(Command), std::cerr, std::cout)
+{
+}
