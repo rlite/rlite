@@ -113,21 +113,21 @@ public:
 
     /* Go over the commands committed so far, and check if there
      * are any missing numbers (adding them to the output argument). */
-    void get_lost_commands(set<uint32_t> *acc) const
+    set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t M = 0) const
     {
         set<uint32_t> got;
-        uint32_t M = 0;
 
-        assert(acc != nullptr);
         for (auto cmd : committed_commands) {
             got.insert(cmd);
             M = std::max(M, cmd);
         }
         for (uint32_t cmd = 1; cmd < M; cmd++) {
             if (got.count(cmd) == 0) {
-                acc->insert(cmd);
+                acc.insert(cmd);
             }
         }
+
+        return acc;
     }
 };
 
@@ -475,11 +475,12 @@ run_simulation(const list<TestEvent> &external_events)
             if (!failures_or_recoveries()) {
                 /* No more failures or recoveries are scheduled.
                  * We can then check if we need to retransmit something. */
-                set<uint32_t> lost_commands;
+                set<uint32_t> missing_commands;
                 for (const auto &kv : replicas) {
-                    kv.second->get_lost_commands(&lost_commands);
+                    missing_commands = kv.second->get_missing_commands(
+                        std::move(missing_commands));
                 }
-                for (const auto cmd : lost_commands) {
+                for (const auto cmd : missing_commands) {
                     TestEvent se = TestEvent::CreateRequestEvent(t_next + 1);
                     se.cmd       = cmd;
                     events.push_back(se);
@@ -496,39 +497,32 @@ run_simulation(const list<TestEvent> &external_events)
         output = std::move(output_next);
     }
 
-    auto discarded_entries = [&replicas]() -> bool {
-        for (const auto &kv : replicas) {
-            RaftSM::Stats stats = kv.second->get_stats();
-            if (stats.discarded > 0) {
-                return true;
-            }
-        }
-        return false;
-    };
-    if (discarded_entries()) {
-        /* If some requests where discarded (e.g. because of log conflicts),
-         * we carry out a relaxed check. We only make sure that the list of
-         * committed commands is the same for all the replicas. */
-        const TestReplica *prev = nullptr;
-        cout << "Some requests where discarded" << endl;
-        assert(replicas.size() > 0);
-        for (const auto &kv : replicas) {
-            if (kv.second->up()) {
-                if (prev && !prev->cross_check(*kv.second.get())) {
-                    cout << "Check failed for replica " << kv.first << endl;
+    /* If some requests where discarded (e.g. because of log conflicts),
+     * we carry out a relaxed check. We only make sure that the list of
+     * committed commands is the same for all the replicas. */
+    const TestReplica *prev = nullptr;
+    assert(replicas.size() > 0);
+    for (const auto &kv : replicas) {
+        if (kv.second->up()) {
+            if (!prev) {
+                /* On the first active replica, check that there are no missing
+                 * commands. */
+                set<uint32_t> missing_commands =
+                    kv.second->get_missing_commands(std::move(set<uint32_t>()),
+                                                    input_counter - 1);
+
+                for (const auto cmd : missing_commands) {
+                    cout << "Replica " << kv.first << " misses command " << cmd
+                         << endl;
+                    return 1;
                 }
-                prev = kv.second.get();
-            }
-        }
-    } else {
-        /* If no requests where discarded, we also check that each list of
-         * committed commands contain all the entries (one for each client
-         * request. */
-        for (const auto &kv : replicas) {
-            if (kv.second->up() && !kv.second->check(input_counter - 1)) {
+            } else if (!prev->cross_check(*kv.second.get())) {
+                /* On any other replica just check that the list of committed
+                 * commands is the same of the previous checked replica. */
                 cout << "Check failed for replica " << kv.first << endl;
                 return 1;
             }
+            prev = kv.second.get();
         }
     }
 
