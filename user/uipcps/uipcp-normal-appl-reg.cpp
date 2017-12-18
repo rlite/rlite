@@ -326,37 +326,33 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     return ret;
 }
 
-class RaftDFT : public RaftSM {
-    uipcp_rib *rib = nullptr;
-
-    /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
-    struct Command {
-        rlm_addr_t address;
-        char name[63];
-        uint8_t opcode;
-    } __attribute__((packed));
-
-    /* State machine implementation. */
-    std::multimap<std::string, DFTEntry> dft_table;
-
-public:
-    RaftDFT(uipcp_rib *_rib)
-        : RaftSM(std::string("ceft-dft-") + _rib->myname, _rib->myname,
-                 std::string("/tmp/ceft-dft-") +
-                     std::to_string(_rib->uipcp->id) + std::string("-") +
-                     _rib->myname,
-                 sizeof(Command), std::cerr, std::cout),
-          rib(_rib){};
-};
-
 int
 CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
+    list<ReplicaId> peers;
+
     if (param_name != "replicas") {
         return -1;
     }
 
     UPD(rib->uipcp, "replicas = %s\n", param_name.c_str());
+
+    // TODO parse param_name --> peers
+
+    auto it = peers.begin();
+    for (; it != peers.end(); it++) {
+        if (*it == rib->myname) {
+            /* I'm one of the replicas. */
+            client.reset();
+            raft = make_unique<RaftDFT>(this);
+            break;
+        }
+    }
+    if (it == peers.end()) {
+        /* I'm not one of the replicas. I'm just a client. */
+        raft.reset();
+        client = make_unique<Client>(this, std::move(peers));
+    }
 
     return 0;
 }
