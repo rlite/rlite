@@ -667,15 +667,49 @@ public:
 };
 
 class CentralizedFaultTolerantDFT : public DFT {
-    /* True if this instance is a state machine replica. False if
-     * it is only a client that will redirect requests to the
-     * server. */
-    bool replica = false;
+    /* An instance of this class can be a state machine replica or it can just
+     * be a client that will redirect requests to one of the replicas. */
 
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
-    class RaftDFT;
-    RaftDFT *raft = nullptr;
+    class RaftDFT : public RaftSM {
+        CentralizedFaultTolerantDFT *parent = nullptr;
+
+        /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
+        struct Command {
+            rlm_addr_t address;
+            char name[63];
+            uint8_t opcode;
+        } __attribute__((packed));
+
+        /* State machine implementation. */
+        std::multimap<std::string, DFTEntry> dft_table;
+
+    public:
+        RaftDFT(CentralizedFaultTolerantDFT *dft)
+            : RaftSM(std::string("ceft-dft-") + dft->rib->myname,
+                     dft->rib->myname,
+                     std::string("/tmp/ceft-dft-") +
+                         std::to_string(dft->rib->uipcp->id) +
+                         std::string("-") + dft->rib->myname,
+                     sizeof(Command), std::cerr, std::cout),
+              parent(dft){};
+        int apply(const char *const serbuf) override { return 0; };
+    };
+    std::unique_ptr<RaftDFT> raft;
+
+    /* In case of client, a pointer to client-side data structures. */
+    class Client {
+        CentralizedFaultTolerantDFT *parent = nullptr;
+        std::list<ReplicaId> replicas;
+
+    public:
+        Client(CentralizedFaultTolerantDFT *dft, std::list<ReplicaId> names)
+            : parent(dft), replicas(std::move(names))
+        {
+        }
+    };
+    std::unique_ptr<Client> client;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
