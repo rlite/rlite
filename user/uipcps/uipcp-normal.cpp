@@ -1265,7 +1265,7 @@ uipcp_rib::policy_param_mod(const std::string &component,
 
     if (!ret) {
         /* Parameter successfully set. */
-        UPD(uipcp, "set %s policy param %s <== %s\n", component.c_str(),
+        UPD(uipcp, "set %s policy param %s <== '%s'\n", component.c_str(),
             param_name.c_str(), param_value.c_str());
 
         /* Invoke the param_changed() method if available. */
@@ -1557,7 +1557,7 @@ uipcp_rib::policy_param_list(
     auto add_parameter = [this](stringstream &ss, const string &component,
                                 const string &parameter) {
         const PolicyParam &param = params_map.at(component).at(parameter);
-        ss << component << "." << parameter << " = " << param;
+        ss << component << "." << parameter << " = '" << param << "'";
     };
 
     auto add_component = [this, add_parameter](stringstream &ss,
