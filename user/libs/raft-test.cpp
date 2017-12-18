@@ -111,6 +111,8 @@ public:
         return committed_commands == o.committed_commands;
     }
 
+    bool something_committed() const { return !committed_commands.empty(); }
+
     /* Go over the commands committed so far, and check if there
      * are any missing numbers (adding them to the output argument). */
     set<uint32_t> get_missing_commands(set<uint32_t> acc, uint32_t M = 0) const
@@ -399,12 +401,13 @@ run_simulation(const list<TestEvent> &external_events)
                 if (leader) {
                     LogIndex request_id;
 
+                    cout << "Submitting command " << next.cmd << " to "
+                         << leader->local_name() << endl;
                     if (leader->submit(
                             reinterpret_cast<const char *>(&next.cmd),
                             &request_id, &output_next)) {
                         return -1;
                     }
-                    cout << "Command " << next.cmd << " submitted" << endl;
                 } else {
                     /* This can happen because no leader is currently elected
                      * or because the current leader is down. */
@@ -472,9 +475,19 @@ run_simulation(const list<TestEvent> &external_events)
                 }
                 return false;
             };
-            if (!failures_or_recoveries()) {
-                /* No more failures or recoveries are scheduled.
-                 * We can then check if we need to retransmit something. */
+            auto anything_committed = [&replicas]() -> bool {
+                for (const auto &kv : replicas) {
+                    if (kv.second->something_committed()) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (!failures_or_recoveries() && anything_committed()) {
+                /* No more failures or recoveries are scheduled, so this is
+                 * a good time to issue retransmissions, if needed.
+                 * The get_missing_commands() method returns meaningful
+                 * results only if the cluster has committed something. */
                 set<uint32_t> missing_commands;
                 for (const auto &kv : replicas) {
                     missing_commands = kv.second->get_missing_commands(
@@ -603,7 +616,24 @@ main(int argc, char **argv)
          * later, there is a conflict between its log and the other logs. */
         {Req(600), Fail(600, F, 0), Fail(600, F, 1), Fail(600, F, 2),
          Fail(600, F, 3), Fail(650, L, 4), Respawn(700, 0), Respawn(700, 1),
-         Respawn(700, 2), Respawn(700, 3), Req(700), Respawn(1300, 4)}};
+         Respawn(700, 2), Respawn(700, 3), Req(700), Respawn(1300, 4)},
+        /* (16) Similar to (15). Start with committing a double request, then
+         * all the four followers fail together (on the request), and the leader
+         * fails shortly after.
+         * The four followers respawn and elect a new leader, but on the next
+         * request a similar failure happen again (the three followers fail,
+         * the second leader fails shortly after and the three followers
+         * respawn to elect a new leader). When the two failed leaders respawn
+         * later they'll have inconsistent logs.
+         */
+        {Req(550),         Req(550),         Req(700),
+         Fail(700, F, 0),  Fail(700, F, 1),  Fail(700, F, 2),
+         Fail(700, F, 3),  Fail(750, L, 4),  Respawn(800, 0),
+         Respawn(800, 1),  Respawn(800, 2),  Respawn(800, 3),
+         Req(1500),        Fail(1500, F, 5), Fail(1500, F, 6),
+         Fail(1500, F, 7), Fail(1550, L, 8), Respawn(1600, 5),
+         Respawn(1600, 6), Respawn(1600, 7), Req(1700),
+         Req(1700),        Respawn(1710, 4), Respawn(1710, 8)}};
     int test_counter  = 1;
     int test_selector = -1;
 
