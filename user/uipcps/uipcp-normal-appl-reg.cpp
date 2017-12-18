@@ -342,17 +342,40 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     auto it = peers.begin();
     for (; it != peers.end(); it++) {
         if (*it == rib->myname) {
-            /* I'm one of the replicas. */
+            /* I'm one of the replicas. Create a Raft state machine and
+             * initialize it. */
             client.reset();
             raft = make_unique<RaftDFT>(this);
-            break;
+            peers.erase(it); /* remove myself */
+
+            RaftSMOutput out;
+            if (raft->init(peers, &out)) {
+                UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
+                return -1;
+            }
+            UPI(rib->uipcp, "Raft replica initialized\n");
+            return raft->process_sm_output(std::move(out));
         }
     }
     if (it == peers.end()) {
         /* I'm not one of the replicas. I'm just a client. */
         raft.reset();
         client = make_unique<Client>(this, std::move(peers));
+        UPI(rib->uipcp, "Client initialized\n");
     }
 
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::RaftDFT::process_sm_output(RaftSMOutput out)
+{
+    // TODO
+    for (const auto &msg : out.output_messages) {
+        (void)msg;
+    }
+    for (const auto &cmd : out.timer_commands) {
+        (void)cmd;
+    }
     return 0;
 }
