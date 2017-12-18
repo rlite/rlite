@@ -694,6 +694,7 @@ class CentralizedFaultTolerantDFT : public DFT {
                          std::string("-") + dft->rib->myname,
                      sizeof(Command), std::cerr, std::cout),
               parent(dft){};
+        int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override { return 0; };
     };
     std::unique_ptr<RaftDFT> raft;
