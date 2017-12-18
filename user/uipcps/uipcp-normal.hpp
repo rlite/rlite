@@ -638,12 +638,13 @@ void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
  * Implementation of several IPCP components.
  */
 
-struct FullyReplicatedDFT : public DFT {
+class FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
     std::multimap<std::string, DFTEntry> dft_table;
 
+public:
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
     FullyReplicatedDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
     ~FullyReplicatedDFT() {}
@@ -672,7 +673,8 @@ public:
     CentralizedFaultTolerantDFT(struct uipcp_rib *_ur);
 };
 
-struct DefaultFlowAllocator : public FlowAllocator {
+class DefaultFlowAllocator : public FlowAllocator {
+public:
     RL_NODEFAULT_NONCOPIABLE(DefaultFlowAllocator);
     DefaultFlowAllocator(struct uipcp_rib *_ur) : FlowAllocator(_ur) {}
     ~DefaultFlowAllocator() {}
@@ -755,10 +757,13 @@ private:
     struct uipcp_rib *rib;
 };
 
-struct FullyReplicatedLFDB : public LFDB {
+class FullyReplicatedLFDB : public LFDB {
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, LowerFlow>> db;
+    friend class RoutingEngine;
 
+public:
+    /* Routing engine. */
     RoutingEngine re;
 
     RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
@@ -791,11 +796,12 @@ struct FullyReplicatedLFDB : public LFDB {
     void age_incr() override;
 };
 
-struct DistributedAddrAllocator : public AddrAllocator {
+class DistributedAddrAllocator : public AddrAllocator {
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
     std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
+public:
     RL_NODEFAULT_NONCOPIABLE(DistributedAddrAllocator);
     DistributedAddrAllocator(struct uipcp_rib *_ur) : AddrAllocator(_ur) {}
     ~DistributedAddrAllocator() {}
@@ -806,7 +812,8 @@ struct DistributedAddrAllocator : public AddrAllocator {
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
 };
 
-struct ManualAddrAllocator : public DistributedAddrAllocator {
+class ManualAddrAllocator : public DistributedAddrAllocator {
+public:
     RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
     ManualAddrAllocator(struct uipcp_rib *_ur) : DistributedAddrAllocator(_ur)
     {
