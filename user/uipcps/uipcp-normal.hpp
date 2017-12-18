@@ -661,16 +661,20 @@ public:
     int neighs_refresh(size_t limit) override;
 };
 
-class CentralizedFaultTolerantDFT : public DFT, public RaftSM {
-    struct Command {
-        rlm_addr_t address;
-        char name[63];
-        uint8_t opcode;
-    } __attribute__((packed));
+class CentralizedFaultTolerantDFT : public DFT {
+    /* True if this instance is a state machine replica. False if
+     * it is only a client that will redirect requests to the
+     * server. */
+    bool replica = false;
+
+    /* In case of state machine replica, a pointer to a Raft state
+     * machine. */
+    class RaftDFT;
+    RaftDFT *raft = nullptr;
 
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
-    CentralizedFaultTolerantDFT(struct uipcp_rib *_ur);
+    CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
 };
 
 class DefaultFlowAllocator : public FlowAllocator {
