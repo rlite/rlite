@@ -1263,8 +1263,14 @@ uipcp_rib::policy_param_mod(const std::string &component,
     }
 
     if (!ret) {
+        /* Parameter successfully set. */
         UPD(uipcp, "set %s policy param %s <== %s\n", component.c_str(),
             param_name.c_str(), param_value.c_str());
+
+        /* Invoke the param_changed() method if available. */
+        if (component == "dft") {
+            dft->param_changed(param_name);
+        }
     }
 
     return ret;
