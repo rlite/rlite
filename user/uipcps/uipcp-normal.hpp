@@ -288,6 +288,7 @@ struct DFT {
     virtual ~DFT() {}
 
     virtual void dump(std::stringstream &ss) const = 0;
+    virtual int param_changed(const std::string &param_name) { return 0; }
 
     virtual int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
                              const rlm_addr_t preferred,
@@ -675,6 +676,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
     CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    int param_changed(const std::string &param_name) override;
 };
 
 class DefaultFlowAllocator : public FlowAllocator {

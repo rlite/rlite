@@ -327,6 +327,8 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
 }
 
 class RaftDFT : public RaftSM {
+    uipcp_rib *rib = nullptr;
+
     /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
     struct Command {
         rlm_addr_t address;
@@ -338,10 +340,23 @@ class RaftDFT : public RaftSM {
     std::multimap<std::string, DFTEntry> dft_table;
 
 public:
-    RaftDFT(uipcp_rib *rib)
-        : RaftSM(std::string("ceft-dft-") + rib->myname, rib->myname,
+    RaftDFT(uipcp_rib *_rib)
+        : RaftSM(std::string("ceft-dft-") + _rib->myname, _rib->myname,
                  std::string("/tmp/ceft-dft-") +
-                     std::to_string(rib->uipcp->id) + std::string("-") +
-                     rib->myname,
-                 sizeof(Command), std::cerr, std::cout){};
+                     std::to_string(_rib->uipcp->id) + std::string("-") +
+                     _rib->myname,
+                 sizeof(Command), std::cerr, std::cout),
+          rib(_rib){};
 };
+
+int
+CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
+{
+    if (param_name != "replicas") {
+        return -1;
+    }
+
+    UPD(rib->uipcp, "replicas = %s\n", param_name.c_str());
+
+    return 0;
+}
