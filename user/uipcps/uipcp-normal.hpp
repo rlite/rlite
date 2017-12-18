@@ -278,13 +278,13 @@ private:
 #define RL_LOCK_ASSERT(_lock, _locked)
 #endif
 
-struct dft {
+struct DFT {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
-    RL_NODEFAULT_NONCOPIABLE(dft);
-    dft(struct uipcp_rib *_ur) : rib(_ur) {}
-    virtual ~dft() {}
+    RL_NODEFAULT_NONCOPIABLE(DFT);
+    DFT(struct uipcp_rib *_ur) : rib(_ur) {}
+    virtual ~DFT() {}
 
     virtual void dump(std::stringstream &ss) const = 0;
 
@@ -298,16 +298,16 @@ struct dft {
     virtual int neighs_refresh(size_t limit)                           = 0;
 };
 
-struct flow_allocator {
+struct FlowAllocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
     /* Id to be used with incoming flow allocation request. */
     uint32_t kevent_id_cnt;
 
-    RL_NODEFAULT_NONCOPIABLE(flow_allocator);
-    flow_allocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) {}
-    virtual ~flow_allocator() {}
+    RL_NODEFAULT_NONCOPIABLE(FlowAllocator);
+    FlowAllocator(struct uipcp_rib *_ur) : rib(_ur), kevent_id_cnt(1) {}
+    virtual ~FlowAllocator() {}
 
     virtual void dump(std::stringstream &ss) const          = 0;
     virtual void dump_memtrack(std::stringstream &ss) const = 0;
@@ -324,13 +324,13 @@ struct flow_allocator {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
-struct lfdb {
+struct LFDB {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
-    RL_NODEFAULT_NONCOPIABLE(lfdb);
-    lfdb(struct uipcp_rib *_ur) : rib(_ur) {}
-    virtual ~lfdb() {}
+    RL_NODEFAULT_NONCOPIABLE(LFDB);
+    LFDB(struct uipcp_rib *_ur) : rib(_ur) {}
+    virtual ~LFDB() {}
 
     virtual void dump(std::stringstream &ss) const         = 0;
     virtual void dump_routing(std::stringstream &ss) const = 0;
@@ -352,13 +352,13 @@ struct lfdb {
     virtual void age_incr()                                         = 0;
 };
 
-struct addr_allocator {
+struct AddrAllocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
 
-    RL_NODEFAULT_NONCOPIABLE(addr_allocator);
-    addr_allocator(struct uipcp_rib *_ur) : rib(_ur) {}
-    virtual ~addr_allocator() {}
+    RL_NODEFAULT_NONCOPIABLE(AddrAllocator);
+    AddrAllocator(struct uipcp_rib *_ur) : rib(_ur) {}
+    virtual ~AddrAllocator() {}
 
     virtual void dump(std::stringstream &ss) const                  = 0;
     virtual rlm_addr_t allocate()                                   = 0;
@@ -431,13 +431,13 @@ struct uipcp_rib {
 
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
-    std::unique_ptr<struct addr_allocator> addra;
+    std::unique_ptr<AddrAllocator> addra;
 
     /* Directory Forwarding Table. */
-    std::unique_ptr<struct dft> dft;
+    std::unique_ptr<DFT> dft;
 
     /* Lower Flow Database. */
-    std::unique_ptr<struct lfdb> lfdb;
+    std::unique_ptr<LFDB> lfdb;
 
     /* Timer ID for LFDB synchronization with neighbors. */
     int sync_tmrid;
@@ -446,7 +446,7 @@ struct uipcp_rib {
     InvokeIdMgr invoke_id_mgr;
 
     /* For supported flows. */
-    std::unique_ptr<struct flow_allocator> fa;
+    std::unique_ptr<FlowAllocator> fa;
 
 #ifdef RL_USE_QOS_CUBES
     /* Available QoS cubes. */
@@ -496,10 +496,10 @@ struct uipcp_rib {
      * allocation successful. */
     static constexpr int kAddrAllocDistrNackWaitSecs = 4;
 
-    /* Lower bound for the addr_allocator NACK timer. */
+    /* Lower bound for the AddrAllocator NACK timer. */
     static constexpr int kAddrAllocDistrNackWaitSecsMin = 1;
 
-    /* Upper bound for the addr_allocator NACK timer. */
+    /* Upper bound for the AddrAllocator NACK timer. */
     static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
@@ -637,15 +637,15 @@ void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
  * Default implementation for IPCP components.
  */
 
-struct dft_default : public dft {
+struct FullyReplicatedDFT : public DFT {
     /* Directory Forwarding Table, mapping application name (std::string)
      * to a set of nodes that registered that name. All nodes are considered
      * equivalent. */
     std::multimap<std::string, DFTEntry> dft_table;
 
-    RL_NODEFAULT_NONCOPIABLE(dft_default);
-    dft_default(struct uipcp_rib *_ur) : dft(_ur) {}
-    ~dft_default() {}
+    RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
+    FullyReplicatedDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    ~FullyReplicatedDFT() {}
 
     void dump(std::stringstream &ss) const override;
 
@@ -659,10 +659,10 @@ struct dft_default : public dft {
     int neighs_refresh(size_t limit) override;
 };
 
-struct flow_allocator_default : public flow_allocator {
-    RL_NODEFAULT_NONCOPIABLE(flow_allocator_default);
-    flow_allocator_default(struct uipcp_rib *_ur) : flow_allocator(_ur) {}
-    ~flow_allocator_default() {}
+struct DefaultFlowAllocator : public FlowAllocator {
+    RL_NODEFAULT_NONCOPIABLE(DefaultFlowAllocator);
+    DefaultFlowAllocator(struct uipcp_rib *_ur) : FlowAllocator(_ur) {}
+    ~DefaultFlowAllocator() {}
 
     void dump(std::stringstream &ss) const override;
     void dump_memtrack(std::stringstream &ss) const override;
@@ -742,15 +742,15 @@ private:
     struct uipcp_rib *rib;
 };
 
-struct lfdb_default : public lfdb {
+struct FullyReplicatedLFDB : public LFDB {
     /* Lower Flow Database. */
     std::unordered_map<NodeId, std::unordered_map<NodeId, LowerFlow>> db;
 
     RoutingEngine re;
 
-    RL_NODEFAULT_NONCOPIABLE(lfdb_default);
-    lfdb_default(struct uipcp_rib *_ur) : lfdb(_ur), re(_ur) {}
-    ~lfdb_default() {}
+    RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
+    FullyReplicatedLFDB(struct uipcp_rib *_ur) : LFDB(_ur), re(_ur) {}
+    ~FullyReplicatedLFDB() {}
 
     void dump(std::stringstream &ss) const override;
     void dump_routing(std::stringstream &ss) const override;
@@ -778,14 +778,14 @@ struct lfdb_default : public lfdb {
     void age_incr() override;
 };
 
-struct addr_allocator_distributed : public addr_allocator {
+struct DistributedAddrAllocator : public AddrAllocator {
     /* Table used to carry on distributed address allocation.
      * It maps (address allocated) --> (requestor address). */
     std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
 
-    RL_NODEFAULT_NONCOPIABLE(addr_allocator_distributed);
-    addr_allocator_distributed(struct uipcp_rib *_ur) : addr_allocator(_ur) {}
-    ~addr_allocator_distributed() {}
+    RL_NODEFAULT_NONCOPIABLE(DistributedAddrAllocator);
+    DistributedAddrAllocator(struct uipcp_rib *_ur) : AddrAllocator(_ur) {}
+    ~DistributedAddrAllocator() {}
 
     void dump(std::stringstream &ss) const override;
     rlm_addr_t allocate() override;
@@ -793,10 +793,9 @@ struct addr_allocator_distributed : public addr_allocator {
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
 };
 
-struct addr_allocator_manual : public addr_allocator_distributed {
-    RL_NODEFAULT_NONCOPIABLE(addr_allocator_manual);
-    addr_allocator_manual(struct uipcp_rib *_ur)
-        : addr_allocator_distributed(_ur)
+struct ManualAddrAllocator : public DistributedAddrAllocator {
+    RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
+    ManualAddrAllocator(struct uipcp_rib *_ur) : DistributedAddrAllocator(_ur)
     {
     }
     rlm_addr_t allocate() override { return RL_ADDR_NULL; }

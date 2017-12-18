@@ -356,9 +356,9 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    dft  = make_unique<dft_default>(this);
-    fa   = make_unique<flow_allocator_default>(this);
-    lfdb = make_unique<lfdb_default>(this);
+    dft  = make_unique<FullyReplicatedDFT>(this);
+    fa   = make_unique<DefaultFlowAllocator>(this);
+    lfdb = make_unique<FullyReplicatedLFDB>(this);
     policy_mod("routing", "link-state");
     policy_mod("address-allocator", "distributed");
 
@@ -820,7 +820,7 @@ uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-addr_allocator_distributed::dump(std::stringstream &ss) const
+DistributedAddrAllocator::dump(std::stringstream &ss) const
 {
     ss << "Address Allocation Table:" << endl;
     for (const auto &kva : addr_alloc_table) {
@@ -832,7 +832,7 @@ addr_allocator_distributed::dump(std::stringstream &ss) const
 }
 
 int
-addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
+DistributedAddrAllocator::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
     int ret = 0;
 
@@ -852,7 +852,7 @@ addr_allocator_distributed::sync_neigh(NeighFlow *nf, unsigned int limit) const
 }
 
 rlm_addr_t
-addr_allocator_distributed::allocate()
+DistributedAddrAllocator::allocate()
 {
     rlm_addr_t modulo = addr_alloc_table.size() + 1;
     const int inflate = 2;
@@ -929,7 +929,7 @@ addr_allocator_distributed::allocate()
 }
 
 int
-addr_allocator_distributed::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
     bool create;
     const char *objbuf;
@@ -1184,7 +1184,8 @@ uipcp_rib::policy_mod(const std::string &component,
     if (component == "routing") {
         /* Temporary solution to support LFA policies. No pointer switching is
          * carried out. */
-        struct lfdb_default *lfdbd = dynamic_cast<lfdb_default *>(lfdb.get());
+        struct FullyReplicatedLFDB *lfdbd =
+            dynamic_cast<FullyReplicatedLFDB *>(lfdb.get());
 
         assert(lfdbd != nullptr);
 
@@ -1201,9 +1202,9 @@ uipcp_rib::policy_mod(const std::string &component,
         }
     } else if (component == "address-allocator") {
         if (policy_name == "manual") {
-            addra = make_unique<addr_allocator_manual>(this);
+            addra = make_unique<ManualAddrAllocator>(this);
         } else if (policy_name == "distributed") {
-            addra = make_unique<addr_allocator_distributed>(this);
+            addra = make_unique<DistributedAddrAllocator>(this);
         }
     }
 
