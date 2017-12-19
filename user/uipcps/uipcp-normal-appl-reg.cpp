@@ -336,8 +336,7 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     }
 
     UPD(rib->uipcp, "replicas = %s\n", param_name.c_str());
-
-    // TODO parse param_name --> peers
+    peers = strsplit(param_name, ',');
 
     auto it = peers.begin();
     for (; it != peers.end(); it++) {
