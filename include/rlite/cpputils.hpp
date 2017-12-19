@@ -4,6 +4,19 @@
 #include <string>
 #include <sstream>
 #include <memory>
+#include <list>
+
+static inline std::list<std::string>
+strsplit(const std::string &s, char delim)
+{
+    std::stringstream ss(s);
+    std::string item;
+    std::list<std::string> ret;
+    while (std::getline(ss, item, delim)) {
+        ret.push_back(std::move(item));
+    }
+    return ret;
+}
 
 static inline std::string
 rina_string_from_components(const std::string &apn, const std::string &api,
@@ -46,6 +59,7 @@ rina_components_from_string(const std::string &str, std::string &apn,
     }
 }
 
+/* This version of make_unique() does not handle arrays. */
 template <typename T, typename... Args>
 std::unique_ptr<T>
 make_unique(Args &&... args)
