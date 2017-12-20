@@ -241,8 +241,7 @@ DefaultFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
              << req->local_port;
 
     m = make_unique<CDAPMessage>();
-    m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0, 0,
-                string());
+    m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str());
 
     freq.invoke_id = 0; /* invoke_id is actually set in send_to_dst_addr() */
     freq.flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
@@ -459,7 +458,7 @@ DefaultFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We should wait 2 MPL here before notifying the peer. */
     m = make_unique<CDAPMessage>();
-    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name, 0, 0, string());
+    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name);
 
     return rib->send_to_dst_addr(std::move(m), remote_addr, nullptr);
 }

@@ -214,7 +214,8 @@ struct CDAPMessage {
                  const std::string &filter = std::string());
 
     int m_create_r(gpb::flagValues_t flags, const std::string &obj_class,
-                   const std::string &obj_name, long obj_inst = 0, int result = 0,
+                   const std::string &obj_name, long obj_inst = 0,
+                   int result                       = 0,
                    const std::string &result_reason = std::string());
 
     int m_delete(gpb::flagValues_t flags, const std::string &obj_class,
@@ -222,7 +223,8 @@ struct CDAPMessage {
                  const std::string &filter = std::string());
 
     int m_delete_r(gpb::flagValues_t flags, const std::string &obj_class,
-                   const std::string &obj_name, long obj_inst = 0, int result = 0,
+                   const std::string &obj_name, long obj_inst = 0,
+                   int result                       = 0,
                    const std::string &result_reason = std::string());
 
     int m_read(gpb::flagValues_t flags, const std::string &obj_class,
@@ -242,7 +244,8 @@ struct CDAPMessage {
 
     int m_cancelread(gpb::flagValues_t flags = gpb::F_NO_FLAGS);
 
-    int m_cancelread_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+    int m_cancelread_r(gpb::flagValues_t flags          = gpb::F_NO_FLAGS,
+                       int result                       = 0,
                        const std::string &result_reason = std::string());
 
     int m_start(gpb::flagValues_t flags, const std::string &obj_class,
