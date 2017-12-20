@@ -35,6 +35,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <functional>
 #include <condition_variable>
 
 #include "rlite/common.h"
@@ -372,7 +373,17 @@ struct AddrAllocator {
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
-extern std::unordered_map<std::string, std::unordered_set<std::string>>
+struct PolicyBuilder {
+    std::string name;
+    std::function<void(uipcp_rib *)> builder;
+
+    PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
+    bool operator<(const PolicyBuilder &o) const { return name < o.name; }
+    bool operator==(const PolicyBuilder &o) const { return name == o.name; }
+    operator std::string() { return name; }
+};
+
+extern std::unordered_map<std::string, std::set<PolicyBuilder>>
     available_policies;
 
 struct uipcp_rib {
