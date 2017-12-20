@@ -344,7 +344,7 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
             /* I'm one of the replicas. Create a Raft state machine and
              * initialize it. */
             client.reset();
-            raft = make_unique<RaftDFT>(this);
+            raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
             RaftSMOutput out;
@@ -368,19 +368,6 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
     return 0;
 }
 
-int
-CentralizedFaultTolerantDFT::RaftDFT::process_sm_output(RaftSMOutput out)
-{
-    // TODO
-    for (const auto &msg : out.output_messages) {
-        (void)msg;
-    }
-    for (const auto &cmd : out.timer_commands) {
-        (void)cmd;
-    }
-    return 0;
-}
-
 void
 CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
 {
@@ -401,8 +388,10 @@ int
 CentralizedFaultTolerantDFT::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
-    UPW(rib->uipcp, "Missing implementation");
-    return -1;
+    if (client) {
+        return client->dft_set(req);
+    }
+    return raft->dft_set(req);
 }
 
 void
@@ -414,7 +403,7 @@ CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
 int
 CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    UPW(rib->uipcp, "Not supported\n");
+    UPW(rib->uipcp, "Missing implementation\n");
     return 0;
 }
 
@@ -428,4 +417,62 @@ int
 CentralizedFaultTolerantDFT::neighs_refresh(size_t limit)
 {
     return 0; /* Nothing to do. */
+}
+
+int
+CentralizedFaultTolerantDFT::Client::dft_set(
+    const struct rl_kmsg_appl_register *req)
+{
+    string appl_name(req->appl_name);
+    auto m              = make_unique<CDAPMessage>();
+    ReplicaId r         = replicas.front();
+    rlm_addr_t dst_addr = parent->rib->lookup_node_address(r);
+    DFTEntry dft_entry;
+    int invoke_id;
+    int ret;
+
+    if (dst_addr == RL_ADDR_NULL) {
+        UPI(parent->rib->uipcp, "Failed to find address for replica %s\n",
+            r.c_str());
+        return -1;
+    }
+
+    m->m_write(obj_class::dft, obj_name::dft);
+    dft_entry.address   = parent->rib->myaddr;
+    dft_entry.appl_name = RinaName(appl_name);
+    dft_entry.timestamp = time64();
+
+    ret = parent->rib->send_to_dst_addr(std::move(m), dst_addr, &dft_entry,
+                                        &invoke_id);
+    if (ret) {
+        return ret;
+    }
+    pending[invoke_id] = std::move(PendingReq(appl_name, r));
+
+    UPI(parent->rib->uipcp,
+        "Write request '%s <= %lu' issued (invoke_id = %d)\n",
+        appl_name.c_str(), parent->rib->myaddr, invoke_id);
+
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::process_sm_output(RaftSMOutput out)
+{
+    // TODO
+    for (const auto &msg : out.output_messages) {
+        (void)msg;
+    }
+    for (const auto &cmd : out.timer_commands) {
+        (void)cmd;
+    }
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::dft_set(
+    const struct rl_kmsg_appl_register *req)
+{
+    UPW(parent->rib->uipcp, "Missing implementation");
+    return -1;
 }

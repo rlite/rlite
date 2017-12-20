@@ -702,7 +702,7 @@ uipcp_rib::realize_registrations(bool reg)
 /* Takes ownership of 'm'. */
 int
 uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                            const UipcpObject *obj)
+                            const UipcpObject *obj, int *invoke_id)
 {
     struct rl_mgmt_hdr mhdr;
     AData adata;
@@ -728,6 +728,9 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     }
 
     m->invoke_id = invoke_id_mgr.get_invoke_id();
+    if (invoke_id) {
+        *invoke_id = m->invoke_id;
+    }
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
