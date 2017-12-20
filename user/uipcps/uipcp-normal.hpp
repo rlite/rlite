@@ -28,6 +28,7 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <list>
 #include <ctime>
 #include <sstream>
@@ -378,6 +379,12 @@ struct PolicyBuilder {
     std::function<void(uipcp_rib *)> builder;
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
+    PolicyBuilder(const std::string &policy_name,
+                  std::function<void(uipcp_rib *)> fun)
+        : PolicyBuilder(policy_name)
+    {
+        builder = fun;
+    }
     bool operator<(const PolicyBuilder &o) const { return name < o.name; }
     bool operator==(const PolicyBuilder &o) const { return name == o.name; }
     operator std::string() { return name; }
