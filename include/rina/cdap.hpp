@@ -148,22 +148,22 @@ int msg_ser_stateless(CDAPMessage *m, char **buf, size_t *len);
 
 /* Internal representation of a CDAP message. */
 struct CDAPMessage {
-    int abs_syntax;
-    gpb::authTypes_t auth_mech;
+    int abs_syntax             = 0;
+    gpb::authTypes_t auth_mech = gpb::AUTH_NONE;
     CDAPAuthValue auth_value;
     std::string src_appl;
     std::string dst_appl;
     std::string filter;
-    gpb::flagValues_t flags;
-    int invoke_id;
+    gpb::flagValues_t flags = gpb::F_NO_FLAGS;
+    int invoke_id           = 0;
     std::string obj_class;
-    long obj_inst;
+    long obj_inst = 0;
     std::string obj_name;
-    gpb::opCode_t op_code;
-    int result;
+    gpb::opCode_t op_code = gpb::M_CONNECT;
+    int result            = 0;
     std::string result_reason;
-    int scope;
-    long version;
+    int scope    = 0;
+    long version = 0;
 
     bool is_request() const { return !is_response(); }
     bool is_response() const { return op_code & 0x1; }
