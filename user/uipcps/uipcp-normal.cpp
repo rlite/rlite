@@ -2006,10 +2006,18 @@ std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
 extern "C" void
 normal_lib_init(void)
 {
-    available_policies["address-allocator"].insert(PolicyBuilder("manual"));
     available_policies["address-allocator"].insert(
-        PolicyBuilder("distributed"));
-    available_policies["dft"].insert(PolicyBuilder("fully-replicated"));
+        PolicyBuilder("manual", [](uipcp_rib *rib) {
+            rib->addra = make_unique<ManualAddrAllocator>(rib);
+        }));
+    available_policies["address-allocator"].insert(
+        PolicyBuilder("distributed", [](uipcp_rib *rib) {
+            rib->addra = make_unique<DistributedAddrAllocator>(rib);
+        }));
+    available_policies["dft"].insert(
+        PolicyBuilder("fully-replicated", [](uipcp_rib *rib) {
+            rib->dft = make_unique<FullyReplicatedDFT>(rib);
+        }));
     available_policies["dft"].insert(
         PolicyBuilder("centralized-fault-tolerant"));
     available_policies["enrollment"].insert(PolicyBuilder("default"));
