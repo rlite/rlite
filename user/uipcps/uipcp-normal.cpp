@@ -740,8 +740,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     adata.dst_addr = dst_addr;
     adata.cdap     = std::move(m); /* Ownership passing */
 
-    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata, 0, 0,
-               string());
+    am.m_write(gpb::F_NO_FLAGS, obj_class::adata, obj_name::adata);
 
     aobjlen = adata.serialize(aobjbuf, sizeof(aobjbuf));
     if (aobjlen < 0) {
@@ -907,7 +906,7 @@ DistributedAddrAllocator::allocate()
                 int ret;
 
                 m.m_create(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
-                           obj_name::addr_alloc_table, 0, 0, "");
+                           obj_name::addr_alloc_table);
                 aar.requestor = rib->myaddr;
                 aar.address   = addr;
                 ret = kvn.second->mgmt_conn()->send_to_port_id(&m, 0, &aar);
@@ -1007,7 +1006,7 @@ DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
                     "requestor=%lu)\n",
                     (long unsigned)aar.address, (long unsigned)aar.requestor);
                 m->m_delete(gpb::F_NO_FLAGS, obj_class::addr_alloc_req,
-                            obj_name::addr_alloc_table, 0, 0, "");
+                            obj_name::addr_alloc_table);
                 ret = rib->send_to_dst_addr(std::move(m), aar.requestor, &aar);
                 if (ret) {
                     UPE(rib->uipcp, "Failed to send message to %lu [%s]\n",

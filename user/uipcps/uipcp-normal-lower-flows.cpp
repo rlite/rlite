@@ -132,7 +132,7 @@ FullyReplicatedLFDB::update_local(const string &node_name)
     lfl.flows.push_back(std::move(lf));
 
     sm = make_unique<CDAPMessage>();
-    sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb, 0, 0, "");
+    sm->m_create(gpb::F_NO_FLAGS, obj_class::lfdb, obj_name::lfdb);
     rib->send_to_myself(std::move(sm), &lfl);
 }
 
