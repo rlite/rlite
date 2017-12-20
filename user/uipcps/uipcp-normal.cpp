@@ -2009,7 +2009,9 @@ normal_lib_init(void)
             rib->dft = make_unique<FullyReplicatedDFT>(rib);
         }));
     available_policies["dft"].insert(
-        PolicyBuilder("centralized-fault-tolerant"));
+        PolicyBuilder("centralized-fault-tolerant", [](uipcp_rib *rib) {
+            rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
+        }));
     available_policies["enrollment"].insert(PolicyBuilder("default"));
     available_policies["resource-allocator"].insert(PolicyBuilder("default"));
     available_policies["routing"].insert(PolicyBuilder("link-state"));

@@ -293,9 +293,8 @@ struct DFT {
     DFT(struct uipcp_rib *_ur) : rib(_ur) {}
     virtual ~DFT() {}
 
-    virtual void dump(std::stringstream &ss) const = 0;
     virtual int param_changed(const std::string &param_name) { return 0; }
-
+    virtual void dump(std::stringstream &ss) const                     = 0;
     virtual int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
                              const rlm_addr_t preferred,
                              uint32_t cookie) const                    = 0;
@@ -700,8 +699,9 @@ class CentralizedFaultTolerantDFT : public DFT {
             uint8_t opcode;
         } __attribute__((packed));
 
-        /* State machine implementation. */
-        std::multimap<std::string, DFTEntry> dft_table;
+        /* State machine implementation. Just reuse the implementation of
+         * a fully replicated DFT. */
+        std::unique_ptr<FullyReplicatedDFT> impl;
 
     public:
         RaftDFT(CentralizedFaultTolerantDFT *dft)
@@ -734,6 +734,16 @@ public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
     CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
     int param_changed(const std::string &param_name) override;
+    void dump(std::stringstream &ss) const override;
+
+    int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+                     const rlm_addr_t preferred,
+                     uint32_t cookie) const override;
+    int appl_register(const struct rl_kmsg_appl_register *req) override;
+    void update_address(rlm_addr_t new_addr) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
 };
 
 class DefaultFlowAllocator : public FlowAllocator {

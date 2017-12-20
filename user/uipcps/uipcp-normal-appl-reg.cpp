@@ -353,15 +353,17 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
                 return -1;
             }
             UPI(rib->uipcp, "Raft replica initialized\n");
+            assert(raft != nullptr && client == nullptr);
             return raft->process_sm_output(std::move(out));
         }
     }
-    if (it == peers.end()) {
-        /* I'm not one of the replicas. I'm just a client. */
-        raft.reset();
-        client = make_unique<Client>(this, std::move(peers));
-        UPI(rib->uipcp, "Client initialized\n");
-    }
+
+    /* I'm not one of the replicas. I'm just a client. */
+    assert(it == peers.end());
+    raft.reset();
+    client = make_unique<Client>(this, std::move(peers));
+    UPI(rib->uipcp, "Client initialized\n");
+    assert(raft == nullptr && client != nullptr);
 
     return 0;
 }
@@ -377,4 +379,48 @@ CentralizedFaultTolerantDFT::RaftDFT::process_sm_output(RaftSMOutput out)
         (void)cmd;
     }
     return 0;
+}
+
+void
+CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
+{
+}
+
+int
+CentralizedFaultTolerantDFT::lookup_entry(const std::string &appl_name,
+                                          rlm_addr_t &dstaddr,
+                                          const rlm_addr_t preferred,
+                                          uint32_t cookie) const
+{
+    return -1;
+}
+
+int
+CentralizedFaultTolerantDFT::appl_register(
+    const struct rl_kmsg_appl_register *req)
+{
+    return -1;
+}
+
+void
+CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
+{
+}
+
+int
+CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+{
+    return -1;
+}
+
+int
+CentralizedFaultTolerantDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
+{
+    return -1;
+}
+
+int
+CentralizedFaultTolerantDFT::neighs_refresh(size_t limit)
+{
+    return -1;
 }
