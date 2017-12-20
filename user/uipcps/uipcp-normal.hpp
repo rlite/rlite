@@ -711,7 +711,8 @@ class CentralizedFaultTolerantDFT : public DFT {
                          std::to_string(dft->rib->uipcp->id) +
                          std::string("-") + dft->rib->myname,
                      sizeof(Command), std::cerr, std::cout),
-              parent(dft){};
+              parent(dft),
+              impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override { return 0; };
     };
