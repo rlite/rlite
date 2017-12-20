@@ -376,7 +376,7 @@ struct AddrAllocator {
 
 struct PolicyBuilder {
     std::string name;
-    std::function<void(uipcp_rib *)> builder;
+    std::function<void(uipcp_rib *)> builder = [](uipcp_rib *) {};
 
     PolicyBuilder(const std::string &policy_name) : name(policy_name) {}
     PolicyBuilder(const std::string &policy_name,
