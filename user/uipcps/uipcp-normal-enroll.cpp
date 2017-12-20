@@ -217,7 +217,7 @@ NeighFlow::keepalive_timeout()
     UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(neigh->ipcp_name).c_str());
 
-    m.m_read(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive);
+    m.m_read(obj_class::keepalive, obj_name::keepalive);
 
     ret = send_to_port_id(&m, 0, nullptr);
     if (ret) {
@@ -465,7 +465,7 @@ NeighFlow::enrollee_default(std::unique_lock<std::mutex> &lk)
         enr_info.lower_difs = rib->lower_difs;
         obj                 = &enr_info;
 
-        m.m_start(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment);
+        m.m_start(obj_class::enrollment, obj_name::enrollment);
         ret = send_to_port_id(&m, 0, obj);
         if (ret) {
             UPE(rib->uipcp, "send_to_port_id() failed [%s]\n", strerror(errno));
@@ -659,8 +659,7 @@ NeighFlow::enrollee_thread()
              *
              * This is not a complete enrollment, but only the allocation
              * of a lower flow. */
-            m.m_start(gpb::F_NO_FLAGS, obj_class::lowerflow,
-                      obj_name::lowerflow);
+            m.m_start(obj_class::lowerflow, obj_name::lowerflow);
             ret = send_to_port_id(&m, 0, nullptr);
             if (ret) {
                 UPE(rib->uipcp, "send_to_port_id() failed [%s]\n",
@@ -786,7 +785,7 @@ NeighFlow::enroller_default(std::unique_lock<std::mutex> &lk)
         enr_info.start_early = true;
 
         m = CDAPMessage();
-        m.m_stop(gpb::F_NO_FLAGS, obj_class::enrollment, obj_name::enrollment);
+        m.m_stop(obj_class::enrollment, obj_name::enrollment);
 
         ret = send_to_port_id(&m, 0, &enr_info);
         if (ret) {
@@ -822,7 +821,7 @@ NeighFlow::enroller_default(std::unique_lock<std::mutex> &lk)
 
         /* This is not required if the initiator is allowed to start
          * early. */
-        m.m_start(gpb::F_NO_FLAGS, obj_class::status, obj_name::status);
+        m.m_start(obj_class::status, obj_name::status);
 
         ret = send_to_port_id(&m, 0, nullptr);
         if (ret) {
@@ -994,10 +993,10 @@ Neighbor::neigh_sync_obj(const NeighFlow *nf, bool create,
     }
 
     if (create) {
-        m.m_create(gpb::F_NO_FLAGS, obj_class, obj_name);
+        m.m_create(obj_class, obj_name);
 
     } else {
-        m.m_delete(gpb::F_NO_FLAGS, obj_class, obj_name);
+        m.m_delete(obj_class, obj_name);
     }
 
     ret = const_cast<NeighFlow *>(nf)->send_to_port_id(&m, 0, obj_value);
@@ -1278,7 +1277,7 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
 
     /* Just reply back to tell the neighbor we are alive. */
 
-    m.m_read_r(gpb::F_NO_FLAGS, obj_class::keepalive, obj_name::keepalive);
+    m.m_read_r(obj_class::keepalive, obj_name::keepalive);
 
     ret = nf->send_to_port_id(&m, rm->invoke_id, nullptr);
     if (ret) {
