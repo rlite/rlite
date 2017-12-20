@@ -1170,7 +1170,8 @@ uipcp_rib::policy_mod(const std::string &component,
         return -1;
     }
 
-    if (!available_policies[component].count(policy_name)) {
+    auto policy_builder = available_policies[component].find(policy_name);
+    if (policy_builder == available_policies[component].end()) {
         UPE(uipcp, "Unknown %s policy %s\n", component.c_str(),
             policy_name.c_str());
         return -1;
@@ -1202,19 +1203,8 @@ uipcp_rib::policy_mod(const std::string &component,
                 UPD(uipcp, "LFA switched on\n");
             }
         }
-    } else if (component == "address-allocator") {
-        if (policy_name == "manual") {
-            addra = make_unique<ManualAddrAllocator>(this);
-        } else if (policy_name == "distributed") {
-            addra = make_unique<DistributedAddrAllocator>(this);
-        }
-    } else if (component == "dft") {
-        if (policy_name == "fully-replicated") {
-            dft = make_unique<FullyReplicatedDFT>(this);
-        } else if (policy_name == "centralized-fault-tolerant") {
-            // dft = make_unique<CentralizedFaultTolerantDFT>(this);
-        }
     }
+    policy_builder->builder(this);
 
     return ret;
 }
