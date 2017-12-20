@@ -29,6 +29,7 @@
 #include <fstream>
 #include <cstring>
 #include <sstream>
+#include <functional>
 #include <cstdlib>
 #include <unistd.h>
 #include <stdint.h>
@@ -1523,10 +1524,10 @@ uipcp_rib::policy_list(const struct rl_cmsg_ipcp_policy_list_req *req,
         }
         for (const auto &policy : available_policies[component]) {
             policy_count++;
-            if (policies[component] == policy) {
-                ss << "[" << policy << "]";
+            if (policies[component] == policy.name) {
+                ss << "[" << policy.name << "]";
             } else {
-                ss << policy;
+                ss << policy.name;
             }
             if (policy_count < available_policies[component].size()) {
                 ss << " ";
@@ -1996,21 +1997,25 @@ normal_trigger_tasks(struct uipcp *uipcp)
     rib->check_for_address_conflicts();
 }
 
-/* Global map of available policies. */
-std::unordered_map<std::string, std::unordered_set<std::string> >
-    available_policies;
+/* Global map of available policies. Maps the name of each replaceable component
+ * to a set of PolicyBuilder objects. Each PolicyBuilder object describes a
+ * different policy (it contains a name and a function to build and assign the
+ * policy). */
+std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
 
 extern "C" void
 normal_lib_init(void)
 {
-    available_policies["address-allocator"].insert("manual");
-    available_policies["address-allocator"].insert("distributed");
-    available_policies["dft"].insert("fully-replicated");
-    available_policies["dft"].insert("centralized-fault-tolerant");
-    available_policies["enrollment"].insert("default");
-    available_policies["resource-allocator"].insert("default");
-    available_policies["routing"].insert("link-state");
-    available_policies["routing"].insert("link-state-lfa");
+    available_policies["address-allocator"].insert(PolicyBuilder("manual"));
+    available_policies["address-allocator"].insert(
+        PolicyBuilder("distributed"));
+    available_policies["dft"].insert(PolicyBuilder("fully-replicated"));
+    available_policies["dft"].insert(
+        PolicyBuilder("centralized-fault-tolerant"));
+    available_policies["enrollment"].insert(PolicyBuilder("default"));
+    available_policies["resource-allocator"].insert(PolicyBuilder("default"));
+    available_policies["routing"].insert(PolicyBuilder("link-state"));
+    available_policies["routing"].insert(PolicyBuilder("link-state-lfa"));
 }
 
 struct uipcp_ops normal_ops = {
