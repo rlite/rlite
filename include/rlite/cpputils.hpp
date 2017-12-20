@@ -10,11 +10,13 @@ static inline std::list<std::string>
 strsplit(const std::string &s, char delim)
 {
     std::stringstream ss(s);
-    std::string item;
     std::list<std::string> ret;
+    std::string item;
+
     while (std::getline(ss, item, delim)) {
         ret.push_back(std::move(item));
     }
+
     return ret;
 }
 

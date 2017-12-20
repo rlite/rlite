@@ -357,11 +357,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    dft  = make_unique<FullyReplicatedDFT>(this);
     fa   = make_unique<DefaultFlowAllocator>(this);
     lfdb = make_unique<FullyReplicatedLFDB>(this);
-    policy_mod("routing", "link-state");
     policy_mod("address-allocator", "distributed");
+    policy_mod("dft", "fully-replicated");
+    policy_mod("routing", "link-state");
 
     /* Insert the handlers for the RIB objects. */
     handlers.insert(make_pair(obj_name::dft, &uipcp_rib::dft_handler));
@@ -1207,6 +1207,12 @@ uipcp_rib::policy_mod(const std::string &component,
         } else if (policy_name == "distributed") {
             addra = make_unique<DistributedAddrAllocator>(this);
         }
+    } else if (component == "dft") {
+        if (policy_name == "fully-replicated") {
+            dft = make_unique<FullyReplicatedDFT>(this);
+        } else if (policy_name == "centralized-fault-tolerant") {
+            // dft = make_unique<CentralizedFaultTolerantDFT>(this);
+        }
     }
 
     return ret;
@@ -1997,12 +2003,14 @@ std::unordered_map<std::string, std::unordered_set<std::string> >
 extern "C" void
 normal_lib_init(void)
 {
-    available_policies["routing"].insert("link-state");
-    available_policies["routing"].insert("link-state-lfa");
     available_policies["address-allocator"].insert("manual");
     available_policies["address-allocator"].insert("distributed");
+    available_policies["dft"].insert("fully-replicated");
+    available_policies["dft"].insert("centralized-fault-tolerant");
     available_policies["enrollment"].insert("default");
     available_policies["resource-allocator"].insert("default");
+    available_policies["routing"].insert("link-state");
+    available_policies["routing"].insert("link-state-lfa");
 }
 
 struct uipcp_ops normal_ops = {
