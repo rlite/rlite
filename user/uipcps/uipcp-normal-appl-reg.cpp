@@ -384,6 +384,7 @@ CentralizedFaultTolerantDFT::RaftDFT::process_sm_output(RaftSMOutput out)
 void
 CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
 {
+    UPE(rib->uipcp, "Missing implementation");
 }
 
 int
@@ -392,6 +393,7 @@ CentralizedFaultTolerantDFT::lookup_entry(const std::string &appl_name,
                                           const rlm_addr_t preferred,
                                           uint32_t cookie) const
 {
+    UPW(rib->uipcp, "Missing implementation");
     return -1;
 }
 
@@ -399,28 +401,31 @@ int
 CentralizedFaultTolerantDFT::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
+    UPW(rib->uipcp, "Missing implementation");
     return -1;
 }
 
 void
 CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
 {
+    UPE(rib->uipcp, "Missing implementation\n");
 }
 
 int
 CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
-    return -1;
+    UPW(rib->uipcp, "Not supported\n");
+    return 0;
 }
 
 int
 CentralizedFaultTolerantDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
 {
-    return -1;
+    return 0; /* Nothing to do. */
 }
 
 int
 CentralizedFaultTolerantDFT::neighs_refresh(size_t limit)
 {
-    return -1;
+    return 0; /* Nothing to do. */
 }
