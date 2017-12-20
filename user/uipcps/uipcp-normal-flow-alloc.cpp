@@ -241,7 +241,7 @@ DefaultFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
              << req->local_port;
 
     m = make_unique<CDAPMessage>();
-    m->m_create(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str());
+    m->m_create(obj_class::flow, obj_name.str());
 
     freq.invoke_id = 0; /* invoke_id is actually set in send_to_dst_addr() */
     freq.flags     = RL_FLOWREQ_INITIATOR | RL_FLOWREQ_SEND_DEL;
@@ -287,8 +287,8 @@ DefaultFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
     }
 
     m = make_unique<CDAPMessage>();
-    m->m_create_r(gpb::F_NO_FLAGS, obj_class::flow, obj_name.str(), 0,
-                  resp->response ? -1 : 0, reason);
+    m->m_create_r(obj_class::flow, obj_name.str(), 0, resp->response ? -1 : 0,
+                  reason);
 
     ret = rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
 
@@ -327,7 +327,7 @@ DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
             static_cast<string>(freq.dst_app).c_str());
 
         m = make_unique<CDAPMessage>();
-        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
+        m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
                       "Cannot find DFT entry");
 
         return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
@@ -340,7 +340,7 @@ DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 
         UPE(rib->uipcp, "Flow request forwarding not supported\n");
         m = make_unique<CDAPMessage>();
-        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
+        m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
                       "Flow request forwarding not supported");
 
         return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
@@ -351,7 +351,7 @@ DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 
         UPE(rib->uipcp, "No connections specified on this flow\n");
         m = make_unique<CDAPMessage>();
-        m->m_create_r(gpb::F_NO_FLAGS, rm->obj_class, rm->obj_name, 0, -1,
+        m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
                       "Cannot find DFT entry");
 
         return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
@@ -458,7 +458,7 @@ DefaultFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 
     /* We should wait 2 MPL here before notifying the peer. */
     m = make_unique<CDAPMessage>();
-    m->m_delete(gpb::F_NO_FLAGS, obj_class::flow, obj_name);
+    m->m_delete(obj_class::flow, obj_name);
 
     return rib->send_to_dst_addr(std::move(m), remote_addr, nullptr);
 }

@@ -1155,7 +1155,7 @@ IPoRINA::connect_to_remotes()
                 if (i == IPOR_DATA) {
                     /* This is a data connection, send an empty CDAP start
                      * message to inform the remote peer. */
-                    m.m_start(gpb::F_NO_FLAGS, "data", "/data");
+                    m.m_start("data", "/data");
                     if (cdap_obj_send(&conn, &m, 0, NULL) < 0) {
                         cerr << "Failed to send M_START(data)" << endl;
                         goto abor;
@@ -1179,7 +1179,7 @@ IPoRINA::connect_to_remotes()
                     }
 
                     /* Exchange routes. */
-                    m.m_start(gpb::F_NO_FLAGS, "hello", "/hello");
+                    m.m_start("hello", "/hello");
                     hello.num_routes   = local_routes.size();
                     hello.tun_subnet   = kv.second.tun_subnet;
                     hello.tun_src_addr = kv.second.tun_local_addr;
@@ -1192,7 +1192,7 @@ IPoRINA::connect_to_remotes()
                     for (const auto &route : local_routes) {
                         RouteObj robj(route.subnet);
 
-                        m.m_write(gpb::F_NO_FLAGS, "route", "/routes");
+                        m.m_write("route", "/routes");
                         if (cdap_obj_send(&conn, &m, 0, &robj) < 0) {
                             cerr << "Failed to send M_WRITE" << endl;
                             goto abor;

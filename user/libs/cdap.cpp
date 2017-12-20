@@ -1221,22 +1221,19 @@ CDAPMessage::m_connect_r(const CDAPMessage *req, int result_,
 }
 
 int
-CDAPMessage::m_release(gpb::flagValues_t flags_)
+CDAPMessage::m_release()
 {
     clear();
     op_code = gpb::M_RELEASE;
-    flags   = flags_;
 
     return 0;
 }
 
 int
-CDAPMessage::m_release_r(gpb::flagValues_t flags_, int result_,
-                         const std::string &result_reason_)
+CDAPMessage::m_release_r(int result_, const std::string &result_reason_)
 {
     clear();
     op_code = gpb::M_RELEASE_R;
-    flags   = flags_;
 
     result        = result_;
     result_reason = result_reason_;
@@ -1245,13 +1242,12 @@ CDAPMessage::m_release_r(gpb::flagValues_t flags_, int result_,
 }
 
 int
-CDAPMessage::m_common(gpb::flagValues_t flags_, const std::string &obj_class_,
+CDAPMessage::m_common(const std::string &obj_class_,
                       const std::string &obj_name_, long obj_inst_, int scope_,
                       const std::string &filter_, gpb::opCode_t op_code_)
 {
     clear();
     op_code   = op_code_;
-    flags     = flags_;
     obj_class = obj_class_;
     obj_name  = obj_name_;
     obj_inst  = obj_inst_;
@@ -1262,14 +1258,13 @@ CDAPMessage::m_common(gpb::flagValues_t flags_, const std::string &obj_class_,
 }
 
 int
-CDAPMessage::m_common_r(gpb::flagValues_t flags_, const std::string &obj_class_,
+CDAPMessage::m_common_r(const std::string &obj_class_,
                         const std::string &obj_name_, long obj_inst_,
                         int result_, const std::string &result_reason_,
                         gpb::opCode_t op_code_)
 {
     clear();
     op_code   = op_code_;
-    flags     = flags_;
     obj_class = obj_class_;
     obj_name  = obj_name_;
     obj_inst  = obj_inst_;
@@ -1281,67 +1276,62 @@ CDAPMessage::m_common_r(gpb::flagValues_t flags_, const std::string &obj_class_,
 }
 
 int
-CDAPMessage::m_create(gpb::flagValues_t flags, const std::string &obj_class,
-                      const std::string &obj_name, long obj_inst, int scope,
-                      const std::string &filter)
+CDAPMessage::m_create(const std::string &obj_class, const std::string &obj_name,
+                      long obj_inst, int scope, const std::string &filter)
 {
-    return m_common(flags, obj_class, obj_name, obj_inst, scope, filter,
+    return m_common(obj_class, obj_name, obj_inst, scope, filter,
                     gpb::M_CREATE);
 }
 
 int
-CDAPMessage::m_create_r(gpb::flagValues_t flags, const std::string &obj_class,
+CDAPMessage::m_create_r(const std::string &obj_class,
                         const std::string &obj_name, long obj_inst, int result,
                         const std::string &result_reason)
 {
-    return m_common_r(flags, obj_class, obj_name, obj_inst, result,
-                      result_reason, gpb::M_CREATE_R);
+    return m_common_r(obj_class, obj_name, obj_inst, result, result_reason,
+                      gpb::M_CREATE_R);
 }
 
 int
-CDAPMessage::m_delete(gpb::flagValues_t flags, const std::string &obj_class,
-                      const std::string &obj_name, long obj_inst, int scope,
-                      const std::string &filter)
+CDAPMessage::m_delete(const std::string &obj_class, const std::string &obj_name,
+                      long obj_inst, int scope, const std::string &filter)
 {
-    return m_common(flags, obj_class, obj_name, obj_inst, scope, filter,
+    return m_common(obj_class, obj_name, obj_inst, scope, filter,
                     gpb::M_DELETE);
 }
 
 int
-CDAPMessage::m_delete_r(gpb::flagValues_t flags, const std::string &obj_class,
+CDAPMessage::m_delete_r(const std::string &obj_class,
                         const std::string &obj_name, long obj_inst, int result,
                         const std::string &result_reason)
 {
-    return m_common_r(flags, obj_class, obj_name, obj_inst, result,
-                      result_reason, gpb::M_DELETE_R);
+    return m_common_r(obj_class, obj_name, obj_inst, result, result_reason,
+                      gpb::M_DELETE_R);
 }
 
 int
-CDAPMessage::m_read(gpb::flagValues_t flags, const std::string &obj_class,
-                    const std::string &obj_name, long obj_inst, int scope,
-                    const std::string &filter)
+CDAPMessage::m_read(const std::string &obj_class, const std::string &obj_name,
+                    long obj_inst, int scope, const std::string &filter)
 {
-    return m_common(flags, obj_class, obj_name, obj_inst, scope, filter,
-                    gpb::M_READ);
+    return m_common(obj_class, obj_name, obj_inst, scope, filter, gpb::M_READ);
 }
 
 int
-CDAPMessage::m_read_r(gpb::flagValues_t flags, const std::string &obj_class,
-                      const std::string &obj_name, long obj_inst, int result,
+CDAPMessage::m_read_r(const std::string &obj_class, const std::string &obj_name,
+                      long obj_inst, int result,
                       const std::string &result_reason)
 {
-    return m_common_r(flags, obj_class, obj_name, obj_inst, result,
-                      result_reason, gpb::M_READ_R);
+    return m_common_r(obj_class, obj_name, obj_inst, result, result_reason,
+                      gpb::M_READ_R);
 }
 
 int
-CDAPMessage::m_write(gpb::flagValues_t flags_, const std::string &obj_class_,
+CDAPMessage::m_write(const std::string &obj_class_,
                      const std::string &obj_name_, long obj_inst_, int scope_,
                      const std::string &filter_)
 {
     clear();
     op_code   = gpb::M_WRITE;
-    flags     = flags_;
     obj_class = obj_class_;
     obj_name  = obj_name_;
     obj_inst  = obj_inst_;
@@ -1352,12 +1342,10 @@ CDAPMessage::m_write(gpb::flagValues_t flags_, const std::string &obj_class_,
 }
 
 int
-CDAPMessage::m_write_r(gpb::flagValues_t flags_, int result_,
-                       const std::string &result_reason_)
+CDAPMessage::m_write_r(int result_, const std::string &result_reason_)
 {
     clear();
     op_code = gpb::M_WRITE_R;
-    flags   = flags_;
 
     result        = result_;
     result_reason = result_reason_;
@@ -1366,22 +1354,19 @@ CDAPMessage::m_write_r(gpb::flagValues_t flags_, int result_,
 }
 
 int
-CDAPMessage::m_cancelread(gpb::flagValues_t flags_)
+CDAPMessage::m_cancelread()
 {
     clear();
     op_code = gpb::M_CANCELREAD;
-    flags   = flags_;
 
     return 0;
 }
 
 int
-CDAPMessage::m_cancelread_r(gpb::flagValues_t flags_, int result_,
-                            const std::string &result_reason_)
+CDAPMessage::m_cancelread_r(int result_, const std::string &result_reason_)
 {
     clear();
     op_code = gpb::M_CANCELREAD_R;
-    flags   = flags_;
 
     result        = result_;
     result_reason = result_reason_;
@@ -1390,21 +1375,17 @@ CDAPMessage::m_cancelread_r(gpb::flagValues_t flags_, int result_,
 }
 
 int
-CDAPMessage::m_start(gpb::flagValues_t flags, const std::string &obj_class,
-                     const std::string &obj_name, long obj_inst, int scope,
-                     const std::string &filter)
+CDAPMessage::m_start(const std::string &obj_class, const std::string &obj_name,
+                     long obj_inst, int scope, const std::string &filter)
 {
-    return m_common(flags, obj_class, obj_name, obj_inst, scope, filter,
-                    gpb::M_START);
+    return m_common(obj_class, obj_name, obj_inst, scope, filter, gpb::M_START);
 }
 
 int
-CDAPMessage::m_start_r(gpb::flagValues_t flags_, int result_,
-                       const std::string &result_reason_)
+CDAPMessage::m_start_r(int result_, const std::string &result_reason_)
 {
     clear();
     op_code = gpb::M_START_R;
-    flags   = flags_;
 
     result        = result_;
     result_reason = result_reason_;
@@ -1413,21 +1394,17 @@ CDAPMessage::m_start_r(gpb::flagValues_t flags_, int result_,
 }
 
 int
-CDAPMessage::m_stop(gpb::flagValues_t flags, const std::string &obj_class,
-                    const std::string &obj_name, long obj_inst, int scope,
-                    const std::string &filter)
+CDAPMessage::m_stop(const std::string &obj_class, const std::string &obj_name,
+                    long obj_inst, int scope, const std::string &filter)
 {
-    return m_common(flags, obj_class, obj_name, obj_inst, scope, filter,
-                    gpb::M_STOP);
+    return m_common(obj_class, obj_name, obj_inst, scope, filter, gpb::M_STOP);
 }
 
 int
-CDAPMessage::m_stop_r(gpb::flagValues_t flags_, int result_,
-                      const std::string &result_reason_)
+CDAPMessage::m_stop_r(int result_, const std::string &result_reason_)
 {
     clear();
     op_code = gpb::M_STOP_R;
-    flags   = flags_;
 
     result        = result_;
     result_reason = result_reason_;

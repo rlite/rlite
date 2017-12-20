@@ -133,34 +133,32 @@ test_cdap_server(int port)
             break;
 
         case gpb::M_RELEASE:
-            rm.m_release_r(gpb::F_NO_FLAGS, 0, string());
+            rm.m_release_r(0, string());
             break;
 
         case gpb::M_CREATE:
-            rm.m_create_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name,
-                          obj_inst_cnt++, 0, string());
+            rm.m_create_r(m->obj_class, m->obj_name, obj_inst_cnt++, 0,
+                          string());
             break;
 
         case gpb::M_DELETE:
-            rm.m_delete_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name,
-                          m->obj_inst, 0, string());
+            rm.m_delete_r(m->obj_class, m->obj_name, m->obj_inst, 0, string());
             break;
 
         case gpb::M_READ:
-            rm.m_read_r(gpb::F_NO_FLAGS, m->obj_class, m->obj_name, m->obj_inst,
-                        0, string());
+            rm.m_read_r(m->obj_class, m->obj_name, m->obj_inst, 0, string());
             break;
 
         case gpb::M_WRITE:
-            rm.m_write_r(gpb::F_NO_FLAGS, 0, string());
+            rm.m_write_r(0, string());
             break;
 
         case gpb::M_START:
-            rm.m_start_r(gpb::F_NO_FLAGS, 0, string());
+            rm.m_start_r(0, string());
             break;
 
         case gpb::M_STOP:
-            rm.m_stop_r(gpb::F_NO_FLAGS, 0, string());
+            rm.m_stop_r(0, string());
             break;
 
         default:
@@ -229,7 +227,7 @@ client_create_some(CDAPConn *conn)
     CDAPMessage req;
     std::unique_ptr<CDAPMessage> m;
 
-    if (req.m_create(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+    if (req.m_create("class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
@@ -252,19 +250,19 @@ client_write_some(CDAPConn *conn)
     std::unique_ptr<CDAPMessage> m;
     char buf[10];
 
-    req.m_write(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string());
+    req.m_write("class_A", "x", 0, 0, string());
     req.set_obj_value(18);
     if (conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
-    req.m_write(gpb::F_NO_FLAGS, "class_B", "y", 0, 0, string());
+    req.m_write("class_B", "y", 0, 0, string());
     req.set_obj_value("ciccio");
     if (conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
-    req.m_write(gpb::F_NO_FLAGS, "class_C", "z", 0, 0, string());
+    req.m_write("class_C", "z", 0, 0, string());
     for (unsigned int i = 0; i < sizeof(buf); i++) {
         buf[i] = '0' + i;
     }
@@ -292,7 +290,7 @@ client_read_some(CDAPConn *conn)
     CDAPMessage req;
     std::unique_ptr<CDAPMessage> m;
 
-    if (req.m_read(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+    if (req.m_read("class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
@@ -314,7 +312,7 @@ client_startstop_some(CDAPConn *conn)
     CDAPMessage req;
     std::unique_ptr<CDAPMessage> m;
 
-    if (req.m_start(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+    if (req.m_start("class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
@@ -327,7 +325,7 @@ client_startstop_some(CDAPConn *conn)
 
     m->dump();
 
-    if (req.m_stop(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+    if (req.m_stop("class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
@@ -349,7 +347,7 @@ client_delete_some(CDAPConn *conn)
     CDAPMessage req;
     std::unique_ptr<CDAPMessage> m;
 
-    if (req.m_delete(gpb::F_NO_FLAGS, "class_A", "x", 0, 0, string()) ||
+    if (req.m_delete("class_A", "x", 0, 0, string()) ||
         conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
@@ -371,7 +369,7 @@ client_disconnect(CDAPConn *conn)
     CDAPMessage req;
     std::unique_ptr<CDAPMessage> m;
 
-    if (req.m_release(gpb::F_NO_FLAGS) || conn->msg_send(&req, 0) < 0) {
+    if (req.m_release() || conn->msg_send(&req, 0) < 0) {
         PE("Failed to send CDAP message\n");
     }
 
