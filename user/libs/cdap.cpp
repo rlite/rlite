@@ -616,10 +616,12 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
 
     abs_syntax = gm.abssyntax();
     op_code    = gm.opcode();
-    invoke_id  = gm.invokeid();
-    flags      = gm.flags();
-    obj_class  = gm.objclass();
-    obj_name   = gm.objname();
+    if (gm.has_invokeid()) {
+        invoke_id = gm.invokeid();
+    }
+    flags     = gm.flags();
+    obj_class = gm.objclass();
+    obj_name  = gm.objname();
     if (gm.has_objinst()) {
         obj_inst = gm.objinst();
     }
@@ -720,7 +722,9 @@ CDAPMessage::operator gpb::CDAPMessage() const
 
     gm.set_abssyntax(abs_syntax);
     gm.set_opcode(op_code);
-    gm.set_invokeid(invoke_id);
+    if (invoke_id) {
+        gm.set_invokeid(invoke_id);
+    }
     gm.set_flags(flags);
     gm.set_objclass(obj_class);
     gm.set_objname(obj_name);

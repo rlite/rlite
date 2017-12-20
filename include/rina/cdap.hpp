@@ -201,63 +201,63 @@ struct CDAPMessage {
                   const std::string &local_appl,
                   const std::string &remote_appl);
 
-    int m_connect_r(const CDAPMessage *req, int result,
-                    const std::string &result_reason);
+    int m_connect_r(const CDAPMessage *req, int result = 0,
+                    const std::string &result_reason = std::string());
 
-    int m_release(gpb::flagValues_t flags);
+    int m_release(gpb::flagValues_t flags = gpb::F_NO_FLAGS);
 
-    int m_release_r(gpb::flagValues_t flags, int result,
-                    const std::string &result_reason);
+    int m_release_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+                    const std::string &result_reason = std::string());
 
     int m_create(gpb::flagValues_t flags, const std::string &obj_class,
-                 const std::string &obj_name, long obj_inst, int scope,
-                 const std::string &filter);
+                 const std::string &obj_name, long obj_inst = 0, int scope = 0,
+                 const std::string &filter = std::string());
 
     int m_create_r(gpb::flagValues_t flags, const std::string &obj_class,
-                   const std::string &obj_name, long obj_inst, int result,
-                   const std::string &result_reason);
+                   const std::string &obj_name, long obj_inst = 0, int result = 0,
+                   const std::string &result_reason = std::string());
 
     int m_delete(gpb::flagValues_t flags, const std::string &obj_class,
-                 const std::string &obj_name, long obj_inst, int scope,
-                 const std::string &filter);
+                 const std::string &obj_name, long obj_inst = 0, int scope = 0,
+                 const std::string &filter = std::string());
 
     int m_delete_r(gpb::flagValues_t flags, const std::string &obj_class,
-                   const std::string &obj_name, long obj_inst, int result,
-                   const std::string &result_reason);
+                   const std::string &obj_name, long obj_inst = 0, int result = 0,
+                   const std::string &result_reason = std::string());
 
     int m_read(gpb::flagValues_t flags, const std::string &obj_class,
-               const std::string &obj_name, long obj_inst, int scope,
-               const std::string &filter);
+               const std::string &obj_name, long obj_inst = 0, int scope = 0,
+               const std::string &filter = std::string());
 
     int m_read_r(gpb::flagValues_t flags, const std::string &obj_class,
-                 const std::string &obj_name, long obj_inst, int result,
-                 const std::string &result_reason);
+                 const std::string &obj_name, long obj_inst = 0, int result = 0,
+                 const std::string &result_reason = std::string());
 
     int m_write(gpb::flagValues_t flags, const std::string &obj_class,
-                const std::string &obj_name, long obj_inst, int scope,
-                const std::string &filter);
+                const std::string &obj_name, long obj_inst = 0, int scope = 0,
+                const std::string &filter = std::string());
 
-    int m_write_r(gpb::flagValues_t flags, int result,
-                  const std::string &result_reason);
+    int m_write_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+                  const std::string &result_reason = std::string());
 
-    int m_cancelread(gpb::flagValues_t flags);
+    int m_cancelread(gpb::flagValues_t flags = gpb::F_NO_FLAGS);
 
-    int m_cancelread_r(gpb::flagValues_t flags, int result,
-                       const std::string &result_reason);
+    int m_cancelread_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+                       const std::string &result_reason = std::string());
 
     int m_start(gpb::flagValues_t flags, const std::string &obj_class,
-                const std::string &obj_name, long obj_inst, int scope,
-                const std::string &filter);
+                const std::string &obj_name, long obj_inst = 0, int scope = 0,
+                const std::string &filter = std::string());
 
-    int m_start_r(gpb::flagValues_t flags, int result,
-                  const std::string &result_reason);
+    int m_start_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+                  const std::string &result_reason = std::string());
 
     int m_stop(gpb::flagValues_t flags, const std::string &obj_class,
-               const std::string &obj_name, long obj_inst, int scope,
-               const std::string &filter);
+               const std::string &obj_name, long obj_inst = 0, int scope = 0,
+               const std::string &filter = std::string());
 
-    int m_stop_r(gpb::flagValues_t flags, int result,
-                 const std::string &result_reason);
+    int m_stop_r(gpb::flagValues_t flags = gpb::F_NO_FLAGS, int result = 0,
+                 const std::string &result_reason = std::string());
 
     void clear() { *this = CDAPMessage(); }
 
