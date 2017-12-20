@@ -117,7 +117,22 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
 {
     std::unique_ptr<CDAPMessage> m;
     Neighbor *neigh;
-    int ret = 0;
+    int ret = 1;
+#if 0
+    /* Track minimum and maximum length of CDAP messages. It's
+     * not thread-safe, but it's just for debugging. We
+     * can live with it. */
+    static int maxlen = 0;
+    static int minlen = 1000000;
+    int newmax = std::max(maxlen, serlen);
+    int newmin = std::min(minlen, serlen);
+
+    if (newmax > maxlen || newmin < minlen) {
+        maxlen = newmax;
+        minlen = newmin;
+        UPD(uipcp, "CDAP messages length <min=%d,max=%d>\n", minlen, maxlen);
+    }
+#endif
 
     if (nf) {
         nf->stats.win[0].bytes_recvd += serlen;
