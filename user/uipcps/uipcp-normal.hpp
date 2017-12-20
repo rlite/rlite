@@ -562,7 +562,7 @@ struct uipcp_rib {
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
-                         const UipcpObject *obj);
+                         const UipcpObject *obj, int *invoke_id = nullptr);
     int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */
@@ -689,7 +689,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
-    class RaftDFT : public RaftSM {
+    class Replica : public RaftSM {
         CentralizedFaultTolerantDFT *parent = nullptr;
 
         /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
@@ -704,7 +704,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         std::unique_ptr<FullyReplicatedDFT> impl;
 
     public:
-        RaftDFT(CentralizedFaultTolerantDFT *dft)
+        Replica(CentralizedFaultTolerantDFT *dft)
             : RaftSM(std::string("ceft-dft-") + dft->rib->myname,
                      dft->rib->myname,
                      std::string("/tmp/ceft-dft-") +
@@ -715,19 +715,32 @@ class CentralizedFaultTolerantDFT : public DFT {
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override { return 0; };
+        int dft_set(const struct rl_kmsg_appl_register *req);
     };
-    std::unique_ptr<RaftDFT> raft;
+    std::unique_ptr<Replica> raft;
 
     /* In case of client, a pointer to client-side data structures. */
     class Client {
         CentralizedFaultTolerantDFT *parent = nullptr;
         std::list<ReplicaId> replicas;
 
+        struct PendingReq {
+            std::string appl_name;
+            ReplicaId replica;
+            PendingReq() = default;
+            PendingReq(const std::string &a, const ReplicaId &r)
+                : appl_name(a), replica(r)
+            {
+            }
+        };
+        std::unordered_map</*invoke_id*/ int, PendingReq> pending;
+
     public:
         Client(CentralizedFaultTolerantDFT *dft, std::list<ReplicaId> names)
             : parent(dft), replicas(std::move(names))
         {
         }
+        int dft_set(const struct rl_kmsg_appl_register *req);
     };
     std::unique_ptr<Client> client;
 
