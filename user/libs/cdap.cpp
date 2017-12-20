@@ -410,19 +410,7 @@ InvokeIdMgr::put_invoke_id_remote(int invoke_id)
     return __put_invoke_id(pending_invoke_ids_remote, invoke_id);
 }
 
-CDAPMessage::CDAPMessage()
-{
-    abs_syntax   = 0;
-    auth_mech    = gpb::AUTH_NONE;
-    flags        = gpb::F_NO_FLAGS;
-    invoke_id    = 0;
-    obj_inst     = 0;
-    op_code      = gpb::M_CONNECT;
-    obj_value.ty = ObjValType::NONE;
-    result       = 0;
-    scope        = 0;
-    version      = 0;
-}
+CDAPMessage::CDAPMessage() { obj_value.ty = ObjValType::NONE; }
 
 void
 CDAPMessage::copy(const CDAPMessage &o)
@@ -623,8 +611,8 @@ CDAPMessage::set_obj_value(const char *buf, size_t len)
 
 CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
 {
-    string apn, api, aen, aei;
     gpb::objVal_t objvalue = gm.objvalue();
+    string apn, api, aen, aei;
 
     abs_syntax = gm.abssyntax();
     op_code    = gm.opcode();
@@ -632,7 +620,9 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
     flags      = gm.flags();
     obj_class  = gm.objclass();
     obj_name   = gm.objname();
-    obj_inst   = gm.objinst();
+    if (gm.has_objinst()) {
+        obj_inst = gm.objinst();
+    }
 
     /* Convert object value. */
     if (objvalue.has_intval()) {
@@ -686,13 +676,21 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
     }
 
     result = gm.result();
-    scope  = gm.scope();
-    filter = gm.filter();
+    if (gm.has_scope()) {
+        scope = gm.scope();
+    }
+    if (gm.has_filter()) {
+        filter = gm.filter();
+    }
 
-    auth_mech           = gm.authmech();
-    auth_value.name     = gm.authvalue().authname();
-    auth_value.password = gm.authvalue().authpassword();
-    auth_value.other    = gm.authvalue().authother();
+    if (gm.has_authmech()) {
+        auth_mech = gm.authmech();
+        if (gm.has_authvalue()) {
+            auth_value.name     = gm.authvalue().authname();
+            auth_value.password = gm.authvalue().authpassword();
+            auth_value.other    = gm.authvalue().authother();
+        }
+    }
 
     apn      = gm.has_destapname() ? gm.destapname() : string();
     api      = gm.has_destapinst() ? gm.destapinst() : string();
@@ -706,8 +704,10 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
     aei      = gm.has_srcaeinst() ? gm.srcaeinst() : string();
     src_appl = rina_string_from_components(apn, api, aen, aei);
 
-    result_reason = gm.resultreason();
-    version       = gm.version();
+    if (gm.has_resultreason()) {
+        result_reason = gm.resultreason();
+    }
+    version = gm.version();
 }
 
 #define safe_c_string(_s) ((_s) ? (_s) : "")
@@ -715,8 +715,7 @@ CDAPMessage::CDAPMessage(const gpb::CDAPMessage &gm)
 CDAPMessage::operator gpb::CDAPMessage() const
 {
     gpb::CDAPMessage gm;
-    gpb::objVal_t *objvalue     = new gpb::objVal_t();
-    gpb::authValue_t *authvalue = new gpb::authValue_t();
+    gpb::objVal_t *objvalue = new gpb::objVal_t();
     string apn, api, aen, aei;
 
     gm.set_abssyntax(abs_syntax);
@@ -725,7 +724,9 @@ CDAPMessage::operator gpb::CDAPMessage() const
     gm.set_flags(flags);
     gm.set_objclass(obj_class);
     gm.set_objname(obj_name);
-    gm.set_objinst(obj_inst);
+    if (obj_inst) {
+        gm.set_objinst(obj_inst);
+    }
 
     /* Convert object value. */
     switch (obj_value.ty) {
@@ -768,28 +769,40 @@ CDAPMessage::operator gpb::CDAPMessage() const
     }
 
     gm.set_result(result);
-    gm.set_scope(scope);
-    gm.set_filter(filter);
-    gm.set_authmech(auth_mech);
+    if (scope) {
+        gm.set_scope(scope);
+    }
+    if (!filter.empty()) {
+        gm.set_filter(filter);
+    }
+    if (auth_mech != gpb::AUTH_NONE) {
+        gpb::authValue_t *authvalue = new gpb::authValue_t();
+        gm.set_authmech(auth_mech);
+        authvalue->set_authname(auth_value.name);
+        authvalue->set_authpassword(auth_value.password);
+        authvalue->set_authother(auth_value.other);
+        gm.set_allocated_authvalue(authvalue);
+    }
 
-    authvalue->set_authname(auth_value.name);
-    authvalue->set_authpassword(auth_value.password);
-    authvalue->set_authother(auth_value.other);
-    gm.set_allocated_authvalue(authvalue);
+    if (!dst_appl.empty()) {
+        rina_components_from_string(dst_appl, apn, api, aen, aei);
+        gm.set_destapname(apn);
+        gm.set_destapinst(api);
+        gm.set_destaename(aen);
+        gm.set_destaeinst(aei);
+    }
 
-    rina_components_from_string(dst_appl, apn, api, aen, aei);
-    gm.set_destapname(apn);
-    gm.set_destapinst(api);
-    gm.set_destaename(aen);
-    gm.set_destaeinst(aei);
+    if (!src_appl.empty()) {
+        rina_components_from_string(src_appl, apn, api, aen, aei);
+        gm.set_srcapname(apn);
+        gm.set_srcapinst(api);
+        gm.set_srcaename(aen);
+        gm.set_srcaeinst(aei);
+    }
 
-    rina_components_from_string(src_appl, apn, api, aen, aei);
-    gm.set_srcapname(apn);
-    gm.set_srcapinst(api);
-    gm.set_srcaename(aen);
-    gm.set_srcaeinst(aei);
-
-    gm.set_resultreason(result_reason);
+    if (!result_reason.empty()) {
+        gm.set_resultreason(result_reason);
+    }
     gm.set_version(version);
 
     return gm;

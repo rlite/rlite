@@ -124,8 +124,8 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
      * can live with it. */
     static int maxlen = 0;
     static int minlen = 1000000;
-    int newmax = std::max(maxlen, serlen);
-    int newmin = std::min(minlen, serlen);
+    int newmax        = std::max(maxlen, serlen);
+    int newmin        = std::min(minlen, serlen);
 
     if (newmax > maxlen || newmin < minlen) {
         maxlen = newmax;
