@@ -2010,6 +2010,8 @@ normal_trigger_tasks(struct uipcp *uipcp)
  * policy). */
 std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
 
+void dft_lib_init();
+
 extern "C" void
 normal_lib_init(void)
 {
@@ -2021,18 +2023,11 @@ normal_lib_init(void)
         PolicyBuilder("distributed", [](uipcp_rib *rib) {
             rib->addra = make_unique<DistributedAddrAllocator>(rib);
         }));
-    available_policies["dft"].insert(
-        PolicyBuilder("fully-replicated", [](uipcp_rib *rib) {
-            rib->dft = make_unique<FullyReplicatedDFT>(rib);
-        }));
-    available_policies["dft"].insert(
-        PolicyBuilder("centralized-fault-tolerant", [](uipcp_rib *rib) {
-            rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
-        }));
     available_policies["enrollment"].insert(PolicyBuilder("default"));
     available_policies["resource-allocator"].insert(PolicyBuilder("default"));
     available_policies["routing"].insert(PolicyBuilder("link-state"));
     available_policies["routing"].insert(PolicyBuilder("link-state-lfa"));
+    dft_lib_init(); /* DFT policies */
 }
 
 struct uipcp_ops normal_ops = {

@@ -43,6 +43,29 @@ time64()
     return (tv.tv_sec << 32) | (tv.tv_nsec & ((1L << 32) - 1L));
 }
 
+class FullyReplicatedDFT : public DFT {
+    /* Directory Forwarding Table, mapping application name (std::string)
+     * to a set of nodes that registered that name. All nodes are considered
+     * equivalent. */
+    std::multimap<std::string, DFTEntry> dft_table;
+
+public:
+    RL_NODEFAULT_NONCOPIABLE(FullyReplicatedDFT);
+    FullyReplicatedDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    ~FullyReplicatedDFT() {}
+
+    void dump(std::stringstream &ss) const override;
+
+    int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+                     const rlm_addr_t preferred,
+                     uint32_t cookie) const override;
+    int appl_register(const struct rl_kmsg_appl_register *req) override;
+    void update_address(rlm_addr_t new_addr) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
+};
+
 int
 FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
                                  rlm_addr_t &dstaddr,
@@ -326,6 +349,83 @@ FullyReplicatedDFT::neighs_refresh(size_t limit)
     return ret;
 }
 
+class CentralizedFaultTolerantDFT : public DFT {
+    /* An instance of this class can be a state machine replica or it can just
+     * be a client that will redirect requests to one of the replicas. */
+
+    /* In case of state machine replica, a pointer to a Raft state
+     * machine. */
+    class Replica : public RaftSM {
+        CentralizedFaultTolerantDFT *parent = nullptr;
+
+        /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
+        struct Command {
+            rlm_addr_t address;
+            char name[63];
+            uint8_t opcode;
+        } __attribute__((packed));
+
+        /* State machine implementation. Just reuse the implementation of
+         * a fully replicated DFT. */
+        std::unique_ptr<FullyReplicatedDFT> impl;
+
+    public:
+        Replica(CentralizedFaultTolerantDFT *dft)
+            : RaftSM(std::string("ceft-dft-") + dft->rib->myname,
+                     dft->rib->myname,
+                     std::string("/tmp/ceft-dft-") +
+                         std::to_string(dft->rib->uipcp->id) +
+                         std::string("-") + dft->rib->myname,
+                     sizeof(Command), std::cerr, std::cout),
+              parent(dft),
+              impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
+        int process_sm_output(RaftSMOutput out);
+        int apply(const char *const serbuf) override { return 0; };
+        int dft_set(const struct rl_kmsg_appl_register *req);
+    };
+    std::unique_ptr<Replica> raft;
+
+    /* In case of client, a pointer to client-side data structures. */
+    class Client {
+        CentralizedFaultTolerantDFT *parent = nullptr;
+        std::list<ReplicaId> replicas;
+
+        struct PendingReq {
+            std::string appl_name;
+            ReplicaId replica;
+            PendingReq() = default;
+            PendingReq(const std::string &a, const ReplicaId &r)
+                : appl_name(a), replica(r)
+            {
+            }
+        };
+        std::unordered_map</*invoke_id*/ int, PendingReq> pending;
+
+    public:
+        Client(CentralizedFaultTolerantDFT *dft, std::list<ReplicaId> names)
+            : parent(dft), replicas(std::move(names))
+        {
+        }
+        int dft_set(const struct rl_kmsg_appl_register *req);
+    };
+    std::unique_ptr<Client> client;
+
+public:
+    RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
+    CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
+    int param_changed(const std::string &param_name) override;
+    void dump(std::stringstream &ss) const override;
+
+    int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+                     const rlm_addr_t preferred,
+                     uint32_t cookie) const override;
+    int appl_register(const struct rl_kmsg_appl_register *req) override;
+    void update_address(rlm_addr_t new_addr) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
+};
+
 int
 CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
@@ -475,4 +575,17 @@ CentralizedFaultTolerantDFT::Replica::dft_set(
 {
     UPW(parent->rib->uipcp, "Missing implementation");
     return -1;
+}
+
+void
+dft_lib_init()
+{
+    available_policies["dft"].insert(
+        PolicyBuilder("fully-replicated", [](uipcp_rib *rib) {
+            rib->dft = make_unique<FullyReplicatedDFT>(rib);
+        }));
+    available_policies["dft"].insert(
+        PolicyBuilder("centralized-fault-tolerant", [](uipcp_rib *rib) {
+            rib->dft = make_unique<CentralizedFaultTolerantDFT>(rib);
+        }));
 }
