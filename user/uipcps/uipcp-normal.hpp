@@ -282,6 +282,7 @@ private:
 #define RL_LOCK_ASSERT(_lock, _locked)
 #endif
 
+/* Naming service, to translate names to addresses. */
 struct DFT {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -302,6 +303,7 @@ struct DFT {
     virtual int neighs_refresh(size_t limit)                           = 0;
 };
 
+/* Allocation and deallocation of N-flows used applications. */
 struct FlowAllocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -328,6 +330,8 @@ struct FlowAllocator {
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
 };
 
+/* Lower Flows Database and dissemination of routing information,
+ * related to (N-1)-flows. */
 struct LFDB {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -356,6 +360,7 @@ struct LFDB {
     virtual void age_incr()                                         = 0;
 };
 
+/* Address allocation for the members of the N-DIF. */
 struct AddrAllocator {
     /* Backpointer to parent data structure. */
     struct uipcp_rib *rib;
@@ -370,6 +375,7 @@ struct AddrAllocator {
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
+/* Object used to store policy names and allocate/switch policies. */
 struct PolicyBuilder {
     std::string name;
     std::function<void(uipcp_rib *)> builder = [](uipcp_rib *) {};
@@ -389,6 +395,7 @@ struct PolicyBuilder {
 extern std::unordered_map<std::string, std::set<PolicyBuilder>>
     available_policies;
 
+/* Main class representing an IPCP. */
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
     struct uipcp *uipcp;

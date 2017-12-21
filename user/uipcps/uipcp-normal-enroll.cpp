@@ -1751,3 +1751,10 @@ uipcp_rib::check_for_address_conflicts()
         }
     }
 }
+
+void
+ra_lib_init()
+{
+    available_policies["enrollment"].insert(PolicyBuilder("default"));
+    available_policies["resource-allocator"].insert(PolicyBuilder("default"));
+}

@@ -1730,16 +1730,17 @@ void addra_lib_init();
 void dft_lib_init();
 void fa_lib_init();
 void lfdb_lib_init();
+void ra_lib_init();
 
 extern "C" void
 normal_lib_init(void)
 {
-    addra_lib_init(); /* address allocation policies */
+    /* We need to register the available policies for all the components. */
+    addra_lib_init(); /* address allocation */
     dft_lib_init();   /* DFT policies */
-    fa_lib_init();    /* flow allocation policies */
-    lfdb_lib_init();  /* routing policies */
-    available_policies["enrollment"].insert(PolicyBuilder("default"));
-    available_policies["resource-allocator"].insert(PolicyBuilder("default"));
+    fa_lib_init();    /* flow allocation */
+    lfdb_lib_init();  /* routing */
+    ra_lib_init();    /* enrollment and resource allocator */
 }
 
 struct uipcp_ops normal_ops = {

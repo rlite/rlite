@@ -836,6 +836,8 @@ usage(void)
            "   -d : start as a daemon process\n");
 }
 
+void normal_lib_init(void);
+
 int
 main(int argc, char **argv)
 {
@@ -925,6 +927,7 @@ main(int argc, char **argv)
         }
     }
 
+    /* Static initializations for the normal IPCP process. */
     normal_lib_init();
 
     /* Open a Unix domain socket to listen to. */
