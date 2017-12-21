@@ -656,38 +656,6 @@ void normal_mgmt_only_flow_ready(struct uipcp *uipcp, int fd, void *opaque);
 
 #define UIPCP_RIB(_u) static_cast<uipcp_rib *>((_u)->priv)
 
-/*
- * Implementation of several IPCP components.
- */
-
-class DefaultFlowAllocator : public FlowAllocator {
-public:
-    RL_NODEFAULT_NONCOPIABLE(DefaultFlowAllocator);
-    DefaultFlowAllocator(struct uipcp_rib *_ur) : FlowAllocator(_ur) {}
-    ~DefaultFlowAllocator() {}
-
-    void dump(std::stringstream &ss) const override;
-    void dump_memtrack(std::stringstream &ss) const override;
-
-    std::unordered_map<std::string, FlowRequest> flow_reqs;
-    std::unordered_map<unsigned int, FlowRequest> flow_reqs_tmp;
-
-    int fa_req(struct rl_kmsg_fa_req *req) override;
-    int fa_resp(struct rl_kmsg_fa_resp *resp) override;
-
-    int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
-
-    int flows_handler_create(const CDAPMessage *rm) override;
-    int flows_handler_create_r(const CDAPMessage *rm) override;
-    int flows_handler_delete(const CDAPMessage *rm) override;
-
-private:
-    void flowspec2flowcfg(const struct rina_flow_spec *spec,
-                          struct rl_flow_config *cfg) const;
-    void policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
-                          const ConnPolicies &p);
-};
-
 class RoutingEngine {
 public:
     RL_NODEFAULT_NONCOPIABLE(RoutingEngine);

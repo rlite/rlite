@@ -373,8 +373,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    fa   = make_unique<DefaultFlowAllocator>(this);
     lfdb = make_unique<FullyReplicatedLFDB>(this);
+    policy_mod("flow-allocator", "local");
     policy_mod("address-allocator", "distributed");
     policy_mod("dft", "fully-replicated");
     policy_mod("routing", "link-state");
@@ -1748,14 +1748,16 @@ normal_trigger_tasks(struct uipcp *uipcp)
  * policy). */
 std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
 
-void dft_lib_init();
 void addra_lib_init();
+void dft_lib_init();
+void fa_lib_init();
 
 extern "C" void
 normal_lib_init(void)
 {
     addra_lib_init(); /* address allocation policies */
     dft_lib_init();   /* DFT policies */
+    fa_lib_init();    /* flow allocation policies */
     available_policies["enrollment"].insert(PolicyBuilder("default"));
     available_policies["resource-allocator"].insert(PolicyBuilder("default"));
     available_policies["routing"].insert(PolicyBuilder("link-state"));

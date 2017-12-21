@@ -833,12 +833,12 @@ of a normal IPCP process:
 | enrollment          | *                 | timeout            | Enrollment timeout in milliseconds. |
 | enrollment          | *                 | keepalive          | Neighbor keepalive timeout in seconds (0 to disable). |
 | enrollment          | *                 | keepalive-thresh   | Number of allowed pending keepalive requests. If exceeded, the N-1 low is pruned. |
-| flow-allocator      | default           | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
-| flow-allocator      | default           | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
-| flow-allocator      | default           | initial-tr         | Initial value for the DTCP retransmission timer (in milliseconds). |
-| flow-allocator      | default           | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
-| flow-allocator      | default           | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
-| flow-allocator      | default           | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
+| flow-allocator      | local             | force-flow-control | If false, flow control is used only with reliable flows. If true, flow control is always used. |
+| flow-allocator      | local             | max-rtxq-len       | Maximum size of the retransmission queue (in PDUs). |
+| flow-allocator      | local             | initial-tr         | Initial value for the DTCP retransmission timer (in milliseconds). |
+| flow-allocator      | local             | initial-a          | Initial value for the DTCP A timer (in milliseconds). |
+| flow-allocator      | local             | initial-credit     | Initial size of the DTCP flow control window (in PDUs). |
+| flow-allocator      | local             | max-cwq-len        | Maximum size of the DTCP closed window queue (in PDUs). |
 | resource-allocator  | *                 | reliable-flows     | Use reliable N-flows if reliable N-1-flows are not available (boolean). |
 | resource-allocator  | *                 | reliable-n-flows   | Use dedicated reliable N-1-flows for management traffic rather than reusing kernel-bound unreliable N-1 flows if possible (boolean). |
 | resource-allocator  | *                 | broadcast-enroller | Let the IPCP register the name of the DIF (DAF name) in addition to the IPCP name (boolean). |
