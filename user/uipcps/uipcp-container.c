@@ -571,7 +571,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     struct uipcp_loop_tmr *e, *cur;
 
     if (!cb) {
-        PE("NULL timer calback\n");
+        UPE(uipcp, "NULL timer calback\n");
         return -1;
     }
 
@@ -585,7 +585,8 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
     pthread_mutex_lock(&uipcp->lock);
 
     if (uipcp->timer_events_cnt >= TIMER_EVENTS_MAX) {
-        PE("Max number of timers reached [%u]\n", uipcp->timer_events_cnt);
+        UPE(uipcp, "Max number of timers reached [%u]\n",
+            uipcp->timer_events_cnt);
     }
 
     e->id  = uipcp->timer_next_id;
@@ -638,7 +639,7 @@ uipcp_loop_schedule_canc(struct uipcp *uipcp, int id)
     }
 
     if (!e) {
-        PE("Cannot find scheduled timer with id %d\n", id);
+        UPE(uipcp, "Cannot find scheduled timer with id %d\n", id);
     } else {
         ret = 0;
         list_del(&e->node);
@@ -658,7 +659,7 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
     struct uipcp_loop_fdh *fdh;
 
     if (!cb || fd < 0) {
-        PE("Invalid arguments fd [%d], cb[%p]\n", fd, cb);
+        UPE(uipcp, "Invalid arguments fd [%d], cb[%p]\n", fd, cb);
         return -1;
     }
 
