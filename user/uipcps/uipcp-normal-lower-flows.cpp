@@ -820,7 +820,7 @@ RoutingEngine::dump(std::stringstream &ss) const
 }
 
 void
-lfdb_lib_init()
+uipcp_rib::lfdb_lib_init()
 {
     auto builder = [](uipcp_rib *rib) {
         std::string policy_name = rib->policies["routing"];

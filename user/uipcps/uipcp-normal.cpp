@@ -75,6 +75,9 @@ string lowerflow        = "/daf/mgmt/" + obj_class::lowerflow;
 string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
 }; // namespace obj_name
 
+std::unordered_map<std::string, std::set<PolicyBuilder>>
+    uipcp_rib::available_policies;
+
 #define MGMTBUF_SIZE_MAX 8092
 
 int
@@ -1729,27 +1732,15 @@ normal_trigger_tasks(struct uipcp *uipcp)
     rib->check_for_address_conflicts();
 }
 
-/* Global map of available policies. Maps the name of each replaceable component
- * to a set of PolicyBuilder objects. Each PolicyBuilder object describes a
- * different policy (it contains a name and a function to build and assign the
- * policy). */
-std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
-
-void addra_lib_init();
-void dft_lib_init();
-void fa_lib_init();
-void lfdb_lib_init();
-void ra_lib_init();
-
 extern "C" void
 normal_lib_init(void)
 {
     /* We need to register the available policies for all the components. */
-    addra_lib_init(); /* address allocation */
-    dft_lib_init();   /* DFT policies */
-    fa_lib_init();    /* flow allocation */
-    lfdb_lib_init();  /* routing */
-    ra_lib_init();    /* enrollment and resource allocator */
+    uipcp_rib::addra_lib_init(); /* address allocation */
+    uipcp_rib::dft_lib_init();   /* DFT policies */
+    uipcp_rib::fa_lib_init();    /* flow allocation */
+    uipcp_rib::lfdb_lib_init();  /* routing */
+    uipcp_rib::ra_lib_init();    /* enrollment and resource allocator */
 }
 
 struct uipcp_ops normal_ops = {

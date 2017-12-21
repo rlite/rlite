@@ -294,7 +294,7 @@ public:
 };
 
 void
-addra_lib_init()
+uipcp_rib::addra_lib_init()
 {
     available_policies["address-allocator"].insert(
         PolicyBuilder("manual", [](uipcp_rib *rib) {

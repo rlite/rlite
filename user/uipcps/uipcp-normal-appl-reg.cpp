@@ -571,7 +571,7 @@ CentralizedFaultTolerantDFT::Replica::dft_set(
 }
 
 void
-dft_lib_init()
+uipcp_rib::dft_lib_init()
 {
     available_policies["dft"].insert(
         PolicyBuilder("fully-replicated", [](uipcp_rib *rib) {
