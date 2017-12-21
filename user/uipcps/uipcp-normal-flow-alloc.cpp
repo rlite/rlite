@@ -27,6 +27,34 @@
 
 using namespace std;
 
+class LocalFlowAllocator : public FlowAllocator {
+public:
+    RL_NODEFAULT_NONCOPIABLE(LocalFlowAllocator);
+    LocalFlowAllocator(struct uipcp_rib *_ur) : FlowAllocator(_ur) {}
+    ~LocalFlowAllocator() {}
+
+    void dump(std::stringstream &ss) const override;
+    void dump_memtrack(std::stringstream &ss) const override;
+
+    std::unordered_map<std::string, FlowRequest> flow_reqs;
+    std::unordered_map<unsigned int, FlowRequest> flow_reqs_tmp;
+
+    int fa_req(struct rl_kmsg_fa_req *req) override;
+    int fa_resp(struct rl_kmsg_fa_resp *resp) override;
+
+    int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
+
+    int flows_handler_create(const CDAPMessage *rm) override;
+    int flows_handler_create_r(const CDAPMessage *rm) override;
+    int flows_handler_delete(const CDAPMessage *rm) override;
+
+private:
+    void flowspec2flowcfg(const struct rina_flow_spec *spec,
+                          struct rl_flow_config *cfg) const;
+    void policies2flowcfg(struct rl_flow_config *cfg, const QosSpec &q,
+                          const ConnPolicies &p);
+};
+
 /* Translate a local flow configuration into the standard
  * representation to be used in the FlowRequest CDAP
  * message. */
@@ -67,8 +95,8 @@ flowcfg2policies(const struct rl_flow_config *cfg, QosSpec &q, ConnPolicies &p)
 /* Translate a standard flow policies specification from FlowRequest
  * CDAP message into a local flow configuration. */
 void
-DefaultFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
-                                       const QosSpec &q, const ConnPolicies &p)
+LocalFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
+                                     const QosSpec &q, const ConnPolicies &p)
 {
     cfg->msg_boundaries    = !q.partial_delivery;
     cfg->in_order_delivery = q.in_order_delivery;
@@ -106,8 +134,8 @@ DefaultFlowAllocator::policies2flowcfg(struct rl_flow_config *cfg,
 /* Any modification to this function must be also reported in the inverse
  * function flowcfg2flowspec(). */
 void
-DefaultFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
-                                       struct rl_flow_config *cfg) const
+LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
+                                     struct rl_flow_config *cfg) const
 {
     bool force_flow_control =
         rib->get_param_value<bool>("flow-allocator", "force-flow-control");
@@ -161,7 +189,7 @@ DefaultFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-DefaultFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
+LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
 {
     rlm_addr_t remote_addr;
     std::unique_ptr<CDAPMessage> m;
@@ -252,7 +280,7 @@ DefaultFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
 
 /* (3) Slave FA <-- Slave application : FA_RESP */
 int
-DefaultFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
+LocalFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 {
     stringstream obj_name;
     string reason;
@@ -299,7 +327,7 @@ DefaultFlowAllocator::fa_resp(struct rl_kmsg_fa_resp *resp)
 
 /* (2) Slave FA <-- Initiator FA : M_CREATE */
 int
-DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
+LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -379,7 +407,7 @@ DefaultFlowAllocator::flows_handler_create(const CDAPMessage *rm)
 
 /* (4) Initiator FA <-- Slave FA : M_CREATE_R */
 int
-DefaultFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
+LocalFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 {
     const char *objbuf;
     size_t objlen;
@@ -413,7 +441,7 @@ DefaultFlowAllocator::flows_handler_create_r(const CDAPMessage *rm)
 }
 
 int
-DefaultFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
+LocalFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 {
     stringstream obj_name_ext;
     string obj_name;
@@ -464,7 +492,7 @@ DefaultFlowAllocator::flow_deallocated(struct rl_kmsg_flow_deallocated *req)
 }
 
 int
-DefaultFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
+LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
 {
     rl_port_t local_port;
     stringstream decode;
@@ -536,7 +564,7 @@ FlowAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 void
-DefaultFlowAllocator::dump(std::stringstream &ss) const
+LocalFlowAllocator::dump(std::stringstream &ss) const
 {
     ss << "Supported flows:" << endl;
     for (const auto &kvf : flow_reqs) {
@@ -558,11 +586,20 @@ DefaultFlowAllocator::dump(std::stringstream &ss) const
 }
 
 void
-DefaultFlowAllocator::dump_memtrack(std::stringstream &ss) const
+LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 {
     ss << endl << "Temporary tables:" << endl;
     ss << "    " << flow_reqs_tmp.size()
        << " elements in the "
           "temporary flow request table"
        << endl;
+}
+
+void
+fa_lib_init()
+{
+    available_policies["flow-allocator"].insert(
+        PolicyBuilder("local", [](uipcp_rib *rib) {
+            rib->fa = make_unique<LocalFlowAllocator>(rib);
+        }));
 }
