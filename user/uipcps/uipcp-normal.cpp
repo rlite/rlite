@@ -78,6 +78,32 @@ string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
 
+TimeoutEvent::TimeoutEvent(unsigned int ms, struct uipcp *u, void *a,
+                           uipcp_tmr_cb_t _cb)
+    : delta_ms(ms), uipcp(u), arg(a), cb(_cb)
+{
+    tmrid = uipcp_loop_schedule(uipcp, delta_ms, cb, arg);
+}
+
+void
+TimeoutEvent::fired()
+{
+    tmrid = -1;
+    clear();
+}
+
+void
+TimeoutEvent::clear()
+{
+    if (tmrid > 0) {
+        uipcp_loop_schedule_canc(uipcp, tmrid);
+        tmrid = -1;
+    }
+    uipcp = nullptr;
+    arg   = nullptr;
+    cb    = nullptr;
+}
+
 #define MGMTBUF_SIZE_MAX 8092
 
 int
@@ -403,8 +429,8 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
 uipcp_rib::~uipcp_rib()
 {
-    uipcp_loop_schedule_canc(uipcp, sync_tmrid);
-    uipcp_loop_schedule_canc(uipcp, age_incr_tmrid);
+    sync_timer->clear();
+    age_incr_timer->clear();
     uipcp_loop_fdh_del(uipcp, mgmtfd);
     close(mgmtfd);
 }
