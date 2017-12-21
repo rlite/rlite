@@ -373,7 +373,6 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
     params_map["routing"]["age-incr-intval"]   = PolicyParam(kAgeIncrIntval);
     params_map["routing"]["age-max"]           = PolicyParam(kAgeMax);
 
-    lfdb = make_unique<FullyReplicatedLFDB>(this);
     policy_mod("flow-allocator", "local");
     policy_mod("address-allocator", "distributed");
     policy_mod("dft", "fully-replicated");
@@ -938,27 +937,6 @@ uipcp_rib::policy_mod(const std::string &component,
 
     policies[component] = policy_name;
     UPD(uipcp, "set %s policy to %s\n", component.c_str(), policy_name.c_str());
-
-    if (component == "routing") {
-        /* Temporary solution to support LFA policies. No pointer switching is
-         * carried out. */
-        struct FullyReplicatedLFDB *lfdbd =
-            dynamic_cast<FullyReplicatedLFDB *>(lfdb.get());
-
-        assert(lfdbd != nullptr);
-
-        if (policy_name == "link-state") {
-            if (lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = false;
-                UPD(uipcp, "LFA switched off\n");
-            }
-        } else if (policy_name == "link-state-lfa") {
-            if (!lfdbd->re.lfa_enabled) {
-                lfdbd->re.lfa_enabled = true;
-                UPD(uipcp, "LFA switched on\n");
-            }
-        }
-    }
     policy_builder->builder(this);
 
     return ret;
@@ -1751,6 +1729,7 @@ std::unordered_map<std::string, std::set<PolicyBuilder>> available_policies;
 void addra_lib_init();
 void dft_lib_init();
 void fa_lib_init();
+void lfdb_lib_init();
 
 extern "C" void
 normal_lib_init(void)
@@ -1758,10 +1737,9 @@ normal_lib_init(void)
     addra_lib_init(); /* address allocation policies */
     dft_lib_init();   /* DFT policies */
     fa_lib_init();    /* flow allocation policies */
+    lfdb_lib_init();  /* routing policies */
     available_policies["enrollment"].insert(PolicyBuilder("default"));
     available_policies["resource-allocator"].insert(PolicyBuilder("default"));
-    available_policies["routing"].insert(PolicyBuilder("link-state"));
-    available_policies["routing"].insert(PolicyBuilder("link-state-lfa"));
 }
 
 struct uipcp_ops normal_ops = {

@@ -30,6 +30,101 @@
 
 using namespace std;
 
+class RoutingEngine {
+public:
+    RL_NODEFAULT_NONCOPIABLE(RoutingEngine);
+    RoutingEngine(struct uipcp_rib *r) : lfa_enabled(false), rib(r) {}
+
+    /* Recompute routing and forwarding table and possibly
+     * update kernel forwarding data structures. */
+    void update_kernel_routing(const NodeId &);
+
+    void flow_state_update(struct rl_kmsg_flow_state *upd);
+
+    /* Is Loop Free Alternate algorithm enabled ? */
+    bool lfa_enabled;
+
+    /* Dump the routing table. */
+    void dump(std::stringstream &ss) const;
+
+private:
+    struct Edge {
+        NodeId to;
+        unsigned int cost;
+
+        Edge(const NodeId &to_, unsigned int cost_) : to(to_), cost(cost_) {}
+        Edge(Edge &&) = default;
+    };
+
+    struct Info {
+        unsigned int dist;
+        NodeId nhop;
+        bool visited;
+    };
+
+    /* Step 1. Shortest Path algorithm. */
+    void compute_shortest_paths(
+        const NodeId &source_node,
+        const std::unordered_map<NodeId, std::list<Edge>> &graph,
+        std::unordered_map<NodeId, Info> &info);
+    int compute_next_hops(const NodeId &);
+
+    /* Step 3. Forwarding table computation and kernel update. */
+    int compute_fwd_table();
+
+    /* The routing table computed by compute_next_hops(). */
+    std::unordered_map<NodeId, std::list<NodeId>> next_hops;
+    NodeId dflt_nhop;
+
+    /* The forwarding table computed by compute_fwd_table().
+     * It maps a NodeId --> (dst_addr, local_port). */
+    std::unordered_map<rlm_addr_t, std::pair<NodeId, rl_port_t>> next_ports;
+
+    /* Set of ports that are currently down. */
+    std::unordered_set<rl_port_t> ports_down;
+
+    struct uipcp_rib *rib;
+};
+
+class FullyReplicatedLFDB : public LFDB {
+    /* Lower Flow Database. */
+    std::unordered_map<NodeId, std::unordered_map<NodeId, LowerFlow>> db;
+    friend class RoutingEngine;
+
+public:
+    /* Routing engine. */
+    RoutingEngine re;
+
+    RL_NODEFAULT_NONCOPIABLE(FullyReplicatedLFDB);
+    FullyReplicatedLFDB(struct uipcp_rib *_ur) : LFDB(_ur), re(_ur) {}
+    ~FullyReplicatedLFDB() {}
+
+    void dump(std::stringstream &ss) const override;
+    void dump_routing(std::stringstream &ss) const override;
+
+    const LowerFlow *find(const NodeId &local_node,
+                          const NodeId &remote_node) const override
+    {
+        return _find(local_node, remote_node);
+    };
+    LowerFlow *find(const NodeId &local_node,
+                    const NodeId &remote_node) override;
+    bool add(const LowerFlow &lf) override;
+    bool del(const NodeId &local_node, const NodeId &remote_node) override;
+    void update_local(const std::string &neigh_name) override;
+    void update_routing() override;
+    int flow_state_update(struct rl_kmsg_flow_state *upd) override;
+
+    const LowerFlow *_find(const NodeId &local_node,
+                           const NodeId &remote_node) const;
+
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+
+    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
+    int neighs_refresh(size_t limit) override;
+    void age_incr() override;
+};
+
 LowerFlow *
 FullyReplicatedLFDB::find(const NodeId &local_node, const NodeId &remote_node)
 {
@@ -356,7 +451,7 @@ FullyReplicatedLFDB::age_incr()
 void
 RoutingEngine::compute_shortest_paths(
     const NodeId &source_addr,
-    const std::unordered_map<NodeId, std::list<Edge> > &graph,
+    const std::unordered_map<NodeId, std::list<Edge>> &graph,
     std::unordered_map<NodeId, Info> &info)
 {
     /* Initialize the per-node info map. */
@@ -420,8 +515,8 @@ RoutingEngine::compute_shortest_paths(
 int
 RoutingEngine::compute_next_hops(const NodeId &local_node)
 {
-    std::unordered_map<NodeId, std::unordered_map<NodeId, Info> > neigh_infos;
-    std::unordered_map<NodeId, std::list<Edge> > graph;
+    std::unordered_map<NodeId, std::unordered_map<NodeId, Info>> neigh_infos;
+    std::unordered_map<NodeId, std::list<Edge>> graph;
     std::unordered_map<NodeId, Info> info;
 
     /* Clean up state left from the previous run. */
@@ -544,7 +639,7 @@ RoutingEngine::flow_state_update(struct rl_kmsg_flow_state *upd)
 int
 RoutingEngine::compute_fwd_table()
 {
-    unordered_map<rlm_addr_t, pair<NodeId, rl_port_t> > next_ports_new_,
+    unordered_map<rlm_addr_t, pair<NodeId, rl_port_t>> next_ports_new_,
         next_ports_new;
     struct uipcp *uipcp = rib->uipcp;
     unordered_map<rl_port_t, int> port_hits;
@@ -722,4 +817,38 @@ RoutingEngine::dump(std::stringstream &ss) const
         }
         ss << endl;
     }
+}
+
+void
+lfdb_lib_init()
+{
+    auto builder = [](uipcp_rib *rib) {
+        std::string policy_name = rib->policies["routing"];
+        struct FullyReplicatedLFDB *lfdbd;
+
+        if (rib->lfdb == nullptr) {
+            rib->lfdb = make_unique<FullyReplicatedLFDB>(rib);
+        }
+        lfdbd = dynamic_cast<FullyReplicatedLFDB *>(rib->lfdb.get());
+        assert(lfdbd != nullptr);
+
+        /* Temporary solution to support LFA policies. No pointer switching is
+         * carried out. */
+        if (policy_name == "link-state") {
+            if (lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = false;
+                UPD(rib->uipcp, "LFA switched off\n");
+            }
+        } else if (policy_name == "link-state-lfa") {
+            if (!lfdbd->re.lfa_enabled) {
+                lfdbd->re.lfa_enabled = true;
+                UPD(rib->uipcp, "LFA switched on\n");
+            }
+        } else {
+            assert(false);
+        }
+    };
+    available_policies["routing"].insert(PolicyBuilder("link-state", builder));
+    available_policies["routing"].insert(
+        PolicyBuilder("link-state-lfa", builder));
 }
