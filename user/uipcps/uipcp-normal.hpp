@@ -570,6 +570,8 @@ struct uipcp_rib {
                               size_t buflen);
     int send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
                          const UipcpObject *obj, int *invoke_id = nullptr);
+    int send_to_dst_node(std::unique_ptr<CDAPMessage> m, std::string node_name,
+                         const UipcpObject *obj, int *invoke_id = nullptr);
     int send_to_myself(std::unique_ptr<CDAPMessage> m, const UipcpObject *obj);
 
     /* Synchronize with neighbors. */

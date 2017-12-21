@@ -782,7 +782,21 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
     return ret;
 }
 
-/* Takes ownership of 'm'. */
+int
+uipcp_rib::send_to_dst_node(std::unique_ptr<CDAPMessage> m,
+                            std::string node_name, const UipcpObject *obj,
+                            int *invoke_id)
+{
+    rlm_addr_t dst_addr = lookup_node_address(node_name);
+
+    if (dst_addr == RL_ADDR_NULL) {
+        UPI(uipcp, "Failed to find address for node %s\n", node_name.c_str());
+        return -1;
+    }
+
+    return send_to_dst_addr(std::move(m), dst_addr, obj, invoke_id);
+}
+
 int
 uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
                           const UipcpObject *obj)
