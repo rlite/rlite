@@ -78,6 +78,19 @@ NeighFlow::~NeighFlow()
     }
 }
 
+std::shared_ptr<NeighFlow>
+NeighFlow::getref()
+{
+    if (this == neigh->mgmt_only.get()) {
+        return neigh->mgmt_only;
+    } else if (this == neigh->n_flow.get()) {
+        return neigh->n_flow;
+    }
+    assert(neigh->flows.count(port_id));
+
+    return neigh->flows[port_id];
+}
+
 /* Does not take ownership of m. */
 int
 NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
@@ -936,18 +949,19 @@ NeighFlow::enrollment_rsrc_get(bool initiator)
             neigh->ipcp_name.c_str());
         enroll_state_set(EnrollState::NEIGH_ENROLLING);
         er = std::shared_ptr<EnrollmentResources>(
-            new EnrollmentResources(this, initiator));
+            new EnrollmentResources(this->getref(), initiator));
     }
 
     return er;
 }
 
-EnrollmentResources::EnrollmentResources(struct NeighFlow *f, bool init)
+EnrollmentResources::EnrollmentResources(std::shared_ptr<NeighFlow> f,
+                                         bool init)
     : nf(f), initiator(init)
 {
     th = std::thread(
         initiator ? &NeighFlow::enrollee_thread : &NeighFlow::enroller_thread,
-        nf);
+        nf.get());
     th.detach();
 }
 
