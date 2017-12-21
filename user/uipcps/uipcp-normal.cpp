@@ -520,7 +520,7 @@ uipcp_rib::dump() const
                                        neigh->second->unheard_since)
                    << "s ago, " << (nf->stats.win[1].bytes_sent / 1000.0)
                    << "KB sent, " << (nf->stats.win[1].bytes_recvd / 1000.0)
-                   << "KB recvd in " << RL_NEIGHFLOW_STATS_PERIOD << "s]";
+                   << "KB recvd in " << kNeighFlowStatsPeriod << "s]";
             } else {
                 ss << "[Enrollment ongoing <"
                    << Neighbor::enroll_state_repr(nf->enroll_state) << ">]";

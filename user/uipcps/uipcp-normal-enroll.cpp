@@ -141,7 +141,7 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     if (ret >= 0) {
         last_activity = time(nullptr);
         stats.win[0].bytes_sent += ret;
-        if (last_activity - stats.t_last >= RL_NEIGHFLOW_STATS_PERIOD) {
+        if (last_activity - stats.t_last >= uipcp_rib::kNeighFlowStatsPeriod) {
             stats.win[1]            = stats.win[0];
             stats.win[0].bytes_sent = stats.win[0].bytes_recvd = 0;
             stats.t_last                                       = last_activity;

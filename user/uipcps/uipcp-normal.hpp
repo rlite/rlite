@@ -80,18 +80,6 @@ extern std::string lowerflow;
 extern std::string addr_alloc_table;
 }; // namespace obj_name
 
-/* Time window to compute statistics about management traffic. */
-#define RL_NEIGHFLOW_STATS_PERIOD 20
-
-enum class EnrollState {
-    NEIGH_NONE = 0,
-
-    NEIGH_ENROLLING,
-    NEIGH_ENROLLED,
-
-    NEIGH_STATE_LAST,
-};
-
 enum class PolicyParamType {
     INT = 0,
     BOOL,
@@ -138,6 +126,15 @@ struct EnrollmentResources {
     std::thread th;
     std::condition_variable msgs_avail;
     std::condition_variable stopped;
+};
+
+enum class EnrollState {
+    NEIGH_NONE = 0,
+
+    NEIGH_ENROLLING,
+    NEIGH_ENROLLED,
+
+    NEIGH_STATE_LAST,
 };
 
 /* Holds the information about an N-1 flow towards a neighbor IPCP. */
@@ -524,6 +521,9 @@ struct uipcp_rib {
 
     /* Upper bound for the AddrAllocator NACK timer. */
     static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
+
+    /* Time window to compute statistics about management traffic (in ms). */
+    static constexpr int kNeighFlowStatsPeriod = 20;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);
     uipcp_rib(struct uipcp *_u);
