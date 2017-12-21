@@ -783,29 +783,4 @@ public:
     void age_incr() override;
 };
 
-class DistributedAddrAllocator : public AddrAllocator {
-    /* Table used to carry on distributed address allocation.
-     * It maps (address allocated) --> (requestor address). */
-    std::unordered_map<rlm_addr_t, AddrAllocRequest> addr_alloc_table;
-
-public:
-    RL_NODEFAULT_NONCOPIABLE(DistributedAddrAllocator);
-    DistributedAddrAllocator(struct uipcp_rib *_ur) : AddrAllocator(_ur) {}
-    ~DistributedAddrAllocator() {}
-
-    void dump(std::stringstream &ss) const override;
-    rlm_addr_t allocate() override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
-};
-
-class ManualAddrAllocator : public DistributedAddrAllocator {
-public:
-    RL_NODEFAULT_NONCOPIABLE(ManualAddrAllocator);
-    ManualAddrAllocator(struct uipcp_rib *_ur) : DistributedAddrAllocator(_ur)
-    {
-    }
-    rlm_addr_t allocate() override { return RL_ADDR_NULL; }
-};
-
 #endif /* __UIPCP_RIB_H__ */
