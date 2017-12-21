@@ -524,26 +524,19 @@ CentralizedFaultTolerantDFT::Client::dft_set(
     const struct rl_kmsg_appl_register *req)
 {
     string appl_name(req->appl_name);
-    auto m              = make_unique<CDAPMessage>();
-    ReplicaId r         = replicas.front();
-    rlm_addr_t dst_addr = parent->rib->lookup_node_address(r);
+    auto m      = make_unique<CDAPMessage>();
+    ReplicaId r = replicas.front();
     DFTEntry dft_entry;
     int invoke_id;
     int ret;
-
-    if (dst_addr == RL_ADDR_NULL) {
-        UPI(parent->rib->uipcp, "Failed to find address for replica %s\n",
-            r.c_str());
-        return -1;
-    }
 
     m->m_write(obj_class::dft, obj_name::dft);
     dft_entry.address   = parent->rib->myaddr;
     dft_entry.appl_name = RinaName(appl_name);
     dft_entry.timestamp = time64();
 
-    ret = parent->rib->send_to_dst_addr(std::move(m), dst_addr, &dft_entry,
-                                        &invoke_id);
+    ret =
+        parent->rib->send_to_dst_node(std::move(m), r, &dft_entry, &invoke_id);
     if (ret) {
         return ret;
     }
