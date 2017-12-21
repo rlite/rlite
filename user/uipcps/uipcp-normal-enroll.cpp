@@ -284,22 +284,13 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string &name)
 
 Neighbor::~Neighbor()
 {
-    for (const auto &kvf : flows) {
-        rl_delete(kvf.second, RL_MT_NEIGHFLOW);
-    }
-
     mgmt_only_set(nullptr);
     n_flow_set(nullptr);
 }
 
 void
-Neighbor::mgmt_only_set(NeighFlow *nf)
+Neighbor::mgmt_only_set(std::shared_ptr<NeighFlow> nf)
 {
-    if (mgmt_only) {
-        uipcp_loop_fdh_del(rib->uipcp, mgmt_only->flow_fd);
-        rl_delete(mgmt_only, RL_MT_NEIGHFLOW);
-    }
-
     if (mgmt_only || nf) {
         UPD(rib->uipcp,
             "Set management-only N-1-flow for neigh %s "
@@ -307,24 +298,26 @@ Neighbor::mgmt_only_set(NeighFlow *nf)
             ipcp_name.c_str(), mgmt_only ? mgmt_only->flow_fd : -1,
             nf ? nf->flow_fd : -1);
     }
+    if (mgmt_only) {
+        uipcp_loop_fdh_del(rib->uipcp, mgmt_only->flow_fd);
+    }
     mgmt_only = nf;
     if (nf) {
         uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
-                           nf);
+                           nf.get());
     }
 }
 
 void
-Neighbor::n_flow_set(NeighFlow *nf)
+Neighbor::n_flow_set(std::shared_ptr<NeighFlow> nf)
 {
     if (nf == nullptr) {
         if (n_flow != nullptr) {
             uipcp_loop_fdh_del(rib->uipcp, n_flow->flow_fd);
-            rl_delete(n_flow, RL_MT_NEIGHFLOW);
             n_flow = nullptr;
         }
     } else {
-        NeighFlow *kbnf;
+        std::shared_ptr<NeighFlow> kbnf;
 
         assert(n_flow == nullptr);
         assert(nf != nullptr);
@@ -345,7 +338,7 @@ Neighbor::n_flow_set(NeighFlow *nf)
             ipcp_name.c_str(), nf->flow_fd);
         n_flow = nf;
         uipcp_loop_fdh_add(rib->uipcp, nf->flow_fd, normal_mgmt_only_flow_ready,
-                           nf);
+                           nf.get());
     }
 }
 
@@ -373,16 +366,16 @@ const NeighFlow *
 Neighbor::_mgmt_conn() const
 {
     if (mgmt_only) {
-        return mgmt_only;
+        return mgmt_only.get();
     }
 
     if (n_flow) {
-        return n_flow;
+        return n_flow.get();
     }
 
     assert(!flows.empty());
 
-    return flows.begin()->second;
+    return flows.begin()->second.get();
 }
 
 NeighFlow *
@@ -1287,23 +1280,18 @@ uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
     return 0;
 }
 
-int
-uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id, NeighFlow **nfp)
+NeighFlow *
+uipcp_rib::lookup_neigh_flow_by_port_id(rl_port_t port_id)
 {
-    *nfp = nullptr;
-
     for (const auto &kvn : neighbors) {
         std::shared_ptr<Neighbor> neigh = kvn.second;
 
         if (neigh->flows.count(port_id)) {
-            *nfp = neigh->flows[port_id];
-            assert((*nfp)->neigh);
-
-            return 0;
+            return neigh->flows[port_id].get();
         }
     }
 
-    return -1;
+    return nullptr;
 }
 
 NeighborCandidate
@@ -1413,9 +1401,8 @@ Neighbor::flow_alloc(const char *supp_dif)
      * out of the lock. */
     rib->lock();
     assert(flow_alloc_enabled == false);
-    flows[port_id_] = rl_new(
-        NeighFlow(this, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_),
-        RL_MT_NEIGHFLOW);
+    flows[port_id_] = std::make_shared<NeighFlow>(
+        this, string(supp_dif), port_id_, flow_fd_, lower_ipcp_id_);
     flows[port_id_]->reliable = false;
 
     UPD(rib->uipcp, "Unreliable N-1 flow allocated [fd=%d, port_id=%u]\n",
@@ -1442,11 +1429,11 @@ Neighbor::flow_alloc(const char *supp_dif)
         if (mgmt_fd < 0) {
             UPE(rib->uipcp, "Failed to allocate managment-only N-1 flow\n");
         } else {
-            NeighFlow *nf;
+            std::shared_ptr<NeighFlow> nf;
 
-            nf = rl_new(NeighFlow(this, string(supp_dif), RL_PORT_ID_NONE,
-                                  mgmt_fd, RL_IPCP_ID_NONE),
-                        RL_MT_NEIGHFLOW);
+            nf           = std::make_shared<NeighFlow>(this, string(supp_dif),
+                                             RL_PORT_ID_NONE, mgmt_fd,
+                                             RL_IPCP_ID_NONE);
             nf->reliable = true;
             UPD(rib->uipcp, "Management-only reliable N-1 flow allocated\n");
             mgmt_only_set(nf);
@@ -1700,11 +1687,11 @@ uipcp_rib::allocate_n_flows()
         lock();
         auto neigh = neighbors.find(re);
         if (neigh != neighbors.end()) {
-            NeighFlow *nf;
+            std::shared_ptr<NeighFlow> nf;
 
-            nf = rl_new(NeighFlow(neigh->second.get(), string(uipcp->dif_name),
-                                  RL_PORT_ID_NONE, pfd.fd, RL_IPCP_ID_NONE),
-                        RL_MT_NEIGHFLOW);
+            nf = std::make_shared<NeighFlow>(
+                neigh->second.get(), string(uipcp->dif_name), RL_PORT_ID_NONE,
+                pfd.fd, RL_IPCP_ID_NONE);
             nf->reliable = true;
             neigh->second->n_flow_set(nf);
         } else {

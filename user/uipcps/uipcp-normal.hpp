@@ -117,15 +117,22 @@ struct NeighFlow;
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(struct NeighFlow *f, bool init);
+    EnrollmentResources(NeighFlow *f, bool init);
     ~EnrollmentResources();
 
-    struct NeighFlow *nf;
+    NeighFlow *nf;
     bool initiator;
     std::list<std::unique_ptr<const CDAPMessage>> msgs;
     std::thread th;
     std::condition_variable msgs_avail;
     std::condition_variable stopped;
+};
+
+struct TimeoutEvent {
+    unsigned int delta_ms;
+    int tmrid;
+
+    TimeoutEvent(unsigned int ms) : delta_ms(ms) {}
 };
 
 enum class EnrollState {
@@ -218,16 +225,16 @@ struct Neighbor {
      * management. NeighFlow objects (including the ones below) are
      * kept using raw pointers, as the RIB lock is never released while
      * we have a reference to one of these objects. */
-    std::unordered_map<rl_port_t, NeighFlow *> flows;
+    std::unordered_map<rl_port_t, std::shared_ptr<NeighFlow>> flows;
 
     /* If not nullptr, a regular (non-kernel-bound) N-1 flow used for
      * management purposes. */
-    NeighFlow *mgmt_only;
+    std::shared_ptr<NeighFlow> mgmt_only;
 
     /* If not nullptr, a regular (non-kernel-bound) N flow used for
      * management purposes. This may be used only if the N-1 DIFs
      * towards the neighbor do not support reliable flows. */
-    NeighFlow *n_flow;
+    std::shared_ptr<NeighFlow> n_flow;
 
     /* A flag used as a lock to prevent flow_alloc from being called
      * concurrently, while at the same time performinc the flow allocation
@@ -249,8 +256,8 @@ struct Neighbor {
 
     static const char *enroll_state_repr(EnrollState s);
 
-    void mgmt_only_set(NeighFlow *nf);
-    void n_flow_set(NeighFlow *nf);
+    void mgmt_only_set(std::shared_ptr<NeighFlow> nf);
+    void n_flow_set(std::shared_ptr<NeighFlow> nf);
     NeighFlow *mgmt_conn();
     const NeighFlow *mgmt_conn() const { return _mgmt_conn(); };
     bool has_flows() const { return !flows.empty(); }
@@ -559,7 +566,7 @@ struct uipcp_rib {
     void check_for_address_conflicts();
 
     NeighborCandidate neighbor_cand_get() const;
-    int lookup_neigh_flow_by_port_id(rl_port_t port_id, NeighFlow **nfp);
+    NeighFlow *lookup_neigh_flow_by_port_id(rl_port_t port_id);
     void neigh_flow_prune(NeighFlow *nf);
     int enroll(const char *neigh_name, const char *supp_dif_name,
                int wait_for_completion);

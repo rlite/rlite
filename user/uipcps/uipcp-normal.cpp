@@ -294,7 +294,7 @@ mgmt_bound_flow_ready(struct uipcp *uipcp, int fd, void *opaque)
 
     /* Lookup neighbor by port id. If ADATA, it is not an error
      * if the lookup fails (nf == nullptr). */
-    rib->lookup_neigh_flow_by_port_id(mhdr->local_port, &nf);
+    nf = rib->lookup_neigh_flow_by_port_id(mhdr->local_port);
 
     /* Hand off the message to the RIB. */
     rib->recv_msg(((char *)(mhdr + 1)), n - sizeof(*mhdr), nf);
@@ -906,18 +906,15 @@ uipcp_rib::neigh_flow_prune(NeighFlow *nf)
 {
     Neighbor *neigh = nf->neigh;
 
-    if (nf == neigh->mgmt_only) {
+    if (nf == neigh->mgmt_only.get()) {
         neigh->mgmt_only_set(nullptr);
-    } else if (nf == neigh->n_flow) {
+    } else if (nf == neigh->n_flow.get()) {
         neigh->n_flow_set(nullptr);
     } else {
         /* Remove the NeighFlow from the Neighbor and, if the
          * NeighFlow is the current mgmt flow, elect
          * another NeighFlow as mgmt flow, if possible. */
         neigh->flows.erase(nf->port_id);
-
-        /* First delete the N-1 flow. */
-        rl_delete(nf, RL_MT_NEIGHFLOW);
     }
 
     /* If there are no other N-1 flows, delete the neighbor. */
@@ -1044,7 +1041,7 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     uint8_t response = RLITE_ERR;
     std::lock_guard<std::mutex> guard(mutex);
     std::shared_ptr<Neighbor> neigh;
-    NeighFlow *nf;
+    std::shared_ptr<NeighFlow> nf;
     int mgmt_fd;
     int ret;
 
@@ -1095,9 +1092,8 @@ uipcp_rib::neigh_n_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     UPD(uipcp, "N-flow allocated [neigh = %s, supp_dif = %s, port_id = %u]\n",
         req->remote_appl, req->dif_name, req->port_id);
 
-    nf = rl_new(NeighFlow(neigh.get(), string(req->dif_name), req->port_id,
-                          mgmt_fd, RL_IPCP_ID_NONE),
-                RL_MT_NEIGHFLOW);
+    nf = std::make_shared<NeighFlow>(neigh.get(), string(req->dif_name),
+                                     req->port_id, mgmt_fd, RL_IPCP_ID_NONE);
     nf->reliable = true;
     neigh->n_flow_set(nf);
 
@@ -1110,7 +1106,7 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     rl_port_t neigh_port_id    = req->port_id;
     const char *supp_dif       = req->dif_name;
     rl_ipcp_id_t lower_ipcp_id = req->ipcp_id;
-    NeighFlow *nf;
+    std::shared_ptr<NeighFlow> nf;
     int flow_fd;
     int result = RLITE_SUCC;
     int ret;
@@ -1143,9 +1139,8 @@ uipcp_rib::neigh_fa_req_arrived(const struct rl_kmsg_fa_req_arrived *req)
     assert(neigh->flows.count(neigh_port_id) == 0); /* kernel bug */
 
     /* Add the flow. */
-    nf = rl_new(NeighFlow(neigh.get(), string(supp_dif), neigh_port_id, 0,
-                          lower_ipcp_id),
-                RL_MT_NEIGHFLOW);
+    nf           = std::make_shared<NeighFlow>(neigh.get(), string(supp_dif),
+                                     neigh_port_id, 0, lower_ipcp_id);
     nf->reliable = is_reliable_spec(&req->flowspec);
 
     /* If flow is reliable, we assume it is a management-only flow, and so
