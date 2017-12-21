@@ -395,13 +395,13 @@ FullyReplicatedLFDB::neighs_refresh(size_t limit)
 void
 uipcp_rib::age_incr_tmr_restart()
 {
-    age_incr_tmrid = uipcp_loop_schedule(
-        uipcp, get_param_value<int>("routing", "age-incr-intval") * 1000,
+    age_incr_timer = make_unique<TimeoutEvent>(
+        get_param_value<int>("routing", "age-incr-intval") * 1000, uipcp, this,
         [](struct uipcp *uipcp, void *arg) {
             struct uipcp_rib *rib = (struct uipcp_rib *)arg;
+            rib->age_incr_timer->fired();
             rib->lfdb->age_incr();
-        },
-        this);
+        });
 }
 
 void

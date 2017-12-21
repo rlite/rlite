@@ -129,10 +129,16 @@ struct EnrollmentResources {
 };
 
 struct TimeoutEvent {
-    unsigned int delta_ms;
-    int tmrid;
+    unsigned int delta_ms = 0;
+    struct uipcp *uipcp   = nullptr;
+    void *arg             = nullptr;
+    uipcp_tmr_cb_t cb     = nullptr;
+    int tmrid             = -1;
 
-    TimeoutEvent(unsigned int ms) : delta_ms(ms) {}
+    TimeoutEvent(unsigned int ms, struct uipcp *u, void *a, uipcp_tmr_cb_t _cb);
+    void clear();
+    void fired();
+    ~TimeoutEvent() { clear(); }
 };
 
 enum class EnrollState {
@@ -174,7 +180,7 @@ struct NeighFlow {
     std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
     std::shared_ptr<EnrollmentResources> er;
 
-    int keepalive_tmrid;
+    std::unique_ptr<TimeoutEvent> keepalive_timer;
     int pending_keepalive_reqs;
 
     /* Statistics about management traffic. */
@@ -476,7 +482,7 @@ struct uipcp_rib {
     std::unique_ptr<LFDB> lfdb;
 
     /* Timer ID for LFDB synchronization with neighbors. */
-    int sync_tmrid;
+    std::unique_ptr<TimeoutEvent> sync_timer;
 
     /* For A-DATA messages. */
     InvokeIdMgr invoke_id_mgr;
@@ -490,7 +496,7 @@ struct uipcp_rib {
 #endif /* RL_USE_QOS_CUBES */
 
     /* Timer ID for age increment of LFDB entries. */
-    int age_incr_tmrid;
+    std::unique_ptr<TimeoutEvent> age_incr_timer;
 
     /* Time interval (in seconds) between two consecutive increments
      * of the age of LFDB entries. */

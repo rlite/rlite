@@ -41,7 +41,6 @@ NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
       flow_fd(ffd),
       reliable(false),
       enroll_state(EnrollState::NEIGH_NONE),
-      keepalive_tmrid(0),
       pending_keepalive_reqs(0)
 {
     last_activity = stats.t_last = time(nullptr);
@@ -225,8 +224,6 @@ NeighFlow::keepalive_timeout()
     CDAPMessage m;
     int ret;
 
-    keepalive_tmrid = 0;
-
     UPV(rib->uipcp, "Sending keepalive M_READ to neighbor '%s'\n",
         static_cast<string>(neigh->ipcp_name).c_str());
 
@@ -267,22 +264,19 @@ NeighFlow::keepalive_tmr_start()
         return;
     }
 
-    keepalive_tmrid = uipcp_loop_schedule(neigh->rib->uipcp, keepalive * 1000,
-                                          [](struct uipcp *uipcp, void *arg) {
-                                              NeighFlow *nf =
-                                                  static_cast<NeighFlow *>(arg);
-                                              nf->keepalive_timeout();
-                                          },
-                                          this);
+    keepalive_timer = make_unique<TimeoutEvent>(
+        keepalive * 1000, neigh->rib->uipcp, this,
+        [](struct uipcp *uipcp, void *arg) {
+            NeighFlow *nf = static_cast<NeighFlow *>(arg);
+            nf->keepalive_timer->fired();
+            nf->keepalive_timeout();
+        });
 }
 
 void
 NeighFlow::keepalive_tmr_stop()
 {
-    if (keepalive_tmrid > 0) {
-        uipcp_loop_schedule_canc(neigh->rib->uipcp, keepalive_tmrid);
-        keepalive_tmrid = 0;
-    }
+    keepalive_timer->clear();
 }
 
 Neighbor::Neighbor(struct uipcp_rib *rib_, const string &name)
@@ -1069,13 +1063,13 @@ Neighbor::neigh_sync_rib(NeighFlow *nf) const
 void
 uipcp_rib::neighs_refresh_tmr_restart()
 {
-    sync_tmrid = uipcp_loop_schedule(
-        uipcp, get_param_value<int>("rib-daemon", "refresh-intval") * 1000,
-        [](struct uipcp *uipcp, void *arg) {
+    sync_timer = make_unique<TimeoutEvent>(
+        get_param_value<int>("rib-daemon", "refresh-intval") * 1000, uipcp,
+        this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
+            rib->sync_timer->fired();
             rib->neighs_refresh();
-        },
-        this);
+        });
 }
 
 void
