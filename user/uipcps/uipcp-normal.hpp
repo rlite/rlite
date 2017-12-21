@@ -135,6 +135,8 @@ struct TimeoutEvent {
     uipcp_tmr_cb_t cb     = nullptr;
     int tmrid             = -1;
 
+    RL_NONCOPIABLE(TimeoutEvent);
+    RL_NONMOVABLE(TimeoutEvent);
     TimeoutEvent(unsigned int ms, struct uipcp *u, void *a, uipcp_tmr_cb_t _cb);
     void clear();
     void fired();

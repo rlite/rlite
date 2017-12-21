@@ -85,6 +85,10 @@ make_unique(Args &&... args)
     _CLA(_CLA &&) = default;                                                   \
     _CLA &operator=(_CLA &&) = default
 
+#define RL_NONMOVABLE(_CLA)                                                    \
+    _CLA(_CLA &&) = delete;                                                    \
+    _CLA &operator=(_CLA &&) = delete
+
 #define RL_COPIABLE_MOVABLE(_CLA)                                              \
     RL_COPIABLE(_CLA);                                                         \
     RL_MOVABLE(_CLA)
