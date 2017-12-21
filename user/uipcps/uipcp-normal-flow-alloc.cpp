@@ -596,7 +596,7 @@ LocalFlowAllocator::dump_memtrack(std::stringstream &ss) const
 }
 
 void
-fa_lib_init()
+uipcp_rib::fa_lib_init()
 {
     available_policies["flow-allocator"].insert(
         PolicyBuilder("local", [](uipcp_rib *rib) {

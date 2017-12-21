@@ -404,9 +404,6 @@ struct PolicyBuilder {
     operator std::string() { return name; }
 };
 
-extern std::unordered_map<std::string, std::set<PolicyBuilder>>
-    available_policies;
-
 /* Main class representing an IPCP. */
 struct uipcp_rib {
     /* Backpointer to parent data structure. */
@@ -641,6 +638,18 @@ struct uipcp_rib {
 
     void lock() { mutex.lock(); }
     void unlock() { mutex.unlock(); }
+
+    /* Global map of available policies. Maps the name of each replaceable
+     * component to a set of PolicyBuilder objects. Each PolicyBuilder object
+     * describes a different policy (it contains a name and a function to build
+     * and assign the policy). */
+    static std::unordered_map<std::string, std::set<PolicyBuilder>>
+        available_policies;
+    static void addra_lib_init();
+    static void dft_lib_init();
+    static void fa_lib_init();
+    static void lfdb_lib_init();
+    static void ra_lib_init();
 
 private:
 #ifdef RL_USE_QOS_CUBES
