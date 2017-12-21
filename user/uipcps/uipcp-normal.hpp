@@ -117,10 +117,10 @@ struct NeighFlow;
  * (initiator or slave) on a NeighFlow. */
 struct EnrollmentResources {
     RL_NODEFAULT_NONCOPIABLE(EnrollmentResources);
-    EnrollmentResources(NeighFlow *f, bool init);
+    EnrollmentResources(std::shared_ptr<NeighFlow> f, bool init);
     ~EnrollmentResources();
 
-    NeighFlow *nf;
+    std::shared_ptr<NeighFlow> nf;
     bool initiator;
     std::list<std::unique_ptr<const CDAPMessage>> msgs;
     std::thread th;
@@ -190,6 +190,11 @@ struct NeighFlow {
     NeighFlow(Neighbor *n, const std::string &supp_dif, rl_port_t pid, int ffd,
               rl_ipcp_id_t lid);
     ~NeighFlow();
+
+    /* Get a std::shared_ptr reference to the shared pointer object that stores
+     * this NeighFlow object. The shared pointer itself is stored in the
+     * associated Neighbor object (this->neigh). */
+    std::shared_ptr<NeighFlow> getref();
 
     void keepalive_tmr_start();
     void keepalive_tmr_stop();
