@@ -62,7 +62,7 @@ struct uipcps {
     int efd;
 };
 
-int eventfd_signal(int efd, unsigned int code);
+int eventfd_signal(int efd, unsigned int value);
 uint64_t eventfd_drain(int efd);
 int uipcps_loop_signal(struct uipcps *uipcps);
 
