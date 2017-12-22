@@ -533,9 +533,9 @@ unix_server(struct uipcps *uipcps)
 }
 
 int
-eventfd_signal(int efd, unsigned int code)
+eventfd_signal(int efd, unsigned int value)
 {
-    uint64_t x = code;
+    uint64_t x = value;
     int n;
 
     n = write(efd, &x, sizeof(x));
