@@ -317,9 +317,6 @@ uipcp_loop_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define RL_SIGNAL_STOP 1
-#define RL_SIGNAL_REPOLL 2
-
 #define ONEBILLION 1000000000ULL
 #define ONEMILLION 1000000ULL
 
@@ -433,10 +430,10 @@ uipcp_loop(void *opaque)
         }
 
         if (FD_ISSET(uipcp->eventfd, &rdfs)) {
-            /* A signal arrived. */
-            uint64_t x = eventfd_drain(uipcp->eventfd);
-
-            if (x == RL_SIGNAL_STOP) {
+            /* A signal arrived. Drain it and check if we should
+             * stop. */
+            eventfd_drain(uipcp->eventfd);
+            if (uipcp->loop_should_stop) {
                 /* Stop the event loop. */
                 UPD(uipcp, "quit main loop\n");
                 break;
@@ -557,9 +554,9 @@ uipcp_loop(void *opaque)
 }
 
 static int
-uipcp_loop_signal(struct uipcp *uipcp, unsigned int code)
+uipcp_loop_signal(struct uipcp *uipcp)
 {
-    return eventfd_signal(uipcp->eventfd, code);
+    return eventfd_signal(uipcp->eventfd, 1);
 }
 
 #define TIMER_EVENTS_MAX 64
@@ -618,7 +615,7 @@ uipcp_loop_schedule(struct uipcp *uipcp, unsigned long delta_ms,
 #endif
     pthread_mutex_unlock(&uipcp->lock);
 
-    uipcp_loop_signal(uipcp, RL_SIGNAL_REPOLL);
+    uipcp_loop_signal(uipcp);
 
     return e->id;
 }
@@ -677,7 +674,7 @@ uipcp_loop_fdh_add(struct uipcp *uipcp, int fd, uipcp_loop_fdh_t cb,
     list_add_tail(&fdh->node, &uipcp->fdhs);
     pthread_mutex_unlock(&uipcp->lock);
 
-    uipcp_loop_signal(uipcp, RL_SIGNAL_REPOLL);
+    uipcp_loop_signal(uipcp);
 
     return 0;
 }
@@ -904,6 +901,7 @@ uipcp_add(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
         ret = uipcp->eventfd;
         goto err3;
     }
+    uipcp->loop_should_stop = 0;
 
     ret = uipcp->ops.init(uipcp);
     if (ret) {
@@ -954,7 +952,8 @@ uipcp_del(struct uipcp *uipcp)
     kernelspace = uipcp_is_kernelspace(uipcp);
 
     if (!kernelspace) {
-        uipcp_loop_signal(uipcp, RL_SIGNAL_STOP);
+        uipcp->loop_should_stop = 1;
+        uipcp_loop_signal(uipcp);
         ret = pthread_join(uipcp->th, NULL);
         if (ret) {
             PE("pthread_join() failed [%s]\n", strerror(ret));

@@ -190,6 +190,7 @@ struct uipcp {
     pthread_t th;
     int cfd;
     int eventfd;
+    int loop_should_stop;
     pthread_mutex_t lock;
     struct list_head timer_events;
     int timer_events_cnt;
