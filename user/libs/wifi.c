@@ -114,7 +114,7 @@ wpasup_start_daemon(const char *config, const char *pid_file, const char *inf,
         return -1;
     } else if (pid == 0) {
         PD("Executing wpa_supplicant\n");
-        execlp("wpa_supplicant", "-D", driver, "-i", inf, "-c", config, "-P",
+        execlp("wpa_supplicant", "wpa_supplicant", "-D", driver, "-i", inf, "-c", config, "-P",
                pid_file, "-B", NULL);
         perror("execlp(wpa_supplicant)");
         return -1;
