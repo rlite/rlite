@@ -576,10 +576,6 @@ wifi_assoc(struct wpa_ctrl *ctrl_conn, const char *ssid)
         ret = wpasup_send_cmd(ctrl_conn, "RECONNECT");
     }
     if (!ret) {
-        ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_SCAN_RESULTS,
-                                  RL_WIFI_TIMEOUT_SCAN);
-    }
-    if (!ret) {
         ret = wpasup_wait_for_msg(ctrl_conn, WPA_EVENT_CONNECTED,
                                   RL_WIFI_TIMEOUT_ASSOC);
     }
