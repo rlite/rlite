@@ -493,7 +493,7 @@ wifi_access_point_init(void)
     if (pid == 0) {
         /* Child process. */
         PD("Executing hostapd\n");
-        execlp("hostapd", "-P", pid_file, conf_file, NULL);
+        execlp("hostapd", "hostapd", "-P", pid_file, conf_file, NULL);
         perror("execlp(hostapd)");
         return -1;
     }
@@ -504,6 +504,7 @@ wifi_access_point_init(void)
     check_result = waitpid(pid, &status, WNOHANG);
     if (check_result == 0) {
         /* Child still alive. */
+        PD("hostapd started\n");
         return 0;
     }
     if (check_result == -1) {
