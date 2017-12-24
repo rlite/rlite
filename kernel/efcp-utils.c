@@ -50,12 +50,12 @@ dtp_fini(struct dtp *dtp)
 {
     struct rl_buf *rb, *tmp;
 
-    spin_lock_bh(&dtp->lock);
-
     del_timer_sync(&dtp->snd_inact_tmr);
     del_timer_sync(&dtp->rcv_inact_tmr);
     del_timer_sync(&dtp->rtx_tmr);
     del_timer_sync(&dtp->a_tmr);
+
+    spin_lock_bh(&dtp->lock);
 
     PD("dropping %u PDUs from cwq, %u from seqq, %u from rtxq\n", dtp->cwq_len,
        dtp->seqq_len, dtp->rtxq_len);
