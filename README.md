@@ -15,7 +15,8 @@
 5. Tutorials
 	51. Using the demonstrator
     52. Hands-on tutorial #1: normal-over-shim-eth
-	53. Hands-on tutorial #2: normal-over-shim-udp4
+    53. Hands-on tutorial #2: normal-over-shim-udp4
+    54. Hands-on tutorial #3: normal-over-shim-wifi
 6. Configuration of IPC Processes
 	61. shim-eth IPC Process
 	62. shim-udp4 IPC Process
@@ -630,6 +631,89 @@ will be automatically selected):
 Access Y and run the rinaperf client (in ping mode):
 
     $ rinaperf
+
+
+### 5.4 Hands-on tutorial #3: normal-over-shim-wifi
+
+This tutorial shows how to deploy RINA over a WiFi wireless LAN. One of the
+nodes is configured in Access Point (AP) mode, while the others can associate
+to the AP. The association to an AP is mapped to a RINA enrollment procedure.
+The shim-wifi implementation uses the *hostapd* software to implement the AP
+functionalities of the enroller IPCP; similarly, *wpa_supplicant* is used
+for the enrollee IPCP. These daemons need their configuration that must be
+prepared by the administrator in addition to the RINA configuration.
+
+For the sake of simplicity, in this tutorial we use only two nodes, with
+one of them acting as AP, and the other acting as client station.
+On top of the shim-wifi DIF we stack a normal DIF to provide complete
+services to the applications; the shim-wifi inherits the limitations of the
+shim-eth (e.g. only a single flow supported between two nodes in the DIF),
+that is used to implement its datapath.
+
+On the AP side, the following *hostapd* configuration file can be stored
+in `/etc/hostapd/rlite.conf` (you should replace `wlp2s0` with your
+local WiFi interface name):
+
+    interface=wlp2s0
+    ssid=rinawlanpwd.DIF
+    wpa_passphrase=password
+    auth_algs=3
+    channel=7
+    driver=nl80211
+    hw_mode=g
+    logger_stdout=-1
+    logger_stdout_level=2
+    max_num_sta=5
+    rsn_pairwise=CCMP
+    wpa=2
+    wpa_key_mgmt=WPA-PSK
+    wpa_pairwise=TKIP CCMP
+
+On the client side, the following *wpa_supplicant* configuration file can be
+stored in `/etc/wpa_supplicant/rlite.conf`
+
+    ctrl_interface=/var/run/wpa_supplicant
+    eapol_version=1
+    ap_scan=1
+    fast_reauth=1
+    update_config=1
+
+    network={
+        ssid="rinawlanpwd.DIF"
+        psk="password"
+    }
+
+On the AP node, we use the following RINA configuration (specified as
+configuration for **rlite-node-config**):
+
+    # Create a shim-wifi IPCP
+    ipcp-create x.IPCP shim-wifi rinawlanpwd.DIF
+    # Configure the IPCP with the interface name (needed by the shim-eth
+    # kernel module to bind to the network interface)
+    ipcp-config x.IPCP netdev wlp2s0
+    # Enable AP mode, running hostapd
+    ipcp-enroller-enable x.IPCP
+    # Create a normal IPCP, register into the shim-wifi DIF, and
+    # enable as enroller.
+    ipcp-create nx.IPCP normal n.DIF
+    ipcp-register nx.IPCP rinawlanpwd.DIF
+    ipcp-enroller-enable nx.IPCP
+
+On the client node, we use the following RINA configuration (assuming
+`wlp3s0` is the name of the WiFi network interface):
+
+    # Create a shim-wifi IPCP
+    ipcp-create y.IPCP shim-wifi rinawlanpwd.DIF
+    # Configure the IPCP with the interface name (needed by the shim-eth
+    # kernel module to bind to the network interface)
+    ipcp-config y.IPCP netdev wlp3s0
+    # Create a normal IPCP and register into the shim-wifi DIF
+    ipcp-create ny.IPCP normal n.DIF
+    ipcp-register ny.IPCP rinawlanpwd.DIF
+    # Enroll the shim-wifi IPCP to rinawlanpwd.DIF
+    ipcp-enroll y.IPCP rinawlanpwd.DIF null
+    # Enroll to the normal DIF
+    ipcp-enroll ny.IPCP n.DIF rinawlanpwd.DIF nx.IPCP
 
 
 ## 6. Configuration of IPC Processes
