@@ -643,16 +643,16 @@ functionalities of the enroller IPCP; similarly, *wpa_supplicant* is used
 for the enrollee IPCP. These daemons need their configuration that must be
 prepared by the administrator in addition to the RINA configuration.
 
-For the sake of simplicity, in this tutorial we use only two nodes, with
-one of them acting as AP, and the other acting as client station.
+For the sake of simplicity, in this tutorial we use only two nodes, each
+having its own WiFI NIC; one of them acts as an AP, while the other is a
+client station.
 On top of the shim-wifi DIF we stack a normal DIF to provide complete
 services to the applications; the shim-wifi inherits the limitations of the
 shim-eth (e.g. only a single flow supported between two nodes in the DIF),
 that is used to implement its datapath.
 
 On the AP side, the following *hostapd* configuration file can be stored
-in `/etc/hostapd/rlite.conf` (you should replace `wlp2s0` with your
-local WiFi interface name):
+in `/etc/hostapd/rlite.conf`:
 
     interface=wlp2s0
     ssid=rinawlanpwd.DIF
@@ -669,6 +669,10 @@ local WiFi interface name):
     wpa_key_mgmt=WPA-PSK
     wpa_pairwise=TKIP CCMP
 
+In the configuration file above you should replace `wlp2s0` with your local
+WiFi interface name. In this tutorial we assume that the NIC supports AP mode
+(a.k.a. *master* mode); you should make sure that this is the case also for
+your hardware.
 On the client side, the following *wpa_supplicant* configuration file can be
 stored in `/etc/wpa_supplicant/rlite.conf`
 
@@ -682,6 +686,9 @@ stored in `/etc/wpa_supplicant/rlite.conf`
         ssid="rinawlanpwd.DIF"
         psk="password"
     }
+
+On both client and AP nodes, make sure that no additional *wpa_supplicant*
+or network manager software is running, to avoid conflicts on the WiFI NIC.
 
 On the AP node, we use the following RINA configuration (specified as
 configuration for **rlite-node-config**):
@@ -714,6 +721,20 @@ On the client node, we use the following RINA configuration (assuming
     ipcp-enroll y.IPCP rinawlanpwd.DIF null
     # Enroll to the normal DIF
     ipcp-enroll ny.IPCP n.DIF rinawlanpwd.DIF nx.IPCP
+
+On both nodes, the RINA configuration can be realized with the following
+command:
+
+    $ sudo rlite-node-config -vd
+
+To test connectivity, you can run a rinaperf server on one of the
+two nodes (it will register on the normal DIF by default):
+
+    (node A)$ rinaperf -l
+
+while the other node runs the server
+
+    (node B)$ rinaperf
 
 
 ## 6. Configuration of IPC Processes
