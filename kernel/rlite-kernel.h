@@ -41,6 +41,7 @@
 #include <linux/version.h>
 #include <linux/uaccess.h>
 #include <linux/uio.h>
+#include <linux/hashtable.h>
 
 #include "kerconfig.h"
 
@@ -706,9 +707,28 @@ txrx_init(struct txrx *txrx, struct ipcp_entry *ipcp)
     txrx->flags  = 0;
 }
 
+/* Implementation of the normal IPCP. */
+struct rl_normal {
+    struct ipcp_entry *ipcp;
+
+    /* Implementation of the PDU Forwarding Table (PDUFT).
+     * An hash table, a default entry and a lock. */
+#define PDUFT_HASHTABLE_BITS 3
+    DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
+    struct flow_entry *pduft_dflt;
+    rwlock_t pduft_lock;
+};
+
 void dtp_init(struct dtp *dtp);
 void dtp_fini(struct dtp *dtp);
 void dtp_dump(struct dtp *dtp);
+int flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats);
+int rl_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr);
+int rl_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry);
+int rl_pduft_flush(struct ipcp_entry *ipcp);
+int rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
+                 struct flow_entry *flow);
+struct flow_entry *rl_pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr);
 
 #define RL_UNBOUND_FLOW_TO (msecs_to_jiffies(15000))
 
