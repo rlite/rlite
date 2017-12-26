@@ -36,8 +36,6 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 
-#define PDUFT_HASHTABLE_BITS 3
-
 /* PCI header to be used for transfer PDUs.
  * The order of the fields is extremely important, because we only
  * accept struct layouts where the compiler does not insert any
@@ -119,18 +117,6 @@ rina_pci_dump(struct rina_pci *pci)
        (long unsigned)pci->seqnum);
 }
 
-/* Implementation of the normal IPCP. */
-
-struct rl_normal {
-    struct ipcp_entry *ipcp;
-
-    /* Implementation of the PDU Forwarding Table (PDUFT).
-     * An hash table, a default entry and a lock. */
-    DECLARE_HASHTABLE(pdu_ft, PDUFT_HASHTABLE_BITS);
-    struct flow_entry *pduft_dflt;
-    rwlock_t pduft_lock;
-};
-
 /* In general RL_PCI_LEN != sizeof(struct rina_pci) and
  * RL_PCI_CTRL_LEN != sizeof(struct rina_pci_ctrl), since
  * compiler may need to insert padding. */
@@ -172,14 +158,12 @@ rl_normal_create(struct ipcp_entry *ipcp)
     return priv;
 }
 
-static int rl_normal_pduft_flush(struct ipcp_entry *ipcp);
-
 static void
 rl_normal_destroy(struct ipcp_entry *ipcp)
 {
     struct rl_normal *priv = ipcp->priv;
 
-    rl_normal_pduft_flush(ipcp);
+    rl_pduft_flush(ipcp);
     rl_free(priv, RL_MT_SHIM);
 
     PD("IPC [%p] destroyed\n", priv);
@@ -500,36 +484,6 @@ rl_normal_flow_init(struct ipcp_entry *ipcp, struct flow_entry *flow)
     return 0;
 }
 
-static struct pduft_entry *
-pduft_lookup_internal(struct rl_normal *priv, rlm_addr_t dst_addr)
-{
-    struct pduft_entry *entry;
-    struct hlist_head *head;
-
-    head = &priv->pdu_ft[hash_min(dst_addr, HASH_BITS(priv->pdu_ft))];
-    hlist_for_each_entry (entry, head, node) {
-        if (entry->address == dst_addr) {
-            return entry;
-        }
-    }
-
-    return NULL;
-}
-
-static struct flow_entry *
-pduft_lookup(struct rl_normal *priv, rlm_addr_t dst_addr)
-{
-    struct pduft_entry *entry;
-    struct flow_entry *flow;
-
-    read_lock_bh(&priv->pduft_lock);
-    entry = pduft_lookup_internal(priv, dst_addr);
-    flow  = entry ? entry->flow : priv->pduft_dflt;
-    read_unlock_bh(&priv->pduft_lock);
-
-    return flow;
-}
-
 #define RMTQ_MAX_SIZE (1 << 17)
 
 static int
@@ -541,7 +495,7 @@ rmt_tx(struct ipcp_entry *ipcp, rl_addr_t remote_addr, struct rl_buf *rb,
     struct ipcp_entry *lower_ipcp;
     int ret;
 
-    lower_flow = pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
+    lower_flow = rl_pduft_lookup((struct rl_normal *)ipcp->priv, remote_addr);
     if (unlikely(!lower_flow && remote_addr != ipcp->addr)) {
         RPD(2, "No route to IPCP %lu, dropping packet\n",
             (long unsigned)remote_addr);
@@ -814,7 +768,7 @@ rl_normal_mgmt_sdu_build(struct ipcp_entry *ipcp,
     rl_addr_t dst_addr = RL_ADDR_NULL; /* Not valid. */
 
     if (mhdr->type == RLITE_MGMT_HDR_T_OUT_DST_ADDR) {
-        *lower_flow = pduft_lookup(priv, mhdr->remote_addr);
+        *lower_flow = rl_pduft_lookup(priv, mhdr->remote_addr);
         if (unlikely(!(*lower_flow))) {
             RPD(2, "No route to IPCP %lu, dropping packet\n",
                 (long unsigned)mhdr->remote_addr);
@@ -880,124 +834,6 @@ rl_normal_config(struct ipcp_entry *ipcp, const char *param_name,
             *notify    = (ipcp->addr != address);
             ipcp->addr = address;
         }
-    }
-
-    return ret;
-}
-
-static int
-rl_normal_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
-                    struct flow_entry *flow)
-{
-    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-    struct pduft_entry *entry;
-
-    write_lock_bh(&priv->pduft_lock);
-
-    if (dst_addr == RL_ADDR_NULL) {
-        /* Default entry. */
-        priv->pduft_dflt = flow;
-    } else {
-        entry = pduft_lookup_internal(priv, dst_addr);
-
-        if (!entry) {
-            entry = rl_alloc(sizeof(*entry), GFP_ATOMIC, RL_MT_PDUFT);
-            if (!entry) {
-                write_unlock_bh(&priv->pduft_lock);
-                return -ENOMEM;
-            }
-
-            hash_add(priv->pdu_ft, &entry->node, dst_addr);
-            list_add_tail(&entry->fnode, &flow->pduft_entries);
-        } else {
-            /* Move from the old list to the new one. */
-            list_del_init(&entry->fnode);
-            list_add_tail_safe(&entry->fnode, &flow->pduft_entries);
-            flow_put(entry->flow);
-        }
-
-        entry->flow    = flow;
-        entry->address = dst_addr;
-    }
-    flow_get_ref(flow);
-    write_unlock_bh(&priv->pduft_lock);
-
-    return 0;
-}
-
-static void
-pduft_entry_unlink(struct pduft_entry *entry)
-{
-    list_del_init(&entry->fnode);
-    hash_del(&entry->node);
-    flow_put(entry->flow);
-}
-
-static int
-rl_normal_pduft_flush(struct ipcp_entry *ipcp)
-{
-    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-    struct pduft_entry *entry;
-    struct hlist_node *tmp;
-    int bucket;
-
-    write_lock_bh(&priv->pduft_lock);
-
-    if (priv->pduft_dflt) {
-        flow_put(priv->pduft_dflt);
-        priv->pduft_dflt = NULL;
-    }
-    hash_for_each_safe(priv->pdu_ft, bucket, tmp, entry, node)
-    {
-        pduft_entry_unlink(entry);
-        rl_free(entry, RL_MT_PDUFT);
-    }
-
-    write_unlock_bh(&priv->pduft_lock);
-
-    return 0;
-}
-
-static int
-rl_normal_pduft_del(struct ipcp_entry *ipcp, struct pduft_entry *entry)
-{
-    struct rl_normal *priv = (struct rl_normal *)ipcp->priv;
-
-    write_lock_bh(&priv->pduft_lock);
-    pduft_entry_unlink(entry);
-    write_unlock_bh(&priv->pduft_lock);
-
-    rl_free(entry, RL_MT_PDUFT);
-
-    return 0;
-}
-
-static int
-rl_normal_pduft_del_addr(struct ipcp_entry *ipcp, rlm_addr_t dst_addr)
-{
-    struct rl_normal *priv    = (struct rl_normal *)ipcp->priv;
-    struct pduft_entry *entry = NULL;
-    int ret                   = -1;
-
-    write_lock_bh(&priv->pduft_lock);
-    if (dst_addr == RL_ADDR_NULL) {
-        /* Default entry. */
-        if (priv->pduft_dflt) {
-            flow_put(priv->pduft_dflt);
-            priv->pduft_dflt = NULL;
-            ret              = 0;
-        }
-    } else {
-        entry = pduft_lookup_internal(priv, dst_addr);
-        if (entry) {
-            pduft_entry_unlink(entry);
-            ret = 0;
-        }
-    }
-    write_unlock_bh(&priv->pduft_lock);
-
-    if (entry) {
-        rl_free(entry, RL_MT_PDUFT);
     }
 
     return ret;
@@ -1674,18 +1510,6 @@ rl_normal_sdu_rx_consumed(struct flow_entry *flow, rlm_seq_t seqnum)
     return 0;
 }
 
-static int
-rl_normal_flow_get_stats(struct flow_entry *flow, struct rl_flow_stats *stats)
-{
-    struct dtp *dtp = &flow->dtp;
-
-    spin_lock_bh(&dtp->lock);
-    *stats = flow->stats;
-    spin_unlock_bh(&dtp->lock);
-
-    return 0;
-}
-
 /* The name of this IPCP (factory) is obtained by concatenating
  * the name of the flavour to the string "normal". For the default
  * normal ICPP, the flavour name is the empty string (""). */
@@ -1708,13 +1532,13 @@ static struct ipcp_factory normal_factory = {
     .ops.flow_init          = rl_normal_flow_init,
     .ops.sdu_write          = rl_normal_sdu_write,
     .ops.config             = rl_normal_config,
-    .ops.pduft_set          = rl_normal_pduft_set,
-    .ops.pduft_flush        = rl_normal_pduft_flush,
-    .ops.pduft_del          = rl_normal_pduft_del,
-    .ops.pduft_del_addr     = rl_normal_pduft_del_addr,
+    .ops.pduft_set          = rl_pduft_set,
+    .ops.pduft_flush        = rl_pduft_flush,
+    .ops.pduft_del          = rl_pduft_del,
+    .ops.pduft_del_addr     = rl_pduft_del_addr,
     .ops.mgmt_sdu_build     = rl_normal_mgmt_sdu_build,
     .ops.sdu_rx             = rl_normal_sdu_rx,
-    .ops.flow_get_stats     = rl_normal_flow_get_stats,
+    .ops.flow_get_stats     = flow_get_stats,
     .ops.flow_writeable     = rl_normal_flow_writeable,
     .ops.qos_supported      = rl_normal_qos_supported,
 };
