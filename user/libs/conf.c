@@ -154,7 +154,7 @@ rl_conf_ipcp_destroy(rl_ipcp_id_t ipcp_id, const int sync)
 
     /* Possibly wait for the kernel to notify us about the IPCP being
      * removed by the kernel (once all the references are gone) . */
-    while (sync) {
+    while (!ret && sync) {
         struct rl_kmsg_ipcp_update *upd;
 
         upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
