@@ -186,15 +186,14 @@ static void
 rl_write_restart_wqh(struct ipcp_entry *ipcp, wait_queue_head_t *wqh)
 {
     spin_lock_bh(&ipcp->rmtq_lock);
-
     if (ipcp->rmtq_size > 0) {
         /* Schedule a tasklet to complete the tx work. */
         tasklet_schedule(&ipcp->tx_completion);
     }
+    spin_unlock_bh(&ipcp->rmtq_lock);
+
     /* Wake up waiting process contexts. */
     wake_up_interruptible_poll(wqh, POLLOUT | POLLWRBAND | POLLWRNORM);
-
-    spin_unlock_bh(&ipcp->rmtq_lock);
 }
 
 void
