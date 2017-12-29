@@ -850,19 +850,25 @@ static int
 ipcp_policy_list(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_policy_list_req req;
-    const char *name;
+    const char *name      = NULL;
     const char *comp_name = NULL;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 1);
-    name = argv[0];
-
-    comp_name = NULL;
+    if (argc >= 1) {
+        name = argv[0];
+    }
     if (argc >= 2) {
         comp_name = argv[1];
     }
 
-    if (strcmp(cd->name, "dif-policy-list") == 0) {
+    if (argc == 0) {
+        attrs = select_ipcp();
+        if (!attrs) {
+            PE("Could not find any IPCP\n");
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else if (strcmp(cd->name, "dif-policy-list") == 0) {
         attrs = ipcp_by_dif(name);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", name);
@@ -889,25 +895,29 @@ static int
 ipcp_policy_param_list(int argc, char **argv, struct cmd_descriptor *cd)
 {
     struct rl_cmsg_ipcp_policy_param_list_req req;
-    const char *name;
-    const char *comp_name;
-    const char *param_name;
+    const char *name       = NULL;
+    const char *comp_name  = NULL;
+    const char *param_name = NULL;
     struct ipcp_attrs *attrs;
 
-    assert(argc >= 1);
-    name = argv[0];
-
-    comp_name = NULL;
+    if (argc >= 1) {
+        name = argv[0];
+    }
     if (argc >= 2) {
         comp_name = argv[1];
     }
-
-    param_name = NULL;
     if (argc >= 3) {
         param_name = argv[2];
     }
 
-    if (strcmp(cd->name, "dif-policy-param-list") == 0) {
+    if (argc == 0) {
+        attrs = select_ipcp();
+        if (!attrs) {
+            PE("Could not find any IPCP\n");
+            return -1;
+        }
+        req.ipcp_name = strdup(attrs->name);
+    } else if (strcmp(cd->name, "dif-policy-param-list") == 0) {
         attrs = ipcp_by_dif(name);
         if (!attrs) {
             PE("Could not find any IPCP in DIF %s\n", name);
@@ -1106,8 +1116,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name     = "dif-policy-list",
-        .usage    = "DIF_NAME [COMPONENT_NAME]",
-        .num_args = 1,
+        .usage    = "[DIF_NAME] [COMPONENT_NAME]",
+        .num_args = 0,
         .func     = ipcp_policy_list,
     },
     {
@@ -1118,8 +1128,8 @@ static struct cmd_descriptor cmd_descriptors[] = {
     },
     {
         .name     = "dif-policy-param-list",
-        .usage    = "DIF_NAME [COMPONENT_NAME] [PARAM_NAME]",
-        .num_args = 1,
+        .usage    = "[DIF_NAME] [COMPONENT_NAME] [PARAM_NAME]",
+        .num_args = 0,
         .func     = ipcp_policy_param_list,
     },
     {
