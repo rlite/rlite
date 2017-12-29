@@ -1549,8 +1549,11 @@ ipcp_del(rl_ipcp_id_t ipcp_id)
         return -ENXIO;
     }
     entry->flags |= RL_K_IPCP_ZOMBIE;
+    barrier();
 
-    /* Flush the PDUFT. */
+    /* Flush the PDUFT. Nobody will do it again afterwards, so we need to make
+     * sure that nobody will add entries to the pduft from now on (see
+     * rl_ipcp_pduft_mod()). */
     ipcp_pduft_flush(entry);
 
     /* Unregister all the applications associated to this IPCP. */
@@ -1984,12 +1987,17 @@ rl_ipcp_pduft_mod(struct rl_ctrl *rc, struct rl_msg_base *bmsg)
     flow = flow_get(req->local_port);
     ipcp = ipcp_get(req->ipcp_id);
 
-    if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set) {
+    if (ipcp && flow && flow->upper.ipcp == ipcp && ipcp->ops.pduft_set &&
+        !(ipcp->flags & RL_K_IPCP_ZOMBIE)) {
         mutex_lock(&ipcp->lock);
         /* We allow this operation only if the requesting IPCP (req->ipcp_id)
          * is really using the requested flow, i.e. 'flow->upper.ipcp == ipcp'.
          * In this situation we are sure that 'ipcp' will not be deleted before
-         * 'flow' is deleted, so we can rely on the internal pduft lock. */
+         * 'flow' is deleted, so we can rely on the internal pduft lock.
+         * Moreover, we don't allow any operation on zombies to avoid a
+         * resources leak, because the pduft of a zombie IPCP is not flushed
+         * anymore (so references to flows in the pduft will stay there forever,
+         * and so the IPCPs bound to them). */
         if (req->msg_type == RLITE_KER_IPCP_PDUFT_SET) {
             ret = ipcp->ops.pduft_set(ipcp, req->dst_addr, flow);
         } else { /* RLITE_KER_IPCP_PDUFT_DEL */

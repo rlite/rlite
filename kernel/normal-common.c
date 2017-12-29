@@ -177,8 +177,9 @@ rl_pduft_set(struct ipcp_entry *ipcp, rlm_addr_t dst_addr,
         entry->flow    = flow;
         entry->address = dst_addr;
     }
-    flow_get_ref(flow);
     write_unlock_bh(&priv->pduft_lock);
+
+    flow_get_ref(flow);
 
     return 0;
 }
