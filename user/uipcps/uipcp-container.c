@@ -1098,6 +1098,7 @@ ipcp_hdrlen(struct uipcp *uipcp)
            sz->seq;
 }
 
+/* Called under uipcps lock. */
 static void
 topo_visit(struct uipcps *uipcps)
 {
@@ -1107,7 +1108,6 @@ topo_visit(struct uipcps *uipcps)
     /*
      * Stage 1: compute txhdroom and mss.
      */
-    pthread_mutex_lock(&uipcps->lock);
     list_for_each_entry (ipn, &uipcps->ipcp_nodes, node) {
         struct uipcp *uipcp = uipcp_lookup(uipcps, ipn->id);
 
@@ -1135,7 +1135,6 @@ topo_visit(struct uipcps *uipcps)
             ipn->update_kern_tx = 1;
         }
     }
-    pthread_mutex_unlock(&uipcps->lock);
 
     for (;;) {
         struct ipcp_node *next = NULL;
@@ -1257,7 +1256,7 @@ topo_visit(struct uipcps *uipcps)
     }
 }
 
-/* Update kernelspace hdrooms and mss. */
+/* Update kernelspace hdrooms and mss. Called under uipcps lock. */
 static int
 topo_update_kern(struct uipcps *uipcps)
 {
@@ -1313,6 +1312,7 @@ topo_update_kern(struct uipcps *uipcps)
     return 0;
 }
 
+/* Called under uipcps lock. */
 static int
 topo_compute(struct uipcps *uipcps)
 {
@@ -1340,6 +1340,7 @@ topo_compute(struct uipcps *uipcps)
     return 0;
 }
 
+/* Called under uipcps lock. */
 static struct ipcp_node *
 topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
 {
@@ -1371,6 +1372,7 @@ topo_node_get(struct uipcps *uipcps, rl_ipcp_id_t ipcp_id, int create)
     return ipn;
 }
 
+/* Called under uipcps lock. */
 static void
 topo_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
 {
@@ -1385,6 +1387,7 @@ topo_node_put(struct uipcps *uipcps, struct ipcp_node *ipn)
     rl_free(ipn, RL_MT_TOPO);
 }
 
+/* Called under uipcps lock. */
 static int
 topo_edge_add(struct ipcp_node *ipcp, struct ipcp_node *neigh,
               struct list_head *edges)
@@ -1414,6 +1417,7 @@ ok:
     return 0;
 }
 
+/* Called under uipcps lock. */
 static int
 topo_edge_del(struct ipcp_node *ipcp, struct ipcp_node *neigh,
               struct list_head *edges)
@@ -1444,23 +1448,30 @@ int
 topo_lower_flow_added(struct uipcps *uipcps, unsigned int upper_id,
                       unsigned int lower_id)
 {
-    struct ipcp_node *upper = topo_node_get(uipcps, upper_id, 1);
-    struct ipcp_node *lower = topo_node_get(uipcps, lower_id, 1);
+    struct ipcp_node *upper;
+    struct ipcp_node *lower;
 
+    pthread_mutex_lock(&uipcps->lock);
+
+    upper = topo_node_get(uipcps, upper_id, 1);
+    lower = topo_node_get(uipcps, lower_id, 1);
     if (!upper || !lower) {
+        pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
 
     if (topo_edge_add(upper, lower, &upper->lowers) ||
         topo_edge_add(lower, upper, &lower->uppers)) {
         topo_edge_del(upper, lower, &upper->lowers);
-
+        pthread_mutex_unlock(&uipcps->lock);
         return -1;
     }
 
     PD("Added flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
     topo_compute(uipcps);
+
+    pthread_mutex_unlock(&uipcps->lock);
 
     return 0;
 }
@@ -1469,15 +1480,21 @@ int
 topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
                         unsigned int lower_id)
 {
-    struct ipcp_node *upper = topo_node_get(uipcps, upper_id, 0);
-    struct ipcp_node *lower = topo_node_get(uipcps, lower_id, 0);
+    struct ipcp_node *upper;
+    struct ipcp_node *lower;
 
+    pthread_mutex_lock(&uipcps->lock);
+
+    upper = topo_node_get(uipcps, upper_id, 0);
+    lower = topo_node_get(uipcps, lower_id, 0);
     if (lower == NULL) {
+        pthread_mutex_unlock(&uipcps->lock);
         PE("Could not find node %u\n", lower_id);
         return -1;
     }
 
     if (upper == NULL) {
+        pthread_mutex_unlock(&uipcps->lock);
         PE("Could not find node %u\n", upper_id);
         return -1;
     }
@@ -1491,6 +1508,8 @@ topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper_id,
     PD("Removed flow (%d -> %d)\n", upper_id, lower_id);
     /* Graph changed, recompute. */
     topo_compute(uipcps);
+
+    pthread_mutex_unlock(&uipcps->lock);
 
     return 0;
 }
@@ -1533,6 +1552,19 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     upd->dif_name       = NULL;
     uipcp->pcisizes     = upd->pcisizes;
 
+    if (!mss_changed) {
+        goto out;
+    }
+
+    node = topo_node_get(uipcps, upd->ipcp_id, 1);
+    if (!node) {
+        goto out;
+    }
+
+    /* A mss was updated, restart topological ordering. */
+    topo_compute(uipcps);
+
+out:
     pthread_mutex_unlock(&uipcps->lock);
 
     /* Address may have changed, notify the IPCP. */
@@ -1541,18 +1573,6 @@ uipcp_update(struct uipcps *uipcps, struct rl_kmsg_ipcp_update *upd)
     }
 
     uipcp_put(uipcp);
-
-    if (!mss_changed) {
-        return 0;
-    }
-
-    node = topo_node_get(uipcps, upd->ipcp_id, 1);
-    if (!node) {
-        return 0;
-    }
-
-    /* A mss was updated, restart topological ordering. */
-    topo_compute(uipcps);
 
     return 0;
 }
