@@ -421,9 +421,9 @@ rl_u_terminate(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
     };
 
     uipcps_reset(/*sync=*/1);
-    rl_u_response(sfd, RLITE_MB(b_req), &resp);
     unlink(RLITE_UIPCPS_UNIX_NAME);
     PD("terminate command received, daemon is going to exit ...\n");
+    rl_u_response(sfd, RLITE_MB(b_req), &resp);
     exit(EXIT_SUCCESS);
 
     return 0;

@@ -36,6 +36,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <sys/ioctl.h>
+#include <poll.h>
 
 #include "rlite/list.h"
 #include "rlite/uipcps-msg.h"
@@ -167,6 +168,7 @@ read_response(int sfd, response_handler_t handler)
     int n;
 
     for (;;) {
+        struct pollfd pfd[1];
         char *sbold = serbuf;
 
         serbuf = realloc(serbuf, serbuf_size);
@@ -178,10 +180,21 @@ read_response(int sfd, response_handler_t handler)
             return -1;
         }
 
+        pfd[0].fd     = sfd;
+        pfd[0].events = POLLIN;
+        ret           = poll(pfd, sizeof(pfd), 10000 /* 10 seconds */);
+        if (ret < 0) {
+            PE("poll() error [%s]\n", strerror(errno));
+            return ret;
+        } else if (ret == 0) {
+            PE("request timed out\n");
+            return -1;
+        }
+
         n = read(sfd, serbuf + read_ofs, serbuf_size - read_ofs);
         if (n < 0) {
-            PE("read() error [%d]\n", n);
-            return -1;
+            PE("read() error [%s]\n", strerror(errno));
+            return n;
         }
 
         read_ofs += n;
