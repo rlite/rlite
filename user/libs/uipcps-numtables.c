@@ -120,6 +120,10 @@ struct rl_msg_layout rl_uipcps_numtables[] = {
                        1 * sizeof(struct rl_buf_field),
             .buffers = 1,
         },
+    [RLITE_U_TERMINATE] =
+        {
+            .copylen = sizeof(struct rl_msg_base),
+        },
     [RLITE_U_MEMTRACK_DUMP] =
         {
             .copylen = sizeof(struct rl_msg_base),

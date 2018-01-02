@@ -50,6 +50,7 @@ enum {
     RLITE_U_IPCP_POLICY_LIST_RESP,       /* 16 */
     RLITE_U_IPCP_POLICY_PARAM_LIST_REQ,  /* 17 */
     RLITE_U_IPCP_POLICY_PARAM_LIST_RESP, /* 18 */
+    RLITE_U_TERMINATE,                   /* 19 */
 
     RLITE_U_MSG_MAX,
 };
