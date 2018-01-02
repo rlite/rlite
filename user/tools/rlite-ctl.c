@@ -768,6 +768,17 @@ probe(int argc, char **argv, struct cmd_descriptor *cd)
     return request_response(RLITE_MB(&req), NULL);
 }
 
+static int
+terminate(int argc, char **argv, struct cmd_descriptor *cd)
+{
+    struct rl_msg_base req;
+
+    req.msg_type = RLITE_U_TERMINATE;
+    req.event_id = 0;
+
+    return request_response(RLITE_MB(&req), NULL);
+}
+
 #ifdef RL_MEMTRACK
 static int
 memtrack_dump(int argc, char **argv, struct cmd_descriptor *cd)
@@ -1143,6 +1154,12 @@ static struct cmd_descriptor cmd_descriptors[] = {
         .usage    = "",
         .num_args = 0,
         .func     = probe,
+    },
+    {
+        .name     = "terminate",
+        .usage    = "",
+        .num_args = 0,
+        .func     = terminate,
     },
 #if 0
     {

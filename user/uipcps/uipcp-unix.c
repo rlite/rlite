@@ -360,6 +360,75 @@ rl_u_probe(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
     return rl_u_response(sfd, RLITE_MB(b_req), &resp);
 }
 
+/* Equivalent to 'rlite-ctl reset', but supporting both synchronous
+ * and asynchronous operation. */
+static int
+uipcps_reset(int sync)
+{
+    int ret = 0;
+    int fd;
+
+    /* We init an rlite control device, with IPCP updates
+     * enabled. */
+    fd = rina_open();
+    if (fd < 0) {
+        perror("rina_open()");
+        return -1;
+    }
+    ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
+    if (ret < 0) {
+        perror("ioctl()");
+        return -1;
+    }
+    ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret < 0) {
+        perror("fcntl(F_SETFL, O_NONBLOCK)");
+        return -1;
+    }
+
+    /* We will receive an update ADD message for each existing IPCP. */
+    for (;;) {
+        struct rl_kmsg_ipcp_update *upd;
+
+        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
+        if (!upd) {
+            if (errno && errno != EAGAIN) {
+                perror("rl_read_next_msg()");
+            }
+            break;
+        }
+        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
+
+        if (upd->update_type == RL_IPCP_UPDATE_ADD) {
+            /* Destroy the IPCP. */
+            int ret;
+            ret = rl_conf_ipcp_destroy(upd->ipcp_id, /*sync=*/sync);
+            PD("Destroying IPCP '%s' (id=%u) --> %d\n", upd->ipcp_name,
+               upd->ipcp_id, ret);
+        }
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
+        rl_free(upd, RL_MT_MSG);
+    }
+    close(fd);
+    return 0;
+}
+
+static int
+rl_u_terminate(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
+{
+    struct rl_msg_base_resp resp = {
+        .result = 0,
+    };
+
+    uipcps_reset(/*sync=*/1);
+    rl_u_response(sfd, RLITE_MB(b_req), &resp);
+    unlink(RLITE_UIPCPS_UNIX_NAME);
+    PD("terminate command received, daemon is going to exit ...\n");
+    exit(EXIT_SUCCESS);
+
+    return 0;
+}
+
 #ifdef RL_MEMTRACK
 static int
 rl_u_memtrack_dump(struct uipcps *uipcps, int sfd,
@@ -391,6 +460,7 @@ static rl_req_handler_t rl_config_handlers[] = {
     [RLITE_U_PROBE]                      = rl_u_probe,
     [RLITE_U_IPCP_POLICY_LIST_REQ]       = rl_u_ipcp_policy_list,
     [RLITE_U_IPCP_POLICY_PARAM_LIST_REQ] = rl_u_ipcp_policy_list,
+    [RLITE_U_TERMINATE]                  = rl_u_terminate,
 #ifdef RL_MEMTRACK
     [RLITE_U_MEMTRACK_DUMP] = rl_u_memtrack_dump,
 #endif /* RL_MEMTRACK */
@@ -710,85 +780,13 @@ print_backtrace(void)
 #endif
 }
 
-/* Asynchronous version of 'rlite-ctl reset'. */
-static void *
-uipcps_reset(void *opaque)
-{
-    int ret = 0;
-    int fd;
-
-    /* We init an rlite control device, with IPCP updates
-     * enabled. */
-    fd = rina_open();
-    if (fd < 0) {
-        perror("rina_open()");
-        return NULL;
-    }
-    ret = ioctl(fd, RLITE_IOCTL_CHFLAGS, RL_F_IPCPS);
-    if (ret < 0) {
-        perror("ioctl()");
-        return NULL;
-    }
-    ret = fcntl(fd, F_SETFL, O_NONBLOCK);
-    if (ret < 0) {
-        perror("fcntl(F_SETFL, O_NONBLOCK)");
-        return NULL;
-    }
-
-    /* We will receive an update ADD message for each existing IPCP. */
-    for (;;) {
-        struct rl_kmsg_ipcp_update *upd;
-
-        upd = (struct rl_kmsg_ipcp_update *)rl_read_next_msg(fd, 1);
-        if (!upd) {
-            if (errno && errno != EAGAIN) {
-                perror("rl_read_next_msg()");
-            }
-            break;
-        }
-        assert(upd->msg_type == RLITE_KER_IPCP_UPDATE);
-
-        if (upd->update_type == RL_IPCP_UPDATE_ADD) {
-            /* Destroy the IPCP. */
-            PD("Destroying IPCP '%s' (id=%u)\n", upd->ipcp_name, upd->ipcp_id);
-            rl_conf_ipcp_destroy(upd->ipcp_id, /*sync=*/0);
-        }
-        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(upd));
-        rl_free(upd, RL_MT_MSG);
-    }
-    close(fd);
-
-    unlink(RLITE_UIPCPS_UNIX_NAME);
-    return NULL;
-}
-
 static void
 sigint_handler(int signum)
 {
-    pthread_t th;
-    int ret;
-
-    if (signum == SIGPIPE) {
-        PI("SIGPIPE received, ignoring...\n");
-        return;
-    }
-
+    assert(signum != SIGPIPE);
     print_backtrace();
-
+    unlink(RLITE_UIPCPS_UNIX_NAME);
     PD("%s signal received, daemon is going to exit ...\n", strsignal(signum));
-
-    /* Spawn a thread to destroy all the IPCPs. */
-    ret = pthread_create(&th, NULL, uipcps_reset, NULL);
-    if (ret) {
-        PE("pthread_create() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    /* Wait for the thread to finish and terminate the daemon. */
-    ret = pthread_join(th, NULL);
-    if (ret) {
-        PE("pthread_join() failed [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
     exit(EXIT_SUCCESS);
 }
 
