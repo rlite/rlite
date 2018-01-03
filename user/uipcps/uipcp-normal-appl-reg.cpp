@@ -382,7 +382,7 @@ class CentralizedFaultTolerantDFT : public DFT {
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override { return 0; };
-        int dft_set(const struct rl_kmsg_appl_register *req);
+        int dft_mod(const struct rl_kmsg_appl_register *req);
     };
     std::unique_ptr<Replica> raft;
 
@@ -396,26 +396,29 @@ class CentralizedFaultTolerantDFT : public DFT {
         std::unique_ptr<TimeoutEvent> timeout;
 
         struct PendingReq {
+            gpb::opCode_t op_code;
             std::string appl_name;
             ReplicaId replica;
             uint32_t kevent_id;
             std::chrono::system_clock::time_point t;
             PendingReq() = default;
-            PendingReq(const std::string &a, const ReplicaId &r,
-                       uint32_t event_id)
-                : appl_name(a), replica(r), kevent_id(event_id)
+            PendingReq(gpb::opCode_t op, const std::string &a,
+                       const ReplicaId &r, uint32_t event_id)
+                : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
             {
                 t = std::chrono::system_clock::now();
             }
         };
         std::unordered_map</*invoke_id*/ int, PendingReq> pending;
 
+        void rearm_pending_timer();
+
     public:
         Client(CentralizedFaultTolerantDFT *dft, std::list<ReplicaId> names)
             : parent(dft), replicas(std::move(names))
         {
         }
-        int dft_set(const struct rl_kmsg_appl_register *req);
+        int dft_mod(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
     };
@@ -500,9 +503,9 @@ CentralizedFaultTolerantDFT::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
     if (client) {
-        return client->dft_set(req);
+        return client->dft_mod(req);
     }
-    return raft->dft_set(req);
+    return raft->dft_mod(req);
 }
 
 void
@@ -533,37 +536,11 @@ CentralizedFaultTolerantDFT::neighs_refresh(size_t limit)
     return 0; /* Nothing to do. */
 }
 
-int
-CentralizedFaultTolerantDFT::Client::dft_set(
-    const struct rl_kmsg_appl_register *req)
+/* Rearm the timer according to the older pending request (i.e. the next one
+ * that is expiring). */
+void
+CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
 {
-    string appl_name(req->appl_name);
-
-    /* Prepare an M_WRITE message for the write operation.
-     * If we know who is the leader, we send it to the leader
-     * only; otherwise we send it to all the replicas. */
-    for (const auto &r : replicas) {
-        if (leader_id.empty() || r == leader_id) {
-            auto m = make_unique<CDAPMessage>();
-            DFTEntry dft_entry;
-            int invoke_id;
-            int ret;
-
-            m->m_write(obj_class::dft, obj_name::dft);
-            dft_entry.address   = parent->rib->myaddr;
-            dft_entry.appl_name = RinaName(appl_name);
-            dft_entry.timestamp = time64();
-
-            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
-                                                &invoke_id);
-            if (ret) {
-                return ret;
-            }
-            pending[invoke_id] =
-                std::move(PendingReq(appl_name, r, req->event_id));
-        }
-    }
-
     if (!pending.empty()) {
         auto t_min = std::chrono::system_clock::time_point::max();
         for (const auto &kv : pending) {
@@ -583,6 +560,44 @@ CentralizedFaultTolerantDFT::Client::dft_set(
                 cli->process_timeout();
             });
     }
+}
+
+int
+CentralizedFaultTolerantDFT::Client::dft_mod(
+    const struct rl_kmsg_appl_register *req)
+{
+    string appl_name(req->appl_name);
+
+    /* Prepare an M_WRITE or M_DELETE message for a write/delete operation.
+     * If we know who is the leader, we send it to the leader only; otherwise
+     * we send it to all the replicas. */
+    for (const auto &r : replicas) {
+        if (leader_id.empty() || r == leader_id) {
+            auto m = make_unique<CDAPMessage>();
+            DFTEntry dft_entry;
+            int invoke_id;
+            int ret;
+
+            if (req->reg) {
+                m->m_write(obj_class::dft, obj_name::dft);
+            } else {
+                m->m_delete(obj_class::dft, obj_name::dft);
+            }
+            dft_entry.address   = parent->rib->myaddr;
+            dft_entry.appl_name = RinaName(appl_name);
+            dft_entry.timestamp = time64();
+
+            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
+                                                &invoke_id);
+            if (ret) {
+                return ret;
+            }
+            pending[invoke_id] =
+                std::move(PendingReq(m->op_code, appl_name, r, req->event_id));
+        }
+    }
+
+    rearm_pending_timer();
 
     UPI(parent->rib->uipcp, "Write request '%s <= %lu' issued\n",
         appl_name.c_str(), parent->rib->myaddr);
@@ -593,6 +608,7 @@ CentralizedFaultTolerantDFT::Client::dft_set(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
+    rearm_pending_timer();
     UPE(parent->rib->uipcp, "Missing implementation\n");
     return 0;
 }
@@ -604,19 +620,23 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
     struct uipcp *uipcp = parent->rib->uipcp;
 
     /* We expect a M_WRITE_R corresponding to the M_WRITE or M_DELETE sent by
-     * Client::dft_set(). */
+     * Client::dft_mod(). */
     if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R) {
         UPE(uipcp, "M_WRITE_R or M_DELETE_R expected\n");
         return 0;
     }
 
-    // TODO we should store in PendingReq a flag to remember whether it was a
-    // write or a delete operation, and check it's consistent with rm->op_code.
-
     /* Lookup rm->invoke_id in the pending map and erase it. */
     auto pi = pending.find(rm->invoke_id);
     if (pi == pending.end()) {
         UPE(uipcp, "Cannot find pending request with invoke id %d\n",
+            rm->invoke_id);
+        return 0;
+    }
+
+    /* Check that rm->op_code is consistent with the pending request. */
+    if (pi->second.op_code != rm->op_code) {
+        UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
             rm->invoke_id);
         return 0;
     }
@@ -652,7 +672,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(RaftSMOutput out)
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::dft_set(
+CentralizedFaultTolerantDFT::Replica::dft_mod(
     const struct rl_kmsg_appl_register *req)
 {
     UPW(parent->rib->uipcp, "Missing implementation");
