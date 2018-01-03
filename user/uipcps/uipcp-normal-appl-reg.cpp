@@ -168,8 +168,8 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
 
     dft_slice.entries.push_back(dft_entry);
 
-    UPD(uipcp, "Application %s %sregistered %s uipcp %d\n", appl_name.c_str(),
-        req->reg ? "" : "un", req->reg ? "to" : "from", uipcp->id);
+    UPD(uipcp, "Application %s %sregistered\n", appl_name.c_str(),
+        req->reg ? "" : "un");
 
     rib->neighs_sync_obj_all(req->reg != 0, obj_class::dft, obj_name::dft,
                              &dft_slice);
@@ -413,6 +413,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         {
         }
         int dft_set(const struct rl_kmsg_appl_register *req);
+        int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
     };
     std::unique_ptr<Client> client;
@@ -510,6 +511,9 @@ CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
 int
 CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
+    if (client) {
+        return client->rib_handler(rm, nf);
+    }
     UPW(rib->uipcp, "Missing implementation\n");
     return 0;
 }
@@ -585,6 +589,47 @@ CentralizedFaultTolerantDFT::Client::dft_set(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
+                                                 NeighFlow *nf)
+{
+    struct uipcp *uipcp = parent->rib->uipcp;
+
+    /* We expect a M_WRITE_R corresponding to the M_WRITE or M_DELETE sent by
+     * Client::dft_set(). */
+    if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R) {
+        UPE(uipcp, "M_WRITE_R or M_DELETE_R expected\n");
+        return 0;
+    }
+
+    // TODO we should store in PendingReq a flag to remember whether it was a
+    // write or a delete operation, and check it's consistent with rm->op_code.
+
+    /* Lookup rm->invoke_id in the pending map and erase it. */
+    auto pi = pending.find(rm->invoke_id);
+    if (pi == pending.end()) {
+        UPE(uipcp, "Cannot find pending request with invoke id %d\n",
+            rm->invoke_id);
+        return 0;
+    }
+
+    /* We assume it was the leader to answer, so now we know who the leader is.
+     */
+    leader_id = pi->second.replica;
+    UPD(uipcp, "Application %s %sregistration %s\n",
+        pi->second.appl_name.c_str(), rm->op_code == gpb::M_WRITE_R ? "" : "un",
+        rm->result ? "failed" : "was successful");
+    if (rm->op_code == gpb::M_WRITE_R) {
+        /* Registrations need a response. */
+        uipcp_appl_register_resp(uipcp, uipcp->id,
+                                 rm->result ? RLITE_ERR : RLITE_SUCC,
+                                 /*TODO*/ NULL);
+    }
+    pending.erase(pi);
+
     return 0;
 }
 
