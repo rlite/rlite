@@ -389,14 +389,20 @@ class CentralizedFaultTolerantDFT : public DFT {
     class Client {
         CentralizedFaultTolerantDFT *parent = nullptr;
         std::list<ReplicaId> replicas;
+        /* The leader, if we know who it is, otherwise the empty
+         * string. */
+        ReplicaId leader_id;
+        std::unique_ptr<TimeoutEvent> timeout;
 
         struct PendingReq {
             std::string appl_name;
             ReplicaId replica;
+            std::chrono::system_clock::time_point t;
             PendingReq() = default;
             PendingReq(const std::string &a, const ReplicaId &r)
                 : appl_name(a), replica(r)
             {
+                t = std::chrono::system_clock::now();
             }
         };
         std::unordered_map</*invoke_id*/ int, PendingReq> pending;
@@ -407,6 +413,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         {
         }
         int dft_set(const struct rl_kmsg_appl_register *req);
+        int process_timeout();
     };
     std::unique_ptr<Client> client;
 
@@ -524,28 +531,60 @@ CentralizedFaultTolerantDFT::Client::dft_set(
     const struct rl_kmsg_appl_register *req)
 {
     string appl_name(req->appl_name);
-    auto m      = make_unique<CDAPMessage>();
-    ReplicaId r = replicas.front();
-    DFTEntry dft_entry;
-    int invoke_id;
-    int ret;
 
-    m->m_write(obj_class::dft, obj_name::dft);
-    dft_entry.address   = parent->rib->myaddr;
-    dft_entry.appl_name = RinaName(appl_name);
-    dft_entry.timestamp = time64();
+    /* Prepare an M_WRITE message for the write operation.
+     * If we know who is the leader, we send it to the leader
+     * only; otherwise we send it to all the replicas. */
+    for (const auto &r : replicas) {
+        if (leader_id.empty() || r == leader_id) {
+            auto m = make_unique<CDAPMessage>();
+            DFTEntry dft_entry;
+            int invoke_id;
+            int ret;
 
-    ret =
-        parent->rib->send_to_dst_node(std::move(m), r, &dft_entry, &invoke_id);
-    if (ret) {
-        return ret;
+            m->m_write(obj_class::dft, obj_name::dft);
+            dft_entry.address   = parent->rib->myaddr;
+            dft_entry.appl_name = RinaName(appl_name);
+            dft_entry.timestamp = time64();
+
+            ret = parent->rib->send_to_dst_node(std::move(m), r, &dft_entry,
+                                                &invoke_id);
+            if (ret) {
+                return ret;
+            }
+            pending[invoke_id] = std::move(PendingReq(appl_name, r));
+        }
     }
-    pending[invoke_id] = std::move(PendingReq(appl_name, r));
 
-    UPI(parent->rib->uipcp,
-        "Write request '%s <= %lu' issued (invoke_id = %d)\n",
-        appl_name.c_str(), parent->rib->myaddr, invoke_id);
+    if (!pending.empty()) {
+        auto t_min = std::chrono::system_clock::time_point::max();
+        for (const auto &kv : pending) {
+            if (kv.second.t < t_min) {
+                t_min = kv.second.t;
+            }
+        }
+        timeout = make_unique<TimeoutEvent>(
+            /*ms=*/std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now() + std::chrono::seconds(3) -
+                t_min)
+                .count(),
+            parent->rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
+                auto cli =
+                    static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
+                cli->timeout->fired();
+                cli->process_timeout();
+            });
+    }
 
+    UPI(parent->rib->uipcp, "Write request '%s <= %lu' issued\n",
+        appl_name.c_str(), parent->rib->myaddr);
+
+    return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Client::process_timeout()
+{
     return 0;
 }
 
