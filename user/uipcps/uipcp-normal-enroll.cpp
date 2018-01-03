@@ -258,7 +258,7 @@ NeighFlow::keepalive_timeout()
 void
 NeighFlow::keepalive_tmr_start()
 {
-    /* keepalive is in seconds, we need to convert it to milliseconds. */
+    /* Keepalive timeout is expressed in seconds. */
     unsigned int keepalive =
         neigh->rib->get_param_value<int>("enrollment", "keepalive");
 
@@ -268,7 +268,7 @@ NeighFlow::keepalive_tmr_start()
     }
 
     keepalive_timer = make_unique<TimeoutEvent>(
-        keepalive * 1000, neigh->rib->uipcp, this,
+        std::chrono::seconds(keepalive), neigh->rib->uipcp, this,
         [](struct uipcp *uipcp, void *arg) {
             NeighFlow *nf = static_cast<NeighFlow *>(arg);
             nf->keepalive_timer->fired();
@@ -1067,8 +1067,9 @@ void
 uipcp_rib::neighs_refresh_tmr_restart()
 {
     sync_timer = make_unique<TimeoutEvent>(
-        get_param_value<int>("rib-daemon", "refresh-intval") * 1000, uipcp,
-        this, [](struct uipcp *uipcp, void *arg) {
+        std::chrono::seconds(
+            get_param_value<int>("rib-daemon", "refresh-intval")),
+        uipcp, this, [](struct uipcp *uipcp, void *arg) {
             uipcp_rib *rib = static_cast<uipcp_rib *>(arg);
             rib->sync_timer->fired();
             rib->neighs_refresh();

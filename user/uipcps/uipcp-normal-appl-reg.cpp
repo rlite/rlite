@@ -549,10 +549,9 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
             }
         }
         timeout = make_unique<TimeoutEvent>(
-            /*ms=*/std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now() + std::chrono::seconds(3) -
-                t_min)
-                .count(),
+                t_min),
             parent->rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
                 auto cli =
                     static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
