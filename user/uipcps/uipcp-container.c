@@ -71,8 +71,7 @@ uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 }
 
 int
-uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                         uint8_t response,
+uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
                          const struct rl_kmsg_appl_register *req)
 {
     struct rl_kmsg_appl_register_resp resp;
@@ -82,7 +81,7 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
     memset(&resp, 0, sizeof(resp));
     resp.msg_type  = RLITE_KER_APPL_REGISTER_RESP;
     resp.event_id  = req->event_id; /* This is just 0 for now. */
-    resp.ipcp_id   = ipcp_id;
+    resp.ipcp_id   = uipcp->id;
     resp.reg       = 1;
     resp.response  = response;
     resp.appl_name = rl_strdup(req->appl_name, RL_MT_UTILS);
@@ -98,8 +97,8 @@ uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
 }
 
 static int
-uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
-                rl_port_t local_port, rl_msg_t msg_type)
+uipcp_pduft_mod(struct uipcp *uipcp, rlm_addr_t dst_addr, rl_port_t local_port,
+                rl_msg_t msg_type)
 {
     struct rl_kmsg_ipcp_pduft_mod req;
     int ret;
@@ -108,7 +107,7 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
     memset(&req, 0, sizeof(req));
     req.msg_type   = msg_type;
     req.event_id   = 1;
-    req.ipcp_id    = ipcp_id;
+    req.ipcp_id    = uipcp->id;
     req.dst_addr   = dst_addr;
     req.local_port = local_port;
 
@@ -122,23 +121,21 @@ uipcp_pduft_mod(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
 }
 
 int
-uipcp_pduft_set(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
-                rl_port_t local_port)
+uipcp_pduft_set(struct uipcp *uipcp, rlm_addr_t dst_addr, rl_port_t local_port)
 {
-    return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
+    return uipcp_pduft_mod(uipcp, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_SET);
 }
 
 int
-uipcp_pduft_del(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id, rlm_addr_t dst_addr,
-                rl_port_t local_port)
+uipcp_pduft_del(struct uipcp *uipcp, rlm_addr_t dst_addr, rl_port_t local_port)
 {
-    return uipcp_pduft_mod(uipcp, ipcp_id, dst_addr, local_port,
+    return uipcp_pduft_mod(uipcp, dst_addr, local_port,
                            RLITE_KER_IPCP_PDUFT_DEL);
 }
 
 int
-uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
+uipcp_pduft_flush(struct uipcp *uipcp)
 {
     struct rl_kmsg_ipcp_pduft_flush req;
     int ret;
@@ -147,7 +144,7 @@ uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id)
     memset(&req, 0, sizeof(req));
     req.msg_type = RLITE_KER_IPCP_PDUFT_FLUSH;
     req.event_id = 1;
-    req.ipcp_id  = ipcp_id;
+    req.ipcp_id  = uipcp->id;
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {

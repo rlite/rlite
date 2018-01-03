@@ -265,17 +265,16 @@ int topo_lower_flow_removed(struct uipcps *uipcps, unsigned int upper,
 int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
                       const char *local_name, int reg);
 
-int uipcp_appl_register_resp(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id,
-                             uint8_t response,
+int uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
                              const struct rl_kmsg_appl_register *req);
 
-int uipcp_pduft_set(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rlm_addr_t dst_addr, rl_port_t local_port);
+int uipcp_pduft_set(struct uipcp *uipcp, rlm_addr_t dst_addr,
+                    rl_port_t local_port);
 
-int uipcp_pduft_del(struct uipcp *uipcs, rl_ipcp_id_t ipcp_id,
-                    rlm_addr_t dst_addr, rl_port_t local_port);
+int uipcp_pduft_del(struct uipcp *uipcp, rlm_addr_t dst_addr,
+                    rl_port_t local_port);
 
-int uipcp_pduft_flush(struct uipcp *uipcp, rl_ipcp_id_t ipcp_id);
+int uipcp_pduft_flush(struct uipcp *uipcp);
 
 int uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
                                rl_port_t remote_port, uint32_t remote_cep,

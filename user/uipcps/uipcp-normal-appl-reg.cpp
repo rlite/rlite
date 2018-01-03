@@ -139,15 +139,14 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
         if (mit != range.second) { /* local collision */
             UPE(uipcp, "Application %s already registered on this uipcp\n",
                 appl_name.c_str());
-            return uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_ERR, req);
+            return uipcp_appl_register_resp(uipcp, RLITE_ERR, req);
         }
 
         if (req->reg) {
             /* Registration requires a response, while unregistrations doesn't.
              * Respond to the client before committing to the RIB, because the
              * response may fail. */
-            int ret =
-                uipcp_appl_register_resp(uipcp, uipcp->id, RLITE_SUCC, req);
+            int ret = uipcp_appl_register_resp(uipcp, RLITE_SUCC, req);
             if (ret) {
                 return ret;
             }
@@ -624,8 +623,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
         rm->result ? "failed" : "was successful");
     if (rm->op_code == gpb::M_WRITE_R) {
         /* Registrations need a response. */
-        uipcp_appl_register_resp(uipcp, uipcp->id,
-                                 rm->result ? RLITE_ERR : RLITE_SUCC,
+        uipcp_appl_register_resp(uipcp, rm->result ? RLITE_ERR : RLITE_SUCC,
                                  /*TODO*/ NULL);
     }
     pending.erase(pi);
