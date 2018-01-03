@@ -43,7 +43,7 @@ NeighFlow::NeighFlow(Neighbor *n, const string &supdif, rl_port_t pid, int ffd,
       enroll_state(EnrollState::NEIGH_NONE),
       pending_keepalive_reqs(0)
 {
-    last_activity = stats.t_last = time(nullptr);
+    last_activity = stats.t_last = std::chrono::system_clock::now();
     memset(&stats.win, 0, sizeof(stats.win));
     assert(neigh);
 }
@@ -151,9 +151,12 @@ NeighFlow::send_to_port_id(CDAPMessage *m, int invoke_id,
     }
 
     if (ret >= 0) {
-        last_activity = time(nullptr);
+        const int neighFlowStatsPeriod = uipcp_rib::kNeighFlowStatsPeriod;
+
+        last_activity = std::chrono::system_clock::now();
         stats.win[0].bytes_sent += ret;
-        if (last_activity - stats.t_last >= uipcp_rib::kNeighFlowStatsPeriod) {
+        if (last_activity - stats.t_last >=
+            std::chrono::seconds(neighFlowStatsPeriod)) {
             stats.win[1]            = stats.win[0];
             stats.win[0].bytes_sent = stats.win[0].bytes_recvd = 0;
             stats.t_last                                       = last_activity;
@@ -285,7 +288,7 @@ Neighbor::Neighbor(struct uipcp_rib *rib_, const string &name)
     initiator = false;
     mgmt_only = n_flow = nullptr;
     ipcp_name          = name;
-    unheard_since      = time(nullptr);
+    unheard_since      = std::chrono::system_clock::now();
     flow_alloc_enabled = true;
 }
 
@@ -1573,20 +1576,22 @@ uipcp_rib::trigger_re_enrollments()
         }
 
         if (neigh != neighbors.end() && neigh->second->has_flows()) {
-            time_t inact;
+            std::chrono::seconds inact;
 
             /* There is a management flow towards this neighbor, but we need
              * to check that this is not a dead flow hanging forever in
              * the NEIGH_NONE state. */
 
-            inact = time(nullptr) - nf->last_activity;
+            inact = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now() - nf->last_activity);
 
-            if (nf->enroll_state == EnrollState::NEIGH_NONE && inact > 10) {
+            if (nf->enroll_state == EnrollState::NEIGH_NONE &&
+                inact > std::chrono::seconds(10)) {
                 /* Prune the flow now, we'll try to enroll later. */
                 UPD(uipcp,
                     "Pruning flow towards %s since inactive "
-                    "for %d seconds\n",
-                    nc.c_str(), (int)inact);
+                    "for %ld seconds\n",
+                    nc.c_str(), inact.count());
                 neigh_flow_prune(nf);
             }
 

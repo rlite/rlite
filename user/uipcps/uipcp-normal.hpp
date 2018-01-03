@@ -38,6 +38,7 @@
 #include <mutex>
 #include <functional>
 #include <condition_variable>
+#include <chrono>
 
 #include "rlite/common.h"
 #include "rlite/utils.h"
@@ -176,7 +177,7 @@ struct NeighFlow {
     /* CDAP connection associated to this flow, if any. */
     std::unique_ptr<CDAPConn> conn;
 
-    time_t last_activity;
+    std::chrono::system_clock::time_point last_activity;
 
     EnrollState enroll_state;
     std::shared_ptr<EnrollmentResources> enrollment_rsrc_get(bool initiator);
@@ -191,7 +192,7 @@ struct NeighFlow {
             unsigned int bytes_sent;
             unsigned int bytes_recvd;
         } win[2];
-        time_t t_last;
+        std::chrono::system_clock::time_point t_last;
     } stats;
 
     RL_NODEFAULT_NONCOPIABLE(NeighFlow);
@@ -256,7 +257,7 @@ struct Neighbor {
 
     /* Last time we received a keepalive response from this neighbor.
      * We don't consider requests, as timeout on responses. */
-    time_t unheard_since;
+    std::chrono::system_clock::time_point unheard_since;
 
     RL_NODEFAULT_NONCOPIABLE(Neighbor);
     Neighbor(struct uipcp_rib *rib, const std::string &name);
@@ -546,7 +547,8 @@ struct uipcp_rib {
     /* Upper bound for the AddrAllocator NACK timer. */
     static constexpr int kAddrAllocDistrNackWaitSecsMax = 99;
 
-    /* Time window to compute statistics about management traffic (in ms). */
+    /* Time window to compute statistics about management traffic (in seconds).
+     */
     static constexpr int kNeighFlowStatsPeriod = 20;
 
     RL_NODEFAULT_NONCOPIABLE(uipcp_rib);

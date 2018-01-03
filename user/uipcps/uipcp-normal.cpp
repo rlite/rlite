@@ -251,7 +251,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
             return -1;
         }
 
-        nf->last_activity = time(nullptr);
+        nf->last_activity = std::chrono::system_clock::now();
 
         if (neigh->enrollment_complete() && nf != neigh->mgmt_conn() &&
             !neigh->initiator && m->op_code == gpb::M_START &&
@@ -545,8 +545,10 @@ uipcp_rib::dump() const
 
             if (neigh->second->enrollment_complete()) {
                 ss << "[Enrolled, heard "
-                   << static_cast<int>(time(nullptr) -
-                                       neigh->second->unheard_since)
+                   << std::chrono::duration_cast<std::chrono::seconds>(
+                          std::chrono::system_clock::now() -
+                          neigh->second->unheard_since)
+                          .count()
                    << "s ago, " << (nf->stats.win[1].bytes_sent / 1000.0)
                    << "KB sent, " << (nf->stats.win[1].bytes_recvd / 1000.0)
                    << "KB recvd in " << kNeighFlowStatsPeriod << "s]";
@@ -855,7 +857,8 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
     }
 
     if (nf && nf->neigh) {
-        nf->neigh->unheard_since = time(nullptr); /* update */
+        nf->neigh->unheard_since =
+            std::chrono::system_clock::now(); /* update */
     }
 
     if (hi == handlers.end()) {
