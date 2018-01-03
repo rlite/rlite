@@ -72,7 +72,7 @@ uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
 
 int
 uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
-                         const struct rl_kmsg_appl_register *req)
+                         uint32_t kevent_id, const char *appl_name)
 {
     struct rl_kmsg_appl_register_resp resp;
     int ret;
@@ -80,11 +80,11 @@ uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
     /* Create a request message. */
     memset(&resp, 0, sizeof(resp));
     resp.msg_type  = RLITE_KER_APPL_REGISTER_RESP;
-    resp.event_id  = req->event_id; /* This is just 0 for now. */
+    resp.event_id  = kevent_id; /* This is just zero for now. */
     resp.ipcp_id   = uipcp->id;
     resp.reg       = 1;
     resp.response  = response;
-    resp.appl_name = rl_strdup(req->appl_name, RL_MT_UTILS);
+    resp.appl_name = rl_strdup(appl_name, RL_MT_UTILS);
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&resp), 1);
     if (ret) {
