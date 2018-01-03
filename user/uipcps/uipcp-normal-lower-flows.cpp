@@ -730,7 +730,7 @@ RoutingEngine::compute_fwd_table()
         dst_addr = kve.first;
         dst_node = kve.second.first;
         port_id  = kve.second.second;
-        ret      = uipcp_pduft_del(uipcp, uipcp->id, dst_addr, port_id);
+        ret      = uipcp_pduft_del(uipcp, dst_addr, port_id);
         if (ret) {
             UPE(uipcp,
                 "Failed to delete PDUFT entry for %s(%lu) "
@@ -761,7 +761,7 @@ RoutingEngine::compute_fwd_table()
         dst_addr = kve.first;
         dst_node = kve.second.first;
         port_id  = kve.second.second;
-        ret      = uipcp_pduft_set(uipcp, uipcp->id, dst_addr, port_id);
+        ret      = uipcp_pduft_set(uipcp, dst_addr, port_id);
         if (ret) {
             UPE(uipcp,
                 "Failed to insert %s(%lu) --> %s (port=%u) PDUFT "
