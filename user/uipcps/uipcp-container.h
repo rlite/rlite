@@ -266,7 +266,7 @@ int uipcp_do_register(struct uipcp *uipcp, const char *dif_name,
                       const char *local_name, int reg);
 
 int uipcp_appl_register_resp(struct uipcp *uipcp, uint8_t response,
-                             const struct rl_kmsg_appl_register *req);
+                             uint32_t kevent_id, const char *appl_name);
 
 int uipcp_pduft_set(struct uipcp *uipcp, rlm_addr_t dst_addr,
                     rl_port_t local_port);
