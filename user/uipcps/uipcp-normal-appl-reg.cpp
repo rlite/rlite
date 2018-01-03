@@ -398,10 +398,12 @@ class CentralizedFaultTolerantDFT : public DFT {
         struct PendingReq {
             std::string appl_name;
             ReplicaId replica;
+            uint32_t kevent_id;
             std::chrono::system_clock::time_point t;
             PendingReq() = default;
-            PendingReq(const std::string &a, const ReplicaId &r)
-                : appl_name(a), replica(r)
+            PendingReq(const std::string &a, const ReplicaId &r,
+                       uint32_t event_id)
+                : appl_name(a), replica(r), kevent_id(event_id)
             {
                 t = std::chrono::system_clock::now();
             }
@@ -557,7 +559,8 @@ CentralizedFaultTolerantDFT::Client::dft_set(
             if (ret) {
                 return ret;
             }
-            pending[invoke_id] = std::move(PendingReq(appl_name, r));
+            pending[invoke_id] =
+                std::move(PendingReq(appl_name, r, req->event_id));
         }
     }
 
@@ -590,6 +593,7 @@ CentralizedFaultTolerantDFT::Client::dft_set(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
+    UPE(parent->rib->uipcp, "Missing implementation\n");
     return 0;
 }
 
@@ -617,7 +621,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
         return 0;
     }
 
-    /* We assume it was the leader to answer, so now we know who the leader is.
+    /* We assume it was the leader to answer. So now we know who the leader is.
      */
     leader_id = pi->second.replica;
     UPD(uipcp, "Application %s %sregistration %s\n",
@@ -626,7 +630,8 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
     if (rm->op_code == gpb::M_WRITE_R) {
         /* Registrations need a response. */
         uipcp_appl_register_resp(uipcp, rm->result ? RLITE_ERR : RLITE_SUCC,
-                                 /*TODO*/ 0, pi->second.appl_name.c_str());
+                                 pi->second.kevent_id,
+                                 pi->second.appl_name.c_str());
     }
     pending.erase(pi);
 
