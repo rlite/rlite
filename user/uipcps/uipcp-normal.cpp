@@ -78,11 +78,11 @@ string addr_alloc_table = "/dif/ra/aa/" + obj_class::addr_alloc_table;
 std::unordered_map<std::string, std::set<PolicyBuilder>>
     uipcp_rib::available_policies;
 
-TimeoutEvent::TimeoutEvent(unsigned int ms, struct uipcp *u, void *a,
-                           uipcp_tmr_cb_t _cb)
-    : delta_ms(ms), uipcp(u), arg(a), cb(_cb)
+TimeoutEvent::TimeoutEvent(std::chrono::milliseconds d, struct uipcp *u,
+                           void *a, uipcp_tmr_cb_t _cb)
+    : delta(d), uipcp(u), arg(a), cb(_cb)
 {
-    tmrid = uipcp_loop_schedule(uipcp, delta_ms, cb, arg);
+    tmrid = uipcp_loop_schedule(uipcp, delta.count(), cb, arg);
 }
 
 void

@@ -130,15 +130,16 @@ struct EnrollmentResources {
 };
 
 struct TimeoutEvent {
-    unsigned int delta_ms = 0;
-    struct uipcp *uipcp   = nullptr;
-    void *arg             = nullptr;
-    uipcp_tmr_cb_t cb     = nullptr;
-    int tmrid             = -1;
+    std::chrono::milliseconds delta;
+    struct uipcp *uipcp = nullptr;
+    void *arg           = nullptr;
+    uipcp_tmr_cb_t cb   = nullptr;
+    int tmrid           = -1;
 
     RL_NONCOPIABLE(TimeoutEvent);
     RL_NONMOVABLE(TimeoutEvent);
-    TimeoutEvent(unsigned int ms, struct uipcp *u, void *a, uipcp_tmr_cb_t _cb);
+    TimeoutEvent(std::chrono::milliseconds d, struct uipcp *u, void *a,
+                 uipcp_tmr_cb_t _cb);
     void clear();
     void fired();
     bool is_pending() const { return tmrid != -1; }
