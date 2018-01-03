@@ -182,7 +182,7 @@ read_response(int sfd, response_handler_t handler)
 
         pfd[0].fd     = sfd;
         pfd[0].events = POLLIN;
-        ret           = poll(pfd, sizeof(pfd), 10000 /* 10 seconds */);
+        ret           = poll(pfd, 1, 10000 /* 10 seconds */);
         if (ret < 0) {
             PE("poll() error [%s]\n", strerror(errno));
             return ret;
