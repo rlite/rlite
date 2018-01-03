@@ -421,12 +421,9 @@ rl_u_terminate(struct uipcps *uipcps, int sfd, const struct rl_msg_base *b_req)
     };
 
     uipcps_reset(/*sync=*/1);
-    unlink(RLITE_UIPCPS_UNIX_NAME);
-    PD("terminate command received, daemon is going to exit ...\n");
-    rl_u_response(sfd, RLITE_MB(b_req), &resp);
-    exit(EXIT_SUCCESS);
+    uipcps->terminate = 1;
 
-    return 0;
+    return rl_u_response(sfd, RLITE_MB(b_req), &resp);
 }
 
 #ifdef RL_MEMTRACK
@@ -532,6 +529,12 @@ out:
     close(wi->cfd);
 
     PV("Worker %p stopped\n", wi);
+
+    if (wi->uipcps->terminate) {
+        unlink(RLITE_UIPCPS_UNIX_NAME);
+        PD("terminate command received, daemon is going to exit ...\n");
+        exit(EXIT_SUCCESS);
+    }
 
     return NULL;
 }
@@ -927,6 +930,8 @@ main(int argc, char **argv)
 
     /* Static initializations for the normal IPCP process. */
     normal_lib_init();
+
+    uipcps->terminate = 0;
 
     /* Open a Unix domain socket to listen to. */
     uipcps->lfd = socket(AF_UNIX, SOCK_STREAM, 0);

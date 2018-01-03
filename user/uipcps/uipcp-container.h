@@ -60,6 +60,9 @@ struct uipcps {
 
     /* Event file descriptor to trigger uipcp loop. */
     int efd;
+
+    /* Set when uipcps daemon is asked to terminate. */
+    int terminate;
 };
 
 int eventfd_signal(int efd, unsigned int value);
