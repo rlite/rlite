@@ -222,8 +222,8 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
             if (!collision || e.timestamp > mit->second.timestamp) {
                 if (collision) {
                     /* Remove the collided entry. */
+                    prop_dft_del.entries.push_back(mit->second);
                     dft_table.erase(mit);
-                    prop_dft_del.entries.push_back(e);
                 }
                 dft_table.insert(make_pair(key, e));
                 prop_dft_add.entries.push_back(e);
