@@ -395,6 +395,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
         std::unique_ptr<FullyReplicatedDFT> impl;
+        ;
 
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
@@ -409,6 +410,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override;
         int dft_mod(const struct rl_kmsg_appl_register *req);
+        void dump(std::stringstream &ss) const { impl->dump(ss); };
     };
     std::unique_ptr<Replica> raft;
 
@@ -511,7 +513,11 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 void
 CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
 {
-    UPE(rib->uipcp, "Missing implementation");
+    if (client) {
+        ss << "Directory Forwarding Table: not available locally" << endl << endl;
+    } else {
+        raft->dump(ss);
+    }
 }
 
 int
