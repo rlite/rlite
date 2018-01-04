@@ -64,6 +64,10 @@ public:
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
+
+    /* Helper function shared with CentralizedFaultTolerantDFT::Replica. */
+    void mod_table(const DFTEntry &e, bool add, DFTSlice *added,
+                   DFTSlice *removed);
 };
 
 int
@@ -178,6 +182,57 @@ FullyReplicatedDFT::appl_register(const struct rl_kmsg_appl_register *req)
     return 0;
 }
 
+/* Tries ot add or remove an entry 'e' from the DFT multimap. If not nullptr,
+ * the entries added and/or removed are appended to 'added' and 'removed'
+ * respectively. */
+void
+FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
+                              DFTSlice *removed)
+{
+    string key = static_cast<string>(e.appl_name);
+    auto range = dft_table.equal_range(key);
+    multimap<string, DFTEntry>::iterator mit;
+    struct uipcp *uipcp = rib->uipcp;
+
+    for (mit = range.first; mit != range.second; mit++) {
+        if (mit->second.address == e.address) {
+            break;
+        }
+    }
+
+    if (add) {
+        bool collision = (mit != range.second);
+
+        if (!collision || e.timestamp > mit->second.timestamp) {
+            if (collision) {
+                /* Remove the collided entry. */
+                if (removed) {
+                    removed->entries.push_back(mit->second);
+                }
+                dft_table.erase(mit);
+            }
+            dft_table.insert(make_pair(key, e));
+            if (added) {
+                added->entries.push_back(e);
+            }
+            UPD(uipcp, "DFT entry %s --> %lu %s remotely\n", key.c_str(),
+                e.address, (collision ? "updated" : "added"));
+        }
+
+    } else {
+        if (mit == range.second) {
+            UPI(uipcp, "DFT entry does not exist\n");
+        } else {
+            dft_table.erase(mit);
+            if (removed) {
+                removed->entries.push_back(e);
+            }
+            UPD(uipcp, "DFT entry %s --> %lu removed remotely\n", key.c_str(),
+                e.address);
+        }
+    }
+}
+
 int
 FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 {
@@ -206,41 +261,7 @@ FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     DFTSlice prop_dft_add, prop_dft_del;
 
     for (const DFTEntry &e : dft_slice.entries) {
-        string key = static_cast<string>(e.appl_name);
-        auto range = dft_table.equal_range(key);
-        multimap<string, DFTEntry>::iterator mit;
-
-        for (mit = range.first; mit != range.second; mit++) {
-            if (mit->second.address == e.address) {
-                break;
-            }
-        }
-
-        if (add) {
-            bool collision = (mit != range.second);
-
-            if (!collision || e.timestamp > mit->second.timestamp) {
-                if (collision) {
-                    /* Remove the collided entry. */
-                    prop_dft_del.entries.push_back(mit->second);
-                    dft_table.erase(mit);
-                }
-                dft_table.insert(make_pair(key, e));
-                prop_dft_add.entries.push_back(e);
-                UPD(uipcp, "DFT entry %s --> %lu %s remotely\n", key.c_str(),
-                    e.address, (collision ? "updated" : "added"));
-            }
-
-        } else {
-            if (mit == range.second) {
-                UPI(uipcp, "DFT entry does not exist\n");
-            } else {
-                dft_table.erase(mit);
-                prop_dft_del.entries.push_back(e);
-                UPD(uipcp, "DFT entry %s --> %lu removed remotely\n",
-                    key.c_str(), e.address);
-            }
-        }
+        mod_table(e, add, &prop_dft_add, &prop_dft_del);
     }
 
     /* Propagate the DFT entries update to the other neighbors,
@@ -709,11 +730,24 @@ CentralizedFaultTolerantDFT::Replica::dft_mod(
     return process_sm_output(std::move(out));
 }
 
+/* Apply a command to the replicated state machine. We just pass the command
+ * to the same multimap implementation used by the fully replicated DFT. */
 int
 CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 {
-    UPW(parent->rib->uipcp, "Missing implementation");
-    return -1;
+    auto c = reinterpret_cast<const Command *const>(serbuf);
+    DFTEntry e;
+
+    e.address   = c->address;
+    e.appl_name = RinaName(c->name);
+    e.timestamp = time64();
+    e.local     = false;
+
+    assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
+
+    impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
+
+    return 0;
 }
 
 void
