@@ -399,13 +399,11 @@ run_simulation(const list<TestEvent> &external_events)
                 /* This event is a client submission. */
                 TestReplica *leader = get_leader();
                 if (leader) {
-                    LogIndex request_id;
-
                     cout << "Submitting command " << next.cmd << " to "
                          << leader->local_name() << endl;
                     if (leader->submit(
                             reinterpret_cast<const char *>(&next.cmd),
-                            &request_id, &output_next)) {
+                            &output_next)) {
                         return -1;
                     }
                 } else {

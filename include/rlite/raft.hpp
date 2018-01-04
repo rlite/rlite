@@ -331,11 +331,8 @@ public:
     int timer_expired(RaftTimerType, RaftSMOutput *out);
 
     /* Called by the user when it wants to submit a new log entry to
-     * the replicated state machine. In addition to the 'out' argument,
-     * it returns the id assigned to this request, so that the caller
-     * can later know when the associated command has been committed. */
-    int submit(const char *const serbuf, LogIndex *request_id,
-               RaftSMOutput *out);
+     * the replicated state machine. */
+    int submit(const char *const serbuf, RaftSMOutput *out);
 
     /* Called by the Raft state machine when a log entry needs to
      * be applied to the replicated state machine. */
