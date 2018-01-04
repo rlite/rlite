@@ -942,7 +942,8 @@ RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
     int ret;
 
     if (!leader()) {
-        IOS_ERR() << "submit() on non-leaders is not currently supported" << endl;
+        IOS_ERR() << "submit() on non-leaders is not currently supported"
+                  << endl;
         return -1;
     }
 
