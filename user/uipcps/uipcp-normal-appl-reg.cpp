@@ -364,7 +364,12 @@ class CentralizedFaultTolerantDFT : public DFT {
             rlm_addr_t address;
             char name[63];
             uint8_t opcode;
+            static constexpr uint8_t OpcodeSet = 1;
+            static constexpr uint8_t OpcodeDel = 2;
         } __attribute__((packed));
+        static_assert(sizeof(struct Command) == sizeof(Command::address) +
+                                                    sizeof(Command::name) +
+                                                    sizeof(Command::opcode));
 
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
@@ -381,7 +386,7 @@ class CentralizedFaultTolerantDFT : public DFT {
               parent(dft),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(RaftSMOutput out);
-        int apply(const char *const serbuf) override { return 0; };
+        int apply(const char *const serbuf) override;
         int dft_mod(const struct rl_kmsg_appl_register *req);
     };
     std::unique_ptr<Replica> raft;
@@ -607,6 +612,8 @@ CentralizedFaultTolerantDFT::Client::dft_mod(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
+    /* We got a timeout, let's forget about the current leader. */
+    leader_id.clear();
     rearm_pending_timer();
     UPE(parent->rib->uipcp, "Missing implementation\n");
     return 0;
@@ -673,6 +680,37 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(RaftSMOutput out)
 int
 CentralizedFaultTolerantDFT::Replica::dft_mod(
     const struct rl_kmsg_appl_register *req)
+{
+    RaftSMOutput out;
+    Command c;
+    int ret;
+
+    if (!leader()) {
+        UPW(parent->rib->uipcp, "Missing implementation for non-leaders\n");
+        return 0;
+    }
+
+    /* Fill in the command struct (already serialized). */
+    c.address = parent->rib->myaddr;
+    strncpy(c.name, req->appl_name, sizeof(c.name));
+    c.opcode = req->reg ? Command::OpcodeSet : Command::OpcodeDel;
+
+    /* Submit the command to the raft state machine. */
+    ret = submit(reinterpret_cast<const char *const>(&c), &out);
+    if (ret) {
+        UPE(parent->rib->uipcp,
+            "Failed to submit application %sregistration for '%s' to the raft "
+            "state machine\n",
+            req->reg ? "" : "un", req->appl_name);
+        return -1;
+    }
+
+    /* Complete raft processing. */
+    return process_sm_output(std::move(out));
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 {
     UPW(parent->rib->uipcp, "Missing implementation");
     return -1;
