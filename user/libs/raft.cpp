@@ -937,8 +937,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 }
 
 int
-RaftSM::submit(const char *const serbuf, LogIndex *request_id,
-               RaftSMOutput *out)
+RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
 {
     int ret;
 
@@ -952,8 +951,6 @@ RaftSM::submit(const char *const serbuf, LogIndex *request_id,
     if ((ret = prepare_append_entries(LogReplicateStrategy::Unsent, out))) {
         return ret;
     }
-
-    *request_id = last_log_index;
 
     return 0;
 }
