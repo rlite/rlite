@@ -941,6 +941,11 @@ RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
 {
     int ret;
 
+    if (!leader()) {
+        IOS_ERR() << "submit() on non-leaders is not currently supported" << endl;
+        return -1;
+    }
+
     /* Serialize the new entry and append it to the local log. */
     if ((ret = append_log_entry(current_term, serbuf))) {
         return ret;
