@@ -5,6 +5,6 @@ import "ApplicationProcessNamingInfoMessage.proto";
 
 message directoryForwardingTableEntry_t{ 			//information about a directoryforwardingtable entry
     required applicationProcessNamingInfo_t applicationName = 1;
-    required uint64 ipcProcessSynonym = 2;
-    optional uint64 timestamp  = 3;
+    required uint64 ipcProcessSynonym = 2; // TODO turn into an ipcp name
+    optional uint64 timestamp  = 3; // TODO turn into a seqnum
 }

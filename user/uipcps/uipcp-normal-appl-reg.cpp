@@ -409,7 +409,8 @@ class CentralizedFaultTolerantDFT : public DFT {
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(RaftSMOutput out);
         int apply(const char *const serbuf) override;
-        int dft_mod(const struct rl_kmsg_appl_register *req);
+        int appl_register(const struct rl_kmsg_appl_register *req);
+        int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
     };
     std::unique_ptr<Replica> raft;
@@ -446,7 +447,7 @@ class CentralizedFaultTolerantDFT : public DFT {
             : parent(dft), replicas(std::move(names))
         {
         }
-        int dft_mod(const struct rl_kmsg_appl_register *req);
+        int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
     };
@@ -514,7 +515,8 @@ void
 CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
 {
     if (client) {
-        ss << "Directory Forwarding Table: not available locally" << endl << endl;
+        ss << "Directory Forwarding Table: not available locally" << endl
+           << endl;
     } else {
         raft->dump(ss);
     }
@@ -535,9 +537,9 @@ CentralizedFaultTolerantDFT::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
     if (client) {
-        return client->dft_mod(req);
+        return client->appl_register(req);
     }
-    return raft->dft_mod(req);
+    return raft->appl_register(req);
 }
 
 void
@@ -552,8 +554,7 @@ CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
     if (client) {
         return client->rib_handler(rm, nf);
     }
-    UPW(rib->uipcp, "Missing implementation\n");
-    return 0;
+    return raft->rib_handler(rm, nf);
 }
 
 int
@@ -594,7 +595,7 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
 }
 
 int
-CentralizedFaultTolerantDFT::Client::dft_mod(
+CentralizedFaultTolerantDFT::Client::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
     string appl_name(req->appl_name);
@@ -653,7 +654,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
     struct uipcp *uipcp = parent->rib->uipcp;
 
     /* We expect a M_WRITE_R corresponding to the M_WRITE or M_DELETE sent by
-     * Client::dft_mod(). */
+     * Client::appl_register(). */
     if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R) {
         UPE(uipcp, "M_WRITE_R or M_DELETE_R expected\n");
         return 0;
@@ -705,7 +706,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(RaftSMOutput out)
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::dft_mod(
+CentralizedFaultTolerantDFT::Replica::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
     RaftSMOutput out;
@@ -754,6 +755,15 @@ CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
 
     return 0;
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
+                                                  NeighFlow *nf)
+{
+    struct uipcp *uipcp = parent->rib->uipcp;
+    UPE(uipcp, "Missing implementation\n");
+    return -1;
 }
 
 void
