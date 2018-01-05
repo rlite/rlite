@@ -390,7 +390,8 @@ class CentralizedFaultTolerantDFT : public DFT {
         } __attribute__((packed));
         static_assert(sizeof(struct Command) == sizeof(Command::address) +
                                                     sizeof(Command::name) +
-                                                    sizeof(Command::opcode));
+                                                    sizeof(Command::opcode),
+                      "Invalid memory layout for class Replica::Command");
 
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
