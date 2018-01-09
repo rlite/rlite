@@ -47,6 +47,7 @@
 #include "ConnectionPoliciesMessage.pb.h"
 #include "FlowMessage.pb.h"
 #include "AddressAllocation.pb.h"
+#include "Raft.pb.h"
 
 using namespace std;
 

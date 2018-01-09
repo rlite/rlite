@@ -40,6 +40,7 @@
 #include "rlite/raft.hpp"
 
 using namespace std;
+using namespace raft;
 
 static string
 logfile(const string &replica)
