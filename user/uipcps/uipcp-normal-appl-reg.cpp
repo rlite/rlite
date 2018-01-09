@@ -377,7 +377,7 @@ class CentralizedFaultTolerantDFT : public DFT {
 
     /* In case of state machine replica, a pointer to a Raft state
      * machine. */
-    class Replica : public RaftSM {
+    class Replica : public raft::RaftSM {
         CentralizedFaultTolerantDFT *parent = nullptr;
 
         /* The structure of a DFT command (i.e. a log entry for the Raft SM). */
@@ -399,15 +399,15 @@ class CentralizedFaultTolerantDFT : public DFT {
 
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
-            : RaftSM(std::string("ceft-dft-") + dft->rib->myname,
-                     dft->rib->myname,
-                     std::string("/tmp/ceft-dft-") +
-                         std::to_string(dft->rib->uipcp->id) +
-                         std::string("-") + dft->rib->myname,
-                     sizeof(Command), std::cerr, std::cout),
+            : raft::RaftSM(std::string("ceft-dft-") + dft->rib->myname,
+                           dft->rib->myname,
+                           std::string("/tmp/ceft-dft-") +
+                               std::to_string(dft->rib->uipcp->id) +
+                               std::string("-") + dft->rib->myname,
+                           sizeof(Command), std::cerr, std::cout),
               parent(dft),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
-        int process_sm_output(RaftSMOutput out);
+        int process_sm_output(raft::RaftSMOutput out);
         int apply(const char *const serbuf) override;
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
@@ -418,21 +418,21 @@ class CentralizedFaultTolerantDFT : public DFT {
     /* In case of client, a pointer to client-side data structures. */
     class Client {
         CentralizedFaultTolerantDFT *parent = nullptr;
-        std::list<ReplicaId> replicas;
+        std::list<raft::ReplicaId> replicas;
         /* The leader, if we know who it is, otherwise the empty
          * string. */
-        ReplicaId leader_id;
+        raft::ReplicaId leader_id;
         std::unique_ptr<TimeoutEvent> timeout;
 
         struct PendingReq {
             gpb::opCode_t op_code;
             std::string appl_name;
-            ReplicaId replica;
+            raft::ReplicaId replica;
             uint32_t kevent_id;
             std::chrono::system_clock::time_point t;
             PendingReq() = default;
             PendingReq(gpb::opCode_t op, const std::string &a,
-                       const ReplicaId &r, uint32_t event_id)
+                       const raft::ReplicaId &r, uint32_t event_id)
                 : op_code(op), appl_name(a), replica(r), kevent_id(event_id)
             {
                 t = std::chrono::system_clock::now();
@@ -443,7 +443,8 @@ class CentralizedFaultTolerantDFT : public DFT {
         void rearm_pending_timer();
 
     public:
-        Client(CentralizedFaultTolerantDFT *dft, std::list<ReplicaId> names)
+        Client(CentralizedFaultTolerantDFT *dft,
+               std::list<raft::ReplicaId> names)
             : parent(dft), replicas(std::move(names))
         {
         }
@@ -472,7 +473,7 @@ public:
 int
 CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
-    list<ReplicaId> peers;
+    list<raft::ReplicaId> peers;
 
     if (param_name != "replicas") {
         return -1;
@@ -490,7 +491,7 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
             raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
-            RaftSMOutput out;
+            raft::RaftSMOutput out;
             if (raft->init(peers, &out)) {
                 UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
                 return -1;
@@ -693,7 +694,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
 }
 
 int
-CentralizedFaultTolerantDFT::Replica::process_sm_output(RaftSMOutput out)
+CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
 {
     // TODO
     for (const auto &msg : out.output_messages) {
@@ -709,7 +710,7 @@ int
 CentralizedFaultTolerantDFT::Replica::appl_register(
     const struct rl_kmsg_appl_register *req)
 {
-    RaftSMOutput out;
+    raft::RaftSMOutput out;
     Command c;
     int ret;
 
@@ -763,7 +764,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
 {
     struct uipcp *uipcp = parent->rib->uipcp;
     const char *objbuf;
-    RaftSMOutput out;
+    raft::RaftSMOutput out;
     size_t objlen;
 
     if (rm->obj_class == obj_class::dft && rm->obj_name == obj_name::dft) {

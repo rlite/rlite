@@ -32,6 +32,8 @@
 #include <iostream>
 #include <memory>
 
+namespace raft {
+
 using Term      = uint32_t;
 using LogIndex  = uint32_t;
 using ReplicaId = std::string;
@@ -381,5 +383,7 @@ public:
 private:
     Stats stats;
 };
+
+} /* namespace raft */
 
 #endif /* __RAFT_H__ */

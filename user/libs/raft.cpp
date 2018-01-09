@@ -34,6 +34,8 @@
 
 using namespace std;
 
+namespace raft {
+
 int
 RaftSM::log_open(bool first_boot)
 {
@@ -960,3 +962,5 @@ RaftSM::submit(const char *const serbuf, RaftSMOutput *out)
 
     return 0;
 }
+
+} /* namespace raft */
