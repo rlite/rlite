@@ -396,7 +396,6 @@ class CentralizedFaultTolerantDFT : public DFT {
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
         std::unique_ptr<FullyReplicatedDFT> impl;
-        ;
 
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
@@ -763,8 +762,63 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
                                                   NeighFlow *nf)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
-    UPE(uipcp, "Missing implementation\n");
-    return -1;
+    const char *objbuf;
+    RaftSMOutput out;
+    size_t objlen;
+
+    if (rm->obj_class == obj_class::dft && rm->obj_name == obj_name::dft) {
+        /* We expect a M_WRITE or M_DELETE as sent by Client::appl_register().
+         */
+        if (rm->op_code != gpb::M_WRITE && rm->op_code != gpb::M_DELETE) {
+            UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
+            return 0;
+        }
+
+        if (!leader()) {
+            /* We are not the leader, we need to forward it to the leader node.
+             */
+            UPW(uipcp, "Missing code to forward request to the leader\n");
+            // TODO send_to_dst_node()
+            return 0;
+        }
+
+        /* We are the leader. Let's submit the request to the Raft state
+         * machine. */
+        rm->get_obj_value(objbuf, objlen);
+        if (!objbuf) {
+            UPE(uipcp, "No object value found\n");
+            return 0;
+        }
+
+        DFTEntry dft_entry(objbuf, objlen);
+        string appl_name(static_cast<string>(dft_entry.appl_name));
+        Command c;
+        int ret;
+
+        /* Fill in the command struct (already serialized). */
+        c.address = dft_entry.address;
+        strncpy(c.name, appl_name.c_str(), sizeof(c.name));
+        c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
+                                               : Command::OpcodeDel;
+
+        /* Submit the command to the raft state machine. */
+        ret = submit(reinterpret_cast<const char *const>(&c), &out);
+        if (ret) {
+            UPE(parent->rib->uipcp,
+                "Failed to submit application %sregistration for '%s' to the "
+                "raft "
+                "state machine\n",
+                rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
+            return -1;
+        }
+    } else {
+        UPE(uipcp, "Unexpected class/name '%s'/'%s'\n", rm->obj_class.c_str(),
+            rm->obj_name.c_str());
+        return 0;
+    }
+
+    /* Complete raft processing. */
+    return process_sm_output(std::move(out));
 }
 
 void
