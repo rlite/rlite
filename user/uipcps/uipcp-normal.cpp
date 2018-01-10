@@ -45,19 +45,23 @@
 using namespace std;
 
 namespace obj_class {
-string adata            = "a_data";
-string dft              = "dft";
-string neighbors        = "neighbors";
-string enrollment       = "enrollment";
-string status           = "operational_status";
-string address          = "address";
-string lfdb             = "fsodb"; /* Lower Flow DB */
-string flows            = "flows"; /* Supported flows */
-string flow             = "flow";
-string keepalive        = "keepalive";
-string lowerflow        = "lowerflow";
-string addr_alloc_table = "addr_alloc_table";
-string addr_alloc_req   = "addr_alloc_req";
+string adata                    = "a_data";
+string dft                      = "dft";
+string neighbors                = "neighbors";
+string enrollment               = "enrollment";
+string status                   = "operational_status";
+string address                  = "address";
+string lfdb                     = "fsodb"; /* Lower Flow DB */
+string flows                    = "flows"; /* Supported flows */
+string flow                     = "flow";
+string keepalive                = "keepalive";
+string lowerflow                = "lowerflow";
+string addr_alloc_table         = "addr_alloc_table";
+string addr_alloc_req           = "addr_alloc_req";
+string raft_req_vote            = "raft_rv";
+string raft_req_vote_resp       = "raft_rv_r";
+string raft_append_entries      = "raft_ae";
+string raft_append_entries_resp = "raft_ae_r";
 }; // namespace obj_class
 
 namespace obj_name {
