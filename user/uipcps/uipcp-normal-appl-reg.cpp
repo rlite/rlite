@@ -696,14 +696,66 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
 int
 CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
 {
-    // TODO
-    for (const auto &msg : out.output_messages) {
-        (void)msg;
+    int ret = 0;
+
+    for (auto &pair : out.output_messages) {
+        raft::RaftMessage *msg = pair.second.get();
+        const auto *rv  = dynamic_cast<const raft::RaftRequestVote *>(msg);
+        const auto *rvr = dynamic_cast<const raft::RaftRequestVoteResp *>(msg);
+        auto *ae        = dynamic_cast<raft::RaftAppendEntries *>(msg);
+        const auto *aer =
+            dynamic_cast<const raft::RaftAppendEntriesResp *>(msg);
+        auto m = make_unique<CDAPMessage>();
+        std::unique_ptr<UipcpObject> obj;
+        std::string obj_class;
+
+        if (rv) {
+            auto mm            = make_unique<RaftRequestVote>();
+            mm->term           = rv->term;
+            mm->candidate_id   = rv->candidate_id;
+            mm->last_log_index = rv->last_log_index;
+            mm->last_log_term  = rv->last_log_term;
+            obj                = std::move(mm);
+            obj_class          = obj_class::raft_req_vote;
+        } else if (rvr) {
+            auto mm          = make_unique<RaftRequestVoteResp>();
+            mm->term         = rvr->term;
+            mm->vote_granted = rvr->vote_granted;
+            obj              = std::move(mm);
+            obj_class        = obj_class::raft_req_vote_resp;
+        } else if (ae) {
+            auto mm            = make_unique<RaftAppendEntries>();
+            mm->term           = ae->term;
+            mm->leader_id      = ae->leader_id;
+            mm->leader_commit  = ae->leader_commit;
+            mm->prev_log_index = ae->prev_log_index;
+            mm->prev_log_term  = ae->prev_log_term;
+            mm->entries        = std::move(ae->entries);
+            obj                = std::move(mm);
+            obj_class          = obj_class::raft_append_entries;
+        } else if (aer) {
+            auto mm         = make_unique<RaftAppendEntriesResp>();
+            mm->term        = aer->term;
+            mm->follower_id = aer->follower_id;
+            mm->log_index   = aer->log_index;
+            mm->success     = aer->success;
+            obj             = std::move(mm);
+            obj_class       = obj_class::raft_append_entries_resp;
+        } else {
+            assert(false);
+        }
+
+        m->m_write(obj_class, obj_name::dft);
+        ret |= parent->rib->send_to_dst_node(std::move(m), pair.first,
+                                             obj.get(), nullptr);
     }
+
+    // TODO
     for (const auto &cmd : out.timer_commands) {
         (void)cmd;
     }
-    return 0;
+
+    return ret;
 }
 
 int

@@ -64,6 +64,10 @@ extern std::string keepalive;
 extern std::string lowerflow;
 extern std::string addr_alloc_req;
 extern std::string addr_alloc_table;
+extern std::string raft_req_vote;
+extern std::string raft_req_vote_resp;
+extern std::string raft_append_entries;
+extern std::string raft_append_entries_resp;
 }; // namespace obj_class
 
 namespace obj_name {
