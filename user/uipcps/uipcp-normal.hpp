@@ -482,8 +482,12 @@ struct uipcp_rib {
     /* A map of current policies. */
     std::unordered_map<std::string, std::string> policies;
 
-    /* Table used to carry on distributed address allocation.
-     * It maps (address allocated) --> (requestor address). */
+    /* Table of flow allocation requests that are pending because they are
+     * waiting for DFT resolution. See uipcp_rib::fa_req(). */
+    std::unordered_map<std::string,
+                       std::list<std::unique_ptr<struct rl_kmsg_fa_req>>>
+        pending_fa_reqs;
+
     std::unique_ptr<AddrAllocator> addra;
 
     /* Directory Forwarding Table. */

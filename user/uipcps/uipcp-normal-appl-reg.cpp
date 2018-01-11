@@ -612,7 +612,9 @@ CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
     UPI(parent->rib->uipcp, "Read request for '%s' issued\n",
         appl_name.c_str());
 
-    // TODO fill dstaddr
+    /* Inform the caller that we issued the request, but the
+     * response will come later. */
+    *dstaddr = RL_ADDR_NULL;
 
     return 0;
 }
