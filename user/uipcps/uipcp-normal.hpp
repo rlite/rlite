@@ -319,13 +319,12 @@ struct DFT {
     virtual ~DFT() {}
 
     virtual int param_changed(const std::string &param_name) { return 0; }
-    virtual void dump(std::stringstream &ss) const                     = 0;
+    virtual void dump(std::stringstream &ss) const                        = 0;
     virtual int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                             const rlm_addr_t preferred,
-                             uint32_t cookie) const                    = 0;
-    virtual int appl_register(const struct rl_kmsg_appl_register *req) = 0;
-    virtual void update_address(rlm_addr_t new_addr)                   = 0;
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)      = 0;
+                             const rlm_addr_t preferred, uint32_t cookie) = 0;
+    virtual int appl_register(const struct rl_kmsg_appl_register *req)    = 0;
+    virtual void update_address(rlm_addr_t new_addr)                      = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)         = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
     {
         return 0;
