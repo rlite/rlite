@@ -415,7 +415,10 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_timeout();
         int apply(const char *const serbuf) override;
         int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                         const rlm_addr_t preferred, uint32_t cookie) const;
+                         const rlm_addr_t preferred, uint32_t cookie) const
+        {
+            return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
+        }
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
@@ -467,14 +470,39 @@ public:
     RL_NODEFAULT_NONCOPIABLE(CentralizedFaultTolerantDFT);
     CentralizedFaultTolerantDFT(struct uipcp_rib *_ur) : DFT(_ur) {}
     int param_changed(const std::string &param_name) override;
-    void dump(std::stringstream &ss) const override;
+    void dump(std::stringstream &ss) const override
+    {
+        if (client) {
+            ss << "Directory Forwarding Table: not available locally" << endl
+               << endl;
+        } else {
+            raft->dump(ss);
+        }
+    }
 
     int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                     const rlm_addr_t preferred,
-                     uint32_t cookie) const override;
-    int appl_register(const struct rl_kmsg_appl_register *req) override;
+                     const rlm_addr_t preferred, uint32_t cookie) const override
+    {
+        if (client) {
+            return client->lookup_entry(appl_name, dstaddr, preferred, cookie);
+        }
+        return raft->lookup_entry(appl_name, dstaddr, preferred, cookie);
+    }
+    int appl_register(const struct rl_kmsg_appl_register *req) override
+    {
+        if (client) {
+            return client->appl_register(req);
+        }
+        return raft->appl_register(req);
+    }
     void update_address(rlm_addr_t new_addr) override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override
+    {
+        if (client) {
+            return client->rib_handler(rm, nf);
+        }
+        return raft->rib_handler(rm, nf);
+    }
 };
 
 int
@@ -520,51 +548,9 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 }
 
 void
-CentralizedFaultTolerantDFT::dump(std::stringstream &ss) const
-{
-    if (client) {
-        ss << "Directory Forwarding Table: not available locally" << endl
-           << endl;
-    } else {
-        raft->dump(ss);
-    }
-}
-
-int
-CentralizedFaultTolerantDFT::lookup_entry(const std::string &appl_name,
-                                          rlm_addr_t &dstaddr,
-                                          const rlm_addr_t preferred,
-                                          uint32_t cookie) const
-{
-    if (client) {
-        return client->lookup_entry(appl_name, dstaddr, preferred, cookie);
-    }
-    return raft->lookup_entry(appl_name, dstaddr, preferred, cookie);
-}
-
-int
-CentralizedFaultTolerantDFT::appl_register(
-    const struct rl_kmsg_appl_register *req)
-{
-    if (client) {
-        return client->appl_register(req);
-    }
-    return raft->appl_register(req);
-}
-
-void
 CentralizedFaultTolerantDFT::update_address(rlm_addr_t new_addr)
 {
     UPE(rib->uipcp, "Missing implementation\n");
-}
-
-int
-CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
-{
-    if (client) {
-        return client->rib_handler(rm, nf);
-    }
-    return raft->rib_handler(rm, nf);
 }
 
 /* Rearm the timer according to the older pending request (i.e. the next one
@@ -796,15 +782,6 @@ CentralizedFaultTolerantDFT::Replica::process_timeout()
     timer_expired(timer_type, &out);
 
     return process_sm_output(std::move(out));
-}
-
-int
-CentralizedFaultTolerantDFT::Replica::lookup_entry(const std::string &appl_name,
-                                                   rlm_addr_t &dstaddr,
-                                                   const rlm_addr_t preferred,
-                                                   uint32_t cookie) const
-{
-    return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
 }
 
 int
