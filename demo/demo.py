@@ -509,7 +509,7 @@ while 1:
 
         continue
 
-    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.-]+)*)\s*$', line)
+    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.,-]+)*)\s*$', line)
     if m:
         dif = m.group(1)
         nodes = m.group(2)
