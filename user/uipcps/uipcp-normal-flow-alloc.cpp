@@ -341,38 +341,6 @@ LocalFlowAllocator::flows_handler_create(const CDAPMessage *rm)
     FlowRequest freq(objbuf, objlen);
     std::string local_appl, remote_appl;
     struct rl_flow_config flowcfg;
-    rlm_addr_t dft_next_hop;
-    int ret;
-
-    ret = rib->dft->lookup_entry(freq.dst_app, &dft_next_hop,
-                                 /* preferred address */ rib->myaddr, 0);
-    if (ret) {
-        /* We don't know how where this application is registered,
-         * reject the request. */
-        std::unique_ptr<CDAPMessage> m;
-
-        UPI(rib->uipcp, "Cannot find DFT entry for %s\n",
-            static_cast<string>(freq.dst_app).c_str());
-
-        m = make_unique<CDAPMessage>();
-        m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
-                      "Cannot find DFT entry");
-
-        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
-    }
-
-    if (dft_next_hop != rib->myaddr) {
-        /* freq.dst_app is not registered with us, we have
-         * to forward the request. TODO */
-        std::unique_ptr<CDAPMessage> m;
-
-        UPE(rib->uipcp, "Flow request forwarding not supported\n");
-        m = make_unique<CDAPMessage>();
-        m->m_create_r(rm->obj_class, rm->obj_name, 0, -1,
-                      "Flow request forwarding not supported");
-
-        return rib->send_to_dst_addr(std::move(m), freq.src_addr, &freq);
-    }
 
     if (freq.connections.size() < 1) {
         std::unique_ptr<CDAPMessage> m;

@@ -198,7 +198,8 @@ uipcp_issue_fa_req_arrived(struct uipcp *uipcp, uint32_t kevent_id,
 
     ret = rl_write_msg(uipcp->cfd, RLITE_MB(&req), 1);
     if (ret) {
-        UPE(uipcp, "rl_write_msg() failed [%s]\n", strerror(errno));
+        UPE(uipcp, "Failed to report fa req for appl '%s' [%s]\n", local_appl,
+            strerror(errno));
     }
     rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(&req));
 
