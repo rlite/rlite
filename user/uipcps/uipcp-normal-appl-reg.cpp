@@ -56,8 +56,8 @@ public:
 
     void dump(std::stringstream &ss) const override;
 
-    int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
-                     const rlm_addr_t preferred, uint32_t cookie) override;
+    int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
+                   const rlm_addr_t preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
     void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
@@ -70,9 +70,9 @@ public:
 };
 
 int
-FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
-                                 rlm_addr_t *dstaddr,
-                                 const rlm_addr_t preferred, uint32_t cookie)
+FullyReplicatedDFT::lookup_req(const std::string &appl_name,
+                               rlm_addr_t *dstaddr, const rlm_addr_t preferred,
+                               uint32_t cookie)
 {
     /* Fetch all entries that hold 'appl_name'. */
     auto range = dft_table.equal_range(appl_name);
@@ -412,10 +412,10 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
         int apply(const char *const serbuf) override;
-        int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
-                         const rlm_addr_t preferred, uint32_t cookie)
+        int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
+                       const rlm_addr_t preferred, uint32_t cookie)
         {
-            return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
+            return impl->lookup_req(appl_name, dstaddr, preferred, cookie);
         }
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
@@ -456,8 +456,8 @@ class CentralizedFaultTolerantDFT : public DFT {
             : parent(dft), replicas(std::move(names))
         {
         }
-        int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
-                         const rlm_addr_t preferred, uint32_t cookie);
+        int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
+                       const rlm_addr_t preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
@@ -478,13 +478,13 @@ public:
         }
     }
 
-    int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
-                     const rlm_addr_t preferred, uint32_t cookie) override
+    int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
+                   const rlm_addr_t preferred, uint32_t cookie) override
     {
         if (client) {
-            return client->lookup_entry(appl_name, dstaddr, preferred, cookie);
+            return client->lookup_req(appl_name, dstaddr, preferred, cookie);
         }
-        return raft->lookup_entry(appl_name, dstaddr, preferred, cookie);
+        return raft->lookup_req(appl_name, dstaddr, preferred, cookie);
     }
     int appl_register(const struct rl_kmsg_appl_register *req) override
     {
@@ -579,10 +579,10 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
 }
 
 int
-CentralizedFaultTolerantDFT::Client::lookup_entry(const std::string &appl_name,
-                                                  rlm_addr_t *dstaddr,
-                                                  const rlm_addr_t preferred,
-                                                  uint32_t cookie)
+CentralizedFaultTolerantDFT::Client::lookup_req(const std::string &appl_name,
+                                                rlm_addr_t *dstaddr,
+                                                const rlm_addr_t preferred,
+                                                uint32_t cookie)
 {
     /* Prepare an M_READ for a read operation. If we know who is the leader,
      * we send it to the leader only; otherwise we send it to all the replicas.
