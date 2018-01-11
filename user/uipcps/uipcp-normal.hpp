@@ -347,8 +347,8 @@ struct FlowAllocator {
     virtual void dump(std::stringstream &ss) const          = 0;
     virtual void dump_memtrack(std::stringstream &ss) const = 0;
 
-    virtual int fa_req(struct rl_kmsg_fa_req *req)    = 0;
-    virtual int fa_resp(struct rl_kmsg_fa_resp *resp) = 0;
+    virtual int fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr) = 0;
+    virtual int fa_resp(struct rl_kmsg_fa_resp *resp)                      = 0;
 
     virtual int flow_deallocated(struct rl_kmsg_flow_deallocated *req) = 0;
 

@@ -39,7 +39,7 @@ public:
     std::unordered_map<std::string, FlowRequest> flow_reqs;
     std::unordered_map<unsigned int, FlowRequest> flow_reqs_tmp;
 
-    int fa_req(struct rl_kmsg_fa_req *req) override;
+    int fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr) override;
     int fa_resp(struct rl_kmsg_fa_resp *resp) override;
 
     int flow_deallocated(struct rl_kmsg_flow_deallocated *req) override;
@@ -189,35 +189,15 @@ LocalFlowAllocator::flowspec2flowcfg(const struct rina_flow_spec *spec,
 
 /* (1) Initiator FA <-- Initiator application : FA_REQ */
 int
-LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req)
+LocalFlowAllocator::fa_req(struct rl_kmsg_fa_req *req, rlm_addr_t remote_addr)
 {
-    rlm_addr_t remote_addr;
     std::unique_ptr<CDAPMessage> m;
     FlowRequest freq;
     ConnId conn_id;
     stringstream obj_name;
     string cubename;
     struct rl_flow_config flowcfg;
-    string dest_appl;
-    int ret;
-
-    if (!req->remote_appl) {
-        UPE(rib->uipcp, "Null remote application name\n");
-        return -1;
-    }
-    dest_appl = string(req->remote_appl);
-
-    ret = rib->dft->lookup_entry(dest_appl, &remote_addr,
-                                 /* no preference */ 0, req->cookie);
-    if (ret) {
-        /* Return a negative flow allocation response immediately. */
-        UPI(rib->uipcp, "No DFT matching entry for destination %s\n",
-            dest_appl.c_str());
-
-        return uipcp_issue_fa_resp_arrived(
-            rib->uipcp, req->local_port, 0 /* don't care */, 0 /* don't care */,
-            0 /* don't care */, 1, nullptr);
-    }
+    string dest_appl = string(req->remote_appl);
 
     conn_id.qos_id  = 0;
     conn_id.src_cep = req->local_cep;
