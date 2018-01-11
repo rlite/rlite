@@ -592,6 +592,8 @@ struct uipcp_rib {
                int wait_for_completion);
     void trigger_re_enrollments();
 
+    int fa_req(struct rl_kmsg_fa_req *req);
+
     int recv_msg(char *serbuf, int serlen, NeighFlow *nf);
     int mgmt_bound_flow_write(const struct rl_mgmt_hdr *mhdr, void *buf,
                               size_t buflen);
