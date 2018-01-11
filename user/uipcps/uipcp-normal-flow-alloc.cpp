@@ -31,6 +31,7 @@ int
 uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 {
     rlm_addr_t remote_addr;
+    std::string appl_name;
     int ret;
 
     if (!req->remote_appl) {
@@ -38,8 +39,10 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
         return -1;
     }
 
+    appl_name = string(req->remote_appl);
+
     /* Lookup the DFT. */
-    ret = dft->lookup_req(string(req->remote_appl), &remote_addr,
+    ret = dft->lookup_req(appl_name, &remote_addr,
                           /* no preference */ 0, req->cookie);
     if (ret) {
         /* Return a negative flow allocation response immediately. */
@@ -58,7 +61,16 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
 
     /* We need to wait for the DFT lookup to complete before we can go
      * ahead. Store the FA request in a list of pending request. */
-    // TODO
+
+    /* Implement move semantic. */
+    std::unique_ptr<struct rl_kmsg_fa_req> reqcopy =
+        make_unique<struct rl_kmsg_fa_req>();
+    *reqcopy         = *req;
+    req->local_appl  = nullptr;
+    req->remote_appl = nullptr;
+    req->dif_name    = nullptr;
+    pending_fa_reqs[appl_name].push_back(std::move(reqcopy));
+
     return 0;
 }
 

@@ -433,6 +433,11 @@ uipcp_rib::uipcp_rib(struct uipcp *_u)
 
 uipcp_rib::~uipcp_rib()
 {
+    for (auto &kv : pending_fa_reqs) {
+        for (auto &p : kv.second) {
+            rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(p.get()));
+        }
+    }
     sync_timer->clear();
     age_incr_timer->clear();
     uipcp_loop_fdh_del(uipcp, mgmtfd);
