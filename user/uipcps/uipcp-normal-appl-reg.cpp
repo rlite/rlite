@@ -414,6 +414,8 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
         int apply(const char *const serbuf) override;
+        int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+                         const rlm_addr_t preferred, uint32_t cookie) const;
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
@@ -453,6 +455,8 @@ class CentralizedFaultTolerantDFT : public DFT {
             : parent(dft), replicas(std::move(names))
         {
         }
+        int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+                         const rlm_addr_t preferred, uint32_t cookie) const;
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
@@ -532,8 +536,10 @@ CentralizedFaultTolerantDFT::lookup_entry(const std::string &appl_name,
                                           const rlm_addr_t preferred,
                                           uint32_t cookie) const
 {
-    UPW(rib->uipcp, "Missing implementation");
-    return -1;
+    if (client) {
+        return client->lookup_entry(appl_name, dstaddr, preferred, cookie);
+    }
+    return raft->lookup_entry(appl_name, dstaddr, preferred, cookie);
 }
 
 int
@@ -586,6 +592,16 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
                 cli->process_timeout();
             });
     }
+}
+
+int
+CentralizedFaultTolerantDFT::Client::lookup_entry(const std::string &appl_name,
+                                                  rlm_addr_t &dstaddr,
+                                                  const rlm_addr_t preferred,
+                                                  uint32_t cookie) const
+{
+    UPE(parent->rib->uipcp, "Missing implementation\n");
+    return -1;
 }
 
 int
@@ -780,6 +796,15 @@ CentralizedFaultTolerantDFT::Replica::process_timeout()
     timer_expired(timer_type, &out);
 
     return process_sm_output(std::move(out));
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::lookup_entry(const std::string &appl_name,
+                                                   rlm_addr_t &dstaddr,
+                                                   const rlm_addr_t preferred,
+                                                   uint32_t cookie) const
+{
+    return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
 }
 
 int
