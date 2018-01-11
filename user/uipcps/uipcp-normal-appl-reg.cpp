@@ -818,8 +818,17 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
     const char *objbuf;
     raft::RaftSMOutput out;
     size_t objlen;
+    int ret;
 
-    if (rm->obj_class == obj_class::dft && rm->obj_name == obj_name::dft) {
+    assert(rm->obj_name == obj_name::dft);
+
+    rm->get_obj_value(objbuf, objlen);
+    if (!objbuf) {
+        UPE(uipcp, "No object value found\n");
+        return 0;
+    }
+
+    if (rm->obj_class == obj_class::dft) {
         /* We expect a M_WRITE or M_DELETE as sent by Client::appl_register().
          */
         if (rm->op_code != gpb::M_WRITE && rm->op_code != gpb::M_DELETE) {
@@ -837,16 +846,10 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
 
         /* We are the leader. Let's submit the request to the Raft state
          * machine. */
-        rm->get_obj_value(objbuf, objlen);
-        if (!objbuf) {
-            UPE(uipcp, "No object value found\n");
-            return 0;
-        }
 
         DFTEntry dft_entry(objbuf, objlen);
         string appl_name(static_cast<string>(dft_entry.appl_name));
         Command c;
-        int ret;
 
         /* Fill in the command struct (already serialized). */
         c.address = dft_entry.address;
@@ -865,9 +868,53 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
             return -1;
         }
     } else {
-        UPE(uipcp, "Unexpected class/name '%s'/'%s'\n", rm->obj_class.c_str(),
-            rm->obj_name.c_str());
-        return 0;
+        if (rm->obj_class == obj_class::raft_req_vote) {
+            auto rv = make_unique<raft::RaftRequestVote>();
+
+            RaftRequestVote mm(objbuf, objlen);
+            rv->term           = mm.term;
+            rv->candidate_id   = mm.candidate_id;
+            rv->last_log_index = mm.last_log_index;
+            rv->last_log_term  = mm.last_log_term;
+            ret                = request_vote_input(*rv, &out);
+
+        } else if (rm->obj_class == obj_class::raft_req_vote_resp) {
+            auto rvr = make_unique<raft::RaftRequestVoteResp>();
+
+            RaftRequestVoteResp mm(objbuf, objlen);
+            rvr->term         = mm.term;
+            rvr->vote_granted = mm.vote_granted;
+            ret               = request_vote_resp_input(*rvr, &out);
+
+        } else if (rm->obj_class == obj_class::raft_append_entries) {
+            auto ae = make_unique<raft::RaftAppendEntries>();
+
+            RaftAppendEntries mm(objbuf, objlen);
+            ae->term           = mm.term;
+            ae->leader_id      = mm.leader_id;
+            ae->leader_commit  = mm.leader_commit;
+            ae->prev_log_index = mm.prev_log_index;
+            ae->prev_log_term  = mm.prev_log_term;
+            ae->entries        = std::move(mm.entries);
+            ret                = append_entries_input(*ae, &out);
+
+        } else if (rm->obj_class == obj_class::raft_append_entries_resp) {
+            auto aer = make_unique<raft::RaftAppendEntriesResp>();
+
+            RaftAppendEntriesResp mm(objbuf, objlen);
+            aer->term        = mm.term;
+            aer->follower_id = mm.follower_id;
+            aer->log_index   = mm.log_index;
+            aer->success     = mm.success;
+            ret              = append_entries_resp_input(*aer, &out);
+        } else {
+            UPE(uipcp, "Unexpected object class '%s'\n", rm->obj_class.c_str());
+            return 0;
+        }
+        if (ret) {
+            UPE(uipcp, "Failed to submit message %s to the RaftSM\n",
+                rm->obj_class.c_str());
+        }
     }
 
     /* Complete raft processing. */
