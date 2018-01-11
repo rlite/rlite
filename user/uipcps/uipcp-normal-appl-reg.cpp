@@ -471,8 +471,6 @@ public:
     int appl_register(const struct rl_kmsg_appl_register *req) override;
     void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
-    int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
-    int neighs_refresh(size_t limit) override;
 };
 
 int
@@ -561,18 +559,6 @@ CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
         return client->rib_handler(rm, nf);
     }
     return raft->rib_handler(rm, nf);
-}
-
-int
-CentralizedFaultTolerantDFT::sync_neigh(NeighFlow *nf, unsigned int limit) const
-{
-    return 0; /* Nothing to do. */
-}
-
-int
-CentralizedFaultTolerantDFT::neighs_refresh(size_t limit)
-{
-    return 0; /* Nothing to do. */
 }
 
 /* Rearm the timer according to the older pending request (i.e. the next one

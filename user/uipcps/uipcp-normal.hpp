@@ -326,8 +326,11 @@ struct DFT {
     virtual int appl_register(const struct rl_kmsg_appl_register *req) = 0;
     virtual void update_address(rlm_addr_t new_addr)                   = 0;
     virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)      = 0;
-    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const    = 0;
-    virtual int neighs_refresh(size_t limit)                           = 0;
+    virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
+    {
+        return 0;
+    }
+    virtual int neighs_refresh(size_t limit) { return 0; }
 };
 
 /* Allocation and deallocation of N-flows used applications. */
