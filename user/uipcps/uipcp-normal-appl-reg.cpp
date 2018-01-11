@@ -566,7 +566,9 @@ CentralizedFaultTolerantDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
 void
 CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
 {
-    if (!pending.empty()) {
+    if (pending.empty()) {
+        timer = nullptr;
+    } else {
         auto t_min = std::chrono::system_clock::time_point::max();
         for (const auto &kv : pending) {
             if (kv.second.t < t_min) {
