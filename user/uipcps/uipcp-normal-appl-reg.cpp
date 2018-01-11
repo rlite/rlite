@@ -393,6 +393,10 @@ class CentralizedFaultTolerantDFT : public DFT {
                                                     sizeof(Command::opcode),
                       "Invalid memory layout for class Replica::Command");
 
+        /* Timer needed by the Raft state machine. */
+        std::unique_ptr<TimeoutEvent> timer;
+        raft::RaftTimerType timer_type;
+
         /* State machine implementation. Just reuse the implementation of
          * a fully replicated DFT. */
         std::unique_ptr<FullyReplicatedDFT> impl;
@@ -408,6 +412,7 @@ class CentralizedFaultTolerantDFT : public DFT {
               parent(dft),
               impl(make_unique<FullyReplicatedDFT>(dft->rib)){};
         int process_sm_output(raft::RaftSMOutput out);
+        int process_timeout();
         int apply(const char *const serbuf) override;
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
@@ -422,7 +427,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         /* The leader, if we know who it is, otherwise the empty
          * string. */
         raft::ReplicaId leader_id;
-        std::unique_ptr<TimeoutEvent> timeout;
+        std::unique_ptr<TimeoutEvent> timer;
 
         struct PendingReq {
             gpb::opCode_t op_code;
@@ -582,14 +587,14 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
                 t_min = kv.second.t;
             }
         }
-        timeout = make_unique<TimeoutEvent>(
+        timer = make_unique<TimeoutEvent>(
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now() + std::chrono::seconds(3) -
                 t_min),
             parent->rib->uipcp, this, [](struct uipcp *uipcp, void *arg) {
                 auto cli =
                     static_cast<CentralizedFaultTolerantDFT::Client *>(arg);
-                cli->timeout->fired();
+                cli->timer->fired();
                 cli->process_timeout();
             });
     }
@@ -641,6 +646,8 @@ CentralizedFaultTolerantDFT::Client::appl_register(
 int
 CentralizedFaultTolerantDFT::Client::process_timeout()
 {
+    std::lock_guard<std::mutex> guard(parent->rib->mutex);
+
     /* We got a timeout, let's forget about the current leader. */
     leader_id.clear();
     rearm_pending_timer();
@@ -750,12 +757,41 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
                                              obj.get(), nullptr);
     }
 
-    // TODO
     for (const auto &cmd : out.timer_commands) {
-        (void)cmd;
+        switch (cmd.action) {
+        case raft::RaftTimerAction::Stop:
+            timer = nullptr;
+            break;
+        case raft::RaftTimerAction::Restart:
+            timer = make_unique<TimeoutEvent>(
+                std::chrono::milliseconds(cmd.milliseconds), parent->rib->uipcp,
+                this, [](struct uipcp *uipcp, void *arg) {
+                    auto replica =
+                        static_cast<CentralizedFaultTolerantDFT::Replica *>(
+                            arg);
+                    replica->timer->fired();
+                    replica->process_timeout();
+                });
+            timer_type = cmd.type;
+            break;
+        default:
+            assert(false);
+            break;
+        }
     }
 
     return ret;
+}
+
+int
+CentralizedFaultTolerantDFT::Replica::process_timeout()
+{
+    std::lock_guard<std::mutex> guard(parent->rib->mutex);
+    raft::RaftSMOutput out;
+
+    timer_expired(timer_type, &out);
+
+    return process_sm_output(std::move(out));
 }
 
 int
