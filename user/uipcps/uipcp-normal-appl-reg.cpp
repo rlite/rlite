@@ -57,8 +57,7 @@ public:
     void dump(std::stringstream &ss) const override;
 
     int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                     const rlm_addr_t preferred,
-                     uint32_t cookie) const override;
+                     const rlm_addr_t preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
     void update_address(rlm_addr_t new_addr) override;
     int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
@@ -73,8 +72,7 @@ public:
 int
 FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
                                  rlm_addr_t &dstaddr,
-                                 const rlm_addr_t preferred,
-                                 uint32_t cookie) const
+                                 const rlm_addr_t preferred, uint32_t cookie)
 {
     /* Fetch all entries that hold 'appl_name'. */
     auto range = dft_table.equal_range(appl_name);
@@ -415,7 +413,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_timeout();
         int apply(const char *const serbuf) override;
         int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                         const rlm_addr_t preferred, uint32_t cookie) const
+                         const rlm_addr_t preferred, uint32_t cookie)
         {
             return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
         }
@@ -459,7 +457,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         {
         }
         int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                         const rlm_addr_t preferred, uint32_t cookie) const;
+                         const rlm_addr_t preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
         int process_timeout();
@@ -481,7 +479,7 @@ public:
     }
 
     int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
-                     const rlm_addr_t preferred, uint32_t cookie) const override
+                     const rlm_addr_t preferred, uint32_t cookie) override
     {
         if (client) {
             return client->lookup_entry(appl_name, dstaddr, preferred, cookie);
@@ -584,10 +582,39 @@ int
 CentralizedFaultTolerantDFT::Client::lookup_entry(const std::string &appl_name,
                                                   rlm_addr_t &dstaddr,
                                                   const rlm_addr_t preferred,
-                                                  uint32_t cookie) const
+                                                  uint32_t cookie)
 {
-    UPE(parent->rib->uipcp, "Missing implementation\n");
-    return -1;
+    /* Prepare an M_READ for a read operation. If we know who is the leader,
+     * we send it to the leader only; otherwise we send it to all the replicas.
+     */
+    for (const auto &r : replicas) {
+        if (leader_id.empty() || r == leader_id) {
+            auto m = make_unique<CDAPMessage>();
+            gpb::opCode_t op_code;
+            int invoke_id;
+            int ret;
+
+            m->m_read(obj_class::dft, obj_name::dft + "/" + appl_name);
+            op_code = m->op_code;
+
+            ret = parent->rib->send_to_dst_node(std::move(m), r, nullptr,
+                                                &invoke_id);
+            if (ret) {
+                return ret;
+            }
+            pending[invoke_id] =
+                std::move(PendingReq(op_code, appl_name, r, 0));
+        }
+    }
+
+    rearm_pending_timer();
+
+    UPI(parent->rib->uipcp, "Read request for '%s' issued\n",
+        appl_name.c_str());
+
+    // TODO fill dstaddr
+
+    return 0;
 }
 
 int
@@ -602,6 +629,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
     for (const auto &r : replicas) {
         if (leader_id.empty() || r == leader_id) {
             auto m = make_unique<CDAPMessage>();
+            gpb::opCode_t op_code;
             DFTEntry dft_entry;
             int invoke_id;
             int ret;
@@ -611,6 +639,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
             } else {
                 m->m_delete(obj_class::dft, obj_name::dft);
             }
+            op_code             = m->op_code;
             dft_entry.address   = parent->rib->myaddr;
             dft_entry.appl_name = RinaName(appl_name);
             dft_entry.timestamp = time64();
@@ -621,7 +650,7 @@ CentralizedFaultTolerantDFT::Client::appl_register(
                 return ret;
             }
             pending[invoke_id] =
-                std::move(PendingReq(m->op_code, appl_name, r, req->event_id));
+                std::move(PendingReq(op_code, appl_name, r, req->event_id));
         }
     }
 
@@ -845,8 +874,6 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
     raft::RaftSMOutput out;
     size_t objlen;
     int ret;
-
-    assert(rm->obj_name == obj_name::dft);
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
