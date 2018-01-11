@@ -39,8 +39,8 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     }
 
     /* Lookup the DFT. */
-    ret = dft->lookup_entry(string(req->remote_appl), &remote_addr,
-                            /* no preference */ 0, req->cookie);
+    ret = dft->lookup_req(string(req->remote_appl), &remote_addr,
+                          /* no preference */ 0, req->cookie);
     if (ret) {
         /* Return a negative flow allocation response immediately. */
         UPI(uipcp, "No DFT matching entry for destination %s\n",
@@ -51,7 +51,15 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
             0 /* don't care */, 1, nullptr);
     }
 
-    return fa->fa_req(req, remote_addr);
+    if (remote_addr != RL_ADDR_NULL) {
+        /* DFT lookup request was served immediately, we can go ahead. */
+        return fa->fa_req(req, remote_addr);
+    }
+
+    /* We need to wait for the DFT lookup to complete before we can go
+     * ahead. Store the FA request in a list of pending request. */
+    // TODO
+    return 0;
 }
 
 class LocalFlowAllocator : public FlowAllocator {
