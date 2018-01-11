@@ -1565,12 +1565,32 @@ normal_fa_req(struct uipcp *uipcp, const struct rl_msg_base *msg)
 {
     struct rl_kmsg_fa_req *req = (struct rl_kmsg_fa_req *)msg;
     uipcp_rib *rib             = UIPCP_RIB(uipcp);
+    int ret;
 
     UPV(uipcp, "[uipcp %u] Got reflected message\n", uipcp->id);
 
-    std::lock_guard<std::mutex> guard(rib->mutex);
+    if (!req->remote_appl) {
+        UPE(rib->uipcp, "Null remote application name\n");
+        return -1;
+    }
 
-    return rib->fa->fa_req(req);
+    std::lock_guard<std::mutex> guard(rib->mutex);
+    rlm_addr_t remote_addr;
+
+    /* Lookup the DFT. */
+    ret = rib->dft->lookup_entry(string(req->remote_appl), &remote_addr,
+                                 /* no preference */ 0, req->cookie);
+    if (ret) {
+        /* Return a negative flow allocation response immediately. */
+        UPI(rib->uipcp, "No DFT matching entry for destination %s\n",
+            req->remote_appl);
+
+        return uipcp_issue_fa_resp_arrived(
+            uipcp, req->local_port, 0 /* don't care */, 0 /* don't care */,
+            0 /* don't care */, 1, nullptr);
+    }
+
+    return rib->fa->fa_req(req, remote_addr);
 }
 
 static int
