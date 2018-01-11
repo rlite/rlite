@@ -56,7 +56,7 @@ public:
 
     void dump(std::stringstream &ss) const override;
 
-    int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+    int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
                      const rlm_addr_t preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
     void update_address(rlm_addr_t new_addr) override;
@@ -71,7 +71,7 @@ public:
 
 int
 FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
-                                 rlm_addr_t &dstaddr,
+                                 rlm_addr_t *dstaddr,
                                  const rlm_addr_t preferred, uint32_t cookie)
 {
     /* Fetch all entries that hold 'appl_name'. */
@@ -109,7 +109,7 @@ FullyReplicatedDFT::lookup_entry(const std::string &appl_name,
         assert(mit != range.second);
     }
 
-    dstaddr = mit->second.address;
+    *dstaddr = mit->second.address;
 
     return 0;
 }
@@ -412,7 +412,7 @@ class CentralizedFaultTolerantDFT : public DFT {
         int process_sm_output(raft::RaftSMOutput out);
         int process_timeout();
         int apply(const char *const serbuf) override;
-        int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+        int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
                          const rlm_addr_t preferred, uint32_t cookie)
         {
             return impl->lookup_entry(appl_name, dstaddr, preferred, cookie);
@@ -456,7 +456,7 @@ class CentralizedFaultTolerantDFT : public DFT {
             : parent(dft), replicas(std::move(names))
         {
         }
-        int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+        int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
                          const rlm_addr_t preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
         int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
@@ -478,7 +478,7 @@ public:
         }
     }
 
-    int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+    int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
                      const rlm_addr_t preferred, uint32_t cookie) override
     {
         if (client) {
@@ -580,7 +580,7 @@ CentralizedFaultTolerantDFT::Client::rearm_pending_timer()
 
 int
 CentralizedFaultTolerantDFT::Client::lookup_entry(const std::string &appl_name,
-                                                  rlm_addr_t &dstaddr,
+                                                  rlm_addr_t *dstaddr,
                                                   const rlm_addr_t preferred,
                                                   uint32_t cookie)
 {

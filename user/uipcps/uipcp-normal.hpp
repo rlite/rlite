@@ -320,7 +320,7 @@ struct DFT {
 
     virtual int param_changed(const std::string &param_name) { return 0; }
     virtual void dump(std::stringstream &ss) const                        = 0;
-    virtual int lookup_entry(const std::string &appl_name, rlm_addr_t &dstaddr,
+    virtual int lookup_entry(const std::string &appl_name, rlm_addr_t *dstaddr,
                              const rlm_addr_t preferred, uint32_t cookie) = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req)    = 0;
     virtual void update_address(rlm_addr_t new_addr)                      = 0;
