@@ -488,6 +488,9 @@ struct uipcp_rib {
                        std::list<std::unique_ptr<struct rl_kmsg_fa_req>>>
         pending_fa_reqs;
 
+    /* Called by the DFT when a name lookup has been resolved asynchronously. */
+    void dft_lookup_resolved(const std::string &name, rlm_addr_t remote_addr);
+
     std::unique_ptr<AddrAllocator> addra;
 
     /* Directory Forwarding Table. */
