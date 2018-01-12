@@ -74,6 +74,24 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     return 0;
 }
 
+void
+uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
+                               rlm_addr_t remote_addr)
+{
+    auto mit = pending_fa_reqs.find(appl_name);
+
+    if (mit == pending_fa_reqs.end()) {
+        return;
+    }
+
+    /* Go ahead with all the flow allocation requests that were pending
+     * waiting for the DFT to resolve the name. */
+    for (auto &fr : mit->second) {
+        fa->fa_req(fr.release(), remote_addr);
+    }
+    pending_fa_reqs.erase(mit);
+}
+
 class LocalFlowAllocator : public FlowAllocator {
 public:
     RL_NODEFAULT_NONCOPIABLE(LocalFlowAllocator);
