@@ -62,7 +62,7 @@ uipcp_rib::fa_req(struct rl_kmsg_fa_req *req)
     /* We need to wait for the DFT lookup to complete before we can go
      * ahead. Store the FA request in a list of pending request. */
 
-    /* Implement move semantic. */
+    /* Make a copy of the request, with some move semantic. */
     std::unique_ptr<struct rl_kmsg_fa_req> reqcopy =
         make_unique<struct rl_kmsg_fa_req>();
     *reqcopy         = *req;
@@ -87,9 +87,24 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
     }
 
     /* Go ahead with all the flow allocation requests that were pending
-     * waiting for the DFT to resolve the name. */
+     * waiting for the DFT to resolve this name. */
+    if (remote_addr == RL_ADDR_NULL) {
+        UPI(uipcp, "No DFT matching entry for destination %s\n",
+            appl_name.c_str());
+    } else {
+        UPD(uipcp, "DFT lookup for '%s' resolved into address '%lu'\n",
+            appl_name.c_str(), remote_addr);
+    }
     for (auto &fr : mit->second) {
-        fa->fa_req(fr.release(), remote_addr);
+        if (remote_addr == RL_ADDR_NULL) {
+            /* Return a negative flow allocation response. */
+            uipcp_issue_fa_resp_arrived(uipcp, fr->local_port,
+                                        0 /* don't care */, 0 /* don't care */,
+                                        0 /* don't care */, 1, nullptr);
+        } else {
+            fa->fa_req(fr.get(), remote_addr);
+        }
+        rl_msg_free(rl_ker_numtables, RLITE_KER_MSG_MAX, RLITE_MB(fr.get()));
     }
     pending_fa_reqs.erase(mit);
 }
