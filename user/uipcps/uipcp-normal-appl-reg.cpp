@@ -88,7 +88,7 @@ FullyReplicatedDFT::lookup_req(const std::string &appl_name,
     auto mit = range.first;
 
     if (d > 1) {
-        if (preferred) {
+        if (preferred != RL_ADDR_NULL) {
             /* Only accept the preferred address. */
 
             for (; mit != range.second; mit++) {
@@ -724,11 +724,19 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
             rm->result ? "failed" : "was successful");
         break;
     case gpb::M_READ_R: {
-        int64_t a, remote_addr;
-        rm->get_obj_value(a);
-        remote_addr = static_cast<rlm_addr_t>(a);
-        UPD(uipcp, "Lookup of name '%s' resolved into address '%lu'\n",
-            pi->second.appl_name.c_str(), remote_addr);
+        rlm_addr_t remote_addr = RL_ADDR_NULL;
+
+        if (rm->result) {
+            UPD(uipcp, "Lookup of name '%s' failed remotely [%s]\n",
+                pi->second.appl_name.c_str(), rm->result_reason.c_str());
+        } else {
+            int64_t a;
+
+            rm->get_obj_value(a);
+            remote_addr = static_cast<rlm_addr_t>(a);
+            UPD(uipcp, "Lookup of name '%s' resolved into address '%lu'\n",
+                pi->second.appl_name.c_str(), remote_addr);
+        }
         parent->rib->dft_lookup_resolved(pi->second.appl_name, remote_addr);
         break;
     }
@@ -903,13 +911,6 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
     }
 
     if (rm->obj_class == obj_class::dft) {
-        /* We expect a M_WRITE or M_DELETE as sent by Client::appl_register().
-         */
-        if (rm->op_code != gpb::M_WRITE && rm->op_code != gpb::M_DELETE) {
-            UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
-            return 0;
-        }
-
         if (!leader()) {
             /* We are not the leader, we need to forward it to the leader node.
              */
@@ -918,30 +919,57 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
             return 0;
         }
 
-        /* We are the leader. Let's submit the request to the Raft state
-         * machine. */
+        if (rm->op_code == gpb::M_WRITE || rm->op_code == gpb::M_DELETE) {
+            /* We received an M_WRITE or M_DELETE as sent by
+             * Client::appl_register(). We are the leader. Let's submit the
+             * request to the Raft state machine. */
+            DFTEntry dft_entry(objbuf, objlen);
+            string appl_name(static_cast<string>(dft_entry.appl_name));
+            Command c;
 
-        DFTEntry dft_entry(objbuf, objlen);
-        string appl_name(static_cast<string>(dft_entry.appl_name));
-        Command c;
+            /* Fill in the command struct (already serialized). */
+            c.address = dft_entry.address;
+            strncpy(c.name, appl_name.c_str(), sizeof(c.name));
+            c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
+                                                   : Command::OpcodeDel;
 
-        /* Fill in the command struct (already serialized). */
-        c.address = dft_entry.address;
-        strncpy(c.name, appl_name.c_str(), sizeof(c.name));
-        c.opcode = rm->op_code == gpb::M_WRITE ? Command::OpcodeSet
-                                               : Command::OpcodeDel;
+            /* Submit the command to the raft state machine. */
+            ret = submit(reinterpret_cast<const char *const>(&c), &out);
+            if (ret) {
+                UPE(parent->rib->uipcp,
+                    "Failed to submit application %sregistration for '%s' to "
+                    "the "
+                    "raft "
+                    "state machine\n",
+                    rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
+                return -1;
+            }
+        } else if (rm->op_code == gpb::M_READ) {
+            /* We received an an M_READ sent by Client::lookup_req().
+             * Recover the application name, look it up in the DFT and
+             * reply. */
+            auto m = make_unique<CDAPMessage>();
+            rlm_addr_t remote_addr;
+            string appl_name;
+            int ret;
 
-        /* Submit the command to the raft state machine. */
-        ret = submit(reinterpret_cast<const char *const>(&c), &out);
-        if (ret) {
-            UPE(parent->rib->uipcp,
-                "Failed to submit application %sregistration for '%s' to the "
-                "raft "
-                "state machine\n",
-                rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
-            return -1;
+            appl_name = rm->obj_name.substr(rm->obj_name.rfind("/") + 1);
+            ret       = impl->lookup_req(appl_name, &remote_addr,
+                                   /*preferred=*/RL_ADDR_NULL, /*cookie=*/0);
+            m->m_read_r(rm->obj_class, rm->obj_name, /*obj_inst=*/0,
+                        /*result=*/ret ? -1 : 0,
+                        /*result_reason=*/ret ? "No match found" : string());
+            m->set_obj_value(static_cast<int64_t>(remote_addr));
+            parent->rib->send_to_dst_node(std::move(m), string() /*TODO*/,
+                                          /*obj=*/nullptr,
+                                          /*invoke_id=*/nullptr);
+        } else {
+            UPE(uipcp, "M_WRITE(dft) or M_DELETE(dft) expected\n");
+            return 0;
         }
+
     } else {
+        /* This is a message belonging to the raft protocol. */
         if (rm->obj_class == obj_class::raft_req_vote) {
             auto rv = make_unique<raft::RaftRequestVote>();
 
