@@ -682,10 +682,12 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
 {
     struct uipcp *uipcp = parent->rib->uipcp;
 
-    /* We expect a M_WRITE_R corresponding to the M_WRITE or M_DELETE sent by
-     * Client::appl_register(). */
-    if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R) {
-        UPE(uipcp, "M_WRITE_R or M_DELETE_R expected\n");
+    /* We expect a M_WRITE_R, M_DELETE_R or M_READ_R, corresponding an
+     * M_WRITE/M_DELETE sent by Client::appl_register() or an M_READ sent by
+     * Client::lookup_req(). */
+    if (rm->op_code != gpb::M_WRITE_R && rm->op_code != gpb::M_DELETE_R &&
+        rm->op_code != gpb::M_READ_R) {
+        UPE(uipcp, "Cannot handle opcode %d\n", rm->op_code);
         return 0;
     }
 
@@ -707,14 +709,31 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
     /* We assume it was the leader to answer. So now we know who the leader is.
      */
     leader_id = pi->second.replica;
-    UPD(uipcp, "Application %s %sregistration %s\n",
-        pi->second.appl_name.c_str(), rm->op_code == gpb::M_WRITE_R ? "" : "un",
-        rm->result ? "failed" : "was successful");
-    if (rm->op_code == gpb::M_WRITE_R) {
-        /* Registrations need a response. */
-        uipcp_appl_register_resp(uipcp, rm->result ? RLITE_ERR : RLITE_SUCC,
-                                 pi->second.kevent_id,
-                                 pi->second.appl_name.c_str());
+    switch (rm->op_code) {
+    case gpb::M_WRITE_R:
+    case gpb::M_DELETE_R:
+        if (rm->op_code == gpb::M_WRITE_R) {
+            /* Registrations need a response. */
+            uipcp_appl_register_resp(uipcp, rm->result ? RLITE_ERR : RLITE_SUCC,
+                                     pi->second.kevent_id,
+                                     pi->second.appl_name.c_str());
+        }
+        UPD(uipcp, "Application %s %sregistration %s\n",
+            pi->second.appl_name.c_str(),
+            rm->op_code == gpb::M_WRITE_R ? "" : "un",
+            rm->result ? "failed" : "was successful");
+        break;
+    case gpb::M_READ_R: {
+        int64_t a, remote_addr;
+        rm->get_obj_value(a);
+        remote_addr = static_cast<rlm_addr_t>(a);
+        UPD(uipcp, "Lookup of name '%s' resolved into address '%lu'\n",
+            pi->second.appl_name.c_str(), remote_addr);
+        parent->rib->dft_lookup_resolved(pi->second.appl_name, remote_addr);
+        break;
+    }
+    default:
+        assert(false);
     }
     pending.erase(pi);
 
