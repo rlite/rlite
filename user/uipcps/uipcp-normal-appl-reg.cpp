@@ -922,7 +922,6 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
             /* We are not the leader, we need to forward it to the leader node.
              */
             UPW(uipcp, "Missing code to forward request to the leader\n");
-            // TODO send_to_dst_node()
             return 0;
         }
 
@@ -967,7 +966,7 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
                         /*result=*/ret ? -1 : 0,
                         /*result_reason=*/ret ? "No match found" : string());
             m->set_obj_value(static_cast<int64_t>(remote_addr));
-            parent->rib->send_to_dst_node(std::move(m), string() /*TODO*/,
+            parent->rib->send_to_dst_addr(std::move(m), src_addr,
                                           /*obj=*/nullptr,
                                           /*invoke_id=*/nullptr);
         } else {
