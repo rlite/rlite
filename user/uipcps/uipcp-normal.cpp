@@ -207,7 +207,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
                 return 0;
             }
 
-            cdap_dispatch(adata.cdap.get(), nullptr);
+            cdap_dispatch(adata.cdap.get(), nullptr, adata.src_addr);
 
             return 0;
         }
@@ -285,7 +285,7 @@ uipcp_rib::recv_msg(char *serbuf, int serlen, NeighFlow *nf)
         } else {
             /* We are already enrolled, we can dispatch this message to
              * the RIB. */
-            ret = cdap_dispatch(m.get(), nf);
+            ret = cdap_dispatch(m.get(), nf, RL_ADDR_NULL);
         }
 
     } catch (std::bad_alloc) {
@@ -773,7 +773,7 @@ uipcp_rib::send_to_dst_addr(std::unique_ptr<CDAPMessage> m, rlm_addr_t dst_addr,
 
     if (dst_addr == myaddr) {
         /* This is a message to be delivered to myself. */
-        int ret = cdap_dispatch(m.get(), nullptr);
+        int ret = cdap_dispatch(m.get(), nullptr, myaddr);
 
         return ret;
     }
@@ -847,11 +847,14 @@ uipcp_rib::send_to_myself(std::unique_ptr<CDAPMessage> m,
 /* To be called under RIB lock. This function does not take ownership
  * of 'rm'. */
 int
-uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf,
+                         rlm_addr_t src_addr)
 {
     /* Dispatch depending on the obj_name specified in the request. */
     auto hi = handlers.find(rm->obj_name);
     int ret = 0;
+
+    assert(nf != nullptr || src_addr != RL_ADDR_NULL);
 
     if (hi == handlers.end()) {
         size_t pos = rm->obj_name.rfind("/");
@@ -874,14 +877,15 @@ uipcp_rib::cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf)
         UPE(uipcp, "Unable to handle CDAP message\n");
         rm->dump();
     } else {
-        ret = (this->*(hi->second))(rm, nf);
+        ret = (this->*(hi->second))(rm, nf, src_addr);
     }
 
     return ret;
 }
 
 int
-uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::status_handler(const CDAPMessage *rm, NeighFlow *nf,
+                          rlm_addr_t src_addr)
 {
     if (rm->op_code != gpb::M_START) {
         UPE(uipcp, "M_START expected\n");

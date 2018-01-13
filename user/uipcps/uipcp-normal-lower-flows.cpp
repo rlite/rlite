@@ -118,7 +118,8 @@ public:
     const LowerFlow *_find(const NodeId &local_node,
                            const NodeId &remote_node) const;
 
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                    rlm_addr_t src_addr) override;
 
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
@@ -232,7 +233,8 @@ FullyReplicatedLFDB::update_local(const string &node_name)
 }
 
 int
-FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FullyReplicatedLFDB::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                                 rlm_addr_t src_addr)
 {
     const char *objbuf;
     size_t objlen;

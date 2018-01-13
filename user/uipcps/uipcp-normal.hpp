@@ -324,7 +324,8 @@ struct DFT {
                            const rlm_addr_t preferred, uint32_t cookie) = 0;
     virtual int appl_register(const struct rl_kmsg_appl_register *req)  = 0;
     virtual void update_address(rlm_addr_t new_addr)                    = 0;
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)       = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                            rlm_addr_t src_addr)                        = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const
     {
         return 0;
@@ -356,7 +357,7 @@ struct FlowAllocator {
     virtual int flows_handler_create_r(const CDAPMessage *rm) = 0;
     virtual int flows_handler_delete(const CDAPMessage *rm)   = 0;
 
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr);
 };
 
 /* Lower Flows Database and dissemination of routing information,
@@ -382,7 +383,8 @@ struct LFDB {
     virtual void update_routing()                                         = 0;
     virtual int flow_state_update(struct rl_kmsg_flow_state *upd)         = 0;
 
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf) = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                            rlm_addr_t src_addr) = 0;
 
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
     virtual int neighs_refresh(size_t limit)                        = 0;
@@ -400,7 +402,8 @@ struct AddrAllocator {
 
     virtual void dump(std::stringstream &ss) const                  = 0;
     virtual rlm_addr_t allocate()                                   = 0;
-    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf)   = 0;
+    virtual int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                            rlm_addr_t src_addr)                    = 0;
     virtual int sync_neigh(NeighFlow *nf, unsigned int limit) const = 0;
 };
 
@@ -437,7 +440,7 @@ struct uipcp_rib {
     std::mutex mutex;
 
     typedef int (uipcp_rib::*rib_handler_t)(const CDAPMessage *rm,
-                                            NeighFlow *nf);
+                                            NeighFlow *nf, rlm_addr_t src_addr);
     std::unordered_map<std::string, rib_handler_t> handlers;
 
     /* Positive if this IPCP is enrolled to the DIF, zero otherwise.
@@ -620,27 +623,32 @@ struct uipcp_rib {
                             const UipcpObject *obj_value) const;
 
     /* Receive info from neighbors. */
-    int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf);
+    int cdap_dispatch(const CDAPMessage *rm, NeighFlow *nf,
+                      rlm_addr_t src_addr);
 
     /* RIB handlers for received CDAP messages. */
-    int dft_handler(const CDAPMessage *rm, NeighFlow *nf)
+    int dft_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
     {
-        return dft->rib_handler(rm, nf);
+        return dft->rib_handler(rm, nf, src_addr);
     };
-    int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf)
+    int neighbors_handler(const CDAPMessage *rm, NeighFlow *nf,
+                          rlm_addr_t src_addr);
+    int lfdb_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
     {
-        return lfdb->rib_handler(rm, nf);
+        return lfdb->rib_handler(rm, nf, src_addr);
     };
-    int flows_handler(const CDAPMessage *rm, NeighFlow *nf)
+    int flows_handler(const CDAPMessage *rm, NeighFlow *nf, rlm_addr_t src_addr)
     {
-        return fa->rib_handler(rm, nf);
+        return fa->rib_handler(rm, nf, src_addr);
     };
-    int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int status_handler(const CDAPMessage *rm, NeighFlow *nf);
-    int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf)
+    int keepalive_handler(const CDAPMessage *rm, NeighFlow *nf,
+                          rlm_addr_t src_addr);
+    int status_handler(const CDAPMessage *rm, NeighFlow *nf,
+                       rlm_addr_t src_addr);
+    int addr_alloc_table_handler(const CDAPMessage *rm, NeighFlow *nf,
+                                 rlm_addr_t src_addr)
     {
-        return addra->rib_handler(rm, nf);
+        return addra->rib_handler(rm, nf, src_addr);
     }
 
     void neighs_refresh();

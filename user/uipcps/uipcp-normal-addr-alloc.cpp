@@ -18,7 +18,8 @@ public:
 
     void dump(std::stringstream &ss) const override;
     rlm_addr_t allocate() override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                    rlm_addr_t src_addr) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
 };
 
@@ -132,7 +133,8 @@ DistributedAddrAllocator::allocate()
 }
 
 int
-DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+DistributedAddrAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                                      rlm_addr_t src_addr)
 {
     bool create;
     const char *objbuf;
