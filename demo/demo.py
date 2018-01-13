@@ -956,6 +956,10 @@ for vmname in sorted(vms):
                 if len(p['nodes']) == 0 or vmname in p.nodes:
                     ctrl_cmds.append('dif-policy-mod %(dif)s.DIF %(comp)s %(policy)s\n'\
                                 % {'dif': dif, 'comp': p['path'], 'policy': p['ps']})
+                    for param in p['parms']:
+                        pname, pvalue = param.split('=')
+                        ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF %(comp)s %(pname)s %(pvalue)s\n'\
+                                    % {'dif': dif, 'comp': p['path'], 'pname': pname, 'pvalue': pvalue})
 
     # Update /etc/hosts file with DIF mappings
     for sh in dns_mappings:
