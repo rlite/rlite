@@ -60,7 +60,8 @@ public:
                    const rlm_addr_t preferred, uint32_t cookie) override;
     int appl_register(const struct rl_kmsg_appl_register *req) override;
     void update_address(rlm_addr_t new_addr) override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override;
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                    rlm_addr_t src_addr) override;
     int sync_neigh(NeighFlow *nf, unsigned int limit) const override;
     int neighs_refresh(size_t limit) override;
 
@@ -232,7 +233,8 @@ FullyReplicatedDFT::mod_table(const DFTEntry &e, bool add, DFTSlice *added,
 }
 
 int
-FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FullyReplicatedDFT::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                                rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = rib->uipcp;
     const char *objbuf;
@@ -418,7 +420,8 @@ class CentralizedFaultTolerantDFT : public DFT {
             return impl->lookup_req(appl_name, dstaddr, preferred, cookie);
         }
         int appl_register(const struct rl_kmsg_appl_register *req);
-        int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+        int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                        rlm_addr_t src_addr);
         void dump(std::stringstream &ss) const { impl->dump(ss); };
     };
     std::unique_ptr<Replica> raft;
@@ -459,7 +462,8 @@ class CentralizedFaultTolerantDFT : public DFT {
         int lookup_req(const std::string &appl_name, rlm_addr_t *dstaddr,
                        const rlm_addr_t preferred, uint32_t cookie);
         int appl_register(const struct rl_kmsg_appl_register *req);
-        int rib_handler(const CDAPMessage *rm, NeighFlow *nf);
+        int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                        rlm_addr_t src_addr);
         int process_timeout();
     };
     std::unique_ptr<Client> client;
@@ -494,12 +498,13 @@ public:
         return raft->appl_register(req);
     }
     void update_address(rlm_addr_t new_addr) override;
-    int rib_handler(const CDAPMessage *rm, NeighFlow *nf) override
+    int rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                    rlm_addr_t src_addr) override
     {
         if (client) {
-            return client->rib_handler(rm, nf);
+            return client->rib_handler(rm, nf, src_addr);
         }
-        return raft->rib_handler(rm, nf);
+        return raft->rib_handler(rm, nf, src_addr);
     }
 };
 
@@ -678,7 +683,8 @@ CentralizedFaultTolerantDFT::Client::process_timeout()
 
 int
 CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
-                                                 NeighFlow *nf)
+                                                 NeighFlow *nf,
+                                                 rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
 
@@ -896,7 +902,8 @@ CentralizedFaultTolerantDFT::Replica::apply(const char *const serbuf)
 
 int
 CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
-                                                  NeighFlow *nf)
+                                                  NeighFlow *nf,
+                                                  rlm_addr_t src_addr)
 {
     struct uipcp *uipcp = parent->rib->uipcp;
     const char *objbuf;

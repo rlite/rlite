@@ -405,7 +405,7 @@ NeighFlow::enrollment_commit()
 
     /* Dispatch queued messages. */
     while (!er->msgs.empty()) {
-        rib->cdap_dispatch(er->msgs.front().get(), this);
+        rib->cdap_dispatch(er->msgs.front().get(), this, RL_ADDR_NULL);
         er->msgs.pop_front();
     }
 
@@ -537,7 +537,7 @@ NeighFlow::enrollee_default(std::unique_lock<std::mutex> &lk)
         /* Here M_CREATE messages from the slave are accepted and
          * dispatched to the RIB. */
         if (rm->op_code == gpb::M_CREATE) {
-            rib->cdap_dispatch(rm.get(), this);
+            rib->cdap_dispatch(rm.get(), this, RL_ADDR_NULL);
             continue;
         }
 
@@ -1165,7 +1165,8 @@ common_lower_dif(const list<string> l1, const list<string> l2)
 }
 
 int
-uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf,
+                             rlm_addr_t src_addr)
 {
     const char *objbuf;
     size_t objlen;
@@ -1260,7 +1261,8 @@ uipcp_rib::neighbors_handler(const CDAPMessage *rm, NeighFlow *nf)
 }
 
 int
-uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf)
+uipcp_rib::keepalive_handler(const CDAPMessage *rm, NeighFlow *nf,
+                             rlm_addr_t src_addr)
 {
     CDAPMessage m;
     int ret;

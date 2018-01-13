@@ -567,7 +567,8 @@ LocalFlowAllocator::flows_handler_delete(const CDAPMessage *rm)
 }
 
 int
-FlowAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf)
+FlowAllocator::rib_handler(const CDAPMessage *rm, NeighFlow *nf,
+                           rlm_addr_t src_addr)
 {
     switch (rm->op_code) {
     case gpb::M_CREATE:
