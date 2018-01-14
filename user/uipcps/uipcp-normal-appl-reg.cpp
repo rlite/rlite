@@ -531,6 +531,10 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
             raft = make_unique<Replica>(this);
             peers.erase(it); /* remove myself */
 
+            raft->set_election_timeout(std::chrono::milliseconds(1000),
+                                       std::chrono::milliseconds(2000));
+            raft->set_heartbeat_timeout(std::chrono::milliseconds(500));
+
             raft::RaftSMOutput out;
             if (raft->init(peers, &out)) {
                 UPE(rib->uipcp, "Failed to init Raft state machine for DFT\n");
@@ -761,6 +765,8 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
 {
     int ret = 0;
 
+    /* Convert raft protocol messages from the library format to the
+     * gpb format. */
     for (auto &pair : out.output_messages) {
         raft::RaftMessage *msg = pair.second.get();
         const auto *rv  = dynamic_cast<const raft::RaftRequestVote *>(msg);
@@ -813,15 +819,28 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
                                              obj.get(), nullptr);
     }
 
+    /* Here we make an assumption about the raft library, that is one
+     * and only one timer is active at all times; so for example if the
+     * heartbeat timer is active, the leader election timer can't be active.
+     * As a result we have just one 'timer' class member (Replica::timer).
+     * We first look at Stop commands, and then at Restart commands; this is
+     * needed to prevent Stop commands to cancel the effect of Restart ones. */
     for (const auto &cmd : out.timer_commands) {
-        switch (cmd.action) {
-        case raft::RaftTimerAction::Stop:
-            timer = nullptr;
+        if (cmd.action == raft::RaftTimerAction::Stop) {
+            timer      = nullptr;
+            timer_type = raft::RaftTimerType::Invalid;
+            /* We can break, as more Stop commands won't have any effect. */
             break;
-        case raft::RaftTimerAction::Restart:
+        }
+    }
+    for (const auto &cmd : out.timer_commands) {
+        if (cmd.action == raft::RaftTimerAction::Restart) {
+            /* The following assertion will fail if our assumption about
+             * the unicity of the timer is not true. */
+            assert(timer == nullptr);
             timer = make_unique<TimeoutEvent>(
-                std::chrono::milliseconds(cmd.milliseconds), parent->rib->uipcp,
-                this, [](struct uipcp *uipcp, void *arg) {
+                cmd.milliseconds, parent->rib->uipcp, this,
+                [](struct uipcp *uipcp, void *arg) {
                     auto replica =
                         static_cast<CentralizedFaultTolerantDFT::Replica *>(
                             arg);
@@ -829,10 +848,6 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
                     replica->process_timeout();
                 });
             timer_type = cmd.type;
-            break;
-        default:
-            assert(false);
-            break;
         }
     }
 
