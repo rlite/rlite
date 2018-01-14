@@ -1431,6 +1431,16 @@ uipcp_rib::get_param_value<int>(const std::string &component,
     return params_map[component][param_name].get_int_value();
 }
 
+template <>
+string
+uipcp_rib::get_param_value<string>(const std::string &component,
+                                   const std::string &param_name)
+{
+    assert(params_map.count(component) &&
+           params_map[component].count(param_name));
+    return params_map[component][param_name].get_string_value();
+}
+
 PolicyParam::PolicyParam() { type = PolicyParamType::UNDEFINED; }
 
 PolicyParam::PolicyParam(bool param_value)

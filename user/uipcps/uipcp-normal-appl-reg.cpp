@@ -512,13 +512,15 @@ int
 CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 {
     list<raft::ReplicaId> peers;
+    string param_value;
 
     if (param_name != "replicas") {
         return -1;
     }
 
-    UPD(rib->uipcp, "replicas = %s\n", param_name.c_str());
-    peers = strsplit(param_name, ',');
+    param_value = rib->get_param_value<std::string>("dft", "replicas");
+    UPD(rib->uipcp, "replicas = %s\n", param_value.c_str());
+    peers = strsplit(param_value, ',');
 
     auto it = peers.begin();
     for (; it != peers.end(); it++) {
