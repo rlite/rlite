@@ -31,6 +31,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <chrono>
 
 namespace raft {
 
@@ -121,13 +122,13 @@ enum class RaftTimerAction {
 class RaftSM;
 
 struct RaftTimerCmd {
-    RaftSM *sm             = nullptr;
-    RaftTimerType type     = RaftTimerType::Invalid;
-    RaftTimerAction action = RaftTimerAction::Invalid;
-    uint32_t milliseconds  = 0;
+    RaftSM *sm                             = nullptr;
+    RaftTimerType type                     = RaftTimerType::Invalid;
+    RaftTimerAction action                 = RaftTimerAction::Invalid;
+    std::chrono::milliseconds milliseconds = std::chrono::milliseconds(0);
 
     RaftTimerCmd(RaftSM *_sm, RaftTimerType ty, RaftTimerAction act,
-                 uint32_t ms = 0)
+                 std::chrono::milliseconds ms = std::chrono::milliseconds(0))
         : sm(_sm), type(ty), action(act), milliseconds(ms)
     {
     }
@@ -284,7 +285,8 @@ class RaftSM {
     std::ostream &IOS_INF() { return ios_inf << "(" << name << ") "; }
 
     int check_output_arg(RaftSMOutput *out);
-    int rand_int_in_range(int left, int right);
+    std::chrono::milliseconds rand_time_in_range(
+        std::chrono::milliseconds left, std::chrono::milliseconds right);
     void switch_state(RaftState next);
     std::string state_repr(RaftState st) const;
     int vote_for_candidate(ReplicaId candidate);
@@ -298,9 +300,11 @@ class RaftSM {
     int append_log_entry(const Term term, const char *serbuf);
     int apply_committed_entries();
 
-    unsigned int ElectionTimeoutMin = 200;
-    unsigned int ElectionTimeoutMax = 500;
-    unsigned int HeartbeatTimeout   = 100;
+    std::chrono::milliseconds ElectionTimeoutMin =
+        std::chrono::milliseconds(200);
+    std::chrono::milliseconds ElectionTimeoutMax =
+        std::chrono::milliseconds(500);
+    std::chrono::milliseconds HeartbeatTimeout = std::chrono::milliseconds(100);
 
 public:
     RaftSM(const std::string &smname, const ReplicaId &myname,
@@ -350,7 +354,8 @@ public:
     std::string local_name() const { return local_id; }
     std::string sm_name() const { return name; }
 
-    int set_election_timeout(unsigned int tmin, unsigned int tmax)
+    int set_election_timeout(std::chrono::milliseconds tmin,
+                             std::chrono::milliseconds tmax)
     {
         if (tmin > tmax) {
             return -1;
@@ -362,15 +367,21 @@ public:
         return 0;
     }
 
-    unsigned int get_election_timeout_max() const { return ElectionTimeoutMax; }
+    std::chrono::milliseconds get_election_timeout_max() const
+    {
+        return ElectionTimeoutMax;
+    }
 
-    int set_heartbeat_timeout(unsigned int t)
+    int set_heartbeat_timeout(std::chrono::milliseconds t)
     {
         HeartbeatTimeout = t;
         return 0;
     }
 
-    unsigned int get_heartbeat_timeout() const { return HeartbeatTimeout; }
+    std::chrono::milliseconds get_heartbeat_timeout() const
+    {
+        return HeartbeatTimeout;
+    }
 
     /* Statistics. */
     struct Stats {
