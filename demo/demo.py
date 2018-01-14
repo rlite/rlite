@@ -509,7 +509,7 @@ while 1:
 
         continue
 
-    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.,-]+)*)\s*$', line)
+    m = re.match(r'\s*policy\s+(\w+)\s+(\*|(?:(?:\w+,)*\w+))\s+([*\w.-]+)\s+([\w-]+)((?:\s+[\w.-]+\s*=\s*[/\w.,\$-]+)*)\s*$', line)
     if m:
         dif = m.group(1)
         nodes = m.group(2)
@@ -958,6 +958,9 @@ for vmname in sorted(vms):
                                 % {'dif': dif, 'comp': p['path'], 'policy': p['ps']})
                     for param in p['parms']:
                         pname, pvalue = param.split('=')
+                        def replfun(m):
+                            return "%s.%s.IPCP" % (dif, vms[m.group(1)]['id'])
+                        pvalue = re.sub(r'\$([\w-]+)', replfun, pvalue)
                         ctrl_cmds.append('dif-policy-param-mod %(dif)s.DIF %(comp)s %(pname)s %(pvalue)s\n'\
                                     % {'dif': dif, 'comp': p['path'], 'pname': pname, 'pvalue': pvalue})
 
