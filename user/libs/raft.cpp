@@ -180,7 +180,7 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
      * the caller. */
     out->timer_commands.push_back(RaftTimerCmd(
         this, RaftTimerType::Election, RaftTimerAction::Restart,
-        rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
+        rand_time_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
 
     return 0;
 }
@@ -305,11 +305,13 @@ RaftSM::log_buf_read(unsigned long pos, char *buf, size_t len)
     return 0;
 }
 
-int
-RaftSM::rand_int_in_range(int left, int right)
+std::chrono::milliseconds
+RaftSM::rand_time_in_range(std::chrono::milliseconds left,
+                           std::chrono::milliseconds right)
 {
-    assert(right > left);
-    return left + (rand() % (right - left));
+    assert(right.count() > left.count());
+    return std::chrono::milliseconds(left.count() +
+                                     (rand() % (right.count() - left.count())));
 }
 
 std::string
@@ -392,7 +394,7 @@ RaftSM::back_to_follower(RaftSMOutput *out)
     switch_state(RaftState::Follower);
     out->timer_commands.push_back(RaftTimerCmd(
         this, RaftTimerType::Election, RaftTimerAction::Restart,
-        rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
+        rand_time_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
     /* Also stop the heartbeat timer, in case we were leader. */
     out->timer_commands.push_back(
         RaftTimerCmd(this, RaftTimerType::HeartBeat, RaftTimerAction::Stop));
@@ -910,7 +912,7 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
         /* Reset the election timer in case we lose the election. */
         out->timer_commands.push_back(RaftTimerCmd(
             this, RaftTimerType::Election, RaftTimerAction::Restart,
-            rand_int_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
+            rand_time_in_range(ElectionTimeoutMin, ElectionTimeoutMax)));
         /* Prepare RequestVote messages for the other servers. */
         for (const auto &kv : servers) {
             auto msg            = make_unique<RaftRequestVote>();

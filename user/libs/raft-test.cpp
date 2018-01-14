@@ -35,6 +35,7 @@
 #include <set>
 #include <map>
 #include <unordered_map>
+#include <chrono>
 
 #include "rlite/cpputils.hpp"
 #include "rlite/raft.hpp"
@@ -149,7 +150,7 @@ enum class FailingReplica {
 
 struct TestEvent {
     TestEventType event_type;
-    unsigned int abstime           = 0;
+    chrono::milliseconds abstime   = chrono::milliseconds(0);
     TestReplica *sm                = nullptr;
     RaftTimerType ttype            = RaftTimerType::Invalid;
     FailingReplica failing_replica = FailingReplica::Invalid;
@@ -169,7 +170,7 @@ struct TestEvent {
     {
         TestEvent e;
         e.event_type = TestEventType::RaftTimer;
-        e.abstime    = t;
+        e.abstime    = chrono::milliseconds(t);
         e.sm         = _sm;
         e.ttype      = ty;
         return e;
@@ -179,7 +180,7 @@ struct TestEvent {
     {
         TestEvent e;
         e.event_type = TestEventType::ClientRequest;
-        e.abstime    = t;
+        e.abstime    = chrono::milliseconds(t);
         return e;
     }
 
@@ -188,7 +189,7 @@ struct TestEvent {
     {
         TestEvent e;
         e.event_type      = TestEventType::SMFailure;
-        e.abstime         = t;
+        e.abstime         = chrono::milliseconds(t);
         e.failing_replica = fr;
         e.failing_id      = fid;
         return e;
@@ -198,7 +199,7 @@ struct TestEvent {
     {
         TestEvent e;
         e.event_type = TestEventType::SMRespawn;
-        e.abstime    = t;
+        e.abstime    = chrono::milliseconds(t);
         e.failing_id = fid;
         return e;
     }
@@ -210,10 +211,10 @@ run_simulation(const list<TestEvent> &external_events)
 {
     list<string> names = {"r1", "r2", "r3", "r4", "r5"};
     map<string, std::unique_ptr<TestReplica>> replicas;
-    list<TestEvent> events     = external_events;
-    unsigned int t             = 0; /* time */
-    unsigned int t_last_ievent = t; /* time of last interesting event */
-    uint32_t input_counter     = 1;
+    list<TestEvent> events             = external_events;
+    chrono::milliseconds t             = chrono::milliseconds(0); /* time */
+    chrono::milliseconds t_last_ievent = t; /* time of last interesting event */
+    uint32_t input_counter             = 1;
     map<unsigned int, TestReplica *> failed_replicas;
     bool retransmit_check = true;
     RaftSMOutput output;
@@ -253,20 +254,21 @@ run_simulation(const list<TestEvent> &external_events)
         replicas[local] = std::move(sm);
     }
 
-    auto compute_grace_period = [&replicas]() -> unsigned int {
+    auto compute_grace_period = [&replicas]() -> chrono::milliseconds {
         for (const auto &kv : replicas) {
             return 2 * kv.second->get_heartbeat_timeout();
         }
         assert(false);
-        return 0;
+        return chrono::milliseconds(0);
     };
-    const unsigned int grace_period = compute_grace_period();
+    const chrono::milliseconds grace_period = compute_grace_period();
 
     /* Stop the simulation when there are no more interesting events scheduled
      * (client submissions, replica failure, replica respawn or non-heartbeat
      * message), a leader is up and running and nothing interesting happened
      * for the last grace period (two heartbeat timeouts). */
-    auto should_stop = [&t, &replicas, &events](unsigned int t_max) -> bool {
+    auto should_stop = [&t, &replicas,
+                        &events](chrono::milliseconds t_max) -> bool {
         auto only_timeouts = [&events]() -> bool {
             for (const auto &e : events) {
                 if (e.event_type != TestEventType::RaftTimer) {
@@ -305,10 +307,10 @@ run_simulation(const list<TestEvent> &external_events)
     };
 
     while (!should_stop(t_last_ievent + grace_period)) {
-        unsigned int t_next = t + 1;
+        chrono::milliseconds t_next = t + chrono::milliseconds(1);
         RaftSMOutput output_next;
 
-        cout << "| t = " << t << " |" << endl;
+        cout << "| t = " << t.count() << " |" << endl;
 
         /* Process current output messages. */
         for (const auto &p : output.output_messages) {
@@ -361,8 +363,8 @@ run_simulation(const list<TestEvent> &external_events)
             }
             if (cmd.action == RaftTimerAction::Restart) {
                 events.push_back(TestEvent::CreateTimerEvent(
-                    t + cmd.milliseconds, dynamic_cast<TestReplica *>(cmd.sm),
-                    cmd.type));
+                    (t + cmd.milliseconds).count(),
+                    dynamic_cast<TestReplica *>(cmd.sm), cmd.type));
             } else {
                 assert(cmd.action == RaftTimerAction::Stop);
             }
@@ -457,7 +459,7 @@ run_simulation(const list<TestEvent> &external_events)
                     if (e.is_interesting() &&
                         (next.event_type == TestEventType::SMFailure ||
                          e.event_type == TestEventType::ClientRequest)) {
-                        e.abstime += 200;
+                        e.abstime += chrono::milliseconds(200);
                     }
                 }
                 events.sort();
@@ -493,8 +495,9 @@ run_simulation(const list<TestEvent> &external_events)
                         std::move(missing_commands));
                 }
                 for (const auto cmd : missing_commands) {
-                    TestEvent se = TestEvent::CreateRequestEvent(t_next + 1);
-                    se.cmd       = cmd;
+                    TestEvent se =
+                        TestEvent::CreateRequestEvent(t_next.count() + 1);
+                    se.cmd = cmd;
                     events.push_back(se);
                     cout << "Retransmit client request " << cmd << endl;
                 }
