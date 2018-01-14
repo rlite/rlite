@@ -391,8 +391,18 @@ public:
 
     Stats get_stats() { return stats; };
 
+    static constexpr unsigned int kVerboseQuiet = 0;
+    static constexpr unsigned int kVerboseInfo  = 6;
+    static constexpr unsigned int kVerboseVery  = 10;
+
+    void set_verbosity(unsigned int level)
+    {
+        verbosity = level; /* no need to check */
+    }
+
 private:
     Stats stats;
+    unsigned int verbosity = kVerboseVery;
 };
 
 } /* namespace raft */
