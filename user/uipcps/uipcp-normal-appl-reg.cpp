@@ -533,7 +533,8 @@ CentralizedFaultTolerantDFT::param_changed(const std::string &param_name)
 
             raft->set_election_timeout(std::chrono::milliseconds(1000),
                                        std::chrono::milliseconds(2000));
-            raft->set_heartbeat_timeout(std::chrono::milliseconds(500));
+            raft->set_heartbeat_timeout(std::chrono::milliseconds(100));
+            raft->set_verbosity(raft::RaftSM::kVerboseInfo);
 
             raft::RaftSMOutput out;
             if (raft->init(peers, &out)) {
