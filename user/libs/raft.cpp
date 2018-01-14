@@ -106,7 +106,9 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
             return ret;
         }
         last_log_index = 0;
-        IOS_INF() << "Raft log initialized on first boot" << endl;
+        if (verbosity >= kVerboseInfo) {
+            IOS_INF() << "Raft log initialized on first boot" << endl;
+        }
 
     } else {
         char id_buf[kLogVotedForSize];
@@ -167,7 +169,9 @@ RaftSM::init(const list<ReplicaId> peers, RaftSMOutput *out)
                       << endl;
             return -1;
         }
-        IOS_INF() << "Raft log recovered" << endl;
+        if (verbosity >= kVerboseInfo) {
+            IOS_INF() << "Raft log recovered" << endl;
+        }
     }
 
     for (const auto &rid : peers) {
@@ -337,8 +341,10 @@ RaftSM::switch_state(RaftState next)
     if (state == next) {
         return; /* nothing to do */
     }
-    IOS_INF() << "switching " << state_repr(state) << " --> "
-              << state_repr(next) << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "switching " << state_repr(state) << " --> "
+                  << state_repr(next) << endl;
+    }
     state = next;
 }
 
@@ -413,8 +419,10 @@ RaftSM::catch_up_term(Term term, RaftSMOutput *out)
     }
 
     /* Our term is outdated. Updated it and become a follower. */
-    IOS_INF() << "Update current term " << current_term << " --> " << term
-              << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Update current term " << current_term << " --> " << term
+                  << endl;
+    }
     current_term = term;
     if ((ret = log_u32_write(kLogCurrentTermOfs, current_term))) {
         return ret;
@@ -530,8 +538,10 @@ RaftSM::append_log_entry(const Term term, const char *serbuf)
     last_log_index = new_index;
     last_log_term  = term;
 
-    IOS_INF() << "Append log entry term=" << last_log_term
-              << ", index=" << last_log_index << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Append log entry term=" << last_log_term
+                  << ", index=" << last_log_index << endl;
+    }
 
     return ret;
 }
@@ -554,7 +564,9 @@ RaftSM::apply_committed_entries()
             return ret;
         }
         apply(serbuf.get());
-        IOS_INF() << "Entry " << next << " applied" << endl;
+        if (verbosity >= kVerboseInfo) {
+            IOS_INF() << "Entry " << next << " applied" << endl;
+        }
     }
 
     return 0;
@@ -577,8 +589,10 @@ RaftSM::log_truncate(LogIndex index)
         return -1;
     }
 
-    IOS_INF() << "Log truncated: " << last_log_index << " entries --> " << index
-              << " entries" << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Log truncated: " << last_log_index << " entries --> "
+                  << index << " entries" << endl;
+    }
     stats.discarded += last_log_index - index;
     last_log_index = index;
 
@@ -595,10 +609,12 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
         return -1;
     }
 
-    IOS_INF() << "Received VoteRequest(term=" << msg.term
-              << ", cand=" << msg.candidate_id
-              << ", last_log_term=" << msg.last_log_term
-              << ", last_log_index=" << msg.last_log_index << ")" << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Received VoteRequest(term=" << msg.term
+                  << ", cand=" << msg.candidate_id
+                  << ", last_log_term=" << msg.last_log_term
+                  << ", last_log_index=" << msg.last_log_index << ")" << endl;
+    }
 
     if ((ret = catch_up_term(msg.term, out)) < 0) {
         return ret;
@@ -629,8 +645,10 @@ RaftSM::request_vote_input(const RaftRequestVote &msg, RaftSMOutput *out)
             return ret;
         }
     }
-    IOS_INF() << "Vote for " << msg.candidate_id
-              << (resp->vote_granted ? "" : " not") << " granted" << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Vote for " << msg.candidate_id
+                  << (resp->vote_granted ? "" : " not") << " granted" << endl;
+    }
 
     out->output_messages.push_back(
         make_pair(msg.candidate_id, std::move(resp)));
@@ -648,8 +666,10 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         return -1;
     }
 
-    IOS_INF() << "Received VoteRequestResp(term=" << resp.term
-              << ", vote_granted=" << resp.vote_granted << ")" << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Received VoteRequestResp(term=" << resp.term
+                  << ", vote_granted=" << resp.vote_granted << ")" << endl;
+    }
 
     if (resp.term < current_term) {
         /* Outdated response, ignore. */
@@ -677,8 +697,10 @@ RaftSM::request_vote_resp_input(const RaftRequestVoteResp &resp,
         return 0; /* quorum not reached yet */
     }
 
-    IOS_INF() << "Collected " << votes_collected << " votes, becoming leader"
-              << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Collected " << votes_collected
+                  << " votes, becoming leader" << endl;
+    }
     switch_state(RaftState::Leader);
     leader_id = local_id;
 
@@ -712,12 +734,15 @@ RaftSM::append_entries_input(const RaftAppendEntries &msg, RaftSMOutput *out)
         return -1;
     }
 
-    IOS_INF() << "AppendEntries(term=" << msg.term
-              << ", leader_id=" << msg.leader_id
-              << ", prev_log_index=" << msg.prev_log_index
-              << ", prev_log_term=" << msg.prev_log_term
-              << ", leader_commit=" << msg.leader_commit
-              << ", num_entries=" << msg.entries.size() << ")" << endl;
+    if (verbosity >= kVerboseVery ||
+        (verbosity >= kVerboseInfo && !msg.entries.empty())) {
+        IOS_INF() << "Received AppendEntries(term=" << msg.term
+                  << ", leader_id=" << msg.leader_id
+                  << ", prev_log_index=" << msg.prev_log_index
+                  << ", prev_log_term=" << msg.prev_log_term
+                  << ", leader_commit=" << msg.leader_commit
+                  << ", num_entries=" << msg.entries.size() << ")" << endl;
+    }
 
     if ((ret = catch_up_term(msg.term, out)) < 0) {
         return ret;
@@ -791,10 +816,12 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
         return -1;
     }
 
-    IOS_INF() << "Received AppendEntriesResp(term=" << resp.term
-              << ", follower_id=" << resp.follower_id
-              << ", last_log_index=" << resp.log_index
-              << ", success=" << resp.success << ")" << endl;
+    if (verbosity >= kVerboseInfo) {
+        IOS_INF() << "Received AppendEntriesResp(term=" << resp.term
+                  << ", follower_id=" << resp.follower_id
+                  << ", last_log_index=" << resp.log_index
+                  << ", success=" << resp.success << ")" << endl;
+    }
 
     if (resp.term < current_term) {
         /* Outdated response, ignore. */
@@ -860,8 +887,10 @@ RaftSM::append_entries_resp_input(const RaftAppendEntriesResp &resp,
                 return ret;
             }
             if (term == current_term) {
-                IOS_INF() << "Leader commit index " << commit_index << " --> "
-                          << next_commit_index << endl;
+                if (verbosity >= kVerboseInfo) {
+                    IOS_INF() << "Leader commit index " << commit_index
+                              << " --> " << next_commit_index << endl;
+                }
                 commit_index = next_commit_index;
                 if ((ret = apply_committed_entries())) {
                     return ret;
@@ -894,7 +923,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 
     case RaftTimerType::Election: {
         /* The election timer fired. */
-        IOS_INF() << "Election timer expired" << endl;
+        if (verbosity >= kVerboseInfo) {
+            IOS_INF() << "Election timer expired" << endl;
+        }
         if (state == RaftState::Leader) {
             /* Nothing to do. */
             return 0;
@@ -927,7 +958,9 @@ RaftSM::timer_expired(RaftTimerType type, RaftSMOutput *out)
 
     case RaftTimerType::HeartBeat: {
         /* The heartbeat timer fired. */
-        IOS_INF() << "Heartbeat timer expired" << endl;
+        if (verbosity >= kVerboseVery) {
+            IOS_INF() << "Heartbeat timer expired" << endl;
+        }
         /* Send new heartbeat messages and rearm the timer. */
         if ((ret =
                  prepare_append_entries(LogReplicateStrategy::Unacked, out))) {
