@@ -81,7 +81,7 @@ uipcp_rib::dft_lookup_resolved(const std::string &appl_name,
     auto mit = pending_fa_reqs.find(appl_name);
 
     if (mit == pending_fa_reqs.end()) {
-        UPW(uipcp, "DFT lookup for '%s' resolved, but no pending requests\n",
+        UPV(uipcp, "DFT lookup for '%s' resolved, but no pending requests\n",
             appl_name.c_str());
         return;
     }
