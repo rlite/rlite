@@ -43,3 +43,4 @@ depmod:
 
 format:
 	clang-format -i -style=file $(shell git ls-files *.c *.h *.cpp *.hpp | grep -v wpa-supplicant)
+	clang-format -i -style=google $(shell git ls-files *.proto)

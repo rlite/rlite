@@ -33,20 +33,7 @@
 
 #include "uipcp-normal-codecs.hpp"
 
-#include "EnrollmentInformationMessage.pb.h"
-#include "ApplicationProcessNamingInfoMessage.pb.h"
-#include "DirectoryForwardingTableEntryArrayMessage.pb.h"
-#include "DirectoryForwardingTableEntryMessage.pb.h"
-#include "NeighborMessage.pb.h"
-#include "NeighborArrayMessage.pb.h"
-#include "FlowStateMessage.pb.h"
-#include "FlowStateGroupMessage.pb.h"
-#include "CommonMessages.pb.h"
-#include "QoSSpecification.pb.h"
-#include "PolicyDescriptorMessage.pb.h"
-#include "ConnectionPoliciesMessage.pb.h"
-#include "FlowMessage.pb.h"
-#include "AddressAllocation.pb.h"
+#include "BaseRIB.pb.h"
 #include "Raft.pb.h"
 
 using namespace std;
