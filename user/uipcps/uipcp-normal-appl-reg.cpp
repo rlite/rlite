@@ -401,6 +401,27 @@ class CentralizedFaultTolerantDFT : public DFT {
          * a fully replicated DFT. */
         std::unique_ptr<FullyReplicatedDFT> impl;
 
+        /* Support for client commands that are pending, waiting for
+         * being applied to the replicated state machine. */
+        struct PendingReq {
+            gpb::opCode_t op_code;
+            std::string obj_name;
+            std::string obj_class;
+            int invoke_id;
+            rlm_addr_t requestor_addr;
+            PendingReq() = default;
+            PendingReq(gpb::opCode_t op, const std::string &oname,
+                       const std::string &oclass, int iid, rlm_addr_t addr)
+                : op_code(op),
+                  obj_name(oname),
+                  obj_class(oclass),
+                  invoke_id(iid),
+                  requestor_addr(addr)
+            {
+            }
+        };
+        std::unordered_map<raft::LogIndex, PendingReq> pending;
+
     public:
         Replica(CentralizedFaultTolerantDFT *dft)
             : raft::RaftSM(std::string("ceft-dft-") + dft->rib->myname,
@@ -713,7 +734,7 @@ CentralizedFaultTolerantDFT::Client::rib_handler(const CDAPMessage *rm,
     }
 
     /* Check that rm->op_code is consistent with the pending request. */
-    if (pi->second.op_code != rm->op_code) {
+    if (pi->second.op_code + 1 != rm->op_code) {
         UPE(uipcp, "Opcode mismatch for request with invoke id %d\n",
             rm->invoke_id);
         return 0;
@@ -912,10 +933,26 @@ CentralizedFaultTolerantDFT::Replica::apply(raft::LogIndex index,
     e.appl_name = RinaName(c->name);
     e.timestamp = time64();
     e.local     = false;
-
     assert(c->opcode == Command::OpcodeSet || c->opcode == Command::OpcodeDel);
-
     impl->mod_table(e, c->opcode == Command::OpcodeSet, nullptr, nullptr);
+
+    /* Send a response to the client. */
+    auto mit = pending.find(index);
+    if (mit != pending.end()) {
+        auto m = make_unique<CDAPMessage>();
+
+        m->op_code = (mit->second.op_code == gpb::M_WRITE) ? gpb::M_WRITE_R
+                                                           : gpb::M_DELETE_R;
+        m->obj_name  = mit->second.obj_name;
+        m->obj_class = mit->second.obj_class;
+        m->invoke_id = mit->second.invoke_id;
+        parent->rib->send_to_dst_addr(std::move(m), mit->second.requestor_addr,
+                                      nullptr, nullptr);
+        UPD(parent->rib->uipcp,
+            "Pending response for index %u sent to client %lu (invoke_id=%d)\n",
+            index, mit->second.requestor_addr, mit->second.invoke_id);
+        pending.erase(index);
+    }
 
     return 0;
 }
@@ -930,6 +967,11 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
     raft::RaftSMOutput out;
     size_t objlen;
     int ret;
+
+    if (src_addr == RL_ADDR_NULL) {
+        UPE(uipcp, "Source address not set\n");
+        return 0;
+    }
 
     rm->get_obj_value(objbuf, objlen);
     if (!objbuf) {
@@ -969,6 +1011,8 @@ CentralizedFaultTolerantDFT::Replica::rib_handler(const CDAPMessage *rm,
                     rm->op_code == gpb::M_WRITE ? "" : "un", appl_name.c_str());
                 return -1;
             }
+            pending[index] = PendingReq(rm->op_code, rm->obj_name,
+                                        rm->obj_class, rm->invoke_id, src_addr);
         } else if (rm->op_code == gpb::M_READ) {
             /* We received an an M_READ sent by Client::lookup_req().
              * Recover the application name, look it up in the DFT and
