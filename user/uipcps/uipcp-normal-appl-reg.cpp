@@ -801,6 +801,7 @@ CentralizedFaultTolerantDFT::Replica::process_sm_output(raft::RaftSMOutput out)
             mm->prev_log_index = ae->prev_log_index;
             mm->prev_log_term  = ae->prev_log_term;
             mm->entries        = std::move(ae->entries);
+            mm->EntrySize      = sizeof(Command);
             obj                = std::move(mm);
             obj_class          = obj_class::raft_append_entries;
         } else if (aer) {
